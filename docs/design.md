@@ -139,6 +139,14 @@ have no German counterpart in the user interface:
 |---|---|
 | `DomainFailure` | The supertype every domain failure extends. It implements Spring's `ErrorResponse` and builds its own RFC 9457 body, so the mapping from a failure to its wire representation lives with the failure rather than in a `@RestControllerAdvice`. Deliberately **not** named `…Exception`: `CLAUDE.md` already separates the concept ("domain failures") from the mechanism ("are typed exceptions"), and this type names the concept. Concrete failures keep the suffix — `CourtNotFoundException extends DomainFailure`. |
 | `ProblemType` | The value type a `DomainFailure` carries: `slug`, `status`, `title`, `detail`. Held as a static constant per failure class so a test can read it without constructing an instance. `detail` lives here and never comes from the exception's message — a message may carry an id or a caller's input, and neither belongs in a response body. |
+| `CodedDomainFailure` | A `DomainFailure` that also carries an i18n `code` and named `params`, which it puts into the body. The shape five failures share; the rest carry no code at all. |
+
+`ErrorResponse` is implemented for `getStatusCode()`, `getHeaders()` and `getBody()` only. Its
+`MessageSource` hooks — `getDetailMessageCode()` and the `MessageFormat` positional arguments
+behind it — are deliberately left unused: this API resolves messages in the frontend from a `code`
+and **named** parameters, and wiring Spring's positional mechanism alongside would give the same
+response body two competing sources of truth. A failure's `detail` is developer-facing English and
+is never what a member reads.
 
 ---
 

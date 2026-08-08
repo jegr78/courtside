@@ -1,18 +1,23 @@
 package org.courtside.rules.internal;
 
-import lombok.Getter;
+import org.courtside.shared.CodedDomainFailure;
+import org.courtside.shared.ProblemType;
+import org.springframework.http.HttpStatus;
 
 import java.util.Map;
 
-@Getter
-public class RuleParameterInvalidException extends RuntimeException {
+public class RuleParameterInvalidException extends CodedDomainFailure {
 
-    private final String code;
-    private final Map<String, Object> params;
+    public static final ProblemType PROBLEM_TYPE = new ProblemType(
+            "rule-parameter-invalid", HttpStatus.BAD_REQUEST,
+            "Invalid rule parameters", "The submitted rule parameters are not acceptable");
 
     RuleParameterInvalidException(String code, Map<String, Object> params) {
-        super(code);
-        this.code = code;
-        this.params = Map.copyOf(params);
+        super(code, params);
+    }
+
+    @Override
+    public ProblemType problemType() {
+        return PROBLEM_TYPE;
     }
 }

@@ -31,6 +31,9 @@ class ValidationMessageCoverageTest {
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
                     "MembershipTypeRuleSetInactiveException");
 
+    private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
+            List.of("CodedDomainFailure", "InvalidOpeningWindowException");
+
     // Every construct in src/main that ends up as a ProblemDetail's "code": a Bean Validation
     // constraint (validation.<AnnotationSimpleName>, resolved dynamically), a RuleViolation, one
     // of the getCode()-carrying exceptions above, or a literal passed alongside a "code" key in a
@@ -119,12 +122,49 @@ class ValidationMessageCoverageTest {
                     .forEach(path -> collectGetCodeClasses(classesRoot, path, getCodeClasses));
         }
 
-        // when / then
+        // when / then — getCode() is declared once on CodedDomainFailure and inherited by its
+        // subclasses, plus once on InvalidOpeningWindowException, which carries a code but no
+        // params and so does not extend it
         assertThat(getCodeClasses)
-                .as("a class declaring getCode() must be named in CODE_CARRYING_EXCEPTION_SIMPLE_NAMES"
-                        + " so everyCodeLiteralPassedToASetPropertyCodeCallHasAMessageKeyInBothBundles"
+                .as("a class declaring getCode() must be named in GET_CODE_DECLARING_SIMPLE_NAMES,"
+                        + " and every concrete failure that carries a code must appear in"
+                        + " CODE_CARRYING_EXCEPTION_SIMPLE_NAMES so"
+                        + " everyCodeLiteralPassedToASetPropertyCodeCallHasAMessageKeyInBothBundles"
                         + " actually covers its code literals")
-                .containsExactlyInAnyOrderElementsOf(CODE_CARRYING_EXCEPTION_SIMPLE_NAMES);
+                .containsExactlyInAnyOrderElementsOf(GET_CODE_DECLARING_SIMPLE_NAMES);
+    }
+
+    @Test
+    void everyCodeCarryingExceptionActuallyExposesGetCode() throws IOException, URISyntaxException {
+        // given — the list above builds the "new X(\"literal\"" patterns; a name that no longer
+        // names a code-carrying failure would silently stop matching anything at all
+        Path classesRoot = classesDirectory();
+        TreeSet<String> resolved = new TreeSet<>();
+        try (Stream<Path> files = Files.walk(classesRoot)) {
+            files.filter(path -> path.toString().endsWith(".class"))
+                    .forEach(path -> collectByGetCodeAccessibility(classesRoot, path, resolved));
+        }
+
+        // when / then
+        assertThat(resolved)
+                .as("every name in CODE_CARRYING_EXCEPTION_SIMPLE_NAMES must be a class whose"
+                        + " instances expose getCode(), declared or inherited")
+                .containsAll(CODE_CARRYING_EXCEPTION_SIMPLE_NAMES);
+    }
+
+    private static void collectByGetCodeAccessibility(Path root, Path classFile, TreeSet<String> found) {
+        String className = toClassName(root, classFile);
+        Class<?> type;
+        try {
+            type = Class.forName(className, false, ValidationMessageCoverageTest.class.getClassLoader());
+        } catch (Throwable ignored) {
+            return;
+        }
+        try {
+            type.getMethod("getCode");
+            found.add(type.getSimpleName());
+        } catch (NoSuchMethodException ignored) {
+        }
     }
 
     private static void collectGetCodeClasses(Path root, Path classFile, TreeSet<String> getCodeClasses) {
