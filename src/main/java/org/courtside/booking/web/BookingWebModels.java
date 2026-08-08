@@ -2,6 +2,7 @@ package org.courtside.booking.web;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import org.courtside.shared.NoDuplicates;
 
 import java.time.Instant;
 import java.util.List;
@@ -12,8 +13,9 @@ final class BookingWebModels {
     private BookingWebModels() {
     }
 
+    @ChronologicalSlot
     record CreateBookingRequest(
-            @NotEmpty List<UUID> courtIds,
+            @NotEmpty @NoDuplicates List<UUID> courtIds,
             @NotNull UUID cardId,
             @NotNull Instant startsAt,
             @NotNull Instant endsAt,

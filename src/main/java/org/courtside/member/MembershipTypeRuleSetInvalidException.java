@@ -1,18 +1,23 @@
 package org.courtside.member;
 
-import lombok.Getter;
+import org.courtside.shared.CodedDomainFailure;
+import org.courtside.shared.ProblemType;
+import org.springframework.http.HttpStatus;
 
 import java.util.Map;
 
-@Getter
-public class MembershipTypeRuleSetInvalidException extends RuntimeException {
+public class MembershipTypeRuleSetInvalidException extends CodedDomainFailure {
 
-    private final String code;
-    private final Map<String, Object> params;
+    public static final ProblemType PROBLEM_TYPE = new ProblemType(
+            "rule-set-unresolvable", HttpStatus.BAD_REQUEST,
+            "Rule set unresolvable", "The request references a rule set that does not exist");
 
     MembershipTypeRuleSetInvalidException(String code, Map<String, Object> params, Throwable cause) {
-        super(code, cause);
-        this.code = code;
-        this.params = Map.copyOf(params);
+        super(code, params, cause);
+    }
+
+    @Override
+    public ProblemType problemType() {
+        return PROBLEM_TYPE;
     }
 }

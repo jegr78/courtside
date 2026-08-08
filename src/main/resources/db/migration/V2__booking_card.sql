@@ -10,7 +10,10 @@ CREATE TABLE booking_card (
     CONSTRAINT booking_card_unique_label UNIQUE (label),
     CONSTRAINT booking_card_label_not_blank CHECK (length(btrim(label)) > 0),
     CONSTRAINT booking_card_color_hex CHECK (color ~ '^#[0-9a-fA-F]{6}$'),
-    CONSTRAINT booking_card_allowed_player_counts_positive CHECK (0 < ALL (allowed_player_counts))
+    CONSTRAINT booking_card_allowed_player_counts_positive CHECK (0 < ALL (allowed_player_counts)),
+    CONSTRAINT booking_card_required_role_known
+        CHECK (required_role IS NULL
+               OR required_role IN ('MEMBER', 'TRAINER', 'GROUNDSKEEPER', 'TREASURER', 'ADMIN'))
 );
 
 INSERT INTO booking_card

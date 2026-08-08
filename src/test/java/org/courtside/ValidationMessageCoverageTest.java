@@ -31,6 +31,9 @@ class ValidationMessageCoverageTest {
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
                     "MembershipTypeRuleSetInactiveException");
 
+    private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
+            List.of("CodedDomainFailure", "InvalidOpeningWindowException");
+
     // Every construct in src/main that ends up as a ProblemDetail's "code": a Bean Validation
     // constraint (validation.<AnnotationSimpleName>, resolved dynamically), a RuleViolation, one
     // of the getCode()-carrying exceptions above, or a literal passed alongside a "code" key in a
@@ -42,8 +45,10 @@ class ValidationMessageCoverageTest {
     // everyConstraintAnnotationUsedInMainIsInTheKnownSet: a new @Constraint annotation mints an
     // unreviewed code on this frozen wire contract until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("Max", "Min", "NoDuplicatePlayerCounts", "NotBlank", "NotEmpty", "NotNull",
-                    "Pattern", "Positive", "Size");
+            List.of("ChronologicalSeries", "ChronologicalSlot", "KnownRole", "Max", "Min",
+                    "MoveChangesSomething", "NoDuplicates", "NotBlank", "NotEmpty",
+                    "NotEmptyIfGiven", "NotNull",
+                    "Pattern", "Positive", "SeriesEndsOnce", "Size");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
@@ -110,6 +115,22 @@ class ValidationMessageCoverageTest {
     }
 
     @Test
+    void bothBundlesDefineTheSameKeys() throws IOException {
+        // given — every other test here checks keys it can *derive* (a constraint annotation, a
+        // code literal). A key written by hand into one bundle and forgotten in the other is
+        // derivable from nothing, so nothing was looking.
+        Properties english = loadBundle("/messages.properties");
+        Properties german = loadBundle("/messages_de.properties");
+
+        // when / then
+        assertThat(german.stringPropertyNames())
+                .as("messages_de.properties must define exactly the keys messages.properties does;"
+                        + " a key present only in the English bundle silently falls back to English"
+                        + " for a German-speaking member, and one present only in German is dead")
+                .containsExactlyInAnyOrderElementsOf(english.stringPropertyNames());
+    }
+
+    @Test
     void everyClassDeclaringGetCodeIsCoveredByAPattern() throws IOException, URISyntaxException {
         // given
         TreeSet<String> getCodeClasses = new TreeSet<>();
@@ -119,12 +140,49 @@ class ValidationMessageCoverageTest {
                     .forEach(path -> collectGetCodeClasses(classesRoot, path, getCodeClasses));
         }
 
-        // when / then
+        // when / then — getCode() is declared once on CodedDomainFailure and inherited by its
+        // subclasses, plus once on InvalidOpeningWindowException, which carries a code but no
+        // params and so does not extend it
         assertThat(getCodeClasses)
-                .as("a class declaring getCode() must be named in CODE_CARRYING_EXCEPTION_SIMPLE_NAMES"
-                        + " so everyCodeLiteralPassedToASetPropertyCodeCallHasAMessageKeyInBothBundles"
+                .as("a class declaring getCode() must be named in GET_CODE_DECLARING_SIMPLE_NAMES,"
+                        + " and every concrete failure that carries a code must appear in"
+                        + " CODE_CARRYING_EXCEPTION_SIMPLE_NAMES so"
+                        + " everyCodeLiteralPassedToASetPropertyCodeCallHasAMessageKeyInBothBundles"
                         + " actually covers its code literals")
-                .containsExactlyInAnyOrderElementsOf(CODE_CARRYING_EXCEPTION_SIMPLE_NAMES);
+                .containsExactlyInAnyOrderElementsOf(GET_CODE_DECLARING_SIMPLE_NAMES);
+    }
+
+    @Test
+    void everyCodeCarryingExceptionActuallyExposesGetCode() throws IOException, URISyntaxException {
+        // given — the list above builds the "new X(\"literal\"" patterns; a name that no longer
+        // names a code-carrying failure would silently stop matching anything at all
+        Path classesRoot = classesDirectory();
+        TreeSet<String> resolved = new TreeSet<>();
+        try (Stream<Path> files = Files.walk(classesRoot)) {
+            files.filter(path -> path.toString().endsWith(".class"))
+                    .forEach(path -> collectByGetCodeAccessibility(classesRoot, path, resolved));
+        }
+
+        // when / then
+        assertThat(resolved)
+                .as("every name in CODE_CARRYING_EXCEPTION_SIMPLE_NAMES must be a class whose"
+                        + " instances expose getCode(), declared or inherited")
+                .containsAll(CODE_CARRYING_EXCEPTION_SIMPLE_NAMES);
+    }
+
+    private static void collectByGetCodeAccessibility(Path root, Path classFile, TreeSet<String> found) {
+        String className = toClassName(root, classFile);
+        Class<?> type;
+        try {
+            type = Class.forName(className, false, ValidationMessageCoverageTest.class.getClassLoader());
+        } catch (Throwable ignored) {
+            return;
+        }
+        try {
+            type.getMethod("getCode");
+            found.add(type.getSimpleName());
+        } catch (NoSuchMethodException ignored) {
+        }
     }
 
     private static void collectGetCodeClasses(Path root, Path classFile, TreeSet<String> getCodeClasses) {
@@ -180,6 +238,10 @@ class ValidationMessageCoverageTest {
         } catch (Throwable ignored) {
             return;
         }
+        // Both zones: a constraint on the record itself (a cross-field rule such as "a booking
+        // must end after it starts") is as much a wire code as one on a field, and scanning only
+        // fields let four of them ship without a bundle entry.
+        collect(type.getAnnotations(), constraintNames);
         for (Field field : type.getDeclaredFields()) {
             collect(field.getAnnotations(), constraintNames);
         }

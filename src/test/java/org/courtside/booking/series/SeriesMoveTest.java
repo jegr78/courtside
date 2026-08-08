@@ -1,6 +1,7 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.CourtNotBookableException;
 import org.courtside.booking.internal.BookingNotOwnedException;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingRulesViolatedException;
@@ -177,7 +178,7 @@ class SeriesMoveTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> seriesService.move(new MoveRequest(
                 series.seriesId(), series.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
                 null, null, List.of(courtTwo)), trainer, Set.of(Role.TRAINER)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CourtNotBookableException.class);
 
         assertThat(startOf(series.bookingIds().getFirst())).isEqualTo(unchanged);
     }

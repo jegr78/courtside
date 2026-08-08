@@ -1,5 +1,7 @@
 package org.courtside.identity.internal;
 
+import org.courtside.identity.Role;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,7 +37,7 @@ public class SecurityConfiguration {
                         .authenticated()
                         .requestMatchers("/api/public/**", "/actuator/health").permitAll()
                         .requestMatchers("/api/session").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginProcessingUrl("/api/session")

@@ -1,18 +1,23 @@
 package org.courtside.booking.internal;
 
-import lombok.Getter;
+import org.courtside.shared.CodedDomainFailure;
+import org.courtside.shared.ProblemType;
+import org.springframework.http.HttpStatus;
 
 import java.util.Map;
 
-@Getter
-public class ParticipantsInvalidException extends RuntimeException {
+public class ParticipantsInvalidException extends CodedDomainFailure {
 
-    private final String code;
-    private final Map<String, Object> params;
+    public static final ProblemType PROBLEM_TYPE = new ProblemType(
+            "participants-invalid", HttpStatus.BAD_REQUEST,
+            "Invalid participants", "The participants of this booking are not acceptable");
 
     public ParticipantsInvalidException(String code, Map<String, Object> params) {
-        super(code);
-        this.code = code;
-        this.params = Map.copyOf(params);
+        super(code, params);
+    }
+
+    @Override
+    public ProblemType problemType() {
+        return PROBLEM_TYPE;
     }
 }

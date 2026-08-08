@@ -1,11 +1,18 @@
 package org.courtside;
 
+import org.courtside.shared.DomainFailure;
+import org.courtside.shared.ProblemType;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -20,27 +27,25 @@ class ProblemTypeUriTest {
 
     // The complete set of problem type URNs src/main is allowed to produce today. A new slug, a
     // near-synonym or a silent rename must land here deliberately, not slip past a shape-only check.
-    private static final List<String> KNOWN_SLUGS = List.of(
-            "urn:courtside:error:access-denied",
+    //
+    // Two sources, because two kinds of failure exist. A domain failure carries its own
+    // ProblemType constant; a framework exception has no such constant and is described by a
+    // literal in the advice that answers for it.
+    private static final List<String> KNOWN_FAILURE_SLUGS = List.of(
             "urn:courtside:error:booking-not-found",
             "urn:courtside:error:booking-not-owned",
             "urn:courtside:error:booking-rules-violated",
             "urn:courtside:error:card-label-taken",
+            "urn:courtside:error:card-not-bookable",
             "urn:courtside:error:card-not-found",
             "urn:courtside:error:card-role-required",
-            "urn:courtside:error:constraint-violation",
+            "urn:courtside:error:court-not-bookable",
             "urn:courtside:error:court-not-found",
             "urn:courtside:error:court-number-taken",
             "urn:courtside:error:court-unavailable",
             "urn:courtside:error:invalid-opening-window",
-            "urn:courtside:error:invalid-request",
-            "urn:courtside:error:malformed-request-body",
             "urn:courtside:error:membership-type-name-taken",
             "urn:courtside:error:membership-type-not-found",
-            "urn:courtside:error:method-not-supported",
-            "urn:courtside:error:missing-parameter",
-            "urn:courtside:error:not-acceptable",
-            "urn:courtside:error:parameter-type-mismatch",
             "urn:courtside:error:participants-invalid",
             "urn:courtside:error:rule-parameter-invalid",
             "urn:courtside:error:rule-set-inactive",
@@ -48,41 +53,134 @@ class ProblemTypeUriTest {
             "urn:courtside:error:rule-set-not-found",
             "urn:courtside:error:rule-set-unresolvable",
             "urn:courtside:error:series-move-conflict",
-            "urn:courtside:error:series-not-found",
+            "urn:courtside:error:series-request-invalid",
+            "urn:courtside:error:series-not-found");
+
+    private static final List<String> KNOWN_ADVICE_SLUGS = List.of(
+            "urn:courtside:error:access-denied",
+            "urn:courtside:error:constraint-violation",
+            "urn:courtside:error:malformed-request-body",
+            "urn:courtside:error:method-not-supported",
+            "urn:courtside:error:missing-parameter",
+            "urn:courtside:error:not-acceptable",
+            "urn:courtside:error:parameter-type-mismatch",
             "urn:courtside:error:unauthenticated",
             "urn:courtside:error:unmapped-path",
             "urn:courtside:error:unsupported-media-type",
             "urn:courtside:error:validation-failed");
 
     @Test
-    void whenReadingEveryProblemTypeUri_thenNoneNamesAHostThisProductDoesNotOwn() throws IOException {
+    void whenReadingEveryProblemTypeUri_thenNoneNamesAHostThisProductDoesNotOwn() throws Exception {
         // given — a club runs its own instance under its own domain, so an http type URI would
         // name a host nobody operates and could later be registered by someone else
-        try (Stream<Path> sources = Files.walk(Path.of("src/main/java"))) {
-            List<String> types = sources
-                    .filter(path -> path.toString().endsWith(".java"))
-                    .flatMap(ProblemTypeUriTest::typeLiteralsIn)
-                    .toList();
+        List<String> types = adviceTypeLiterals();
+        List<String> failureTypes = failureSlugs();
 
-            // when / then
-            assertThat(types).isNotEmpty();
-            assertThat(types)
-                    .as("every ProblemDetail type must be a urn:courtside:error:<slug> URN")
-                    .allMatch(type -> ALLOWED.matcher(type).matches());
-        }
+        // when / then
+        assertThat(types).isNotEmpty();
+        assertThat(failureTypes).isNotEmpty();
+        assertThat(types)
+                .as("every ProblemDetail type an advice sets must be a urn:courtside:error:<slug> URN")
+                .allMatch(type -> ALLOWED.matcher(type).matches());
+        assertThat(failureTypes)
+                .as("every DomainFailure's ProblemType must be a urn:courtside:error:<slug> URN")
+                .allMatch(type -> ALLOWED.matcher(type).matches());
     }
 
     @Test
-    void whenReadingEveryProblemTypeUri_thenTheSlugSetMatchesKnownSlugsExactly() throws IOException {
-        // given
+    void whenReadingEveryDomainFailuresProblemType_thenTheSlugSetMatchesKnownSlugsExactly()
+            throws Exception {
+        // when / then — a new failure must be added here deliberately before it can ship
+        assertThat(failureSlugs()).containsExactlyInAnyOrderElementsOf(KNOWN_FAILURE_SLUGS);
+    }
+
+    @Test
+    void whenReadingEveryProblemTypeAnAdviceSets_thenTheSlugSetMatchesKnownSlugsExactly()
+            throws IOException {
+        // when / then — an advice that describes a framework exception has no ProblemType
+        // constant to read, so its literal is pinned separately
+        assertThat(adviceTypeLiterals()).containsExactlyInAnyOrderElementsOf(KNOWN_ADVICE_SLUGS);
+    }
+
+    @Test
+    void whenReadingEveryDomainFailure_thenEachDeclaresItsOwnProblemTypeConstant() throws Exception {
+        // given — the constant is what the assertions above read; a failure that built its
+        // ProblemType inline would be invisible to them and could ship an unreviewed slug
+        TreeSet<String> withoutConstant = new TreeSet<>();
+
+        // when
+        for (Class<?> failure : concreteDomainFailures()) {
+            if (problemTypeConstantOf(failure) == null) {
+                withoutConstant.add(failure.getSimpleName());
+            }
+        }
+
+        // then
+        assertThat(withoutConstant)
+                .as("every concrete DomainFailure must declare a public static final ProblemType")
+                .isEmpty();
+    }
+
+    private static List<String> failureSlugs() throws Exception {
+        List<String> slugs = new java.util.ArrayList<>();
+        for (Class<?> failure : concreteDomainFailures()) {
+            ProblemType type = problemTypeConstantOf(failure);
+            if (type != null) {
+                slugs.add(type.uri().toString());
+            }
+        }
+        return slugs;
+    }
+
+    private static ProblemType problemTypeConstantOf(Class<?> failure) throws Exception {
+        for (Field field : failure.getDeclaredFields()) {
+            if (field.getType() == ProblemType.class
+                    && Modifier.isStatic(field.getModifiers())
+                    && Modifier.isFinal(field.getModifiers())) {
+                field.setAccessible(true);
+                return (ProblemType) field.get(null);
+            }
+        }
+        return null;
+    }
+
+    private static List<Class<?>> concreteDomainFailures() throws IOException, URISyntaxException {
+        Path classesRoot = classesDirectory();
+        List<Class<?>> failures = new java.util.ArrayList<>();
+        try (Stream<Path> files = Files.walk(classesRoot)) {
+            files.filter(path -> path.toString().endsWith(".class")).forEach(path -> {
+                Class<?> type = loadClass(classesRoot, path);
+                if (type != null && DomainFailure.class.isAssignableFrom(type)
+                        && !Modifier.isAbstract(type.getModifiers())) {
+                    failures.add(type);
+                }
+            });
+        }
+        return failures;
+    }
+
+    private static Class<?> loadClass(Path root, Path classFile) {
+        String className = root.relativize(classFile).toString()
+                .replace(java.io.File.separatorChar, '.')
+                .replaceAll("\\.class$", "");
+        try {
+            return Class.forName(className, false, ProblemTypeUriTest.class.getClassLoader());
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Path classesDirectory() throws URISyntaxException {
+        URL marker = ProblemTypeUriTest.class.getProtectionDomain().getCodeSource().getLocation();
+        return Path.of(marker.toURI()).getParent().resolve("classes");
+    }
+
+    private static List<String> adviceTypeLiterals() throws IOException {
         try (Stream<Path> sources = Files.walk(Path.of("src/main/java"))) {
-            List<String> types = sources
+            return sources
                     .filter(path -> path.toString().endsWith(".java"))
                     .flatMap(ProblemTypeUriTest::typeLiteralsIn)
                     .toList();
-
-            // when / then — a new slug must be added here deliberately before it can ship
-            assertThat(types).containsExactlyInAnyOrderElementsOf(KNOWN_SLUGS);
         }
     }
 

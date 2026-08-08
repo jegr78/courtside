@@ -1,6 +1,5 @@
 package org.courtside.shared.web;
 
-import org.courtside.shared.InvalidOpeningWindowException;
 import jakarta.validation.ConstraintViolation;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -41,25 +40,6 @@ class SharedExceptionHandler {
             "Size", Set.of("min", "max"),
             "Min", Set.of("value"),
             "Max", Set.of("value"));
-
-    @ExceptionHandler(InvalidOpeningWindowException.class)
-    ProblemDetail handleInvalidOpeningWindow(InvalidOpeningWindowException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.BAD_REQUEST, exception.getMessage());
-        problem.setType(URI.create("urn:courtside:error:invalid-opening-window"));
-        problem.setTitle("Invalid opening window");
-        problem.setProperty("code", exception.getCode());
-        return problem;
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    ProblemDetail handleInvalidRequest(IllegalArgumentException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.BAD_REQUEST, exception.getMessage());
-        problem.setType(URI.create("urn:courtside:error:invalid-request"));
-        problem.setTitle("Invalid request");
-        return problem;
-    }
 
     // Deliberately narrow: a write that raises a more specific conflict exception instead of
     // letting the underlying constraint violation through must not have it downgraded to a 400

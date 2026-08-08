@@ -261,14 +261,16 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                         .content(body)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("newCourtIds must not contain the same court twice"));
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("newCourtIds"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NoDuplicates"));
 
         mockMvc.perform(post("/api/booking-series/{id}/move", seriesId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("newCourtIds must not contain the same court twice"));
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("newCourtIds"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NoDuplicates"));
     }
 
     @Test

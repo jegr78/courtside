@@ -1,6 +1,8 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.booking.internal.CardNotBookableException;
+import org.courtside.facility.CourtNotBookableException;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.CreateBookingCommand;
@@ -167,9 +169,15 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> previewAsTrainer(rule))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("200")
-                .hasMessageContaining("201");
+                .isInstanceOf(SeriesRequestInvalidException.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.type(
+                        SeriesRequestInvalidException.class))
+                .satisfies(failure -> {
+                    assertThat(failure.getCode()).isEqualTo("booking.series.tooManyOccurrences");
+                    assertThat(failure.getParams())
+                            .containsEntry("limit", 200)
+                            .containsEntry("requested", 201);
+                });
         verifyNoInteractions(allocations);
     }
 
@@ -194,8 +202,7 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> seriesService.create(rule,
                 List.of(Instant.parse("2026-04-07T16:00:00Z")), UUID.randomUUID(), null,
                 Set.of(Role.TRAINER), "Team training"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("200");
+                .isInstanceOf(SeriesRequestInvalidException.class);
     }
 
     @Test
@@ -207,7 +214,9 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> previewAsTrainer(rule(4)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CourtNotBookableException.class)
+                .extracting(failure -> ((CourtNotBookableException) failure).getCode())
+                .isEqualTo("court.inactive");
     }
 
     @Test
@@ -220,7 +229,9 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> previewAsTrainer(rule))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CardNotBookableException.class)
+                .extracting(failure -> ((CardNotBookableException) failure).getCode())
+                .isEqualTo("card.unknown");
     }
 
     @Test
@@ -241,8 +252,9 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> previewAsTrainer(rule))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("not active");
+                .isInstanceOf(CardNotBookableException.class)
+                .extracting(failure -> ((CardNotBookableException) failure).getCode())
+                .isEqualTo("card.inactive");
     }
 
     @Test

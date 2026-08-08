@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.card.ParticipantCard;
+import org.courtside.identity.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,7 +72,7 @@ class CardControllerTest extends AbstractIntegrationTest {
     void givenACardGatedBehindARoleTheCallerDoesNotHold_whenListingPublicly_thenItIsAbsent()
             throws Exception {
         // given
-        BookingCard gated = cards.createCard("Trainer session", "#3a4a5c", "TRAINER",
+        BookingCard gated = cards.createCard("Trainer session", "#3a4a5c", Role.TRAINER,
                 new short[0], false, false);
         BookingCard open = cards.createCard("Match play", "#3a4a5c", null,
                 new short[] {2, 4}, true, true);

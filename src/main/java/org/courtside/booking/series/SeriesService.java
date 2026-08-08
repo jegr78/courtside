@@ -6,6 +6,7 @@ import org.courtside.booking.internal.BookingNotOwnedException;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingRuleCheck;
 import org.courtside.booking.internal.BookingRuleGate;
+import org.courtside.booking.internal.CardNotBookableException;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.internal.CardRoleRequiredException;
@@ -134,9 +135,10 @@ public class SeriesService {
 
     private BookingCard requireBookableCard(UUID cardId) {
         BookingCard card = cards.findCard(cardId)
-                .orElseThrow(() -> new IllegalArgumentException("No booking card with id " + cardId));
+                .orElseThrow(() -> new CardNotBookableException(
+                        "card.unknown", Map.of("field", "cardId")));
         if (!card.isActive()) {
-            throw new IllegalArgumentException("Booking card %s is not active".formatted(cardId));
+            throw new CardNotBookableException("card.inactive", Map.of("field", "cardId"));
         }
         requireCardDoesNotTrackPlayers(card);
         return card;
@@ -147,10 +149,9 @@ public class SeriesService {
         if (callerRoles.contains(Role.ADMIN)) {
             return;
         }
-        String requiredRole = card.getRequiredRole();
-        if (requiredRole != null && callerRoles.stream().noneMatch(role -> role.name().equals(requiredRole))) {
+        if (!card.permits(callerRoles)) {
             throw new CardRoleRequiredException(
-                    "Card %s requires role %s".formatted(card.getId(), requiredRole));
+                    "Card %s requires role %s".formatted(card.getId(), card.getRequiredRole()));
         }
     }
 
@@ -306,8 +307,8 @@ public class SeriesService {
             throw new SeriesNotFoundException("No booking series with id " + seriesId);
         }
         if (!bookingRepository.existsByIdAndSeriesId(fromBookingId, seriesId)) {
-            throw new IllegalArgumentException(
-                    "Booking %s is not part of series %s".formatted(fromBookingId, seriesId));
+            throw new SeriesRequestInvalidException("booking.series.bookingNotInSeries",
+                    Map.of("field", "fromBookingId"));
         }
     }
 
@@ -358,9 +359,9 @@ public class SeriesService {
     private SeriesSchedule.Expansion expandWithinLimit(SeriesRule rule) {
         SeriesSchedule.Expansion expansion = schedule.expand(rule);
         if (expansion.slots().size() > SeriesRule.MAX_OCCURRENCES) {
-            throw new IllegalArgumentException(
-                    "A series may hold at most %d occurrences, this rule expands to %d"
-                            .formatted(SeriesRule.MAX_OCCURRENCES, expansion.slots().size()));
+            throw new SeriesRequestInvalidException("booking.series.tooManyOccurrences",
+                    Map.of("limit", SeriesRule.MAX_OCCURRENCES,
+                           "requested", expansion.slots().size()));
         }
         return expansion;
     }
@@ -370,11 +371,12 @@ public class SeriesService {
                 .map(TimeSlot::start)
                 .collect(Collectors.toSet());
         if (!offered.containsAll(confirmedStarts)) {
-            throw new IllegalArgumentException(
-                    "confirmedStarts must only contain occurrences the schedule offers");
+            throw new SeriesRequestInvalidException("booking.series.startNotOffered",
+                    Map.of("field", "confirmedStarts"));
         }
         if (Set.copyOf(confirmedStarts).size() != confirmedStarts.size()) {
-            throw new IllegalArgumentException("confirmedStarts must not contain the same date twice");
+            throw new SeriesRequestInvalidException("booking.series.duplicateStart",
+                    Map.of("field", "confirmedStarts"));
         }
     }
 

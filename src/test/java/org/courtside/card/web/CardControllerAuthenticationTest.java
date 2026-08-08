@@ -1,9 +1,11 @@
 package org.courtside.card.web;
 
 import org.courtside.card.CardService;
+import org.courtside.identity.CurrentUser;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -13,14 +15,16 @@ import static org.mockito.Mockito.when;
 class CardControllerAuthenticationTest {
 
     @Test
-    void givenNoAuthenticationOnTheRequest_whenListingBookingCardsPublicly_thenItReturnsNoCardsRatherThanThrowing() {
+    void givenNoAuthenticatedAccount_whenListingBookingCardsPublicly_thenItReturnsNoCardsRatherThanThrowing() {
         // given — reached directly, with no security filter chain in front to guarantee
         // authentication is present, unlike every MockMvc-driven test in this package
         CardService cards = mock(CardService.class);
+        CurrentUser currentUser = mock(CurrentUser.class);
+        when(currentUser.account()).thenReturn(Optional.empty());
         when(cards.bookableCards(Set.of())).thenReturn(List.of());
-        CardController controller = new CardController(cards);
+        CardController controller = new CardController(cards, currentUser);
 
         // when / then
-        assertThat(controller.bookingCards(null)).isEmpty();
+        assertThat(controller.bookingCards()).isEmpty();
     }
 }

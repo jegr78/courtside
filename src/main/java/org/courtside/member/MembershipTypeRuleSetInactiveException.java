@@ -1,18 +1,23 @@
 package org.courtside.member;
 
-import lombok.Getter;
+import org.courtside.shared.CodedDomainFailure;
+import org.courtside.shared.ProblemType;
+import org.springframework.http.HttpStatus;
 
 import java.util.Map;
 
-@Getter
-public class MembershipTypeRuleSetInactiveException extends RuntimeException {
+public class MembershipTypeRuleSetInactiveException extends CodedDomainFailure {
 
-    private final String code;
-    private final Map<String, Object> params;
+    public static final ProblemType PROBLEM_TYPE = new ProblemType(
+            "rule-set-inactive", HttpStatus.BAD_REQUEST,
+            "Rule set inactive", "The request references a rule set that is not active");
 
     MembershipTypeRuleSetInactiveException(String code, Map<String, Object> params) {
-        super(code);
-        this.code = code;
-        this.params = Map.copyOf(params);
+        super(code, params);
+    }
+
+    @Override
+    public ProblemType problemType() {
+        return PROBLEM_TYPE;
     }
 }
