@@ -19,7 +19,7 @@ public class SeriesMoveConflictException extends DomainFailure {
 
     private static final String CODE = "booking.series.moveConflict";
 
-    private final transient List<UUID> blockedBookingIds;
+    private final List<UUID> blockedBookingIds;
 
     public SeriesMoveConflictException(List<UUID> blockedBookingIds) {
         super("%d occurrences cannot move".formatted(blockedBookingIds.size()));

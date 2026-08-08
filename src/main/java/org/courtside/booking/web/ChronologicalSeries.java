@@ -30,7 +30,7 @@ import java.lang.annotation.Target;
                     || !value.endsOn().isBefore(value.startsOn())) {
                 return true;
             }
-            return SeriesConstraints.reportOn(context, "endsOn");
+            return FieldViolations.on(context, "endsOn");
         }
     }
 }

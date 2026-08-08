@@ -32,14 +32,7 @@ import java.lang.annotation.Target;
             if (value.endsAt().isAfter(value.startsAt())) {
                 return true;
             }
-            // Reported against endsAt rather than the record, so it reaches the client as a
-            // fieldErrors entry like every other constraint instead of a global error the
-            // response shape has no place for.
-            context.disableDefaultConstraintViolation();
-            context.buildConstraintViolationWithTemplate(context.getDefaultConstraintMessageTemplate())
-                    .addPropertyNode("endsAt")
-                    .addConstraintViolation();
-            return false;
+            return FieldViolations.on(context, "endsAt");
         }
     }
 }

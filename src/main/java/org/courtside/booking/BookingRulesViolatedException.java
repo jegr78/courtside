@@ -16,7 +16,7 @@ public class BookingRulesViolatedException extends DomainFailure {
             "booking-rules-violated", HttpStatus.UNPROCESSABLE_ENTITY,
             "Booking not allowed", "The booking violates one or more rules");
 
-    private final transient List<RuleViolation> violations;
+    private final List<RuleViolation> violations;
 
     public BookingRulesViolatedException(List<RuleViolation> violations) {
         super("Booking rejected by %d rule(s)".formatted(violations.size()));

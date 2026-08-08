@@ -30,7 +30,7 @@ import java.lang.annotation.Target;
                     || value.newCourtIds() != null) {
                 return true;
             }
-            return SeriesConstraints.reportOn(context, "newStartTime");
+            return FieldViolations.on(context, "newStartTime");
         }
     }
 }

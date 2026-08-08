@@ -7,8 +7,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
 import org.courtside.shared.NoDuplicates;
+import org.courtside.shared.NotEmptyIfGiven;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -59,7 +59,7 @@ final class SeriesWebModels {
             @NotNull CancelScope scope,
             LocalTime newStartTime,
             @Positive Integer newDurationMinutes,
-            @Size(min = 1) @NoDuplicates List<UUID> newCourtIds) {
+            @NotEmptyIfGiven @NoDuplicates List<UUID> newCourtIds) {
     }
 
     record MovePreviewResponse(List<MoveResponse> moves, boolean executable) {

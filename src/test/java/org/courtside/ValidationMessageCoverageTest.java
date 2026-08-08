@@ -46,7 +46,8 @@ class ValidationMessageCoverageTest {
     // unreviewed code on this frozen wire contract until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
             List.of("ChronologicalSeries", "ChronologicalSlot", "KnownRole", "Max", "Min",
-                    "MoveChangesSomething", "NoDuplicates", "NotBlank", "NotEmpty", "NotNull",
+                    "MoveChangesSomething", "NoDuplicates", "NotBlank", "NotEmpty",
+                    "NotEmptyIfGiven", "NotNull",
                     "Pattern", "Positive", "SeriesEndsOnce", "Size");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
@@ -111,6 +112,22 @@ class ValidationMessageCoverageTest {
         assertThat(codes).isNotEmpty();
         codes.forEach(code -> assertBothBundlesDefine(english, german,
                 code, "passed as a problem code literal in src/main"));
+    }
+
+    @Test
+    void bothBundlesDefineTheSameKeys() throws IOException {
+        // given — every other test here checks keys it can *derive* (a constraint annotation, a
+        // code literal). A key written by hand into one bundle and forgotten in the other is
+        // derivable from nothing, so nothing was looking.
+        Properties english = loadBundle("/messages.properties");
+        Properties german = loadBundle("/messages_de.properties");
+
+        // when / then
+        assertThat(german.stringPropertyNames())
+                .as("messages_de.properties must define exactly the keys messages.properties does;"
+                        + " a key present only in the English bundle silently falls back to English"
+                        + " for a German-speaking member, and one present only in German is dead")
+                .containsExactlyInAnyOrderElementsOf(english.stringPropertyNames());
     }
 
     @Test

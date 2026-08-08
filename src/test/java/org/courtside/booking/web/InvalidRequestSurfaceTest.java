@@ -32,10 +32,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Characterises which IllegalArgumentException throw sites a request can actually reach. Every
-// assertion of urn:courtside:error:invalid-request below is a failure a member can cause that
-// answers with raw English and no i18n code — CLAUDE.md forbids exactly this. The test exists to
-// turn the classification from something read off the annotations into something proven.
+// Pins the answer at every throw site a request was found able to reach. Each of these once
+// returned urn:courtside:error:invalid-request — a 400 carrying the exception's message verbatim,
+// with no i18n code and no field, which CLAUDE.md forbids. The test was written the other way
+// round first, asserting that broken answer, so that "this site is reachable" was proven rather
+// than read off the annotations; those assertions were then turned into the ones below.
 @WithMockUser(username = "doe.jane", roles = "MEMBER")
 class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
@@ -198,6 +199,46 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SeriesEndsOnce"));
     }
 
+    @Test
+    void whenAMoveNamesNoCourtsAtAll_thenItIsAFieldErrorOnNewCourtIds() throws Exception {
+        // given — leaving newCourtIds out means "keep the courts", so null stays legal; an empty
+        // list asks for a booking on no court at all
+        // when / then
+        postMovePreview("""
+                {"fromBookingId": "%s", "scope": "WHOLE_SERIES", "newCourtIds": []}
+                """.formatted(UUID.randomUUID()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("newCourtIds"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotEmptyIfGiven"));
+    }
+
+    @Test
+    void whenAMoveAsksForAZeroLengthBooking_thenItIsAFieldErrorOnNewDurationMinutes() throws Exception {
+        // when / then
+        postMovePreview("""
+                {"fromBookingId": "%s", "scope": "WHOLE_SERIES", "newDurationMinutes": 0}
+                """.formatted(UUID.randomUUID()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("newDurationMinutes"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Positive"));
+    }
+
+    @Test
+    void whenAMoveChangesNothing_thenItIsAFieldErrorRatherThanASilentNoOp() throws Exception {
+        // given — all three of time, duration and courts left out; the request asks the series to
+        // move to exactly where it already is
+        // when / then
+        postMovePreview("""
+                {"fromBookingId": "%s", "scope": "WHOLE_SERIES"}
+                """.formatted(UUID.randomUUID()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("newStartTime"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.MoveChangesSomething"));
+    }
+
     private org.springframework.test.web.servlet.ResultActions postBooking(String body)
             throws Exception {
         return mockMvc.perform(post("/api/bookings")
@@ -209,6 +250,16 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
     private org.springframework.test.web.servlet.ResultActions postSeriesPreview(String body)
             throws Exception {
         return mockMvc.perform(post("/api/booking-series/preview")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+    }
+
+    // The series id is arbitrary: @Valid on the request body is resolved before the controller
+    // method runs, so a body that fails validation never reaches the lookup.
+    private org.springframework.test.web.servlet.ResultActions postMovePreview(String body)
+            throws Exception {
+        return mockMvc.perform(post("/api/booking-series/{id}/move/preview", UUID.randomUUID())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
                 .with(csrf()));

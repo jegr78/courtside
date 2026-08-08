@@ -29,7 +29,7 @@ import java.lang.annotation.Target;
             if (value == null || (value.endsOn() == null) != (value.occurrenceCount() == null)) {
                 return true;
             }
-            return SeriesConstraints.reportOn(context, "endsOn");
+            return FieldViolations.on(context, "endsOn");
         }
     }
 }
