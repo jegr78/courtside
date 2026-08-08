@@ -3,6 +3,7 @@ package org.courtside.card;
 import org.courtside.card.internal.BookingCardRepository;
 import org.courtside.card.internal.CardLabelTakenException;
 import org.courtside.card.internal.ParticipantCardRepository;
+import org.courtside.identity.Role;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,6 @@ public class CardService {
 
     private static final String UNIQUE_BOOKING_CARD_LABEL = "booking_card_unique_label";
     private static final String UNIQUE_PARTICIPANT_CARD_LABEL = "participant_card_unique_label";
-    private static final String ADMIN_ROLE = "ADMIN";
 
     private final BookingCardRepository cards;
     private final ParticipantCardRepository participantCards;
@@ -29,18 +29,13 @@ public class CardService {
         return cards.findByActiveTrueOrderByLabelAsc();
     }
 
-    public List<BookingCard> bookableCards(Set<String> callerRoles) {
-        if (callerRoles.contains(ADMIN_ROLE)) {
+    public List<BookingCard> bookableCards(Set<Role> callerRoles) {
+        if (callerRoles.contains(Role.ADMIN)) {
             return activeCards();
         }
         return activeCards().stream()
-                .filter(card -> isBookableBy(card, callerRoles))
+                .filter(card -> card.permits(callerRoles))
                 .toList();
-    }
-
-    private static boolean isBookableBy(BookingCard card, Set<String> callerRoles) {
-        String required = card.getRequiredRole();
-        return required == null || callerRoles.contains(required);
     }
 
     public List<BookingCard> allCards() {
@@ -64,7 +59,7 @@ public class CardService {
     }
 
     @Transactional
-    public BookingCard createCard(String label, String color, String requiredRole,
+    public BookingCard createCard(String label, String color, Role requiredRole,
                                   short[] allowedPlayerCounts, boolean countsAgainstLimits,
                                   boolean guestAllowed) {
         return saveOrRejectTakenLabel(new BookingCard(label, color, requiredRole,
@@ -72,7 +67,7 @@ public class CardService {
     }
 
     @Transactional
-    public BookingCard changeCard(UUID cardId, String label, String color, String requiredRole,
+    public BookingCard changeCard(UUID cardId, String label, String color, Role requiredRole,
                                   short[] allowedPlayerCounts, boolean countsAgainstLimits,
                                   boolean guestAllowed) {
         BookingCard card = requireCard(cardId);

@@ -6,27 +6,26 @@ import org.courtside.card.ParticipantCard;
 import org.courtside.card.web.CardWebModels.PublicBookingCardResponse;
 import org.courtside.card.web.CardWebModels.PublicParticipantCardResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
+import org.courtside.identity.CurrentUser;
+import org.courtside.identity.Role;
+import org.courtside.identity.UserAccount;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
 class CardController {
 
-    private static final String ROLE_PREFIX = "ROLE_";
-
     private final CardService cards;
+    private final CurrentUser currentUser;
 
     @GetMapping("/api/public/booking-cards")
-    List<PublicBookingCardResponse> bookingCards(Authentication authentication) {
-        return cards.bookableCards(callerRoles(authentication)).stream()
+    List<PublicBookingCardResponse> bookingCards() {
+        return cards.bookableCards(callerRoles()).stream()
                 .map(CardController::toResponse)
                 .toList();
     }
@@ -38,15 +37,8 @@ class CardController {
                 .toList();
     }
 
-    private static Set<String> callerRoles(Authentication authentication) {
-        if (authentication == null) {
-            return Set.of();
-        }
-        return authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .filter(authority -> authority.startsWith(ROLE_PREFIX))
-                .map(authority -> authority.substring(ROLE_PREFIX.length()))
-                .collect(Collectors.toSet());
+    private Set<Role> callerRoles() {
+        return currentUser.account().map(UserAccount::getRoles).orElseGet(Set::of);
     }
 
     private static PublicBookingCardResponse toResponse(BookingCard card) {

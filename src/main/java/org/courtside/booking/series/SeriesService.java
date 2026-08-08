@@ -147,10 +147,9 @@ public class SeriesService {
         if (callerRoles.contains(Role.ADMIN)) {
             return;
         }
-        String requiredRole = card.getRequiredRole();
-        if (requiredRole != null && callerRoles.stream().noneMatch(role -> role.name().equals(requiredRole))) {
+        if (!card.permits(callerRoles)) {
             throw new CardRoleRequiredException(
-                    "Card %s requires role %s".formatted(card.getId(), requiredRole));
+                    "Card %s requires role %s".formatted(card.getId(), card.getRequiredRole()));
         }
     }
 

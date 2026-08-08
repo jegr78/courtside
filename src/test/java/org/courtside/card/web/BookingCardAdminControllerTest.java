@@ -211,7 +211,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("requiredRole"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.KnownRole"));
     }
 
     @Test

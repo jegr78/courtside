@@ -3,6 +3,7 @@ package org.courtside.card.web;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.card.ParticipantCard;
+import org.courtside.identity.Role;
 import org.courtside.card.web.CardAdminWebModels.BookingCardRequest;
 import org.courtside.card.web.CardAdminWebModels.BookingCardResponse;
 import org.courtside.card.web.CardAdminWebModels.ParticipantCardRequest;
@@ -41,7 +42,7 @@ class CardAdminController {
     @PostMapping("/booking-cards")
     ResponseEntity<BookingCardResponse> createBookingCard(
             @Valid @RequestBody BookingCardRequest request) {
-        BookingCard card = cards.createCard(request.label(), request.color(), request.requiredRole(),
+        BookingCard card = cards.createCard(request.label(), request.color(), roleOrNone(request.requiredRole()),
                 toPlayerCounts(request.allowedPlayerCounts()), request.countsAgainstLimits(),
                 request.guestAllowed());
         return ResponseEntity
@@ -52,7 +53,7 @@ class CardAdminController {
     @PutMapping("/booking-cards/{id}")
     BookingCardResponse changeBookingCard(@PathVariable UUID id,
                                           @Valid @RequestBody BookingCardRequest request) {
-        BookingCard card = cards.changeCard(id, request.label(), request.color(), request.requiredRole(),
+        BookingCard card = cards.changeCard(id, request.label(), request.color(), roleOrNone(request.requiredRole()),
                 toPlayerCounts(request.allowedPlayerCounts()), request.countsAgainstLimits(),
                 request.guestAllowed());
         return toResponse(card);
@@ -119,9 +120,23 @@ class CardAdminController {
         return result;
     }
 
+    // Unreachable while @KnownRole guards the request: an unknown name here would otherwise
+    // become a null requirement, which is a card open to everyone.
+    private static Role roleOrNone(String requiredRole) {
+        if (requiredRole == null) {
+            return null;
+        }
+        return Role.named(requiredRole).orElseThrow(() -> new IllegalStateException(
+                "Unvalidated role name reached the card boundary: " + requiredRole));
+    }
+
+    private static String roleName(Role requiredRole) {
+        return requiredRole == null ? null : requiredRole.name();
+    }
+
     private static BookingCardResponse toResponse(BookingCard card) {
         return new BookingCardResponse(
-                card.getId(), card.getLabel(), card.getColor(), card.getRequiredRole(),
+                card.getId(), card.getLabel(), card.getColor(), roleName(card.getRequiredRole()),
                 toPlayerCountList(card.getAllowedPlayerCounts()), card.tracksPlayers(),
                 card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isActive());
     }

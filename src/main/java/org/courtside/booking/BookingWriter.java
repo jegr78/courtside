@@ -101,13 +101,9 @@ class BookingWriter {
     }
 
     private void checkRequiredRole(BookingCard card, Set<Role> callerRoles) {
-        String requiredRole = card.getRequiredRole();
-        if (requiredRole == null) {
-            return;
-        }
-        if (callerRoles.stream().noneMatch(role -> role.name().equals(requiredRole))) {
+        if (!card.permits(callerRoles)) {
             throw new CardRoleRequiredException(
-                    "Card %s requires role %s".formatted(card.getId(), requiredRole));
+                    "Card %s requires role %s".formatted(card.getId(), card.getRequiredRole()));
         }
     }
 

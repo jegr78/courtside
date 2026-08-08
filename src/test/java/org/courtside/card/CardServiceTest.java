@@ -1,6 +1,7 @@
 package org.courtside.card;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -36,7 +37,7 @@ class CardServiceTest extends AbstractIntegrationTest {
     @Test
     void givenAnAdmin_whenListingBookableCards_thenEveryActiveCardIsVisibleRegardlessOfRequiredRole() {
         // when
-        List<BookingCard> result = cardService.bookableCards(Set.of("ADMIN"));
+        List<BookingCard> result = cardService.bookableCards(Set.of(Role.ADMIN));
 
         // then
         assertThat(result).extracting(BookingCard::getLabel)
@@ -47,7 +48,7 @@ class CardServiceTest extends AbstractIntegrationTest {
     @Test
     void givenACallerHoldingSeveralRoles_whenListingBookableCards_thenACardGatedBehindAnyHeldRoleIsPresent() {
         // when
-        List<BookingCard> result = cardService.bookableCards(Set.of("MEMBER", "TRAINER"));
+        List<BookingCard> result = cardService.bookableCards(Set.of(Role.MEMBER, Role.TRAINER));
 
         // then
         assertThat(result).extracting(BookingCard::getLabel)

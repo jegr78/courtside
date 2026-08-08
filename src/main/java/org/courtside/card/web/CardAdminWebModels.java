@@ -32,7 +32,7 @@ final class CardAdminWebModels {
     record BookingCardRequest(
             @NotBlank @Size(max = 60) String label,
             @NotBlank @Pattern(regexp = "^#[0-9a-fA-F]{6}$") String color,
-            @Pattern(regexp = "^(MEMBER|TRAINER|GROUNDSKEEPER|TREASURER|ADMIN)$") String requiredRole,
+            @KnownRole String requiredRole,
             @NotNull @Size(max = 20) @NoDuplicatePlayerCounts
             List<@NotNull @Min(1) @Max(20) Integer> allowedPlayerCounts,
             @NotNull Boolean countsAgainstLimits,

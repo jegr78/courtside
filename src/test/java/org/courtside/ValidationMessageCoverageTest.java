@@ -42,8 +42,8 @@ class ValidationMessageCoverageTest {
     // everyConstraintAnnotationUsedInMainIsInTheKnownSet: a new @Constraint annotation mints an
     // unreviewed code on this frozen wire contract until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("Max", "Min", "NoDuplicatePlayerCounts", "NotBlank", "NotEmpty", "NotNull",
-                    "Pattern", "Positive", "Size");
+            List.of("KnownRole", "Max", "Min", "NoDuplicatePlayerCounts", "NotBlank", "NotEmpty",
+                    "NotNull", "Pattern", "Positive", "Size");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
