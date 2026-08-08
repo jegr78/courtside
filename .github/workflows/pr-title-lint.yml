@@ -1,0 +1,28 @@
+name: PR Title Lint
+#
+# The PR title is the merge commit's subject: the repository is configured with
+# merge_commit_title = PR_TITLE, so whatever stands here is what lands in main's
+# history and what any future release tooling reads to decide a version bump. A
+# free-text title would therefore produce a merge commit that says nothing about
+# what changed and carries no semver signal. This check fails such a title before
+# it can be merged.
+#
+# pull_request_target, not pull_request: it runs in the base-repo context, so the
+# check is reported on pull requests from forks too — which an AGPL project will
+# get. It neither checks out nor runs the pull request's code; the action only
+# reads the title through GITHUB_TOKEN, so no untrusted code executes here.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50  # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
