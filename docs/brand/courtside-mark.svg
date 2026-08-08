@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Courtside">
+  <title>Courtside</title>
+  <defs>
+    <clipPath id="tile">
+      <rect x="0" y="0" width="64" height="64" rx="12" ry="12"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect x="0" y="0" width="64" height="64" fill="#B85C38"/>
+    <rect x="11" y="9" width="9" height="46" fill="#D7E24B"/>
+    <g fill="none" stroke="#FCFBF9" stroke-width="2.5" stroke-linecap="square">
+      <rect x="11" y="9" width="42" height="46"/>
+      <line x1="20" y1="9" x2="20" y2="55"/>
+      <line x1="20" y1="31" x2="53" y2="31"/>
+      <line x1="36.5" y1="9" x2="36.5" y2="31"/>
+    </g>
+  </g>
+</svg>

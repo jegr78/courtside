@@ -1,0 +1,170 @@
+package org.courtside.rules;
+
+import org.courtside.AbstractIntegrationTest;
+import org.courtside.booking.BookingService;
+import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.ParticipantSpec;
+import org.courtside.facility.Court;
+import org.courtside.facility.CourtRepository;
+import org.courtside.facility.OpeningHours;
+import org.courtside.facility.OpeningHoursRepository;
+import org.courtside.shared.OpeningWindow;
+import org.courtside.identity.Person;
+import org.courtside.identity.PersonRepository;
+import org.courtside.identity.Role;
+import org.courtside.rules.internal.MaxOpenBookingsRule;
+import org.courtside.shared.TimeSlot;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
+
+    private static final UUID STANDARD = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+    private static final UUID MEMBER_BOOKING_CARD =
+            UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID TRAINING_CARD =
+            UUID.fromString("22222222-2222-2222-2222-222222222222");
+
+    @Autowired
+    private MaxOpenBookingsRule rule;
+
+    @Autowired
+    private BookingService bookingService;
+
+    @Autowired
+    private CourtRepository courts;
+
+    @Autowired
+    private OpeningHoursRepository openingHours;
+
+    @Autowired
+    private PersonRepository persons;
+
+    private UUID courtId;
+    private final UUID member = UUID.randomUUID();
+    private UUID bookerPersonId;
+
+    @BeforeEach
+    void setUp() {
+        for (DayOfWeek day : DayOfWeek.values()) {
+            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+        }
+        courtId = courts.save(new Court(1, "Court 1")).getId();
+        bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+    }
+
+    @Test
+    void givenALimitOfTwoAndOneOpenBooking_whenChecking_thenNoViolation() {
+        // given
+        book("2026-05-13T16:00:00Z");
+
+        // when
+        var violations = rule.check(contextFor(STANDARD));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void givenALimitOfTwoAndTwoOpenBookings_whenChecking_thenExceededViolation() {
+        // given
+        book("2026-05-13T16:00:00Z");
+        book("2026-05-13T17:00:00Z");
+
+        // when
+        var violations = rule.check(contextFor(STANDARD));
+
+        // then
+        assertThat(violations).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.maxOpenBookings.exceeded");
+    }
+
+    @Test
+    void givenOneOfTwoBookingsCancelled_whenChecking_thenTheCancelledOneDoesNotCount() {
+        // given
+        UUID first = book("2026-05-13T16:00:00Z");
+        book("2026-05-13T17:00:00Z");
+        bookingService.cancel(first, member, Set.of());
+
+        // when
+        var violations = rule.check(contextFor(STANDARD));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void givenTwoBookingsThatHaveAlreadyEnded_whenChecking_thenTheyDoNotCount() {
+        // given
+        book("2026-05-11T16:00:00Z");
+        book("2026-05-11T17:00:00Z");
+
+        // when
+        var violations = rule.check(contextFor(STANDARD));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void givenABookingEndingExactlyAtTheClockInstant_whenChecking_thenItDoesNotCountAsOpen() {
+        // given — the fixed clock reads 2026-05-12T10:00:00Z
+        book("2026-05-12T09:00:00Z");
+        book("2026-05-13T16:00:00Z");
+
+        // when
+        var violations = rule.check(contextFor(STANDARD));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void givenTwoBookingsOnACardOutsideTheLimits_whenChecking_thenTheyDoNotCount() {
+        // given
+        bookTraining("2026-05-13T16:00:00Z");
+        bookTraining("2026-05-13T17:00:00Z");
+
+        // when
+        var violations = rule.check(contextFor(STANDARD));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    private UUID book(String start) {
+        return book(MEMBER_BOOKING_CARD, Role.MEMBER, start,
+                List.of(ParticipantSpec.guest("Partner")));
+    }
+
+    private UUID bookTraining(String start) {
+        return book(TRAINING_CARD, Role.TRAINER, start, List.of());
+    }
+
+    private UUID book(UUID cardId, Role role, String start, List<ParticipantSpec> participants) {
+        Instant from = Instant.parse(start);
+        return bookingService.create(new CreateBookingCommand(
+                List.of(courtId), cardId,
+                new TimeSlot(from, from.plus(1, ChronoUnit.HOURS)), member, bookerPersonId,
+                Set.of(role), null, participants, null));
+    }
+
+    private RuleContext contextFor(UUID membershipTypeId) {
+        Instant start = Instant.parse("2026-05-13T18:00:00Z");
+        return new RuleContext(
+                courtId, MEMBER_BOOKING_CARD,
+                new TimeSlot(start, start.plus(1, ChronoUnit.HOURS)),
+                member, membershipTypeId);
+    }
+}

@@ -1,0 +1,22 @@
+Courtside
+Copyright (C) 2026 The Courtside Contributors
+
+This product is licensed under the GNU Affero General Public License, version 3
+or later. See LICENSE for the full text.
+
+--------------------------------------------------------------------------------
+Third-party components distributed in this repository
+--------------------------------------------------------------------------------
+
+Apache Maven Wrapper
+  Files: mvnw, mvnw.cmd, .mvn/wrapper/maven-wrapper.properties
+  Copyright: The Apache Software Foundation
+  Licence: Apache License, Version 2.0
+           https://www.apache.org/licenses/LICENSE-2.0
+
+  These files are distributed unmodified under their own licence, which their
+  headers state. The AGPL notice above does not apply to them.
+
+Dependencies resolved at build time are not distributed in this repository; their
+licences are declared in their own artifacts and reported by
+`./mvnw license:aggregate-third-party-report` or an SBOM.

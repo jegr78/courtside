@@ -1,0 +1,52 @@
+package org.courtside.rules.internal;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public final class RuleParameters {
+
+    private record Bounds(int min, int max) {
+    }
+
+    private static final Map<RuleType, Map<String, Bounds>> CONTRACT = Map.of(
+            RuleType.ADVANCE_WINDOW, Map.of("maxDays", new Bounds(1, 365)),
+            RuleType.MAX_OPEN_BOOKINGS, Map.of("limit", new Bounds(1, 99)));
+
+    private RuleParameters() {
+    }
+
+    public static boolean isConfigurablePerRuleSet(RuleType type) {
+        return CONTRACT.containsKey(type);
+    }
+
+    public static Map<String, Integer> validated(RuleType type, Map<String, Integer> params) {
+        Map<String, Bounds> expected = CONTRACT.get(type);
+        if (expected == null) {
+            throw new RuleParameterInvalidException("rule.parameters.typeNotConfigurable",
+                    Map.of("ruleType", type.name()));
+        }
+        params.keySet().stream()
+                .filter(key -> !expected.containsKey(key))
+                .findFirst()
+                .ifPresent(key -> {
+                    throw new RuleParameterInvalidException("rule.parameters.unknownParameter",
+                            Map.of("ruleType", type.name()));
+                });
+
+        Map<String, Integer> validated = new LinkedHashMap<>();
+        expected.forEach((key, bounds) -> {
+            Integer value = params.get(key);
+            if (value == null) {
+                throw new RuleParameterInvalidException("rule.parameters.missingParameter",
+                        Map.of("ruleType", type.name(), "parameter", key));
+            }
+            if (value < bounds.min() || value > bounds.max()) {
+                throw new RuleParameterInvalidException("rule.parameters.outOfBounds",
+                        Map.of("ruleType", type.name(), "parameter", key,
+                                "min", bounds.min(), "max", bounds.max()));
+            }
+            validated.put(key, value);
+        });
+        return Map.copyOf(validated);
+    }
+}

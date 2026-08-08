@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+.superpowers/
+*.iml
+target/
+
+# IDE
+.vscode/
+.idea/
+
+# Planning documents: kept locally, not published
+docs/superpowers/

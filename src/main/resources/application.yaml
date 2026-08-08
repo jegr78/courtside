@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: courtside
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
+  messages:
+    basename: messages
+    fallback-to-system-locale: false
+  web:
+    locale: de
+    locale-resolver: accept-header
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+  servlet:
+    session:
+      cookie:
+        secure: ${COURTSIDE_COOKIE_SECURE:false}
+
+courtside:
+  booking:
+    slot-minutes: 30
+    time-zone: Europe/Berlin
+    series-horizon-months: 12
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs
