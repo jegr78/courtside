@@ -13,8 +13,11 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// rule_type and role are each backed by a real Java enum, the same shape RequiredRolePatternTest
-// and RolePrefixPatternTest already use to tie a duplicated literal back to its source.
+// Three columns hold the name of a Java enum constant. A CHECK is what keeps the database's idea
+// of the allowed set from drifting away from the enum's — and since the entity reads the column
+// back through @Enumerated, a value outside the set is no longer a quiet "nobody holds that role"
+// but an exception on load. The list in the migration is hand-written, so this test is what ties
+// it to its source.
 class EnumeratedColumnInListPatternTest {
 
     @Test
@@ -29,6 +32,21 @@ class EnumeratedColumnInListPatternTest {
         // then
         assertThat(actual)
                 .as("rule_definition_rule_type_known has drifted from org.courtside.rules.internal.RuleType")
+                .isEqualTo(expected);
+    }
+
+    @Test
+    void whenReadingTheBookingCardRequiredRoleInList_thenItAcceptsExactlyTheRoleEnumConstants()
+            throws IOException, ReflectiveOperationException {
+        // given
+        String expected = enumValuesOf("org.courtside.identity.Role");
+
+        // when
+        String actual = sqlInListValues("V2__booking_card.sql", "required_role");
+
+        // then
+        assertThat(actual)
+                .as("booking_card_required_role_known has drifted from org.courtside.identity.Role")
                 .isEqualTo(expected);
     }
 
