@@ -139,7 +139,7 @@ have no German counterpart in the user interface:
 |---|---|
 | `DomainFailure` | The supertype every domain failure extends. It implements Spring's `ErrorResponse` and builds its own RFC 9457 body, so the mapping from a failure to its wire representation lives with the failure rather than in a `@RestControllerAdvice`. Deliberately **not** named `…Exception`: `CLAUDE.md` already separates the concept ("domain failures") from the mechanism ("are typed exceptions"), and this type names the concept. Concrete failures keep the suffix — `CourtNotFoundException extends DomainFailure`. |
 | `ProblemType` | The value type a `DomainFailure` carries: `slug`, `status`, `title`, `detail`. Held as a static constant per failure class so a test can read it without constructing an instance. `detail` lives here and never comes from the exception's message — a message may carry an id or a caller's input, and neither belongs in a response body. |
-| `CodedDomainFailure` | A `DomainFailure` that also carries an i18n `code` and named `params`, which it puts into the body. The shape five failures share; the rest carry no code at all. |
+| `CodedDomainFailure` | A `DomainFailure` that also carries an i18n `code` and named `params`. It emits them as a one-element `violations` array, which is the only shape a translatable failure travels in. The rest carry no code at all. |
 
 `ErrorResponse` is implemented for `getStatusCode()`, `getHeaders()` and `getBody()` only. Its
 `MessageSource` hooks — `getDetailMessageCode()` and the `MessageFormat` positional arguments
@@ -533,6 +533,16 @@ Errors are returned as RFC 9457 Problem Details:
   ]
 }
 ```
+
+**`violations` is the only shape a translatable failure travels in**, and it is an array even
+where only one entry is ever possible — a court that does not exist produces a one-element array,
+not a `code` on the problem itself. A client therefore resolves messages against the bundle in one
+place instead of branching on where the code happened to sit. The rule engine forces the plural
+case anyway, since evaluation collects every violation rather than stopping at the first.
+
+A second array, `fieldErrors`, carries what Bean Validation rejected. Its entries are
+`{ field, code, params }` — the same violation, plus the name of the input it came from — so a
+client that can render a violation can render these by ignoring one key.
 
 ### Three failure modes that are easy to get wrong
 

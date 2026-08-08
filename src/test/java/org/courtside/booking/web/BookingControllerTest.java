@@ -319,10 +319,10 @@ class BookingControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.code").value("booking.participants.slotCount"))
-                .andExpect(jsonPath("$.params.cardLabel").value("Member booking"))
-                .andExpect(jsonPath("$.params.allowed").value("2 / 4"))
-                .andExpect(jsonPath("$.params.actual").value(1));
+                .andExpect(jsonPath("$.violations[0].code").value("booking.participants.slotCount"))
+                .andExpect(jsonPath("$.violations[0].params.cardLabel").value("Member booking"))
+                .andExpect(jsonPath("$.violations[0].params.allowed").value("2 / 4"))
+                .andExpect(jsonPath("$.violations[0].params.actual").value(1));
     }
 
     @Test

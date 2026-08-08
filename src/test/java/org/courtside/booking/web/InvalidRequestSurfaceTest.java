@@ -95,8 +95,12 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:court-not-bookable"))
-                .andExpect(jsonPath("$.code").value("court.unknown"))
-                .andExpect(jsonPath("$.params.field").value("courtIds"));
+                .andExpect(jsonPath("$.violations[0].code").value("court.unknown"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("courtIds"))
+                // The old shape is gone, not merely joined: a client that finds a code here would
+                // keep the second render path alive.
+                .andExpect(jsonPath("$.code").doesNotExist())
+                .andExpect(jsonPath("$.params").doesNotExist());
     }
 
     @Test
@@ -108,7 +112,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:court-not-bookable"))
-                .andExpect(jsonPath("$.code").value("court.inactive"));
+                .andExpect(jsonPath("$.violations[0].code").value("court.inactive"));
     }
 
     @Test
@@ -155,8 +159,8 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:card-not-bookable"))
-                .andExpect(jsonPath("$.code").value("card.unknown"))
-                .andExpect(jsonPath("$.params.field").value("cardId"));
+                .andExpect(jsonPath("$.violations[0].code").value("card.unknown"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("cardId"));
     }
 
     @Test

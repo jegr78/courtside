@@ -5,7 +5,6 @@ import org.courtside.shared.DomainFailure;
 import org.courtside.shared.ProblemType;
 import org.springframework.http.HttpStatus;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,9 +32,7 @@ public class SeriesMoveConflictException extends DomainFailure {
 
     @Override
     protected Map<String, Object> properties() {
-        Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("blockedBookingIds", blockedBookingIds);
-        properties.put("code", CODE);
-        return properties;
+        return Map.of("blockedBookingIds", blockedBookingIds,
+                "violations", oneViolation(CODE, Map.of()));
     }
 }

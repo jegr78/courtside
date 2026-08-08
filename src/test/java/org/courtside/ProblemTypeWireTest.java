@@ -210,8 +210,8 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
 
         // then
         assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:missing-parameter");
-        result.andExpect(jsonPath("$.code").value("request.missingParameter"))
-                .andExpect(jsonPath("$.params.parameter").value("date"));
+        result.andExpect(jsonPath("$.violations[0].code").value("request.missingParameter"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("date"));
     }
 
     @Test

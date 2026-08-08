@@ -115,7 +115,7 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:invalid-opening-window"))
-                .andExpect(jsonPath("$.code").value("openingWindow.closesBeforeItOpens"));
+                .andExpect(jsonPath("$.violations[0].code").value("openingWindow.closesBeforeItOpens"));
     }
 
     @Test
@@ -130,8 +130,8 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:parameter-type-mismatch"))
-                .andExpect(jsonPath("$.code").value("request.parameterTypeMismatch"))
-                .andExpect(jsonPath("$.params.parameter").value("day"))
+                .andExpect(jsonPath("$.violations[0].code").value("request.parameterTypeMismatch"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("day"))
                 .andExpect(jsonPath("$.detail").value(not(containsString("DayOfWeek"))));
     }
 
