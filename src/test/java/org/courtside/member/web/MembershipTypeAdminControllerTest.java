@@ -129,8 +129,8 @@ class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:rule-set-unresolvable"))
-                .andExpect(jsonPath("$.code").value("membershipType.ruleSet.unresolvable"))
-                .andExpect(jsonPath("$.params.field").value("ruleSetId"))
+                .andExpect(jsonPath("$.violations[0].code").value("membershipType.ruleSet.unresolvable"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("ruleSetId"))
                 .andExpect(jsonPath("$.detail").value(Matchers.not(Matchers.containsString(ruleSetId.toString()))));
     }
 
@@ -178,8 +178,8 @@ class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:rule-set-inactive"))
-                .andExpect(jsonPath("$.code").value("membershipType.ruleSet.inactive"))
-                .andExpect(jsonPath("$.params.field").value("ruleSetId"));
+                .andExpect(jsonPath("$.violations[0].code").value("membershipType.ruleSet.inactive"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("ruleSetId"));
     }
 
     @Test
@@ -198,8 +198,8 @@ class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:rule-set-inactive"))
-                .andExpect(jsonPath("$.code").value("membershipType.ruleSet.inactive"))
-                .andExpect(jsonPath("$.params.field").value("ruleSetId"));
+                .andExpect(jsonPath("$.violations[0].code").value("membershipType.ruleSet.inactive"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("ruleSetId"));
     }
 
     @Test

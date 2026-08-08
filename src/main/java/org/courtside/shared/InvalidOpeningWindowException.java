@@ -26,6 +26,6 @@ public class InvalidOpeningWindowException extends DomainFailure {
 
     @Override
     protected Map<String, Object> properties() {
-        return Map.of("code", code);
+        return Map.of("violations", oneViolation(code, Map.of()));
     }
 }

@@ -140,8 +140,8 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:rule-parameter-invalid"))
-                .andExpect(jsonPath("$.code").value("rule.parameters.unknownParameter"))
-                .andExpect(jsonPath("$.params.ruleType").value("ADVANCE_WINDOW"))
+                .andExpect(jsonPath("$.violations[0].code").value("rule.parameters.unknownParameter"))
+                .andExpect(jsonPath("$.violations[0].params.ruleType").value("ADVANCE_WINDOW"))
                 .andExpect(jsonPath("$.detail").value(Matchers.not(Matchers.containsString("maxdays"))));
     }
 
@@ -159,8 +159,8 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:rule-parameter-invalid"))
-                .andExpect(jsonPath("$.code").value("rule.parameters.typeNotConfigurable"))
-                .andExpect(jsonPath("$.params.ruleType").value("OPENING_HOURS"));
+                .andExpect(jsonPath("$.violations[0].code").value("rule.parameters.typeNotConfigurable"))
+                .andExpect(jsonPath("$.violations[0].params.ruleType").value("OPENING_HOURS"));
     }
 
     @Test

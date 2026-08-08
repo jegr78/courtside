@@ -2,7 +2,6 @@ package org.courtside.shared;
 
 import lombok.Getter;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Getter
@@ -26,9 +25,6 @@ public abstract class CodedDomainFailure extends DomainFailure {
 
     @Override
     protected Map<String, Object> properties() {
-        Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("code", code);
-        properties.put("params", params);
-        return properties;
+        return Map.of("violations", oneViolation(code, params));
     }
 }

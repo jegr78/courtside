@@ -21,6 +21,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -74,8 +75,9 @@ class SharedExceptionHandler {
                 HttpStatus.BAD_REQUEST, "One of the request's parameters is not valid");
         problem.setType(URI.create("urn:courtside:error:parameter-type-mismatch"));
         problem.setTitle("Parameter type mismatch");
-        problem.setProperty("code", "request.parameterTypeMismatch");
-        problem.setProperty("params", Map.of("parameter", exception.getName()));
+        problem.setProperty("violations", List.of(Map.of(
+                "code", "request.parameterTypeMismatch",
+                "params", Map.of("parameter", exception.getName()))));
         return problem;
     }
 
@@ -140,8 +142,9 @@ class SharedExceptionHandler {
                 HttpStatus.BAD_REQUEST, "A required request parameter is missing");
         problem.setType(URI.create("urn:courtside:error:missing-parameter"));
         problem.setTitle("Missing parameter");
-        problem.setProperty("code", "request.missingParameter");
-        problem.setProperty("params", Map.of("parameter", exception.getParameterName()));
+        problem.setProperty("violations", List.of(Map.of(
+                "code", "request.missingParameter",
+                "params", Map.of("parameter", exception.getParameterName()))));
         return problem;
     }
 

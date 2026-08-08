@@ -330,7 +330,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
                         .param("opensAt", "08:00"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:invalid-opening-window"))
-                .andExpect(jsonPath("$.code").value("openingWindow.incomplete"));
+                .andExpect(jsonPath("$.violations[0].code").value("openingWindow.incomplete"));
     }
 
     @Test
@@ -348,7 +348,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
                         .param("closesAt", "18:00"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:invalid-opening-window"))
-                .andExpect(jsonPath("$.code").value("openingWindow.incomplete"));
+                .andExpect(jsonPath("$.violations[0].code").value("openingWindow.incomplete"));
     }
 
     private void setStandardOpeningHours() {
