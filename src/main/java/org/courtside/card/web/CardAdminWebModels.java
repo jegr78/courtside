@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import org.courtside.shared.NoDuplicates;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,7 +34,7 @@ final class CardAdminWebModels {
             @NotBlank @Size(max = 60) String label,
             @NotBlank @Pattern(regexp = "^#[0-9a-fA-F]{6}$") String color,
             @KnownRole String requiredRole,
-            @NotNull @Size(max = 20) @NoDuplicatePlayerCounts
+            @NotNull @Size(max = 20) @NoDuplicates
             List<@NotNull @Min(1) @Max(20) Integer> allowedPlayerCounts,
             @NotNull Boolean countsAgainstLimits,
             @NotNull Boolean guestAllowed) {

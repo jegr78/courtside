@@ -45,8 +45,9 @@ class ValidationMessageCoverageTest {
     // everyConstraintAnnotationUsedInMainIsInTheKnownSet: a new @Constraint annotation mints an
     // unreviewed code on this frozen wire contract until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("KnownRole", "Max", "Min", "NoDuplicatePlayerCounts", "NotBlank", "NotEmpty",
-                    "NotNull", "Pattern", "Positive", "Size");
+            List.of("ChronologicalSeries", "ChronologicalSlot", "KnownRole", "Max", "Min",
+                    "MoveChangesSomething", "NoDuplicates", "NotBlank", "NotEmpty", "NotNull",
+                    "Pattern", "Positive", "SeriesEndsOnce", "Size");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
@@ -220,6 +221,10 @@ class ValidationMessageCoverageTest {
         } catch (Throwable ignored) {
             return;
         }
+        // Both zones: a constraint on the record itself (a cross-field rule such as "a booking
+        // must end after it starts") is as much a wire code as one on a field, and scanning only
+        // fields let four of them ship without a bundle entry.
+        collect(type.getAnnotations(), constraintNames);
         for (Field field : type.getDeclaredFields()) {
             collect(field.getAnnotations(), constraintNames);
         }

@@ -135,7 +135,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), UUID.randomUUID(),
                 CancelScope.THIS_AND_FOLLOWING, trainer, Set.of(Role.TRAINER)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SeriesRequestInvalidException.class);
     }
 
     @Test
@@ -146,7 +146,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), UUID.randomUUID(),
                 CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SeriesRequestInvalidException.class);
     }
 
     @Test

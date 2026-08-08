@@ -106,16 +106,19 @@ public class FacilityService {
     }
 
     public void requireBookableCourts(List<UUID> courtIds) {
+        // Unreachable through the API: @NotEmpty and @NoDuplicates answer for both before a
+        // request gets here. Reaching them means a caller skipped validation, which is this
+        // service's bug to report, not the caller's input to reject.
         if (courtIds.isEmpty()) {
-            throw new IllegalArgumentException("A booking needs at least one court");
+            throw new IllegalStateException("A booking needs at least one court");
         }
         if (Set.copyOf(courtIds).size() != courtIds.size()) {
-            throw new IllegalArgumentException("A booking cannot hold the same court twice");
+            throw new IllegalStateException("A booking cannot hold the same court twice");
         }
         findUnbookableCourts(courtIds).stream().findFirst().ifPresent(courtId -> {
-            throw new IllegalArgumentException(findCourt(courtId).isPresent()
-                    ? "Court %s is not active".formatted(courtId)
-                    : "No court with id " + courtId);
+            throw new CourtNotBookableException(
+                    findCourt(courtId).isPresent() ? "court.inactive" : "court.unknown",
+                    Map.of("field", "courtIds"));
         });
     }
 

@@ -84,17 +84,20 @@ class MultiCourtBookingTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenBookingWithAnEmptyCourtList_thenItIsRejected() {
+    void whenBookingWithAnEmptyCourtList_thenTheServiceStillRefusesItsOwnCaller() {
+        // given — @NotEmpty answers for this through the API; reaching the service means a
+        // caller skipped validation, which is a bug here rather than bad input
         // when / then
         assertThatThrownBy(() -> book(List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    void whenBookingTheSameCourtTwiceInOneRequest_thenItIsRejected() {
+    void whenBookingTheSameCourtTwiceInOneRequest_thenTheServiceStillRefusesItsOwnCaller() {
+        // given — as above: @NoDuplicates is the API's answer, this is the backstop
         // when / then
         assertThatThrownBy(() -> book(List.of(courtOne, courtOne)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalStateException.class);
     }
 
     private UUID book(List<UUID> courtIds) {

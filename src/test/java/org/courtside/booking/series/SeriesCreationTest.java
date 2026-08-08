@@ -271,7 +271,11 @@ class SeriesCreationTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> create(List.of(first, first)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SeriesRequestInvalidException.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.type(
+                        SeriesRequestInvalidException.class))
+                .satisfies(failure -> assertThat(failure.getCode())
+                        .isEqualTo("booking.series.duplicateStart"));
         assertThat(seriesRepository.count()).isZero();
     }
 
@@ -282,7 +286,12 @@ class SeriesCreationTest extends AbstractIntegrationTest {
         confirmed.set(0, confirmed.get(0).plus(1, ChronoUnit.DAYS));
 
         // when / then
-        assertThatThrownBy(() -> create(confirmed)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> create(confirmed))
+                .isInstanceOf(SeriesRequestInvalidException.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.type(
+                        SeriesRequestInvalidException.class))
+                .satisfies(failure -> assertThat(failure.getCode())
+                        .isEqualTo("booking.series.startNotOffered"));
         assertThat(seriesRepository.count()).isZero();
     }
 

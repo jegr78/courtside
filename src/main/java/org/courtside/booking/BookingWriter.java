@@ -3,6 +3,7 @@ package org.courtside.booking;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingNotOwnedException;
 import org.courtside.booking.internal.BookingRuleGate;
+import org.courtside.booking.internal.CardNotBookableException;
 import org.courtside.booking.internal.CardRoleRequiredException;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantKind;
@@ -88,9 +89,10 @@ class BookingWriter {
 
     private BookingCard requireBookableCard(UUID cardId) {
         BookingCard card = cards.findCard(cardId)
-                .orElseThrow(() -> new IllegalArgumentException("No booking card with id " + cardId));
+                .orElseThrow(() -> new CardNotBookableException(
+                        "card.unknown", Map.of("field", "cardId")));
         if (!card.isActive()) {
-            throw new IllegalArgumentException("Booking card %s is not active".formatted(cardId));
+            throw new CardNotBookableException("card.inactive", Map.of("field", "cardId"));
         }
         return card;
     }

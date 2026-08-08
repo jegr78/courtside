@@ -420,7 +420,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
                 .with(csrf()));
 
         // then
-        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:invalid-request");
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:card-not-bookable");
     }
 
     private void createAccount(String username, Role role) {

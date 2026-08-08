@@ -1,4 +1,4 @@
-package org.courtside.card.web;
+package org.courtside.shared;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -12,27 +12,27 @@ import java.lang.annotation.Target;
 import java.util.List;
 import java.util.Objects;
 
-@Constraint(validatedBy = NoDuplicatePlayerCounts.Validator.class)
+@Constraint(validatedBy = NoDuplicates.Validator.class)
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
-@interface NoDuplicatePlayerCounts {
+public @interface NoDuplicates {
 
     // A plain literal, not a "{key}" placeholder: Hibernate Validator resolves that form against
     // ValidationMessages.properties, not this project's own bundles, so it would never resolve.
-    String message() default "Each player count may appear at most once.";
+    String message() default "Each entry may appear at most once.";
 
     Class<?>[] groups() default {};
 
     Class<? extends Payload>[] payload() default {};
 
-    class Validator implements ConstraintValidator<NoDuplicatePlayerCounts, List<Integer>> {
+    class Validator implements ConstraintValidator<NoDuplicates, List<?>> {
 
         @Override
-        public boolean isValid(List<Integer> value, ConstraintValidatorContext context) {
+        public boolean isValid(List<?> value, ConstraintValidatorContext context) {
             if (value == null) {
                 return true;
             }
-            List<Integer> present = value.stream().filter(Objects::nonNull).toList();
+            List<?> present = value.stream().filter(Objects::nonNull).toList();
             return present.stream().distinct().count() == present.size();
         }
     }

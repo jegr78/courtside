@@ -179,6 +179,18 @@ Use records for commands, specs, value types and web models (`CreateBookingComma
   *programming* error — `TimeSlot` refusing an end before its start. Such a throw means a caller
   has a bug, and it must not be reachable from a request. If it is, it is the wrong tool.
 
+  `IllegalArgumentSurfaceTest` enforces this: it lists every file in `src/main` allowed to throw
+  one, and that list holds value types only. A service, controller or entity that throws one fails
+  the build by name. When a request can reach a guard, one of three answers applies — a Bean
+  Validation constraint if a field can express the rule (a cross-field one reports through
+  `addPropertyNode` so it arrives as a `fieldErrors` entry), a `DomainFailure` with an i18n code if
+  it cannot, and `IllegalStateException` where a service guards against its own caller having
+  skipped the validation that precedes it. The third says "we have a bug", not "your input is
+  wrong", and a 500 is the honest answer to it.
+
+  Removing a service's guard because the web layer now covers it is the one move to avoid: the
+  guard belongs where the value is used, and the constraint belongs where it enters. Both.
+
 ## Git Workflow
 
 * **Default branch:** `main`. Feature work on `feat/<short-description>`.

@@ -36,8 +36,10 @@ class ProblemTypeUriTest {
             "urn:courtside:error:booking-not-owned",
             "urn:courtside:error:booking-rules-violated",
             "urn:courtside:error:card-label-taken",
+            "urn:courtside:error:card-not-bookable",
             "urn:courtside:error:card-not-found",
             "urn:courtside:error:card-role-required",
+            "urn:courtside:error:court-not-bookable",
             "urn:courtside:error:court-not-found",
             "urn:courtside:error:court-number-taken",
             "urn:courtside:error:court-unavailable",
@@ -51,6 +53,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:rule-set-not-found",
             "urn:courtside:error:rule-set-unresolvable",
             "urn:courtside:error:series-move-conflict",
+            "urn:courtside:error:series-request-invalid",
             "urn:courtside:error:series-not-found");
 
     private static final List<String> KNOWN_ADVICE_SLUGS = List.of(

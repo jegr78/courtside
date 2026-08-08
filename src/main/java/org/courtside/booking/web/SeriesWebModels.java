@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import org.courtside.shared.NoDuplicates;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -21,8 +23,10 @@ final class SeriesWebModels {
     private SeriesWebModels() {
     }
 
+    @SeriesEndsOnce
+    @ChronologicalSeries
     record SeriesRuleRequest(
-            @NotEmpty List<UUID> courtIds,
+            @NotEmpty @NoDuplicates List<UUID> courtIds,
             @NotNull UUID cardId,
             @NotNull LocalDate startsOn,
             @NotNull LocalTime startTime,
@@ -30,9 +34,9 @@ final class SeriesWebModels {
             @Positive @Max(SeriesRule.MAX_INTERVAL_WEEKS) int intervalWeeks,
             @NotEmpty Set<DayOfWeek> weekdays,
             LocalDate endsOn,
-            @Max(SeriesRule.MAX_OCCURRENCES) Integer occurrenceCount,
+            @Positive @Max(SeriesRule.MAX_OCCURRENCES) Integer occurrenceCount,
             String note,
-            @NotEmpty(groups = OnCreate.class) List<Instant> confirmedStarts) {
+            @NotEmpty(groups = OnCreate.class) @NoDuplicates List<Instant> confirmedStarts) {
 
         interface OnCreate {
         }
@@ -49,12 +53,13 @@ final class SeriesWebModels {
     record SeriesCreatedResponse(UUID seriesId, List<UUID> bookingIds, List<Instant> skipped) {
     }
 
+    @MoveChangesSomething
     record MoveRequestBody(
             @NotNull UUID fromBookingId,
             @NotNull CancelScope scope,
             LocalTime newStartTime,
-            Integer newDurationMinutes,
-            List<UUID> newCourtIds) {
+            @Positive Integer newDurationMinutes,
+            @Size(min = 1) @NoDuplicates List<UUID> newCourtIds) {
     }
 
     record MovePreviewResponse(List<MoveResponse> moves, boolean executable) {
