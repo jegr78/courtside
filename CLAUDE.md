@@ -235,15 +235,25 @@ enough to need.
   `fix:`. Add `!` or a `BREAKING CHANGE:` footer when a published surface changes shape — the
   REST API or an environment variable, per the compatibility contract in `docs/design.md`.
 
-* **Keep a milestone's branches small enough that one squashed commit is an honest unit.** A
-  milestone branch used to merge whole; it no longer can, and a branch that grows to ninety
-  commits now collapses into one that nobody can bisect. So cut the work into pull requests that
-  each stand on their own — milestone 5 was three such commits and would have made three good
-  pull requests. The milestone becomes a sequence in the history rather than a single node.
+* **A branch is small enough that one squashed commit is an honest unit.** Since a branch now
+  collapses into a single commit, one that grew to ninety commits would leave `main` with a node
+  nobody can bisect. Cut the work so that each pull request stands on its own and its title
+  describes something a reader can act on.
 
-* **A milestone branch gets a whole-branch review before its pull request is merged.** Every
-  milestone so far has had its most serious findings surface there rather than in the per-task
-  reviews.
+* **Nothing outside this repository's own planning names a work package.** Branch names, pull
+  request titles, issue titles and issue bodies describe *the change*, never the batch it belonged
+  to. `feat/booking-series` and not `feat/milestone-5`; "the admin surface added an audit gap" and
+  not "milestone 4 added an audit gap".
+
+  This is the rule the no-comment-pollution section already applies to code, for the same reason:
+  a number is resolvable only while someone remembers the plan it came from, and this is a public
+  repository other clubs read. Naming a body of work by what it *is* — "the account-management
+  work", "the deployment reference" — stays readable and is fine.
+
+  Plans and their numbering live in `docs/superpowers/`, which is git-ignored and stays local.
+
+* **A branch gets a whole-branch review before its pull request is merged.** Every batch of work
+  so far has had its most serious findings surface there rather than in the per-task reviews.
 
 ## References
 
