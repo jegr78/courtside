@@ -202,8 +202,32 @@ Use records for commands, specs, value types and web models (`CreateBookingComma
   repository other clubs will read and fork.
 * **No real name, address or contact detail is ever written into a tracked file** — this one
   included. Author identity belongs in commit metadata, where git puts it, and nowhere else.
-* **`main` is protected**: a pull request and a green `build` check, with a bypass for the
-  repository-admin role.
+
+### Everything reaches `main` through a pull request
+
+`main` is protected: a pull request and a green `build` check, with a bypass for the
+repository-admin role. The bypass exists for a bootstrap that has already happened — do not
+reach for it. A branch pushed straight to `main` skips the review the repository is now public
+enough to need.
+
+* **The pull request title is a Conventional Commit**, and it is not a formality: the repository
+  sets `merge_commit_title = PR_TITLE`, so the title *becomes* the merge commit's subject in
+  `main`'s history and is what release tooling reads to decide a version bump. `PR Title Lint`
+  enforces the form on every pull request and blocks the merge.
+
+  Choose the type from what the change does to a **consumer of the API**, not from how the diff
+  looks. A branch that is mostly refactoring but ends up correcting a response a member sees is a
+  `fix:`. Add `!` or a `BREAKING CHANGE:` footer when a published surface changes shape — the
+  REST API or an environment variable, per the compatibility contract in `docs/design.md`.
+
+* **Merge a milestone with a merge commit, never a squash.** The commit history on a milestone
+  branch is the record of what went wrong and how it was found — in milestone 4, 55 of 92 commits
+  were remediation. Squashing throws that away and leaves a single commit nobody can bisect.
+  Small, single-purpose branches may squash.
+
+* **A milestone branch gets a whole-branch review before its pull request is merged.** Every
+  milestone so far has had its most serious findings surface there rather than in the per-task
+  reviews.
 
 ## References
 
