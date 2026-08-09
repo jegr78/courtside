@@ -1,8 +1,5 @@
 INSERT INTO court (id, number) VALUES
-    ('dddddddd-0000-0000-0000-000000000001', 1),
-    ('dddddddd-0000-0000-0000-000000000002', 2),
-    ('dddddddd-0000-0000-0000-000000000003', 3),
-    ('dddddddd-0000-0000-0000-000000000004', 4);
+    ('dddddddd-0000-0000-0000-000000000001', 1);
 
 INSERT INTO opening_hours (id, day_of_week, opens_at, closes_at) VALUES
     ('eeeeeeee-0000-0000-0000-000000000001', 1, '08:00', '22:00'),

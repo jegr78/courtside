@@ -29,7 +29,7 @@ class CommentBudgetTest {
 
     // The Maven wrapper is the Apache Software Foundation's code, not this project's — see NOTICE.
     private static final List<Path> ROOTS = List.of(
-            Path.of("src/main"), Path.of("src/test"), Path.of(".github"));
+            Path.of("src/main"), Path.of("src/test"), Path.of(".github"), Path.of("deploy"));
 
     // A required marker begins its own comment, so "// given — why" followed by "// when / then"
     // is two comments and not a three-line one.

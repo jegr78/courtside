@@ -6,9 +6,9 @@ all of it the same booking entity, distinguished only by its booking card.
 
 Java 25, Spring Boot 4.1, Spring Modulith, PostgreSQL 17. Licensed under AGPL-3.0.
 
-**Status:** no tagged release yet. There is no published container image, and
-`courtside-deploy` — the reference deployment the design spec describes — is planned but
-not yet published. For now, run it from source as below.
+**Status:** no tagged release yet, so no published container image. The reference deployment
+lives in [`deploy/`](deploy/) — Compose, Caddy and the documented environment — and it expects a
+released image to pull. Until the first tag, run it from source as below.
 
 ## Requirements
 
@@ -32,9 +32,11 @@ SPRING_DATASOURCE_PASSWORD=courtside \
 ```
 
 Flyway creates the schema on first start and seeds opening hours of 08:00–22:00 for every
-weekday, four courts numbered 1 to 4 (unnamed — give them names through the admin UI), the four
-booking cards, the two participant cards (Ball machine, Looking for a partner) and the Standard
-and Youth rule sets. Adjust all of it later through the database or the admin UI. Migrations
+weekday, a single court numbered 1 (unnamed — give it a name and add the rest through the admin
+UI), the four booking cards, the two participant cards (Ball machine, Looking for a partner) and
+the Standard and Youth rule sets. How many courts a club has is the club's business, so the seed
+takes no position beyond the one court without which nothing can be booked at all. Adjust all of
+it later through the database or the admin UI. Migrations
 currently run to `V9`, which adds `club_config` for the club's branding (name, colors, logo) on
 top of `V8`'s `booking_series` and the multi-court allocation it needs for recurring bookings.
 
