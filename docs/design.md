@@ -24,11 +24,13 @@ participant cards, booking series and multi-court allocation, the rule engine, o
 courts, accounts, roles and session login, club configuration and branding, and the admin surface
 for all of it. `/actuator/health` is exposed. The OpenAPI document is the source of truth: every
 controller implements an interface generated from it, and an instance serves the document it
-actually answers to at `GET /api/openapi.yaml`.
+actually answers to at `GET /api/openapi.yaml`. A tagged release builds a multi-arch container
+image, publishes it to GHCR signed with cosign and carrying an SBOM attestation, and attaches the
+OpenAPI document to the release.
 
 Designed and not built: `Idempotency-Key` handling, the observability stack of
-section 9 beyond the health endpoint, the supply-chain measures of section 10 beyond Dependabot,
-CSV import, reports and exports, and the frontend.
+section 9 beyond the health endpoint, container image scanning, CSV import, reports and exports,
+and the frontend.
 
 ---
 
@@ -97,7 +99,7 @@ Every tagged release publishes:
   generated from, not a by-product of it. The release workflow attaches
   `src/main/resources/api/openapi.yaml` to the tag unchanged — there is nothing to build, and a
   document assembled at release time would be a different document from the one the instance
-  serves. Waits on there being a release workflow at all.
+  serves.
 - Release notes including explicit upgrade notes for breaking changes
 
 ### Compatibility contract
@@ -821,8 +823,8 @@ whether it is built or designed. **Designed means absent today.**
   deployment). *Designed* — the reference deployment is not published yet, so this is the
   operator's own job for now.
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
-  release. *Dependabot is configured; the rest is designed and waits on there being a release
-  to sign.*
+  release. *Dependabot is configured, and the release workflow signs each image keylessly with
+  cosign and attaches an SBOM attestation. Image scanning is designed and not built.*
 
 ### Roles
 

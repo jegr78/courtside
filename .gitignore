@@ -3,6 +3,7 @@
 .superpowers/
 *.iml
 target/
+build/
 
 # IDE
 .vscode/
