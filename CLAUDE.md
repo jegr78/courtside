@@ -33,6 +33,10 @@ export JAVA_HOME=/path/to/temurin-25
 
 Docker must be running for Testcontainers.
 
+The application reads `build-info.properties` and `git.properties`, both written by Maven, so it
+starts only after a Maven build has run — an IDE that compiles on its own produces a context that
+fails on the missing `BuildProperties` bean.
+
 ## Architectural Principles
 
 * **PostgreSQL is not interchangeable.** Non-overlapping court occupancy is enforced by a GiST

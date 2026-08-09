@@ -16,6 +16,9 @@
     <version>0.1.0-SNAPSHOT</version>
     <name>courtside</name>
     <description>Court booking system for sports clubs</description>
+    <!-- The one place the upstream repository is named; application.yaml takes it as the
+         default a deployment reports for AGPL section 13. -->
+    <url>https://github.com/jegr78/courtside</url>
 
     <licenses>
         <license>
@@ -27,6 +30,7 @@
 
     <properties>
         <java.version>25</java.version>
+        <git-commit-id.version>10.0.0</git-commit-id.version>
         <spring-modulith.version>2.1.0</spring-modulith.version>
         <lombok.version>1.18.46</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
@@ -136,6 +140,13 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
                 <configuration>
                     <excludes>
                         <exclude>
@@ -145,6 +156,26 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>io.github.git-commit-id</groupId>
+                <artifactId>git-commit-id-maven-plugin</artifactId>
+                <version>${git-commit-id.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>revision</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <failOnNoGitDirectory>false</failOnNoGitDirectory>
+                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
+                    <includeOnlyProperties>
+                        <includeOnlyProperty>^git\.commit\.id$</includeOnlyProperty>
+                    </includeOnlyProperties>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.openapitools</groupId>
                 <artifactId>openapi-generator-maven-plugin</artifactId>
