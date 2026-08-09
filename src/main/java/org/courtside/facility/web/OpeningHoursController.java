@@ -1,24 +1,25 @@
 package org.courtside.facility.web;
 
+import org.courtside.api.ApiOpeningHours;
+import org.courtside.api.OpeningHoursApi;
 import org.courtside.facility.FacilityService;
-import org.courtside.facility.web.FacilityAdminWebModels.OpeningHoursResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-class OpeningHoursController {
+class OpeningHoursController implements OpeningHoursApi {
 
     private final FacilityService facility;
 
-    @GetMapping("/api/public/opening-hours")
-    List<OpeningHoursResponse> openingHours() {
-        return facility.weeklyOpeningHours().stream()
-                .map(hours -> new OpeningHoursResponse(
+    @Override
+    public ResponseEntity<List<ApiOpeningHours>> listOpeningHours() {
+        return ResponseEntity.ok(facility.weeklyOpeningHours().stream()
+                .map(hours -> FacilityAdminController.toResponse(
                         hours.dayOfWeek(), hours.opensAt(), hours.closesAt()))
-                .toList();
+                .toList());
     }
 }

@@ -1,28 +1,29 @@
 package org.courtside.facility.web;
 
+import org.courtside.api.ApiPublicCourt;
+import org.courtside.api.CourtsApi;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
-import org.courtside.facility.web.FacilityWebModels.PublicCourtResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-class CourtController {
+class CourtController implements CourtsApi {
 
     private final FacilityService facility;
 
-    @GetMapping("/api/public/courts")
-    List<PublicCourtResponse> courts() {
-        return facility.activeCourts().stream()
+    @Override
+    public ResponseEntity<List<ApiPublicCourt>> listCourts() {
+        return ResponseEntity.ok(facility.activeCourts().stream()
                 .map(CourtController::toResponse)
-                .toList();
+                .toList());
     }
 
-    private static PublicCourtResponse toResponse(Court court) {
-        return new PublicCourtResponse(court.getId(), court.getNumber(), court.getName());
+    private static ApiPublicCourt toResponse(Court court) {
+        return new ApiPublicCourt(court.getId(), court.getNumber(), court.getName());
     }
 }

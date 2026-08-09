@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -256,6 +257,11 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         try {
             MockHttpServletRequest servletRequest =
                     new MockHttpServletRequest(endpoint.method().name(), endpoint.concretePath());
+            // The mappings state the media types they consume, so a probe with no content type
+            // matches nothing and every body-taking endpoint reads as misrouted. Accept stays open:
+            // this instance also serves its own document as YAML.
+            servletRequest.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            servletRequest.addHeader(HttpHeaders.ACCEPT, MediaType.ALL_VALUE);
             ServletRequestPathUtils.parseAndCache(servletRequest);
             if (handlerMapping.getHandler(servletRequest) == null) {
                 return false;

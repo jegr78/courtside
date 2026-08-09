@@ -39,6 +39,8 @@ servers:
 tags:
   - name: session
     description: Logging in and out.
+  - name: documentation
+    description: The contract this instance answers to.
   - name: courts
     description: The club's courts, as anyone may see them.
   - name: opening-hours
@@ -637,7 +639,7 @@ paths:
 
   /api/openapi.yaml:
     get:
-      tags: [session]
+      tags: [documentation]
       operationId: getApiDocument
       summary: This document, as served by this instance.
       description: |
