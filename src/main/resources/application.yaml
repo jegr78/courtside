@@ -31,8 +31,6 @@ server:
         secure: ${COURTSIDE_COOKIE_SECURE:false}
 
 courtside:
-  # Filtered from the pom's <url>, so the upstream repository is named once. A club that modified
-  # Courtside points this at its own fork.
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}
   booking:
     slot-minutes: 30

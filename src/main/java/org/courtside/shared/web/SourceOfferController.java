@@ -2,19 +2,20 @@ package org.courtside.shared.web;
 
 import org.courtside.api.ApiSourceOffer;
 import org.courtside.api.SourceApi;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.info.GitProperties;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.Set;
 
-// AGPL section 13 asks a club that modified Courtside to offer its members the source. Public,
-// because the obligation runs to the people using the service.
 @RestController
 class SourceOfferController implements SourceApi {
+
+    private static final Set<String> SCHEMES_A_MEMBER_CAN_FOLLOW = Set.of("http", "https");
 
     private final BuildProperties build;
     private final GitProperties git;
@@ -27,12 +28,24 @@ class SourceOfferController implements SourceApi {
                           @Value("${courtside.source-url}") URI sourceUrl) {
         this.build = build;
         this.git = git;
-        this.sourceUrl = sourceUrl;
+        this.sourceUrl = requireAnOfferAMemberCanFollow(sourceUrl);
     }
 
     @Override
     public ResponseEntity<ApiSourceOffer> getSourceOffer() {
         return ResponseEntity.ok(new ApiSourceOffer(build.getVersion(), sourceUrl)
                 .commit(git == null ? null : git.getCommitId()));
+    }
+
+    private static URI requireAnOfferAMemberCanFollow(URI sourceUrl) {
+        if (sourceUrl.getScheme() == null
+                || !SCHEMES_A_MEMBER_CAN_FOLLOW.contains(sourceUrl.getScheme().toLowerCase())
+                || sourceUrl.getHost() == null) {
+            throw new IllegalStateException(
+                    "courtside.source-url must be an http or https address a member can open, "
+                            + "because it is the offer of source AGPL section 13 asks for. Got: "
+                            + sourceUrl);
+        }
+        return sourceUrl;
     }
 }

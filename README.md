@@ -140,3 +140,7 @@ Every instance answers `GET /api/source` with the version it is running, the com
 from and where that source can be obtained. It needs no login, because the obligation runs to the
 people using the service. An unmodified deployment reports this repository; a club that forked
 sets `COURTSIDE_SOURCE_URL` to its own and has thereby discharged section 13.
+
+That address must be one the members can actually open. An internal `https://git.intern.example/…`
+discharges nothing — the offer is to them — and publishes an internal hostname to anyone who asks.
+Courtside refuses to start on anything that is not an absolute `http` or `https` address.

@@ -4,13 +4,16 @@ import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -20,11 +23,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// An offer is only worth something if it names a version and a place: a 200 carrying nulls would
-// satisfy the schema and discharge nothing.
 class SourceOfferTest extends AbstractIntegrationTest {
 
-    private static final Pattern POM_URL = Pattern.compile("\n {4}<url>([^<]+)</url>");
+    private static final Pattern POM_URL = Pattern.compile("<url>(https?://[^<]+)</url>");
 
     @Autowired
     private WebApplicationContext context;
@@ -54,18 +55,28 @@ class SourceOfferTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenTheBuildHadARepository_thenTheAnswerNamesTheCommitItWasBuiltFrom() throws Exception {
-        // given — a fork running unreleased code is the case section 13 is about, and the
-        // version alone identifies nothing while releases are unnumbered
+    void whenAskingWhereTheSourceIs_thenTheCommitIsTheOneTheBuildRecorded() throws Exception {
+        // given — the build tolerates having no repository to read, so the endpoint must report
+        // whatever git.properties ended up holding, including nothing
+        String recorded = whatTheBuildRecorded();
+
+        // when / then
         mockMvc.perform(get("/api/source"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.commit").value(org.hamcrest.Matchers.matchesPattern("[0-9a-f]{40}")));
+                .andExpect(jsonPath("$.commit").value(recorded));
+    }
+
+    private static String whatTheBuildRecorded() throws IOException {
+        Properties git = new Properties();
+        try (InputStream in = new ClassPathResource("git.properties").getInputStream()) {
+            git.load(in);
+        }
+        return git.getProperty("git.commit.id");
     }
 
     @Test
-    void whenNobodyOverrodeIt_thenTheSourceUrlIsTheOneTheProjectDeclares() throws IOException, Exception {
-        // given — application.yaml takes the pom's <url> by resource filtering, and a build that
-        // stopped filtering would ship the placeholder, which is a link to nowhere
+    void whenNobodyOverrodeIt_thenTheSourceUrlIsTheOneTheProjectDeclares() throws Exception {
+        // given — a build that stopped filtering @project.url@ would ship the placeholder
         Matcher declared = POM_URL.matcher(Files.readString(Path.of("pom.xml")));
         assertThat(declared.find()).as("pom.xml must declare the project url").isTrue();
 

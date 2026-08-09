@@ -526,7 +526,15 @@ components:
         sourceUrl:
           type: string
           format: uri
-          description: Where the corresponding source of this version can be obtained.
+          pattern: "^https?://.+"
+          description: |
+            Where the corresponding source of this version can be obtained. Absolute and
+            resolvable by whoever reads it: an address only the club's own network can reach is
+            not an offer to the club's members.
+      example:
+        version: "1.4.0"
+        commit: "9f1c0e3a5b7d2f4681c9a0e5d3b7f2a4c6e8d0b1"
+        sourceUrl: "https://example.org/git/courtside"
 
     Occurrence:
       type: object
