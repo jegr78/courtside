@@ -150,7 +150,13 @@ class SharedExceptionHandler {
 
     private static Map<String, Object> toMap(FieldError error) {
         if (!error.contains(ConstraintViolation.class)) {
-            return Map.of("field", error.getField(), "code", "validation.rejected", "params", Map.of());
+            // A Spring Validator's rejection carries its own code — a cross-field rule the request
+            // record cannot hold. Falling back to "rejected" would throw that name away and leave
+            // a client unable to tell one such rule from another.
+            String code = error.getCode();
+            return Map.of("field", error.getField(),
+                    "code", code == null ? "validation.rejected" : "validation." + code,
+                    "params", Map.of());
         }
 
         ConstraintViolation<?> violation = error.unwrap(ConstraintViolation.class);

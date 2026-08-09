@@ -45,10 +45,8 @@ class ValidationMessageCoverageTest {
     // everyConstraintAnnotationUsedInMainIsInTheKnownSet: a new @Constraint annotation mints an
     // unreviewed code on this frozen wire contract until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("ChronologicalSeries", "ChronologicalSlot", "KnownRole", "Max", "Min",
-                    "MoveChangesSomething", "NoDuplicates", "NotBlank", "NotEmpty",
-                    "NotEmptyIfGiven", "NotNull",
-                    "Pattern", "Positive", "SeriesEndsOnce", "Size");
+            List.of("KnownRole", "Max", "Min", "NoDuplicates", "NotBlank", "NotEmpty",
+                    "NotEmptyIfGiven", "NotNull", "Pattern", "Positive", "Size");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
@@ -112,6 +110,36 @@ class ValidationMessageCoverageTest {
         assertThat(codes).isNotEmpty();
         codes.forEach(code -> assertBothBundlesDefine(english, german,
                 code, "passed as a problem code literal in src/main"));
+    }
+
+    @Test
+    void everyCodeASpringValidatorRejectsWithHasAMessageKeyInBothBundles()
+            throws IOException, URISyntaxException {
+        // given — a cross-field rule cannot be a per-field annotation, so it lives in a Validator
+        // and names its code through rejectValue. That code reaches the wire as
+        // validation.<code> exactly as a constraint annotation's simple name does, and would
+        // otherwise be covered by nothing: the annotation scan cannot see it.
+        TreeSet<String> codes = new TreeSet<>();
+        Pattern rejectValue = Pattern.compile("rejectValue\\(\\s*\"[^\"]+\",\\s*\"([^\"]+)\"");
+        try (Stream<Path> sources = Files.walk(mainSourceDirectory())) {
+            sources.filter(path -> path.toString().endsWith(".java")).forEach(path -> {
+                try {
+                    Matcher matcher = rejectValue.matcher(Files.readString(path));
+                    matcher.results().forEach(result -> codes.add(result.group(1)));
+                } catch (IOException e) {
+                    throw new IllegalStateException("Cannot read " + path, e);
+                }
+            });
+        }
+        Properties english = loadBundle("/messages.properties");
+        Properties german = loadBundle("/messages_de.properties");
+
+        // when / then
+        assertThat(codes)
+                .as("at least one cross-field rule is expected to live in a Validator")
+                .isNotEmpty();
+        codes.forEach(code -> assertBothBundlesDefine(english, german,
+                "validation." + code, "rejected by a Spring Validator in src/main"));
     }
 
     @Test

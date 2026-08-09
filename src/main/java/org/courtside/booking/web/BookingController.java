@@ -20,6 +20,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,16 +43,24 @@ class BookingController {
     private final BookingService bookings;
     private final CardService cards;
     private final CurrentUser currentUser;
+    private final BookingRequestValidator crossFieldRules;
     private final ZoneId zone;
 
     BookingController(BookingService bookings,
                       CardService cards,
                       CurrentUser currentUser,
+                      BookingRequestValidator crossFieldRules,
                       @Value("${courtside.booking.time-zone}") String zone) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
+        this.crossFieldRules = crossFieldRules;
         this.zone = ZoneId.of(zone);
+    }
+
+    @InitBinder
+    void registerCrossFieldRules(WebDataBinder binder) {
+        binder.addValidators(crossFieldRules);
     }
 
     @PostMapping

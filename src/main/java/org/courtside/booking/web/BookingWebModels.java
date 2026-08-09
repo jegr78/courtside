@@ -13,7 +13,6 @@ final class BookingWebModels {
     private BookingWebModels() {
     }
 
-    @ChronologicalSlot
     record CreateBookingRequest(
             @NotEmpty @NoDuplicates List<UUID> courtIds,
             @NotNull UUID cardId,

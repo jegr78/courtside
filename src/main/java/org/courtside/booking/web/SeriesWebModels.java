@@ -23,8 +23,6 @@ final class SeriesWebModels {
     private SeriesWebModels() {
     }
 
-    @SeriesEndsOnce
-    @ChronologicalSeries
     record SeriesRuleRequest(
             @NotEmpty @NoDuplicates List<UUID> courtIds,
             @NotNull UUID cardId,
@@ -53,7 +51,6 @@ final class SeriesWebModels {
     record SeriesCreatedResponse(UUID seriesId, List<UUID> bookingIds, List<Instant> skipped) {
     }
 
-    @MoveChangesSomething
     record MoveRequestBody(
             @NotNull UUID fromBookingId,
             @NotNull CancelScope scope,
