@@ -25,9 +25,8 @@ import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 // Ordered ahead of Boot's own spring.mvc.problemdetails fallback advice, which otherwise wins the
 // tie for MethodArgumentNotValidException and answers with its generic, field-less detail — but
@@ -117,15 +116,38 @@ class SharedExceptionHandler {
                         : Map.of("field", field, "code", "validation.TypeMismatch", "params", Map.of())));
     }
 
+    // A property name a caller chose is not a property name this API defines: the keys of an
+    // additionalProperties object are whatever was sent. Anything outside this set is not put in
+    // the response — the field then names the object that holds it, which is true and says as much
+    // as can honestly be said.
+    private static final Pattern A_NAME_THIS_API_DEFINES = Pattern.compile("[A-Za-z0-9_-]{1,40}");
+
     private static String mismatchedField(HttpMessageNotReadableException exception) {
         if (!(exception.getCause() instanceof JacksonException mismatch)) {
             return null;
         }
-        String path = mismatch.getPath().stream()
-                .map(reference -> reference.getPropertyName())
-                .filter(Objects::nonNull)
-                .collect(Collectors.joining("."));
-        return path.isEmpty() ? null : path;
+        StringBuilder field = new StringBuilder();
+        for (JacksonException.Reference reference : mismatch.getPath()) {
+            // The index belongs in the name: "participants.personId" leaves a caller with several
+            // participants no way to tell which one, and Bean Validation names the same field
+            // "participants[0].personId".
+            if (reference.getIndex() >= 0) {
+                field.append('[').append(reference.getIndex()).append(']');
+                continue;
+            }
+            String name = reference.getPropertyName();
+            if (name == null) {
+                continue;
+            }
+            if (reference.from() instanceof Map<?, ?> && !A_NAME_THIS_API_DEFINES.matcher(name).matches()) {
+                break;
+            }
+            if (!field.isEmpty()) {
+                field.append('.');
+            }
+            field.append(name);
+        }
+        return field.isEmpty() ? null : field.toString();
     }
 
     // RFC 9110 §15.5.6 makes Allow mandatory on a 405, and it is the only machine-readable

@@ -176,7 +176,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors").isArray())
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("allowedPlayerCounts"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("allowedPlayerCounts[1]"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
     }
 

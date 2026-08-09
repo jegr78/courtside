@@ -32,8 +32,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.Collection;
 import java.util.List;
@@ -59,10 +57,7 @@ class SeriesController implements BookingSeriesApi {
     public ResponseEntity<ApiSeriesPreview> previewSeries(ApiSeriesRuleRequest request) {
         Optional<UserAccount> account = currentUser.account();
         SeriesPreview preview = series.preview(
-                ruleOf(request.getCourtIds(), request.getCardId(), request.getStartsOn(),
-                        request.getStartTime(), request.getDurationMinutes(),
-                        request.getIntervalWeeks(), request.getWeekdays(), request.getEndsOn(),
-                        request.getOccurrenceCount()),
+                ruleOf(request),
                 account.map(UserAccount::getId).orElse(null),
                 account.map(caller -> caller.getPerson().getId()).orElse(null),
                 account.map(UserAccount::getRoles).orElse(Set.of()));
@@ -76,10 +71,7 @@ class SeriesController implements BookingSeriesApi {
     public ResponseEntity<ApiSeriesCreated> createSeries(ApiCreateSeriesRequest request) {
         UserAccount account = currentUser.requireAccount();
         SeriesCreationResult result = series.create(
-                ruleOf(request.getCourtIds(), request.getCardId(), request.getStartsOn(),
-                        request.getStartTime(), request.getDurationMinutes(),
-                        request.getIntervalWeeks(), request.getWeekdays(), request.getEndsOn(),
-                        request.getOccurrenceCount()),
+                ruleOf(request),
                 request.getConfirmedStarts().stream().map(WireTypes::toInstant).toList(),
                 account.getId(), account.getPerson().getId(), account.getRoles(), request.getNote());
 
@@ -120,14 +112,20 @@ class SeriesController implements BookingSeriesApi {
 
     // Previewing and creating carry the same recurrence in two generated types — the document
     // states that creating also requires the caller's confirmation, and allOf produces two classes
-    // rather than one hierarchy. The recurrence is read out once, here.
-    private static SeriesRule ruleOf(Collection<UUID> courtIds, UUID cardId,
-                                     LocalDate startsOn, LocalTime startTime,
-                                     Integer durationMinutes, Integer intervalWeeks,
-                                     Collection<ApiDayOfWeek> weekdays,
-                                     LocalDate endsOn, Integer occurrenceCount) {
-        return new SeriesRule(List.copyOf(courtIds), cardId, startsOn, startTime,
-                durationMinutes, intervalWeeks, toWeekdays(weekdays), endsOn, occurrenceCount);
+    // rather than one hierarchy. One overload each, rather than one method behind nine positional
+    // parameters: durationMinutes and intervalWeeks are both Integer and would transpose silently.
+    private static SeriesRule ruleOf(ApiSeriesRuleRequest request) {
+        return new SeriesRule(List.copyOf(request.getCourtIds()), request.getCardId(),
+                request.getStartsOn(), request.getStartTime(), request.getDurationMinutes(),
+                request.getIntervalWeeks(), toWeekdays(request.getWeekdays()),
+                request.getEndsOn(), request.getOccurrenceCount());
+    }
+
+    private static SeriesRule ruleOf(ApiCreateSeriesRequest request) {
+        return new SeriesRule(List.copyOf(request.getCourtIds()), request.getCardId(),
+                request.getStartsOn(), request.getStartTime(), request.getDurationMinutes(),
+                request.getIntervalWeeks(), toWeekdays(request.getWeekdays()),
+                request.getEndsOn(), request.getOccurrenceCount());
     }
 
     private static Set<DayOfWeek> toWeekdays(Collection<ApiDayOfWeek> weekdays) {

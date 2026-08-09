@@ -113,6 +113,60 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnUnreadableValueInsideAnObjectInAnArray_whenPosting_thenTheFieldCarriesTheIndex()
+            throws Exception {
+        // given — with several participants, a field name without the index leaves the caller
+        // guessing which one to correct
+        String body = """
+                {"courtIds":["%s"],"cardId":"%s",
+                 "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z",
+                 "participants":[{"guestName":"John Roe"},{"personId":"not-a-uuid"}]}
+                """.formatted(courtId, MEMBER_BOOKING_CARD);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/bookings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("participants[1].personId"));
+    }
+
+    @Test
+    void givenAnUnreadableValueUnderAKeyThisApiDefines_whenPutting_thenTheKeyNamesTheField()
+            throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(put(
+                "/api/admin/rule-sets/{id}/rules/{type}", UUID.randomUUID(), "ADVANCE_WINDOW")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"params\":{\"maxDays\":\"not-a-number\"}}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("params.maxDays"));
+    }
+
+    @Test
+    void givenAnUnreadableValueUnderAKeyTheCallerInvented_whenPutting_thenOnlyTheObjectIsNamed()
+            throws Exception {
+        // given — the keys of an additionalProperties object are whatever was sent, so echoing one
+        // back puts the caller's own text in the response
+        ResultActions result = mockMvc.perform(put(
+                "/api/admin/rule-sets/{id}/rules/{type}", UUID.randomUUID(), "ADVANCE_WINDOW")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"params\":{\"<img src=x onerror=alert(1)>\":\"nope\"}}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("params"));
+        assertThat(result.andReturn().getResponse().getContentAsString()).doesNotContain("<img");
+    }
+
+    @Test
     void givenADuplicateInAnArrayThatMustBeUnique_whenPosting_thenTheResponseNamesTheField()
             throws Exception {
         // given — weekdays is a Set, so a duplicate would simply vanish on the way in and the
@@ -136,10 +190,10 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnUnreadableValueInsideAnArray_whenPosting_thenTheResponseNamesTheArray()
+    void givenAnUnreadableValueInsideAnArray_whenPosting_thenTheResponseNamesTheEntry()
             throws Exception {
-        // given — Jackson records the array element as an index, which has no property name; the
-        // field the caller can act on is the array itself
+        // given — the entry, not just the array: an array of ten court ids with one bad entry
+        // should not send the caller looking through all ten
         String body = """
                 {"courtIds":["not-a-uuid"],"cardId":"%s",
                  "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z"}
@@ -153,7 +207,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
 
         // then
         assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
-        result.andExpect(jsonPath("$.fieldErrors[0].field").value("courtIds"))
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("courtIds[0]"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
     }
 
