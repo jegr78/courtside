@@ -45,15 +45,17 @@ Behind TLS, set `COURTSIDE_COOKIE_SECURE=true` so the session and CSRF cookies a
 
 No account is seeded — a shipped password is a shipped vulnerability. Create the first
 admin by hand. The password hash must be **Argon2id** with the parameters this application
-hashes with: `m=32768`, `t=2`, `p=1`, 16-byte salt, 32-byte hash. That exceeds current OWASP
-guidance for Argon2id, and `argon2` takes the memory cost as a power of two, which is why it is
-32 MiB rather than OWASP's 19 MiB.
+hashes with, which are OWASP's current guidance: `m=19456`, `t=2`, `p=1`, 16-byte salt, 32-byte
+hash.
 
 ```bash
-echo -n 'your-password' | argon2 "$(openssl rand -base64 12)" -id -m 15 -t 2 -p 1 -l 32 -e
+echo -n 'your-password' | argon2 "$(openssl rand -base64 12)" -id -k 19456 -t 2 -p 1 -l 32 -e
 ```
 
-That prints `$argon2id$v=19$m=32768,t=2,p=1$<salt>$<hash>`. Paste it into the insert below:
+`-k` sets the memory in KiB; `-m` would set it as a power of two and cannot express 19456. Older
+`argon2` help output and the manpage omit `-k`, but every release since 20190702 accepts it.
+
+That prints `$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`. Paste it into the insert below:
 
 ```sql
 INSERT INTO person (id, first_name, last_name, email) VALUES
@@ -63,12 +65,19 @@ INSERT INTO user_account (id, person_id, username, password_hash, enabled) VALUE
     ('00000000-0000-0000-0000-0000000000a2',
      '00000000-0000-0000-0000-0000000000a1',
      'admin',
-     '$argon2id$v=19$m=32768,t=2,p=1$REPLACE$REPLACE',
+     '$argon2id$v=19$m=19456,t=2,p=1$REPLACE$REPLACE',
      true);
 
 INSERT INTO user_account_role (user_account_id, role) VALUES
     ('00000000-0000-0000-0000-0000000000a2', 'ADMIN');
 ```
+
+An account created before these parameters were raised keeps the hash it has — Argon2 stores its
+own cost, so it still verifies, and nothing rehashes it on login. Change the password to move it up.
+
+Until rate limiting lands (see `docs/design.md`), `POST /api/session` will happily spend this much
+memory per attempt, including for a username that does not exist. Rate-limit it at the reverse
+proxy on any deployment facing the public internet.
 
 `enabled` defaults to `false` — accounts normally wait for approval, and the first one has
 nobody to approve it.

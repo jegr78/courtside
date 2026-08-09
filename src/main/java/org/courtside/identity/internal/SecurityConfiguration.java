@@ -16,21 +16,11 @@ import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfiguration {
 
-    // OWASP's Argon2id guidance lists several equivalent settings; the memory-heavy end of that
-    // list is the one that costs an attacker with GPUs the most, and 32 MiB per login attempt is
-    // nothing for an instance serving one club.
-    //
-    // Not OWASP's m=19456 literally: the argon2 command line the README publishes takes memory as
-    // a power of two, so 19456 KiB cannot be produced with it. 32768 exceeds 19456 at the same
-    // iteration count and parallelism, and a hash an operator creates by hand is then the same
-    // shape as one this application writes. Two shapes in one user_account table is the thing to
-    // avoid.
-    //
-    // Existing hashes keep working: Argon2 encodes its parameters, so matches() reads them from
-    // the stored hash rather than from this configuration.
-    static final int MEMORY_IN_KIBIBYTES = 32768;
-    static final int ITERATIONS = 2;
-    static final int PARALLELISM = 1;
+    // OWASP's Argon2id minimum. Every login costs this much memory, including one for a username
+    // that does not exist, and nothing rate-limits that yet — see docs/design.md.
+    private static final int MEMORY_IN_KIBIBYTES = 19456;
+    private static final int ITERATIONS = 2;
+    private static final int PARALLELISM = 1;
     private static final int SALT_LENGTH_IN_BYTES = 16;
     private static final int HASH_LENGTH_IN_BYTES = 32;
 
