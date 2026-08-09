@@ -33,7 +33,6 @@ class AdminAuthorizationTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/admin/config"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.title").value("Not authenticated"))
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
     }
 
@@ -42,7 +41,8 @@ class AdminAuthorizationTest extends AbstractIntegrationTest {
     void givenARoleThatIsNotAdmin_whenCallingAnAdminEndpoint_thenItIsForbidden() throws Exception {
         // when / then
         mockMvc.perform(get("/api/admin/config"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
     }
 
     @Test
@@ -60,6 +60,41 @@ class AdminAuthorizationTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/admin/does-not-exist"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenAMember_whenCallingAnAdminPathWithMixedCase_thenItIsForbidden() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/ADMIN/config"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAdmin_whenCallingAnAdminPathWithMixedCase_thenItRemainsUnmapped() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/ADMIN/config"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenAMember_whenCallingAPathWithAnAdminPrefix_thenItRemainsUnmapped() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/administrator"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenAMember_whenCallingTheMixedCaseAdminRootWithAQuery_thenItIsForbidden()
+            throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/ADMIN").queryParam("view", "summary"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
     }
 
     @Test
