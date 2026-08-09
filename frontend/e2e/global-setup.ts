@@ -72,6 +72,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
         SPRING_DATASOURCE_URL: `jdbc:postgresql://${postgres.getHost()}:${postgres.getMappedPort(5432)}/courtside`,
         SPRING_DATASOURCE_USERNAME: "courtside",
         SPRING_DATASOURCE_PASSWORD: "courtside",
+        COURTSIDE_COOKIE_SECURE: "false",
         COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: "bootstrap-admin",
         COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: "temporary-password",
         COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "Bootstrap Administrator"
