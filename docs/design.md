@@ -813,6 +813,9 @@ whether it is built or designed. **Designed means absent today.**
   factor of any kind today.
 - **Card PINs** are stored hashed. They are shared secrets, but still credentials.
   **Designed, not built** — `booking_card` carries no PIN column yet.
+- **Source offer:** `GET /api/source` reports the running version, the commit it was built from
+  and where its source can be obtained, unauthenticated. *Built.* An operator who forked sets
+  `COURTSIDE_SOURCE_URL`; unset, it names this repository.
 - **Security headers and TLS** are terminated at the reverse proxy (Caddy in the reference
   deployment). *Designed* — the reference deployment is not published yet, so this is the
   operator's own job for now.

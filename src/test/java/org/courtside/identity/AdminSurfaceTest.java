@@ -58,7 +58,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/openapi.yaml",
             "/api/public/config",
             "/api/public/courts",
-            "/api/public/opening-hours");
+            "/api/public/opening-hours",
+            "/api/source");
 
     private static final Set<String> AUTHENTICATED_PATHS = Set.of(
             "/api/public/booking-cards",

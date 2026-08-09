@@ -41,6 +41,8 @@ tags:
     description: Logging in and out.
   - name: documentation
     description: The contract this instance answers to.
+  - name: source
+    description: Where this instance's own source can be had.
   - name: courts
     description: The club's courts, as anyone may see them.
   - name: opening-hours
@@ -509,6 +511,23 @@ components:
                 occurrences to keep, and nothing is written that they did not confirm.
               items: { type: string, format: date-time }
 
+    SourceOffer:
+      type: object
+      required: [version, sourceUrl]
+      properties:
+        version:
+          type: string
+          description: The version this instance was built as.
+        commit:
+          type: [string, "null"]
+          description: |
+            The commit it was built from, when the build had a repository to read. Absent for a
+            build from a source archive, where the version is all there is to go on.
+        sourceUrl:
+          type: string
+          format: uri
+          description: Where the corresponding source of this version can be obtained.
+
     Occurrence:
       type: object
       required: [startsAt, endsAt, blockedCourtIds, violations, creatable]
@@ -657,6 +676,27 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
 
 paths:
+
+  /api/source:
+    get:
+      tags: [source]
+      operationId: getSourceOffer
+      summary: The running version and where its source can be had.
+      description: |
+        Courtside is AGPL-3.0. A club that modified it and runs it for its members owes those
+        members the source of the modified version, and this is where an instance says which
+        version that is and where to get it. An unmodified deployment reports the upstream
+        repository; a club that forked points `sourceUrl` at its own.
+
+        Public and unauthenticated on purpose: the obligation is to the people using the service,
+        and requiring an account to see it would defeat it.
+      security: []
+      responses:
+        "200":
+          description: What this instance is running.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SourceOffer" }
 
   /api/openapi.yaml:
     get:

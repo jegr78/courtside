@@ -135,3 +135,8 @@ notices intact.
 
 That network clause is what separates the AGPL from the GPL, and it is a deliberate choice
 here: a club's members should be able to see what handles their bookings.
+
+Every instance answers `GET /api/source` with the version it is running, the commit it was built
+from and where that source can be obtained. It needs no login, because the obligation runs to the
+people using the service. An unmodified deployment reports this repository; a club that forked
+sets `COURTSIDE_SOURCE_URL` to its own and has thereby discharged section 13.
