@@ -9,15 +9,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
-// An instance hands out its own contract. Clubs run their own instances and update on their own
-// schedule, so the document in this repository describes some version and the one here describes
-// the version actually answering — which is the one an integrator is writing against.
+// Clubs update on their own schedule, so the document in the repository and the one an instance
+// answers to are not the same document. This is the second.
 @RestController
 class ApiDocumentController implements DocumentationApi {
 
-    // Read once at startup rather than per request: it is a file on this instance's own classpath
-    // that cannot change while the instance runs, and a failure to read it should surface then
-    // rather than the first time somebody asks for the contract.
+    // Read once at startup: it cannot change while the instance runs, and a failure to read it
+    // should stop the start rather than the first request for it.
     private final String document = read();
 
     @Override

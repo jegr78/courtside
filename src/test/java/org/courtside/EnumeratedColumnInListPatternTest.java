@@ -13,11 +13,8 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Three columns hold the name of a Java enum constant. A CHECK is what keeps the database's idea
-// of the allowed set from drifting away from the enum's — and since the entity reads the column
-// back through @Enumerated, a value outside the set is no longer a quiet "nobody holds that role"
-// but an exception on load. The list in the migration is hand-written, so this test is what ties
-// it to its source.
+// The CHECK lists a Java enum's constants by hand. @Enumerated reads the column back, so a value
+// outside the set is an exception on load rather than a quiet miss.
 class EnumeratedColumnInListPatternTest {
 
     @Test

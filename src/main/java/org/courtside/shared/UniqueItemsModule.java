@@ -14,17 +14,8 @@ import tools.jackson.databind.type.CollectionType;
 import java.util.HashSet;
 import java.util.Set;
 
-// Every array the API document declares uniqueItems arrives as a Set, and a Set makes a duplicate
-// disappear: ["A", "A"] would be read as one court, the request would succeed, and the caller
-// would believe two were booked — the response carries no court list to tell them otherwise.
-//
-// JSON Schema calls a document with duplicates invalid, so silently accepting one means the server
-// does not honour its own published contract. This rejects it instead, once and for every such
-// array, present and future.
-//
-// Deliberately a Jackson module rather than a generator template or a mapped collection type: the
-// runtime's own extension point survives a generator upgrade, and the generated models stay
-// exactly what the generator produces.
+// A Set makes a duplicate disappear, so ["A", "A"] would succeed as one court and the response
+// carries no court list to tell the caller otherwise. JSON Schema calls such a document invalid.
 @Component
 class UniqueItemsModule extends SimpleModule {
 
@@ -52,9 +43,8 @@ class UniqueItemsModule extends SimpleModule {
             this.delegate = delegate;
         }
 
-        // A collection deserializer learns what its elements are through these two calls. A wrapper
-        // that answers them itself leaves the delegate holding nothing, and every Set in the API
-        // stops reading — including the ones with no duplicate in them.
+        // A collection deserializer learns its element type through these two; answering them
+        // here instead of delegating leaves every Set in the API unreadable.
         @Override
         public void resolve(DeserializationContext context) {
             delegate.resolve(context);

@@ -24,12 +24,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Ordered on purpose, same reasoning as MembershipTypeSeedRestoreTest: the second test only
-// proves anything if the first one has already run and left the seeded rule set's definitions
-// changed and one of them deleted. AbstractIntegrationTest.restoreRuleDefinitions runs in both
-// @BeforeEach and @AfterEach, so either boundary between these two methods would catch a
-// regression to delete-only restore, or one that forgets a delete-then-recreate gives the
-// re-created row a fresh id.
+// Ordered on purpose, as in MembershipTypeSeedRestoreTest: the second test needs the first to
+// have changed the seeded definitions and deleted one of them.
 @WithMockUser(username = "admin", roles = "ADMIN")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class RuleDefinitionSeedRestoreTest extends AbstractIntegrationTest {

@@ -5,12 +5,8 @@ import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomize
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
-// No array in the API document declares its items nullable, so a null inside one is a request the
-// contract does not describe. Jackson's default is to put that null into the collection, where it
-// travels on until something dereferences it — the caller then gets a 500 for an error they made.
-//
-// Rejected at the point it is read instead, it arrives as a failure carrying the property path,
-// which the exception advice turns into the field a caller has to correct.
+// No array in the document declares its items nullable. Jackson would otherwise carry the null
+// into the collection until something dereferences it, and answer 500 for the caller's mistake.
 @Component
 class RejectsNullElements implements JsonMapperBuilderCustomizer {
 

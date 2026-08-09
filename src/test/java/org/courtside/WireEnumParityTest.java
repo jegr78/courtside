@@ -20,17 +20,8 @@ import static java.util.stream.Collectors.toSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Five enums now exist twice: once in the domain and once, written by hand, in the API document.
-// Nothing makes the two agree — the generator reads only the document, and the compiler never sees
-// them side by side. The controllers cross between them by name.
-//
-// Both directions of drift fail closed rather than open, but neither fails well. A value only the
-// domain knows simply cannot be set through the API, silently. A value only the document knows
-// deserialises and then throws on the way into the domain — a 500 for a request the document said
-// was valid.
-//
-// The same shape as HexColorPatternTest, for the same reason: two copies of one fact, and a test
-// as the only thing holding them together.
+// Five enums exist twice, in the domain and hand-written in the document, with nothing making
+// them agree. A value only the document knows is a 500 for a request the document called valid.
 class WireEnumParityTest {
 
     @Test

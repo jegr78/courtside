@@ -15,10 +15,8 @@ import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// The OpenAPI document is the source of truth for the REST API, which only holds if the two
-// cannot drift. This walks Spring's own mapping registry and the document, and requires them to
-// describe the same set of operations: an endpoint added without a contract fails the build, and
-// so does a contract entry with nothing serving it.
+// Walks Spring's mapping registry and the document in both directions, so neither an undocumented
+// endpoint nor an unserved contract entry can ship.
 class ApiContractCoverageTest extends AbstractIntegrationTest {
 
     // Read from the classpath, not from src: this is the copy that ships inside the jar, and the

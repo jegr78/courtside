@@ -110,10 +110,8 @@ class SeriesController implements BookingSeriesApi {
                 series.move(moveRequestOf(id, body), account.getId(), account.getRoles())));
     }
 
-    // Previewing and creating carry the same recurrence in two generated types — the document
-    // states that creating also requires the caller's confirmation, and allOf produces two classes
-    // rather than one hierarchy. One overload each, rather than one method behind nine positional
-    // parameters: durationMinutes and intervalWeeks are both Integer and would transpose silently.
+    // allOf gives the recurrence two unrelated generated types. One overload each, because nine
+    // positional parameters would put durationMinutes and intervalWeeks side by side.
     private static SeriesRule ruleOf(ApiSeriesRuleRequest request) {
         return new SeriesRule(List.copyOf(request.getCourtIds()), request.getCardId(),
                 request.getStartsOn(), request.getStartTime(), request.getDurationMinutes(),

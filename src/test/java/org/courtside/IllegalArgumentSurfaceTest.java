@@ -11,16 +11,8 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// IllegalArgumentException is the JDK's catch-all: the shared advice can only turn it into a 400
-// carrying getMessage() verbatim, so its raw English reaches a club board with no code, no
-// parameters and nothing a frontend can translate. CLAUDE.md allows it in exactly one place — a
-// value type guarding an invariant against a programming error — and this test is what makes that
-// allowance an enforced boundary rather than an intention.
-//
-// Every site outside the list below was found reachable from a request and converted: to a Bean
-// Validation constraint where a field could express it, to a typed failure with an i18n code where
-// it could not, and to IllegalStateException where a service guards against its own caller
-// skipping the validation that precedes it.
+// An IllegalArgumentException reachable from a request becomes a 400 carrying raw English, with
+// no code a frontend can translate. Allowed only in a value type guarding against a programmer.
 class IllegalArgumentSurfaceTest {
 
     private static final String THROW = "throw new IllegalArgumentException";

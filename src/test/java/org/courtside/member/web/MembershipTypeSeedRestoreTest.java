@@ -24,10 +24,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Ordered on purpose: the second test only proves anything if the first one has already run and
-// left the seeded row deactivated. AbstractIntegrationTest.restoreMembershipTypes runs in both
-// @BeforeEach and @AfterEach, so either boundary between these two methods would catch a
-// regression to delete-only restore.
+// Ordered on purpose: the second test only proves anything once the first has left the seeded row
+// deactivated, and the restore runs at both boundaries between them.
 @WithMockUser(username = "admin", roles = "ADMIN")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class MembershipTypeSeedRestoreTest extends AbstractIntegrationTest {
