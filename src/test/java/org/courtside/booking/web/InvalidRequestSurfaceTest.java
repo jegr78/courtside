@@ -32,11 +32,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Pins the answer at every throw site a request was found able to reach. Each of these once
-// returned urn:courtside:error:invalid-request — a 400 carrying the exception's message verbatim,
-// with no i18n code and no field, which CLAUDE.md forbids. The test was written the other way
-// round first, asserting that broken answer, so that "this site is reachable" was proven rather
-// than read off the annotations; those assertions were then turned into the ones below.
+// Pins the answer at every throw site a request can reach. Each once returned a 400 carrying the
+// exception's message verbatim, with no code and no field.
 @WithMockUser(username = "doe.jane", roles = "MEMBER")
 class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
@@ -203,11 +200,8 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SeriesEndsOnce"));
     }
 
-    // Previewing and creating carry the recurrence in two different generated types, so the same
-    // rule is stated twice in SeriesRequestValidator. Testing only the preview leaves the second
-    // statement free to be deleted: without it a series that ends twice reaches SeriesRule's
-    // constructor, and an IllegalArgumentException there is a 500 for a request the caller got
-    // wrong.
+    // The rule is stated twice in SeriesRequestValidator, once per generated type. Testing only
+    // the preview leaves the other free to be deleted, and its absence is a 500.
     @Test
     void whenASeriesToCreateEndsBeforeItStarts_thenItIsAFieldErrorOnEndsOn() throws Exception {
         // when / then
@@ -240,9 +234,8 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SeriesEndsOnce"));
     }
 
-    // weekdays is the one array the document bounds below but not above — seven is what
-    // uniqueItems already allows, not a limit worth stating. It is therefore also the only case
-    // that reaches the code written for a maximum no message can name.
+    // The one array the document bounds below but not above, and so the only case reaching the
+    // code written for a maximum no message can name.
     @Test
     void whenASeriesNamesNoWeekdays_thenTheViolationDoesNotQuoteAnUnboundedMaximum()
             throws Exception {

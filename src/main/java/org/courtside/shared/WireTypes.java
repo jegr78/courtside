@@ -7,14 +7,8 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
-// The API document describes a moment as an RFC 3339 date-time, which the generator reads as an
-// OffsetDateTime; the domain speaks Instant, because a booking happens at one moment regardless of
-// how anyone writes it down. Every controller crossing that line crosses it here, so the choice of
-// offset is made once and is the same in every response.
-//
-// UTC, and not the club's own zone: the offset a response carries says nothing the instant does not
-// already say, and a club that moves across a daylight-saving boundary would otherwise change how
-// its past bookings read.
+// UTC and not the club's zone: the offset says nothing the instant does not, and a club crossing
+// a daylight-saving boundary would otherwise change how its past bookings read.
 public final class WireTypes {
 
     private WireTypes() {

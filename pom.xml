@@ -189,24 +189,18 @@
                             <library>spring-boot</library>
                             <apiPackage>org.courtside.api</apiPackage>
                             <modelPackage>org.courtside.api</modelPackage>
-                            <!-- Fifteen of the document's schemas share a name with a domain type:
-                                 Court, OpeningHours, RuleSet, Role and more. The document is right
-                                 to call a court a Court, so the prefix goes on this side. -->
+                            <!-- Fifteen schemas share a name with a domain type, and the
+                                 document is right to call a court a Court. -->
                             <modelNamePrefix>Api</modelNamePrefix>
                             <generateApiTests>false</generateApiTests>
                             <generateModelTests>false</generateModelTests>
                             <generateApiDocumentation>false</generateApiDocumentation>
                             <generateModelDocumentation>false</generateModelDocumentation>
-                            <!-- Boot 4 ships Jackson 3, where databind moved to tools.jackson.
-                                 The generator hard-codes the Jackson 2 package for the annotation
-                                 it adds to a uniqueItems array; this points it at the right one so
-                                 the document can keep saying what is true. -->
+                            <!-- The generator hard-codes Jackson 2's package for the
+                                 annotation on a uniqueItems array; Boot 4 ships Jackson 3. -->
                             <typeMappings>
-                                <!-- format: time is a LocalTime everywhere it appears, in a
-                                     property and in a query parameter alike. DayOfWeek is
-                                     deliberately left generated: the mapping reaches properties
-                                     but not path variables, and one wire enum converted at the
-                                     edge beats the same type meaning two things. -->
+                                <!-- DayOfWeek is deliberately not mapped: it would reach
+                                     properties but not path variables. -->
                                 <typeMapping>time=LocalTime</typeMapping>
                             </typeMappings>
                             <importMappings>

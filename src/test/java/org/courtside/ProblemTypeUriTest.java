@@ -25,12 +25,8 @@ class ProblemTypeUriTest {
             Pattern.compile("setType\\(URI\\.create\\(\"([^\"]+)\"\\)\\)");
     private static final Pattern ALLOWED = Pattern.compile("urn:courtside:error:[a-z0-9-]+");
 
-    // The complete set of problem type URNs src/main is allowed to produce today. A new slug, a
-    // near-synonym or a silent rename must land here deliberately, not slip past a shape-only check.
-    //
-    // Two sources, because two kinds of failure exist. A domain failure carries its own
-    // ProblemType constant; a framework exception has no such constant and is described by a
-    // literal in the advice that answers for it.
+    // Every URN src/main may produce. Two sources: a domain failure carries a ProblemType
+    // constant, a framework exception only a literal in the advice answering for it.
     private static final List<String> KNOWN_FAILURE_SLUGS = List.of(
             "urn:courtside:error:booking-not-found",
             "urn:courtside:error:booking-not-owned",

@@ -16,9 +16,18 @@ import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfiguration {
 
+    // OWASP's Argon2id minimum. Every login costs this much memory, including one for a username
+    // that does not exist, and nothing rate-limits that yet — see docs/design.md.
+    private static final int MEMORY_IN_KIBIBYTES = 19456;
+    private static final int ITERATIONS = 2;
+    private static final int PARALLELISM = 1;
+    private static final int SALT_LENGTH_IN_BYTES = 16;
+    private static final int HASH_LENGTH_IN_BYTES = 32;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
+        return new Argon2PasswordEncoder(SALT_LENGTH_IN_BYTES, HASH_LENGTH_IN_BYTES,
+                PARALLELISM, MEMORY_IN_KIBIBYTES, ITERATIONS);
     }
 
     @Bean

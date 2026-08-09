@@ -28,12 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-// Ordered ahead of Boot's own spring.mvc.problemdetails fallback advice, which otherwise wins the
-// tie for MethodArgumentNotValidException and answers with its generic, field-less detail — but
-// behind module-specific advices such as BookingExceptionHandler, which must resolve their own
-// exceptions before this one can claim them by walking their cause chain (Spring's resolver
-// recurses to the end of it, not just one level). AdviceOrderingTest enforces this for every
-// advice, present and future.
+// Ahead of Boot's problemdetails fallback, behind the module advices that must claim their own
+// exceptions first. AdviceOrderingTest enforces it.
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 1000)
 class SharedExceptionHandler {
@@ -45,12 +41,8 @@ class SharedExceptionHandler {
             "Min", Set.of("value"),
             "Max", Set.of("value"));
 
-    // Deliberately narrow: a write that raises a more specific conflict exception instead of
-    // letting the underlying constraint violation through must not have it downgraded to a 400
-    // here, which would turn a 409 into one. A module that knows what a particular constraint
-    // means translates it to a typed exception with its own advice, ordered ahead of this one, so
-    // this only ever answers for a violation nothing upstream recognised — it must not guess at a
-    // cause (a foreign key, a check, a not-null constraint) it cannot actually name.
+    // Only for a violation nothing upstream recognised, and it must not guess at which
+    // constraint: naming one would downgrade a module's 409 to a 400.
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleRejectedByTheDatabase(DataIntegrityViolationException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -67,9 +59,7 @@ class SharedExceptionHandler {
                 .toList());
     }
 
-    // One builder for both advices that answer with this type: ProblemTypeUriTest reads the type
-    // literals an advice sets and expects each slug once, so a second literal here would read as a
-    // second, unreviewed problem type rather than as the same one reached two ways.
+    // One builder, because ProblemTypeUriTest expects each slug's literal exactly once.
     private static ProblemDetail validationFailed(List<Map<String, Object>> fieldErrors) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "The request does not pass validation");
@@ -91,11 +81,8 @@ class SharedExceptionHandler {
         return problem;
     }
 
-    // Jackson records the property path as a mismatch unwinds, so a value it cannot read — an
-    // unknown enum constant, a malformed uuid, a date that is not one, a duplicate in an array the
-    // contract declares unique — can be reported as the field it came from rather than as "the
-    // body was unreadable". Without this the caller is told only that something, somewhere, is
-    // wrong with a request they wrote.
+    // Jackson records the property path as a mismatch unwinds, so a value it cannot read names
+    // its field instead of leaving the caller with "something in the body is wrong".
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail handleUnreadableBody(HttpMessageNotReadableException exception) {
         String field = mismatchedField(exception);
@@ -107,19 +94,16 @@ class SharedExceptionHandler {
             return problem;
         }
 
-        // Written out twice rather than as one map with a computed code: ValidationMessageCoverageTest
-        // finds a code by the literal that follows the "code" key, and a code it cannot see is a
-        // code with no bundle entry.
+        // Twice, not one map with a computed code: ValidationMessageCoverageTest finds a code
+        // by the literal following the "code" key, and one it cannot see has no bundle entry.
         return validationFailed(List.of(
                 exception.getCause() instanceof DuplicateItemException
                         ? Map.of("field", field, "code", "validation.NoDuplicates", "params", Map.of())
                         : Map.of("field", field, "code", "validation.TypeMismatch", "params", Map.of())));
     }
 
-    // A property name a caller chose is not a property name this API defines: the keys of an
-    // additionalProperties object are whatever was sent. Anything outside this set is not put in
-    // the response — the field then names the object that holds it, which is true and says as much
-    // as can honestly be said.
+    // The keys of an additionalProperties object are whatever the caller sent, so anything
+    // outside this set is not echoed back.
     private static final Pattern A_NAME_THIS_API_DEFINES = Pattern.compile("[A-Za-z0-9_-]{1,40}");
 
     private static String mismatchedField(HttpMessageNotReadableException exception) {
@@ -128,9 +112,8 @@ class SharedExceptionHandler {
         }
         StringBuilder field = new StringBuilder();
         for (JacksonException.Reference reference : mismatch.getPath()) {
-            // The index belongs in the name: "participants.personId" leaves a caller with several
-            // participants no way to tell which one, and Bean Validation names the same field
-            // "participants[0].personId".
+            // Bean Validation names the same field "participants[0].personId"; without the
+            // index a caller cannot tell which entry to correct.
             if (reference.getIndex() >= 0) {
                 field.append('[').append(reference.getIndex()).append(']');
                 continue;
@@ -150,9 +133,7 @@ class SharedExceptionHandler {
         return field.isEmpty() ? null : field.toString();
     }
 
-    // RFC 9110 §15.5.6 makes Allow mandatory on a 405, and it is the only machine-readable
-    // statement of what is allowed — HttpRequestMethodNotSupportedException.getHeaders() already
-    // carries it, so a bare ProblemDetail must not be returned in its place.
+    // RFC 9110 §15.5.6 makes Allow mandatory on a 405, and getHeaders() already carries it.
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     ResponseEntity<ProblemDetail> handleUnsupportedMethod(HttpRequestMethodNotSupportedException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -173,9 +154,8 @@ class SharedExceptionHandler {
         return problem;
     }
 
-    // HttpMediaTypeNotSupportedException.getHeaders() carries Accept, the same way
-    // HttpRequestMethodNotSupportedException.getHeaders() carries Allow above — RFC 9110 does not
-    // make it mandatory on a 415, but dropping it is the same loss of a machine-readable answer.
+    // getHeaders() carries Accept, as it carries Allow above. Not mandatory on a 415, but
+    // dropping it loses the same machine-readable answer.
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     ResponseEntity<ProblemDetail> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -210,9 +190,8 @@ class SharedExceptionHandler {
 
     private static Map<String, Object> toMap(FieldError error) {
         if (!error.contains(ConstraintViolation.class)) {
-            // A Spring Validator's rejection carries its own code — a cross-field rule the request
-            // record cannot hold. Falling back to "rejected" would throw that name away and leave
-            // a client unable to tell one such rule from another.
+            // A Validator's rejection carries its own code; falling back to "rejected" would
+            // leave a client unable to tell one cross-field rule from another.
             String code = error.getCode();
             return Map.of("field", error.getField(),
                     "code", code == null ? "validation.rejected" : "validation." + code,
@@ -228,9 +207,8 @@ class SharedExceptionHandler {
         Map<String, Object> params = new LinkedHashMap<>();
         allowedParams.forEach(name -> params.put(name, attributes.get(name)));
 
-        // minItems with no maximum generates @Size(min = 1), whose max is Integer.MAX_VALUE. A
-        // message reading "between 1 and 2147483647 in length" tells a caller nothing, and two
-        // billion is not information — so the unbounded case is its own code with its own message.
+        // An unbounded minItems generates @Size(min = 1) with max = Integer.MAX_VALUE, and no
+        // message can name two billion usefully.
         if ("Size".equals(constraintName) && Integer.valueOf(Integer.MAX_VALUE).equals(params.get("max"))) {
             params.remove("max");
             return Map.of(

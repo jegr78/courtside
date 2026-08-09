@@ -25,9 +25,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Australia/Lord_Howe sits at UTC+10:30 in June, far enough from UTC that a query filtering on the
-// server's or the database session's zone instead of the configured club zone would misclassify
-// this booking's weekday and this test would fail.
+// At UTC+10:30 in June, far enough that filtering on the server's or the database's zone instead
+// of the club's would misclassify this booking's weekday.
 @WithMockUser(username = "admin", roles = "ADMIN")
 @SpringBootTest(properties = "courtside.booking.time-zone=Australia/Lord_Howe")
 class ImpactClubZoneTest extends AbstractIntegrationTest {

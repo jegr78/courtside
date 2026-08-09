@@ -92,9 +92,8 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
 
     @Test
     void givenABodyFieldThatIsNotAUuid_whenPosting_thenTheResponseNamesTheField() throws Exception {
-        // given — a value Jackson cannot read is a validation failure about one field, not an
-        // unreadable body. Reported as the latter, a caller learns only that something, somewhere,
-        // in what they sent is wrong.
+        // given — a value Jackson cannot read is a failure about one field, not an unreadable
+        // body
         String body = """
                 {"courtIds":["%s"],"cardId":"not-a-uuid",
                  "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z"}

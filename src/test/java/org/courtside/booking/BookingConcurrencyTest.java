@@ -127,9 +127,8 @@ class BookingConcurrencyTest extends AbstractIntegrationTest {
                 List.of(ParticipantSpec.guest("Partner")), null));
     }
 
-    // The whole point of the test: the second session must be forced to wait on the first, and
-    // waiting is the one thing an assertion about outcomes cannot observe. Both bookings would
-    // still come out SUCCEEDED and REJECTED if they never overlapped at all.
+    // The second session must be made to wait, and waiting is the one thing an outcome assertion
+    // cannot see: both results hold even if the two never overlapped.
     private void awaitASessionBlockedOnALock() {
         long deadline = System.nanoTime() + UNTIL_CONTENTION.toNanos();
         while (System.nanoTime() < deadline) {
@@ -143,9 +142,8 @@ class BookingConcurrencyTest extends AbstractIntegrationTest {
                         + ", so the second booking never contended with the uncommitted first one");
     }
 
-    // Without the discard, this poll can never succeed: PostgreSQL caches the statistics views
-    // for the whole transaction, and this one runs inside the transaction holding the slot, so
-    // it would keep re-reading a snapshot taken before the other session even connected.
+    // PostgreSQL caches the statistics views per transaction, and this poll runs inside the one
+    // holding the slot, so without the discard it re-reads a stale snapshot.
     private int sessionsBlockedOnALock() {
         jdbc.sql("SELECT pg_stat_clear_snapshot()").query().singleValue();
         return jdbc.sql("""

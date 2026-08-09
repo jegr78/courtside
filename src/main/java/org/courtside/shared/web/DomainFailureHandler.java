@@ -8,9 +8,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-// Ahead of SharedExceptionHandler, so a failure that wraps a DataIntegrityViolationException is
-// answered by its own descriptor rather than by that advice's cause-chain fallback, which would
-// downgrade a 409 to a 400. AdviceOrderingTest enforces the relation.
+// Ahead of SharedExceptionHandler, whose cause-chain fallback would downgrade a wrapped 409 to a
+// 400. AdviceOrderingTest enforces the relation.
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 500)
 class DomainFailureHandler {

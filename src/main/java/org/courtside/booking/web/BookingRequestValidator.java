@@ -5,11 +5,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 
-// Rules that span two fields, which no per-field constraint and no OpenAPI keyword can state.
-// They live here rather than as an annotation on the request model because the model is generated
-// from the API document: an annotation on it would be overwritten on the next build. Errors are
-// reported against the field the member has to correct, so they reach the client as fieldErrors
-// entries exactly as a Bean Validation failure does.
+// Cross-field rules live here and not on the request model, which is generated and would lose
+// an annotation on the next build.
 @Component
 class BookingRequestValidator implements Validator {
 

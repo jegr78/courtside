@@ -31,9 +31,8 @@ import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Berlin's shift is one hour on the last Sunday of March and October. Australia/Lord_Howe shifts
-// half an hour, on different dates, in the opposite direction — a create/move path that assumed
-// "one hour" would still pass every Berlin-only test and drift here.
+// Lord_Howe shifts half an hour, on other dates, in the opposite direction to Berlin: code that
+// assumed "one hour" passes every Berlin-only test and drifts here.
 @SpringBootTest(properties = "courtside.booking.time-zone=Australia/Lord_Howe")
 class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
@@ -41,10 +40,8 @@ class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
             UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final ZoneId ZONE = ZoneId.of("Australia/Lord_Howe");
 
-    // Derived from ZoneId.of("Australia/Lord_Howe").getRules(), tzdb 2025b, with a throwaway
-    // program, then cross-checked: nextTransition from 2026-01-01 gives 2026-04-05 (an overlap,
-    // +11:00 to +10:30, before the fixed clock and so unusable) and then 2026-10-04 (a gap,
-    // +10:30 to +11:00); the transition after that is 2027-04-04 (an overlap, +11:00 to +10:30).
+    // From ZoneId.of("Australia/Lord_Howe").getRules(), tzdb 2025b: 2026-10-04 is the gap
+    // (+10:30 to +11:00) and 2027-04-04 the overlap (+11:00 to +10:30).
     private static final LocalDate BEFORE_THE_GAP = LocalDate.of(2026, 9, 27);
     private static final LocalDate THE_GAP = LocalDate.of(2026, 10, 4);
     private static final LocalDate BEFORE_THE_OVERLAP = LocalDate.of(2027, 3, 28);

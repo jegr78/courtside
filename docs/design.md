@@ -797,8 +797,9 @@ uptime ping.
 A club admin decides here whether to trust Courtside with member credentials, so each item says
 whether it is built or designed. **Designed means absent today.**
 
-- **Passwords:** Argon2id, at Spring Security's current defaults. Login by username (section 4).
-  *Built.*
+- **Passwords:** Argon2id at `m=19456`, `t=2`, `p=1`, OWASP's current guidance and above Spring
+  Security's own defaults. Login by username (section 4). *Built.* Nothing rehashes an older,
+  cheaper hash on login — it keeps verifying, and only a password change moves it up.
 - **Sessions:** server-side via Spring Session in the database, delivered as an
   `HttpOnly` / `Secure` / `SameSite=Lax` cookie. **No JWT** — the PWA and API share an
   origin, so no token gymnastics are needed, and an admin can terminate a session

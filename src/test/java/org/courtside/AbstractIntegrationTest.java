@@ -13,10 +13,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-// The two configurations are top-level classes rather than nested ones on purpose. Nested
-// @Configuration classes are also picked up as a subclass's default context configuration,
-// which Spring Framework 7.1 stops ignoring — they would then apply twice, once by detection
-// and once by this import.
+// Top-level and not nested: Spring Framework 7.1 stops ignoring a nested @Configuration as a
+// subclass's default, which would apply them twice.
 @SpringBootTest
 @Import({TestcontainersConfiguration.class, FixedClockConfiguration.class})
 public abstract class AbstractIntegrationTest {
@@ -43,10 +41,8 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
-    // A superclass's @BeforeAll runs before a subclass's own @BeforeAll, so capturing the seed
-    // here — not lazily on restoreClubConfig()'s first call — closes the window a subclass could
-    // otherwise poison first: a @TestInstance(PER_CLASS) class with its own @BeforeAll writing to
-    // club_config before this class's @BeforeEach ever runs.
+    // Captured in @BeforeAll and not lazily: a subclass's own @BeforeAll runs later and could
+    // otherwise write to club_config before the seed was ever read.
     @BeforeAll
     static void captureSeededClubConfig(@Autowired JdbcClient jdbc) {
         seededClubConfig = jdbc.sql("""
@@ -56,9 +52,7 @@ public abstract class AbstractIntegrationTest {
                 """).query().singleRow();
     }
 
-    // booking_card and participant_card are, like club_config, never blanket-deleted: their rows
-    // are addressed by fixed seeded id elsewhere (CardServiceTest). Captured here for the same
-    // ordering reason as the club config seed.
+    // Never blanket-deleted, because other tests address these rows by fixed seeded id.
     @BeforeAll
     static void captureSeededCardCatalog(@Autowired JdbcClient jdbc) {
         seededBookingCardActiveById = activeById(jdbc, "booking_card");
@@ -73,12 +67,8 @@ public abstract class AbstractIntegrationTest {
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
-    // rule_set and membership_type carry fixed-id seeded rows (Standard/Youth, Active/Youth) that
-    // other integration tests read by literal UUID (AdvanceWindowRuleTest, MaxOpenBookingsRuleTest,
-    // AdminOverrideTest, SeriesCreationTest, SeriesControllerTest), so — like the card catalog —
-    // neither table can go in TABLES_IN_DELETION_ORDER: a blanket delete would take the seed with
-    // it. rule_definition is captured the same way: RuleDefinitionAdminControllerTest writes to it
-    // through RuleAdminService.setRule/removeRule, including on the seeded rule sets themselves.
+    // Same as the card catalog: other tests read these rows by literal UUID, so a blanket delete
+    // would take the seed with them.
     @BeforeAll
     static void captureSeededRuleConfiguration(@Autowired JdbcClient jdbc) {
         seededRuleSetById = jdbc.sql("SELECT id, name, active FROM rule_set")
@@ -99,12 +89,8 @@ public abstract class AbstractIntegrationTest {
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
-    // Bound to both phases: @AfterEach alone would still expose the bootstrap seed to the first
-    // test of a JVM, which is the ordering dependency this teardown exists to remove. The card
-    // catalog restore runs at the end of this same method, not as a sibling @BeforeEach/@AfterEach,
-    // because JUnit Jupiter does not guarantee the relative order of multiple lifecycle methods in
-    // one class — and it must run after booking_participant and booking are cleared, since both
-    // hold foreign keys into the two card tables.
+    // Both phases, because @AfterEach alone still exposes the bootstrap seed to a JVM's first
+    // test. The card restore is inline, since Jupiter does not order sibling lifecycle methods.
     @BeforeEach
     @AfterEach
     protected void deleteTransactionalData() {
@@ -127,10 +113,8 @@ public abstract class AbstractIntegrationTest {
                 .update());
     }
 
-    // club_config is never deleted (it must always have exactly one row), so a test that changes
-    // it is restored here instead, for the same ordering reason as deleteTransactionalData. Raw
-    // SQL rather than ConfigService: this fixture must not depend on the production code it exists
-    // to let other tests trust.
+    // Restored rather than deleted, since club_config must always hold exactly one row. Raw SQL,
+    // so the fixture does not depend on the code it exists to let other tests trust.
     @BeforeEach
     @AfterEach
     protected void restoreClubConfig() {
@@ -142,9 +126,8 @@ public abstract class AbstractIntegrationTest {
                 """).params(seededClubConfig).update();
     }
 
-    // Must run before restoreRuleSets(): membership_type.rule_set_id has no ON DELETE, so a
-    // seeded membership type still pointing at a test-created rule set would block that rule
-    // set's deletion unless its own rule_set_id is put back first.
+    // Before restoreRuleSets(): membership_type.rule_set_id has no ON DELETE, so a seeded row
+    // still pointing at a test-created rule set would block its deletion.
     private void restoreMembershipTypes() {
         jdbc.sql("DELETE FROM membership_type WHERE id NOT IN (:ids)")
                 .param("ids", seededMembershipTypeById.keySet())
@@ -172,11 +155,8 @@ public abstract class AbstractIntegrationTest {
                 .update());
     }
 
-    // Deleting by id-not-in-seed and then upserting the seeded rows back (rather than updating in
-    // place) also undoes a delete-then-recreate: RuleAdminService.setRule gives a re-created
-    // definition a fresh random id, so the row left behind after the delete has an id outside the
-    // seed and is caught by the same clause, before the upsert restores the original by its
-    // original id.
+    // Delete-by-id-not-in-seed then upsert, rather than update in place: a re-created definition
+    // gets a fresh id, which only the delete clause catches.
     private void restoreRuleDefinitions() {
         jdbc.sql("DELETE FROM rule_definition WHERE id NOT IN (:ids)")
                 .param("ids", seededRuleDefinitionById.keySet())
