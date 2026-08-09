@@ -28,7 +28,7 @@ server:
   servlet:
     session:
       cookie:
-        secure: ${COURTSIDE_COOKIE_SECURE:false}
+        secure: ${COURTSIDE_COOKIE_SECURE:true}
 
 courtside:
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}

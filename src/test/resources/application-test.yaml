@@ -3,3 +3,9 @@ courtside:
     username: bootstrap-admin
     password: temporary-password
     display-name: Bootstrap Administrator
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false

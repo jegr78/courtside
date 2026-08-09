@@ -28,6 +28,7 @@ export JAVA_HOME=/path/to/temurin-25
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/courtside \
 SPRING_DATASOURCE_USERNAME=courtside \
 SPRING_DATASOURCE_PASSWORD=courtside \
+COURTSIDE_COOKIE_SECURE=false \
 ./mvnw spring-boot:run
 ```
 
@@ -36,11 +37,11 @@ weekday, a single court numbered 1 (unnamed — give it a name and add the rest 
 UI), the four booking cards, the two participant cards (Ball machine, Looking for a partner) and
 the Standard and Youth rule sets. How many courts a club has is the club's business, so the seed
 takes no position beyond the one court without which nothing can be booked at all. Adjust all of
-it later through the database or the admin UI. Migrations currently run to `V10`, which records
-whether an account must replace its initial password.
+it later through the database or the admin UI. Migrations currently run to `V11`, which stores
+login-attempt counters.
 
-Behind TLS, set `COURTSIDE_COOKIE_SECURE=true` so the session and CSRF cookies are marked
-`Secure`. It defaults to `false` so plain HTTP works during development.
+Session and CSRF cookies are marked `Secure` by default. Set `COURTSIDE_COOKIE_SECURE=false` only
+for a local plain-HTTP process such as the development command above.
 
 ## First start: creating the first admin
 
