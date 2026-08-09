@@ -1,0 +1,53 @@
+name: courtside
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: courtside
+      POSTGRES_USER: courtside
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courtside -d courtside"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  app:
+    image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
+      SPRING_DATASOURCE_USERNAME: courtside
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      COURTSIDE_COOKIE_SECURE: ${COURTSIDE_COOKIE_SECURE:-true}
+      COURTSIDE_TIME_ZONE: ${COURTSIDE_TIME_ZONE:-Europe/Berlin}
+      COURTSIDE_SOURCE_URL: ${COURTSIDE_SOURCE_URL:-https://github.com/jegr78/courtside}
+    ports:
+      - "127.0.0.1:${COURTSIDE_PORT:-8080}:8080"
+
+  proxy:
+    image: caddy:2-alpine
+    profiles: [proxy]
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      COURTSIDE_DOMAIN: ${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  db:
+  caddy-data:
+  caddy-config:

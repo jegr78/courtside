@@ -4,6 +4,7 @@
 *.iml
 target/
 build/
+deploy/.env
 
 # IDE
 .vscode/

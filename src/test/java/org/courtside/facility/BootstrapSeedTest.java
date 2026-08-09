@@ -21,7 +21,7 @@ class BootstrapSeedTest extends AbstractIntegrationTest {
     private FacilityService facility;
 
     @Test
-    void whenTheBootstrapSeedIsApplied_thenFourCourtsAndAWholeWeekOfOpeningHoursExist() {
+    void whenTheBootstrapSeedIsApplied_thenOneCourtAndAWholeWeekOfOpeningHoursExist() {
         // given
         new ResourceDatabasePopulator(new ClassPathResource("db/migration/V7__bootstrap.sql"))
                 .execute(dataSource);
@@ -31,7 +31,9 @@ class BootstrapSeedTest extends AbstractIntegrationTest {
 
         // then
         assertThat(courts).extracting(Court::getNumber)
-                .containsExactly(1, 2, 3, 4);
+                .as("how many courts a club has is the club's business — the seed takes no"
+                        + " position beyond the one without which nothing can be booked")
+                .containsExactly(1);
         assertThat(courts).extracting(Court::getName)
                 .containsOnlyNulls();
         assertThat(DayOfWeek.values()).allSatisfy(day ->

@@ -78,16 +78,19 @@ controller for its own members' data.** The Courtside project is not a processor
 anyone else's data. Courtside therefore ships the *means* to comply (deletion jobs, data
 export, documentation templates) but never holds foreign personal data.
 
-### Repository split
+### Code and deployment
 
-| Repository | Contains |
-|---|---|
-| `courtside` | The application. Produces releases. |
-| `courtside-deploy` | Reference deployment, to be published separately. Clubs copy and adapt it rather than configuring the application repository. |
+The reference deployment lives in `deploy/` in this repository: a Compose file, a Caddy
+configuration and the documented environment. Clubs copy the directory and adapt it rather than
+configuring the application repository, and the maintainer runs the same thing they publish.
 
-Keeping deployment out of the application repository is deliberate: clubs will not all run
-the same infrastructure, and the project must not assume they do. Every instance is a
-consumer of the reference deployment; none is a special case.
+A separate `courtside-deploy` repository was the earlier plan, on the reasoning that clubs will not
+all run the same infrastructure. That reasoning argues for the deployment being *copyable*, which a
+directory is. What it does not survive is the release choreography: a new environment variable and
+the Compose file that sets it belong in one change and one review, and two repositories would make
+every release answer which deployment version pairs with which image tag.
+
+Every instance is a consumer of the reference deployment; none is a special case.
 
 ### Release artifacts
 
@@ -820,8 +823,9 @@ whether it is built or designed. **Designed means absent today.**
   and where its source can be obtained, unauthenticated. *Built.* An operator who forked sets
   `COURTSIDE_SOURCE_URL`; unset, it names this repository.
 - **Security headers and TLS** are terminated at the reverse proxy (Caddy in the reference
-  deployment). *Designed* — the reference deployment is not published yet, so this is the
-  operator's own job for now.
+  deployment, which sets HSTS, `X-Content-Type-Options`, `X-Frame-Options` and a referrer policy
+  and obtains its own certificate). An operator without a public address can use Tailscale Funnel
+  instead, which terminates TLS the same way; that is documented as an option, not a dependency.
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the release workflow signs each image keylessly with
   cosign and attaches an SBOM attestation. Image scanning is designed and not built.*
@@ -925,7 +929,7 @@ AGPL users run version 1.2 in the wild, a broken migration means data loss for s
 | Sessions | Spring Session, database-backed |
 | Observability | OTLP via `spring-boot-starter-opentelemetry`, structured ECS logs |
 | Packaging | Multi-arch container image, GHCR |
-| Reference deployment | Docker Compose + Caddy, in `courtside-deploy` (planned) |
+| Reference deployment | Docker Compose + Caddy, in `deploy/` |
 | Licence | AGPL-3.0 |
 
 **PostgreSQL is not interchangeable here.** Exclusion constraints over range types are the

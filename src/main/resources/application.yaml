@@ -34,7 +34,7 @@ courtside:
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}
   booking:
     slot-minutes: 30
-    time-zone: Europe/Berlin
+    time-zone: ${COURTSIDE_TIME_ZONE:Europe/Berlin}
     series-horizon-months: 12
 
 management:
