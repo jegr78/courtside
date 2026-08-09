@@ -1,26 +1,18 @@
 package org.courtside.rules.web;
 
+import org.courtside.api.AdminRuleSetsApi;
+import org.courtside.api.ApiActiveRequest;
+import org.courtside.api.ApiRuleDefinition;
+import org.courtside.api.ApiRuleSet;
+import org.courtside.api.ApiRuleSetRequest;
+import org.courtside.api.ApiRuleType;
+import org.courtside.api.ApiSetRuleRequest;
 import org.courtside.rules.internal.RuleAdminService;
 import org.courtside.rules.internal.RuleDefinition;
 import org.courtside.rules.internal.RuleSet;
 import org.courtside.rules.internal.RuleType;
-import org.courtside.rules.web.RuleAdminWebModels.RuleDefinitionResponse;
-import org.courtside.rules.web.RuleAdminWebModels.RuleSetRequest;
-import org.courtside.rules.web.RuleAdminWebModels.RuleSetResponse;
-import org.courtside.rules.web.RuleAdminWebModels.SetRuleRequest;
-import org.courtside.shared.ActiveRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -28,66 +20,71 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/admin/rule-sets")
 @RequiredArgsConstructor
-class RuleAdminController {
+class RuleAdminController implements AdminRuleSetsApi {
 
     private final RuleAdminService ruleSets;
 
-    @GetMapping
-    List<RuleSetResponse> ruleSets() {
-        return ruleSets.allRuleSets().stream()
+    @Override
+    public ResponseEntity<List<ApiRuleSet>> listRuleSets() {
+        return ResponseEntity.ok(ruleSets.allRuleSets().stream()
                 .map(RuleAdminController::toResponse)
-                .toList();
+                .toList());
     }
 
-    @PostMapping
-    ResponseEntity<RuleSetResponse> create(@Valid @RequestBody RuleSetRequest request) {
-        RuleSet ruleSet = ruleSets.createRuleSet(request.name());
+    @Override
+    public ResponseEntity<ApiRuleSet> createRuleSet(ApiRuleSetRequest request) {
+        RuleSet ruleSet = ruleSets.createRuleSet(request.getName());
         return ResponseEntity
                 .created(URI.create("/api/admin/rule-sets/" + ruleSet.getId()))
                 .body(toResponse(ruleSet));
     }
 
-    @PutMapping("/{id}")
-    RuleSetResponse change(@PathVariable UUID id, @Valid @RequestBody RuleSetRequest request) {
-        return toResponse(ruleSets.changeRuleSet(id, request.name()));
+    @Override
+    public ResponseEntity<ApiRuleSet> changeRuleSet(UUID id, ApiRuleSetRequest request) {
+        return ResponseEntity.ok(toResponse(ruleSets.changeRuleSet(id, request.getName())));
     }
 
-    @PutMapping("/{id}/active")
-    RuleSetResponse setActive(@PathVariable UUID id, @Valid @RequestBody ActiveRequest request) {
-        return toResponse(ruleSets.setRuleSetActive(id, request.active()));
+    @Override
+    public ResponseEntity<ApiRuleSet> setRuleSetActive(UUID id, ApiActiveRequest request) {
+        return ResponseEntity.ok(toResponse(ruleSets.setRuleSetActive(id, request.getActive())));
     }
 
-    @GetMapping("/{id}")
-    RuleSetResponse ruleSet(@PathVariable UUID id) {
-        return toResponse(ruleSets.requireRuleSet(id));
+    @Override
+    public ResponseEntity<ApiRuleSet> getRuleSet(UUID id) {
+        return ResponseEntity.ok(toResponse(ruleSets.requireRuleSet(id)));
     }
 
-    @GetMapping("/{id}/rules")
-    List<RuleDefinitionResponse> rules(@PathVariable UUID id) {
-        return ruleSets.rulesOf(id).stream()
+    @Override
+    public ResponseEntity<List<ApiRuleDefinition>> listRules(UUID id) {
+        return ResponseEntity.ok(ruleSets.rulesOf(id).stream()
                 .map(RuleAdminController::toResponse)
-                .toList();
+                .toList());
     }
 
-    @PutMapping("/{id}/rules/{ruleType}")
-    RuleDefinitionResponse setRule(@PathVariable UUID id, @PathVariable RuleType ruleType,
-            @Valid @RequestBody SetRuleRequest request) {
-        return toResponse(ruleSets.setRule(id, ruleType, request.params()));
+    @Override
+    public ResponseEntity<ApiRuleDefinition> setRule(
+            UUID id, ApiRuleType ruleType, ApiSetRuleRequest request) {
+        return ResponseEntity.ok(
+                toResponse(ruleSets.setRule(id, toRuleType(ruleType), request.getParams())));
     }
 
-    @DeleteMapping("/{id}/rules/{ruleType}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    void removeRule(@PathVariable UUID id, @PathVariable RuleType ruleType) {
-        ruleSets.removeRule(id, ruleType);
+    @Override
+    public ResponseEntity<Void> removeRule(UUID id, ApiRuleType ruleType) {
+        ruleSets.removeRule(id, toRuleType(ruleType));
+        return ResponseEntity.noContent().build();
     }
 
-    private static RuleSetResponse toResponse(RuleSet ruleSet) {
-        return new RuleSetResponse(ruleSet.getId(), ruleSet.getName(), ruleSet.isActive());
+    private static RuleType toRuleType(ApiRuleType ruleType) {
+        return RuleType.valueOf(ruleType.getValue());
     }
 
-    private static RuleDefinitionResponse toResponse(RuleDefinition definition) {
-        return new RuleDefinitionResponse(definition.getRuleType(), definition.getParams());
+    private static ApiRuleSet toResponse(RuleSet ruleSet) {
+        return new ApiRuleSet(ruleSet.getId(), ruleSet.getName(), ruleSet.isActive());
+    }
+
+    private static ApiRuleDefinition toResponse(RuleDefinition definition) {
+        return new ApiRuleDefinition(
+                ApiRuleType.fromValue(definition.getRuleType().name()), definition.getParams());
     }
 }

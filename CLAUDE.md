@@ -142,8 +142,26 @@ Docker must be running for Testcontainers.
 
 ### Records
 
-Use records for commands, specs, value types and web models (`CreateBookingCommand`,
-`RuleViolation`, `TimeSlot`). Validate invariants in the compact constructor.
+Use records for commands, specs and value types (`CreateBookingCommand`, `RuleViolation`,
+`TimeSlot`). Validate invariants in the compact constructor.
+
+Web models are the exception, and not by choice: they are generated from `src/main/resources/api/
+openapi.yaml` into `org.courtside.api` as mutable POJOs with setters and a fluent builder. The
+reason behind "no `@Setter`" — state changes go through named domain methods so invariants stay in
+the entity — has nothing to hold onto in a transport shape that has no invariants of its own. Do
+not hand-write a request or response type, and do not edit a generated one; change the document.
+
+### The API document
+
+`src/main/resources/api/openapi.yaml` is written by hand and is the source of truth for every
+endpoint. It is language-independent: nothing is left out of it, weakened in it, or shaped by it to
+suit a Java generator. Where the generator cannot produce usable Java from a keyword the document
+is right to state, the answer is plugin configuration, a Jackson module, or code at the controller
+edge — never a thinner document.
+
+Controllers implement the generated interfaces and carry no mapping annotations of their own; a
+route, its media types and its parameter names all come from the document.
+`GeneratedApiImplementationTest` and `ApiContractCoverageTest` are what keep that true.
 
 ### Error Handling
 
@@ -239,6 +257,11 @@ enough to need.
   collapses into a single commit, one that grew to ninety commits would leave `main` with a node
   nobody can bisect. Cut the work so that each pull request stands on its own and its title
   describes something a reader can act on.
+
+  A change that cannot be cut without leaving `main` broken in between is the exception — moving
+  every controller onto a generated contract is one of them, because the first half of that move
+  compiles against nothing. Say so in the pull request body rather than splitting it into pieces
+  that do not stand up.
 
 * **Nothing outside this repository's own planning names a work package.** Branch names, pull
   request titles, issue titles and issue bodies describe *the change*, never the batch it belonged

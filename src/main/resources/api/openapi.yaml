@@ -241,7 +241,7 @@ components:
       type: object
       required: [clubName, primaryColor, accentColor, defaultLocale]
       properties:
-        clubName: { type: string, minLength: 1, maxLength: 100 }
+        clubName: { type: string, maxLength: 100, pattern: ".*\\S.*" }
         primaryColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
         accentColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
         logoUrl:
@@ -300,7 +300,7 @@ components:
       type: object
       required: [label, color, allowedPlayerCounts, countsAgainstLimits, guestAllowed]
       properties:
-        label: { type: string, minLength: 1, maxLength: 60 }
+        label: { type: string, maxLength: 60, pattern: ".*\\S.*" }
         color: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
         requiredRole:
           oneOf:
@@ -330,7 +330,7 @@ components:
       type: object
       required: [label]
       properties:
-        label: { type: string, minLength: 1, maxLength: 60 }
+        label: { type: string, maxLength: 60, pattern: ".*\\S.*" }
         capacity:
           type: [integer, "null"]
           minimum: 1
@@ -356,7 +356,7 @@ components:
       type: object
       required: [name]
       properties:
-        name: { type: string, minLength: 1, maxLength: 60 }
+        name: { type: string, maxLength: 60, pattern: ".*\\S.*" }
         ruleSetId: { type: [string, "null"], format: uuid }
 
     RuleSet:
@@ -371,7 +371,7 @@ components:
       type: object
       required: [name]
       properties:
-        name: { type: string, minLength: 1, maxLength: 60 }
+        name: { type: string, maxLength: 60, pattern: ".*\\S.*" }
 
     RuleDefinition:
       type: object
@@ -480,14 +480,25 @@ components:
           maximum: 200
           description: Mutually exclusive with `endsOn`.
         note: { type: [string, "null"] }
-        confirmedStarts:
-          type: array
-          uniqueItems: true
-          description: |
-            Required when creating, ignored when previewing. Each entry must be one the preview
-            actually offered — the creator decides which occurrences to keep, and nothing is
-            written that they did not confirm.
-          items: { type: string, format: date-time }
+
+    CreateSeriesRequest:
+      description: |
+        A recurrence together with the occurrences to actually write. Previewing needs only the
+        recurrence; creating needs the caller's confirmation as well, which is why the two
+        operations do not share one shape.
+      allOf:
+        - $ref: "#/components/schemas/SeriesRuleRequest"
+        - type: object
+          required: [confirmedStarts]
+          properties:
+            confirmedStarts:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              description: |
+                Each entry must be one the preview actually offered — the creator decides which
+                occurrences to keep, and nothing is written that they did not confirm.
+              items: { type: string, format: date-time }
 
     Occurrence:
       type: object
@@ -780,16 +791,15 @@ paths:
     get:
       tags: [bookings]
       operationId: listAllocations
-      summary: The occupancy grid for a time range.
+      summary: The occupancy grid for one day.
+      description: |
+        A day, not a range: the grid a member reads is one day wide, and the instance's own time
+        zone decides where that day begins. A range would let a caller ask for a year.
       parameters:
-        - name: from
+        - name: date
           in: query
           required: true
-          schema: { type: string, format: date-time }
-        - name: to
-          in: query
-          required: true
-          schema: { type: string, format: date-time }
+          schema: { type: string, format: date }
       responses:
         "200":
           description: One entry per occupied court and slot.
@@ -908,7 +918,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/SeriesRuleRequest" }
+            schema: { $ref: "#/components/schemas/CreateSeriesRequest" }
       responses:
         "201":
           description: Created, with whatever was skipped.

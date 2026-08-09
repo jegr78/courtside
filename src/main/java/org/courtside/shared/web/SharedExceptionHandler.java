@@ -2,7 +2,7 @@ package org.courtside.shared.web;
 
 import jakarta.validation.ConstraintViolation;
 import org.courtside.shared.DuplicateItemException;
-import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.core.JacksonException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -118,7 +118,7 @@ class SharedExceptionHandler {
     }
 
     private static String mismatchedField(HttpMessageNotReadableException exception) {
-        if (!(exception.getCause() instanceof MismatchedInputException mismatch)) {
+        if (!(exception.getCause() instanceof JacksonException mismatch)) {
             return null;
         }
         String path = mismatch.getPath().stream()
@@ -205,6 +205,17 @@ class SharedExceptionHandler {
 
         Map<String, Object> params = new LinkedHashMap<>();
         allowedParams.forEach(name -> params.put(name, attributes.get(name)));
+
+        // minItems with no maximum generates @Size(min = 1), whose max is Integer.MAX_VALUE. A
+        // message reading "between 1 and 2147483647 in length" tells a caller nothing, and two
+        // billion is not information — so the unbounded case is its own code with its own message.
+        if ("Size".equals(constraintName) && Integer.valueOf(Integer.MAX_VALUE).equals(params.get("max"))) {
+            params.remove("max");
+            return Map.of(
+                    "field", error.getField(),
+                    "code", "validation.SizeAtLeast",
+                    "params", params);
+        }
 
         return Map.of(
                 "field", error.getField(),

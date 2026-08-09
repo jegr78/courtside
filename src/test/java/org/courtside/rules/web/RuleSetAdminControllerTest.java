@@ -202,7 +202,7 @@ class RuleSetAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("name"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotBlank"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
     }
 
     @Test

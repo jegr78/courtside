@@ -1,31 +1,25 @@
 package org.courtside.booking.web;
 
+import org.courtside.api.ApiAllocation;
+import org.courtside.api.ApiBookingCreated;
+import org.courtside.api.ApiCreateBookingRequest;
+import org.courtside.api.ApiMatchType;
+import org.courtside.api.BookingsApi;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.MatchType;
 import org.courtside.booking.ParticipantSpec;
-import org.courtside.booking.web.BookingWebModels.AllocationResponse;
-import org.courtside.booking.web.BookingWebModels.BookingCreatedResponse;
-import org.courtside.booking.web.BookingWebModels.CreateBookingRequest;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.identity.CurrentUser;
 import org.courtside.identity.UserAccount;
 import org.courtside.shared.TimeSlot;
-import jakarta.validation.Valid;
+import org.courtside.shared.WireTypes;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.InitBinder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -37,8 +31,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/bookings")
-class BookingController {
+class BookingController implements BookingsApi {
 
     private final BookingService bookings;
     private final CardService cards;
@@ -63,41 +56,41 @@ class BookingController {
         binder.addValidators(crossFieldRules);
     }
 
-    @PostMapping
-    ResponseEntity<BookingCreatedResponse> create(@Valid @RequestBody CreateBookingRequest request) {
+    @Override
+    public ResponseEntity<ApiBookingCreated> createBooking(ApiCreateBookingRequest request) {
         UserAccount account = currentUser.requireAccount();
 
-        List<ParticipantSpec> participants = request.participants() == null
+        List<ParticipantSpec> participants = request.getParticipants() == null
                 ? List.of()
-                : request.participants().stream()
-                        .map(p -> ParticipantSpec.from(p.personId(), p.guestName(), p.cardId()))
+                : request.getParticipants().stream()
+                        .map(p -> ParticipantSpec.from(p.getPersonId(), p.getGuestName(), p.getCardId()))
                         .toList();
 
         UUID id = bookings.create(new CreateBookingCommand(
-                request.courtIds(),
-                request.cardId(),
-                new TimeSlot(request.startsAt(), request.endsAt()),
+                List.copyOf(request.getCourtIds()),
+                request.getCardId(),
+                new TimeSlot(WireTypes.toInstant(request.getStartsAt()),
+                        WireTypes.toInstant(request.getEndsAt())),
                 account.getId(),
                 account.getPerson().getId(),
                 account.getRoles(),
-                request.note(),
+                request.getNote(),
                 participants,
                 null));
 
         return ResponseEntity.created(URI.create("/api/bookings/" + id))
-                .body(new BookingCreatedResponse(id));
+                .body(new ApiBookingCreated(id));
     }
 
-    @DeleteMapping("/{id}")
-    ResponseEntity<Void> cancel(@PathVariable UUID id) {
+    @Override
+    public ResponseEntity<Void> cancelBooking(UUID id) {
         UserAccount account = currentUser.requireAccount();
         bookings.cancel(id, account.getId(), account.getRoles());
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping
-    List<AllocationResponse> grid(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    @Override
+    public ResponseEntity<List<ApiAllocation>> listAllocations(LocalDate date) {
         List<CourtAllocation> allocations = bookings.allocationsBetween(
                 date.atStartOfDay(zone).toInstant(),
                 date.plusDays(1).atStartOfDay(zone).toInstant());
@@ -107,28 +100,27 @@ class BookingController {
         Map<UUID, Long> slotCounts = bookings.participantCountsFor(
                 allocations.stream().map(a -> a.getBooking().getId()).distinct().toList());
 
-        return allocations.stream()
+        return ResponseEntity.ok(allocations.stream()
                 .map(allocation -> toResponse(allocation, cardsById, slotCounts))
-                .toList();
+                .toList());
     }
 
-    private AllocationResponse toResponse(CourtAllocation allocation,
-                                          Map<UUID, BookingCard> cardsById,
-                                          Map<UUID, Long> slotCounts) {
+    private ApiAllocation toResponse(CourtAllocation allocation,
+                                     Map<UUID, BookingCard> cardsById,
+                                     Map<UUID, Long> slotCounts) {
         BookingCard card = cardsById.get(allocation.getBooking().getCardId());
-        String matchType = MatchType
+        ApiMatchType matchType = MatchType
                 .ofSlotCount(slotCounts.getOrDefault(allocation.getBooking().getId(), 0L))
-                .map(Enum::name)
+                .map(type -> ApiMatchType.fromValue(type.name()))
                 .orElse(null);
 
-        return new AllocationResponse(
+        return new ApiAllocation(
                 allocation.getBooking().getId(),
                 allocation.getCourtId(),
-                allocation.getStartsAt(),
-                allocation.getEndsAt(),
+                WireTypes.toOffsetDateTime(allocation.getStartsAt()),
+                WireTypes.toOffsetDateTime(allocation.getEndsAt()),
                 card == null ? "?" : card.getLabel(),
-                card == null ? "#999999" : card.getColor(),
-                null,
-                matchType);
+                card == null ? "#999999" : card.getColor())
+                .matchType(matchType);
     }
 }

@@ -4,7 +4,7 @@ import jakarta.validation.constraints.Pattern;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Matcher;
@@ -16,7 +16,8 @@ class HexColorPatternTest {
     @Test
     void whenReadingEveryHexColorPatternCopy_thenTheyAllAgreeWithBookingCardsColorCheck()
             throws IOException, ReflectiveOperationException {
-        // given — booking_card.color is the oldest of the five hand-written copies of this pattern
+        // given — booking_card.color is the oldest copy of this pattern; the three web-side
+        // copies now live in the API document and reach the code through the generator
         String canonical = sqlCheckRegex("V2__booking_card.sql", "color");
 
         // when / then
@@ -26,19 +27,16 @@ class HexColorPatternTest {
         assertThat(sqlCheckRegex("V9__club_config.sql", "accent_color"))
                 .as("club_config_accent_color_hex has drifted from booking_card_color_hex")
                 .isEqualTo(canonical);
-        assertThat(fieldPattern(
-                "org.courtside.card.web.CardAdminWebModels$BookingCardRequest", "color"))
-                .as("CardAdminWebModels.BookingCardRequest.color's @Pattern has drifted from "
+        assertThat(accessorPattern("org.courtside.api.ApiBookingCardRequest", "getColor"))
+                .as("BookingCardRequest.color's pattern in the API document has drifted from "
                         + "booking_card_color_hex")
                 .isEqualTo(canonical);
-        assertThat(fieldPattern(
-                "org.courtside.config.web.ConfigWebModels$ConfigRequest", "primaryColor"))
-                .as("ConfigWebModels.ConfigRequest.primaryColor's @Pattern has drifted from "
+        assertThat(accessorPattern("org.courtside.api.ApiClubConfigRequest", "getPrimaryColor"))
+                .as("ClubConfigRequest.primaryColor's pattern in the API document has drifted from "
                         + "booking_card_color_hex")
                 .isEqualTo(canonical);
-        assertThat(fieldPattern(
-                "org.courtside.config.web.ConfigWebModels$ConfigRequest", "accentColor"))
-                .as("ConfigWebModels.ConfigRequest.accentColor's @Pattern has drifted from "
+        assertThat(accessorPattern("org.courtside.api.ApiClubConfigRequest", "getAccentColor"))
+                .as("ClubConfigRequest.accentColor's pattern in the API document has drifted from "
                         + "booking_card_color_hex")
                 .isEqualTo(canonical);
     }
@@ -55,8 +53,11 @@ class HexColorPatternTest {
         return matcher.group(1);
     }
 
-    private static String fieldPattern(String className, String fieldName) throws ReflectiveOperationException {
-        Field field = Class.forName(className).getDeclaredField(fieldName);
-        return field.getAnnotation(Pattern.class).regexp();
+    // Read off the generated accessor rather than the document: that is where the pattern ends up
+    // enforcing anything, and it proves the document actually reached the code.
+    private static String accessorPattern(String className, String accessorName)
+            throws ReflectiveOperationException {
+        Method accessor = Class.forName(className).getDeclaredMethod(accessorName);
+        return accessor.getAnnotation(Pattern.class).regexp();
     }
 }

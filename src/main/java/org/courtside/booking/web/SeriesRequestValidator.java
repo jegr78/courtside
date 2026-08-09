@@ -1,43 +1,52 @@
 package org.courtside.booking.web;
 
-import org.courtside.booking.web.SeriesWebModels.MoveRequestBody;
-import org.courtside.booking.web.SeriesWebModels.SeriesRuleRequest;
+import org.courtside.api.ApiCreateSeriesRequest;
+import org.courtside.api.ApiMoveRequest;
+import org.courtside.api.ApiSeriesRuleRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 
-// See BookingRequestValidator for why these rules are not annotations on the request records.
+import java.time.LocalDate;
+
+// See BookingRequestValidator for why these rules are not annotations on the request models.
 @Component
 class SeriesRequestValidator implements Validator {
 
     @Override
     public boolean supports(Class<?> type) {
-        return SeriesRuleRequest.class.isAssignableFrom(type)
-                || MoveRequestBody.class.isAssignableFrom(type);
+        return ApiSeriesRuleRequest.class.isAssignableFrom(type)
+                || ApiCreateSeriesRequest.class.isAssignableFrom(type)
+                || ApiMoveRequest.class.isAssignableFrom(type);
     }
 
     @Override
     public void validate(Object target, Errors errors) {
-        if (target instanceof SeriesRuleRequest rule) {
-            validateRule(rule, errors);
-        } else if (target instanceof MoveRequestBody move) {
+        // Previewing and creating carry the same recurrence in two generated types, so the same
+        // two rules have to be stated against both.
+        if (target instanceof ApiSeriesRuleRequest rule) {
+            validateRule(rule.getStartsOn(), rule.getEndsOn(), rule.getOccurrenceCount(), errors);
+        } else if (target instanceof ApiCreateSeriesRequest rule) {
+            validateRule(rule.getStartsOn(), rule.getEndsOn(), rule.getOccurrenceCount(), errors);
+        } else if (target instanceof ApiMoveRequest move) {
             validateMove(move, errors);
         }
     }
 
-    private void validateRule(SeriesRuleRequest rule, Errors errors) {
-        if ((rule.endsOn() == null) == (rule.occurrenceCount() == null)) {
+    private void validateRule(LocalDate startsOn, LocalDate endsOn, Integer occurrenceCount,
+                              Errors errors) {
+        if ((endsOn == null) == (occurrenceCount == null)) {
             errors.rejectValue("endsOn", "SeriesEndsOnce");
             return;
         }
-        if (rule.endsOn() != null && rule.startsOn() != null && rule.endsOn().isBefore(rule.startsOn())) {
+        if (endsOn != null && startsOn != null && endsOn.isBefore(startsOn)) {
             errors.rejectValue("endsOn", "ChronologicalSeries");
         }
     }
 
-    private void validateMove(MoveRequestBody move, Errors errors) {
-        if (move.newStartTime() == null && move.newDurationMinutes() == null
-                && move.newCourtIds() == null) {
+    private void validateMove(ApiMoveRequest move, Errors errors) {
+        if (move.getNewStartTime() == null && move.getNewDurationMinutes() == null
+                && move.getNewCourtIds() == null) {
             errors.rejectValue("newStartTime", "MoveChangesSomething");
         }
     }

@@ -257,8 +257,10 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
         // then
         assertProblem(result, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "urn:courtside:error:unsupported-media-type");
         assertThat(result.andReturn().getResponse().getContentAsString()).doesNotContain("text/plain");
+        // Exactly what the document says the endpoint consumes — narrower than Spring's own
+        // default of every JSON-ish media type, because the contract is narrower.
         assertThat(headerValues(result, "Accept"))
-                .containsExactlyInAnyOrder("application/json", "application/*+json");
+                .containsExactly("application/json");
     }
 
     @Test

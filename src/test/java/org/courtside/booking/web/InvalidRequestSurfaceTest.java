@@ -170,7 +170,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("occurrenceCount"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Positive"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Min"));
     }
 
     @Test
@@ -214,7 +214,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("newCourtIds"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotEmptyIfGiven"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SizeAtLeast"));
     }
 
     @Test
@@ -226,7 +226,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("newDurationMinutes"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Positive"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Min"));
     }
 
     @Test

@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -47,8 +48,7 @@ class ValidationMessageCoverageTest {
     // everyConstraintAnnotationUsedInMainIsInTheKnownSet: a new @Constraint annotation mints an
     // unreviewed code on this frozen wire contract until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("KnownRole", "Max", "Min", "NoDuplicates", "NotBlank", "NotEmpty",
-                    "NotEmptyIfGiven", "NotNull", "Pattern", "Positive", "Size");
+            List.of("Max", "Min", "NotNull", "Pattern", "Size");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
@@ -310,6 +310,12 @@ class ValidationMessageCoverageTest {
         collect(type.getAnnotations(), constraintNames);
         for (Field field : type.getDeclaredFields()) {
             collect(field.getAnnotations(), constraintNames);
+        }
+        // And on accessors: the generator puts its constraints on the getter, so a scan of fields
+        // and types alone found nothing at all in the generated models — every one of their codes
+        // would have reached the wire with no bundle entry behind it.
+        for (Method method : type.getDeclaredMethods()) {
+            collect(method.getAnnotations(), constraintNames);
         }
     }
 
