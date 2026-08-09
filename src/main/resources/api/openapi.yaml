@@ -118,6 +118,25 @@ components:
           format: password
           minLength: 12
 
+    SessionStatus:
+      type: object
+      required: [authenticated, roles, passwordChangeRequired]
+      properties:
+        authenticated:
+          type: boolean
+        username:
+          type: string
+        displayName:
+          type: string
+        locale:
+          type: string
+          pattern: "^(de|en)$"
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/Role" }
+        passwordChangeRequired:
+          type: boolean
+
     RuleType:
       type: string
       enum: [OPENING_HOURS, SLOT_GRID, ADVANCE_WINDOW, MAX_OPEN_BOOKINGS]
@@ -264,6 +283,28 @@ components:
           maxLength: 500
           pattern: "^(https?://.+|/[^/\\\\].*|/)$"
         defaultLocale: { type: string, pattern: "^(de|en)$" }
+
+    WebManifest:
+      type: object
+      required: [name, short_name, start_url, display, background_color, theme_color, icons]
+      properties:
+        name: { type: string }
+        short_name: { type: string }
+        start_url: { type: string }
+        display: { type: string, enum: [standalone] }
+        background_color: { type: string }
+        theme_color: { type: string }
+        icons:
+          type: array
+          items: { $ref: "#/components/schemas/WebManifestIcon" }
+
+    WebManifestIcon:
+      type: object
+      required: [src, sizes]
+      properties:
+        src: { type: string }
+        sizes: { type: string }
+        type: { type: string }
 
     PublicBookingCard:
       type: object
@@ -732,6 +773,16 @@ paths:
               schema: { type: string }
 
   /api/session:
+    get:
+      tags: [session-status]
+      operationId: getSessionStatus
+      summary: Report the current browser session.
+      responses:
+        "200":
+          description: The current authentication state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionStatus" }
     post:
       tags: [session]
       operationId: logIn
@@ -846,6 +897,19 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ClubConfig" }
+
+  /manifest.webmanifest:
+    get:
+      tags: [manifest]
+      operationId: getWebManifest
+      summary: The installable web application's club-specific metadata.
+      security: []
+      responses:
+        "200":
+          description: The web application manifest.
+          content:
+            application/manifest+json:
+              schema: { $ref: "#/components/schemas/WebManifest" }
 
   /api/public/booking-cards:
     get:

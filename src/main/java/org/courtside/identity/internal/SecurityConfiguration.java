@@ -15,6 +15,7 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(BootstrapAdminProperties.class)
@@ -55,6 +56,9 @@ public class SecurityConfiguration {
                         // The contract is not a secret and is needed before anyone can
                         // authenticate against it.
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
+                        .requestMatchers("/", "/login", "/initial-password", "/index.html",
+                                "/assets/**", "/icon.svg", "/manifest.webmanifest", "/sw.js",
+                                "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()
                         .requestMatchers("/api/account/initial-password").access(
@@ -91,6 +95,15 @@ public class SecurityConfiguration {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository(secureCookies))
                         .csrfTokenRequestHandler(csrfHandler))
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; img-src 'self' https: http: data:; "
+                                        + "style-src 'self'; script-src 'self'; connect-src 'self'; "
+                                        + "manifest-src 'self'; worker-src 'self'; "
+                                        + "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"))
+                        .frameOptions(frame -> frame.deny())
+                        .referrerPolicy(referrer -> referrer.policy(
+                                ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
                 .build();
     }
 
