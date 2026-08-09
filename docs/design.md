@@ -811,10 +811,11 @@ whether it is built or designed. **Designed means absent today.**
   immediately, which JWT cannot do. *Built, except that terminating another member's session
   has no admin surface yet.*
 - **CSRF:** on, double-submit cookie. *Built.*
-- **Brute force:** rate limiting plus temporary account lockout after repeated failures.
-  **Designed, not built** — today the login endpoint accepts attempts at whatever rate a caller
-  can produce them. A deployment that faces the public internet should rate-limit at the reverse
-  proxy until this lands.
+- **Brute force:** rate limiting before password verification. *Built.* Source-address counters
+  absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;
+  both are stored in PostgreSQL. There is deliberately no username lockout: an anonymous attacker
+  could renew it against a known administrator indefinitely. Success clears its address counter,
+  while `Retry-After` tells a client when an address or instance cooldown ends.
 - **Admin roles:** optional TOTP second factor. **Designed, not built** — there is no second
   factor of any kind today.
 - **Card PINs** are stored hashed. They are shared secrets, but still credentials.

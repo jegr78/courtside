@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 public abstract class AbstractIntegrationTest {
 
     private static final List<String> TABLES_IN_DELETION_ORDER = List.of(
+            "login_attempt_limit",
             "booking_participant",
             "court_allocation",
             "booking",
