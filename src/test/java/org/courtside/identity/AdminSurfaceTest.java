@@ -41,11 +41,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // directions against the running filter chain.
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
-    private static final int KNOWN_ADMIN_ENDPOINT_COUNT = 36;
+    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 37;
 
     private static final String CATCH_ALL_UUID = "11111111-1111-1111-1111-111111111111";
 
     private static final String BOOT_ERROR_PATH = "/error";
+    private static final String INITIAL_PASSWORD_PATH = "/api/account/initial-password";
 
     // A variable missing here is checked against the catch-all UUID it was given, which proves nothing.
     private static final Map<String, String> EXPECTED_LITERAL_BY_VARIABLE = Map.of(
@@ -111,7 +112,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         // when
         List<String> unclassified = mapped.stream()
                 .filter(pattern -> !pattern.equals(BOOT_ERROR_PATH))
-                .filter(pattern -> !pattern.startsWith("/api/admin/"))
+                .filter(pattern -> !isPrivileged(pattern))
                 .filter(pattern -> !ANONYMOUS_ALLOWED_PATHS.contains(pattern))
                 .filter(pattern -> !AUTHENTICATED_PATHS.contains(pattern))
                 .toList();
@@ -125,13 +126,13 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAMember_whenCallingEveryAdminEndpoint_thenEveryOneOfThemIsForbidden() {
         // given
-        List<MappedEndpoint> endpoints = endpointsMatching(pattern -> pattern.startsWith("/api/admin/"));
+        List<MappedEndpoint> endpoints = endpointsMatching(AdminSurfaceTest::isPrivileged);
         assertThat(endpoints)
                 .as("admin endpoint discovery is expected to match the known count of %d exactly; "
                         + "a mismatch means discovery broke, an endpoint was added, or an endpoint "
                         + "was removed — in every case this constant must be updated to match once "
-                        + "the cause is confirmed", KNOWN_ADMIN_ENDPOINT_COUNT)
-                .hasSize(KNOWN_ADMIN_ENDPOINT_COUNT);
+                        + "the cause is confirmed", KNOWN_PRIVILEGED_ENDPOINT_COUNT)
+                .hasSize(KNOWN_PRIVILEGED_ENDPOINT_COUNT);
 
         // when
         List<String> misrouted = new ArrayList<>();
@@ -349,6 +350,10 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 .filter(Objects::nonNull)
                 .flatMap(condition -> condition.getPatternValues().stream())
                 .toList();
+    }
+
+    private static boolean isPrivileged(String pattern) {
+        return pattern.startsWith("/api/admin/") || pattern.equals(INITIAL_PASSWORD_PATH);
     }
 
     private List<MappedEndpoint> endpointsMatching(Predicate<String> patternFilter) {

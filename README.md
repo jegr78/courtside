@@ -36,53 +36,37 @@ weekday, a single court numbered 1 (unnamed — give it a name and add the rest 
 UI), the four booking cards, the two participant cards (Ball machine, Looking for a partner) and
 the Standard and Youth rule sets. How many courts a club has is the club's business, so the seed
 takes no position beyond the one court without which nothing can be booked at all. Adjust all of
-it later through the database or the admin UI. Migrations
-currently run to `V9`, which adds `club_config` for the club's branding (name, colors, logo) on
-top of `V8`'s `booking_series` and the multi-court allocation it needs for recurring bookings.
+it later through the database or the admin UI. Migrations currently run to `V10`, which records
+whether an account must replace its initial password.
 
 Behind TLS, set `COURTSIDE_COOKIE_SECURE=true` so the session and CSRF cookies are marked
 `Secure`. It defaults to `false` so plain HTTP works during development.
 
 ## First start: creating the first admin
 
-No account is seeded — a shipped password is a shipped vulnerability. Create the first
-admin by hand. The password hash must be **Argon2id** with the parameters this application
-hashes with, which are OWASP's current guidance: `m=19456`, `t=2`, `p=1`, 16-byte salt, 32-byte
-hash.
+No account or shared password is seeded. On an empty account table the application instead
+requires three environment variables and refuses to start without them:
 
 ```bash
-echo -n 'your-password' | argon2 "$(openssl rand -base64 12)" -id -k 19456 -t 2 -p 1 -l 32 -e
+export COURTSIDE_BOOTSTRAP_ADMIN_USERNAME=admin
+export COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD='one-time-password'
+export COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME='First Last'
 ```
 
-`-k` sets the memory in KiB; `-m` would set it as a power of two and cannot express 19456. Older
-`argon2` help output and the manpage omit `-k`, but every release since 20190702 accepts it.
+The password must contain at least 12 characters. Startup creates one enabled local account with
+the `ADMIN` role, hashes its password with Argon2id and marks it for an initial password change.
+The database operation is serialized, so concurrent application starts cannot create two initial
+administrators.
 
-That prints `$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`. Paste it into the insert below:
-
-```sql
-INSERT INTO person (id, first_name, last_name, email) VALUES
-    ('00000000-0000-0000-0000-0000000000a1', 'First', 'Last', 'admin@example.org');
-
-INSERT INTO user_account (id, person_id, username, password_hash, enabled) VALUES
-    ('00000000-0000-0000-0000-0000000000a2',
-     '00000000-0000-0000-0000-0000000000a1',
-     'admin',
-     '$argon2id$v=19$m=19456,t=2,p=1$REPLACE$REPLACE',
-     true);
-
-INSERT INTO user_account_role (user_account_id, role) VALUES
-    ('00000000-0000-0000-0000-0000000000a2', 'ADMIN');
-```
-
-An account created before these parameters were raised keeps the hash it has — Argon2 stores its
-own cost, so it still verifies, and nothing rehashes it on login. Change the password to move it up.
+Once any local account exists, the variables are ignored: a restart can never create another
+administrator or reset a password. Remove them after the initial password has been changed.
 
 Until rate limiting lands (see `docs/design.md`), `POST /api/session` will happily spend this much
 memory per attempt, including for a username that does not exist. Rate-limit it at the reverse
 proxy on any deployment facing the public internet.
 
-`enabled` defaults to `false` — accounts normally wait for approval, and the first one has
-nobody to approve it.
+`enabled` defaults to `false` — accounts normally wait for approval. The bootstrap path explicitly
+enables the first administrator because nobody exists to approve it.
 
 `ADMIN` alone is enough. It overrides the restrictions that say *who* may book — the role a
 booking card requires, the advance window, the limit on open bookings.
@@ -108,7 +92,20 @@ curl -i -b cookies.txt -c cookies.txt \
   -d 'username=admin' -d 'password=your-password'
 ```
 
-`200` with a `SESSION` cookie means it worked.
+`200` with a `SESSION` cookie and the header
+`X-Courtside-Password-Change-Required: true` means it worked. That session can only replace the
+one-time password or log out:
+
+```bash
+curl -i -b cookies.txt -c cookies.txt \
+  -X PUT http://localhost:8080/api/account/initial-password \
+  -H "X-XSRF-TOKEN: $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"a-new-permanent-password"}'
+```
+
+The successful `204` ends the session. Sign in again with the permanent password; every normal
+admin operation is available then.
 
 Posting without the header returns `401`, not `403`: a missing CSRF token raises an
 `AccessDeniedException`, and for an anonymous caller Spring Security routes that to the

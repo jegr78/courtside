@@ -40,6 +40,6 @@ public class Person {
     }
 
     public String getDisplayName() {
-        return firstName + " " + lastName;
+        return (firstName + " " + lastName).trim();
     }
 }

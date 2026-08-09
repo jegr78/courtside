@@ -47,6 +47,9 @@ public class UserAccount {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "password_change_required", nullable = false)
+    private boolean passwordChangeRequired;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_account_role",
             joinColumns = @JoinColumn(name = "user_account_id"))
@@ -62,11 +65,16 @@ public class UserAccount {
         this.roles = Set.copyOf(roles);
         this.locale = "de";
         this.enabled = false;
+        this.passwordChangeRequired = false;
         this.createdAt = Instant.now();
     }
 
     public void enable() {
         this.enabled = true;
+    }
+
+    public void requirePasswordChange() {
+        this.passwordChangeRequired = true;
     }
 
     public Set<Role> getRoles() {

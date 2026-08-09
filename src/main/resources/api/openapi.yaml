@@ -109,6 +109,15 @@ components:
       description: A permission bundle. One person often holds several.
       enum: [MEMBER, TRAINER, GROUNDSKEEPER, TREASURER, ADMIN]
 
+    InitialPasswordChangeRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          format: password
+          minLength: 12
+
     RuleType:
       type: string
       enum: [OPENING_HOURS, SLOT_GRID, ADVANCE_WINDOW, MAX_OPEN_BOOKINGS]
@@ -750,6 +759,10 @@ paths:
       responses:
         "200":
           description: Logged in. The session cookie is set.
+          headers:
+            X-Courtside-Password-Change-Required:
+              description: Present and `true` when only the initial-password endpoint may be used.
+              schema: { type: boolean }
         "401":
           $ref: "#/components/responses/Unauthenticated"
 
@@ -764,6 +777,32 @@ paths:
       responses:
         "204":
           description: Logged out.
+
+  /api/account/initial-password:
+    put:
+      tags: [account]
+      operationId: changeInitialPassword
+      summary: Replace the one-time bootstrap password.
+      description: |
+        Available only to an authenticated account marked for an initial password change. The
+        successful change ends the current session; sign in again with the new password.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InitialPasswordChangeRequest" }
+      responses:
+        "204":
+          description: Changed. The current session has ended.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/public/courts:
     get:
