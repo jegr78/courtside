@@ -108,6 +108,12 @@ default.
 | `COURTSIDE_TIME_ZONE` | `Europe/Berlin` | The club's IANA time zone. |
 | `COURTSIDE_MEMORY` | `1g` | Memory ceiling for the application container. |
 | `COURTSIDE_COOKIE_SECURE` | `true` | Sends the session cookie over HTTPS only. Lower it only for a local test. |
+| `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` | `20` | Login attempts allowed per source address and window. |
+| `COURTSIDE_LOGIN_ADDRESS_WINDOW` | `1m` | Counting window for a source address. |
+| `COURTSIDE_LOGIN_ADDRESS_BLOCK` | `1m` | Temporary source-address block duration. |
+| `COURTSIDE_LOGIN_GLOBAL_MAX_FAILURES` | `100` | Login attempts allowed across the instance and window. |
+| `COURTSIDE_LOGIN_GLOBAL_WINDOW` | `1m` | Instance-wide counting window. |
+| `COURTSIDE_LOGIN_GLOBAL_BLOCK` | `1m` | Instance-wide login cooldown duration. |
 | `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |
 | `COURTSIDE_SOURCE_URL` | this repository | Where `GET /api/source` points. **If you modified Courtside and let others use it, the AGPL requires this to point at your source, not at ours.** |
 
@@ -153,6 +159,5 @@ docker compose exec -T db pg_dump -U courtside courtside | gzip > courtside-$(da
   [#26](https://github.com/jegr78/courtside/issues/26)
 - **Session rows accumulate.** Expired sessions stay in the database; nothing removes them.
   [#27](https://github.com/jegr78/courtside/issues/27)
-- **Log-in attempts are not rate-limited.** [#68](https://github.com/jegr78/courtside/issues/68)
 - **There is nothing to look at.** `/actuator/health` is the only thing an operator can ask.
   [#73](https://github.com/jegr78/courtside/issues/73)

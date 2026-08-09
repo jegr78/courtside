@@ -13,16 +13,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(BootstrapAdminProperties.class)
+@EnableScheduling
+@EnableConfigurationProperties({BootstrapAdminProperties.class, LoginProtectionProperties.class})
 public class SecurityConfiguration {
 
-    // OWASP's Argon2id minimum. Every login costs this much memory, including one for a username
-    // that does not exist, and nothing rate-limits that yet — see docs/design.md.
+    // OWASP's Argon2id minimum; the login filter limits how often a caller can incur this cost.
     private static final int MEMORY_IN_KIBIBYTES = 19456;
     private static final int ITERATIONS = 2;
     private static final int PARALLELISM = 1;
@@ -40,6 +42,8 @@ public class SecurityConfiguration {
             HttpSecurity http,
             ProblemDetailAccessDeniedHandler accessDeniedHandler,
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
+            LoginAttemptProtection loginAttemptProtection,
+            LoginRateLimitHandler loginRateLimitHandler,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
         CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
@@ -77,6 +81,7 @@ public class SecurityConfiguration {
                 .formLogin(form -> form
                         .loginProcessingUrl("/api/session")
                         .successHandler((request, response, authentication) -> {
+                            loginAttemptProtection.clear(request.getRemoteAddr());
                             if (authentication.getAuthorities().stream().anyMatch(authority ->
                                     authority.getAuthority().equals(
                                             CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED))) {
@@ -85,6 +90,8 @@ public class SecurityConfiguration {
                             response.setStatus(HttpStatus.OK.value());
                         })
                         .failureHandler(authenticationEntryPoint::commence))
+                .addFilterBefore(new LoginAttemptFilter(loginAttemptProtection, loginRateLimitHandler),
+                        UsernamePasswordAuthenticationFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
                         .logoutSuccessHandler((request, response, authentication) ->

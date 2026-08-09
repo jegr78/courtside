@@ -37,9 +37,9 @@ a working example.
 
 These are absent by design decision or by not being built yet, so they need no report:
 
-- No rate limiting on the login endpoint and no account lockout — see the issue tracker.
 - No multi-factor authentication.
-- The first admin account is created by hand in SQL; the README documents how.
+- The first admin account comes from one-time bootstrap environment variables; the README
+  documents the forced password-change flow and the manual SQL alternative.
 - `GET /api/source` names the commit an instance is running, without a login. Fixes land on `main`
   and are described in their commit, so anyone can tell whether a given instance has one yet. That
   is what AGPL section 13 asks for — an offer of source has to say which source — and every honest

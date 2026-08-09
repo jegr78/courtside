@@ -25,7 +25,7 @@ describe("AppRoutes", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("heading", { name: "Bei Courtside anmelden" })).toBeInTheDocument();
+    expect(screen.getByTestId("login-view")).toBeInTheDocument();
   });
 
   it("given a member session, when opening sign in, then it shows the app shell", () => {
@@ -44,7 +44,7 @@ describe("AppRoutes", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("heading", { name: "Willkommen, Jane Doe" })).toBeInTheDocument();
+    expect(screen.getByTestId("home-view")).toBeInTheDocument();
   });
 
   it("given an initial password session, when opening the app, then it requires a new password", () => {
@@ -63,7 +63,7 @@ describe("AppRoutes", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("heading", { name: "Einmalpasswort ersetzen" })).toBeInTheDocument();
+    expect(screen.getByTestId("initial-password-view")).toBeInTheDocument();
   });
 
   it("given a member session, when sign out succeeds, then sign in is shown without another request", async () => {
@@ -87,9 +87,9 @@ describe("AppRoutes", () => {
     render(<MemoryRouter><Harness /></MemoryRouter>);
 
     // when
-    await userEvent.click(screen.getByRole("button", { name: "Abmelden" }));
+    await userEvent.click(screen.getByTestId("logout"));
 
     // then
-    expect(screen.getByRole("heading", { name: "Bei Courtside anmelden" })).toBeInTheDocument();
+    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
   });
 });

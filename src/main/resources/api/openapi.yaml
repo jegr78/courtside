@@ -732,6 +732,15 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
+    RateLimited:
+      description: Too many requests for the protected operation.
+      headers:
+        Retry-After:
+          description: Seconds until another attempt may be made.
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
 
 paths:
 
@@ -816,6 +825,8 @@ paths:
               schema: { type: boolean }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/session/logout:
     post:

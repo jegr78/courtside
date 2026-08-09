@@ -61,9 +61,11 @@ administrators.
 Once any local account exists, the variables are ignored: a restart can never create another
 administrator or reset a password. Remove them after the initial password has been changed.
 
-Until rate limiting lands (see `docs/design.md`), `POST /api/session` will happily spend this much
-memory per attempt, including for a username that does not exist. Rate-limit it at the reverse
-proxy on any deployment facing the public internet.
+`POST /api/session` limits attempts by source address and by an instance-wide Argon2 budget before
+another password verification is allowed. The counters live in PostgreSQL, survive restarts and
+apply across application instances. A limited request returns `429` with `Retry-After`; successful
+login clears its address counter. No username can be locked independently, so anonymous failures
+cannot keep a known administrator account in a renewable lockout.
 
 `enabled` defaults to `false` — accounts normally wait for approval. The bootstrap path explicitly
 enables the first administrator because nobody exists to approve it.
