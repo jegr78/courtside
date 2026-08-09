@@ -30,6 +30,7 @@
         <spring-modulith.version>2.1.0</spring-modulith.version>
         <lombok.version>1.18.46</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
+        <openapi-generator.version>7.14.0</openapi-generator.version>
     </properties>
 
     <dependencyManagement>
@@ -143,6 +144,57 @@
                         </exclude>
                     </excludes>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>${openapi-generator.version}</version>
+                <executions>
+                    <execution>
+                        <goals><goal>generate</goal></goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/api/openapi.yaml</inputSpec>
+                            <generatorName>spring</generatorName>
+                            <library>spring-boot</library>
+                            <apiPackage>org.courtside.api</apiPackage>
+                            <modelPackage>org.courtside.api</modelPackage>
+                            <!-- Fifteen of the document's schemas share a name with a domain type:
+                                 Court, OpeningHours, RuleSet, Role and more. The document is right
+                                 to call a court a Court, so the prefix goes on this side. -->
+                            <modelNamePrefix>Api</modelNamePrefix>
+                            <generateApiTests>false</generateApiTests>
+                            <generateModelTests>false</generateModelTests>
+                            <generateApiDocumentation>false</generateApiDocumentation>
+                            <generateModelDocumentation>false</generateModelDocumentation>
+                            <!-- Boot 4 ships Jackson 3, where databind moved to tools.jackson.
+                                 The generator hard-codes the Jackson 2 package for the annotation
+                                 it adds to a uniqueItems array; this points it at the right one so
+                                 the document can keep saying what is true. -->
+                            <typeMappings>
+                                <!-- format: time is a LocalTime everywhere it appears, in a
+                                     property and in a query parameter alike. DayOfWeek is
+                                     deliberately left generated: the mapping reaches properties
+                                     but not path variables, and one wire enum converted at the
+                                     edge beats the same type meaning two things. -->
+                                <typeMapping>time=LocalTime</typeMapping>
+                            </typeMappings>
+                            <importMappings>
+                                <importMapping>JsonDeserialize=tools.jackson.databind.annotation.JsonDeserialize</importMapping>
+                                <importMapping>LocalTime=java.time.LocalTime</importMapping>
+                            </importMappings>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <useSpringBoot3>true</useSpringBoot3>
+                                <useJakartaEe>true</useJakartaEe>
+                                <documentationProvider>none</documentationProvider>
+                                <openApiNullable>false</openApiNullable>
+                                <useTags>true</useTags>
+                                <useOptional>false</useOptional>
+                                <skipDefaultInterface>true</skipDefaultInterface>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

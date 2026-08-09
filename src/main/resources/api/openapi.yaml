@@ -1,0 +1,2025 @@
+openapi: 3.1.0
+
+info:
+  title: Courtside
+  version: 0.1.0
+  summary: Court booking for a single sports club.
+  description: |
+    Courtside is single-tenant: this document describes the API of one club's own instance.
+    There is no tenant identifier anywhere in it, and there never will be.
+
+    This document is the source of truth for the API, not a description generated from an
+    implementation. An operation that is not here is not part of the API, and a change here is a
+    change to a published contract.
+
+    ## Errors
+
+    Every failure is an RFC 9457 problem detail. `type` is always a `urn:courtside:error:<slug>`
+    URN: a stable identifier, not a fetchable page. A club runs its instance under its own domain,
+    so an `https://` type would name a host nobody operates.
+
+    Two arrays carry everything a client has to show a member, and both hold the same kind of
+    entry:
+
+    - `violations` — a rule the request broke. Always an array, even where only one entry is ever
+      possible, so a client has one shape to render rather than two.
+    - `fieldErrors` — the same, plus the name of the input it came from.
+
+    Neither carries rendered text. Each entry has a `code` naming a message and `params` holding
+    the values that message interpolates, and the client resolves the pair against its own message
+    catalogue. This is what makes the API usable in a language the server does not ship.
+  license:
+    name: AGPL-3.0-or-later
+    identifier: AGPL-3.0-or-later
+
+servers:
+  - url: /
+    description: The club's own instance.
+
+tags:
+  - name: session
+    description: Logging in and out.
+  - name: documentation
+    description: The contract this instance answers to.
+  - name: courts
+    description: The club's courts, as anyone may see them.
+  - name: opening-hours
+    description: When the facility is open, as anyone may see it.
+  - name: club-config
+    description: The club's name and branding, as anyone may see it.
+  - name: cards
+    description: The booking and participant cards a member may use.
+  - name: bookings
+    description: Booking a court, and cancelling.
+  - name: booking-series
+    description: Recurring bookings — previewing, creating, moving and cancelling.
+  - name: admin-courts
+    description: Administering courts.
+  - name: admin-opening-hours
+    description: Administering opening hours.
+  - name: admin-booking-cards
+    description: Administering booking cards.
+  - name: admin-participant-cards
+    description: Administering participant cards.
+  - name: admin-membership-types
+    description: Administering membership types.
+  - name: admin-rule-sets
+    description: Administering rule sets and their rules.
+  - name: admin-config
+    description: Administering the club's own name and branding.
+  - name: admin-impact
+    description: What a configuration change would affect, before it is made.
+
+security:
+  - sessionCookie: []
+
+components:
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: SESSION
+      description: |
+        A server-side session, established by `POST /api/session`. Deliberately not a JWT: the
+        club's own frontend and the API share an origin, and an admin must be able to end a
+        session immediately, which a self-contained token cannot offer.
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-XSRF-TOKEN
+      description: |
+        Required on every state-changing request. Any `GET` issues a readable `XSRF-TOKEN` cookie;
+        echo its value in this header. Modelled as a security scheme rather than as a header
+        parameter because it is consumed before the operation runs and is never part of its input.
+
+        A write without it answers `401`, not `403`: for an unauthenticated caller the missing
+        token is indistinguishable from a missing session.
+
+  schemas:
+
+    DayOfWeek:
+      type: string
+      enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]
+
+    Role:
+      type: string
+      description: A permission bundle. One person often holds several.
+      enum: [MEMBER, TRAINER, GROUNDSKEEPER, TREASURER, ADMIN]
+
+    RuleType:
+      type: string
+      enum: [OPENING_HOURS, SLOT_GRID, ADVANCE_WINDOW, MAX_OPEN_BOOKINGS]
+
+    CancelScope:
+      type: string
+      description: Which occurrences of a series an operation applies to.
+      enum: [THIS, THIS_AND_FOLLOWING, WHOLE_SERIES]
+
+    MatchType:
+      type: string
+      description: |
+        Derived from how many players a booking has. This is what the grid shows in place of a
+        name — it answers the only question the grid has to answer without publishing who plays
+        with whom.
+      enum: [SINGLES, DOUBLES]
+
+    Violation:
+      type: object
+      description: |
+        A rule the request broke, named rather than rendered. The client resolves `code` against
+        its own message catalogue and interpolates `params`.
+      required: [code, params]
+      properties:
+        code:
+          type: string
+          examples: ["booking.rule.advanceWindow.exceeded"]
+        params:
+          type: object
+          additionalProperties: true
+          examples: [{ maxDays: 14 }]
+
+    FieldError:
+      type: object
+      description: A violation that also names the input it came from.
+      required: [field, code, params]
+      properties:
+        field:
+          type: string
+          examples: ["endsAt"]
+        code:
+          type: string
+          examples: ["validation.ChronologicalSlot"]
+        params:
+          type: object
+          additionalProperties: true
+
+    Problem:
+      type: object
+      description: RFC 9457 problem detail.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A `urn:courtside:error:<slug>` URN. Stable, and not a fetchable page.
+          examples: ["urn:courtside:error:court-not-bookable"]
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: |
+            English, for a developer reading a log. Never shown to a member, and never built from
+            a caller's input — the translatable part is in `violations`.
+        instance:
+          type: string
+          format: uri
+        violations:
+          type: array
+          items: { $ref: "#/components/schemas/Violation" }
+        fieldErrors:
+          type: array
+          items: { $ref: "#/components/schemas/FieldError" }
+
+    PublicCourt:
+      type: object
+      required: [id, number, name]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer }
+        name: { type: string }
+
+    Court:
+      type: object
+      required: [id, number, name, active]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer }
+        name: { type: string }
+        active: { type: boolean }
+
+    CourtRequest:
+      type: object
+      required: [number]
+      properties:
+        number: { type: integer, minimum: 1, maximum: 999 }
+        name: { type: string, maxLength: 60 }
+
+    OpeningHours:
+      type: object
+      description: |
+        A day with no window is closed. Opening hours bind everyone, including an admin: the grid
+        can only offer slots they permit, so a booking outside them is one the interface cannot
+        render back.
+      required: [dayOfWeek]
+      properties:
+        dayOfWeek: { $ref: "#/components/schemas/DayOfWeek" }
+        opensAt: { type: [string, "null"], format: time }
+        closesAt: { type: [string, "null"], format: time }
+
+    SetOpeningHoursRequest:
+      type: object
+      required: [opensAt, closesAt]
+      properties:
+        opensAt: { type: string, format: time }
+        closesAt: { type: string, format: time }
+
+    ClubConfig:
+      type: object
+      required: [clubName, primaryColor, accentColor, defaultLocale]
+      properties:
+        clubName: { type: string }
+        primaryColor: { type: string }
+        accentColor: { type: string }
+        logoUrl: { type: [string, "null"] }
+        imprintUrl: { type: [string, "null"] }
+        defaultLocale: { type: string }
+
+    ClubConfigRequest:
+      type: object
+      required: [clubName, primaryColor, accentColor, defaultLocale]
+      properties:
+        clubName: { type: string, maxLength: 100, pattern: ".*\\S.*" }
+        primaryColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+        accentColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+        logoUrl:
+          type: [string, "null"]
+          maxLength: 500
+          pattern: "^(https?://.+|/[^/\\\\].*|/)$"
+        imprintUrl:
+          type: [string, "null"]
+          maxLength: 500
+          pattern: "^(https?://.+|/[^/\\\\].*|/)$"
+        defaultLocale: { type: string, pattern: "^(de|en)$" }
+
+    PublicBookingCard:
+      type: object
+      required: [id, label, color, allowedPlayerCounts, guestAllowed]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        color: { type: string }
+        allowedPlayerCounts:
+          type: array
+          items: { type: integer }
+        guestAllowed: { type: boolean }
+
+    PublicParticipantCard:
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        capacity: { type: [integer, "null"] }
+
+    BookingCard:
+      type: object
+      description: |
+        What kind of occupancy a booking is. Member booking, training, league match and court
+        closure differ only by their card, so a new kind is a row rather than a deployment.
+      required: [id, label, color, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, active]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        color: { type: string }
+        requiredRole:
+          oneOf:
+            - $ref: "#/components/schemas/Role"
+            - type: "null"
+        allowedPlayerCounts:
+          type: array
+          items: { type: integer }
+        tracksPlayers: { type: boolean }
+        countsAgainstLimits: { type: boolean }
+        guestAllowed: { type: boolean }
+        active: { type: boolean }
+
+    BookingCardRequest:
+      type: object
+      required: [label, color, allowedPlayerCounts, countsAgainstLimits, guestAllowed]
+      properties:
+        label: { type: string, maxLength: 60, pattern: ".*\\S.*" }
+        color: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+        requiredRole:
+          oneOf:
+            - $ref: "#/components/schemas/Role"
+            - type: "null"
+        allowedPlayerCounts:
+          type: array
+          description: |
+            The exact player counts this card permits — `[2, 4]` for a member card, empty for a
+            card that does not record players at all, such as training or a closure.
+          maxItems: 20
+          uniqueItems: true
+          items: { type: integer, minimum: 1, maximum: 20 }
+        countsAgainstLimits: { type: boolean }
+        guestAllowed: { type: boolean }
+
+    ParticipantCard:
+      type: object
+      required: [id, label, active]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        capacity: { type: [integer, "null"] }
+        active: { type: boolean }
+
+    ParticipantCardRequest:
+      type: object
+      required: [label]
+      properties:
+        label: { type: string, maxLength: 60, pattern: ".*\\S.*" }
+        capacity:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 99
+          description: How many of this card the club owns. Absent means unlimited.
+
+    ActiveRequest:
+      type: object
+      required: [active]
+      properties:
+        active: { type: boolean }
+
+    MembershipType:
+      type: object
+      required: [id, name, active]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        ruleSetId: { type: [string, "null"], format: uuid }
+        active: { type: boolean }
+
+    MembershipTypeRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 60, pattern: ".*\\S.*" }
+        ruleSetId: { type: [string, "null"], format: uuid }
+
+    RuleSet:
+      type: object
+      required: [id, name, active]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        active: { type: boolean }
+
+    RuleSetRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 60, pattern: ".*\\S.*" }
+
+    RuleDefinition:
+      type: object
+      required: [ruleType, params]
+      properties:
+        ruleType: { $ref: "#/components/schemas/RuleType" }
+        params:
+          type: object
+          additionalProperties: { type: integer }
+
+    SetRuleRequest:
+      type: object
+      required: [params]
+      properties:
+        params:
+          type: object
+          additionalProperties: { type: integer }
+
+    ParticipantRequest:
+      type: object
+      description: |
+        Exactly one of the three is set. A member by id, a guest by name, or a participant card
+        such as a ball machine, which occupies a place on court without being a person.
+      properties:
+        personId: { type: [string, "null"], format: uuid }
+        guestName: { type: [string, "null"] }
+        cardId: { type: [string, "null"], format: uuid }
+
+    CreateBookingRequest:
+      type: object
+      required: [courtIds, cardId, startsAt, endsAt]
+      properties:
+        courtIds:
+          type: array
+          minItems: 1
+          # A court's number is at most 999, so no club has more to book at once. The bound is
+          # here because an array with none is a body of any size a caller cares to send.
+          maxItems: 999
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        cardId: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt:
+          type: string
+          format: date-time
+          description: Must be after `startsAt`.
+        note: { type: [string, "null"] }
+        participants:
+          type: array
+          items: { $ref: "#/components/schemas/ParticipantRequest" }
+
+    BookingCreated:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string, format: uuid }
+
+    Allocation:
+      type: object
+      description: One court's occupancy for one booking.
+      required: [bookingId, courtId, startsAt, endsAt, cardLabel, cardColor]
+      properties:
+        bookingId: { type: string, format: uuid }
+        courtId: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        cardLabel: { type: string }
+        cardColor: { type: string }
+        bookedByName:
+          type: [string, "null"]
+          description: |
+            Null on every member-facing response, always. Participant names are not shown for
+            someone else's booking — not to guests and not to members — and this is not a setting
+            a club can switch on. Only the administrative views resolve a name.
+        matchType:
+          oneOf:
+            - $ref: "#/components/schemas/MatchType"
+            - type: "null"
+
+    SeriesRuleRequest:
+      type: object
+      description: |
+        A recurrence, ending either on a date or after a number of occurrences — exactly one of
+        `endsOn` and `occurrenceCount` is given.
+      required: [courtIds, cardId, startsOn, startTime, durationMinutes, intervalWeeks, weekdays]
+      properties:
+        courtIds:
+          type: array
+          minItems: 1
+          # A court's number is at most 999, so no club has more to book at once. The bound is
+          # here because an array with none is a body of any size a caller cares to send.
+          maxItems: 999
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        cardId: { type: string, format: uuid }
+        startsOn: { type: string, format: date }
+        startTime: { type: string, format: time }
+        durationMinutes: { type: integer, minimum: 1, maximum: 1440 }
+        intervalWeeks: { type: integer, minimum: 1, maximum: 52 }
+        weekdays:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/DayOfWeek" }
+        endsOn:
+          type: [string, "null"]
+          format: date
+          description: Not before `startsOn`. Mutually exclusive with `occurrenceCount`.
+        occurrenceCount:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 200
+          description: Mutually exclusive with `endsOn`.
+        note: { type: [string, "null"] }
+
+    CreateSeriesRequest:
+      description: |
+        A recurrence together with the occurrences to actually write. Previewing needs only the
+        recurrence; creating needs the caller's confirmation as well, which is why the two
+        operations do not share one shape.
+      allOf:
+        - $ref: "#/components/schemas/SeriesRuleRequest"
+        - type: object
+          required: [confirmedStarts]
+          properties:
+            confirmedStarts:
+              type: array
+              minItems: 1
+              # A series has at most occurrenceCount's maximum of occurrences, so it can confirm
+              # no more than that many.
+              maxItems: 200
+              uniqueItems: true
+              description: |
+                Each entry must be one the preview actually offered — the creator decides which
+                occurrences to keep, and nothing is written that they did not confirm.
+              items: { type: string, format: date-time }
+
+    Occurrence:
+      type: object
+      required: [startsAt, endsAt, blockedCourtIds, violations, creatable]
+      properties:
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        blockedCourtIds:
+          type: array
+          items: { type: string, format: uuid }
+        violations:
+          type: array
+          items: { $ref: "#/components/schemas/Violation" }
+        creatable: { type: boolean }
+
+    SeriesPreview:
+      type: object
+      required: [occurrences, creatableCount, truncatedByHorizon]
+      properties:
+        occurrences:
+          type: array
+          items: { $ref: "#/components/schemas/Occurrence" }
+        creatableCount: { type: integer, format: int64 }
+        truncatedByHorizon:
+          type: boolean
+          description: |
+            True when the recurrence would run past the instance's horizon. Said here rather than
+            on creation, because by then a dropped date was never among the confirmed occurrences
+            to report against.
+        horizonLimit: { type: [string, "null"], format: date }
+
+    SeriesCreated:
+      type: object
+      required: [bookingIds, skipped]
+      properties:
+        seriesId:
+          type: [string, "null"]
+          format: uuid
+          description: Null when nothing could be created; no empty series is left behind.
+        bookingIds:
+          type: array
+          items: { type: string, format: uuid }
+        skipped:
+          type: array
+          description: Occurrences a conflict or a rule kept from being created.
+          items: { type: string, format: date-time }
+
+    MoveRequest:
+      type: object
+      description: A move must change at least one of the time, the duration or the courts.
+      required: [fromBookingId, scope]
+      properties:
+        fromBookingId: { type: string, format: uuid }
+        scope: { $ref: "#/components/schemas/CancelScope" }
+        newStartTime: { type: [string, "null"], format: time }
+        newDurationMinutes: { type: [integer, "null"], minimum: 1 }
+        newCourtIds:
+          type: [array, "null"]
+          minItems: 1
+          maxItems: 999
+          uniqueItems: true
+          description: Absent leaves the courts as they are; empty is not a request that means anything.
+          items: { type: string, format: uuid }
+
+    Move:
+      type: object
+      required: [bookingId, fromStartsAt, toStartsAt, blockedCourtIds, unbookableCourtIds, violations, executable]
+      properties:
+        bookingId: { type: string, format: uuid }
+        fromStartsAt: { type: string, format: date-time }
+        toStartsAt: { type: string, format: date-time }
+        blockedCourtIds:
+          type: array
+          items: { type: string, format: uuid }
+        unbookableCourtIds:
+          type: array
+          items: { type: string, format: uuid }
+        violations:
+          type: array
+          items: { $ref: "#/components/schemas/Violation" }
+        executable: { type: boolean }
+
+    MovePreview:
+      type: object
+      required: [moves, executable]
+      properties:
+        moves:
+          type: array
+          items: { $ref: "#/components/schemas/Move" }
+        executable: { type: boolean }
+
+    MoveExecuted:
+      type: object
+      required: [moved]
+      properties:
+        moved: { type: integer }
+
+    AffectedBooking:
+      type: object
+      required: [bookingId, courtIds, startsAt, endsAt]
+      properties:
+        bookingId: { type: string, format: uuid }
+        courtIds:
+          type: array
+          items: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+
+    Impact:
+      type: object
+      description: What a configuration change would hit, before it is made.
+      required: [affectedCount, truncated, bookings]
+      properties:
+        affectedCount: { type: integer }
+        truncated:
+          type: boolean
+          description: True when more bookings are affected than the list shows.
+        bookings:
+          type: array
+          items: { $ref: "#/components/schemas/AffectedBooking" }
+
+  responses:
+    Unauthenticated:
+      description: No session, or a state-changing request without a CSRF token.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: Authenticated, but not allowed to do this.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: No such thing.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Invalid:
+      description: The request was understood and rejected.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: The request collides with something that already exists.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+paths:
+
+  /api/openapi.yaml:
+    get:
+      tags: [documentation]
+      operationId: getApiDocument
+      summary: This document, as served by this instance.
+      description: |
+        Clubs update on their own schedule, so the contract an instance answers to may be older
+        than the one in the project's repository. This is the one that binds here.
+      security: []
+      responses:
+        "200":
+          description: The API document.
+          content:
+            application/yaml:
+              schema: { type: string }
+
+  /api/session:
+    post:
+      tags: [session]
+      operationId: logIn
+      summary: Log in.
+      description: |
+        Form-encoded, not JSON: this is Spring Security's form login, and the encoding is part of
+        the contract rather than an accident.
+
+        A `GET` beforehand issues the readable `XSRF-TOKEN` cookie whose value this request must
+        echo in `X-XSRF-TOKEN`. Without it the answer is `401`, indistinguishable from a wrong
+        password — if credentials are certainly right and the answer is `401`, the token is
+        missing.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Logged in. The session cookie is set.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /api/session/logout:
+    post:
+      tags: [session]
+      operationId: logOut
+      summary: Log out and end the session.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204":
+          description: Logged out.
+
+  /api/public/courts:
+    get:
+      tags: [courts]
+      operationId: listCourts
+      summary: The club's active courts.
+      security: []
+      responses:
+        "200":
+          description: The courts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PublicCourt" }
+
+  /api/public/opening-hours:
+    get:
+      tags: [opening-hours]
+      operationId: listOpeningHours
+      summary: When the facility is open, by weekday.
+      security: []
+      responses:
+        "200":
+          description: One entry per weekday.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OpeningHours" }
+
+  /api/public/config:
+    get:
+      tags: [club-config]
+      operationId: getClubConfig
+      summary: The club's name and branding.
+      security: []
+      responses:
+        "200":
+          description: The configuration.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClubConfig" }
+
+  /api/public/booking-cards:
+    get:
+      tags: [cards]
+      operationId: listBookableCards
+      summary: The booking cards the caller may use.
+      description: |
+        Filtered by the caller's roles: a card gated behind a role they do not hold is absent
+        rather than shown and refused. Authenticated despite the path — the answer depends on who
+        is asking.
+      responses:
+        "200":
+          description: The cards this caller may place.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PublicBookingCard" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /api/public/participant-cards:
+    get:
+      tags: [cards]
+      operationId: listParticipantCards
+      summary: The active participant cards.
+      description: What can fill a player slot without being a person — a ball machine, or an open slot.
+      responses:
+        "200":
+          description: The cards.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PublicParticipantCard" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /api/bookings:
+    get:
+      tags: [bookings]
+      operationId: listAllocations
+      summary: The occupancy grid for one day.
+      description: |
+        A day, not a range: the grid a member reads is one day wide, and the instance's own time
+        zone decides where that day begins. A range would let a caller ask for a year.
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: One entry per occupied court and slot.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Allocation" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+    post:
+      tags: [bookings]
+      operationId: createBooking
+      summary: Book one or more courts for a slot.
+      description: |
+        Non-overlap is decided by the database, not by a check beforehand — time passes between
+        checking and inserting. A collision is a `409`, and it is authoritative.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateBookingRequest" }
+      responses:
+        "201":
+          description: Booked.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingCreated" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A court was taken in the meantime.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: One or more booking rules refused it.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/bookings/{id}:
+    delete:
+      tags: [bookings]
+      operationId: cancelBooking
+      summary: Cancel a booking.
+      description: A member may cancel their own; an admin may cancel any.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Cancelled.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/booking-series/preview:
+    post:
+      tags: [booking-series]
+      operationId: previewSeries
+      summary: What a recurrence would produce, without writing anything.
+      description: |
+        Mandatory before creating. Open to any authenticated caller, including one who could not
+        actually place the card — the card's role requirement is enforced when the series is
+        created, exactly as it is for a single booking.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SeriesRuleRequest" }
+      responses:
+        "200":
+          description: Every occurrence the rule produces, with what would block it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeriesPreview" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /api/booking-series:
+    post:
+      tags: [booking-series]
+      operationId: createSeries
+      summary: Create the occurrences the caller confirmed.
+      description: |
+        `confirmedStarts` names exactly the occurrences to create, and each must be one the
+        preview offered. What cannot be created is reported as skipped rather than failing the
+        request — a single blocked date does not undo the other twenty-five.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSeriesRequest" }
+      responses:
+        "201":
+          description: Created, with whatever was skipped.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeriesCreated" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/booking-series/{id}:
+    delete:
+      tags: [booking-series]
+      operationId: cancelSeries
+      summary: Cancel occurrences of a series.
+      description: Calendar semantics — this one, this and all following, or the whole series.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: fromBookingId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: scope
+          in: query
+          required: true
+          schema: { $ref: "#/components/schemas/CancelScope" }
+      responses:
+        "204":
+          description: Cancelled.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/booking-series/{id}/move/preview:
+    post:
+      tags: [booking-series]
+      operationId: previewSeriesMove
+      summary: Where a move would land, and what would block it.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MoveRequest" }
+      responses:
+        "200":
+          description: One entry per occurrence the scope covers.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MovePreview" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/booking-series/{id}/move:
+    post:
+      tags: [booking-series]
+      operationId: moveSeries
+      summary: Move occurrences of a series.
+      description: All or nothing — if any occurrence cannot move, none does.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MoveRequest" }
+      responses:
+        "200":
+          description: Moved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MoveExecuted" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Some occurrences cannot move; none was moved.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/courts:
+    get:
+      tags: [admin-courts]
+      operationId: listCourtsForAdmin
+      summary: Every court, active or not.
+      responses:
+        "200":
+          description: The list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Court" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin-courts]
+      operationId: createCourt
+      summary: Create a court.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CourtRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Court" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A court already carries that number.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/courts/{id}:
+    get:
+      tags: [admin-courts]
+      operationId: getCourt
+      summary: One court.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The court.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Court" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [admin-courts]
+      operationId: changeCourt
+      summary: Change a court.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CourtRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Court" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: A court already carries that number.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/courts/{id}/active:
+    put:
+      tags: [admin-courts]
+      operationId: setCourtActive
+      summary: Activate or deactivate a court.
+      description: Deactivating keeps existing bookings; it only stops new ones.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActiveRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Court" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/booking-cards:
+    get:
+      tags: [admin-booking-cards]
+      operationId: listBookingCards
+      summary: Every bookingcard, active or not.
+      responses:
+        "200":
+          description: The list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BookingCard" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin-booking-cards]
+      operationId: createBookingCard
+      summary: Create a bookingcard.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BookingCardRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingCard" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A card already carries that label.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/booking-cards/{id}:
+    get:
+      tags: [admin-booking-cards]
+      operationId: getBookingCard
+      summary: One bookingcard.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The bookingcard.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingCard" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [admin-booking-cards]
+      operationId: changeBookingCard
+      summary: Change a bookingcard.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BookingCardRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingCard" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: A card already carries that label.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/booking-cards/{id}/active:
+    put:
+      tags: [admin-booking-cards]
+      operationId: setBookingCardActive
+      summary: Activate or deactivate a bookingcard.
+      description: A deactivated card stays on its existing bookings and cannot be placed again.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActiveRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingCard" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/participant-cards:
+    get:
+      tags: [admin-participant-cards]
+      operationId: listParticipantCardsForAdmin
+      summary: Every participantcard, active or not.
+      responses:
+        "200":
+          description: The list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ParticipantCard" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin-participant-cards]
+      operationId: createParticipantCard
+      summary: Create a participantcard.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ParticipantCardRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParticipantCard" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A card already carries that label.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/participant-cards/{id}:
+    get:
+      tags: [admin-participant-cards]
+      operationId: getParticipantCard
+      summary: One participantcard.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The participantcard.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParticipantCard" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [admin-participant-cards]
+      operationId: changeParticipantCard
+      summary: Change a participantcard.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ParticipantCardRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParticipantCard" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: A card already carries that label.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/participant-cards/{id}/active:
+    put:
+      tags: [admin-participant-cards]
+      operationId: setParticipantCardActive
+      summary: Activate or deactivate a participantcard.
+      description: A deactivated card can no longer fill a slot.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActiveRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParticipantCard" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/membership-types:
+    get:
+      tags: [admin-membership-types]
+      operationId: listMembershipTypes
+      summary: Every membershiptype, active or not.
+      responses:
+        "200":
+          description: The list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MembershipType" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin-membership-types]
+      operationId: createMembershipType
+      summary: Create a membershiptype.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MembershipTypeRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MembershipType" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A membership type already carries that name.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/membership-types/{id}:
+    get:
+      tags: [admin-membership-types]
+      operationId: getMembershipType
+      summary: One membershiptype.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The membershiptype.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MembershipType" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [admin-membership-types]
+      operationId: changeMembershipType
+      summary: Change a membershiptype.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MembershipTypeRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MembershipType" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: A membership type already carries that name.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/membership-types/{id}/active:
+    put:
+      tags: [admin-membership-types]
+      operationId: setMembershipTypeActive
+      summary: Activate or deactivate a membershiptype.
+      description: Deactivating leaves members on it; it only stops new assignment.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActiveRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MembershipType" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/rule-sets:
+    get:
+      tags: [admin-rule-sets]
+      operationId: listRuleSets
+      summary: Every ruleset, active or not.
+      responses:
+        "200":
+          description: The list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RuleSet" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin-rule-sets]
+      operationId: createRuleSet
+      summary: Create a ruleset.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RuleSetRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleSet" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A rule set already carries that name.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/rule-sets/{id}:
+    get:
+      tags: [admin-rule-sets]
+      operationId: getRuleSet
+      summary: One ruleset.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The ruleset.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleSet" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [admin-rule-sets]
+      operationId: changeRuleSet
+      summary: Change a ruleset.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RuleSetRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleSet" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: A rule set already carries that name.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/rule-sets/{id}/active:
+    put:
+      tags: [admin-rule-sets]
+      operationId: setRuleSetActive
+      summary: Activate or deactivate a ruleset.
+      description: An inactive rule set cannot be assigned to a membership type.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActiveRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleSet" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/opening-hours:
+    get:
+      tags: [admin-opening-hours]
+      operationId: listOpeningHoursForAdmin
+      summary: Opening hours for every weekday, including the closed ones.
+      responses:
+        "200":
+          description: One entry per weekday.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OpeningHours" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/opening-hours/{day}:
+    put:
+      tags: [admin-opening-hours]
+      operationId: setOpeningHours
+      summary: Set one weekday's window.
+      description: |
+        To open the courts early for a tournament, change the day's window rather than booking
+        around it — the window binds everyone, including an admin.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: day
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/DayOfWeek" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetOpeningHoursRequest" }
+      responses:
+        "200":
+          description: Set.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpeningHours" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      tags: [admin-opening-hours]
+      operationId: closeDay
+      summary: Close a weekday entirely.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: day
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/DayOfWeek" }
+      responses:
+        "204":
+          description: Closed.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/config:
+    get:
+      tags: [admin-config]
+      operationId: getClubConfigForAdmin
+      summary: The club's configuration.
+      responses:
+        "200":
+          description: The configuration.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClubConfig" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      tags: [admin-config]
+      operationId: changeClubConfig
+      summary: Change the club's name and branding.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClubConfigRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClubConfig" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/rule-sets/{id}/rules:
+    get:
+      tags: [admin-rule-sets]
+      operationId: listRules
+      summary: The rules configured in a rule set.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: One entry per configured rule type.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RuleDefinition" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/rule-sets/{id}/rules/{ruleType}:
+    put:
+      tags: [admin-rule-sets]
+      operationId: setRule
+      summary: Configure one rule of a rule set.
+      description: |
+        Rules are data, not code: a rule is a row with parameters, and which parameters a type
+        accepts is defined by the type. An unknown parameter is refused rather than ignored.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: ruleType
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/RuleType" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetRuleRequest" }
+      responses:
+        "200":
+          description: Configured.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleDefinition" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [admin-rule-sets]
+      operationId: removeRule
+      summary: Remove a rule from a rule set.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: ruleType
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/RuleType" }
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/impact/courts/{courtId}:
+    get:
+      tags: [admin-impact]
+      operationId: courtImpact
+      summary: Which bookings deactivating this court would affect.
+      parameters:
+        - name: courtId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The affected bookings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Impact" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/impact/booking-cards/{cardId}:
+    get:
+      tags: [admin-impact]
+      operationId: bookingCardImpact
+      summary: Which bookings deactivating this card would affect.
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The affected bookings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Impact" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/impact/opening-hours/{day}:
+    get:
+      tags: [admin-impact]
+      operationId: openingHoursImpact
+      summary: Which bookings a new window for this weekday would put outside it.
+      description: |
+        Both times or neither. Omitting both asks what closing the day entirely would affect.
+      parameters:
+        - name: day
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/DayOfWeek" }
+        - name: opensAt
+          in: query
+          required: false
+          schema: { type: string, format: time }
+        - name: closesAt
+          in: query
+          required: false
+          schema: { type: string, format: time }
+      responses:
+        "200":
+          description: The affected bookings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Impact" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"

@@ -9,15 +9,18 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,10 +48,7 @@ class ValidationMessageCoverageTest {
     // everyConstraintAnnotationUsedInMainIsInTheKnownSet: a new @Constraint annotation mints an
     // unreviewed code on this frozen wire contract until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("ChronologicalSeries", "ChronologicalSlot", "KnownRole", "Max", "Min",
-                    "MoveChangesSomething", "NoDuplicates", "NotBlank", "NotEmpty",
-                    "NotEmptyIfGiven", "NotNull",
-                    "Pattern", "Positive", "SeriesEndsOnce", "Size");
+            List.of("Max", "Min", "NotNull", "Pattern", "Size");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
@@ -115,6 +115,36 @@ class ValidationMessageCoverageTest {
     }
 
     @Test
+    void everyCodeASpringValidatorRejectsWithHasAMessageKeyInBothBundles()
+            throws IOException, URISyntaxException {
+        // given — a cross-field rule cannot be a per-field annotation, so it lives in a Validator
+        // and names its code through rejectValue. That code reaches the wire as
+        // validation.<code> exactly as a constraint annotation's simple name does, and would
+        // otherwise be covered by nothing: the annotation scan cannot see it.
+        TreeSet<String> codes = new TreeSet<>();
+        Pattern rejectValue = Pattern.compile("rejectValue\\(\\s*\"[^\"]+\",\\s*\"([^\"]+)\"");
+        try (Stream<Path> sources = Files.walk(mainSourceDirectory())) {
+            sources.filter(path -> path.toString().endsWith(".java")).forEach(path -> {
+                try {
+                    Matcher matcher = rejectValue.matcher(Files.readString(path));
+                    matcher.results().forEach(result -> codes.add(result.group(1)));
+                } catch (IOException e) {
+                    throw new IllegalStateException("Cannot read " + path, e);
+                }
+            });
+        }
+        Properties english = loadBundle("/messages.properties");
+        Properties german = loadBundle("/messages_de.properties");
+
+        // when / then
+        assertThat(codes)
+                .as("at least one cross-field rule is expected to live in a Validator")
+                .isNotEmpty();
+        codes.forEach(code -> assertBothBundlesDefine(english, german,
+                "validation." + code, "rejected by a Spring Validator in src/main"));
+    }
+
+    @Test
     void bothBundlesDefineTheSameKeys() throws IOException {
         // given — every other test here checks keys it can *derive* (a constraint annotation, a
         // code literal). A key written by hand into one bundle and forgotten in the other is
@@ -134,10 +164,11 @@ class ValidationMessageCoverageTest {
     void everyClassDeclaringGetCodeIsCoveredByAPattern() throws IOException, URISyntaxException {
         // given
         TreeSet<String> getCodeClasses = new TreeSet<>();
+        Set<String> generated = generatedTopLevelClassNames();
         Path classesRoot = classesDirectory();
         try (Stream<Path> files = Files.walk(classesRoot)) {
             files.filter(path -> path.toString().endsWith(".class"))
-                    .forEach(path -> collectGetCodeClasses(classesRoot, path, getCodeClasses));
+                    .forEach(path -> collectGetCodeClasses(classesRoot, path, generated, getCodeClasses));
         }
 
         // when / then — getCode() is declared once on CodedDomainFailure and inherited by its
@@ -157,10 +188,11 @@ class ValidationMessageCoverageTest {
         // given — the list above builds the "new X(\"literal\"" patterns; a name that no longer
         // names a code-carrying failure would silently stop matching anything at all
         Path classesRoot = classesDirectory();
+        Set<String> generated = generatedTopLevelClassNames();
         TreeSet<String> resolved = new TreeSet<>();
         try (Stream<Path> files = Files.walk(classesRoot)) {
             files.filter(path -> path.toString().endsWith(".class"))
-                    .forEach(path -> collectByGetCodeAccessibility(classesRoot, path, resolved));
+                    .forEach(path -> collectByGetCodeAccessibility(classesRoot, path, generated, resolved));
         }
 
         // when / then
@@ -170,8 +202,38 @@ class ValidationMessageCoverageTest {
                 .containsAll(CODE_CARRYING_EXCEPTION_SIMPLE_NAMES);
     }
 
-    private static void collectByGetCodeAccessibility(Path root, Path classFile, TreeSet<String> found) {
+    // The generator writes wire models for the error shapes themselves — a Violation carries a
+    // code, a FieldError carries a code and a field — so they answer getCode() without ever
+    // choosing a code. Read off disk rather than pinned as a package name: the exemption is then
+    // exactly what the generator produced, and cannot quietly grow to cover hand-written code.
+    //
+    // Constraint annotations are deliberately not exempted. A generated @Size or @Pattern reaches
+    // the wire as validation.<name> exactly as a hand-written one does, and must have its bundle
+    // entry like any other.
+    private static Set<String> generatedTopLevelClassNames() throws IOException, URISyntaxException {
+        Path root = classesDirectory().getParent()
+                .resolve(Path.of("generated-sources", "openapi", "src", "main", "java"));
+        assertThat(root).as("the OpenAPI generator's output directory").isDirectory();
+        try (Stream<Path> sources = Files.walk(root)) {
+            return sources.filter(path -> path.toString().endsWith(".java"))
+                    .map(path -> root.relativize(path).toString())
+                    .map(name -> name.substring(0, name.length() - ".java".length()))
+                    .map(name -> name.replace(File.separatorChar, '.'))
+                    .collect(Collectors.toCollection(TreeSet::new));
+        }
+    }
+
+    private static boolean isGenerated(Set<String> generated, String className) {
+        int nested = className.indexOf('$');
+        return generated.contains(nested < 0 ? className : className.substring(0, nested));
+    }
+
+    private static void collectByGetCodeAccessibility(
+            Path root, Path classFile, Set<String> generated, TreeSet<String> found) {
         String className = toClassName(root, classFile);
+        if (isGenerated(generated, className)) {
+            return;
+        }
         Class<?> type;
         try {
             type = Class.forName(className, false, ValidationMessageCoverageTest.class.getClassLoader());
@@ -185,8 +247,12 @@ class ValidationMessageCoverageTest {
         }
     }
 
-    private static void collectGetCodeClasses(Path root, Path classFile, TreeSet<String> getCodeClasses) {
+    private static void collectGetCodeClasses(
+            Path root, Path classFile, Set<String> generated, TreeSet<String> getCodeClasses) {
         String className = toClassName(root, classFile);
+        if (isGenerated(generated, className)) {
+            return;
+        }
         Class<?> type;
         try {
             type = Class.forName(className, false, ValidationMessageCoverageTest.class.getClassLoader());
@@ -244,6 +310,12 @@ class ValidationMessageCoverageTest {
         collect(type.getAnnotations(), constraintNames);
         for (Field field : type.getDeclaredFields()) {
             collect(field.getAnnotations(), constraintNames);
+        }
+        // And on accessors: the generator puts its constraints on the getter, so a scan of fields
+        // and types alone found nothing at all in the generated models — every one of their codes
+        // would have reached the wire with no bundle entry behind it.
+        for (Method method : type.getDeclaredMethods()) {
+            collect(method.getAnnotations(), constraintNames);
         }
     }
 

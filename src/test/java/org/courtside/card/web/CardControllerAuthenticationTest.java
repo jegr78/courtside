@@ -25,6 +25,6 @@ class CardControllerAuthenticationTest {
         CardController controller = new CardController(cards, currentUser);
 
         // when / then
-        assertThat(controller.bookingCards()).isEmpty();
+        assertThat(controller.listBookableCards().getBody()).isEmpty();
     }
 }

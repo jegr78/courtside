@@ -101,7 +101,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.length()").value(1))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("primaryColor"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotBlank"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
     }
 
     @Test
@@ -119,7 +119,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.length()").value(1))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("accentColor"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotBlank"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
     }
 
     @Test
@@ -137,7 +137,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.length()").value(1))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("defaultLocale"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotBlank"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
     }
 
     @Test

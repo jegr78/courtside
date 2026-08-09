@@ -91,6 +91,127 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABodyFieldThatIsNotAUuid_whenPosting_thenTheResponseNamesTheField() throws Exception {
+        // given — a value Jackson cannot read is a validation failure about one field, not an
+        // unreadable body. Reported as the latter, a caller learns only that something, somewhere,
+        // in what they sent is wrong.
+        String body = """
+                {"courtIds":["%s"],"cardId":"not-a-uuid",
+                 "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z"}
+                """.formatted(courtId);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/bookings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("cardId"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
+    }
+
+    @Test
+    void givenAnUnreadableValueInsideAnObjectInAnArray_whenPosting_thenTheFieldCarriesTheIndex()
+            throws Exception {
+        // given — with several participants, a field name without the index leaves the caller
+        // guessing which one to correct
+        String body = """
+                {"courtIds":["%s"],"cardId":"%s",
+                 "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z",
+                 "participants":[{"guestName":"John Roe"},{"personId":"not-a-uuid"}]}
+                """.formatted(courtId, MEMBER_BOOKING_CARD);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/bookings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("participants[1].personId"));
+    }
+
+    @Test
+    void givenAnUnreadableValueUnderAKeyThisApiDefines_whenPutting_thenTheKeyNamesTheField()
+            throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(put(
+                "/api/admin/rule-sets/{id}/rules/{type}", UUID.randomUUID(), "ADVANCE_WINDOW")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"params\":{\"maxDays\":\"not-a-number\"}}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("params.maxDays"));
+    }
+
+    @Test
+    void givenAnUnreadableValueUnderAKeyTheCallerInvented_whenPutting_thenOnlyTheObjectIsNamed()
+            throws Exception {
+        // given — the keys of an additionalProperties object are whatever was sent, so echoing one
+        // back puts the caller's own text in the response
+        ResultActions result = mockMvc.perform(put(
+                "/api/admin/rule-sets/{id}/rules/{type}", UUID.randomUUID(), "ADVANCE_WINDOW")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"params\":{\"<img src=x onerror=alert(1)>\":\"nope\"}}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("params"));
+        assertThat(result.andReturn().getResponse().getContentAsString()).doesNotContain("<img");
+    }
+
+    @Test
+    void givenADuplicateInAnArrayThatMustBeUnique_whenPosting_thenTheResponseNamesTheField()
+            throws Exception {
+        // given — weekdays is a Set, so a duplicate would simply vanish on the way in and the
+        // caller would be told the request succeeded exactly as sent. It did not.
+        String body = """
+                {"courtIds":["%s"],"cardId":"%s","startsOn":"2026-04-07","startTime":"18:00:00",
+                 "durationMinutes":120,"intervalWeeks":1,"weekdays":["TUESDAY","TUESDAY"],
+                 "occurrenceCount":2,"confirmedStarts":["2026-04-07T18:00:00+02:00"]}
+                """.formatted(courtId, TRAINING_CARD);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/booking-series")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("weekdays"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NoDuplicates"));
+    }
+
+    @Test
+    void givenAnUnreadableValueInsideAnArray_whenPosting_thenTheResponseNamesTheEntry()
+            throws Exception {
+        // given — the entry, not just the array: an array of ten court ids with one bad entry
+        // should not send the caller looking through all ten
+        String body = """
+                {"courtIds":["not-a-uuid"],"cardId":"%s",
+                 "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z"}
+                """.formatted(MEMBER_BOOKING_CARD);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/bookings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("courtIds[0]"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
+    }
+
+    @Test
     void givenAnUnsupportedMethod_whenRequesting_thenTheAllowHeaderNamesEveryMethodTheEndpointSupports()
             throws Exception {
         // given / when
@@ -190,8 +311,10 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
         // then
         assertProblem(result, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "urn:courtside:error:unsupported-media-type");
         assertThat(result.andReturn().getResponse().getContentAsString()).doesNotContain("text/plain");
+        // Exactly what the document says the endpoint consumes — narrower than Spring's own
+        // default of every JSON-ish media type, because the contract is narrower.
         assertThat(headerValues(result, "Accept"))
-                .containsExactlyInAnyOrder("application/json", "application/*+json");
+                .containsExactly("application/json");
     }
 
     @Test

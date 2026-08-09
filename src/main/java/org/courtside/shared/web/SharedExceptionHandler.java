@@ -1,6 +1,8 @@
 package org.courtside.shared.web;
 
 import jakarta.validation.ConstraintViolation;
+import org.courtside.shared.DuplicateItemException;
+import tools.jackson.core.JacksonException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -24,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 // Ordered ahead of Boot's own spring.mvc.problemdetails fallback advice, which otherwise wins the
 // tie for MethodArgumentNotValidException and answers with its generic, field-less detail — but
@@ -59,13 +62,20 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleValidationFailure(MethodArgumentNotValidException exception) {
+        return validationFailed(exception.getBindingResult().getFieldErrors().stream()
+                .map(SharedExceptionHandler::toMap)
+                .toList());
+    }
+
+    // One builder for both advices that answer with this type: ProblemTypeUriTest reads the type
+    // literals an advice sets and expects each slug once, so a second literal here would read as a
+    // second, unreviewed problem type rather than as the same one reached two ways.
+    private static ProblemDetail validationFailed(List<Map<String, Object>> fieldErrors) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "The request does not pass validation");
         problem.setType(URI.create("urn:courtside:error:validation-failed"));
         problem.setTitle("Validation failed");
-        problem.setProperty("fieldErrors", exception.getBindingResult().getFieldErrors().stream()
-                .map(SharedExceptionHandler::toMap)
-                .toList());
+        problem.setProperty("fieldErrors", fieldErrors);
         return problem;
     }
 
@@ -81,13 +91,63 @@ class SharedExceptionHandler {
         return problem;
     }
 
+    // Jackson records the property path as a mismatch unwinds, so a value it cannot read — an
+    // unknown enum constant, a malformed uuid, a date that is not one, a duplicate in an array the
+    // contract declares unique — can be reported as the field it came from rather than as "the
+    // body was unreadable". Without this the caller is told only that something, somewhere, is
+    // wrong with a request they wrote.
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail handleUnreadableBody(HttpMessageNotReadableException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.BAD_REQUEST, "The request body could not be parsed");
-        problem.setType(URI.create("urn:courtside:error:malformed-request-body"));
-        problem.setTitle("Malformed request body");
-        return problem;
+        String field = mismatchedField(exception);
+        if (field == null) {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.BAD_REQUEST, "The request body could not be parsed");
+            problem.setType(URI.create("urn:courtside:error:malformed-request-body"));
+            problem.setTitle("Malformed request body");
+            return problem;
+        }
+
+        // Written out twice rather than as one map with a computed code: ValidationMessageCoverageTest
+        // finds a code by the literal that follows the "code" key, and a code it cannot see is a
+        // code with no bundle entry.
+        return validationFailed(List.of(
+                exception.getCause() instanceof DuplicateItemException
+                        ? Map.of("field", field, "code", "validation.NoDuplicates", "params", Map.of())
+                        : Map.of("field", field, "code", "validation.TypeMismatch", "params", Map.of())));
+    }
+
+    // A property name a caller chose is not a property name this API defines: the keys of an
+    // additionalProperties object are whatever was sent. Anything outside this set is not put in
+    // the response — the field then names the object that holds it, which is true and says as much
+    // as can honestly be said.
+    private static final Pattern A_NAME_THIS_API_DEFINES = Pattern.compile("[A-Za-z0-9_-]{1,40}");
+
+    private static String mismatchedField(HttpMessageNotReadableException exception) {
+        if (!(exception.getCause() instanceof JacksonException mismatch)) {
+            return null;
+        }
+        StringBuilder field = new StringBuilder();
+        for (JacksonException.Reference reference : mismatch.getPath()) {
+            // The index belongs in the name: "participants.personId" leaves a caller with several
+            // participants no way to tell which one, and Bean Validation names the same field
+            // "participants[0].personId".
+            if (reference.getIndex() >= 0) {
+                field.append('[').append(reference.getIndex()).append(']');
+                continue;
+            }
+            String name = reference.getPropertyName();
+            if (name == null) {
+                continue;
+            }
+            if (reference.from() instanceof Map<?, ?> && !A_NAME_THIS_API_DEFINES.matcher(name).matches()) {
+                break;
+            }
+            if (!field.isEmpty()) {
+                field.append('.');
+            }
+            field.append(name);
+        }
+        return field.isEmpty() ? null : field.toString();
     }
 
     // RFC 9110 §15.5.6 makes Allow mandatory on a 405, and it is the only machine-readable
@@ -150,7 +210,13 @@ class SharedExceptionHandler {
 
     private static Map<String, Object> toMap(FieldError error) {
         if (!error.contains(ConstraintViolation.class)) {
-            return Map.of("field", error.getField(), "code", "validation.rejected", "params", Map.of());
+            // A Spring Validator's rejection carries its own code — a cross-field rule the request
+            // record cannot hold. Falling back to "rejected" would throw that name away and leave
+            // a client unable to tell one such rule from another.
+            String code = error.getCode();
+            return Map.of("field", error.getField(),
+                    "code", code == null ? "validation.rejected" : "validation." + code,
+                    "params", Map.of());
         }
 
         ConstraintViolation<?> violation = error.unwrap(ConstraintViolation.class);
@@ -161,6 +227,17 @@ class SharedExceptionHandler {
 
         Map<String, Object> params = new LinkedHashMap<>();
         allowedParams.forEach(name -> params.put(name, attributes.get(name)));
+
+        // minItems with no maximum generates @Size(min = 1), whose max is Integer.MAX_VALUE. A
+        // message reading "between 1 and 2147483647 in length" tells a caller nothing, and two
+        // billion is not information — so the unbounded case is its own code with its own message.
+        if ("Size".equals(constraintName) && Integer.valueOf(Integer.MAX_VALUE).equals(params.get("max"))) {
+            params.remove("max");
+            return Map.of(
+                    "field", error.getField(),
+                    "code", "validation.SizeAtLeast",
+                    "params", params);
+        }
 
         return Map.of(
                 "field", error.getField(),

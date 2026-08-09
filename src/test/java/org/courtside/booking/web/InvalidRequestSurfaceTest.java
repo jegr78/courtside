@@ -170,7 +170,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("occurrenceCount"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Positive"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Min"));
     }
 
     @Test
@@ -203,6 +203,63 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SeriesEndsOnce"));
     }
 
+    // Previewing and creating carry the recurrence in two different generated types, so the same
+    // rule is stated twice in SeriesRequestValidator. Testing only the preview leaves the second
+    // statement free to be deleted: without it a series that ends twice reaches SeriesRule's
+    // constructor, and an IllegalArgumentException there is a 500 for a request the caller got
+    // wrong.
+    @Test
+    void whenASeriesToCreateEndsBeforeItStarts_thenItIsAFieldErrorOnEndsOn() throws Exception {
+        // when / then
+        postSeriesCreate(seriesToCreate("\"endsOn\": \"2026-05-01\""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("endsOn"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.ChronologicalSeries"));
+    }
+
+    @Test
+    void whenASeriesToCreateSaysNeitherHowLongNorHowOften_thenItIsAFieldErrorOnEndsOn()
+            throws Exception {
+        // when / then
+        postSeriesCreate(seriesToCreate(null))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("endsOn"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SeriesEndsOnce"));
+    }
+
+    @Test
+    void whenASeriesToCreateSaysBothHowLongAndHowOften_thenItIsAFieldErrorOnEndsOn()
+            throws Exception {
+        // when / then
+        postSeriesCreate(seriesToCreate("\"endsOn\": \"2026-09-29\", \"occurrenceCount\": 10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("endsOn"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SeriesEndsOnce"));
+    }
+
+    // weekdays is the one array the document bounds below but not above — seven is what
+    // uniqueItems already allows, not a limit worth stating. It is therefore also the only case
+    // that reaches the code written for a maximum no message can name.
+    @Test
+    void whenASeriesNamesNoWeekdays_thenTheViolationDoesNotQuoteAnUnboundedMaximum()
+            throws Exception {
+        // when / then
+        postSeriesPreview("""
+                {"courtIds": ["%s"], "cardId": "%s", "startsOn": "2026-05-12",
+                 "startTime": "18:00", "durationMinutes": 60, "intervalWeeks": 1,
+                 "weekdays": [], "occurrenceCount": 4}
+                """.formatted(secondCourtId, MEMBER_BOOKING_CARD))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("weekdays"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SizeAtLeast"))
+                .andExpect(jsonPath("$.fieldErrors[0].params.min").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].params.max").doesNotExist());
+    }
+
     @Test
     void whenAMoveNamesNoCourtsAtAll_thenItIsAFieldErrorOnNewCourtIds() throws Exception {
         // given — leaving newCourtIds out means "keep the courts", so null stays legal; an empty
@@ -214,7 +271,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("newCourtIds"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotEmptyIfGiven"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"));
     }
 
     @Test
@@ -226,7 +283,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("newDurationMinutes"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Positive"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Min"));
     }
 
     @Test
@@ -273,6 +330,25 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
         return """
                 {"courtIds": ["%s"], "cardId": "%s", "startsAt": "%s", "endsAt": "%s"}
                 """.formatted(courtId, cardId, startsAt, endsAt);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions postSeriesCreate(String body)
+            throws Exception {
+        return mockMvc.perform(post("/api/booking-series")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+    }
+
+    // Creating additionally requires the occurrences the caller confirmed; one valid entry keeps
+    // the recurrence itself the only thing under test.
+    private String seriesToCreate(String ending) {
+        return """
+                {"courtIds": ["%s"], "cardId": "%s", "startsOn": "2026-05-12",
+                 "startTime": "18:00", "durationMinutes": 60, "intervalWeeks": 1,
+                 "weekdays": ["TUESDAY"], "confirmedStarts": ["2026-05-12T16:00:00Z"]%s}
+                """.formatted(secondCourtId, MEMBER_BOOKING_CARD,
+                ending == null ? "" : ", " + ending);
     }
 
     private String series(String ending) {

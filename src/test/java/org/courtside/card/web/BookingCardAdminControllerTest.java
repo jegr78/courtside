@@ -176,7 +176,8 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors").isArray())
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("allowedPlayerCounts[1]"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
     }
 
     @Test
@@ -193,7 +194,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("color"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotBlank"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
     }
 
     @Test
@@ -211,7 +212,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("requiredRole"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.KnownRole"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
     }
 
     @Test

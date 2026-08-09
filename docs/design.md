@@ -22,10 +22,11 @@ port interface has been introduced, because no second adapter has needed one.
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
 courts, accounts, roles and session login, club configuration and branding, and the admin surface
-for all of it. `/actuator/health` is exposed.
+for all of it. `/actuator/health` is exposed. The OpenAPI document is the source of truth: every
+controller implements an interface generated from it, and an instance serves the document it
+actually answers to at `GET /api/openapi.yaml`.
 
-Designed and not built: the OpenAPI document as the source of truth (the REST API is currently
-hand-written — see the issue tracker), `Idempotency-Key` handling, the observability stack of
+Designed and not built: `Idempotency-Key` handling, the observability stack of
 section 9 beyond the health endpoint, the supply-chain measures of section 10 beyond Dependabot,
 CSV import, reports and exports, and the frontend.
 
@@ -93,7 +94,10 @@ Every tagged release publishes:
 - Multi-arch container image on GHCR, semver-tagged
 - Cosign signature and SBOM
 - The OpenAPI document, which is written by hand and is the source of truth the API is
-  generated from, not a by-product of it
+  generated from, not a by-product of it. The release workflow attaches
+  `src/main/resources/api/openapi.yaml` to the tag unchanged — there is nothing to build, and a
+  document assembled at release time would be a different document from the one the instance
+  serves. Waits on there being a release workflow at all.
 - Release notes including explicit upgrade notes for breaking changes
 
 ### Compatibility contract

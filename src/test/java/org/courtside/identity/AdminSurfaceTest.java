@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -54,6 +55,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "ruleType", "ADVANCE_WINDOW");
 
     private static final Set<String> ANONYMOUS_ALLOWED_PATHS = Set.of(
+            "/api/openapi.yaml",
             "/api/public/config",
             "/api/public/courts",
             "/api/public/opening-hours");
@@ -255,6 +257,11 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         try {
             MockHttpServletRequest servletRequest =
                     new MockHttpServletRequest(endpoint.method().name(), endpoint.concretePath());
+            // The mappings state the media types they consume, so a probe with no content type
+            // matches nothing and every body-taking endpoint reads as misrouted. Accept stays open:
+            // this instance also serves its own document as YAML.
+            servletRequest.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            servletRequest.addHeader(HttpHeaders.ACCEPT, MediaType.ALL_VALUE);
             ServletRequestPathUtils.parseAndCache(servletRequest);
             if (handlerMapping.getHandler(servletRequest) == null) {
                 return false;
@@ -301,6 +308,9 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         }
     }
 
+    // The content type is taken from what the mapping declares rather than assumed to be JSON:
+    // one endpoint serves the API document as YAML on purpose, and hard-coding JSON here would
+    // have made that a test failure instead of a described fact.
     private String successfulAsAnonymousFailure(MappedEndpoint endpoint) {
         try {
             mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
@@ -309,7 +319,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                             .with(anonymous())
                             .with(csrf()))
                     .andExpect(status().is2xxSuccessful())
-                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
+                    .andExpect(content().contentTypeCompatibleWith(endpoint.produces()));
             return null;
         } catch (Exception | AssertionError failure) {
             return failure.getMessage();
@@ -355,8 +365,14 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 .flatMap(info -> info.getPathPatternsCondition().getPatternValues().stream()
                         .filter(patternFilter)
                         .flatMap(pattern -> methodsOf(info).stream()
-                                .map(method -> new MappedEndpoint(method, pattern))))
+                                .map(method -> new MappedEndpoint(method, pattern, producesOf(info)))))
                 .toList();
+    }
+
+    private static MediaType producesOf(RequestMappingInfo info) {
+        return info.getProducesCondition().getProducibleMediaTypes().stream()
+                .findFirst()
+                .orElse(MediaType.APPLICATION_JSON);
     }
 
     private static List<HttpMethod> methodsOf(RequestMappingInfo info) {
@@ -370,7 +386,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 .toList();
     }
 
-    private record MappedEndpoint(HttpMethod method, String pattern) {
+    private record MappedEndpoint(HttpMethod method, String pattern, MediaType produces) {
 
         String concretePath() {
             return pattern

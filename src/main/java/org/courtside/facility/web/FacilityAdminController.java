@@ -1,92 +1,96 @@
 package org.courtside.facility.web;
 
+import org.courtside.api.AdminCourtsApi;
+import org.courtside.api.AdminOpeningHoursApi;
+import org.courtside.api.ApiActiveRequest;
+import org.courtside.api.ApiCourt;
+import org.courtside.api.ApiCourtRequest;
+import org.courtside.api.ApiDayOfWeek;
+import org.courtside.api.ApiOpeningHours;
+import org.courtside.api.ApiSetOpeningHoursRequest;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
 import org.courtside.facility.OpeningHours;
-import org.courtside.facility.web.FacilityAdminWebModels.CourtRequest;
-import org.courtside.facility.web.FacilityAdminWebModels.CourtResponse;
-import org.courtside.facility.web.FacilityAdminWebModels.OpeningHoursResponse;
-import org.courtside.facility.web.FacilityAdminWebModels.SetOpeningHoursRequest;
-import org.courtside.shared.ActiveRequest;
 import org.courtside.shared.OpeningWindow;
-import jakarta.validation.Valid;
+import org.courtside.shared.WireTypes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/admin")
 @RequiredArgsConstructor
-class FacilityAdminController {
+class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
 
     private final FacilityService facility;
 
-    @GetMapping("/courts")
-    List<CourtResponse> courts() {
-        return facility.allCourts().stream()
+    @Override
+    public ResponseEntity<List<ApiCourt>> listCourtsForAdmin() {
+        return ResponseEntity.ok(facility.allCourts().stream()
                 .map(FacilityAdminController::toResponse)
-                .toList();
+                .toList());
     }
 
-    @PostMapping("/courts")
-    ResponseEntity<CourtResponse> create(@Valid @RequestBody CourtRequest request) {
-        Court court = facility.createCourt(request.number(), request.name());
+    @Override
+    public ResponseEntity<ApiCourt> createCourt(ApiCourtRequest request) {
+        Court court = facility.createCourt(request.getNumber(), request.getName());
         return ResponseEntity
                 .created(URI.create("/api/admin/courts/" + court.getId()))
                 .body(toResponse(court));
     }
 
-    @PutMapping("/courts/{id}")
-    CourtResponse change(@PathVariable UUID id, @Valid @RequestBody CourtRequest request) {
-        return toResponse(facility.changeCourt(id, request.number(), request.name()));
+    @Override
+    public ResponseEntity<ApiCourt> changeCourt(UUID id, ApiCourtRequest request) {
+        return ResponseEntity.ok(
+                toResponse(facility.changeCourt(id, request.getNumber(), request.getName())));
     }
 
-    @PutMapping("/courts/{id}/active")
-    CourtResponse setActive(@PathVariable UUID id, @Valid @RequestBody ActiveRequest request) {
-        return toResponse(facility.setCourtActive(id, request.active()));
+    @Override
+    public ResponseEntity<ApiCourt> setCourtActive(UUID id, ApiActiveRequest request) {
+        return ResponseEntity.ok(toResponse(facility.setCourtActive(id, request.getActive())));
     }
 
-    @GetMapping("/courts/{id}")
-    CourtResponse court(@PathVariable UUID id) {
-        return toResponse(facility.requireCourt(id));
+    @Override
+    public ResponseEntity<ApiCourt> getCourt(UUID id) {
+        return ResponseEntity.ok(toResponse(facility.requireCourt(id)));
     }
 
-    @GetMapping("/opening-hours")
-    List<OpeningHoursResponse> openingHours() {
-        return facility.weeklyOpeningHours().stream()
-                .map(hours -> new OpeningHoursResponse(
-                        hours.dayOfWeek(), hours.opensAt(), hours.closesAt()))
-                .toList();
+    @Override
+    public ResponseEntity<List<ApiOpeningHours>> listOpeningHoursForAdmin() {
+        return ResponseEntity.ok(facility.weeklyOpeningHours().stream()
+                .map(hours -> toResponse(hours.dayOfWeek(), hours.opensAt(), hours.closesAt()))
+                .toList());
     }
 
-    @PutMapping("/opening-hours/{day}")
-    OpeningHoursResponse setOpeningHours(@PathVariable DayOfWeek day,
-                                         @Valid @RequestBody SetOpeningHoursRequest request) {
+    @Override
+    public ResponseEntity<ApiOpeningHours> setOpeningHours(
+            ApiDayOfWeek day, ApiSetOpeningHoursRequest request) {
+        DayOfWeek weekday = WireTypes.toDayOfWeek(day);
         OpeningHours hours = facility.setOpeningHours(
-                day, new OpeningWindow(request.opensAt(), request.closesAt()));
-        return new OpeningHoursResponse(day, hours.getOpensAt(), hours.getClosesAt());
+                weekday, new OpeningWindow(request.getOpensAt(), request.getClosesAt()));
+        return ResponseEntity.ok(
+                toResponse(weekday, hours.getOpensAt(), hours.getClosesAt()));
     }
 
-    @DeleteMapping("/opening-hours/{day}")
-    ResponseEntity<Void> closeOn(@PathVariable DayOfWeek day) {
-        facility.closeOn(day);
+    @Override
+    public ResponseEntity<Void> closeDay(ApiDayOfWeek day) {
+        facility.closeOn(WireTypes.toDayOfWeek(day));
         return ResponseEntity.noContent().build();
     }
 
-    private static CourtResponse toResponse(Court court) {
-        return new CourtResponse(
+    static ApiOpeningHours toResponse(DayOfWeek day, LocalTime opensAt, LocalTime closesAt) {
+        return new ApiOpeningHours(WireTypes.toApiDayOfWeek(day))
+                .opensAt(opensAt)
+                .closesAt(closesAt);
+    }
+
+    private static ApiCourt toResponse(Court court) {
+        return new ApiCourt(
                 court.getId(), court.getNumber(), court.getName(), court.isActive());
     }
 }

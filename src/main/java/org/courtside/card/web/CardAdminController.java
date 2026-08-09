@@ -1,113 +1,108 @@
 package org.courtside.card.web;
 
+import org.courtside.api.AdminBookingCardsApi;
+import org.courtside.api.AdminParticipantCardsApi;
+import org.courtside.api.ApiActiveRequest;
+import org.courtside.api.ApiBookingCard;
+import org.courtside.api.ApiBookingCardRequest;
+import org.courtside.api.ApiParticipantCard;
+import org.courtside.api.ApiParticipantCardRequest;
+import org.courtside.api.ApiRole;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.card.ParticipantCard;
 import org.courtside.identity.Role;
-import org.courtside.card.web.CardAdminWebModels.BookingCardRequest;
-import org.courtside.card.web.CardAdminWebModels.BookingCardResponse;
-import org.courtside.card.web.CardAdminWebModels.ParticipantCardRequest;
-import org.courtside.card.web.CardAdminWebModels.ParticipantCardResponse;
-import org.courtside.shared.ActiveRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/admin")
 @RequiredArgsConstructor
-class CardAdminController {
+class CardAdminController implements AdminBookingCardsApi, AdminParticipantCardsApi {
 
     private final CardService cards;
 
-    @GetMapping("/booking-cards")
-    List<BookingCardResponse> bookingCards() {
-        return cards.allCards().stream()
+    @Override
+    public ResponseEntity<List<ApiBookingCard>> listBookingCards() {
+        return ResponseEntity.ok(cards.allCards().stream()
                 .map(CardAdminController::toResponse)
-                .toList();
+                .toList());
     }
 
-    @PostMapping("/booking-cards")
-    ResponseEntity<BookingCardResponse> createBookingCard(
-            @Valid @RequestBody BookingCardRequest request) {
-        BookingCard card = cards.createCard(request.label(), request.color(), roleOrNone(request.requiredRole()),
-                toPlayerCounts(request.allowedPlayerCounts()), request.countsAgainstLimits(),
-                request.guestAllowed());
+    @Override
+    public ResponseEntity<ApiBookingCard> createBookingCard(ApiBookingCardRequest request) {
+        BookingCard card = cards.createCard(
+                request.getLabel(), request.getColor(), roleOrNone(request.getRequiredRole()),
+                toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
+                request.getGuestAllowed());
         return ResponseEntity
                 .created(URI.create("/api/admin/booking-cards/" + card.getId()))
                 .body(toResponse(card));
     }
 
-    @PutMapping("/booking-cards/{id}")
-    BookingCardResponse changeBookingCard(@PathVariable UUID id,
-                                          @Valid @RequestBody BookingCardRequest request) {
-        BookingCard card = cards.changeCard(id, request.label(), request.color(), roleOrNone(request.requiredRole()),
-                toPlayerCounts(request.allowedPlayerCounts()), request.countsAgainstLimits(),
-                request.guestAllowed());
-        return toResponse(card);
+    @Override
+    public ResponseEntity<ApiBookingCard> changeBookingCard(UUID id, ApiBookingCardRequest request) {
+        return ResponseEntity.ok(toResponse(cards.changeCard(
+                id, request.getLabel(), request.getColor(), roleOrNone(request.getRequiredRole()),
+                toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
+                request.getGuestAllowed())));
     }
 
-    @PutMapping("/booking-cards/{id}/active")
-    BookingCardResponse setBookingCardActive(@PathVariable UUID id,
-                                             @Valid @RequestBody ActiveRequest request) {
-        return toResponse(cards.setCardActive(id, request.active()));
+    @Override
+    public ResponseEntity<ApiBookingCard> setBookingCardActive(UUID id, ApiActiveRequest request) {
+        return ResponseEntity.ok(toResponse(cards.setCardActive(id, request.getActive())));
     }
 
-    @GetMapping("/booking-cards/{id}")
-    BookingCardResponse bookingCard(@PathVariable UUID id) {
-        return toResponse(cards.requireCard(id));
+    @Override
+    public ResponseEntity<ApiBookingCard> getBookingCard(UUID id) {
+        return ResponseEntity.ok(toResponse(cards.requireCard(id)));
     }
 
-    @GetMapping("/participant-cards")
-    List<ParticipantCardResponse> participantCards() {
-        return cards.allParticipantCards().stream()
+    @Override
+    public ResponseEntity<List<ApiParticipantCard>> listParticipantCardsForAdmin() {
+        return ResponseEntity.ok(cards.allParticipantCards().stream()
                 .map(CardAdminController::toResponse)
-                .toList();
+                .toList());
     }
 
-    @PostMapping("/participant-cards")
-    ResponseEntity<ParticipantCardResponse> createParticipantCard(
-            @Valid @RequestBody ParticipantCardRequest request) {
-        ParticipantCard card = cards.createParticipantCard(request.label(), request.capacity());
+    @Override
+    public ResponseEntity<ApiParticipantCard> createParticipantCard(ApiParticipantCardRequest request) {
+        ParticipantCard card = cards.createParticipantCard(request.getLabel(), request.getCapacity());
         return ResponseEntity
                 .created(URI.create("/api/admin/participant-cards/" + card.getId()))
                 .body(toResponse(card));
     }
 
-    @PutMapping("/participant-cards/{id}")
-    ParticipantCardResponse changeParticipantCard(@PathVariable UUID id,
-                                                  @Valid @RequestBody ParticipantCardRequest request) {
-        ParticipantCard card = cards.changeParticipantCard(id, request.label(), request.capacity());
-        return toResponse(card);
+    @Override
+    public ResponseEntity<ApiParticipantCard> changeParticipantCard(
+            UUID id, ApiParticipantCardRequest request) {
+        return ResponseEntity.ok(toResponse(
+                cards.changeParticipantCard(id, request.getLabel(), request.getCapacity())));
     }
 
-    @PutMapping("/participant-cards/{id}/active")
-    ParticipantCardResponse setParticipantCardActive(@PathVariable UUID id,
-                                                      @Valid @RequestBody ActiveRequest request) {
-        return toResponse(cards.setParticipantCardActive(id, request.active()));
+    @Override
+    public ResponseEntity<ApiParticipantCard> setParticipantCardActive(
+            UUID id, ApiActiveRequest request) {
+        return ResponseEntity.ok(
+                toResponse(cards.setParticipantCardActive(id, request.getActive())));
     }
 
-    @GetMapping("/participant-cards/{id}")
-    ParticipantCardResponse participantCard(@PathVariable UUID id) {
-        return toResponse(cards.requireParticipantCard(id));
+    @Override
+    public ResponseEntity<ApiParticipantCard> getParticipantCard(UUID id) {
+        return ResponseEntity.ok(toResponse(cards.requireParticipantCard(id)));
     }
 
-    private static short[] toPlayerCounts(List<Integer> counts) {
+    private static short[] toPlayerCounts(Collection<Integer> counts) {
         short[] result = new short[counts.size()];
-        for (int i = 0; i < counts.size(); i++) {
-            result[i] = counts.get(i).shortValue();
+        int index = 0;
+        for (Integer count : counts) {
+            result[index++] = count.shortValue();
         }
         return result;
     }
@@ -120,29 +115,31 @@ class CardAdminController {
         return result;
     }
 
-    // Unreachable while @KnownRole guards the request: an unknown name here would otherwise
-    // become a null requirement, which is a card open to everyone.
-    private static Role roleOrNone(String requiredRole) {
+    // Unreachable while the document declares requiredRole an enum: a name outside it never
+    // deserialises, and one that did would otherwise become a null requirement — a card open to
+    // everyone.
+    private static Role roleOrNone(ApiRole requiredRole) {
         if (requiredRole == null) {
             return null;
         }
-        return Role.named(requiredRole).orElseThrow(() -> new IllegalStateException(
-                "Unvalidated role name reached the card boundary: " + requiredRole));
+        return Role.named(requiredRole.getValue()).orElseThrow(() -> new IllegalStateException(
+                "Unvalidated role name reached the card boundary: " + requiredRole.getValue()));
     }
 
-    private static String roleName(Role requiredRole) {
-        return requiredRole == null ? null : requiredRole.name();
+    private static ApiRole roleName(Role requiredRole) {
+        return requiredRole == null ? null : ApiRole.fromValue(requiredRole.name());
     }
 
-    private static BookingCardResponse toResponse(BookingCard card) {
-        return new BookingCardResponse(
-                card.getId(), card.getLabel(), card.getColor(), roleName(card.getRequiredRole()),
+    private static ApiBookingCard toResponse(BookingCard card) {
+        return new ApiBookingCard(
+                card.getId(), card.getLabel(), card.getColor(),
                 toPlayerCountList(card.getAllowedPlayerCounts()), card.tracksPlayers(),
-                card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isActive());
+                card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isActive())
+                .requiredRole(roleName(card.getRequiredRole()));
     }
 
-    private static ParticipantCardResponse toResponse(ParticipantCard card) {
-        return new ParticipantCardResponse(
-                card.getId(), card.getLabel(), card.getCapacity(), card.isActive());
+    private static ApiParticipantCard toResponse(ParticipantCard card) {
+        return new ApiParticipantCard(card.getId(), card.getLabel(), card.isActive())
+                .capacity(card.getCapacity());
     }
 }
