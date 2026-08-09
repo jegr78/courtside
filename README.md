@@ -44,15 +44,16 @@ Behind TLS, set `COURTSIDE_COOKIE_SECURE=true` so the session and CSRF cookies a
 ## First start: creating the first admin
 
 No account is seeded — a shipped password is a shipped vulnerability. Create the first
-admin by hand. The password hash must be **Argon2id** in the encoded form Spring Security's
-`Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()` produces: `m=16384`, `t=2`, `p=1`,
-16-byte salt, 32-byte hash.
+admin by hand. The password hash must be **Argon2id** with the parameters this application
+hashes with: `m=32768`, `t=2`, `p=1`, 16-byte salt, 32-byte hash. That exceeds current OWASP
+guidance for Argon2id, and `argon2` takes the memory cost as a power of two, which is why it is
+32 MiB rather than OWASP's 19 MiB.
 
 ```bash
-echo -n 'your-password' | argon2 "$(openssl rand -base64 12)" -id -m 14 -t 2 -p 1 -l 32 -e
+echo -n 'your-password' | argon2 "$(openssl rand -base64 12)" -id -m 15 -t 2 -p 1 -l 32 -e
 ```
 
-That prints `$argon2id$v=19$m=16384,t=2,p=1$<salt>$<hash>`. Paste it into the insert below:
+That prints `$argon2id$v=19$m=32768,t=2,p=1$<salt>$<hash>`. Paste it into the insert below:
 
 ```sql
 INSERT INTO person (id, first_name, last_name, email) VALUES
@@ -62,7 +63,7 @@ INSERT INTO user_account (id, person_id, username, password_hash, enabled) VALUE
     ('00000000-0000-0000-0000-0000000000a2',
      '00000000-0000-0000-0000-0000000000a1',
      'admin',
-     '$argon2id$v=19$m=16384,t=2,p=1$REPLACE$REPLACE',
+     '$argon2id$v=19$m=32768,t=2,p=1$REPLACE$REPLACE',
      true);
 
 INSERT INTO user_account_role (user_account_id, role) VALUES
