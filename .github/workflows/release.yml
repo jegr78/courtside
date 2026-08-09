@@ -39,7 +39,7 @@ jobs:
 
       - name: Stamp the version into the build
         run: >
-          ./mvnw -B org.codehaus.mojo:versions-maven-plugin:2.18.0:set
+          ./mvnw -B versions:set
           -DnewVersion="$VERSION" -DgenerateBackupPoms=false
 
       - name: Build and test

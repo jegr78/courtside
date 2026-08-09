@@ -35,6 +35,7 @@
         <lombok.version>1.18.46</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
         <openapi-generator.version>7.24.0</openapi-generator.version>
+        <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -136,6 +137,15 @@
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>versions-maven-plugin</artifactId>
+                    <version>${versions-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
