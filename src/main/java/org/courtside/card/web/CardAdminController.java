@@ -115,9 +115,8 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
         return result;
     }
 
-    // Unreachable while the document declares requiredRole an enum: a name outside it never
-    // deserialises, and one that did would otherwise become a null requirement — a card open to
-    // everyone.
+    // Unreachable while requiredRole is an enum in the document; a name that got through would
+    // become a null requirement, which is a card open to everyone.
     private static Role roleOrNone(ApiRole requiredRole) {
         if (requiredRole == null) {
             return null;

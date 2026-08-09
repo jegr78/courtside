@@ -20,9 +20,8 @@ class AdviceOrderingTest extends AbstractIntegrationTest {
 
     @Test
     void everyOtherControllerAdvice_sortsAheadOfTheSharedFallback() {
-        // given — ControllerAdvice.class also matches @RestControllerAdvice beans, which are
-        // meta-annotated with it; scoped to this project's own package so Boot's own
-        // ProblemDetailsExceptionHandler (LOWEST_PRECEDENCE, not ours to order) is not swept in
+        // given — scoped to this project's package, so Boot's own ProblemDetailsExceptionHandler
+        // is not swept in
         Map<String, Object> advices = context.getBeansWithAnnotation(ControllerAdvice.class);
         Object sharedAdvice = advices.values().stream()
                 .filter(advice -> advice.getClass().getSimpleName().equals(SHARED_ADVICE_SIMPLE_NAME))
@@ -31,9 +30,8 @@ class AdviceOrderingTest extends AbstractIntegrationTest {
                         SHARED_ADVICE_SIMPLE_NAME + " is not registered"));
         int sharedOrder = AnnotationAwareOrderComparator.INSTANCE.getOrder(sharedAdvice, null);
 
-        // when / then — an advice without @Order sorts behind SharedExceptionHandler and would
-        // silently answer for any of its exceptions whose cause chain ends in a
-        // DataIntegrityViolationException or an IllegalArgumentException
+        // when / then — an unordered advice sorts behind SharedExceptionHandler and silently
+        // claims anything whose cause chain ends where that advice looks
         advices.values().stream()
                 .filter(advice -> advice != sharedAdvice)
                 .filter(advice -> advice.getClass().getPackageName().startsWith(OWNED_PACKAGE_PREFIX))

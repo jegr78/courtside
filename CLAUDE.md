@@ -106,15 +106,25 @@ Docker must be running for Testcontainers.
 ## No Comment Pollution
 
 * **Default: no comments.** Code is self-explanatory through naming and structure.
-* **Hard-banned** in all source files (Java, SQL migrations, YAML, tests):
+* **Hard-banned** in every file this project writes — Java, tests, SQL migrations, YAML,
+  GitHub workflows and `pom.xml`:
   * Task / plan / milestone references (`// Task 4 fix:`, `// added in milestone 1`). They rot —
     git history carries this.
   * File-header blocks restating what the file does or repeating conventions.
   * `Added for X`, `used by Y`, `called from Z` cross-references — they are greppable.
   * Multi-line Javadoc on obvious getters, setters, one-line methods or self-evident classes.
   * `// for JPA`-style markers on protected no-arg constructors.
-* **Allowed, and rare:** a single-line comment explaining a non-obvious **why** — a hidden
-  constraint, a subtle invariant, a workaround for a specific external bug.
+  * Prose explaining a decision, a trade-off, or what the alternative would have cost. That is
+    commit-message material. It reads like care while it is being written, which is exactly why
+    it is the form of pollution that keeps getting through.
+* **Allowed, and rare:** **one line** explaining a non-obvious **why** — a hidden constraint, a
+  subtle invariant, a workaround for a specific external bug. One line, not one sentence spread
+  over five. If the reason does not fit, it belongs in the commit message and the pull request
+  body, which are where a reader goes to ask why and which do not rot in the file.
+* **Two consecutive comment lines is the ceiling**, and the second exists only so a sentence may
+  wrap. `CommentBudgetTest` enforces it across all of those file types — a rule this repository
+  does not test is a rule it has already lost. A `//` or `#` separator line inside a block counts
+  like any other line, so two paragraphs are two comments too many.
 * **The `// given` / `// when` / `// then` markers in tests are required** and are not pollution.
 * **When touching a file, remove pollution you find.** Do not preserve it for consistency.
 * **Applies equally to subagents.** Every prompt that writes code must carry this rule.

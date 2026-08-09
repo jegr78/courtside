@@ -1,16 +1,6 @@
 name: PR Title Lint
-#
-# The PR title is the merge commit's subject: the repository is configured with
-# merge_commit_title = PR_TITLE, so whatever stands here is what lands in main's
-# history and what any future release tooling reads to decide a version bump. A
-# free-text title would therefore produce a merge commit that says nothing about
-# what changed and carries no semver signal. This check fails such a title before
-# it can be merged.
-#
-# pull_request_target, not pull_request: it runs in the base-repo context, so the
-# check is reported on pull requests from forks too — which an AGPL project will
-# get. It neither checks out nor runs the pull request's code; the action only
-# reads the title through GITHUB_TOKEN, so no untrusted code executes here.
+# pull_request_target, so a pull request from a fork is checked too: it runs in the base-repo
+# context and reads only the title, never the fork's code.
 on:
   pull_request_target:
     types: [opened, edited, reopened, synchronize]

@@ -17,20 +17,12 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// ApiContractCoverageTest asserts that the document and the handler mappings describe the same set
-// of endpoints. It cannot see *how* a controller arrived at its mapping, so a controller that
-// stopped implementing its generated interface and declared its own @GetMapping would still pass —
-// and would then be free to drift from the document in everything the path does not cover: the
-// media types, the parameter names, the request and response shapes.
-//
-// Implementing the interface is what makes those agree by construction. This is the test that says
-// so, and it is why a hand-written mapping annotation on a controller is a defect rather than a
-// style choice.
+// ApiContractCoverageTest compares paths, which a hand-written @GetMapping would still satisfy
+// while drifting in media types, parameter names and shapes. Implementing the interface cannot.
 class GeneratedApiImplementationTest extends AbstractIntegrationTest {
 
-    // Logging in and out are Spring Security's, not a controller's: the filter chain answers both
-    // before any handler is consulted. The document describes them because a client has to know
-    // they exist, and nothing implements SessionApi because nothing can.
+    // The filter chain answers both before any handler is consulted, so nothing can implement
+    // SessionApi. The document describes them because a client has to know they exist.
     private static final Set<String> ANSWERED_BY_THE_FILTER_CHAIN = Set.of("SessionApi");
 
     private static final Set<String> MAPPING_ANNOTATIONS = Set.of(

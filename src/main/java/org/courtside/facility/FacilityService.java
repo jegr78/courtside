@@ -106,9 +106,8 @@ public class FacilityService {
     }
 
     public void requireBookableCourts(List<UUID> courtIds) {
-        // Unreachable through the API: the document declares courtIds minItems: 1 and
-        // uniqueItems, which answers for both before a request gets here. Reaching them means a caller skipped validation, which is this
-        // service's bug to report, not the caller's input to reject.
+        // Unreachable through the API, where minItems and uniqueItems answer for both. Reaching
+        // here is this service's caller skipping validation, not bad input.
         if (courtIds.isEmpty()) {
             throw new IllegalStateException("A booking needs at least one court");
         }

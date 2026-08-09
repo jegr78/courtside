@@ -11,21 +11,12 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// A translatable failure travels in exactly one shape: a violations array of {code, params}
-// entries, even when there is only ever one entry. The alternative — a code and params sitting on
-// the problem itself — was in use alongside it, so a frontend resolving "a violation" against the
-// message bundle needed two code paths and a null check rather than one.
-//
-// The shape is not something a type system can hold: any failure may override properties() and put
-// whatever it likes on the body. This test is the boundary instead.
+// One shape for a translatable failure: a violations array, even for a single entry. No type
+// system can hold that, since any failure may override properties(); this test is the boundary.
 class ViolationShapeTest {
 
-    // The only two files allowed to write a "code" map key.
-    //
-    // DomainFailure builds the violations entry that every coded failure goes through.
-    // SharedExceptionHandler builds two arrays: violations, for the framework failures that carry
-    // a translatable code, and fieldErrors, whose entries are {field, code, params} — a violation
-    // that also names the input it came from.
+    // The only two files allowed to write a "code" map key: DomainFailure builds the violations
+    // entry, SharedExceptionHandler builds both violations and fieldErrors.
     private static final List<String> ALLOWED_TO_WRITE_A_CODE = List.of(
             "org/courtside/shared/DomainFailure.java",
             "org/courtside/shared/web/SharedExceptionHandler.java");

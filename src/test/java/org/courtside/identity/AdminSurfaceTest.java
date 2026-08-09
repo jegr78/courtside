@@ -37,10 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// The tests below classify every mapped path into exactly one of three buckets and prove the
-// classification holds against the running security filter chain, in both directions per bucket:
-// an anonymous-allowed path must succeed anonymously, an authenticated path must refuse an
-// anonymous caller and succeed for an authenticated one, and an admin path must refuse a member.
+// Every mapped path falls into exactly one of three buckets, and each bucket is proven in both
+// directions against the running filter chain.
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
     private static final int KNOWN_ADMIN_ENDPOINT_COUNT = 36;
@@ -117,9 +115,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 .filter(pattern -> !AUTHENTICATED_PATHS.contains(pattern))
                 .toList();
 
-        // then — a path here is either an admin endpoint reachable outside /api/admin/, or a new
-        // endpoint nobody classified into one of the three buckets; either way its actual
-        // reachability is unproven
+        // then — an admin endpoint outside /api/admin/, or one nobody classified; either way
+        // its reachability is unproven
         assertThat(unclassified).isEmpty();
     }
 
@@ -257,9 +254,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         try {
             MockHttpServletRequest servletRequest =
                     new MockHttpServletRequest(endpoint.method().name(), endpoint.concretePath());
-            // The mappings state the media types they consume, so a probe with no content type
-            // matches nothing and every body-taking endpoint reads as misrouted. Accept stays open:
-            // this instance also serves its own document as YAML.
+            // The mappings state what they consume, so a probe with no content type matches
+            // nothing. Accept stays open, since one endpoint serves YAML.
             servletRequest.setContentType(MediaType.APPLICATION_JSON_VALUE);
             servletRequest.addHeader(HttpHeaders.ACCEPT, MediaType.ALL_VALUE);
             ServletRequestPathUtils.parseAndCache(servletRequest);
@@ -308,9 +304,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         }
     }
 
-    // The content type is taken from what the mapping declares rather than assumed to be JSON:
-    // one endpoint serves the API document as YAML on purpose, and hard-coding JSON here would
-    // have made that a test failure instead of a described fact.
+    // Taken from what the mapping declares rather than assumed to be JSON, because one endpoint
+    // serves the API document as YAML.
     private String successfulAsAnonymousFailure(MappedEndpoint endpoint) {
         try {
             mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
@@ -326,12 +321,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         }
     }
 
-    // Unlike the two checks above, this deliberately does not pin a single expected status: the
-    // endpoints in AUTHENTICATED_PATHS are heterogeneous (some need a body, a query parameter or a
-    // real id to succeed), so the only thing every one of them shares is that neither the
-    // authentication gate nor a role restriction may be why they fail. 401 and 403 are produced
-    // exclusively by ProblemDetailAuthenticationEntryPoint and ProblemDetailAccessDeniedHandler in
-    // this app, so their absence unambiguously proves the request passed both gates.
+    // No single expected status: these endpoints differ in what they need to succeed, and only
+    // this app's two gates produce 401 and 403, so their absence proves both were passed.
     private String reachableAsAuthenticatedMemberFailure(MappedEndpoint endpoint) {
         try {
             int status = mockMvc.perform(request(endpoint.method(), endpoint.concretePath())

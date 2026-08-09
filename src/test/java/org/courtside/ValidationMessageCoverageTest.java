@@ -37,16 +37,12 @@ class ValidationMessageCoverageTest {
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
             List.of("CodedDomainFailure", "InvalidOpeningWindowException");
 
-    // Every construct in src/main that ends up as a ProblemDetail's "code": a Bean Validation
-    // constraint (validation.<AnnotationSimpleName>, resolved dynamically), a RuleViolation, one
-    // of the getCode()-carrying exceptions above, or a literal passed alongside a "code" key in a
-    // Map or ProblemDetail property.
+    // Every construct in src/main that ends up as a ProblemDetail's "code": a constraint, a
+    // RuleViolation, one of the getCode() carriers above, or a literal following a "code" key.
     private static final List<Pattern> CODE_LITERAL_PATTERNS = buildCodeLiteralPatterns();
 
-    // The set SharedExceptionHandler.toMap's "validation." + AnnotationSimpleName concatenation can
-    // actually produce today, kept in sync with reality by
-    // everyConstraintAnnotationUsedInMainIsInTheKnownSet: a new @Constraint annotation mints an
-    // unreviewed code on this frozen wire contract until it is added here and to both bundles.
+    // What toMap's "validation." + AnnotationSimpleName can produce today. A new @Constraint
+    // mints an unreviewed wire code until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
             List.of("Max", "Min", "NotNull", "Pattern", "Size");
 
@@ -117,10 +113,8 @@ class ValidationMessageCoverageTest {
     @Test
     void everyCodeASpringValidatorRejectsWithHasAMessageKeyInBothBundles()
             throws IOException, URISyntaxException {
-        // given — a cross-field rule cannot be a per-field annotation, so it lives in a Validator
-        // and names its code through rejectValue. That code reaches the wire as
-        // validation.<code> exactly as a constraint annotation's simple name does, and would
-        // otherwise be covered by nothing: the annotation scan cannot see it.
+        // given — a cross-field rule names its code through rejectValue, which reaches the wire
+        // like a constraint's simple name but is invisible to the annotation scan
         TreeSet<String> codes = new TreeSet<>();
         Pattern rejectValue = Pattern.compile("rejectValue\\(\\s*\"[^\"]+\",\\s*\"([^\"]+)\"");
         try (Stream<Path> sources = Files.walk(mainSourceDirectory())) {
@@ -146,9 +140,8 @@ class ValidationMessageCoverageTest {
 
     @Test
     void bothBundlesDefineTheSameKeys() throws IOException {
-        // given — every other test here checks keys it can *derive* (a constraint annotation, a
-        // code literal). A key written by hand into one bundle and forgotten in the other is
-        // derivable from nothing, so nothing was looking.
+        // given — every other test here derives its keys; one written by hand into a single
+        // bundle is derivable from nothing
         Properties english = loadBundle("/messages.properties");
         Properties german = loadBundle("/messages_de.properties");
 
@@ -171,9 +164,8 @@ class ValidationMessageCoverageTest {
                     .forEach(path -> collectGetCodeClasses(classesRoot, path, generated, getCodeClasses));
         }
 
-        // when / then — getCode() is declared once on CodedDomainFailure and inherited by its
-        // subclasses, plus once on InvalidOpeningWindowException, which carries a code but no
-        // params and so does not extend it
+        // when / then — declared on CodedDomainFailure and inherited, plus on
+        // InvalidOpeningWindowException, which carries a code but no params
         assertThat(getCodeClasses)
                 .as("a class declaring getCode() must be named in GET_CODE_DECLARING_SIMPLE_NAMES,"
                         + " and every concrete failure that carries a code must appear in"
@@ -202,14 +194,8 @@ class ValidationMessageCoverageTest {
                 .containsAll(CODE_CARRYING_EXCEPTION_SIMPLE_NAMES);
     }
 
-    // The generator writes wire models for the error shapes themselves — a Violation carries a
-    // code, a FieldError carries a code and a field — so they answer getCode() without ever
-    // choosing a code. Read off disk rather than pinned as a package name: the exemption is then
-    // exactly what the generator produced, and cannot quietly grow to cover hand-written code.
-    //
-    // Constraint annotations are deliberately not exempted. A generated @Size or @Pattern reaches
-    // the wire as validation.<name> exactly as a hand-written one does, and must have its bundle
-    // entry like any other.
+    // The generated error models answer getCode() without choosing a code. Read off disk so the
+    // exemption is exactly what the generator wrote; constraint annotations stay in scope.
     private static Set<String> generatedTopLevelClassNames() throws IOException, URISyntaxException {
         Path root = classesDirectory().getParent()
                 .resolve(Path.of("generated-sources", "openapi", "src", "main", "java"));
@@ -276,9 +262,8 @@ class ValidationMessageCoverageTest {
                 .isTrue();
     }
 
-    // Properties.load, not ResourceBundle: ResourceBundle.containsKey searches the parent chain,
-    // and messages_de's parent is messages — so any key present in the English bundle alone would
-    // make the German assertion pass regardless of what messages_de.properties actually defines.
+    // Properties.load, not ResourceBundle: its containsKey searches the parent chain, so an
+    // English-only key would satisfy the German assertion.
     private static Properties loadBundle(String resourceName) throws IOException {
         Properties properties = new Properties();
         try (InputStream in = ValidationMessageCoverageTest.class.getResourceAsStream(resourceName)) {
@@ -304,16 +289,14 @@ class ValidationMessageCoverageTest {
         } catch (Throwable ignored) {
             return;
         }
-        // Both zones: a constraint on the record itself (a cross-field rule such as "a booking
-        // must end after it starts") is as much a wire code as one on a field, and scanning only
-        // fields let four of them ship without a bundle entry.
+        // Both zones: a class-level constraint is as much a wire code as a field-level one, and
+        // scanning fields alone let four ship without a bundle entry.
         collect(type.getAnnotations(), constraintNames);
         for (Field field : type.getDeclaredFields()) {
             collect(field.getAnnotations(), constraintNames);
         }
-        // And on accessors: the generator puts its constraints on the getter, so a scan of fields
-        // and types alone found nothing at all in the generated models — every one of their codes
-        // would have reached the wire with no bundle entry behind it.
+        // And on accessors: the generator annotates getters, so a field-and-type scan found
+        // nothing at all in the generated models.
         for (Method method : type.getDeclaredMethods()) {
             collect(method.getAnnotations(), constraintNames);
         }
