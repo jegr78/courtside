@@ -80,7 +80,7 @@ docker compose up -d
 tailscale funnel 8080
 ```
 
-Two things this path costs you, both worth knowing before you choose it:
+Three things this path costs you, all worth knowing before you choose it:
 
 - **The security headers are Caddy's, not the application's.** Without the proxy there is no HSTS,
   no `X-Content-Type-Options`, no `X-Frame-Options`, no CSP and no referrer policy. Funnel
@@ -88,6 +88,8 @@ Two things this path costs you, both worth knowing before you choose it:
   is a small gap, and it grows the day the web client lands.
 - **Funnel makes the instance reachable from anywhere in the world**, exactly like a public
   address does. Everything in "What this deployment does not solve yet" applies with full force.
+- **The application trusts forwarded headers.** Funnel or any replacement must discard incoming
+  `Forwarded` and `X-Forwarded-*` values and supply its own. Never forward arbitrary client values.
 
 This is an option, not part of the reference deployment — the project must not depend on one
 vendor, and everything here works without it.
@@ -153,10 +155,6 @@ docker compose exec -T db pg_dump -U courtside courtside | gzip > courtside-$(da
 
 ## What this deployment does not solve yet
 
-- **The proxy is trusted unconditionally.** The application accepts `X-Forwarded-*` from whoever
-  sends it. Caddy overwrites `X-Forwarded-For` with the address it actually saw, so behind the
-  proxy that is correct — but do not expose port 8080 to anything else.
-  [#26](https://github.com/jegr78/courtside/issues/26)
 - **Session rows accumulate.** Expired sessions stay in the database; nothing removes them.
   [#27](https://github.com/jegr78/courtside/issues/27)
 - **There is nothing to look at.** `/actuator/health` is the only thing an operator can ask.
