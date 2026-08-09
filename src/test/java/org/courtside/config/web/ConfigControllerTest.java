@@ -41,6 +41,17 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenReadingTheManifestWithoutAuthentication_thenItUsesTheClubBranding() throws Exception {
+        // when / then
+        mockMvc.perform(get("/manifest.webmanifest"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Courtside"))
+                .andExpect(jsonPath("$.short_name").value("Courtside"))
+                .andExpect(jsonPath("$.theme_color").value("#1f6feb"))
+                .andExpect(jsonPath("$.icons[0].src").value("/icon.svg"));
+    }
+
+    @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAMember_whenChangingTheConfig_thenItIsForbidden() throws Exception {
         // when / then

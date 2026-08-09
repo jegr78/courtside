@@ -71,7 +71,7 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
             }
             patterns.getPatterns().stream()
                     .map(pattern -> pattern.getPatternString())
-                    .filter(path -> path.startsWith("/api"))
+                    .filter(path -> path.startsWith("/api") || path.equals("/manifest.webmanifest"))
                     .forEach(path -> info.getMethodsCondition().getMethods()
                             .forEach(method -> operations.add(method + " " + path)));
         }

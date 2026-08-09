@@ -36,6 +36,9 @@
         <surefire.runOrder>alphabetical</surefire.runOrder>
         <openapi-generator.version>7.24.0</openapi-generator.version>
         <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
+        <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
+        <node.version>v24.19.0</node.version>
+        <npm.version>11.17.0</npm.version>
     </properties>
 
     <dependencyManagement>
@@ -147,6 +150,85 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>com.github.eirslett</groupId>
+                <artifactId>frontend-maven-plugin</artifactId>
+                <version>${frontend-maven-plugin.version}</version>
+                <configuration>
+                    <workingDirectory>frontend</workingDirectory>
+                    <nodeVersion>${node.version}</nodeVersion>
+                    <npmVersion>${npm.version}</npmVersion>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>install-node-and-npm</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>install-node-and-npm</goal></goals>
+                    </execution>
+                    <execution>
+                        <id>npm-ci</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>npm</goal></goals>
+                        <configuration><arguments>ci</arguments></configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-lint</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>npm</goal></goals>
+                        <configuration><arguments>run lint</arguments></configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-test</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>npm</goal></goals>
+                        <configuration><arguments>run test</arguments></configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-build</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>npm</goal></goals>
+                        <configuration><arguments>run build</arguments></configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-audit</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>npm</goal></goals>
+                        <configuration><arguments>audit --audit-level=high</arguments></configuration>
+                    </execution>
+                    <execution>
+                        <id>install-playwright-chromium</id>
+                        <phase>pre-integration-test</phase>
+                        <goals><goal>npm</goal></goals>
+                        <configuration><arguments>exec playwright install chromium</arguments></configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-e2e</id>
+                        <phase>integration-test</phase>
+                        <goals><goal>npm</goal></goals>
+                        <configuration><arguments>run test:e2e</arguments></configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-web-client</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/frontend/dist</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

@@ -67,6 +67,37 @@ class LoginTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenNoSession_whenReadingTheSession_thenItReportsAnonymous() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/session"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(false))
+                .andExpect(jsonPath("$.username").doesNotExist());
+    }
+
+    @Test
+    void givenAnAuthenticatedMember_whenReadingTheSession_thenItReportsTheMember() throws Exception {
+        // given
+        MvcResult login = mockMvc.perform(post("/api/session")
+                        .param("username", "doe.jane")
+                        .param("password", "correct-horse")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+
+        // when / then
+        mockMvc.perform(get("/api/session").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.username").value("doe.jane"))
+                .andExpect(jsonPath("$.displayName").value("Jane Doe"))
+                .andExpect(jsonPath("$.locale").value("de"))
+                .andExpect(jsonPath("$.roles[0]").value("MEMBER"))
+                .andExpect(jsonPath("$.passwordChangeRequired").value(false));
+    }
+
+    @Test
     void givenAnEnabledAccount_whenLoggingInWithAWrongPassword_thenUnauthorized() throws Exception {
         // when / then
         mockMvc.perform(post("/api/session")
