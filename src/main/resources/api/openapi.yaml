@@ -1029,7 +1029,7 @@ paths:
   /api/admin/courts:
     get:
       tags: [admin-courts]
-      operationId: listCourts
+      operationId: listCourtsForAdmin
       summary: Every court, active or not.
       responses:
         "200":
@@ -1309,7 +1309,7 @@ paths:
   /api/admin/participant-cards:
     get:
       tags: [admin-participant-cards]
-      operationId: listParticipantCards
+      operationId: listParticipantCardsForAdmin
       summary: Every participantcard, active or not.
       responses:
         "200":

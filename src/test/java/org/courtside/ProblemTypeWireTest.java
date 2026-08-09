@@ -91,6 +91,73 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABodyFieldThatIsNotAUuid_whenPosting_thenTheResponseNamesTheField() throws Exception {
+        // given — a value Jackson cannot read is a validation failure about one field, not an
+        // unreadable body. Reported as the latter, a caller learns only that something, somewhere,
+        // in what they sent is wrong.
+        String body = """
+                {"courtIds":["%s"],"cardId":"not-a-uuid",
+                 "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z"}
+                """.formatted(courtId);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/bookings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("cardId"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
+    }
+
+    @Test
+    void givenADuplicateInAnArrayThatMustBeUnique_whenPosting_thenTheResponseNamesTheField()
+            throws Exception {
+        // given — weekdays is a Set, so a duplicate would simply vanish on the way in and the
+        // caller would be told the request succeeded exactly as sent. It did not.
+        String body = """
+                {"courtIds":["%s"],"cardId":"%s","startsOn":"2026-04-07","startTime":"18:00:00",
+                 "durationMinutes":120,"intervalWeeks":1,"weekdays":["TUESDAY","TUESDAY"],
+                 "occurrenceCount":2,"confirmedStarts":["2026-04-07T18:00:00+02:00"]}
+                """.formatted(courtId, TRAINING_CARD);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/booking-series")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("weekdays"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NoDuplicates"));
+    }
+
+    @Test
+    void givenAnUnreadableValueInsideAnArray_whenPosting_thenTheResponseNamesTheArray()
+            throws Exception {
+        // given — Jackson records the array element as an index, which has no property name; the
+        // field the caller can act on is the array itself
+        String body = """
+                {"courtIds":["not-a-uuid"],"cardId":"%s",
+                 "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z"}
+                """.formatted(MEMBER_BOOKING_CARD);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/bookings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].field").value("courtIds"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
+    }
+
+    @Test
     void givenAnUnsupportedMethod_whenRequesting_thenTheAllowHeaderNamesEveryMethodTheEndpointSupports()
             throws Exception {
         // given / when
