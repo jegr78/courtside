@@ -17,6 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration(proxyBeanMethods = false)
@@ -69,7 +70,8 @@ public class SecurityConfiguration {
                                 (authentication, context) -> new AuthorizationDecision(
                                         hasAuthority(authentication.get(),
                                                 CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
-                        .requestMatchers("/api/admin/**").access((authentication, context) ->
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(
+                                "(?i)^/api/admin(?:/.*)?(?:\\?.*)?$")).access((authentication, context) ->
                                 new AuthorizationDecision(hasAuthority(authentication.get(),
                                         "ROLE_" + Role.ADMIN.name())
                                         && !hasAuthority(authentication.get(),
