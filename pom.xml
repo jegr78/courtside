@@ -34,7 +34,7 @@
         <spring-modulith.version>2.1.0</spring-modulith.version>
         <lombok.version>1.18.46</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
-        <openapi-generator.version>7.14.0</openapi-generator.version>
+        <openapi-generator.version>7.24.0</openapi-generator.version>
     </properties>
 
     <dependencyManagement>
