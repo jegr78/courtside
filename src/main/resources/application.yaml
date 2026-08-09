@@ -32,6 +32,10 @@ server:
 
 courtside:
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}
+  bootstrap-admin:
+    username: ${COURTSIDE_BOOTSTRAP_ADMIN_USERNAME:}
+    password: ${COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD:}
+    display-name: ${COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME:}
   booking:
     slot-minutes: 30
     time-zone: ${COURTSIDE_TIME_ZONE:Europe/Berlin}

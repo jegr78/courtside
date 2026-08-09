@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 // Top-level and not nested: Spring Framework 7.1 stops ignoring a nested @Configuration as a
 // subclass's default, which would apply them twice.
 @SpringBootTest
+@ActiveProfiles("test")
 @Import({TestcontainersConfiguration.class, FixedClockConfiguration.class})
 public abstract class AbstractIntegrationTest {
 

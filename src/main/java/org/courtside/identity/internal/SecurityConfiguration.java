@@ -5,15 +5,19 @@ import org.courtside.identity.Role;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(BootstrapAdminProperties.class)
 public class SecurityConfiguration {
 
     // OWASP's Argon2id minimum. Every login costs this much memory, including one for a username
@@ -43,18 +47,39 @@ public class SecurityConfiguration {
         return http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/public/booking-cards", "/api/public/participant-cards")
-                        .authenticated()
+                        .access((authentication, context) -> new AuthorizationDecision(
+                                isAuthenticated(authentication.get())
+                                        && !hasAuthority(authentication.get(),
+                                        CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
                         .requestMatchers("/api/public/**", "/actuator/health").permitAll()
                         // The contract is not a secret and is needed before anyone can
                         // authenticate against it.
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
                         .requestMatchers("/api/session").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/session/logout").authenticated()
+                        .requestMatchers("/api/account/initial-password").access(
+                                (authentication, context) -> new AuthorizationDecision(
+                                        hasAuthority(authentication.get(),
+                                                CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
+                        .requestMatchers("/api/admin/**").access((authentication, context) ->
+                                new AuthorizationDecision(hasAuthority(authentication.get(),
+                                        "ROLE_" + Role.ADMIN.name())
+                                        && !hasAuthority(authentication.get(),
+                                        CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
+                        .anyRequest().access((authentication, context) -> new AuthorizationDecision(
+                                isAuthenticated(authentication.get())
+                                        && !hasAuthority(authentication.get(),
+                                        CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED))))
                 .formLogin(form -> form
                         .loginProcessingUrl("/api/session")
-                        .successHandler((request, response, authentication) ->
-                                response.setStatus(HttpStatus.OK.value()))
+                        .successHandler((request, response, authentication) -> {
+                            if (authentication.getAuthorities().stream().anyMatch(authority ->
+                                    authority.getAuthority().equals(
+                                            CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED))) {
+                                response.setHeader("X-Courtside-Password-Change-Required", "true");
+                            }
+                            response.setStatus(HttpStatus.OK.value());
+                        })
                         .failureHandler(authenticationEntryPoint::commence))
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
@@ -73,5 +98,17 @@ public class SecurityConfiguration {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieCustomizer(cookie -> cookie.secure(secureCookies));
         return repository;
+    }
+
+    private static boolean hasAuthority(
+            org.springframework.security.core.Authentication authentication, String authority) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(granted -> granted.getAuthority().equals(authority));
+    }
+
+    private static boolean isAuthenticated(
+            org.springframework.security.core.Authentication authentication) {
+        return authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
     }
 }

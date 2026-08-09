@@ -21,6 +21,10 @@ Fill in `.env`:
   `0.1.0-alpha.1@sha256:…`. Registry tags are mutable, digests are not.
 - `POSTGRES_PASSWORD` — generate one, for example with `openssl rand -base64 32`. It is only ever
   used between the two containers.
+- `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` — the username of the first local administrator.
+- `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` — a one-time password of at least 12 characters. The first
+  login can do nothing except replace it.
+- `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` — the administrator's first and last name.
 - `COURTSIDE_DOMAIN` — the name your members will type. Only needed for the reverse proxy below.
 - `COURTSIDE_TIME_ZONE` — the club's zone, as an IANA identifier such as `Europe/Berlin`. Every
   booking is stored as an instant; this decides which day a member sees it on. An invalid value
@@ -36,15 +40,17 @@ Caddy obtains a certificate for `COURTSIDE_DOMAIN` on its own, so ports 80 and 4
 host and the name must already point at it. The application itself is published on
 `127.0.0.1:8080` and never directly on a public interface.
 
-Flyway runs the migrations on startup. `docker compose ps` shows the application as `healthy`, and
-`docker compose logs -f app` shows it reporting `Started CourtsideApplication`.
+Flyway runs the migrations on startup. On an empty account table, startup creates exactly one
+enabled local account with the `ADMIN` role. Missing bootstrap values stop startup instead of
+leaving an instance that nobody can enter. `docker compose ps` shows the application as `healthy`,
+and `docker compose logs -f app` shows it reporting `Started CourtsideApplication`.
 
-> **Signing in the first time still needs a shell.** A fresh database holds one court, opening
-> hours and no account — none is seeded, because a shipped password is a shipped vulnerability.
-> The procedure is in the repository's `README.md`: hash a password with the `argon2` CLI and
-> insert three rows. It works, but it needs tools this deployment does not ship.
-> [Issue #88](https://github.com/jegr78/courtside/issues/88) replaces it with two environment
-> variables and a forced password change, and it is the next thing on the list.
+Sign in with the bootstrap username and password. The response carries
+`X-Courtside-Password-Change-Required: true`; until `PUT /api/account/initial-password` replaces
+that password, all other authenticated application operations are forbidden. A successful change
+ends the session. After signing in with the new password, remove the three
+`COURTSIDE_BOOTSTRAP_ADMIN_*` values from `.env`: once any local account exists, later starts ignore
+them and never create, reset or modify an account.
 
 ## Verifying what you are about to run
 
@@ -95,6 +101,9 @@ default.
 |---|---|---|
 | `COURTSIDE_VERSION` | *required* | The release to run, optionally with `@sha256:…`. Pin it. |
 | `POSTGRES_PASSWORD` | *required* | Database password, used only between the containers. |
+| `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | *required on an empty account table* | Username of the first local administrator. |
+| `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
+| `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
 | `COURTSIDE_DOMAIN` | *required with the proxy* | The public name Caddy obtains a certificate for. |
 | `COURTSIDE_TIME_ZONE` | `Europe/Berlin` | The club's IANA time zone. |
 | `COURTSIDE_MEMORY` | `1g` | Memory ceiling for the application container. |

@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -13,7 +15,9 @@ import java.util.Set;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -90,6 +94,56 @@ class LoginTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("Not authenticated"))
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+    }
+
+    @Test
+    void givenTheBootstrapAdmin_whenChangingTheInitialPassword_thenTheOldPasswordStopsWorking()
+            throws Exception {
+        // given
+        Person admin = persons.save(new Person("Ada", "Admin", "admin@localhost.invalid"));
+        UserAccount account = enabled(new UserAccount(admin, "admin",
+                passwordEncoder.encode("temporary-password"), Set.of(Role.ADMIN)));
+        account.requirePasswordChange();
+        accounts.save(account);
+
+        MvcResult login = mockMvc.perform(post("/api/session")
+                        .param("username", "admin")
+                        .param("password", "temporary-password")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .header().string("X-Courtside-Password-Change-Required", "true"))
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+
+        mockMvc.perform(post("/api/admin/config").session(session).with(csrf()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/public/booking-cards").session(session))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/public/participant-cards").session(session))
+                .andExpect(status().isForbidden());
+
+        // when
+        mockMvc.perform(put("/api/account/initial-password")
+                        .session(session)
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"password\":\"permanent-password\"}"))
+                .andExpect(status().isNoContent());
+
+        // then
+        mockMvc.perform(post("/api/session")
+                        .param("username", "admin")
+                        .param("password", "temporary-password")
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/session")
+                        .param("username", "admin")
+                        .param("password", "permanent-password")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .header().doesNotExist("X-Courtside-Password-Change-Required"));
     }
 
     private UserAccount enabled(UserAccount account) {
