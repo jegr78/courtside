@@ -1,13 +1,21 @@
 {$COURTSIDE_DOMAIN} {
 	encode zstd gzip
 
+	request_body {
+		max_size 2MB
+	}
+
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
 		-Server
 	}
 
-	reverse_proxy app:8080
+	reverse_proxy app:8080 {
+		header_up X-Forwarded-For {remote_host}
+	}
 }

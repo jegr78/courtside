@@ -1,9 +1,18 @@
 name: courtside
 
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_DB: courtside
       POSTGRES_USER: courtside
@@ -19,6 +28,15 @@ services:
   app:
     image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}
     restart: unless-stopped
+    logging: *logging
+    mem_limit: ${COURTSIDE_MEMORY:-1g}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     depends_on:
       db:
         condition: service_healthy
@@ -36,7 +54,12 @@ services:
     image: caddy:2-alpine
     profiles: [proxy]
     restart: unless-stopped
-    depends_on: [app]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      app:
+        condition: service_healthy
     environment:
       COURTSIDE_DOMAIN: ${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}
     ports:
