@@ -36,6 +36,9 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/public/booking-cards", "/api/public/participant-cards")
                         .authenticated()
                         .requestMatchers("/api/public/**", "/actuator/health").permitAll()
+                        // The contract is not a secret and is needed before anyone can
+                        // authenticate against it.
+                        .requestMatchers("/api/openapi.yaml").permitAll()
                         .requestMatchers("/api/session").permitAll()
                         .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
                         .anyRequest().authenticated())
