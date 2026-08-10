@@ -22,6 +22,7 @@ const uatStateFile = join(root, "build", "uat-environment.json");
 const uatFunnelStateFile = join(root, "build", "uat-funnel.json");
 const perfComposeFile = join(root, "deploy", "compose.perf.yaml");
 const perfDbComposeFile = join(root, "deploy", "compose.perf-db.yaml");
+const perfTelemetryComposeFile = join(root, "deploy", "compose.perf-telemetry.yaml");
 const perfProject = "courtside-perf";
 const perfStateFile = join(root, "build", "perf-environment.json");
 
@@ -50,7 +51,7 @@ export function parseArguments(argv) {
   const options = {
     command, suspend: false, json: false, environment: undefined, version: undefined,
     skipVerify: false, dbPort: false, file: undefined, confirm: undefined, all: false,
-    profile: undefined, fresh: false
+    profile: undefined, fresh: false, telemetry: false
   };
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
@@ -63,6 +64,8 @@ export function parseArguments(argv) {
       options.skipVerify = true;
     } else if (flag === "--db-port" && ["uat", "perf"].includes(command)) {
       options.dbPort = true;
+    } else if (flag === "--telemetry" && command === "perf") {
+      options.telemetry = true;
     } else if (flag === "--json" && command === "status") {
       options.json = true;
     } else if (["dev", "uat", "perf"].includes(flag) && command === "status" && !options.environment) {
@@ -131,9 +134,10 @@ export function uatComposeArgs(withDatabasePort = false) {
     ...(withDatabasePort ? ["-f", uatDbComposeFile] : [])];
 }
 
-export function perfComposeArgs(withDatabasePort = false) {
+export function perfComposeArgs(withDatabasePort = false, withTelemetry = false) {
   return ["compose", "-p", perfProject, "-f", perfComposeFile,
-    ...(withDatabasePort ? ["-f", perfDbComposeFile] : [])];
+    ...(withDatabasePort ? ["-f", perfDbComposeFile] : []),
+    ...(withTelemetry ? ["-f", perfTelemetryComposeFile] : [])];
 }
 
 export function parseTailscaleNodeStatus(output) {
@@ -319,10 +323,10 @@ export function lifecyclePlan(command) {
     return { command: "docker", args: [...uatComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside"] };
   }
   if (command === "perf-stop") {
-    return { command: "docker", args: [...perfComposeArgs(), "stop"] };
+    return { command: "docker", args: [...perfComposeArgs(false, true), "stop"] };
   }
   if (command === "perf-logs") {
-    return { command: "docker", args: [...perfComposeArgs(), "logs", "--follow"] };
+    return { command: "docker", args: [...perfComposeArgs(false, true), "logs", "--follow"] };
   }
   if (command === "perf-db-shell") {
     return { command: "docker", args: [...perfComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside_perf"] };
@@ -483,19 +487,23 @@ function startPerformance(options) {
   const password = state?.password ?? newBootstrapPassword();
   const environment = { ...process.env, COURTSIDE_PERF_SHARED_PASSWORD: password };
   writePrivateFile(perfStateFile,
-    `${JSON.stringify({ password, dbPort: options.dbPort }, null, 2)}\n`);
+    `${JSON.stringify({ password, dbPort: options.dbPort, telemetry: options.telemetry }, null, 2)}\n`);
   runInteractive(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
   extractApplicationLayers();
   runInteractive({ command: "docker", args: ["build", "-t", "courtside:perf-local", "."] });
   runInteractive({
     command: "docker",
-    args: [...perfComposeArgs(options.dbPort), "up", "-d", "--wait", "--force-recreate"],
+    args: [...perfComposeArgs(options.dbPort, options.telemetry), "up", "-d", "--wait", "--force-recreate",
+      "--remove-orphans"],
     environment
   });
   process.stdout.write("Performance: https://localhost:9443 | HTTP redirect: http://localhost:9080\n");
   process.stdout.write(`Accounts: member0001 through member1000 | shared password: ${password}\n`);
   if (options.dbPort) {
     process.stdout.write("Database: jdbc:postgresql://127.0.0.1:5434/courtside_perf\n");
+  }
+  if (options.telemetry) {
+    process.stdout.write("Prometheus: http://127.0.0.1:9090\n");
   }
 }
 
@@ -519,7 +527,7 @@ function readPerformanceState() {
 }
 
 export function perfResetPlan() {
-  return { command: "docker", args: [...perfComposeArgs(), "down", "--volumes", "--remove-orphans"] };
+  return { command: "docker", args: [...perfComposeArgs(false, true), "down", "--volumes", "--remove-orphans"] };
 }
 
 export function performanceRunPlan(options, resultDirectory, certificateFile, runId = "test-run") {
@@ -1124,7 +1132,7 @@ async function showStatus(environment, asJson) {
   const perfState = readPerformanceState();
   const project = isUat ? uatProject : isPerf ? perfProject : "courtside-dev";
   const composeArgs = isUat ? uatComposeArgs(uatState.dbPort)
-    : isPerf ? perfComposeArgs(perfState?.dbPort) : devComposeArgs;
+    : isPerf ? perfComposeArgs(perfState?.dbPort, perfState?.telemetry) : devComposeArgs;
   const compose = spawnSync("docker", [...composeArgs, "ps", "--format", "json"], {
     cwd: root, encoding: "utf8"
   });
@@ -1151,7 +1159,10 @@ async function showStatus(environment, asJson) {
         https: { port: 8443, reachable: await canConnect(8443) }
       } : isPerf ? {
         http: { port: 9080, reachable: await canConnect(9080) },
-        https: { port: 9443, reachable: await canConnect(9443) }
+        https: { port: 9443, reachable: await canConnect(9443) },
+        ...(perfState?.telemetry
+          ? { prometheus: { port: 9090, reachable: await canConnect(9090) } }
+          : {})
       } : {
         backend: { port: 8080, reachable: await canConnect(8080) },
         frontend: { port: 5173, reachable: await canConnect(5173) },
@@ -1161,8 +1172,8 @@ async function showStatus(environment, asJson) {
         ? { debugger: { port: 5005, reachable: isListenerActive(5005) } }
         : {})
     },
-    health: await readHealth(isUat ? "https://localhost:8443/actuator/health"
-      : isPerf ? "https://localhost:9443/actuator/health" : "http://127.0.0.1:8080/actuator/health", isUat || isPerf),
+    health: isPerf ? readPerformanceHealth(composeArgs) : await readHealth(
+      isUat ? "https://localhost:8443/actuator/health" : "http://127.0.0.1:8080/actuator/health", isUat),
     volumes: volumes.stdout.trim().split(/\r?\n/).filter(Boolean),
     containers: compose.stdout.trim().split(/\r?\n/).filter(Boolean).map(parseJson),
     ...(isUat ? { funnel } : {})
@@ -1272,6 +1283,13 @@ async function readHealth(url, allowLocalCertificate = false) {
   }
 }
 
+function readPerformanceHealth(composeArgs) {
+  const result = spawnSync("docker", [...composeArgs, "exec", "-T", "app", "curl", "-fsS",
+    "http://127.0.0.1:9091/actuator/health"], { encoding: "utf8" });
+  if (result.status !== 0) return "unavailable";
+  return parseJson(result.stdout).status ?? "unknown";
+}
+
 export function localRequest({ secure, port, path, method = "GET", headers = {}, body, ca }) {
   return new Promise((resolveResponse, rejectResponse) => {
     const request = (secure ? httpsRequest : httpRequest)({
@@ -1297,7 +1315,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port]\n  perf-run <smoke|baseline|peak|stress|soak> [--confirm courtside-perf] [--fresh]\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry]\n  perf-run <smoke|baseline|peak|stress|soak> [--confirm courtside-perf] [--fresh]\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

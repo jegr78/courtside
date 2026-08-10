@@ -2,7 +2,20 @@ courtside:
   performance:
     confirm-disposable: ${COURTSIDE_PERF_CONFIRM_DISPOSABLE:false}
     shared-password: ${COURTSIDE_PERF_SHARED_PASSWORD:}
+    telemetry-enabled: ${COURTSIDE_PERF_TELEMETRY_ENABLED:false}
 
 spring:
   datasource:
     url: ${COURTSIDE_DB_URL:jdbc:postgresql://db:5432/courtside_perf}
+
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: ${COURTSIDE_PERF_TELEMETRY_ENABLED:false}
+  server:
+    port: 9091
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus

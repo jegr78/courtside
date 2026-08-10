@@ -45,6 +45,7 @@ public class SecurityConfiguration {
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
             LoginAttemptProtection loginAttemptProtection,
             LoginRateLimitHandler loginRateLimitHandler,
+            @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
         CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
@@ -58,6 +59,8 @@ public class SecurityConfiguration {
                                         && !hasAuthority(authentication.get(),
                                         CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
                         .requestMatchers("/api/public/**", "/actuator/health").permitAll()
+                        .requestMatchers("/actuator/prometheus").access((authentication, context) ->
+                                new AuthorizationDecision(performanceTelemetryEnabled))
                         // The contract is not a secret and is needed before anyone can
                         // authenticate against it.
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()

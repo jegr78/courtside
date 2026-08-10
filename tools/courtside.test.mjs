@@ -185,6 +185,7 @@ test("given performance commands, when parsing them, then lifecycle and diagnosi
   // when / then
   assert.equal(parseArguments(["perf"]).command, "perf");
   assert.equal(parseArguments(["perf", "--db-port"]).dbPort, true);
+  assert.equal(parseArguments(["perf", "--telemetry"]).telemetry, true);
   assert.equal(parseArguments(["status", "perf"]).environment, "perf");
   assert.throws(() => parseArguments(["perf-reset", "wrong"]), /courtside-perf/);
   assert.equal(parseArguments(["perf-reset", "courtside-perf"]).confirm, "courtside-perf");
@@ -293,20 +294,33 @@ test("given performance lifecycle commands, when planning them, then only the pe
   // when
   const privateArgs = perfComposeArgs(false);
   const exposedArgs = perfComposeArgs(true);
+  const telemetryArgs = perfComposeArgs(false, true);
   const reset = perfResetPlan();
 
   // then
   assert.ok(privateArgs.includes("courtside-perf"));
   assert.equal(privateArgs.some((argument) => argument.endsWith("compose.perf-db.yaml")), false);
   assert.equal(exposedArgs.some((argument) => argument.endsWith("compose.perf-db.yaml")), true);
+  assert.equal(telemetryArgs.some((argument) => argument.endsWith("compose.perf-telemetry.yaml")), true);
   assert.deepEqual(reset.args.slice(-3), ["down", "--volumes", "--remove-orphans"]);
   assert.ok(reset.args.includes("courtside-perf"));
+});
+
+test("given telemetry was previously enabled, when starting without it, then orphaned collectors are removed", () => {
+  // given
+  const source = readFileSync(fileURLToPath(new URL("./courtside.mjs", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(source, /perfComposeArgs\(options\.dbPort, options\.telemetry\).*--remove-orphans/s);
 });
 
 test("given the performance compose contract, when inspecting isolation, then resources and ports are bounded", () => {
   // given
   const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
   const databaseOverride = readFileSync(fileURLToPath(new URL("../deploy/compose.perf-db.yaml", import.meta.url)), "utf8");
+  const telemetryOverride = readFileSync(fileURLToPath(new URL("../deploy/compose.perf-telemetry.yaml", import.meta.url)), "utf8");
+  const prometheus = readFileSync(fileURLToPath(new URL("../deploy/prometheus.perf.yaml", import.meta.url)), "utf8");
+  const postgresQueries = readFileSync(fileURLToPath(new URL("../deploy/postgres-exporter.perf.yaml", import.meta.url)), "utf8");
 
   // when / then
   assert.match(compose, /^name: courtside-perf/m);
@@ -319,6 +333,15 @@ test("given the performance compose contract, when inspecting isolation, then re
   assert.match(compose, /SPRING_PROFILES_ACTIVE: perf/);
   assert.match(compose, /COURTSIDE_PERF_CONFIRM_DISPOSABLE: "true"/);
   assert.match(compose, /COURTSIDE_ENVIRONMENT: PERFORMANCE/);
+  assert.match(compose, /POSTGRES_PASSWORD: \$\{COURTSIDE_PERF_SHARED_PASSWORD:-\}/);
+  assert.match(telemetryOverride, /prom\/prometheus:v3\.5\.0@sha256:[a-f0-9]{64}/);
+  assert.match(telemetryOverride, /prometheuscommunity\/postgres-exporter:v0\.17\.1@sha256:[a-f0-9]{64}/);
+  assert.match(composeService(telemetryOverride, "app"), /COURTSIDE_PERF_TELEMETRY_ENABLED: "true"/);
+  assert.match(composeService(telemetryOverride, "prometheus"), /127\.0\.0\.1:9090:9090/);
+  assert.doesNotMatch(composeService(telemetryOverride, "postgres-exporter"), /ports:/);
+  assert.match(prometheus, /app:9091/);
+  assert.match(prometheus, /postgres-exporter:9187/);
+  assert.match(postgresQueries, /FROM pg_locks/);
   const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.perf", import.meta.url)), "utf8");
   assert.match(caddy, /https:\/\/host\.docker\.internal:443/);
 });
