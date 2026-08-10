@@ -25,62 +25,10 @@ export JAVA_HOME=/path/to/temurin-25
 node tools/courtside.mjs dev
 ```
 
-This starts PostgreSQL in Docker and Spring Boot plus Vite on the host. Stop the host processes
-with `Ctrl+C`; the database keeps running and retains its data. Use
-`node tools/courtside.mjs dev-stop` to stop PostgreSQL or `node tools/courtside.mjs dev-reset` to
-remove its data explicitly. `node tools/courtside.mjs dev-debug` opens JDWP at
-`127.0.0.1:5005`, and the additional `--suspend` option waits for the debugger before starting the
-application. `node tools/courtside.mjs status dev` and the additional `--json` option report
-health, ports, Git revision, containers and volumes.
-
-The application is available at `http://127.0.0.1:5173`. Demo accounts are `admin`, `jane.doe`
-and `john.roe`; their passwords are `courtside-admin` and `courtside-member`, respectively.
-
-PostgreSQL is reachable only through `127.0.0.1:5432`. Use database `courtside_dev`, username
-`courtside` and password `courtside-dev`, for example with the JDBC URL
-`jdbc:postgresql://127.0.0.1:5432/courtside_dev`.
-
-Build a runnable artifact with `node tools/courtside.mjs build`. Run the complete quality gate
-with `node tools/courtside.mjs verify`.
-
-## Local acceptance environment
-
-```bash
-export JAVA_HOME=/path/to/temurin-25
-node tools/courtside.mjs uat
-```
-
-This verifies the current source, builds the application image, and starts PostgreSQL, Courtside,
-and Caddy as the isolated `courtside-uat` Compose project. Open `https://localhost:8443`; plain
-HTTP on `http://localhost:8081` redirects there. The database and Caddy's local certificate
-authority persist across starts. Use `--skip-verify` for an explicitly faster local image build,
-or `--version <tag>` to run `ghcr.io/jegr78/courtside:<tag>` instead of the current source.
-
-Export Caddy's root certificate with `node tools/courtside.mjs uat-cert`. The command prints
-platform-specific trust instructions; remove the certificate from the operating-system trust store
-when it is no longer needed. UAT keeps Secure Cookies enabled and never activates the demo profile.
-On an empty database, the command prints a generated one-time password for `admin`; replace it when
-prompted.
-
-PostgreSQL is private by default. Open an interactive session with
-`node tools/courtside.mjs uat-db-shell`, or add `--db-port` when starting UAT to expose it only at
-`127.0.0.1:5433`. The JDBC URL is `jdbc:postgresql://127.0.0.1:5433/courtside`, with username
-`courtside` and password `courtside-uat`.
-
-Create a portable compressed PostgreSQL dump with `node tools/courtside.mjs uat-backup [file]`.
-Restore one only with
-`node tools/courtside.mjs uat-restore <file> --confirm courtside-uat`. Inspect the environment with
-`node tools/courtside.mjs status uat [--json]`, follow output with
-`node tools/courtside.mjs uat-logs`, and stop it with `node tools/courtside.mjs uat-stop`.
-
-The destructive command `node tools/courtside.mjs uat-reset courtside-uat` removes only the UAT
-database and retains the local CA. Add `--all` to remove both the database and the CA volumes.
-Run the destructive automated lifecycle smoke test with
-`npm --prefix frontend run test:uat -- --confirm courtside-uat`; it removes the UAT environment
-when finished.
-
-Session and CSRF cookies are marked `Secure` by default. Set `COURTSIDE_COOKIE_SECURE=false` only
-for a local plain-HTTP process such as the development command above.
+Open the application at `http://127.0.0.1:5173` and its Swagger UI at
+`http://127.0.0.1:8082/api-ui/`. For the persistent HTTPS acceptance environment, every CLI
+command, database access, certificates, API clients, backups, and reset behavior, see
+[`docs/local-environments.md`](docs/local-environments.md).
 
 ## First start: creating the first admin
 

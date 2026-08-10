@@ -8,6 +8,10 @@ You need Docker with the Compose plugin. The application container is capped at 
 instance with an empty database sits at roughly 450 MiB of that; raise `COURTSIDE_MEMORY` if your
 club outgrows it.
 
+For the repository's local Dev and UAT environments, use the
+[local environment guide](../docs/local-environments.md). This document covers the production
+reference deployment only.
+
 ## First start
 
 ```sh

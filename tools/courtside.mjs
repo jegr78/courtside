@@ -129,8 +129,14 @@ function validateWindowsArgument(value) {
   return value;
 }
 
-export function requiredPorts(options) {
-  return [5432, 8080, 5173, ...(options.command === "dev-debug" ? [5005] : [])];
+export function requiredPorts(options, runningServices = new Set()) {
+  return [
+    ...(runningServices.has("db") ? [] : [5432]),
+    8080,
+    5173,
+    ...(runningServices.has("api-proxy") ? [] : [8082]),
+    ...(options.command === "dev-debug" ? [5005] : [])
+  ];
 }
 
 export function lifecyclePlan(command) {
@@ -416,13 +422,12 @@ function readUatState() {
 }
 
 async function startDevelopment(options) {
-  for (const port of requiredPorts(options)) {
-    if (port === 5432 && isDevDatabaseRunning()) continue;
+  for (const port of requiredPorts(options, runningDevServices())) {
     if (!await isPortAvailable(port)) {
       throw new Error(`Port ${port} is already in use`);
     }
   }
-  runInteractive({ command: "docker", args: [...devComposeArgs, "up", "-d", "--wait", "db"] });
+  runInteractive({ command: "docker", args: [...devComposeArgs, "up", "-d", "--wait", "db", "api-ui", "api-proxy"] });
   const plans = processPlans(options);
   const environment = {
     ...process.env,
@@ -439,12 +444,13 @@ async function startDevelopment(options) {
   const processes = await startProcesses(plans, environment);
   const { children } = processes;
   process.stdout.write("Dev: http://localhost:5173 | DB: jdbc:postgresql://127.0.0.1:5432/courtside_dev\n");
+  process.stdout.write("API UI: http://127.0.0.1:8082/api-ui/\n");
   if (options.command === "dev-debug") {
     process.stdout.write(`Debugger: 127.0.0.1:5005${options.suspend ? " (waiting)" : ""}\n`);
   }
   writeProcessState(children, options.command);
   const stop = () => {
-    children.forEach(terminate);
+    terminateChildren(children, terminate);
     removeProcessState();
   };
   process.once("SIGINT", stop);
@@ -465,9 +471,13 @@ export async function startProcesses(plans, environment, runtime = { spawn, term
     }
     return { children, exit: Promise.race(exits) };
   } catch (failure) {
-    children.forEach(runtime.terminate);
+    terminateChildren(children, runtime.terminate);
     throw failure;
   }
+}
+
+export function terminateChildren(children, terminateProcess) {
+  children.forEach((child) => terminateProcess(child));
 }
 
 function spawnReady(label, plan, environment, spawnProcess) {
@@ -491,11 +501,12 @@ function spawnReady(label, plan, environment, spawnProcess) {
   });
 }
 
-function isDevDatabaseRunning() {
-  const result = spawnSync("docker", [...devComposeArgs, "ps", "-q", "db"], {
+function runningDevServices() {
+  const result = spawnSync("docker", [...devComposeArgs, "ps", "--services", "--filter", "status=running"], {
     cwd: root, encoding: "utf8"
   });
-  return result.status === 0 && result.stdout.trim().length > 0;
+  if (result.status !== 0) return new Set();
+  return new Set(result.stdout.trim().split(/\r?\n/).filter(Boolean));
 }
 
 function runInteractive(plan) {
@@ -629,7 +640,8 @@ async function showStatus(environment, asJson) {
         https: { port: 8443, reachable: await canConnect(8443) }
       } : {
         backend: { port: 8080, reachable: await canConnect(8080) },
-        frontend: { port: 5173, reachable: await canConnect(5173) }
+        frontend: { port: 5173, reachable: await canConnect(5173) },
+        apiUi: { port: 8082, reachable: await canConnect(8082) }
       }),
       ...(runtime.mode === "dev-debug"
         ? { debugger: { port: 5005, reachable: isListenerActive(5005) } }

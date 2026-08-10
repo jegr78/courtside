@@ -1,0 +1,11 @@
+:8080 {
+	handle /api-ui* {
+		reverse_proxy api-ui:8080
+	}
+
+	handle /api/* {
+		reverse_proxy host.docker.internal:8080
+	}
+
+	redir / /api-ui/
+}

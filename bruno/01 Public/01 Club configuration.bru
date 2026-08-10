@@ -1,0 +1,17 @@
+meta {
+  name: Club configuration
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/public/config
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns the public configuration", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

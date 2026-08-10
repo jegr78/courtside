@@ -1,0 +1,21 @@
+meta {
+  name: Log out
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/session/logout
+  body: none
+  auth: none
+}
+
+headers {
+  X-XSRF-TOKEN: {{csrfToken}}
+}
+
+tests {
+  test("ends the authenticated session", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
