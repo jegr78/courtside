@@ -1,0 +1,63 @@
+name: courtside-uat
+
+services:
+  db:
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: courtside
+      POSTGRES_USER: courtside
+      POSTGRES_PASSWORD: courtside-uat
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courtside -d courtside"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    image: ${COURTSIDE_UAT_IMAGE:-courtside:uat-local}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
+      SPRING_DATASOURCE_USERNAME: courtside
+      SPRING_DATASOURCE_PASSWORD: courtside-uat
+      COURTSIDE_COOKIE_SECURE: "true"
+      COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: admin
+      COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_UAT_ADMIN_PASSWORD:-}
+      COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  proxy:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8081:80"
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./Caddyfile.uat:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  db:
+  caddy-data:
+  caddy-config:

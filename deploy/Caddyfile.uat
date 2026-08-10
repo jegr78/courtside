@@ -1,0 +1,28 @@
+http://localhost:80 {
+	redir https://localhost:8443{uri} permanent
+}
+
+https://localhost:443 {
+	tls internal
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	reverse_proxy app:8080 {
+		header_up -Forwarded
+		header_up -X-Forwarded-For
+		header_up -X-Forwarded-Host
+		header_up -X-Forwarded-Port
+		header_up -X-Forwarded-Prefix
+		header_up -X-Forwarded-Proto
+		header_up -X-Forwarded-Ssl
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
