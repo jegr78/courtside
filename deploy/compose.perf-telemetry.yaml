@@ -1,0 +1,56 @@
+services:
+  app:
+    environment:
+      COURTSIDE_PERF_TELEMETRY_ENABLED: "true"
+    networks:
+      - telemetry
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.17.1@sha256:38606faa38c54787525fb0ff2fd6b41b4cfb75d455c1df294927c5f611699b17
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      DATA_SOURCE_NAME: postgresql://courtside:${COURTSIDE_PERF_SHARED_PASSWORD:-}@db:5432/courtside_perf?sslmode=disable
+    command:
+      - --extend.query-path=/etc/postgres_exporter/queries.yaml
+    volumes:
+      - ./postgres-exporter.perf.yaml:/etc/postgres_exporter/queries.yaml:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+      - telemetry
+
+  prometheus:
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus.perf.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      app:
+        condition: service_healthy
+      postgres-exporter:
+        condition: service_started
+    networks:
+      - telemetry
+
+volumes:
+  prometheus-data:
+
+networks:
+  telemetry:

@@ -52,6 +52,10 @@ courtside:
     series-horizon-months: 12
 
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: false
   endpoints:
     web:
       exposure:

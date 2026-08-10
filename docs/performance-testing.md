@@ -77,6 +77,7 @@ The CLI creates the reference dataset in the independent `courtside-perf` Compos
 
 ```text
 node tools/courtside.mjs perf
+node tools/courtside.mjs perf --telemetry
 node tools/courtside.mjs status perf
 node tools/courtside.mjs perf-logs
 node tools/courtside.mjs perf-stop
@@ -88,6 +89,17 @@ a dedicated Caddy boundary. The application is available at `https://localhost:9
 is intentionally disposable. The CLI generates one shared password, stores it only in the ignored
 `build/perf-environment.json` with owner-only permissions where supported, and creates the accounts
 `member0001` through `member1000`. Account `member1000` is reserved for contention workloads.
+
+`--telemetry` adds Prometheus and a PostgreSQL exporter to the isolated project. Prometheus is
+available only on `http://127.0.0.1:9090`; the exporter and the application's management port have
+no host binding. Prometheus scrapes JVM, GC, threads, HTTP server requests, Hikari pool state,
+PostgreSQL activity, connections, and locks every five seconds and retains data for seven days.
+Use the run start time from the result to select the corresponding time range. The telemetry volume
+is disposable and is removed by `perf-reset courtside-perf`.
+
+The ordinary HTTPS endpoint does not expose Actuator. UAT, its Funnel ingress, and the production
+reference deployment do not enable Prometheus or the exporter. Database and exporter credentials
+come from the generated runtime state and are never stored in Compose files.
 
 PostgreSQL has no host port by default. Use `perf --db-port` to expose it temporarily at
 `127.0.0.1:5434`, or use `perf-db-shell` without exposing it. The reset command requires the exact

@@ -1,0 +1,16 @@
+pg_locks_count:
+  query: |
+    SELECT datname, mode, granted, count(*) AS count
+    FROM pg_locks
+    JOIN pg_database ON pg_database.oid = pg_locks.database
+    WHERE datname = current_database()
+    GROUP BY datname, mode, granted
+  metrics:
+    - datname:
+        usage: LABEL
+    - mode:
+        usage: LABEL
+    - granted:
+        usage: LABEL
+    - count:
+        usage: GAUGE

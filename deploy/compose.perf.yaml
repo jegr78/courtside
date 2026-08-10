@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: courtside_perf
       POSTGRES_USER: courtside
-      POSTGRES_PASSWORD: courtside-perf
+      POSTGRES_PASSWORD: ${COURTSIDE_PERF_SHARED_PASSWORD:-}
     cpus: 2.0
     mem_limit: 2g
     volumes:
@@ -37,7 +37,7 @@ services:
       SPRING_PROFILES_ACTIVE: perf
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_perf
       SPRING_DATASOURCE_USERNAME: courtside
-      SPRING_DATASOURCE_PASSWORD: courtside-perf
+      SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_PERF_SHARED_PASSWORD:-}
       COURTSIDE_COOKIE_SECURE: "true"
       COURTSIDE_ENVIRONMENT: PERFORMANCE
       COURTSIDE_PERF_CONFIRM_DISPOSABLE: "true"
@@ -49,7 +49,7 @@ services:
       - backend
       - frontend
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9091/actuator/health"]
       interval: 5s
       timeout: 3s
       retries: 120
