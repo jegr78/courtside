@@ -11,11 +11,13 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.core.annotation.Order;
 
 import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
+@Order(0)
 class BootstrapAdminInitializer implements ApplicationRunner {
 
     private static final String LOCAL_ADMIN_EMAIL = "admin@localhost.invalid";
