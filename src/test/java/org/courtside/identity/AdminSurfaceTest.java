@@ -55,6 +55,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
 
     private static final Set<String> ANONYMOUS_ALLOWED_PATHS = Set.of(
             "/api/openapi.yaml",
+            "/api/public/booking-grid",
             "/api/public/config",
             "/api/public/courts",
             "/api/public/opening-hours",
@@ -104,7 +105,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenEveryMappedPathIsInspected_thenItIsClassifiedAsAdminAnonymousOrAuthenticated() {
-        // given — the two permissive buckets must be disjoint, or a path's classification is ambiguous
+        // given
         assertThat(ANONYMOUS_ALLOWED_PATHS)
                 .as("a path cannot be both anonymous-allowed and authenticated-only")
                 .doesNotContainAnyElementsOf(AUTHENTICATED_PATHS);
@@ -119,8 +120,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 .filter(pattern -> !AUTHENTICATED_PATHS.contains(pattern))
                 .toList();
 
-        // then — an admin endpoint outside /api/admin/, or one nobody classified; either way
-        // its reachability is unproven
+        // then
         assertThat(unclassified).isEmpty();
     }
 

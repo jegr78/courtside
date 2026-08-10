@@ -64,3 +64,56 @@ it("given valid credentials, when the empty login response arrives, then login s
   // when / then
   await expect(api.login("doe.jane", "secret")).resolves.toBeUndefined();
 });
+
+it("when loading courts, then the active public courts are returned", async () => {
+  // given
+  server.use(http.get("/api/public/courts", () => HttpResponse.json([
+    { id: "11111111-1111-1111-1111-111111111111", number: 1, name: "Centre Court" }
+  ])));
+
+  // when
+  const courts = await api.courts();
+
+  // then
+  expect(courts).toEqual([
+    { id: "11111111-1111-1111-1111-111111111111", number: 1, name: "Centre Court" }
+  ]);
+});
+
+it("given a date, when loading allocations, then that date is sent as a query parameter", async () => {
+  // given
+  server.use(http.get("/api/bookings", ({ request }) => {
+    expect(new URL(request.url).searchParams.get("date")).toBe("2026-08-10");
+    return HttpResponse.json([{
+      bookingId: "22222222-2222-2222-2222-222222222222",
+      courtId: "11111111-1111-1111-1111-111111111111",
+      startsAt: "2026-08-10T18:00:00+02:00",
+      endsAt: "2026-08-10T19:00:00+02:00",
+      cardLabel: "Singles",
+      cardColor: "#176b55"
+    }]);
+  }));
+
+  // when
+  const allocations = await api.allocations("2026-08-10");
+
+  // then
+  expect(allocations).toHaveLength(1);
+  expect(allocations[0].cardLabel).toBe("Singles");
+});
+
+it("when loading the booking grid, then its club clock and slot duration are returned", async () => {
+  // given
+  server.use(http.get("/api/public/booking-grid", () => HttpResponse.json({
+    timeZone: "Europe/Berlin",
+    slotMinutes: 30,
+    openingHours: [{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }]
+  })));
+
+  // when
+  const grid = await api.bookingGrid();
+
+  // then
+  expect(grid.timeZone).toBe("Europe/Berlin");
+  expect(grid.slotMinutes).toBe(30);
+});
