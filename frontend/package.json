@@ -23,7 +23,8 @@
     "build": "npm run generate-api && tsc -b && vite build",
     "lint": "npm run generate-api && eslint .",
     "lint:fix": "npm run generate-api && eslint . --fix",
-    "test": "npm run generate-api && vitest run",
+    "test": "npm run generate-api && vitest run && npm run test:tools",
+    "test:tools": "node --test ../tools/*.test.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

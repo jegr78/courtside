@@ -13,6 +13,7 @@ released image to pull. Until the first tag, run it from source as below.
 ## Requirements
 
 - JDK 25 (Eclipse Temurin)
+- Node.js 24
 - Docker — for PostgreSQL and for the Testcontainers-backed test suite
 - PostgreSQL 17. The non-overlap guarantee is a GiST exclusion constraint; no other database
   will do.
@@ -20,25 +21,27 @@ released image to pull. Until the first tag, run it from source as below.
 ## Running locally
 
 ```bash
-docker run -d --name courtside-db -p 5432:5432 \
-  -e POSTGRES_DB=courtside -e POSTGRES_USER=courtside -e POSTGRES_PASSWORD=courtside \
-  postgres:17-alpine
-
 export JAVA_HOME=/path/to/temurin-25
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/courtside \
-SPRING_DATASOURCE_USERNAME=courtside \
-SPRING_DATASOURCE_PASSWORD=courtside \
-COURTSIDE_COOKIE_SECURE=false \
-./mvnw spring-boot:run
+node tools/courtside.mjs dev
 ```
 
-Flyway creates the schema on first start and seeds opening hours of 08:00–22:00 for every
-weekday, a single court numbered 1 (unnamed — give it a name and add the rest through the admin
-UI), the four booking cards, the two participant cards (Ball machine, Looking for a partner) and
-the Standard and Youth rule sets. How many courts a club has is the club's business, so the seed
-takes no position beyond the one court without which nothing can be booked at all. Adjust all of
-it later through the database or the admin UI. Migrations currently run to `V11`, which stores
-login-attempt counters.
+This starts PostgreSQL in Docker and Spring Boot plus Vite on the host. Stop the host processes
+with `Ctrl+C`; the database keeps running and retains its data. Use
+`node tools/courtside.mjs dev-stop` to stop PostgreSQL or `node tools/courtside.mjs dev-reset` to
+remove its data explicitly. `node tools/courtside.mjs dev-debug` opens JDWP at
+`127.0.0.1:5005`, and the additional `--suspend` option waits for the debugger before starting the
+application. `node tools/courtside.mjs status dev` and the additional `--json` option report
+health, ports, Git revision, containers and volumes.
+
+The application is available at `http://127.0.0.1:5173`. Demo accounts are `admin`, `jane.doe`
+and `john.roe`; their passwords are `courtside-admin` and `courtside-member`, respectively.
+
+PostgreSQL is reachable only through `127.0.0.1:5432`. Use database `courtside_dev`, username
+`courtside` and password `courtside-dev`, for example with the JDBC URL
+`jdbc:postgresql://127.0.0.1:5432/courtside_dev`.
+
+Build a runnable artifact with `node tools/courtside.mjs build`. Run the complete quality gate
+with `node tools/courtside.mjs verify`.
 
 Session and CSRF cookies are marked `Secure` by default. Set `COURTSIDE_COOKIE_SECURE=false` only
 for a local plain-HTTP process such as the development command above.
