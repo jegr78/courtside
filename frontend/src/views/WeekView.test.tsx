@@ -60,12 +60,14 @@ it("given the current week, when opening the next week, then its seven days are 
   await screen.findByText("Singles");
 
   // when
-  await userEvent.click(screen.getByRole("button", { name: "Next week" }));
+  await userEvent.click(screen.getByTestId("week-next"));
 
   // then
   await waitFor(() => expect(api.allocations).toHaveBeenCalledWith("2026-08-17"));
   expect(api.allocations).toHaveBeenCalledWith("2026-08-23");
+  expect(screen.getByTestId("week-grid")).toHaveAttribute("data-week-offset", "1");
   expect(screen.getByRole("button", { name: /Monday, August 17/ })).toBeInTheDocument();
+  expect(screen.getByTestId("week-previous")).toBeInTheDocument();
 });
 
 it("given another day is selected, when viewing it, then its occupancy table is shown", async () => {

@@ -122,6 +122,7 @@ node tools/courtside.mjs perf-run baseline --confirm courtside-perf
 node tools/courtside.mjs perf-run peak --confirm courtside-perf
 node tools/courtside.mjs perf-run stress --confirm courtside-perf
 node tools/courtside.mjs perf-run soak --confirm courtside-perf --fresh
+node tools/courtside.mjs perf-run browser --confirm courtside-perf
 ```
 
 Append `--remote-write` to a protocol run to send an additional time series to the local
@@ -133,7 +134,19 @@ The CLI verifies `/api/source` before starting k6 and refuses any target that do
 `PERFORMANCE`. Profiles, durations, VUs, stages, traffic mix, image digest, and thresholds come from
 the contract and cannot be overridden on the command line. Baseline, peak, stress, and soak require
 the disposable project confirmation; soak additionally requires an explicit assertion that the
-environment was freshly reset. Browser and Funnel profiles have separate runners in later work.
+environment was freshly reset. Funnel uses a separate runner.
+
+The browser profile uses the pinned official Chromium image and is capped at five VUs for ten
+minutes. Each VU signs in through the rendered PWA with its own synthetic account, navigates the
+week through language-neutral test hooks, creates a booking through the real browser session and
+CSRF token, verifies the allocation, reloads the PWA, and proves that the session remains active.
+The booking is cancelled during cleanup. This complements rather than replaces Playwright's
+functional E2E suite.
+
+Browser reports retain p75 LCP, INP, and CLS against the contract budgets, failed browser requests
+and console errors, the complete-journey success rate, and average journey duration. Their profile
+and metrics remain distinct from protocol results. Since a full browser run is resource-intensive
+and intentionally manual, it requires the disposable environment confirmation.
 
 Each VU logs in with its corresponding `memberNNNN` account and the generated password mounted
 read-only from local state. Login latency is measured separately. Normal iterations use the agreed
@@ -146,7 +159,8 @@ exit non-zero. Every run uses unique idempotency keys.
 
 The CLI exports Caddy's disposable root CA for the duration of a run. Both the environment preflight
 and k6 validate the certificate chain and hostname against that CA; the test does not disable TLS
-verification.
+verification. Chromium receives only the SPKI pin from that verified target certificate, rather
+than a general instruction to accept invalid certificates.
 
 ## Reference baselines
 

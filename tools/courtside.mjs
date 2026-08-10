@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, X509Certificate } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { createConnection, createServer } from "node:net";
@@ -109,9 +109,9 @@ export function parseArguments(argv) {
     throw new Error(`perf-reset requires the exact project name '${perfProject}'`);
   }
   if (command === "perf-run") {
-    const protocolProfiles = ["smoke", "baseline", "peak", "stress", "soak"];
-    if (!protocolProfiles.includes(options.profile)) {
-      throw new Error("perf-run requires a protocol profile: smoke, baseline, peak, stress, or soak");
+    const localProfiles = ["smoke", "baseline", "peak", "stress", "soak", "browser"];
+    if (!localProfiles.includes(options.profile)) {
+      throw new Error("perf-run requires a local profile: smoke, baseline, peak, stress, soak, or browser");
     }
     if (options.profile !== "smoke" && options.confirm !== perfProject) {
       throw new Error(`perf-run ${options.profile} requires --confirm ${perfProject}`);
@@ -544,9 +544,13 @@ export function perfResetPlan() {
   return { command: "docker", args: [...perfComposeArgs(false, true), "down", "--volumes", "--remove-orphans"] };
 }
 
-export function performanceRunPlan(options, resultDirectory, certificateFile, runId = "test-run") {
+export function performanceRunPlan(options, resultDirectory, certificateFile, runId = "test-run", certificatePin) {
   const contract = JSON.parse(readFileSync(join(root, "performance", "contract.json"), "utf8"));
-  const image = contract.tooling.protocolImage;
+  const browserRun = contract.profiles[options.profile].kind === "browser";
+  if (browserRun && !certificatePin) {
+    throw new Error("A verified target certificate pin is required for a browser run");
+  }
+  const image = browserRun ? contract.tooling.browserImage : contract.tooling.protocolImage;
   return {
     command: "docker",
     args: [
@@ -556,6 +560,10 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "-e", "PERF_TARGET=https://host.docker.internal:9443",
       "-e", "K6_WEB_DASHBOARD=true",
       "-e", "K6_WEB_DASHBOARD_EXPORT=/results/report.html",
+      ...(browserRun ? [
+        "-e", "K6_BROWSER_HEADLESS=true",
+        "-e", `K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=${certificatePin}`
+      ] : []),
       ...(options.remoteWrite ? [
         "-e", "K6_PROMETHEUS_RW_SERVER_URL=http://host.docker.internal:9090/api/v1/write",
         "-e", "K6_PROMETHEUS_RW_TREND_STATS=p(50),p(90),p(95),p(99),min,max,avg,med"
@@ -568,8 +576,8 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       `${image.reference}@${image.digest}`,
       "run", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
       "--tag", `testid=${runId}`, "--tag", `profile=${options.profile}`,
-      "--summary-trend-stats", "avg,min,med,max,p(50),p(90),p(95),p(99)",
-      "/scripts/protocol.js"
+      "--summary-trend-stats", "avg,min,med,max,p(50),p(75),p(90),p(95),p(99)",
+      browserRun ? "/scripts/browser.js" : "/scripts/protocol.js"
     ]
   };
 }
@@ -592,7 +600,7 @@ async function runPerformance(options) {
     args: [...perfComposeArgs(), "cp", "proxy:/data/caddy/pki/authorities/local/root.crt", certificateFile]
   });
   const identity = await localRequest({
-    secure: true, port: 9443, path: "/api/source", ca: readFileSync(certificateFile)
+    secure: true, port: 9443, path: "/api/source", ca: readFileSync(certificateFile), servername: "host.docker.internal"
   });
   const source = parseJson(identity.body);
   if (identity.statusCode !== 200 || source.environment !== "PERFORMANCE") {
@@ -600,7 +608,7 @@ async function runPerformance(options) {
   }
   let runFailure;
   try {
-    runInteractive(performanceRunPlan(options, resultDirectory, certificateFile, runId));
+    runInteractive(performanceRunPlan(options, resultDirectory, certificateFile, runId, identity.certificatePin));
   } catch (error) {
     runFailure = error;
   }
@@ -612,16 +620,22 @@ async function runPerformance(options) {
   const contractText = readFileSync(join(root, "performance", "contract.json"), "utf8");
   const contract = JSON.parse(contractText);
   const raw = JSON.parse(readFileSync(rawSummary, "utf8"));
-  const result = buildPerformanceResult({
-    contract,
-    contractDigest: `sha256:${createHash("sha256").update(contractText).digest("hex")}`,
-    source,
-    profileName: options.profile,
-    startedAt,
-    raw,
-    platform: process.platform,
-    architecture: process.arch
-  });
+  let result;
+  try {
+    result = buildPerformanceResult({
+      contract,
+      contractDigest: `sha256:${createHash("sha256").update(contractText).digest("hex")}`,
+      source,
+      profileName: options.profile,
+      startedAt,
+      raw,
+      platform: process.platform,
+      architecture: process.arch
+    });
+  } catch (error) {
+    rmSync(certificateFile, { force: true });
+    throw runFailure ?? error;
+  }
   validatePerformanceResult(result);
   writeFileSync(join(resultDirectory, "summary.json"), `${JSON.stringify(result, null, 2)}\n`);
   rmSync(certificateFile, { force: true });
@@ -634,7 +648,9 @@ export function buildPerformanceResult({
 }) {
   const profile = contract.profiles[profileName];
   const workload = contract.workloads[profile.workload];
-  const latency = raw.metrics.http_req_duration.values;
+  const browserRun = profile.kind === "browser";
+  const latencyMetric = browserRun ? raw.metrics.browser_http_req_duration : raw.metrics.http_req_duration;
+  const latency = latencyMetric.values;
   const thresholdPassed = (name) => Object.values(raw.metrics[name].thresholds).every(value => value.ok);
   const load = {
     dataset: contract.datasets[workload.dataset],
@@ -662,7 +678,14 @@ export function buildPerformanceResult({
     },
     load,
     resources: contract.resources,
-    thresholds: {
+    thresholds: browserRun ? {
+      technicalErrorRate: thresholdPassed("technical_errors"),
+      unexpectedServerErrors: thresholdPassed("unexpected_server_errors"),
+      webVitals: ["browser_web_vital_lcp", "browser_web_vital_inp", "browser_web_vital_cls"]
+        .every(thresholdPassed),
+      browserErrors: thresholdPassed("browser_errors"),
+      browserJourney: thresholdPassed("browser_journey_success")
+    } : {
       technicalErrorRate: thresholdPassed("technical_errors"),
       unexpectedServerErrors: thresholdPassed("unexpected_server_errors"),
       readOnlyApi: thresholdPassed("read_only_api_duration"),
@@ -671,12 +694,25 @@ export function buildPerformanceResult({
     },
     metrics: {
       iterations: raw.metrics.iterations.values.count,
-      requests: raw.metrics.http_reqs.values.count,
-      throughputPerSecond: raw.metrics.http_reqs.values.rate,
+      requests: browserRun ? raw.metrics.browser_requests.values.count : raw.metrics.http_reqs.values.count,
+      throughputPerSecond: browserRun
+        ? raw.metrics.browser_requests.values.rate
+        : raw.metrics.http_reqs.values.rate,
       technicalErrorRate: raw.metrics.technical_errors.values.rate,
       unexpectedServerErrors: raw.metrics.unexpected_server_errors.values.count,
-      bookingConflicts: raw.metrics.booking_conflicts?.values.count ?? 0,
-      bookingConflictRate: raw.metrics.booking_conflict_rate?.values.rate ?? 0,
+      ...(browserRun ? {
+        browserErrors: raw.metrics.browser_errors.values.count,
+        browserJourneyMilliseconds: raw.metrics.browser_journey_duration.values.avg,
+        webVitals: {
+          percentile: contract.thresholds.webVitals.percentile,
+          lcpMilliseconds: raw.metrics.browser_web_vital_lcp.values["p(75)"],
+          inpMilliseconds: raw.metrics.browser_web_vital_inp.values["p(75)"],
+          cls: raw.metrics.browser_web_vital_cls.values["p(75)"]
+        }
+      } : {
+        bookingConflicts: raw.metrics.booking_conflicts?.values.count ?? 0,
+        bookingConflictRate: raw.metrics.booking_conflict_rate?.values.rate ?? 0
+      }),
       latencyMilliseconds: {
         p50: latency["p(50)"], p90: latency["p(90)"], p95: latency["p(95)"], p99: latency["p(99)"]
       }
@@ -1354,17 +1390,19 @@ function readPerformanceHealth(composeArgs) {
   return parseJson(result.stdout).status ?? "unknown";
 }
 
-export function localRequest({ secure, port, path, method = "GET", headers = {}, body, ca }) {
+export function localRequest({ secure, port, path, method = "GET", headers = {}, body, ca, servername }) {
   return new Promise((resolveResponse, rejectResponse) => {
     const request = (secure ? httpsRequest : httpRequest)({
       hostname: "localhost", port, path, method, headers,
-      ...(secure ? { rejectUnauthorized: Boolean(ca), ...(ca ? { ca } : {}) } : {})
+      ...(secure ? { rejectUnauthorized: Boolean(ca), ...(ca ? { ca } : {}), ...(servername ? { servername } : {}) } : {})
     }, (response) => {
+      const peerCertificate = secure ? response.socket.getPeerCertificate() : undefined;
+      const certificatePin = peerCertificate?.raw ? certificatePublicKeyPin(peerCertificate.raw) : undefined;
       let responseBody = "";
       response.setEncoding("utf8");
       response.on("data", (chunk) => { responseBody += chunk; });
       response.on("end", () => resolveResponse({
-        statusCode: response.statusCode ?? 0, headers: response.headers, body: responseBody
+        statusCode: response.statusCode ?? 0, headers: response.headers, body: responseBody, certificatePin
       }));
     });
     request.setTimeout(1000, () => request.destroy(new Error("Request timed out")));
@@ -1374,12 +1412,18 @@ export function localRequest({ secure, port, path, method = "GET", headers = {},
   });
 }
 
+function certificatePublicKeyPin(certificate) {
+  const parsed = new X509Certificate(certificate);
+  const subjectPublicKey = parsed.publicKey.export({ type: "spki", format: "der" });
+  return createHash("sha256").update(subjectPublicKey).digest("base64");
+}
+
 function parseJson(value) {
   try { return JSON.parse(value); } catch { return value; }
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry]\n  perf-run <smoke|baseline|peak|stress|soak> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

@@ -62,10 +62,10 @@ export function WeekView({ today = new Date() }: WeekViewProps) {
         {days.length > 0 && <p className="text-sm text-slate-600">{formatWeekRange(days, language)}</p>}
       </div>
       <div className="flex gap-2">
-        <Button type="button" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
+        <Button type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
           {t("week.previousShort")}
         </Button>
-        <Button type="button" onClick={() => setWeekOffset((offset) => offset + 1)} aria-label={t("week.next")}>
+        <Button type="button" data-testid="week-next" onClick={() => setWeekOffset((offset) => offset + 1)} aria-label={t("week.next")}>
           {t("week.nextShort")}
         </Button>
       </div>
@@ -92,7 +92,7 @@ export function WeekView({ today = new Date() }: WeekViewProps) {
 
     {error && <Alert>{error}</Alert>}
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
-    {data && <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
+    {data && <div data-testid="week-grid" data-week-offset={weekOffset} className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
       <table className="min-w-full border-collapse text-sm">
         <thead className="bg-slate-100">
           <tr>

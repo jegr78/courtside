@@ -67,6 +67,10 @@ test("given supported performance profiles, when reading their execution limits,
   });
   assert.equal(contract.profiles["funnel-smoke"].readOnly, true);
   assert.equal(contract.profiles["funnel-smoke"].manual, true);
+  assert.deepEqual(contract.profiles.browser.limits, {
+    maximumVirtualUsers: 5,
+    maximumDuration: "10m"
+  });
 });
 
 test("given performance thresholds, when classifying outcomes, then domain conflicts stay separate from failures", () => {
