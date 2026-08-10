@@ -1,0 +1,87 @@
+name: courtside-perf
+
+services:
+  db:
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    environment:
+      POSTGRES_DB: courtside_perf
+      POSTGRES_USER: courtside
+      POSTGRES_PASSWORD: courtside-perf
+    cpus: 2.0
+    mem_limit: 2g
+    volumes:
+      - db:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courtside -d courtside_perf"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    image: courtside:perf-local
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 2.0
+    mem_limit: 1g
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: perf
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_perf
+      SPRING_DATASOURCE_USERNAME: courtside
+      SPRING_DATASOURCE_PASSWORD: courtside-perf
+      COURTSIDE_COOKIE_SECURE: "true"
+      COURTSIDE_ENVIRONMENT: PERFORMANCE
+      COURTSIDE_PERF_CONFIRM_DISPOSABLE: "true"
+      COURTSIDE_PERF_SHARED_PASSWORD: ${COURTSIDE_PERF_SHARED_PASSWORD:-}
+      COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: admin
+      COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_PERF_SHARED_PASSWORD:-}
+      COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
+    networks:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 120
+
+  proxy:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    cpus: 0.5
+    mem_limit: 256m
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9080:80"
+      - "127.0.0.1:9443:443"
+    volumes:
+      - ./Caddyfile.perf:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - frontend
+
+volumes:
+  db:
+  caddy-data:
+  caddy-config:
+
+networks:
+  backend:
+  frontend:

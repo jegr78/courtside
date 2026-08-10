@@ -1,0 +1,74 @@
+package org.courtside.performance;
+
+import org.courtside.booking.BookingRepository;
+import org.courtside.booking.BookingService;
+import org.courtside.booking.HistoricalBookingImporter;
+import org.courtside.facility.Court;
+import org.courtside.facility.FacilityService;
+import org.courtside.identity.PersonRepository;
+import org.courtside.identity.UserAccountRepository;
+import org.courtside.member.MemberRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.DefaultApplicationArguments;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+class PerformanceDataSeederTest {
+
+    @Test
+    void givenFreshBaseline_whenSeedingPerformanceData_thenAllBookingsUseDomainService() throws Exception {
+        // given
+        PersonRepository persons = mock(PersonRepository.class);
+        UserAccountRepository accounts = mock(UserAccountRepository.class);
+        MemberRepository members = mock(MemberRepository.class);
+        FacilityService facility = mock(FacilityService.class);
+        BookingService bookingService = mock(BookingService.class);
+        HistoricalBookingImporter historicalBookings = mock(HistoricalBookingImporter.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        Court baseline = new Court(1, null);
+        when(accounts.existsByUsername(PerformanceDataSeeder.MARKER_USERNAME)).thenReturn(false);
+        when(accounts.count()).thenReturn(1L);
+        when(members.count()).thenReturn(0L);
+        when(bookings.count()).thenReturn(0L);
+        when(persons.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(passwordEncoder.encode("performance-password")).thenReturn("password-hash");
+        when(facility.allCourts()).thenReturn(List.of(baseline));
+        when(facility.changeCourt(baseline.getId(), 1, "Court 1")).thenReturn(new Court(1, "Court 1"));
+        for (int number = 2; number <= PerformanceDataSeeder.COURT_COUNT; number++) {
+            when(facility.createCourt(number, "Court " + number)).thenReturn(new Court(number, "Court " + number));
+        }
+        PerformanceDataSeeder seeder = new PerformanceDataSeeder(
+                persons, accounts, members, facility, bookingService, historicalBookings, bookings, passwordEncoder,
+                new PerformanceProperties(true, "performance-password"),
+                Clock.fixed(Instant.parse("2026-08-10T12:00:00Z"), ZoneOffset.UTC));
+
+        // when
+        seeder.run(new DefaultApplicationArguments(new String[0]));
+
+        // then
+        verify(persons, times(PerformanceDataSeeder.MEMBER_COUNT)).save(any());
+        verify(accounts, times(PerformanceDataSeeder.MEMBER_COUNT)).save(any());
+        verify(members, times(PerformanceDataSeeder.MEMBER_COUNT)).save(any());
+        verify(bookingService, atLeastOnce()).create(any());
+        verify(historicalBookings, atLeastOnce()).importBooking(any());
+        long domainServiceCalls = mockingDetails(bookingService).getInvocations().size()
+                + mockingDetails(historicalBookings).getInvocations().size();
+        assertThat(domainServiceCalls).isEqualTo(PerformanceDataSeeder.BOOKING_COUNT);
+        verify(bookings, never()).save(any());
+    }
+}
