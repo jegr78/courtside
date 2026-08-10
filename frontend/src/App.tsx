@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./api/client";
 import { Alert } from "./components/Alert";
+import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
 import { applyAccountLocale, supportedLocale } from "./i18n";
 import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
@@ -47,6 +48,7 @@ export function App() {
   const [session, setSession] = useState<SessionStatus>();
   const [config, setConfig] = useState<ClubConfig>();
   const [source, setSource] = useState<SourceOffer>();
+  const [identityStatus, setIdentityStatus] = useState<"loading" | "available" | "unavailable">("loading");
   const [offline, setOffline] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(false);
 
@@ -64,7 +66,12 @@ export function App() {
     void Promise.all([
       refreshSession().catch(() => setOffline(true)),
       api.config().then((value) => { setConfig(value); applyBranding(value); }).catch(() => undefined),
-      api.source().then(setSource).catch(() => undefined)
+      api.source()
+        .then((value) => {
+          setSource(value);
+          setIdentityStatus("available");
+        })
+        .catch(() => setIdentityStatus("unavailable"))
     ]);
     const unauthenticated = () => {
       setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
@@ -90,13 +97,14 @@ export function App() {
       {config?.logoUrl && <img src={config.logoUrl} alt="" className="h-10 w-10 rounded-lg object-contain" />}
       <span className="text-xl font-bold">{config?.clubName ?? t("app.name")}</span>
     </header>
+    <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-center justify-center px-4 py-8">
       {offline ? <Alert>{t("status.offline")}</Alert> : session
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} />
         : <p aria-live="polite">{t("status.loading")}</p>}
     </main>
     <footer className="flex justify-center gap-5 px-5 py-4 text-sm text-slate-600">
-      {source && <a className="underline hover:no-underline" href={source.sourceUrl}>{t("footer.source")}</a>}
+      <BuildIdentity source={source} />
       {config?.imprintUrl && <a className="underline hover:no-underline" href={config.imprintUrl}>{t("footer.imprint")}</a>}
     </footer>
   </div>;

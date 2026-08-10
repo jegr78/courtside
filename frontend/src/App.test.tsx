@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AppRoutes } from "./App";
+import { App, AppRoutes } from "./App";
 import { api, type SessionStatus } from "./api/client";
 import i18n from "./i18n";
 
@@ -91,5 +91,39 @@ describe("AppRoutes", () => {
 
     // then
     expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+  });
+});
+
+describe("App build identity", () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await i18n.changeLanguage("en");
+  });
+
+  it("given the source endpoint fails, when the app loads, then an identity warning remains visible", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("environment-warning")).toHaveAttribute("role", "alert");
+  });
+
+  it("given the source endpoint hangs, when the app becomes usable, then its identity stays marked as unknown", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "source").mockReturnValue(new Promise<never>(() => undefined));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+    await screen.findByTestId("login-view");
+
+    // then
+    expect(screen.getByTestId("environment-warning")).toHaveAttribute("role", "alert");
   });
 });

@@ -311,6 +311,7 @@ test("given UAT persistence, when reading its Compose contract, then data, CA, T
 
   // when / then
   assert.match(compose, /COURTSIDE_COOKIE_SECURE: "true"/);
+  assert.match(compose, /COURTSIDE_ENVIRONMENT: UAT/);
   assert.match(compose, /postgres:17-alpine@sha256:[a-f0-9]{64}/);
   assert.match(compose, /caddy:2-alpine@sha256:[a-f0-9]{64}/);
   assert.match(compose, /COURTSIDE_UAT_ADMIN_PASSWORD/);

@@ -579,7 +579,7 @@ components:
 
     SourceOffer:
       type: object
-      required: [version, sourceUrl]
+      required: [version, environment, sourceUrl]
       properties:
         version:
           type: string
@@ -589,6 +589,10 @@ components:
           description: |
             The commit it was built from, when the build had a repository to read. Absent for a
             build from a source archive, where the version is all there is to go on.
+        environment:
+          type: string
+          enum: [PRODUCTION, UAT, DEVELOPMENT]
+          description: The deployment environment this instance identifies itself as.
         sourceUrl:
           type: string
           format: uri
@@ -600,6 +604,7 @@ components:
       example:
         version: "1.4.0"
         commit: "9f1c0e3a5b7d2f4681c9a0e5d3b7f2a4c6e8d0b1"
+        environment: "PRODUCTION"
         sourceUrl: "https://example.org/git/courtside"
 
     Occurrence:

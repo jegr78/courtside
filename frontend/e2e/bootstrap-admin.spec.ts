@@ -1,5 +1,26 @@
 import { expect, test } from "@playwright/test";
 
+test("the application shell identifies the exact running build", async ({ page, request }) => {
+  // given
+  const source = await (await request.get("/api/source")).json() as {
+    version: string;
+    commit?: string;
+    environment: string;
+  };
+
+  // when
+  await page.goto("/");
+  await page.getByTestId("build-identity").click();
+
+  // then
+  await expect(page.getByTestId("build-identity")).toContainText(`v${source.version}`);
+  await expect(page.getByRole("dialog")).toContainText(source.version);
+  await expect(page.getByRole("dialog")).toContainText(source.environment);
+  if (source.commit) {
+    await expect(page.getByRole("dialog")).toContainText(source.commit);
+  }
+});
+
 test("the bootstrap admin can replace the initial password and maintain a session", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("login-view")).toBeVisible();
