@@ -1,0 +1,15 @@
+courtside:
+  bootstrap-admin:
+    username: ${COURTSIDE_BOOTSTRAP_ADMIN_USERNAME:admin}
+    password: ${COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD:courtside-admin}
+    display-name: ${COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME:Local Administrator}
+  demo:
+    confirm-disposable: ${COURTSIDE_DEMO_CONFIRM_DISPOSABLE:false}
+    member-password: ${COURTSIDE_DEMO_MEMBER_PASSWORD:courtside-member}
+
+spring:
+  datasource:
+    url: ${COURTSIDE_DB_URL:jdbc:postgresql://127.0.0.1:5432/courtside_dev}
+
+server:
+  address: 127.0.0.1
