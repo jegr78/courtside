@@ -16,8 +16,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockingDetails;
@@ -28,6 +30,32 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PerformanceDataSeederTest {
+
+    @Test
+    void givenCompletedSeedWithLoadBookings_whenStartingAgain_thenAdditionalBookingsRemainValid() {
+        // given
+        PersonRepository persons = mock(PersonRepository.class);
+        UserAccountRepository accounts = mock(UserAccountRepository.class);
+        MemberRepository members = mock(MemberRepository.class);
+        FacilityService facility = mock(FacilityService.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        when(accounts.existsByUsername(PerformanceDataSeeder.MARKER_USERNAME)).thenReturn(true);
+        when(accounts.count()).thenReturn(PerformanceDataSeeder.MEMBER_COUNT + 1L);
+        when(members.count()).thenReturn((long) PerformanceDataSeeder.MEMBER_COUNT);
+        when(bookings.count()).thenReturn(PerformanceDataSeeder.BOOKING_COUNT + 1L);
+        when(facility.allCourts()).thenReturn(java.util.Collections.nCopies(
+                PerformanceDataSeeder.COURT_COUNT, mock(Court.class)));
+        when(accounts.findByUsername(PerformanceDataSeeder.CONTENTION_USERNAME))
+                .thenReturn(Optional.of(mock(org.courtside.identity.UserAccount.class)));
+        PerformanceDataSeeder seeder = new PerformanceDataSeeder(
+                persons, accounts, members, facility, mock(BookingService.class),
+                mock(HistoricalBookingImporter.class), bookings, mock(PasswordEncoder.class),
+                new PerformanceProperties(true, "performance-password"), Clock.systemUTC());
+
+        // when / then
+        assertThatCode(() -> seeder.run(new DefaultApplicationArguments(new String[0])))
+                .doesNotThrowAnyException();
+    }
 
     @Test
     void givenFreshBaseline_whenSeedingPerformanceData_thenAllBookingsUseDomainService() throws Exception {

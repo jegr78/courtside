@@ -9,7 +9,7 @@ import {
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   processPlans, requiredPorts, restoreDatabase, startProcesses, superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
-  writePrivateFile
+  writePrivateFile, performanceRunPlan, buildPerformanceResult
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
@@ -190,6 +190,72 @@ test("given performance commands, when parsing them, then lifecycle and diagnosi
   assert.equal(parseArguments(["perf-reset", "courtside-perf"]).confirm, "courtside-perf");
 });
 
+test("given load profiles, when parsing execution, then manual runs require disposable confirmation", () => {
+  // when / then
+  assert.equal(parseArguments(["perf-run", "smoke"]).profile, "smoke");
+  assert.equal(parseArguments(["perf-run", "baseline", "--confirm", "courtside-perf"]).profile, "baseline");
+  assert.throws(() => parseArguments(["perf-run", "stress"]), /--confirm courtside-perf/);
+  assert.throws(() => parseArguments(["perf-run", "soak", "--confirm", "courtside-perf"]), /--fresh/);
+  assert.equal(parseArguments(["perf-run", "soak", "--confirm", "courtside-perf", "--fresh"]).fresh, true);
+  assert.throws(() => parseArguments(["perf-run", "browser", "--confirm", "courtside-perf"]), /protocol profile/);
+});
+
+test("given a protocol profile, when planning k6, then the pinned image and isolated artifacts are used", () => {
+  // given
+  const options = parseArguments(["perf-run", "peak", "--confirm", "courtside-perf"]);
+
+  // when
+  const plan = performanceRunPlan(options, "/tmp/performance-result", "/tmp/performance-root.crt");
+
+  // then
+  assert.equal(plan.command, "docker");
+  assert.ok(plan.args.includes("grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6"));
+  assert.ok(plan.args.includes("PERF_PROFILE=peak"));
+  assert.ok(plan.args.includes("PERF_RUN_ID=test-run"));
+  assert.ok(plan.args.includes("PERF_TARGET=https://host.docker.internal:9443"));
+  assert.ok(plan.args.includes("/tmp/performance-result:/results"));
+  assert.ok(plan.args.some((argument) => argument.endsWith(":/run/courtside/perf.json:ro")));
+  assert.ok(plan.args.includes("K6_WEB_DASHBOARD_EXPORT=/results/report.html"));
+  assert.ok(plan.args.includes("SSL_CERT_FILE=/certs/root.crt"));
+  assert.ok(plan.args.includes("/tmp/performance-root.crt:/certs/root.crt:ro"));
+});
+
+test("given raw k6 metrics, when building a result, then the performance schema metadata is retained", () => {
+  // given
+  const contract = JSON.parse(readFileSync(fileURLToPath(new URL("../performance/contract.json", import.meta.url))));
+  const raw = {
+    state: { testRunDurationMs: 60_400 },
+    metrics: {
+      iterations: { values: { count: 100 } },
+      http_reqs: { values: { count: 300, rate: 5 } },
+      technical_errors: { values: { rate: 0 }, thresholds: { "rate<0.01": { ok: true } } },
+      unexpected_server_errors: { values: { count: 0 }, thresholds: { "count==0": { ok: true } } },
+      read_only_api_duration: { thresholds: { "p(95)<500": { ok: true } } },
+      login_duration: { thresholds: { "p(95)<750": { ok: true } } },
+      booking_duration: { thresholds: { "p(95)<1000": { ok: true } } },
+      booking_conflicts: { values: { count: 4 } },
+      booking_conflict_rate: { values: { rate: 0.25 } },
+      http_req_duration: { values: { "p(50)": 10, "p(90)": 20, "p(95)": 30, "p(99)": 40 } }
+    }
+  };
+
+  // when
+  const result = buildPerformanceResult({
+    contract, contractDigest: `sha256:${"a".repeat(64)}`, source: { version: "1.2.3", commit: "abcdef0" },
+    profileName: "smoke", startedAt: "2026-08-10T12:00:00.000Z", raw, platform: "darwin", architecture: "arm64"
+  });
+
+  // then
+  assert.equal(result.build.applicationVersion, "1.2.3");
+  assert.equal(result.profile.durationSeconds, 60);
+  assert.equal(result.metrics.throughputPerSecond, 5);
+  assert.equal(result.metrics.bookingConflictRate, 0.25);
+  assert.deepEqual(result.metrics.latencyMilliseconds, { p50: 10, p90: 20, p95: 30, p99: 40 });
+  assert.deepEqual(result.thresholds, {
+    technicalErrorRate: true, unexpectedServerErrors: true, readOnlyApi: true, login: true, booking: true
+  });
+});
+
 test("given an existing credential file, when rewriting it on POSIX, then owner-only mode is restored", () => {
   // given
   const calls = [];
@@ -253,6 +319,8 @@ test("given the performance compose contract, when inspecting isolation, then re
   assert.match(compose, /SPRING_PROFILES_ACTIVE: perf/);
   assert.match(compose, /COURTSIDE_PERF_CONFIRM_DISPOSABLE: "true"/);
   assert.match(compose, /COURTSIDE_ENVIRONMENT: PERFORMANCE/);
+  const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.perf", import.meta.url)), "utf8");
+  assert.match(caddy, /https:\/\/host\.docker\.internal:443/);
 });
 
 test("given development modes, when validating ports, then debug adds only its listener", () => {
