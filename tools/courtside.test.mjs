@@ -229,10 +229,30 @@ test("given load profiles, when parsing execution, then manual runs require disp
   assert.equal(parseArguments(["perf-run", "smoke"]).profile, "smoke");
   assert.equal(parseArguments(["perf-run", "baseline", "--confirm", "courtside-perf"]).profile, "baseline");
   assert.equal(parseArguments(["perf-run", "smoke", "--remote-write"]).remoteWrite, true);
+  assert.equal(parseArguments(["perf-run", "browser", "--confirm", "courtside-perf"]).profile, "browser");
   assert.throws(() => parseArguments(["perf-run", "stress"]), /--confirm courtside-perf/);
   assert.throws(() => parseArguments(["perf-run", "soak", "--confirm", "courtside-perf"]), /--fresh/);
   assert.equal(parseArguments(["perf-run", "soak", "--confirm", "courtside-perf", "--fresh"]).fresh, true);
-  assert.throws(() => parseArguments(["perf-run", "browser", "--confirm", "courtside-perf"]), /protocol profile/);
+  assert.throws(() => parseArguments(["perf-run", "browser"]), /--confirm courtside-perf/);
+});
+
+test("given the browser profile, when planning k6, then Chromium and the browser journey are isolated", () => {
+  // given
+  const options = parseArguments(["perf-run", "browser", "--confirm", "courtside-perf"]);
+
+  // when
+  const plan = performanceRunPlan(options, "/tmp/performance-result", "/tmp/performance-root.crt", "test-run", "test-pin");
+
+  // then
+  assert.throws(
+    () => performanceRunPlan(options, "/tmp/performance-result", "/tmp/performance-root.crt"),
+    /verified target certificate pin/
+  );
+  assert.ok(plan.args.includes("grafana/k6:2.2.0-with-browser@sha256:defdc0a3e70c46bce010bfc10dedc03e335cc7febe01f6359552fe72827c2aa2"));
+  assert.ok(plan.args.includes("/scripts/browser.js"));
+  assert.ok(plan.args.includes("K6_BROWSER_HEADLESS=true"));
+  assert.ok(plan.args.includes("K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=test-pin"));
+  assert.ok(plan.args.some((argument) => argument.includes("p(75)")));
 });
 
 test("given a protocol profile, when planning k6, then the pinned image and isolated artifacts are used", () => {
@@ -306,6 +326,45 @@ test("given raw k6 metrics, when building a result, then the performance schema 
   assert.deepEqual(result.thresholds, {
     technicalErrorRate: true, unexpectedServerErrors: true, readOnlyApi: true, login: true, booking: true
   });
+});
+
+test("given raw browser metrics, when building a result, then p75 Web Vitals and journey evidence are retained", () => {
+  // given
+  const contract = JSON.parse(readFileSync(fileURLToPath(new URL("../performance/contract.json", import.meta.url))));
+  const metric = (value, ok = true) => ({ values: value, thresholds: { budget: { ok } } });
+  const raw = {
+    state: { testRunDurationMs: 90_000 },
+    metrics: {
+      iterations: { values: { count: 5 } },
+      browser_http_req_duration: { values: { "p(50)": 20, "p(90)": 40, "p(95)": 50, "p(99)": 70 } },
+      browser_requests: { values: { count: 50, rate: 0.55 } },
+      browser_web_vital_lcp: metric({ "p(75)": 1200 }),
+      browser_web_vital_inp: metric({ "p(75)": 80 }),
+      browser_web_vital_cls: metric({ "p(75)": 0.03 }),
+      browser_errors: metric({ count: 0 }),
+      browser_journey_success: metric({ rate: 1 }),
+      browser_journey_duration: { values: { count: 5, avg: 1800 } },
+      technical_errors: metric({ rate: 0 }),
+      unexpected_server_errors: metric({ count: 0 })
+    }
+  };
+
+  // when
+  const result = buildPerformanceResult({
+    contract, contractDigest: `sha256:${"a".repeat(64)}`, source: { version: "1.2.3", commit: "abcdef0" },
+    profileName: "browser", startedAt: "2026-08-10T12:00:00.000Z", raw, platform: "linux", architecture: "x64"
+  });
+
+  // then
+  assert.deepEqual(result.thresholds, {
+    technicalErrorRate: true, unexpectedServerErrors: true, webVitals: true, browserErrors: true,
+    browserJourney: true
+  });
+  assert.deepEqual(result.metrics.webVitals, {
+    percentile: 75, lcpMilliseconds: 1200, inpMilliseconds: 80, cls: 0.03
+  });
+  assert.equal(result.metrics.browserErrors, 0);
+  assert.equal(result.metrics.browserJourneyMilliseconds, 1800);
 });
 
 test("given an approved result, when planning baseline promotion, then its versioned path contains no machine data", () => {
