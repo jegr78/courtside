@@ -466,7 +466,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     void givenAMoveBlockedByAnotherBooking_whenMovingTheSeries_thenTheResponseCarriesItsOwnType()
             throws Exception {
         // given — a directly-booked training session already occupies the court at the slot the
-        // move would shift the 2026-04-14 occurrence into
+        // move would shift the 2026-06-09 occurrence into
         createAccount("roe.john", Role.TRAINER);
         String created = mockMvc.perform(post("/api/booking-series")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -474,15 +474,15 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
                                 {
                                   "courtIds": ["%s"],
                                   "cardId": "%s",
-                                  "startsOn": "2026-04-07",
+                                  "startsOn": "2026-06-02",
                                   "startTime": "18:00:00",
                                   "durationMinutes": 120,
                                   "intervalWeeks": 1,
                                   "weekdays": ["TUESDAY"],
                                   "occurrenceCount": 2,
                                   "confirmedStarts": [
-                                    "2026-04-07T18:00:00+02:00",
-                                    "2026-04-14T18:00:00+02:00"
+                                    "2026-06-02T18:00:00+02:00",
+                                    "2026-06-09T18:00:00+02:00"
                                   ]
                                 }
                                 """.formatted(courtId, TRAINING_CARD))
@@ -498,8 +498,8 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
                                 {
                                   "courtIds": ["%s"],
                                   "cardId": "%s",
-                                  "startsAt": "2026-04-14T20:00:00+02:00",
-                                  "endsAt": "2026-04-14T22:00:00+02:00"
+                                  "startsAt": "2026-06-09T20:00:00+02:00",
+                                  "endsAt": "2026-06-09T22:00:00+02:00"
                                 }
                                 """.formatted(courtId, TRAINING_CARD))
                         .with(csrf()))

@@ -132,12 +132,28 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenABookingStartingInThePast_whenCreating_thenTheViolationCodeIsReturned() throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T11:00:00+02:00",
+                                "2026-05-12T12:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-rules-violated"))
+                .andExpect(jsonPath("$.violations[*].code")
+                        .value(Matchers.contains("booking.rule.startsInPast")));
+        assertThat(bookings.count()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenABookingBreakingTwoRules_whenCreatingIt_thenBothViolationsAreReported()
             throws Exception {
         // when / then
         mockMvc.perform(post("/api/bookings")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingJson("2026-05-12T06:10:00+02:00", "2026-05-12T06:50:00+02:00"))
+                        .content(bookingJson("2026-05-12T22:10:00+02:00", "2026-05-12T22:50:00+02:00"))
                         .with(csrf()))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.violations.length()").value(2))

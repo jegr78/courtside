@@ -17,10 +17,12 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
@@ -50,6 +52,9 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
 
     @Autowired
     private PersonRepository persons;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     private UUID courtId;
     private final UUID member = UUID.randomUUID();
@@ -107,8 +112,8 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
     @Test
     void givenTwoBookingsThatHaveAlreadyEnded_whenChecking_thenTheyDoNotCount() {
         // given
-        book("2026-05-11T16:00:00Z");
-        book("2026-05-11T17:00:00Z");
+        insertHistoricalBooking("2026-05-11T16:00:00Z");
+        insertHistoricalBooking("2026-05-11T17:00:00Z");
 
         // when
         var violations = rule.check(contextFor(STANDARD));
@@ -120,7 +125,7 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
     @Test
     void givenABookingEndingExactlyAtTheClockInstant_whenChecking_thenItDoesNotCountAsOpen() {
         // given — the fixed clock reads 2026-05-12T10:00:00Z
-        book("2026-05-12T09:00:00Z");
+        insertHistoricalBooking("2026-05-12T09:00:00Z");
         book("2026-05-13T16:00:00Z");
 
         // when
@@ -150,6 +155,30 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
 
     private UUID bookTraining(String start) {
         return book(TRAINING_CARD, Role.TRAINER, start, List.of());
+    }
+
+    private void insertHistoricalBooking(String start) {
+        UUID bookingId = UUID.randomUUID();
+        Instant from = Instant.parse(start);
+        jdbc.sql("""
+                        INSERT INTO booking (id, card_id, status, booked_by)
+                        VALUES (:id, :cardId, 'CONFIRMED', :bookedBy)
+                        """)
+                .param("id", bookingId)
+                .param("cardId", MEMBER_BOOKING_CARD)
+                .param("bookedBy", member)
+                .update();
+        jdbc.sql("""
+                        INSERT INTO court_allocation
+                            (id, booking_id, court_id, starts_at, ends_at, status)
+                        VALUES (:id, :bookingId, :courtId, :startsAt, :endsAt, 'CONFIRMED')
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("bookingId", bookingId)
+                .param("courtId", courtId)
+                .param("startsAt", from.atOffset(ZoneOffset.UTC))
+                .param("endsAt", from.plus(1, ChronoUnit.HOURS).atOffset(ZoneOffset.UTC))
+                .update();
     }
 
     private UUID book(UUID cardId, Role role, String start, List<ParticipantSpec> participants) {
