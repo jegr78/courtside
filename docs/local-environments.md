@@ -1,5 +1,8 @@
 # Local environments
 
+The separate load-model, threshold, and safety contract is documented in
+[`performance-testing.md`](performance-testing.md).
+
 The repository CLI provides a disposable development environment and an isolated, persistent UAT
 environment on macOS, Linux, and Windows. Run all commands from the repository root with Node.js
 24, Eclipse Temurin 25, and a running Docker engine with the Compose plugin.
