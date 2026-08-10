@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:performance:result:v1",
+  "title": "Courtside performance result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contract",
+    "build",
+    "runtime",
+    "profile",
+    "load",
+    "resources",
+    "thresholds",
+    "metrics"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "digest"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationVersion", "gitCommit"],
+      "properties": {
+        "applicationVersion": { "type": "string", "minLength": 1 },
+        "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{7,64}$" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["k6Version", "operatingSystem", "architecture"],
+      "properties": {
+        "k6Version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "operatingSystem": { "type": "string", "enum": ["linux", "darwin", "win32"] },
+        "architecture": { "type": "string", "enum": ["x64", "arm64"] }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "workload", "target", "environment", "startedAt", "durationSeconds"],
+      "properties": {
+        "name": { "type": "string", "enum": ["smoke", "baseline", "peak", "stress", "soak", "browser", "funnel-smoke"] },
+        "workload": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "enum": ["application", "system", "funnel"] },
+        "environment": { "type": "string", "enum": ["PERFORMANCE", "UAT"] },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "durationSeconds": { "type": "integer", "minimum": 0 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "name": { "const": "funnel-smoke" } } },
+          "then": {
+            "properties": {
+              "target": { "const": "funnel" },
+              "environment": { "const": "UAT" }
+            }
+          },
+          "else": {
+            "properties": {
+              "target": { "enum": ["application", "system"] },
+              "environment": { "const": "PERFORMANCE" }
+            }
+          }
+        }
+      ]
+    },
+    "load": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset", "readShare", "writeShare"],
+      "properties": {
+        "dataset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["members", "courts"],
+          "properties": {
+            "members": { "type": "integer", "minimum": 1 },
+            "courts": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "readShare": { "type": "number", "minimum": 0, "maximum": 1 },
+        "writeShare": { "type": "number", "minimum": 0, "maximum": 1 },
+        "virtualUsers": { "type": "integer", "minimum": 1 },
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["targetVirtualUsers", "durationSeconds"],
+            "properties": {
+              "targetVirtualUsers": { "type": "integer", "minimum": 0 },
+              "durationSeconds": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      },
+      "oneOf": [
+        { "required": ["virtualUsers"] },
+        { "required": ["stages"] }
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["application", "database", "proxy"],
+      "properties": {
+        "application": { "$ref": "#/$defs/resource" },
+        "database": { "$ref": "#/$defs/resource" },
+        "proxy": { "$ref": "#/$defs/resource" }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["technicalErrorRate", "unexpectedServerErrors"],
+      "properties": {
+        "technicalErrorRate": { "type": "boolean" },
+        "unexpectedServerErrors": { "type": "boolean" },
+        "readOnlyApi": { "type": "boolean" },
+        "login": { "type": "boolean" },
+        "booking": { "type": "boolean" },
+        "webVitals": { "type": "boolean" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "iterations",
+        "requests",
+        "throughputPerSecond",
+        "technicalErrorRate",
+        "unexpectedServerErrors",
+        "latencyMilliseconds"
+      ],
+      "properties": {
+        "iterations": { "type": "integer", "minimum": 0 },
+        "requests": { "type": "integer", "minimum": 0 },
+        "throughputPerSecond": { "type": "number", "minimum": 0 },
+        "technicalErrorRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "unexpectedServerErrors": { "type": "integer", "minimum": 0 },
+        "bookingConflicts": { "type": "integer", "minimum": 0 },
+        "webVitals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["percentile", "lcpMilliseconds", "inpMilliseconds", "cls"],
+          "properties": {
+            "percentile": { "const": 75 },
+            "lcpMilliseconds": { "type": "number", "minimum": 0 },
+            "inpMilliseconds": { "type": "number", "minimum": 0 },
+            "cls": { "type": "number", "minimum": 0 }
+          }
+        },
+        "latencyMilliseconds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["p50", "p90", "p95", "p99"],
+          "properties": {
+            "p50": { "type": "number", "minimum": 0 },
+            "p90": { "type": "number", "minimum": 0 },
+            "p95": { "type": "number", "minimum": 0 },
+            "p99": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "profile": { "type": "object", "properties": { "name": { "const": "funnel-smoke" } } } } },
+      "then": {
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": { "durationSeconds": { "type": "integer", "maximum": 120 } }
+          },
+          "load": {
+            "type": "object",
+            "required": ["virtualUsers"],
+            "properties": {
+              "readShare": { "const": 1 },
+              "writeShare": { "const": 0 },
+              "virtualUsers": { "type": "integer", "maximum": 2 },
+              "stages": false
+            }
+          },
+          "thresholds": { "type": "object", "required": ["readOnlyApi"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "profile": { "type": "object", "properties": { "name": { "const": "browser" } } } } },
+      "then": { "properties": { "thresholds": { "type": "object", "required": ["webVitals"] } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "name": { "enum": ["smoke", "baseline", "peak", "stress", "soak"] }
+            }
+          }
+        }
+      },
+      "then": { "properties": { "thresholds": { "type": "object", "required": ["readOnlyApi", "login", "booking"] } } }
+    }
+  ],
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "memoryMegabytes"],
+      "properties": {
+        "cpu": { "type": "number", "exclusiveMinimum": 0 },
+        "memoryMegabytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

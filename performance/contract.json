@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "tooling": {
+    "k6Version": "2.2.0",
+    "protocolImage": {
+      "reference": "grafana/k6:2.2.0",
+      "digest": "sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6"
+    },
+    "browserImage": {
+      "reference": "grafana/k6:2.2.0-with-browser",
+      "digest": "sha256:defdc0a3e70c46bce010bfc10dedc03e335cc7febe01f6359552fe72827c2aa2"
+    }
+  },
+  "datasets": {
+    "reference": {
+      "members": 1000,
+      "courts": 8
+    }
+  },
+  "workloads": {
+    "reference": {
+      "dataset": "reference",
+      "readShare": 0.9,
+      "writeShare": 0.1,
+      "normalVirtualUsers": 50,
+      "peakVirtualUsers": 100,
+      "contentionVirtualUsers": 20
+    }
+  },
+  "profiles": {
+    "smoke": {
+      "kind": "protocol",
+      "workload": "reference",
+      "virtualUsers": 2,
+      "duration": "1m",
+      "manual": false,
+      "limits": {
+        "maximumVirtualUsers": 2,
+        "maximumDuration": "1m"
+      }
+    },
+    "baseline": {
+      "kind": "protocol",
+      "workload": "reference",
+      "virtualUsers": 50,
+      "duration": "10m",
+      "manual": true,
+      "limits": {
+        "maximumVirtualUsers": 50,
+        "maximumDuration": "10m"
+      }
+    },
+    "peak": {
+      "kind": "protocol",
+      "workload": "reference",
+      "virtualUsers": 100,
+      "duration": "15m",
+      "manual": true,
+      "limits": {
+        "maximumVirtualUsers": 100,
+        "maximumDuration": "15m"
+      }
+    },
+    "stress": {
+      "kind": "protocol",
+      "workload": "reference",
+      "stages": [
+        { "target": 50, "duration": "5m" },
+        { "target": 100, "duration": "5m" },
+        { "target": 150, "duration": "5m" },
+        { "target": 200, "duration": "5m" },
+        { "target": 0, "duration": "2m" }
+      ],
+      "manual": true,
+      "limits": {
+        "maximumVirtualUsers": 200,
+        "maximumDuration": "22m"
+      }
+    },
+    "soak": {
+      "kind": "protocol",
+      "workload": "reference",
+      "virtualUsers": 50,
+      "duration": "2h",
+      "manual": true,
+      "requiresFreshEnvironment": true,
+      "limits": {
+        "maximumVirtualUsers": 50,
+        "maximumDuration": "2h"
+      }
+    },
+    "browser": {
+      "kind": "browser",
+      "workload": "reference",
+      "virtualUsers": 5,
+      "duration": "10m",
+      "manual": true,
+      "limits": {
+        "maximumVirtualUsers": 5,
+        "maximumDuration": "10m"
+      }
+    },
+    "funnel-smoke": {
+      "kind": "protocol",
+      "workload": "reference",
+      "virtualUsers": 2,
+      "duration": "2m",
+      "manual": true,
+      "readOnly": true,
+      "limits": {
+        "maximumVirtualUsers": 2,
+        "maximumDuration": "2m"
+      }
+    }
+  },
+  "thresholds": {
+    "technicalErrorRate": "rate<0.01",
+    "unexpectedServerErrors": "count==0",
+    "readOnlyApi": {
+      "p95Milliseconds": 500,
+      "p99Milliseconds": 1000
+    },
+    "login": {
+      "p95Milliseconds": 750
+    },
+    "booking": {
+      "p95Milliseconds": 1000,
+      "p99Milliseconds": 2000
+    },
+    "webVitals": {
+      "percentile": 75,
+      "lcpMilliseconds": 2500,
+      "inpMilliseconds": 200,
+      "cls": 0.1
+    }
+  },
+  "expectedDomainOutcomes": {
+    "bookingConflict": {
+      "status": 409,
+      "metric": "booking_conflicts"
+    }
+  },
+  "resources": {
+    "application": {
+      "cpu": 2,
+      "memoryMegabytes": 1024
+    },
+    "database": {
+      "cpu": 2,
+      "memoryMegabytes": 2048
+    },
+    "proxy": {
+      "cpu": 0.5,
+      "memoryMegabytes": 256
+    }
+  },
+  "targets": {
+    "default": "system",
+    "application": {
+      "environment": "PERFORMANCE",
+      "remote": false,
+      "purpose": "diagnostic"
+    },
+    "system": {
+      "environment": "PERFORMANCE",
+      "remote": false,
+      "purpose": "authoritative"
+    },
+    "funnel": {
+      "environment": "UAT",
+      "remote": true,
+      "profiles": ["funnel-smoke"],
+      "requiresExplicitConfirmation": true,
+      "storesTarget": false
+    }
+  },
+  "safety": {
+    "disposableConfirmation": "courtside-perf",
+    "requiresEnvironmentMarker": true,
+    "requiresRemoteOptIn": true,
+    "allowOrdinaryLimitOverrides": false,
+    "persistentUatWritesAllowed": false,
+    "productionTargetsAllowed": false,
+    "trackedCredentialsAllowed": false,
+    "trackedRemoteTargetsAllowed": false
+  }
+}
