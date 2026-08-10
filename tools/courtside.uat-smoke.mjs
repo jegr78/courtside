@@ -43,11 +43,15 @@ try {
   const session = await localRequest({ secure: true, port: 8443, path: "/api/session" });
   const apiUi = await localRequest({ secure: true, port: 8443, path: "/api-ui/" });
   const apiDocument = await localRequest({ secure: true, port: 8443, path: "/api/openapi.yaml" });
-  const csrfCookie = session.headers["set-cookie"].find((cookie) => cookie.startsWith("XSRF-TOKEN="));
+  const sharedSession = await localRequest({ secure: false, port: 8083, path: "/api/session" });
+  const sharedApiUi = await localRequest({ secure: false, port: 8083, path: "/api-ui/" });
+  const sharedApiDocument = await localRequest({ secure: false, port: 8083, path: "/api/openapi.yaml" });
+  const sharedActuator = await localRequest({ secure: false, port: 8083, path: "/actuator/health" });
+  const csrfCookie = sharedSession.headers["set-cookie"].find((cookie) => cookie.startsWith("XSRF-TOKEN="));
   const csrfToken = csrfCookie.match(/^XSRF-TOKEN=([^;]+)/)[1];
   const login = await localRequest({
-    secure: true,
-    port: 8443,
+    secure: false,
+    port: 8083,
     path: "/api/session",
     method: "POST",
     headers: {
@@ -60,10 +64,17 @@ try {
 
   assert.equal(redirect.statusCode, 301);
   assert.equal(redirect.headers.location, "https://localhost:8443/api/session");
+  assert.equal(session.statusCode, 200);
   assert.equal(apiUi.statusCode, 200);
   assert.match(apiUi.body, /Swagger UI/);
   assert.equal(apiDocument.statusCode, 200);
   assert.match(apiDocument.body, /^openapi: 3\.1\.0/m);
+  assert.equal(sharedSession.statusCode, 200);
+  assert.equal(sharedApiUi.statusCode, 404);
+  assert.equal(sharedApiDocument.statusCode, 404);
+  assert.equal(sharedActuator.statusCode, 404);
+  assert.equal(sharedSession.headers["strict-transport-security"], "max-age=31536000");
+  assert.equal(sharedSession.headers["x-robots-tag"], "noindex, nofollow");
   assert.match(csrfCookie, /; Secure/i);
   assert.equal(login.statusCode, 200);
   assert.match(login.headers["set-cookie"].find((cookie) => cookie.startsWith("JSESSIONID=")), /; Secure; HttpOnly/i);
