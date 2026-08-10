@@ -95,6 +95,37 @@ project name and removes only the performance containers, volumes, local CA, and
 Dev, UAT, and their Funnel configuration are not addressed by any performance command. The same
 Node command plans and Docker Compose files are used on macOS, Linux, and Windows.
 
+Protocol runs use the pinned official k6 image and write a self-contained `report.html`, the raw
+`raw-summary.json`, and a schema-validated `summary.json` below
+`build/performance/<profile>/<timestamp>`:
+
+```text
+node tools/courtside.mjs perf-run smoke
+node tools/courtside.mjs perf-run baseline --confirm courtside-perf
+node tools/courtside.mjs perf-run peak --confirm courtside-perf
+node tools/courtside.mjs perf-run stress --confirm courtside-perf
+node tools/courtside.mjs perf-run soak --confirm courtside-perf --fresh
+```
+
+The CLI verifies `/api/source` before starting k6 and refuses any target that does not identify as
+`PERFORMANCE`. Profiles, durations, VUs, stages, traffic mix, image digest, and thresholds come from
+the contract and cannot be overridden on the command line. Baseline, peak, stress, and soak require
+the disposable project confirmation; soak additionally requires an explicit assertion that the
+environment was freshly reset. Browser and Funnel profiles have separate runners in later work.
+
+Each VU logs in with its corresponding `memberNNNN` account and the generated password mounted
+read-only from local state. Login latency is measured separately. Normal iterations use the agreed
+90/10 read/write mix; writes create and cancel bookings in VU-specific slots. On the first
+iteration, at most the workload's configured contention VUs claim one known-free slot. Only a `409`
+with the stable `court-unavailable` problem type increments `booking_conflicts` and the conflict
+ratio without becoming a technical failure. Other `409` responses, unexpected 5xx responses, and
+all other unexpected statuses remain technical failures and participate in thresholds that make k6
+exit non-zero. Every run uses unique idempotency keys.
+
+The CLI exports Caddy's disposable root CA for the duration of a run. Both the environment preflight
+and k6 validate the certificate chain and hostname against that CA; the test does not disable TLS
+verification.
+
 Remote targets require a separate opt-in and cannot use ordinary load profiles. Production targets,
 persistent UAT writes, tracked credentials, tracked remote targets, and ordinary overrides of VU or
 duration caps are forbidden. Runtime credentials identify individual synthetic accounts but may

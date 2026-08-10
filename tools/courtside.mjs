@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { createConnection, createServer } from "node:net";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devComposeFile = join(root, "deploy", "compose.dev.yaml");
@@ -40,7 +41,7 @@ export function parseArguments(argv) {
   const supported = new Set([
     "build", "verify", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
     "uat-share", "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore",
-    "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset",
+    "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset", "perf-run",
     "status", "help"
   ]);
   if (!command || !supported.has(command)) {
@@ -48,7 +49,8 @@ export function parseArguments(argv) {
   }
   const options = {
     command, suspend: false, json: false, environment: undefined, version: undefined,
-    skipVerify: false, dbPort: false, file: undefined, confirm: undefined, all: false
+    skipVerify: false, dbPort: false, file: undefined, confirm: undefined, all: false,
+    profile: undefined, fresh: false
   };
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
@@ -75,6 +77,12 @@ export function parseArguments(argv) {
       options.confirm = flag;
     } else if (!flag.startsWith("--") && command === "perf-reset" && !options.confirm) {
       options.confirm = flag;
+    } else if (!flag.startsWith("--") && command === "perf-run" && !options.profile) {
+      options.profile = flag;
+    } else if (flag === "--confirm" && command === "perf-run") {
+      options.confirm = requiredOptionValue(flags, ++index, "--confirm");
+    } else if (flag === "--fresh" && command === "perf-run") {
+      options.fresh = true;
     } else {
       throw new Error(`Unknown option for ${command}: ${flag}`);
     }
@@ -90,6 +98,18 @@ export function parseArguments(argv) {
   }
   if (command === "perf-reset" && options.confirm !== perfProject) {
     throw new Error(`perf-reset requires the exact project name '${perfProject}'`);
+  }
+  if (command === "perf-run") {
+    const protocolProfiles = ["smoke", "baseline", "peak", "stress", "soak"];
+    if (!protocolProfiles.includes(options.profile)) {
+      throw new Error("perf-run requires a protocol profile: smoke, baseline, peak, stress, or soak");
+    }
+    if (options.profile !== "smoke" && options.confirm !== perfProject) {
+      throw new Error(`perf-run ${options.profile} requires --confirm ${perfProject}`);
+    }
+    if (options.profile === "soak" && !options.fresh) {
+      throw new Error("perf-run soak requires --fresh after recreating the performance environment");
+    }
   }
   return options;
 }
@@ -402,6 +422,10 @@ async function execute(options) {
     process.stdout.write("Performance data and local credentials removed.\n");
     return;
   }
+  if (options.command === "perf-run") {
+    await runPerformance(options);
+    return;
+  }
   if (options.command === "status") {
     await showStatus(options.environment, options.json);
     return;
@@ -496,6 +520,148 @@ function readPerformanceState() {
 
 export function perfResetPlan() {
   return { command: "docker", args: [...perfComposeArgs(), "down", "--volumes", "--remove-orphans"] };
+}
+
+export function performanceRunPlan(options, resultDirectory, certificateFile, runId = "test-run") {
+  const contract = JSON.parse(readFileSync(join(root, "performance", "contract.json"), "utf8"));
+  const image = contract.tooling.protocolImage;
+  return {
+    command: "docker",
+    args: [
+      "run", "--rm", "--add-host", "host.docker.internal:host-gateway",
+      "-e", `PERF_PROFILE=${options.profile}`,
+      "-e", `PERF_RUN_ID=${runId}`,
+      "-e", "PERF_TARGET=https://host.docker.internal:9443",
+      "-e", "K6_WEB_DASHBOARD=true",
+      "-e", "K6_WEB_DASHBOARD_EXPORT=/results/report.html",
+      "-e", "SSL_CERT_FILE=/certs/root.crt",
+      "-v", `${join(root, "performance")}:/scripts:ro`,
+      "-v", `${perfStateFile}:/run/courtside/perf.json:ro`,
+      "-v", `${certificateFile}:/certs/root.crt:ro`,
+      "-v", `${resultDirectory}:/results`,
+      `${image.reference}@${image.digest}`,
+      "run", "--summary-trend-stats", "avg,min,med,max,p(50),p(90),p(95),p(99)",
+      "/scripts/protocol.js"
+    ]
+  };
+}
+
+async function runPerformance(options) {
+  const state = readPerformanceState();
+  if (!state) {
+    throw new Error("Performance credentials are unavailable; run 'perf' first");
+  }
+  const startedAt = new Date().toISOString();
+  const runId = startedAt.replaceAll(":", "-");
+  const resultDirectory = join(root, "build", "performance", options.profile, runId);
+  const certificateFile = join(resultDirectory, "root.crt");
+  mkdirSync(resultDirectory, { recursive: true });
+  runInteractive({
+    command: "docker",
+    args: [...perfComposeArgs(), "cp", "proxy:/data/caddy/pki/authorities/local/root.crt", certificateFile]
+  });
+  const identity = await localRequest({
+    secure: true, port: 9443, path: "/api/source", ca: readFileSync(certificateFile)
+  });
+  const source = parseJson(identity.body);
+  if (identity.statusCode !== 200 || source.environment !== "PERFORMANCE") {
+    throw new Error("The target did not identify itself as the disposable PERFORMANCE environment");
+  }
+  let runFailure;
+  try {
+    runInteractive(performanceRunPlan(options, resultDirectory, certificateFile, runId));
+  } catch (error) {
+    runFailure = error;
+  }
+  const contractText = readFileSync(join(root, "performance", "contract.json"), "utf8");
+  const contract = JSON.parse(contractText);
+  const raw = JSON.parse(readFileSync(join(resultDirectory, "raw-summary.json"), "utf8"));
+  const result = buildPerformanceResult({
+    contract,
+    contractDigest: `sha256:${createHash("sha256").update(contractText).digest("hex")}`,
+    source,
+    profileName: options.profile,
+    startedAt,
+    raw,
+    platform: process.platform,
+    architecture: process.arch
+  });
+  validatePerformanceResult(result);
+  writeFileSync(join(resultDirectory, "summary.json"), `${JSON.stringify(result, null, 2)}\n`);
+  rmSync(certificateFile, { force: true });
+  process.stdout.write(`Performance results: ${resultDirectory}\n`);
+  if (runFailure) throw runFailure;
+}
+
+export function buildPerformanceResult({
+  contract, contractDigest, source, profileName, startedAt, raw, platform, architecture
+}) {
+  const profile = contract.profiles[profileName];
+  const workload = contract.workloads[profile.workload];
+  const latency = raw.metrics.http_req_duration.values;
+  const thresholdPassed = (name) => Object.values(raw.metrics[name].thresholds).every(value => value.ok);
+  const load = {
+    dataset: contract.datasets[workload.dataset],
+    readShare: workload.readShare,
+    writeShare: workload.writeShare,
+    ...(profile.stages
+      ? { stages: profile.stages.map(stage => ({
+          targetVirtualUsers: stage.target,
+          durationSeconds: durationSeconds(stage.duration)
+        })) }
+      : { virtualUsers: profile.virtualUsers })
+  };
+  return {
+    schemaVersion: 1,
+    contract: { schemaVersion: contract.schemaVersion, digest: contractDigest },
+    build: { applicationVersion: source.version, gitCommit: source.commit },
+    runtime: { k6Version: contract.tooling.k6Version, operatingSystem: platform, architecture },
+    profile: {
+      name: profileName,
+      workload: profile.workload,
+      target: contract.targets.default,
+      environment: source.environment,
+      startedAt,
+      durationSeconds: Math.round(raw.state.testRunDurationMs / 1000)
+    },
+    load,
+    resources: contract.resources,
+    thresholds: {
+      technicalErrorRate: thresholdPassed("technical_errors"),
+      unexpectedServerErrors: thresholdPassed("unexpected_server_errors"),
+      readOnlyApi: thresholdPassed("read_only_api_duration"),
+      login: thresholdPassed("login_duration"),
+      booking: thresholdPassed("booking_duration")
+    },
+    metrics: {
+      iterations: raw.metrics.iterations.values.count,
+      requests: raw.metrics.http_reqs.values.count,
+      throughputPerSecond: raw.metrics.http_reqs.values.rate,
+      technicalErrorRate: raw.metrics.technical_errors.values.rate,
+      unexpectedServerErrors: raw.metrics.unexpected_server_errors.values.count,
+      bookingConflicts: raw.metrics.booking_conflicts?.values.count ?? 0,
+      bookingConflictRate: raw.metrics.booking_conflict_rate?.values.rate ?? 0,
+      latencyMilliseconds: {
+        p50: latency["p(50)"], p90: latency["p(90)"], p95: latency["p(95)"], p99: latency["p(99)"]
+      }
+    }
+  };
+}
+
+function durationSeconds(duration) {
+  const match = /^(\d+)([smh])$/.exec(duration);
+  if (!match) throw new Error(`Unsupported performance duration: ${duration}`);
+  return Number(match[1]) * { s: 1, m: 60, h: 3600 }[match[2]];
+}
+
+function validatePerformanceResult(result) {
+  const require = createRequire(join(root, "frontend", "package.json"));
+  const Ajv = require("ajv/dist/2020").default;
+  const schema = JSON.parse(readFileSync(join(root, "performance", "result.schema.json"), "utf8"));
+  const validate = new Ajv({ strict: true, strictRequired: false, formats: { "date-time": true } }).compile(schema);
+  if (!validate(result)) {
+    throw new Error(`Performance result does not match its schema: ${JSON.stringify(validate.errors)}`);
+  }
 }
 
 async function shareUat() {
@@ -1106,11 +1272,11 @@ async function readHealth(url, allowLocalCertificate = false) {
   }
 }
 
-export function localRequest({ secure, port, path, method = "GET", headers = {}, body }) {
+export function localRequest({ secure, port, path, method = "GET", headers = {}, body, ca }) {
   return new Promise((resolveResponse, rejectResponse) => {
     const request = (secure ? httpsRequest : httpRequest)({
       hostname: "localhost", port, path, method, headers,
-      ...(secure ? { rejectUnauthorized: false } : {})
+      ...(secure ? { rejectUnauthorized: Boolean(ca), ...(ca ? { ca } : {}) } : {})
     }, (response) => {
       let responseBody = "";
       response.setEncoding("utf8");
@@ -1131,7 +1297,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port]\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port]\n  perf-run <smoke|baseline|peak|stress|soak> [--confirm courtside-perf] [--fresh]\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

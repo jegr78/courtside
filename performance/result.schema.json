@@ -154,6 +154,7 @@
         "technicalErrorRate": { "type": "number", "minimum": 0, "maximum": 1 },
         "unexpectedServerErrors": { "type": "integer", "minimum": 0 },
         "bookingConflicts": { "type": "integer", "minimum": 0 },
+        "bookingConflictRate": { "type": "number", "minimum": 0, "maximum": 1 },
         "webVitals": {
           "type": "object",
           "additionalProperties": false,
@@ -217,7 +218,12 @@
           }
         }
       },
-      "then": { "properties": { "thresholds": { "type": "object", "required": ["readOnlyApi", "login", "booking"] } } }
+      "then": {
+        "properties": {
+          "thresholds": { "type": "object", "required": ["readOnlyApi", "login", "booking"] },
+          "metrics": { "type": "object", "required": ["bookingConflicts", "bookingConflictRate"] }
+        }
+      }
     }
   ],
   "$defs": {

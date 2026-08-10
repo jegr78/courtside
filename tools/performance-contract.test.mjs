@@ -118,6 +118,7 @@ test("given a performance result, when validating its documented shape, then com
   assert.deepEqual(schema.properties.metrics.required, [
     "iterations", "requests", "throughputPerSecond", "technicalErrorRate", "unexpectedServerErrors", "latencyMilliseconds"
   ]);
+  assert.deepEqual(schema.allOf[2].then.properties.metrics.required, ["bookingConflicts", "bookingConflictRate"]);
   assert.deepEqual(schema.properties.metrics.properties.latencyMilliseconds.required, ["p50", "p90", "p95", "p99"]);
 });
 
@@ -165,6 +166,8 @@ test("given incomplete or unsafe result claims, when validating them, then the s
       throughputPerSecond: 1,
       technicalErrorRate: 0,
       unexpectedServerErrors: 0,
+      bookingConflicts: 0,
+      bookingConflictRate: 0,
       latencyMilliseconds: { p50: 1, p90: 1, p95: 1, p99: 1 }
     }
   };

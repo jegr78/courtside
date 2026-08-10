@@ -88,7 +88,7 @@ class PerformanceDataSeeder implements ApplicationRunner {
 
     private void requireCompleteSeed() {
         if (accounts.count() != MEMBER_COUNT + 1L || members.count() != MEMBER_COUNT
-                || facility.allCourts().size() != COURT_COUNT || bookings.count() != BOOKING_COUNT
+                || facility.allCourts().size() != COURT_COUNT || bookings.count() < BOOKING_COUNT
                 || accounts.findByUsername(CONTENTION_USERNAME).isEmpty()) {
             throw new IllegalStateException("The performance dataset is incomplete; run perf-reset to recreate it");
         }
