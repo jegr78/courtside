@@ -27,6 +27,7 @@ class ProblemDetailAuthenticationEntryPoint implements AuthenticationEntryPoint 
                 HttpStatus.UNAUTHORIZED, "You must be authenticated to perform this request");
         problem.setType(URI.create("urn:courtside:error:unauthenticated"));
         problem.setTitle("Not authenticated");
+        problem.setInstance(URI.create(request.getRequestURI()));
 
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);

@@ -31,9 +31,10 @@ class AdminAuthorizationTest extends AbstractIntegrationTest {
     @Test
     void givenNoAuthentication_whenCallingAnAdminEndpoint_thenItIsUnauthorised() throws Exception {
         // when / then
-        mockMvc.perform(get("/api/admin/config"))
+        mockMvc.perform(get("/api/admin/config").queryParam("view", "summary"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"))
+                .andExpect(jsonPath("$.instance").value("/api/admin/config"));
     }
 
     @Test

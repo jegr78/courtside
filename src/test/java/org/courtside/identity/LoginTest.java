@@ -105,8 +105,8 @@ class LoginTest extends AbstractIntegrationTest {
                         .param("password", "wrong")
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.title").value("Not authenticated"))
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"))
+                .andExpect(jsonPath("$.instance").value("/api/session"));
     }
 
     @Test
@@ -123,8 +123,8 @@ class LoginTest extends AbstractIntegrationTest {
                         .param("password", "secret")
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.title").value("Not authenticated"))
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"))
+                .andExpect(jsonPath("$.instance").value("/api/session"));
     }
 
     @Test
