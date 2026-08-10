@@ -21,6 +21,7 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -35,6 +36,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 class SeriesCreationTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -148,7 +150,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
         // given — the "Standard" rule set caps advance booking at 7 days
         UUID personId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
         members.save(new Member(personId, STANDARD_MEMBERSHIP));
-        SeriesRule rule = fridaysFromMay15(4);
+        SeriesRule rule = fridaysFromApril3(4);
 
         // when
         SeriesCreationResult result = seriesService.create(rule, allStarts(previewAsTrainer(rule)),
@@ -166,7 +168,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
         UUID personId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
         members.save(new Member(personId, STANDARD_MEMBERSHIP));
         UUID bookedBy = UUID.randomUUID();
-        SeriesRule rule = fridaysFromMay15(6);
+        SeriesRule rule = fridaysFromApril3(6);
 
         // when
         SeriesPreview preview = seriesService.preview(rule, bookedBy, personId, Set.of(Role.TRAINER));
@@ -186,7 +188,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
         UUID personId = persons.save(new Person("John", "Roe", "john@example.org")).getId();
         members.save(new Member(personId, STANDARD_MEMBERSHIP));
         UUID bookedBy = UUID.randomUUID();
-        SeriesRule rule = fridaysFromMay15(6);
+        SeriesRule rule = fridaysFromApril3(6);
 
         // when
         SeriesPreview preview = seriesService.preview(rule, bookedBy, personId, Set.of(Role.ADMIN));
@@ -265,6 +267,26 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenEveryConfirmedOccurrenceIsInThePast_whenCreating_thenNothingIsCreatedAndNoSeriesRowSurvives() {
+        // given
+        SeriesRule rule = new SeriesRule(
+                List.of(courtOne), TRAINING_CARD,
+                LocalDate.of(2026, 3, 3), LocalTime.of(18, 0), 120,
+                1, Set.of(DayOfWeek.TUESDAY), null, 2);
+        List<Instant> confirmed = allStarts(previewAsTrainer(rule));
+
+        // when
+        SeriesCreationResult result = seriesService.create(rule, confirmed, UUID.randomUUID(), null,
+                Set.of(Role.ADMIN), "Team training");
+
+        // then
+        assertThat(result.seriesId()).isNull();
+        assertThat(result.bookingIds()).isEmpty();
+        assertThat(result.skipped()).containsExactlyElementsOf(confirmed);
+        assertThat(seriesRepository.count()).isZero();
+    }
+
+    @Test
     void givenTheSameConfirmedStartTwice_whenCreating_thenItIsRejectedAndNoSeriesRowIsWritten() {
         // given
         Instant first = starts(previewAsTrainer(rule(4))).getFirst();
@@ -312,10 +334,10 @@ class SeriesCreationTest extends AbstractIntegrationTest {
                 .toList();
     }
 
-    private SeriesRule fridaysFromMay15(int count) {
+    private SeriesRule fridaysFromApril3(int count) {
         return new SeriesRule(
                 List.of(courtOne), TRAINING_CARD,
-                LocalDate.of(2026, 5, 15), LocalTime.of(18, 0), 120,
+                LocalDate.of(2026, 4, 3), LocalTime.of(18, 0), 120,
                 1, Set.of(DayOfWeek.FRIDAY), null, count);
     }
 

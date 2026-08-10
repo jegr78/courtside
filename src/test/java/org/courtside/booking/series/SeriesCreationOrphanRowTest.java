@@ -11,6 +11,7 @@ import org.courtside.identity.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.DayOfWeek;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+@TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 class SeriesCreationOrphanRowTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

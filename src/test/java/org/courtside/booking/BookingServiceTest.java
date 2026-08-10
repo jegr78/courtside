@@ -10,6 +10,7 @@ import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.rules.RuleViolation;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -85,6 +87,20 @@ class BookingServiceTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> bookingService.create(command(SEVEN_PM, EIGHT_PM)))
                 .isInstanceOf(CourtUnavailableException.class);
+    }
+
+    @Test
+    void givenABookingStartingInThePast_whenCreating_thenItIsRejectedWithoutBeingStored() {
+        // given
+        Instant start = Instant.parse("2026-05-12T09:00:00Z");
+
+        // when / then
+        assertThatThrownBy(() -> bookingService.create(command(
+                start, start.plus(1, ChronoUnit.HOURS))))
+                .isInstanceOfSatisfying(BookingRulesViolatedException.class, failure ->
+                        assertThat(failure.getViolations()).extracting(RuleViolation::code)
+                                .contains("booking.rule.startsInPast"));
+        assertThat(bookings.count()).isZero();
     }
 
     @Test

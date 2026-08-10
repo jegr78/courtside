@@ -465,7 +465,10 @@ components:
           uniqueItems: true
           items: { type: string, format: uuid }
         cardId: { type: string, format: uuid }
-        startsAt: { type: string, format: date-time }
+        startsAt:
+          type: string
+          format: date-time
+          description: Must not be before the current instant.
         endsAt:
           type: string
           format: date-time
@@ -519,7 +522,10 @@ components:
           uniqueItems: true
           items: { type: string, format: uuid }
         cardId: { type: string, format: uuid }
-        startsOn: { type: string, format: date }
+        startsOn:
+          type: string
+          format: date
+          description: Occurrences before the current instant cannot be created.
         startTime: { type: string, format: time }
         durationMinutes: { type: integer, minimum: 1, maximum: 1440 }
         intervalWeeks: { type: integer, minimum: 1, maximum: 52 }

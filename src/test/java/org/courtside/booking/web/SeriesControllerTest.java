@@ -18,6 +18,7 @@ import org.courtside.member.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 class SeriesControllerTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_MEMBERSHIP =
@@ -173,9 +175,24 @@ class SeriesControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
+    void givenEveryConfirmedOccurrenceIsInThePast_whenCreating_thenNoSeriesIsCreated() throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/booking-series")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(pastSeriesJson())
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.seriesId").doesNotExist())
+                .andExpect(jsonPath("$.bookingIds").isEmpty())
+                .andExpect(jsonPath("$.skipped.length()").value(2));
+        assertThat(series.count()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenTheTrainerIsAlsoAMember_whenPreviewing_thenTheAdvanceWindowNarrowsTheCreatableCount()
             throws Exception {
-        // given — the "Active" membership caps advance booking at 7 days, the clock says 2026-05-12
+        // given — the "Active" membership caps advance booking at 7 days
         members.save(new Member(trainerPersonId, ACTIVE_MEMBERSHIP));
 
         // when / then
@@ -469,7 +486,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                 {
                   "courtIds": ["%s"],
                   "cardId": "22222222-2222-2222-2222-222222222222",
-                  "startsOn": "2026-05-15",
+                  "startsOn": "2026-04-03",
                   "startTime": "18:00:00",
                   "durationMinutes": 120,
                   "intervalWeeks": 1,
@@ -477,6 +494,25 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                   "occurrenceCount": %d
                 }
                 """.formatted(courtId, occurrenceCount);
+    }
+
+    private String pastSeriesJson() {
+        return """
+                {
+                  "courtIds": ["%s"],
+                  "cardId": "22222222-2222-2222-2222-222222222222",
+                  "startsOn": "2026-03-03",
+                  "startTime": "18:00:00",
+                  "durationMinutes": 120,
+                  "intervalWeeks": 1,
+                  "weekdays": ["TUESDAY"],
+                  "occurrenceCount": 2,
+                  "confirmedStarts": [
+                    "2026-03-03T18:00:00+01:00",
+                    "2026-03-10T18:00:00+01:00"
+                  ]
+                }
+                """.formatted(courtId);
     }
 
     private String previewJson(int occurrenceCount) {
