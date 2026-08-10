@@ -97,6 +97,11 @@ PostgreSQL activity, connections, and locks every five seconds and retains data 
 Use the run start time from the result to select the corresponding time range. The telemetry volume
 is disposable and is removed by `perf-reset courtside-perf`.
 
+Grafana is provisioned with the read-only Courtside performance dashboard at
+`http://127.0.0.1:3000`. It correlates application latency and throughput, JVM and GC state, Hikari,
+PostgreSQL, and optional k6 time series. Both local observability UIs are loopback-only and Grafana
+allows anonymous viewing solely within that boundary; it has no editable dashboards or login form.
+
 The ordinary HTTPS endpoint does not expose Actuator. UAT, its Funnel ingress, and the production
 reference deployment do not enable Prometheus or the exporter. Database and exporter credentials
 come from the generated runtime state and are never stored in Compose files.
@@ -119,6 +124,11 @@ node tools/courtside.mjs perf-run stress --confirm courtside-perf
 node tools/courtside.mjs perf-run soak --confirm courtside-perf --fresh
 ```
 
+Append `--remote-write` to a protocol run to send an additional time series to the local
+Prometheus instance. The option is accepted only after `perf --telemetry`; HTML and JSON remain the
+authoritative outputs because the k6 Prometheus remote-write output is experimental. Every series
+is tagged with the run id and profile for dashboard correlation.
+
 The CLI verifies `/api/source` before starting k6 and refuses any target that does not identify as
 `PERFORMANCE`. Profiles, durations, VUs, stages, traffic mix, image digest, and thresholds come from
 the contract and cannot be overridden on the command line. Baseline, peak, stress, and soak require
@@ -137,6 +147,20 @@ exit non-zero. Every run uses unique idempotency keys.
 The CLI exports Caddy's disposable root CA for the duration of a run. Both the environment preflight
 and k6 validate the certificate chain and hostname against that CA; the test does not disable TLS
 verification.
+
+## Reference baselines
+
+Only a successful authoritative `baseline` result using the current performance contract can be
+promoted. The explicit command validates the result schema and every threshold before creating a
+new, non-overwriting versioned file below `performance/baselines/baseline`:
+
+```text
+node tools/courtside.mjs perf-promote build/performance/baseline/<run>/summary.json --confirm courtside-perf
+```
+
+The stored summary contains only contract-approved build, runtime, load, resource, threshold, and
+metric fields. Credentials, hostnames, remote URLs, identities, and addresses cannot pass the
+closed result schema. Failed and stale-contract results are rejected and never replace a baseline.
 
 Remote targets require a separate opt-in and cannot use ordinary load profiles. Production targets,
 persistent UAT writes, tracked credentials, tracked remote targets, and ordinary overrides of VU or
