@@ -43,6 +43,10 @@ test("given pinned performance tooling, when reading image references, then muta
     reference: "grafana/k6:2.2.0-with-browser",
     digest: "sha256:defdc0a3e70c46bce010bfc10dedc03e335cc7febe01f6359552fe72827c2aa2"
   });
+  assert.deepEqual(contract.tooling.grafanaImage, {
+    reference: "grafana/grafana:12.1.0",
+    digest: "sha256:6ac590e7cabc2fbe8d7b8fc1ce9c9f0582177b334e0df9c927ebd9670469440f"
+  });
 });
 
 test("given supported performance profiles, when reading their execution limits, then every run is bounded", () => {

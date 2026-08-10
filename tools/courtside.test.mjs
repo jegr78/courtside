@@ -9,11 +9,40 @@ import {
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   processPlans, requiredPorts, restoreDatabase, startProcesses, superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
-  writePrivateFile, performanceRunPlan, buildPerformanceResult
+  writePrivateFile, performanceRunPlan, buildPerformanceResult, performanceBaselinePlan
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
   return compose.match(new RegExp(`^  ${service}:\\n(?<body>.*?)(?=^  [\\w-]+:|^volumes:|^networks:)`, "ms"))?.groups.body ?? "";
+}
+
+function passingPerformanceResult() {
+  return {
+    schemaVersion: 1,
+    contract: { schemaVersion: 1, digest: `sha256:${"a".repeat(64)}` },
+    build: { applicationVersion: "1.2.3", gitCommit: "abcdef0" },
+    runtime: { k6Version: "2.2.0", operatingSystem: "linux", architecture: "arm64" },
+    profile: {
+      name: "baseline", workload: "reference", target: "system", environment: "PERFORMANCE",
+      startedAt: "2026-08-10T12:00:00.000Z", durationSeconds: 600
+    },
+    load: {
+      dataset: { members: 1000, courts: 8 }, readShare: 0.9, writeShare: 0.1, virtualUsers: 50
+    },
+    resources: {
+      application: { cpu: 2, memoryMegabytes: 1024 },
+      database: { cpu: 2, memoryMegabytes: 2048 },
+      proxy: { cpu: 0.5, memoryMegabytes: 256 }
+    },
+    thresholds: {
+      technicalErrorRate: true, unexpectedServerErrors: true, readOnlyApi: true, login: true, booking: true
+    },
+    metrics: {
+      iterations: 100, requests: 300, throughputPerSecond: 5, technicalErrorRate: 0,
+      unexpectedServerErrors: 0, bookingConflicts: 1, bookingConflictRate: 0.1,
+      latencyMilliseconds: { p50: 10, p90: 20, p95: 30, p99: 40 }
+    }
+  };
 }
 
 test("given Windows, when resolving executables, then wrapper commands use cmd launchers", () => {
@@ -189,12 +218,17 @@ test("given performance commands, when parsing them, then lifecycle and diagnosi
   assert.equal(parseArguments(["status", "perf"]).environment, "perf");
   assert.throws(() => parseArguments(["perf-reset", "wrong"]), /courtside-perf/);
   assert.equal(parseArguments(["perf-reset", "courtside-perf"]).confirm, "courtside-perf");
+  assert.equal(parseArguments([
+    "perf-promote", "build/performance/baseline/run/summary.json", "--confirm", "courtside-perf"
+  ]).file, "build/performance/baseline/run/summary.json");
+  assert.throws(() => parseArguments(["perf-promote", "summary.json"]), /--confirm courtside-perf/);
 });
 
 test("given load profiles, when parsing execution, then manual runs require disposable confirmation", () => {
   // when / then
   assert.equal(parseArguments(["perf-run", "smoke"]).profile, "smoke");
   assert.equal(parseArguments(["perf-run", "baseline", "--confirm", "courtside-perf"]).profile, "baseline");
+  assert.equal(parseArguments(["perf-run", "smoke", "--remote-write"]).remoteWrite, true);
   assert.throws(() => parseArguments(["perf-run", "stress"]), /--confirm courtside-perf/);
   assert.throws(() => parseArguments(["perf-run", "soak", "--confirm", "courtside-perf"]), /--fresh/);
   assert.equal(parseArguments(["perf-run", "soak", "--confirm", "courtside-perf", "--fresh"]).fresh, true);
@@ -219,6 +253,23 @@ test("given a protocol profile, when planning k6, then the pinned image and isol
   assert.ok(plan.args.includes("K6_WEB_DASHBOARD_EXPORT=/results/report.html"));
   assert.ok(plan.args.includes("SSL_CERT_FILE=/certs/root.crt"));
   assert.ok(plan.args.includes("/tmp/performance-root.crt:/certs/root.crt:ro"));
+  assert.deepEqual(plan.args.filter((argument) => argument === "--tag"), ["--tag", "--tag"]);
+  assert.ok(plan.args.includes("testid=test-run"));
+  assert.ok(plan.args.includes("profile=peak"));
+  assert.equal(plan.args.includes("experimental-prometheus-rw"), false);
+});
+
+test("given remote write is selected, when planning k6, then Prometheus remains an optional secondary output", () => {
+  // given
+  const options = parseArguments(["perf-run", "smoke", "--remote-write"]);
+
+  // when
+  const plan = performanceRunPlan(options, "/tmp/performance-result", "/tmp/performance-root.crt");
+
+  // then
+  assert.ok(plan.args.includes("K6_PROMETHEUS_RW_SERVER_URL=http://host.docker.internal:9090/api/v1/write"));
+  assert.ok(plan.args.includes("experimental-prometheus-rw"));
+  assert.ok(plan.args.includes("K6_WEB_DASHBOARD_EXPORT=/results/report.html"));
 });
 
 test("given raw k6 metrics, when building a result, then the performance schema metadata is retained", () => {
@@ -255,6 +306,29 @@ test("given raw k6 metrics, when building a result, then the performance schema 
   assert.deepEqual(result.thresholds, {
     technicalErrorRate: true, unexpectedServerErrors: true, readOnlyApi: true, login: true, booking: true
   });
+});
+
+test("given an approved result, when planning baseline promotion, then its versioned path contains no machine data", () => {
+  // given
+  const result = passingPerformanceResult();
+
+  // when
+  const baseline = performanceBaselinePlan(result, result.contract.digest);
+
+  // then
+  assert.equal(baseline.relativePath, "performance/baselines/baseline/1.2.3-abcdef0.json");
+  assert.equal(JSON.parse(baseline.content).build.gitCommit, "abcdef0");
+});
+
+test("given a failed or stale result, when planning baseline promotion, then it is rejected", () => {
+  // given
+  const failed = passingPerformanceResult();
+  failed.thresholds.booking = false;
+  const stale = passingPerformanceResult();
+
+  // when / then
+  assert.throws(() => performanceBaselinePlan(failed, failed.contract.digest), /thresholds/);
+  assert.throws(() => performanceBaselinePlan(stale, `sha256:${"b".repeat(64)}`), /contract/);
 });
 
 test("given an existing credential file, when rewriting it on POSIX, then owner-only mode is restored", () => {
@@ -321,6 +395,7 @@ test("given the performance compose contract, when inspecting isolation, then re
   const telemetryOverride = readFileSync(fileURLToPath(new URL("../deploy/compose.perf-telemetry.yaml", import.meta.url)), "utf8");
   const prometheus = readFileSync(fileURLToPath(new URL("../deploy/prometheus.perf.yaml", import.meta.url)), "utf8");
   const postgresQueries = readFileSync(fileURLToPath(new URL("../deploy/postgres-exporter.perf.yaml", import.meta.url)), "utf8");
+  const dashboard = readFileSync(fileURLToPath(new URL("../deploy/grafana/performance-dashboard.json", import.meta.url)), "utf8");
 
   // when / then
   assert.match(compose, /^name: courtside-perf/m);
@@ -336,12 +411,17 @@ test("given the performance compose contract, when inspecting isolation, then re
   assert.match(compose, /POSTGRES_PASSWORD: \$\{COURTSIDE_PERF_SHARED_PASSWORD:-\}/);
   assert.match(telemetryOverride, /prom\/prometheus:v3\.5\.0@sha256:[a-f0-9]{64}/);
   assert.match(telemetryOverride, /prometheuscommunity\/postgres-exporter:v0\.17\.1@sha256:[a-f0-9]{64}/);
+  assert.match(telemetryOverride, /grafana\/grafana:12\.1\.0@sha256:[a-f0-9]{64}/);
   assert.match(composeService(telemetryOverride, "app"), /COURTSIDE_PERF_TELEMETRY_ENABLED: "true"/);
   assert.match(composeService(telemetryOverride, "prometheus"), /127\.0\.0\.1:9090:9090/);
   assert.doesNotMatch(composeService(telemetryOverride, "postgres-exporter"), /ports:/);
   assert.match(prometheus, /app:9091/);
   assert.match(prometheus, /postgres-exporter:9187/);
   assert.match(postgresQueries, /FROM pg_locks/);
+  assert.match(dashboard, /http_server_requests_seconds/);
+  assert.match(dashboard, /hikaricp_connections_active/);
+  assert.match(dashboard, /pg_stat_database_numbackends/);
+  assert.match(dashboard, /k6_http_req_duration/);
   const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.perf", import.meta.url)), "utf8");
   assert.match(caddy, /https:\/\/host\.docker\.internal:443/);
 });

@@ -42,7 +42,7 @@ export function parseArguments(argv) {
   const supported = new Set([
     "build", "verify", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
     "uat-share", "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore",
-    "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset", "perf-run",
+    "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset", "perf-run", "perf-promote",
     "status", "help"
   ]);
   if (!command || !supported.has(command)) {
@@ -51,7 +51,7 @@ export function parseArguments(argv) {
   const options = {
     command, suspend: false, json: false, environment: undefined, version: undefined,
     skipVerify: false, dbPort: false, file: undefined, confirm: undefined, all: false,
-    profile: undefined, fresh: false, telemetry: false
+    profile: undefined, fresh: false, telemetry: false, remoteWrite: false
   };
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
@@ -86,6 +86,12 @@ export function parseArguments(argv) {
       options.confirm = requiredOptionValue(flags, ++index, "--confirm");
     } else if (flag === "--fresh" && command === "perf-run") {
       options.fresh = true;
+    } else if (flag === "--remote-write" && command === "perf-run") {
+      options.remoteWrite = true;
+    } else if (!flag.startsWith("--") && command === "perf-promote" && !options.file) {
+      options.file = flag;
+    } else if (flag === "--confirm" && command === "perf-promote") {
+      options.confirm = requiredOptionValue(flags, ++index, "--confirm");
     } else {
       throw new Error(`Unknown option for ${command}: ${flag}`);
     }
@@ -113,6 +119,9 @@ export function parseArguments(argv) {
     if (options.profile === "soak" && !options.fresh) {
       throw new Error("perf-run soak requires --fresh after recreating the performance environment");
     }
+  }
+  if (command === "perf-promote" && (!options.file || options.confirm !== perfProject)) {
+    throw new Error(`perf-promote requires a summary file and --confirm ${perfProject}`);
   }
   return options;
 }
@@ -430,6 +439,10 @@ async function execute(options) {
     await runPerformance(options);
     return;
   }
+  if (options.command === "perf-promote") {
+    promotePerformanceBaseline(options.file);
+    return;
+  }
   if (options.command === "status") {
     await showStatus(options.environment, options.json);
     return;
@@ -504,6 +517,7 @@ function startPerformance(options) {
   }
   if (options.telemetry) {
     process.stdout.write("Prometheus: http://127.0.0.1:9090\n");
+    process.stdout.write("Grafana: http://127.0.0.1:3000\n");
   }
 }
 
@@ -542,13 +556,19 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "-e", "PERF_TARGET=https://host.docker.internal:9443",
       "-e", "K6_WEB_DASHBOARD=true",
       "-e", "K6_WEB_DASHBOARD_EXPORT=/results/report.html",
+      ...(options.remoteWrite ? [
+        "-e", "K6_PROMETHEUS_RW_SERVER_URL=http://host.docker.internal:9090/api/v1/write",
+        "-e", "K6_PROMETHEUS_RW_TREND_STATS=p(50),p(90),p(95),p(99),min,max,avg,med"
+      ] : []),
       "-e", "SSL_CERT_FILE=/certs/root.crt",
       "-v", `${join(root, "performance")}:/scripts:ro`,
       "-v", `${perfStateFile}:/run/courtside/perf.json:ro`,
       "-v", `${certificateFile}:/certs/root.crt:ro`,
       "-v", `${resultDirectory}:/results`,
       `${image.reference}@${image.digest}`,
-      "run", "--summary-trend-stats", "avg,min,med,max,p(50),p(90),p(95),p(99)",
+      "run", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
+      "--tag", `testid=${runId}`, "--tag", `profile=${options.profile}`,
+      "--summary-trend-stats", "avg,min,med,max,p(50),p(90),p(95),p(99)",
       "/scripts/protocol.js"
     ]
   };
@@ -558,6 +578,9 @@ async function runPerformance(options) {
   const state = readPerformanceState();
   if (!state) {
     throw new Error("Performance credentials are unavailable; run 'perf' first");
+  }
+  if (options.remoteWrite && !state.telemetry) {
+    throw new Error("Prometheus remote write requires a performance environment started with --telemetry");
   }
   const startedAt = new Date().toISOString();
   const runId = startedAt.replaceAll(":", "-");
@@ -581,9 +604,14 @@ async function runPerformance(options) {
   } catch (error) {
     runFailure = error;
   }
+  const rawSummary = join(resultDirectory, "raw-summary.json");
+  if (!existsSync(rawSummary)) {
+    rmSync(certificateFile, { force: true });
+    throw runFailure ?? new Error("k6 did not produce a machine-readable summary");
+  }
   const contractText = readFileSync(join(root, "performance", "contract.json"), "utf8");
   const contract = JSON.parse(contractText);
-  const raw = JSON.parse(readFileSync(join(resultDirectory, "raw-summary.json"), "utf8"));
+  const raw = JSON.parse(readFileSync(rawSummary, "utf8"));
   const result = buildPerformanceResult({
     contract,
     contractDigest: `sha256:${createHash("sha256").update(contractText).digest("hex")}`,
@@ -670,6 +698,39 @@ function validatePerformanceResult(result) {
   if (!validate(result)) {
     throw new Error(`Performance result does not match its schema: ${JSON.stringify(validate.errors)}`);
   }
+}
+
+export function performanceBaselinePlan(result, currentContractDigest) {
+  validatePerformanceResult(result);
+  if (result.profile.name !== "baseline" || result.profile.target !== "system"
+      || result.profile.environment !== "PERFORMANCE") {
+    throw new Error("Only an authoritative PERFORMANCE baseline result can be promoted");
+  }
+  if (result.contract.digest !== currentContractDigest) {
+    throw new Error("The result uses a different performance contract");
+  }
+  if (!Object.values(result.thresholds).every(Boolean)) {
+    throw new Error("A result with failed thresholds cannot become a baseline");
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(result.build.applicationVersion)) {
+    throw new Error("The application version is not safe for a baseline path");
+  }
+  const name = `${result.build.applicationVersion}-${result.build.gitCommit.slice(0, 7)}.json`;
+  return {
+    relativePath: join("performance", "baselines", result.profile.name, name),
+    content: `${JSON.stringify(result, null, 2)}\n`
+  };
+}
+
+function promotePerformanceBaseline(file) {
+  const result = JSON.parse(readFileSync(resolve(root, file), "utf8"));
+  const contractText = readFileSync(join(root, "performance", "contract.json"), "utf8");
+  const digest = `sha256:${createHash("sha256").update(contractText).digest("hex")}`;
+  const baseline = performanceBaselinePlan(result, digest);
+  const destination = join(root, baseline.relativePath);
+  mkdirSync(dirname(destination), { recursive: true });
+  writeFileSync(destination, baseline.content, { flag: "wx" });
+  process.stdout.write(`Performance baseline: ${destination}\n`);
 }
 
 async function shareUat() {
@@ -1161,7 +1222,10 @@ async function showStatus(environment, asJson) {
         http: { port: 9080, reachable: await canConnect(9080) },
         https: { port: 9443, reachable: await canConnect(9443) },
         ...(perfState?.telemetry
-          ? { prometheus: { port: 9090, reachable: await canConnect(9090) } }
+          ? {
+              prometheus: { port: 9090, reachable: await canConnect(9090) },
+              grafana: { port: 3000, reachable: await canConnect(3000) }
+            }
           : {})
       } : {
         backend: { port: 8080, reachable: await canConnect(8080) },
@@ -1315,7 +1379,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry]\n  perf-run <smoke|baseline|peak|stress|soak> [--confirm courtside-perf] [--fresh]\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry]\n  perf-run <smoke|baseline|peak|stress|soak> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

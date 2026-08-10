@@ -36,6 +36,7 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=7d
+      - --web.enable-remote-write-receiver
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
@@ -49,8 +50,34 @@ services:
     networks:
       - telemetry
 
+  grafana:
+    image: grafana/grafana:12.1.0@sha256:6ac590e7cabc2fbe8d7b8fc1ce9c9f0582177b334e0df9c927ebd9670469440f
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./grafana/datasource.yaml:/etc/grafana/provisioning/datasources/courtside.yaml:ro
+      - ./grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/courtside.yaml:ro
+      - ./grafana/performance-dashboard.json:/var/lib/grafana/dashboards/courtside-performance.json:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+    networks:
+      - telemetry
+
 volumes:
   prometheus-data:
+  grafana-data:
 
 networks:
   telemetry:

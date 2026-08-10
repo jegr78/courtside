@@ -9,6 +9,10 @@ spring:
     url: ${COURTSIDE_DB_URL:jdbc:postgresql://db:5432/courtside_perf}
 
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
   prometheus:
     metrics:
       export:
