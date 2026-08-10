@@ -996,10 +996,21 @@ paths:
       summary: Book one or more courts for a slot.
       description: |
         Non-overlap is decided by the database, not by a check beforehand — time passes between
-        checking and inserting. A collision is a `409`, and it is authoritative.
+        checking and inserting. A collision is a `409`, and it is authoritative. Every booking
+        attempt carries an idempotency key; retrying the same request returns the original booking.
       security:
         - sessionCookie: []
           csrfToken: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: An opaque key unique to this booking attempt for the authenticated account.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: '^[\x21-\x7E]+$'
       requestBody:
         required: true
         content:
@@ -1018,7 +1029,7 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "409":
-          description: A court was taken in the meantime.
+          description: A court was taken in the meantime, or the idempotency key belongs to another request.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }

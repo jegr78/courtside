@@ -77,4 +77,6 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findConfirmedBySeriesOrderedByStart(@Param("seriesId") UUID seriesId);
 
     boolean existsByIdAndSeriesId(UUID id, UUID seriesId);
+
+    Optional<Booking> findByBookedByAndIdempotencyKey(UUID bookedBy, String idempotencyKey);
 }

@@ -22,6 +22,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -111,7 +112,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @Test
     void givenAnonymousCaller_whenCreatingABooking_thenUnauthorized() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
@@ -122,7 +123,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnAuthenticatedMember_whenCreatingAValidBooking_thenItIsCreated() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
@@ -132,9 +133,115 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
-    void givenABookingStartingInThePast_whenCreating_thenTheViolationCodeIsReturned() throws Exception {
+    void givenNoIdempotencyKey_whenCreatingABooking_thenBadRequestIsReturned() throws Exception {
         // when / then
         mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest());
+
+        assertThat(bookings.count()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenAnInvalidIdempotencyKey_whenCreatingABooking_thenValidationFailureIsReturned()
+            throws Exception {
+        // when / then
+        mockMvc.perform(bookingPost("contains whitespace")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("idempotencyKey"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"))
+                .andExpect(jsonPath("$.fieldErrors[0].params").isEmpty());
+
+        assertThat(bookings.count()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenTheSameIdempotencyKeyAndRequest_whenCreatingTwice_thenTheOriginalBookingIsReturned()
+            throws Exception {
+        // given
+        String key = UUID.randomUUID().toString();
+        String request = bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00");
+
+        // when
+        String first = mockMvc.perform(bookingPost(key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String second = mockMvc.perform(bookingPost(key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(JsonPath.<String>read(second, "$.id"))
+                .isEqualTo(JsonPath.<String>read(first, "$.id"));
+        assertThat(bookings.count()).isOne();
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenTheSameIdempotencyKeyAndDifferentRequest_whenCreatingAgain_thenConflictIsReturned()
+            throws Exception {
+        // given
+        String key = UUID.randomUUID().toString();
+        mockMvc.perform(bookingPost(key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(bookingPost(key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T19:00:00+02:00", "2026-05-12T20:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:idempotency-key-reused"))
+                .andExpect(jsonPath("$.violations[0].code").value("booking.idempotencyKey.reused"));
+
+        assertThat(bookings.count()).isOne();
+    }
+
+    @Test
+    void givenTwoAccountsUseTheSameIdempotencyKey_whenCreatingDifferentBookings_thenBothAreCreated()
+            throws Exception {
+        // given
+        String key = UUID.randomUUID().toString();
+
+        // when / then
+        mockMvc.perform(bookingPost(key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(user("doe.jane").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+        mockMvc.perform(bookingPost(key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T19:00:00+02:00", "2026-05-12T20:00:00+02:00"))
+                        .with(user("major.mary").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        assertThat(bookings.count()).isEqualTo(2);
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenABookingStartingInThePast_whenCreating_thenTheViolationCodeIsReturned() throws Exception {
+        // when / then
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T11:00:00+02:00",
                                 "2026-05-12T12:00:00+02:00"))
@@ -151,7 +258,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     void givenABookingBreakingTwoRules_whenCreatingIt_thenBothViolationsAreReported()
             throws Exception {
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T22:10:00+02:00", "2026-05-12T22:50:00+02:00"))
                         .with(csrf()))
@@ -166,14 +273,14 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnOccupiedSlot_whenBookingItAgain_thenConflictIsReturned() throws Exception {
         // given
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
                 .andExpect(status().isCreated());
 
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
@@ -185,7 +292,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenABookingOnADay_whenRequestingThatDaysGrid_thenTheBookingIsListed() throws Exception {
         // given
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
@@ -202,7 +309,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid() throws Exception {
         // given
-        String response = mockMvc.perform(post("/api/bookings")
+        String response = mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
@@ -255,7 +362,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenACardRequiringATrainer_whenAMemberBooksIt_thenForbidden() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(trainingJson())
                         .with(csrf()))
@@ -267,7 +374,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenACardRequiringATrainer_whenATrainerBooksIt_thenItIsCreated() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(trainingJson())
                         .with(csrf()))
@@ -329,7 +436,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     void givenAMemberCardBookedWithoutAFurtherPlayer_whenCreatingABooking_thenSlotCountIsRejected()
             throws Exception {
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson(courtId, MEMBER_BOOKING_CARD, ""))
                         .with(csrf()))
@@ -346,7 +453,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     void givenARequestMissingTheCourt_whenCreatingABooking_thenBeanValidationUsesProblemJson()
             throws Exception {
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -382,7 +489,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenABallMachineSlot_whenCreatingABooking_thenItIsCreated() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -403,7 +510,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenASinglesBooking_whenLoadingTheGrid_thenItIsLabelledSingles() throws Exception {
         // given
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-13T18:00:00+02:00", "2026-05-13T19:00:00+02:00"))
                         .with(csrf()))
@@ -421,7 +528,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     void givenATrainingBookingWithNoParticipants_whenLoadingTheGrid_thenMatchTypeIsNull()
             throws Exception {
         // given
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(trainingJson())
                         .with(csrf()))
@@ -437,7 +544,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenTwoCourts_whenCreatingATrainingBooking_thenTheGridShowsBoth() throws Exception {
         // given
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -465,7 +572,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenNoCourtAtAll_whenCreatingABooking_thenBadRequest() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -481,7 +588,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     }
 
     private void expectBadRequest(String body) throws Exception {
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .with(csrf()))
@@ -501,7 +608,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     }
 
     private UUID bookingOf(String username) throws Exception {
-        String response = mockMvc.perform(post("/api/bookings")
+        String response = mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(user(username).roles("MEMBER"))
@@ -521,6 +628,14 @@ class BookingControllerTest extends AbstractIntegrationTest {
                   "participants": [ %s ]
                 }
                 """.formatted(courtId, MEMBER_BOOKING_CARD, start, end, GUEST_PARTICIPANT);
+    }
+
+    private MockHttpServletRequestBuilder bookingPost() {
+        return bookingPost(UUID.randomUUID().toString());
+    }
+
+    private MockHttpServletRequestBuilder bookingPost(String idempotencyKey) {
+        return post("/api/bookings").header("Idempotency-Key", idempotencyKey);
     }
 
     private String bookingJson(UUID court, UUID card, String participant) {

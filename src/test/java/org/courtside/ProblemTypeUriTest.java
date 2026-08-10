@@ -40,6 +40,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:court-number-taken",
             "urn:courtside:error:court-unavailable",
             "urn:courtside:error:invalid-opening-window",
+            "urn:courtside:error:idempotency-key-reused",
             "urn:courtside:error:login-rate-limited",
             "urn:courtside:error:membership-type-name-taken",
             "urn:courtside:error:membership-type-not-found",

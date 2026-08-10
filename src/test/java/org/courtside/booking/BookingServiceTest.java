@@ -14,6 +14,8 @@ import org.courtside.rules.RuleViolation;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.DayOfWeek;
@@ -23,6 +25,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -103,6 +106,16 @@ class BookingServiceTest extends AbstractIntegrationTest {
         assertThat(bookings.count()).isZero();
     }
 
+    @ParameterizedTest
+    @MethodSource("invalidIdempotencyKeys")
+    void givenAnInvalidIdempotencyKey_whenCreating_thenCallerBugIsReported(String idempotencyKey) {
+        // when / then
+        assertThatThrownBy(() -> bookingService.create(command(SIX_PM, SEVEN_PM), idempotencyKey))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("The idempotency key must be 1 to 128 visible ASCII characters");
+        assertThat(bookings.count()).isZero();
+    }
+
     @Test
     void givenACancelledBooking_whenBookingTheSameSlotAgain_thenItSucceeds() {
         // given
@@ -147,5 +160,9 @@ class BookingServiceTest extends AbstractIntegrationTest {
         return new CreateBookingCommand(
                 List.of(courtId), MEMBER_BOOKING_CARD, new TimeSlot(start, end), someUser, bookerPersonId,
                 Set.of(Role.MEMBER), null, List.of(ParticipantSpec.guest("Partner")), null);
+    }
+
+    private static Stream<String> invalidIdempotencyKeys() {
+        return Stream.of(null, "", "contains whitespace", "ä", "x".repeat(129));
     }
 }

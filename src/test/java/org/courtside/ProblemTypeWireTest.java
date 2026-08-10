@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -100,7 +101,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
                 """.formatted(courtId);
 
         // when
-        ResultActions result = mockMvc.perform(post("/api/bookings")
+        ResultActions result = mockMvc.perform(bookingPost()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
                 .with(csrf()));
@@ -123,7 +124,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
                 """.formatted(courtId, MEMBER_BOOKING_CARD);
 
         // when
-        ResultActions result = mockMvc.perform(post("/api/bookings")
+        ResultActions result = mockMvc.perform(bookingPost()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
                 .with(csrf()));
@@ -199,7 +200,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
                 """.formatted(MEMBER_BOOKING_CARD);
 
         // when
-        ResultActions result = mockMvc.perform(post("/api/bookings")
+        ResultActions result = mockMvc.perform(bookingPost()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
                 .with(csrf()));
@@ -343,7 +344,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
         createAccount("doe.jane", Role.MEMBER);
 
         // when
-        ResultActions result = mockMvc.perform(post("/api/bookings")
+        ResultActions result = mockMvc.perform(bookingPost()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -367,7 +368,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
         createAccount("doe.jane", Role.MEMBER);
 
         // when
-        ResultActions result = mockMvc.perform(post("/api/bookings")
+        ResultActions result = mockMvc.perform(bookingPost()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -398,12 +399,12 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
                   "participants": [{"guestName": "Partner"}]
                 }
                 """.formatted(courtId, MEMBER_BOOKING_CARD);
-        mockMvc.perform(post("/api/bookings").contentType(MediaType.APPLICATION_JSON).content(body).with(csrf()))
+        mockMvc.perform(bookingPost().contentType(MediaType.APPLICATION_JSON).content(body).with(csrf()))
                 .andExpect(status().isCreated());
 
         // when
         ResultActions result = mockMvc.perform(
-                post("/api/bookings").contentType(MediaType.APPLICATION_JSON).content(body).with(csrf()));
+                bookingPost().contentType(MediaType.APPLICATION_JSON).content(body).with(csrf()));
 
         // then
         assertProblem(result, HttpStatus.CONFLICT, "urn:courtside:error:court-unavailable");
@@ -416,7 +417,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
         createAccount("doe.jane", Role.MEMBER);
 
         // when
-        ResultActions result = mockMvc.perform(post("/api/bookings")
+        ResultActions result = mockMvc.perform(bookingPost()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -492,7 +493,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
         UUID seriesId = UUID.fromString(JsonPath.read(created, "$.seriesId"));
         UUID firstBookingId = UUID.fromString(JsonPath.<List<String>>read(created, "$.bookingIds").getFirst());
 
-        mockMvc.perform(post("/api/bookings")
+        mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -528,7 +529,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
         createAccount("doe.jane", Role.MEMBER);
 
         // when
-        ResultActions result = mockMvc.perform(post("/api/bookings")
+        ResultActions result = mockMvc.perform(bookingPost()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -549,6 +550,10 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
         String[] name = username.split("\\.");
         Person person = persons.save(new Person(capitalize(name[1]), capitalize(name[0]), username + "@example.org"));
         accounts.save(new UserAccount(person, username, "irrelevant", Set.of(role)));
+    }
+
+    private MockHttpServletRequestBuilder bookingPost() {
+        return post("/api/bookings").header("Idempotency-Key", UUID.randomUUID().toString());
     }
 
     private static String capitalize(String value) {

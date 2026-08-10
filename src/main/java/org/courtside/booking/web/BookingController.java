@@ -57,7 +57,8 @@ class BookingController implements BookingsApi {
     }
 
     @Override
-    public ResponseEntity<ApiBookingCreated> createBooking(ApiCreateBookingRequest request) {
+    public ResponseEntity<ApiBookingCreated> createBooking(String idempotencyKey,
+                                                           ApiCreateBookingRequest request) {
         UserAccount account = currentUser.requireAccount();
 
         List<ParticipantSpec> participants = request.getParticipants() == null
@@ -76,7 +77,7 @@ class BookingController implements BookingsApi {
                 account.getRoles(),
                 request.getNote(),
                 participants,
-                null));
+                null), idempotencyKey);
 
         return ResponseEntity.created(URI.create("/api/bookings/" + id))
                 .body(new ApiBookingCreated(id));
