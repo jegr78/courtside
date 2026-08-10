@@ -1,0 +1,25 @@
+meta {
+  name: Get session and CSRF token
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/session
+  body: none
+  auth: none
+}
+
+script:post-response {
+  const headers = res.getHeader("set-cookie");
+  const cookies = Array.isArray(headers) ? headers : [headers];
+  const csrfCookie = cookies.filter((cookie) => /^XSRF-TOKEN=[^;]/.test(cookie ?? "")).pop();
+  if (!csrfCookie) throw new Error("The response did not set an XSRF-TOKEN cookie");
+  bru.setVar("csrfToken", csrfCookie.slice("XSRF-TOKEN=".length).split(";", 1)[0]);
+}
+
+tests {
+  test("returns the session state", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

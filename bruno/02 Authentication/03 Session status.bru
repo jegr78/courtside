@@ -1,0 +1,18 @@
+meta {
+  name: Authenticated session status
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/session
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns an authenticated session", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().authenticated).to.equal(true);
+  });
+}

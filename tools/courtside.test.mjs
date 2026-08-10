@@ -7,8 +7,13 @@ import { test } from "node:test";
 import {
   executableNames, frontendInstallPlan, lifecyclePlan, listenerOutputMatches, parseArguments,
   newBootstrapPassword, processPlans, requiredPorts, restoreDatabase, startProcesses, terminate,
+  terminateChildren,
   uatComposeArgs, uatResetPlans
 } from "./courtside.mjs";
+
+function composeService(compose, service) {
+  return compose.match(new RegExp(`^  ${service}:\\n(?<body>.*?)(?=^  [\\w-]+:|^volumes:|^networks:)`, "ms"))?.groups.body ?? "";
+}
 
 test("given Windows, when resolving executables, then wrapper commands use cmd launchers", () => {
   // when / then
@@ -74,6 +79,18 @@ test("given a POSIX process already ended, when terminating its group, then clea
 
   // when / then
   assert.doesNotThrow(() => terminate(child, "linux", kill));
+});
+
+test("given multiple development processes, when stopping them, then only each child is passed to termination", () => {
+  // given
+  const children = [{ pid: 101 }, { pid: 102 }];
+  const terminated = [];
+
+  // when
+  terminateChildren(children, (...argumentsReceived) => terminated.push(argumentsReceived));
+
+  // then
+  assert.deepEqual(terminated, [[children[0]], [children[1]]]);
 });
 
 test("given lifecycle commands, when planning them, then only the isolated Dev project is targeted", () => {
@@ -165,8 +182,71 @@ test("given an unsupported argument, when parsing it, then it is rejected", () =
 
 test("given development modes, when validating ports, then debug adds only its listener", () => {
   // when / then
-  assert.deepEqual(requiredPorts(parseArguments(["dev"])), [5432, 8080, 5173]);
-  assert.deepEqual(requiredPorts(parseArguments(["dev-debug"])), [5432, 8080, 5173, 5005]);
+  assert.deepEqual(requiredPorts(parseArguments(["dev"])), [5432, 8080, 5173, 8082]);
+  assert.deepEqual(requiredPorts(parseArguments(["dev-debug"])), [5432, 8080, 5173, 8082, 5005]);
+});
+
+test("given retained development containers, when validating ports, then their listeners are reused", () => {
+  // given
+  const runningServices = new Set(["db", "api-ui", "api-proxy"]);
+
+  // when / then
+  assert.deepEqual(requiredPorts(parseArguments(["dev"]), runningServices), [8080, 5173]);
+  assert.deepEqual(requiredPorts(parseArguments(["dev-debug"]), runningServices), [8080, 5173, 5005]);
+});
+
+test("given local API tooling, when reading deployment contracts, then Swagger UI stays out of production", () => {
+  // given
+  const devCompose = readFileSync(fileURLToPath(new URL("../deploy/compose.dev.yaml", import.meta.url)), "utf8");
+  const uatCompose = readFileSync(fileURLToPath(new URL("../deploy/compose.uat.yaml", import.meta.url)), "utf8");
+  const uatCaddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.uat", import.meta.url)), "utf8");
+  const productionCompose = readFileSync(fileURLToPath(new URL("../deploy/compose.yaml", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(devCompose, /swaggerapi\/swagger-ui:[^\s]+@sha256:/);
+  assert.match(uatCompose, /swaggerapi\/swagger-ui:[^\s]+@sha256:/);
+  assert.match(devCompose, /SWAGGER_JSON_URL: \/api\/openapi\.yaml/);
+  assert.match(uatCompose, /SWAGGER_JSON_URL: \/api\/openapi\.yaml/);
+  assert.match(uatCaddy, /\/api-ui/);
+  assert.doesNotMatch(productionCompose, /swagger|api-ui/i);
+});
+
+test("given local API tooling, when reading its container boundaries, then Swagger cannot reach PostgreSQL", () => {
+  // given
+  const devCompose = readFileSync(fileURLToPath(new URL("../deploy/compose.dev.yaml", import.meta.url)), "utf8");
+  const uatCompose = readFileSync(fileURLToPath(new URL("../deploy/compose.uat.yaml", import.meta.url)), "utf8");
+
+  // when / then
+  for (const compose of [devCompose, uatCompose]) {
+    assert.match(composeService(compose, "db"), /networks:\n      - backend/);
+    assert.doesNotMatch(composeService(compose, "db"), /frontend/);
+    assert.match(composeService(compose, "api-ui"), /user: "101:101"/);
+    assert.match(composeService(compose, "api-ui"), /no-new-privileges:true/);
+    assert.match(composeService(compose, "api-ui"), /cap_drop:\n      - ALL/);
+    assert.match(composeService(compose, "api-ui"), /networks:\n      - frontend/);
+    assert.doesNotMatch(composeService(compose, "api-ui"), /backend/);
+  }
+  assert.match(composeService(uatCompose, "app"), /networks:\n      - backend\n      - frontend/);
+  assert.match(composeService(uatCompose, "proxy"), /networks:\n      - frontend/);
+});
+
+test("given the local API collection, when reading tracked requests, then secrets stay runtime-only", () => {
+  // given
+  const collection = readFileSync(fileURLToPath(new URL("../bruno/bruno.json", import.meta.url)), "utf8");
+  const devEnvironment = readFileSync(fileURLToPath(new URL("../bruno/environments/Dev.bru", import.meta.url)), "utf8");
+  const uatEnvironment = readFileSync(fileURLToPath(new URL("../bruno/environments/UAT.bru", import.meta.url)), "utf8");
+  const csrfRequest = readFileSync(fileURLToPath(new URL("../bruno/02 Authentication/01 Get session and CSRF token.bru", import.meta.url)), "utf8");
+  const loginRequest = readFileSync(fileURLToPath(new URL("../bruno/02 Authentication/02 Log in.bru", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(collection, /"name": "Courtside local API"/);
+  assert.match(devEnvironment, /baseUrl: http:\/\/127\.0\.0\.1:8082/);
+  assert.match(uatEnvironment, /baseUrl: https:\/\/localhost:8443/);
+  assert.doesNotMatch(`${devEnvironment}\n${uatEnvironment}`, /password|token/i);
+  assert.match(csrfRequest, /bru\.setVar\("csrfToken"/);
+  assert.match(loginRequest, /X-XSRF-TOKEN: \{\{csrfToken\}\}/);
+  assert.match(loginRequest, /username: \{\{username\}\}/);
+  assert.match(loginRequest, /password: \{\{password\}\}/);
 });
 
 test("given UAT source options, when parsing them, then verification and database exposure are explicit", () => {

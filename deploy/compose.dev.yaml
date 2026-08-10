@@ -12,11 +12,43 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - db:/var/lib/postgresql/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U courtside -d courtside_dev"]
       interval: 2s
       timeout: 3s
       retries: 20
 
+  api-ui:
+    image: swaggerapi/swagger-ui:v5.32.11@sha256:e43eb34b978af58d8cb78e5da9c12d605cf43d113ad3a96b18f9b028d6479d68
+    user: "101:101"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      BASE_URL: /api-ui
+      SWAGGER_JSON_URL: /api/openapi.yaml
+    networks:
+      - frontend
+
+  api-proxy:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    depends_on:
+      - api-ui
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8082:8080"
+    volumes:
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+    networks:
+      - frontend
+
 volumes:
   db:
+
+networks:
+  backend:
+  frontend:

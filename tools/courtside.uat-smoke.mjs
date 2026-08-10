@@ -41,6 +41,8 @@ try {
   const accountCount = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from user_account");
   const redirect = await localRequest({ secure: false, port: 8081, path: "/api/session" });
   const session = await localRequest({ secure: true, port: 8443, path: "/api/session" });
+  const apiUi = await localRequest({ secure: true, port: 8443, path: "/api-ui/" });
+  const apiDocument = await localRequest({ secure: true, port: 8443, path: "/api/openapi.yaml" });
   const csrfCookie = session.headers["set-cookie"].find((cookie) => cookie.startsWith("XSRF-TOKEN="));
   const csrfToken = csrfCookie.match(/^XSRF-TOKEN=([^;]+)/)[1];
   const login = await localRequest({
@@ -58,6 +60,10 @@ try {
 
   assert.equal(redirect.statusCode, 301);
   assert.equal(redirect.headers.location, "https://localhost:8443/api/session");
+  assert.equal(apiUi.statusCode, 200);
+  assert.match(apiUi.body, /Swagger UI/);
+  assert.equal(apiDocument.statusCode, 200);
+  assert.match(apiDocument.body, /^openapi: 3\.1\.0/m);
   assert.match(csrfCookie, /; Secure/i);
   assert.equal(login.statusCode, 200);
   assert.match(login.headers["set-cookie"].find((cookie) => cookie.startsWith("JSESSIONID=")), /; Secure; HttpOnly/i);
