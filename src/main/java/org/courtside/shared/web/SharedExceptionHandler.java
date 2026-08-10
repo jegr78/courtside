@@ -1,6 +1,7 @@
 package org.courtside.shared.web;
 
 import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.courtside.shared.DuplicateItemException;
 import tools.jackson.core.JacksonException;
 import org.springframework.core.Ordered;
@@ -56,6 +57,13 @@ class SharedExceptionHandler {
     ProblemDetail handleValidationFailure(MethodArgumentNotValidException exception) {
         return validationFailed(exception.getBindingResult().getFieldErrors().stream()
                 .map(SharedExceptionHandler::toMap)
+                .toList());
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    ProblemDetail handleMethodValidationFailure(ConstraintViolationException exception) {
+        return validationFailed(exception.getConstraintViolations().stream()
+                .map(violation -> toMap(lastPathNode(violation), violation))
                 .toList());
     }
 
@@ -199,6 +207,18 @@ class SharedExceptionHandler {
         }
 
         ConstraintViolation<?> violation = error.unwrap(ConstraintViolation.class);
+        return toMap(error.getField(), violation);
+    }
+
+    private static String lastPathNode(ConstraintViolation<?> violation) {
+        String field = null;
+        for (jakarta.validation.Path.Node node : violation.getPropertyPath()) {
+            field = node.getName();
+        }
+        return field == null ? "request" : field;
+    }
+
+    private static Map<String, Object> toMap(String field, ConstraintViolation<?> violation) {
         String constraintName = violation.getConstraintDescriptor().getAnnotation()
                 .annotationType().getSimpleName();
         Map<String, Object> attributes = violation.getConstraintDescriptor().getAttributes();
@@ -212,13 +232,13 @@ class SharedExceptionHandler {
         if ("Size".equals(constraintName) && Integer.valueOf(Integer.MAX_VALUE).equals(params.get("max"))) {
             params.remove("max");
             return Map.of(
-                    "field", error.getField(),
+                    "field", field,
                     "code", "validation.SizeAtLeast",
                     "params", params);
         }
 
         return Map.of(
-                "field", error.getField(),
+                "field", field,
                 "code", "validation." + constraintName,
                 "params", params);
     }

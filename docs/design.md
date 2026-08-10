@@ -28,9 +28,8 @@ actually answers to at `GET /api/openapi.yaml`. A tagged release builds a multi-
 image, publishes it to GHCR signed with cosign and carrying an SBOM attestation, and attaches the
 OpenAPI document to the release.
 
-Designed and not built: `Idempotency-Key` handling, the observability stack of
-section 9 beyond the health endpoint, container image scanning, CSV import, reports and exports,
-and the frontend.
+Designed and not built: the observability stack of section 9 beyond the health endpoint,
+container image scanning, CSV import, and reports and exports.
 
 ---
 

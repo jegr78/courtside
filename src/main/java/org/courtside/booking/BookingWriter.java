@@ -9,6 +9,7 @@ import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantKind;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
+import org.courtside.booking.internal.IdempotencyKeyRaceException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.card.ParticipantCard;
@@ -37,6 +38,7 @@ import java.util.stream.IntStream;
 class BookingWriter {
 
     private static final String OVERLAP_CONSTRAINT = "court_allocation_no_overlap";
+    private static final String IDEMPOTENCY_CONSTRAINT = "booking_idempotency_by_account";
 
     private final BookingRepository bookings;
     private final Clock clock;
@@ -47,6 +49,10 @@ class BookingWriter {
     private final ParticipantCardCapacity participantCardCapacity;
 
     UUID write(CreateBookingCommand command) {
+        return write(command, null, null);
+    }
+
+    UUID write(CreateBookingCommand command, String idempotencyKey, String requestFingerprint) {
         facility.requireBookableCourts(command.courtIds());
         BookingCard card = requireBookableCard(command.cardId());
 
@@ -63,6 +69,7 @@ class BookingWriter {
         command.courtIds().forEach(courtId -> booking.allocate(courtId, command.slot()));
         slots.forEach(booking::addParticipant);
         booking.joinSeries(command.seriesId());
+        booking.identifyRequest(idempotencyKey, requestFingerprint);
 
         try {
             bookings.saveAndFlush(booking);
@@ -70,6 +77,9 @@ class BookingWriter {
             if (isOverlap(e)) {
                 throw new CourtUnavailableException(
                         "One of the requested courts is already occupied for that time", e);
+            }
+            if (isConstraint(e, IDEMPOTENCY_CONSTRAINT)) {
+                throw new IdempotencyKeyRaceException(e);
             }
             throw e;
         }
@@ -100,8 +110,12 @@ class BookingWriter {
     }
 
     private boolean isOverlap(DataIntegrityViolationException e) {
+        return isConstraint(e, OVERLAP_CONSTRAINT);
+    }
+
+    private boolean isConstraint(DataIntegrityViolationException e, String constraint) {
         String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(OVERLAP_CONSTRAINT);
+        return message != null && message.contains(constraint);
     }
 
     private void checkRequiredRole(BookingCard card, Set<Role> callerRoles) {

@@ -296,6 +296,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
     private org.springframework.test.web.servlet.ResultActions postBooking(String body)
             throws Exception {
         return mockMvc.perform(post("/api/bookings")
+                .header("Idempotency-Key", UUID.randomUUID().toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
                 .with(csrf()));

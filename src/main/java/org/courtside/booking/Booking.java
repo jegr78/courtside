@@ -52,6 +52,12 @@ public class Booking {
     @Column(name = "series_id")
     private UUID seriesId;
 
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
+
+    @Column(name = "request_fingerprint", length = 64)
+    private String requestFingerprint;
+
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<CourtAllocation> allocations = new ArrayList<>();
 
@@ -97,5 +103,10 @@ public class Booking {
 
     void joinSeries(UUID seriesId) {
         this.seriesId = seriesId;
+    }
+
+    void identifyRequest(String idempotencyKey, String requestFingerprint) {
+        this.idempotencyKey = idempotencyKey;
+        this.requestFingerprint = requestFingerprint;
     }
 }
