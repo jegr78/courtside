@@ -7,6 +7,7 @@ import org.courtside.booking.internal.CardNotBookableException;
 import org.courtside.booking.internal.CardRoleRequiredException;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantKind;
+import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
@@ -43,6 +44,7 @@ class BookingWriter {
     private final CardService cards;
     private final FacilityService facility;
     private final PersonRepository personRepository;
+    private final ParticipantCardCapacity participantCardCapacity;
 
     UUID write(CreateBookingCommand command) {
         facility.requireBookableCourts(command.courtIds());
@@ -158,7 +160,7 @@ class BookingWriter {
             }
         }
 
-        checkCardCapacity(slots, command.slot());
+        participantCardCapacity.requireAvailableForSpecs(slots, command.slot());
 
         return slots;
     }
@@ -167,25 +169,6 @@ class BookingWriter {
         return cards.findParticipantCard(participantCardId)
                 .filter(ParticipantCard::isActive)
                 .isPresent();
-    }
-
-    private void checkCardCapacity(List<ParticipantSpec> slots, TimeSlot slot) {
-        Map<UUID, Long> namedCounts = slots.stream()
-                .filter(spec -> spec.kind() == ParticipantKind.CARD)
-                .collect(Collectors.groupingBy(ParticipantSpec::cardId, Collectors.counting()));
-
-        for (Map.Entry<UUID, Long> entry : namedCounts.entrySet()) {
-            ParticipantCard card = cards.findParticipantCard(entry.getKey()).orElseThrow();
-            if (!card.isLimited()) {
-                continue;
-            }
-            long usedAtThisTime = bookings.countCardUsageOverlapping(
-                    card.getId(), slot.start(), slot.end());
-            if (usedAtThisTime + entry.getValue() > card.getCapacity()) {
-                throw new ParticipantsInvalidException("booking.participants.cardUnavailable",
-                        Map.of("cardLabel", card.getLabel(), "capacity", card.getCapacity()));
-            }
-        }
     }
 
     private String allowedAsText(BookingCard card) {

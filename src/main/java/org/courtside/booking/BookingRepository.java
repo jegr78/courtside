@@ -51,6 +51,22 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                                    @Param("startsAt") Instant startsAt,
                                    @Param("endsAt") Instant endsAt);
 
+    @Query("""
+            SELECT count(distinct p) FROM BookingParticipant p
+            JOIN p.booking b
+            JOIN b.allocations a
+            WHERE p.cardId = :cardId
+              AND b.id NOT IN :excludedBookingIds
+              AND b.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND a.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND a.startsAt < :endsAt
+              AND a.endsAt > :startsAt
+            """)
+    long countCardUsageOverlappingExcluding(@Param("cardId") UUID cardId,
+                                            @Param("startsAt") Instant startsAt,
+                                            @Param("endsAt") Instant endsAt,
+                                            @Param("excludedBookingIds") Collection<UUID> excludedBookingIds);
+
     @EntityGraph(attributePaths = "allocations")
     @Query("""
             SELECT b FROM Booking b

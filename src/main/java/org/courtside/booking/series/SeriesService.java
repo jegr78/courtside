@@ -14,11 +14,13 @@ import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Role;
+import org.courtside.rules.RuleViolation;
 import org.courtside.shared.TimeSlot;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -53,6 +55,7 @@ public class SeriesService {
     private final FacilityService facility;
     private final CardService cards;
     private final BookingRuleGate ruleGate;
+    private final ParticipantCardCapacity participantCardCapacity;
     private final Clock clock;
     private final ZoneId zone;
 
@@ -64,6 +67,7 @@ public class SeriesService {
                          FacilityService facility,
                          CardService cards,
                          BookingRuleGate ruleGate,
+                         ParticipantCardCapacity participantCardCapacity,
                          Clock clock,
                          @Value("${courtside.booking.time-zone}") String zone) {
         this.schedule = schedule;
@@ -74,6 +78,7 @@ public class SeriesService {
         this.facility = facility;
         this.cards = cards;
         this.ruleGate = ruleGate;
+        this.participantCardCapacity = participantCardCapacity;
         this.clock = clock;
         this.zone = ZoneId.of(zone);
     }
@@ -185,9 +190,10 @@ public class SeriesService {
         List<PlannedMove> planned = affected.stream()
                 .map(booking -> planMove(booking, request))
                 .toList();
+        List<ParticipantCardCapacity.Target> targets = participantTargets(planned);
 
         List<MovePreview.Move> moves = planned.stream()
-                .map(move -> toPreviewMove(move, planned, movingIds))
+                .map(move -> toPreviewMove(move, planned, movingIds, targets))
                 .toList();
 
         return new MovePreview(moves);
@@ -209,10 +215,18 @@ public class SeriesService {
         List<MoveExecution> executions = preview.moves().stream()
                 .map(move -> planExecution(move, request))
                 .toList();
+        List<ParticipantCardCapacity.Target> targets = executions.stream()
+                .map(execution -> new ParticipantCardCapacity.Target(
+                        execution.booking().getId(), execution.booking().getParticipants(), execution.slot()))
+                .toList();
+        List<UUID> movingIds = movingBookingIds(executions);
 
         executions.forEach(execution -> {
             facility.requireBookableCourts(execution.courtIds());
             requireNoNonOverridableViolations(execution);
+            participantCardCapacity.requireAvailableForParticipants(
+                    execution.booking().getParticipants(), execution.slot(), execution.booking().getId(),
+                    movingIds, targets);
         });
 
         executions.forEach(execution -> execution.booking().clearAllocations());
@@ -233,6 +247,10 @@ public class SeriesService {
     }
 
     private record MoveExecution(Booking booking, List<UUID> courtIds, TimeSlot slot) {
+    }
+
+    private List<UUID> movingBookingIds(List<MoveExecution> executions) {
+        return executions.stream().map(execution -> execution.booking().getId()).toList();
     }
 
     private MoveExecution planExecution(MovePreview.Move move, MoveRequest request) {
@@ -283,14 +301,29 @@ public class SeriesService {
                 from, to, courts);
     }
 
-    private MovePreview.Move toPreviewMove(PlannedMove move, List<PlannedMove> planned, List<UUID> movingIds) {
+    private MovePreview.Move toPreviewMove(PlannedMove move, List<PlannedMove> planned,
+                                           List<UUID> movingIds,
+                                           List<ParticipantCardCapacity.Target> targets) {
         Set<UUID> blocked = new LinkedHashSet<>(allocations.findOccupiedCourtsExcluding(
                 move.courts(), move.to().start(), move.to().end(), movingIds));
         blocked.addAll(conflictingCourts(move, planned));
-        return new MovePreview.Move(move.bookingId(), move.from(), move.to(), List.copyOf(blocked),
-                facility.findUnbookableCourts(move.courts()),
+        Booking booking = bookingRepository.findWithParticipantsById(move.bookingId()).orElseThrow();
+        List<RuleViolation> violations = new ArrayList<>(
                 ruleGate.nonOverridableViolationsFor(
                         move.courts(), move.cardId(), move.to(), move.bookedBy()));
+        violations.addAll(participantCardCapacity.violationsFor(
+                booking.getParticipants(), move.to(), move.bookingId(), movingIds, targets));
+        return new MovePreview.Move(move.bookingId(), move.from(), move.to(), List.copyOf(blocked),
+                facility.findUnbookableCourts(move.courts()),
+                violations);
+    }
+
+    private List<ParticipantCardCapacity.Target> participantTargets(List<PlannedMove> planned) {
+        return planned.stream()
+                .map(move -> new ParticipantCardCapacity.Target(move.bookingId(),
+                        bookingRepository.findWithParticipantsById(move.bookingId()).orElseThrow()
+                                .getParticipants(), move.to()))
+                .toList();
     }
 
     private List<UUID> conflictingCourts(PlannedMove move, List<PlannedMove> planned) {
