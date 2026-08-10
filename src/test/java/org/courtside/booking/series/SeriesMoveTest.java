@@ -3,7 +3,10 @@ package org.courtside.booking.series;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.CourtNotBookableException;
 import org.courtside.booking.internal.BookingNotOwnedException;
+import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.booking.BookingRepository;
+import org.courtside.booking.Booking;
+import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CourtAllocation;
@@ -37,6 +40,10 @@ class SeriesMoveTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
             UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID MEMBER_BOOKING_CARD =
+            UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID BALL_MACHINE =
+            UUID.fromString("55555555-5555-5555-5555-555555555555");
 
     @Autowired
     private SeriesService seriesService;
@@ -215,6 +222,60 @@ class SeriesMoveTest extends AbstractIntegrationTest {
                                 .containsExactly("booking.rule.slotGrid.misaligned"));
 
         assertThat(startOf(series.bookingIds().getFirst())).isEqualTo(unchanged);
+    }
+
+    @Test
+    void givenAParticipantCardIsUnavailableAtTheTarget_whenMoving_thenNothingMovesAtAll() {
+        // given
+        SeriesCreationResult series = createSeries(1);
+        Booking seriesBooking = bookings.findWithParticipantsById(series.bookingIds().getFirst()).orElseThrow();
+        seriesBooking.addParticipant(ParticipantSpec.card(BALL_MACHINE));
+        bookings.saveAndFlush(seriesBooking);
+        Booking competingBooking = new Booking(MEMBER_BOOKING_CARD, UUID.randomUUID(), null,
+                Instant.parse("2026-04-01T10:00:00Z"));
+        competingBooking.allocate(courtTwo, new TimeSlot(
+                Instant.parse("2026-04-07T18:00:00Z"), Instant.parse("2026-04-07T20:00:00Z")));
+        competingBooking.addParticipant(ParticipantSpec.card(BALL_MACHINE));
+        bookings.saveAndFlush(competingBooking);
+        Instant unchanged = startOf(series.bookingIds().getFirst());
+        MoveRequest request = new MoveRequest(
+                series.seriesId(), series.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
+                LocalTime.of(20, 0), null, null);
+
+        // when
+        MovePreview preview = seriesService.previewMove(request, trainer, Set.of(Role.TRAINER));
+
+        // then
+        assertThat(preview.isExecutable()).isFalse();
+        assertThat(preview.moves().getFirst().violations()).extracting(RuleViolation::code)
+                .containsExactly("booking.participants.cardUnavailable");
+
+        // when / then
+        assertThatThrownBy(() -> seriesService.move(request, trainer, Set.of(Role.TRAINER)))
+                .isInstanceOf(ParticipantsInvalidException.class)
+                .extracting("code")
+                .isEqualTo("booking.participants.cardUnavailable");
+
+        assertThat(startOf(series.bookingIds().getFirst())).isEqualTo(unchanged);
+    }
+
+    @Test
+    void givenAParticipantCardOnTheMovingBooking_whenTargetOverlapsItsOldSlot_thenItDoesNotCountItself() {
+        // given
+        SeriesCreationResult series = createSeries(1);
+        Booking seriesBooking = bookings.findWithParticipantsById(series.bookingIds().getFirst()).orElseThrow();
+        seriesBooking.addParticipant(ParticipantSpec.card(BALL_MACHINE));
+        bookings.saveAndFlush(seriesBooking);
+
+        // when
+        int moved = seriesService.move(new MoveRequest(
+                series.seriesId(), series.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
+                LocalTime.of(19, 0), null, null), trainer, Set.of(Role.TRAINER));
+
+        // then
+        assertThat(moved).isOne();
+        assertThat(startOf(series.bookingIds().getFirst()))
+                .isEqualTo(Instant.parse("2026-04-07T17:00:00Z"));
     }
 
     private Instant startOf(UUID bookingId) {
