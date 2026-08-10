@@ -1,6 +1,9 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.Court;
+import org.courtside.facility.CourtRepository;
+import org.postgresql.util.PSQLException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,13 +30,18 @@ class BookingSeriesTest extends AbstractIntegrationTest {
     private BookingSeriesRepository series;
 
     @Autowired
+    private CourtRepository courts;
+
+    @Autowired
     private JdbcClient jdbc;
 
     @Test
     void givenASeriesEndingOnADate_whenStored_thenTheRuleSurvivesTheRoundTrip() {
         // given
+        UUID firstCourt = courts.save(new Court(1, "Court 1")).getId();
+        UUID secondCourt = courts.save(new Court(2, "Court 2")).getId();
         SeriesRule rule = new SeriesRule(
-                List.of(UUID.randomUUID(), UUID.randomUUID()), TRAINING_CARD,
+                List.of(firstCourt, secondCourt), TRAINING_CARD,
                 LocalDate.of(2026, 4, 7), LocalTime.of(18, 0), 120,
                 1, Set.of(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY),
                 LocalDate.of(2026, 9, 29), null);
@@ -48,6 +56,59 @@ class BookingSeriesTest extends AbstractIntegrationTest {
         assertThat(stored.endsOn()).isEqualTo(LocalDate.of(2026, 9, 29));
         assertThat(stored.occurrenceCount()).isNull();
         assertThat(stored.durationMinutes()).isEqualTo(120);
+        assertThat(stored.courtIds()).containsExactly(firstCourt, secondCourt);
+    }
+
+    @Test
+    void givenASeriesReferencesAnUnknownCourt_whenStored_thenTheDatabaseRefusesIt() {
+        // given
+        SeriesRule rule = new SeriesRule(
+                List.of(UUID.randomUUID()), TRAINING_CARD,
+                LocalDate.of(2026, 4, 7), LocalTime.of(18, 0), 120,
+                1, Set.of(DayOfWeek.TUESDAY), null, 2);
+
+        // when / then
+        assertThatThrownBy(() -> series.saveAndFlush(
+                new BookingSeries(rule, UUID.randomUUID(), "Training", CREATED_AT)))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("booking_series_court_court_fk");
+    }
+
+    @Test
+    void givenACourtReferencedByASeries_whenDeletingIt_thenTheDatabaseRefusesIt() {
+        // given
+        UUID courtId = courts.save(new Court(1, "Court 1")).getId();
+        SeriesRule rule = new SeriesRule(
+                List.of(courtId), TRAINING_CARD,
+                LocalDate.of(2026, 4, 7), LocalTime.of(18, 0), 120,
+                1, Set.of(DayOfWeek.TUESDAY), null, 2);
+        series.saveAndFlush(new BookingSeries(
+                rule, UUID.randomUUID(), "Training", CREATED_AT));
+
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("DELETE FROM court WHERE id = ?")
+                        .param(courtId)
+                        .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("booking_series_court_court_fk");
+    }
+
+    @Test
+    void givenASeriesWithoutAnyCourt_whenInsertedDirectly_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO booking_series (id, card_id, starts_on, start_time,
+                                                    duration_minutes, interval_weeks, weekdays,
+                                                    occurrence_count)
+                        VALUES (gen_random_uuid(), '22222222-2222-2222-2222-222222222222',
+                                DATE '2026-04-07', TIME '18:00', 120, 1,
+                                ARRAY[2]::smallint[], 2)
+                        """).update())
+                .isInstanceOfSatisfying(DataIntegrityViolationException.class, failure ->
+                        assertThat(failure.getRootCause()).isInstanceOfSatisfying(
+                                PSQLException.class, sqlFailure ->
+                                        assertThat(sqlFailure.getServerErrorMessage().getConstraint())
+                                                .isEqualTo("booking_series_has_a_court")));
     }
 
     @Test
@@ -144,11 +205,10 @@ class BookingSeriesTest extends AbstractIntegrationTest {
     void givenARowWithAZeroOccurrenceCount_whenInsertedDirectly_thenTheDatabaseRefusesIt() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""
-                        INSERT INTO booking_series (id, card_id, court_ids, starts_on, start_time,
+                        INSERT INTO booking_series (id, card_id, starts_on, start_time,
                                                     duration_minutes, interval_weeks, weekdays,
                                                     occurrence_count)
                         VALUES (gen_random_uuid(), '22222222-2222-2222-2222-222222222222',
-                                ARRAY['11111111-1111-1111-1111-111111111111']::uuid[],
                                 DATE '2026-04-07', TIME '18:00', 120, 1, ARRAY[2]::smallint[], 0)
                         """).update())
                 .isInstanceOf(DataIntegrityViolationException.class);

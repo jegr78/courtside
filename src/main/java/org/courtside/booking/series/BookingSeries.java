@@ -1,8 +1,13 @@
 package org.courtside.booking.series;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -12,6 +17,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -30,8 +36,12 @@ public class BookingSeries {
     private UUID cardId;
 
     @Getter(AccessLevel.NONE)
-    @Column(name = "court_ids", nullable = false)
-    private UUID[] courtIds;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "booking_series_court",
+            joinColumns = @JoinColumn(name = "booking_series_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "court_id", nullable = false)
+    private List<UUID> courtIds = new ArrayList<>();
 
     @Column(name = "starts_on", nullable = false)
     private LocalDate startsOn;
@@ -66,7 +76,7 @@ public class BookingSeries {
     public BookingSeries(SeriesRule rule, UUID createdBy, String note, Instant createdAt) {
         this.id = UUID.randomUUID();
         this.cardId = rule.cardId();
-        this.courtIds = rule.courtIds().toArray(UUID[]::new);
+        this.courtIds = new ArrayList<>(rule.courtIds());
         this.startsOn = rule.startsOn();
         this.startTime = rule.startTime();
         this.durationMinutes = (short) rule.durationMinutes();
@@ -85,7 +95,7 @@ public class BookingSeries {
             days.add(DayOfWeek.of(weekday));
         }
         return new SeriesRule(
-                List.of(courtIds), cardId, startsOn, startTime,
+                List.copyOf(courtIds), cardId, startsOn, startTime,
                 durationMinutes, intervalWeeks, days, endsOn,
                 occurrenceCount == null ? null : occurrenceCount.intValue());
     }

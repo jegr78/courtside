@@ -102,10 +102,9 @@ class CheckConstraintTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""
                         INSERT INTO booking_series
-                            (id, card_id, court_ids, starts_on, start_time,
+                            (id, card_id, starts_on, start_time,
                              duration_minutes, interval_weeks, weekdays, occurrence_count)
                         VALUES (?, '11111111-1111-1111-1111-111111111111',
-                                ARRAY['dddddddd-0000-0000-0000-000000000001']::uuid[],
                                 '2026-05-12', '18:00', 60, 1, '{8}', 1)
                         """)
                         .params(UUID.randomUUID())
