@@ -31,6 +31,7 @@ $env:JAVA_HOME = "C:\path\to\temurin-25"
 | `node tools/courtside.mjs uat --skip-verify` | Builds and starts local source without the quality gate. |
 | `node tools/courtside.mjs uat --version <tag>` | Runs an exact published GHCR version instead of local source. |
 | `node tools/courtside.mjs uat --db-port` | Starts UAT and exposes PostgreSQL on loopback port 5433. |
+| `node tools/courtside.mjs uat share` | Starts UAT when needed and shares it temporarily through Tailscale Funnel. |
 | `node tools/courtside.mjs uat-stop` | Stops UAT without deleting its database or local CA. |
 | `node tools/courtside.mjs uat-logs` | Follows all UAT container logs. |
 | `node tools/courtside.mjs uat-db-shell` | Opens `psql` inside the private UAT database container. |
@@ -105,6 +106,45 @@ command for the current operating system. Trusting the CA removes browser and RE
 it changes the system trust store and may require administrator rights. Remove the certificate from
 the trust store when it is no longer needed. A normal UAT reset retains the CA, while `--all`
 deletes it and the next start creates a new certificate.
+
+### Temporary public sharing
+
+`node tools/courtside.mjs uat share` performs a read-only Tailscale preflight before changing
+anything. The device must be connected to Tailscale, MagicDNS and HTTPS certificates must be
+enabled, and the tailnet policy must grant the device the `funnel` capability. Configure these
+prerequisites in the Tailscale administration console; Courtside neither stores a Tailscale API
+token nor changes tailnet policy.
+
+The command refuses to start when any foreign Serve or Funnel handler exists. It never replaces or
+resets another application's configuration. A successful session stays attached to the terminal
+and prints its public `https://*.ts.net/` address. Press `Ctrl+C` to remove the public route while
+leaving the UAT containers and persistent database running. `uat-stop` and both `uat-reset` modes
+also remove a Courtside-owned route. A cleanup failure exits with an error and identifies the
+manual `tailscale funnel reset` recovery command; verify ownership before running it.
+
+Funnel reaches a dedicated Caddy listener bound to `127.0.0.1:8083`. It exposes the PWA and its
+application API, replaces forwarded headers, preserves the outer HTTPS request context, adds
+security and no-index headers, and returns `404` for `/api-ui`, `/api/openapi.yaml`, and
+`/actuator`. PostgreSQL remains private. Ordinary `uat` startup never enables Funnel.
+
+The Funnel URL is public internet access, not tailnet access control. Use only synthetic data and
+individual test accounts, never production data, personal data, or a shared administrator account.
+All public requests currently reach application-level address throttling through the trusted proxy
+boundary; do not assume that this represents an end user's public address. The global login limit
+remains the dependable protection until client-address behavior has been verified against the
+installed Tailscale version.
+
+An exit node does not publish UAT. It is optional client-side test infrastructure for checking how
+Courtside behaves through another network or geographic egress. Funnel is the mechanism that makes
+the temporary UAT address reachable by testers who are not tailnet members.
+
+For release verification on macOS, Linux, and Windows, run `uat share` in a terminal, open the
+reported URL in a browser on a device that is not a tailnet member, install or launch the PWA, and
+complete login, CSRF-protected changes, navigation, and sign-out. Confirm that `/api-ui/`,
+`/api/openapi.yaml`, and `/actuator/health` return `404`. Press `Ctrl+C`, verify that the local UAT
+site and its data remain available, and use `status uat` to confirm that Funnel reports `none`.
+Repeat `uat-stop` with an active Courtside share and confirm the same cleanup before treating that
+platform as verified.
 
 ### Persistence and recovery
 

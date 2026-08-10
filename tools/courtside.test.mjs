@@ -5,10 +5,10 @@ import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import {
-  executableNames, frontendInstallPlan, lifecyclePlan, listenerOutputMatches, parseArguments,
-  newBootstrapPassword, processPlans, requiredPorts, restoreDatabase, startProcesses, terminate,
-  terminateChildren,
-  uatComposeArgs, uatResetPlans
+  assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
+  funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
+  processPlans, requiredPorts, restoreDatabase, startProcesses, superviseFunnel, terminate,
+  terminateChildren, uatComposeArgs, uatResetPlans
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
@@ -259,6 +259,142 @@ test("given UAT source options, when parsing them, then verification and databas
   assert.equal(options.version, undefined);
 });
 
+test("given an explicit UAT share command, when parsing it, then detached exposure is impossible", () => {
+  // when / then
+  assert.equal(parseArguments(["uat", "share"]).command, "uat-share");
+  assert.throws(() => parseArguments(["uat", "share", "--detach"]), /Unknown option/);
+});
+
+test("given a connected Funnel-capable node, when parsing its status, then sharing prerequisites are known", () => {
+  // given
+  const status = JSON.stringify({
+    BackendState: "Running",
+    Self: {
+      ID: "node-example",
+      DNSName: "uat.example.ts.net.",
+      CapMap: {
+        "https://tailscale.com/cap/funnel-ports?ports=443,8443,10000": null,
+        "https": null
+      }
+    }
+  });
+
+  // when / then
+  assert.deepEqual(parseTailscaleNodeStatus(status), {
+    connected: true,
+    nodeId: "node-example",
+    dnsName: "uat.example.ts.net",
+    funnelCapable: true,
+    httpsCapable: true
+  });
+});
+
+test("given a foreign Funnel handler, when classifying it, then Courtside cannot claim ownership", () => {
+  // given
+  const status = JSON.stringify({
+    TCP: { "443": { HTTPS: true } },
+    Web: {
+      "uat.example.ts.net:443": {
+        Handlers: { "/foreign-service": { Proxy: "http://127.0.0.1:19090/foreign-service" } }
+      }
+    },
+    AllowFunnel: { "uat.example.ts.net:443": true }
+  });
+
+  // when / then
+  const funnel = classifyFunnelConfig(status);
+  assert.deepEqual(funnel, { ownership: "foreign" });
+  assert.throws(() => assertFunnelShareable(funnel), /left it unchanged/);
+});
+
+test("given the exact Courtside Funnel handler without a marker, when classifying it, then it remains unclaimed", () => {
+  // given
+  const status = JSON.stringify({
+    TCP: { "443": { HTTPS: true } },
+    Web: {
+      "uat.example.ts.net:443": {
+        Handlers: { "/": { Proxy: "http://127.0.0.1:8083" } }
+      }
+    },
+    AllowFunnel: { "uat.example.ts.net:443": true }
+  });
+
+  // when / then
+  assert.deepEqual(classifyFunnelConfig(status), {
+    ownership: "unclaimed",
+    publicUrl: "https://uat.example.ts.net/"
+  });
+  assert.throws(() => assertFunnelShareable(classifyFunnelConfig(status)), /left it unchanged/);
+});
+
+test("given the exact Courtside Funnel handler and marker, when classifying it, then ownership is node-bound", () => {
+  // given
+  const status = JSON.stringify({
+    TCP: { "443": { HTTPS: true } },
+    Web: {
+      "uat.example.ts.net:443": {
+        Handlers: { "/": { Proxy: "http://127.0.0.1:8083" } }
+      }
+    },
+    AllowFunnel: { "uat.example.ts.net:443": true }
+  });
+  const marker = { target: "http://127.0.0.1:8083", nodeId: "node-example" };
+
+  // when / then
+  assert.deepEqual(classifyFunnelConfig(status, marker, "node-example"), {
+    ownership: "courtside",
+    publicUrl: "https://uat.example.ts.net/"
+  });
+  assert.equal(classifyFunnelConfig(status, marker, "other-node").ownership, "unclaimed");
+  assert.deepEqual(classifyFunnelConfig("{}"), { ownership: "none" });
+});
+
+test("given a public UAT target, when planning Funnel, then it stays attached to the CLI", () => {
+  // when
+  const plan = funnelPlan("tailscale");
+
+  // then
+  assert.deepEqual(plan, {
+    command: "tailscale",
+    args: ["funnel", "--yes", "--https=443", "http://127.0.0.1:8083"]
+  });
+  assert.equal(plan.args.includes("--bg"), false);
+});
+
+test("given Funnel ownership, when planning cleanup, then only Courtside can be reset", () => {
+  // when / then
+  assert.deepEqual(funnelResetPlan("tailscale", { ownership: "courtside" }), {
+    command: "tailscale",
+    args: ["funnel", "reset"]
+  });
+  assert.equal(funnelResetPlan("tailscale", { ownership: "none" }), undefined);
+  assert.equal(funnelResetPlan("tailscale", { ownership: "unclaimed" }), undefined);
+  assert.throws(() => funnelResetPlan("tailscale", { ownership: "foreign" }, true), /not reset/);
+  assert.throws(() => funnelResetPlan("tailscale", { ownership: "unclaimed" }, true), /not reset/);
+});
+
+test("given an attached Funnel session, when interrupted, then it is stopped and cleaned up", async () => {
+  // given
+  const signals = new EventEmitter();
+  const child = new EventEmitter();
+  child.kill = () => child.emit("exit", 0);
+  const cleaned = [];
+
+  // when
+  const sharing = superviseFunnel(funnelPlan("tailscale"), {
+    spawn: () => child,
+    signals,
+    cleanup: () => cleaned.push(true),
+    platform: "linux"
+  });
+  child.emit("spawn");
+  signals.emit("SIGINT");
+  await sharing;
+
+  // then
+  assert.deepEqual(cleaned, [true]);
+});
+
 test("given a published UAT version, when parsing it, then only an image-safe tag is accepted", () => {
   // when / then
   assert.equal(parseArguments(["uat", "--version", "1.2.3"]).version, "1.2.3");
@@ -308,6 +444,7 @@ test("given UAT persistence, when reading its Compose contract, then data, CA, T
   const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.uat.yaml", import.meta.url)), "utf8");
   const databaseOverride = readFileSync(fileURLToPath(new URL("../deploy/compose.uat-db.yaml", import.meta.url)), "utf8");
   const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.uat", import.meta.url)), "utf8");
+  const localCaddy = caddy.slice(0, caddy.indexOf("http://:8083"));
 
   // when / then
   assert.match(compose, /COURTSIDE_COOKIE_SECURE: "true"/);
@@ -321,8 +458,24 @@ test("given UAT persistence, when reading its Compose contract, then data, CA, T
   assert.match(compose, /caddy-data:\/data/);
   assert.match(compose, /db:\/var\/lib\/postgresql\/data/);
   assert.match(caddy, /redir https:\/\/localhost:8443\{uri\} permanent/);
-  assert.doesNotMatch(caddy, /Strict-Transport-Security/);
+  assert.doesNotMatch(localCaddy, /Strict-Transport-Security/);
   assert.doesNotMatch(compose, /demo/);
+});
+
+test("given the Funnel ingress, when reading its proxy contract, then only application traffic is public", () => {
+  // given
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.uat.yaml", import.meta.url)), "utf8");
+  const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.uat", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(compose, /127\.0\.0\.1:8083:8083/);
+  assert.match(caddy, /http:\/\/:8083/);
+  assert.match(caddy, /X-Robots-Tag "noindex, nofollow"/);
+  assert.match(caddy, /Strict-Transport-Security/);
+  assert.match(caddy, /@private path \/api-ui\* \/actuator\* \/api\/openapi\.yaml/);
+  assert.match(caddy, /respond @private 404/);
+  assert.match(caddy, /header_up X-Forwarded-Proto https/);
+  assert.match(caddy, /header_up X-Forwarded-Port 443/);
 });
 
 test("given a fresh UAT database, when creating its bootstrap password, then it is unpredictable and strong", () => {

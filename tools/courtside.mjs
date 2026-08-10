@@ -15,8 +15,10 @@ const devComposeArgs = ["compose", "-p", "courtside-dev", "-f", devComposeFile];
 const uatComposeFile = join(root, "deploy", "compose.uat.yaml");
 const uatDbComposeFile = join(root, "deploy", "compose.uat-db.yaml");
 const uatProject = "courtside-uat";
+const funnelTarget = "http://127.0.0.1:8083";
 const stateFile = join(root, "build", "dev-processes.json");
 const uatStateFile = join(root, "build", "uat-environment.json");
+const uatFunnelStateFile = join(root, "build", "uat-funnel.json");
 
 export function executableNames(platform = process.platform) {
   return {
@@ -26,10 +28,15 @@ export function executableNames(platform = process.platform) {
 }
 
 export function parseArguments(argv) {
-  const [command, ...flags] = argv;
+  let [command, ...flags] = argv;
+  if (command === "uat" && flags[0] === "share") {
+    command = "uat-share";
+    flags = flags.slice(1);
+  }
   const supported = new Set([
     "build", "verify", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
-    "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore", "uat-reset", "status", "help"
+    "uat-share", "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore",
+    "uat-reset", "status", "help"
   ]);
   if (!command || !supported.has(command)) {
     throw new Error(command ? `Unknown command: ${command}` : "A command is required");
@@ -92,6 +99,127 @@ function validateImageVersion(version) {
 export function uatComposeArgs(withDatabasePort = false) {
   return ["compose", "-p", uatProject, "-f", uatComposeFile,
     ...(withDatabasePort ? ["-f", uatDbComposeFile] : [])];
+}
+
+export function parseTailscaleNodeStatus(output) {
+  const status = parseJsonObject(output, "Tailscale status");
+  const capabilities = Object.keys(status.Self?.CapMap ?? {});
+  return {
+    connected: status.BackendState === "Running",
+    nodeId: typeof status.Self?.ID === "string" ? status.Self.ID : "",
+    dnsName: typeof status.Self?.DNSName === "string" ? status.Self.DNSName.replace(/\.$/, "") : "",
+    funnelCapable: capabilities.some((capability) =>
+      capability === "funnel" || capability.includes("tailscale.com/cap/funnel")),
+    httpsCapable: capabilities.some((capability) =>
+      capability === "https" || capability.includes("tailscale.com/cap/https"))
+  };
+}
+
+export function classifyFunnelConfig(output, marker, nodeId) {
+  const status = parseJsonObject(output, "Tailscale Funnel status");
+  const tcp = status.TCP ?? {};
+  const web = status.Web ?? {};
+  const allowed = status.AllowFunnel ?? {};
+  const hasConfiguration = Object.keys(tcp).length > 0
+    || Object.keys(web).length > 0
+    || Object.keys(allowed).length > 0;
+  if (!hasConfiguration) return { ownership: "none" };
+  const webEntries = Object.entries(web);
+  const allowedEntries = Object.entries(allowed);
+  const handlers = webEntries[0]?.[1]?.Handlers ?? {};
+  const handlerEntries = Object.entries(handlers);
+  const hasCourtsideTarget = Object.keys(tcp).length === 1
+    && tcp["443"]?.HTTPS === true
+    && webEntries.length === 1
+    && handlerEntries.length === 1
+    && handlerEntries[0][0] === "/"
+    && handlerEntries[0][1]?.Proxy === funnelTarget
+    && allowedEntries.length === 1
+    && allowedEntries[0][0] === webEntries[0][0]
+    && allowedEntries[0][1] === true;
+  if (!hasCourtsideTarget) return { ownership: "foreign" };
+  const isCourtside = marker?.target === funnelTarget
+    && typeof marker.nodeId === "string"
+    && marker.nodeId.length > 0
+    && marker.nodeId === nodeId;
+  return {
+    ownership: isCourtside ? "courtside" : "unclaimed",
+    publicUrl: `https://${webEntries[0][0].replace(/:443$/, "")}/`
+  };
+}
+
+export function funnelPlan(command) {
+  return {
+    command,
+    args: ["funnel", "--yes", "--https=443", funnelTarget]
+  };
+}
+
+export function assertFunnelShareable(funnel) {
+  if (!["none", "courtside"].includes(funnel.ownership)) {
+    throw new Error("Another Tailscale Serve or Funnel configuration is active; Courtside left it unchanged");
+  }
+  return funnel;
+}
+
+export function funnelResetPlan(command, funnel, required = false) {
+  if (funnel.ownership === "courtside") {
+    return { command, args: ["funnel", "reset"] };
+  }
+  if (funnel.ownership !== "none" && required) {
+    throw new Error("The active Funnel no longer belongs exclusively to Courtside and was not reset");
+  }
+  return undefined;
+}
+
+export function superviseFunnel(plan, runtime) {
+  return new Promise((resolveSession, rejectSession) => {
+    const child = runtime.spawn(plan.command, plan.args, {
+      cwd: root,
+      stdio: "inherit"
+    });
+    let stopping = false;
+    let finished = false;
+    const stop = () => {
+      if (finished || stopping) return;
+      stopping = true;
+      child.kill(runtime.platform === "win32" ? undefined : "SIGINT");
+    };
+    const removeSignalListeners = () => {
+      runtime.signals.removeListener("SIGINT", stop);
+      runtime.signals.removeListener("SIGTERM", stop);
+    };
+    const finish = async (code, failure) => {
+      if (finished) return;
+      finished = true;
+      removeSignalListeners();
+      try {
+        await runtime.cleanup();
+      } catch (cleanupFailure) {
+        rejectSession(cleanupFailure);
+        return;
+      }
+      if (failure) {
+        rejectSession(failure);
+      } else if (!stopping && code !== 0) {
+        rejectSession(new Error(`${plan.command} exited with status ${code}`));
+      } else {
+        resolveSession();
+      }
+    };
+    runtime.signals.once("SIGINT", stop);
+    runtime.signals.once("SIGTERM", stop);
+    child.once("error", (failure) => void finish(undefined, failure));
+    child.once("exit", (code) => void finish(code ?? 1));
+  });
+}
+
+function parseJsonObject(output, label) {
+  const parsed = parseJson(output);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`${label} was not valid JSON`);
+  }
+  return parsed;
 }
 
 export function processPlans(options, platform = process.platform) {
@@ -176,7 +304,7 @@ async function main() {
       return;
     }
     validateNode();
-    if (["build", "verify", "dev", "dev-debug", "uat"].includes(options.command) && !options.version) {
+    if (["build", "verify", "dev", "dev-debug", "uat", "uat-share"].includes(options.command) && !options.version) {
       validateJava();
     }
     if (!["build", "help"].includes(options.command)) {
@@ -203,12 +331,21 @@ async function execute(options) {
     process.stdout.write("Development data removed. Run 'dev' to create it again.\n");
     return;
   }
-  if (["uat-stop", "uat-logs", "uat-db-shell"].includes(options.command)) {
+  if (options.command === "uat-stop") {
+    cleanupUatFunnel();
+    runInteractive(lifecyclePlan(options.command));
+    return;
+  }
+  if (["uat-logs", "uat-db-shell"].includes(options.command)) {
     runInteractive(lifecyclePlan(options.command));
     return;
   }
   if (options.command === "uat") {
     startUat(options);
+    return;
+  }
+  if (options.command === "uat-share") {
+    await shareUat();
     return;
   }
   if (options.command === "uat-cert") {
@@ -277,6 +414,125 @@ function uatEnvironment(version, password) {
     COURTSIDE_UAT_IMAGE: version ? `ghcr.io/jegr78/courtside:${version}` : "courtside:uat-local",
     COURTSIDE_UAT_ADMIN_PASSWORD: password
   };
+}
+
+async function shareUat() {
+  const tailscale = locateTailscale();
+  const node = parseTailscaleNodeStatus(tailscale.status);
+  requireFunnelPrerequisites(node);
+  const existing = assertFunnelShareable(readFunnelConfig(tailscale.command, readUatFunnelState(), node.nodeId));
+  if (existing.ownership === "courtside") {
+    resetFunnel(tailscale.command);
+  }
+  rmSync(uatFunnelStateFile, { force: true });
+  if (!await isUatShareReady()) {
+    startUat(parseArguments(["uat"]));
+  }
+  if (!await isUatShareReady()) {
+    throw new Error("The UAT public ingress is not ready on 127.0.0.1:8083");
+  }
+  const currentTailscale = locateTailscale();
+  const currentNode = parseTailscaleNodeStatus(currentTailscale.status);
+  requireFunnelPrerequisites(currentNode);
+  assertFunnelShareable(readFunnelConfig(currentTailscale.command));
+  mkdirSync(dirname(uatFunnelStateFile), { recursive: true });
+  writeFileSync(uatFunnelStateFile, `${JSON.stringify({ target: funnelTarget, nodeId: currentNode.nodeId }, null, 2)}\n`, { mode: 0o600 });
+  process.stdout.write("Public UAT requires synthetic data and individual test accounts. Press Ctrl+C to stop sharing.\n");
+  await superviseFunnel(funnelPlan(currentTailscale.command), {
+    spawn,
+    signals: process,
+    platform: process.platform,
+    cleanup: () => cleanupUatFunnel(true)
+  });
+}
+
+async function isUatShareReady() {
+  try {
+    const response = await localRequest({ secure: false, port: 8083, path: "/api/source" });
+    return response.statusCode === 200;
+  } catch {
+    return false;
+  }
+}
+
+function requireFunnelPrerequisites(status) {
+  if (!status.connected) {
+    throw new Error("Tailscale is not connected");
+  }
+  if (!status.dnsName || !status.nodeId) {
+    throw new Error("Tailscale MagicDNS is not available for this device");
+  }
+  if (!status.httpsCapable || !status.funnelCapable) {
+    throw new Error("Tailscale HTTPS certificates and Funnel authorization must be enabled by a tailnet administrator");
+  }
+}
+
+function tailscaleCandidates(platform = process.platform, environment = process.env) {
+  if (platform === "darwin") {
+    return ["tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale"];
+  }
+  if (platform === "win32") {
+    return ["tailscale.exe", join(environment.ProgramFiles ?? "C:\\Program Files", "Tailscale", "tailscale.exe")];
+  }
+  return ["tailscale"];
+}
+
+function locateTailscale() {
+  for (const command of tailscaleCandidates()) {
+    const result = spawnSync(command, ["status", "--json"], { encoding: "utf8" });
+    if (!result.error && result.status === 0) {
+      return { command, status: result.stdout };
+    }
+    if (result.error?.code !== "ENOENT") {
+      throw new Error(`Tailscale status failed: ${(result.stderr ?? result.error?.message ?? "unknown error").trim()}`);
+    }
+  }
+  throw new Error("The Tailscale CLI is required for public UAT sharing");
+}
+
+function readFunnelConfig(command, marker, nodeId) {
+  const result = spawnSync(command, ["funnel", "status", "--json"], { encoding: "utf8" });
+  if (result.error || result.status !== 0) {
+    throw new Error(`Tailscale Funnel status failed: ${(result.stderr ?? result.error?.message ?? "unknown error").trim()}`);
+  }
+  return classifyFunnelConfig(result.stdout, marker, nodeId);
+}
+
+function readUatFunnelState() {
+  try {
+    const marker = JSON.parse(readFileSync(uatFunnelStateFile, "utf8"));
+    return typeof marker === "object" && marker !== null ? marker : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resetFunnel(command) {
+  const plan = funnelResetPlan(command, { ownership: "courtside" });
+  const result = spawnSync(plan.command, plan.args, { stdio: "inherit" });
+  if (result.error || result.status !== 0) {
+    throw new Error("Courtside could not disable its Funnel. Run 'tailscale funnel reset' after verifying ownership");
+  }
+}
+
+function cleanupUatFunnel(required = existsSync(uatFunnelStateFile)) {
+  let tailscale;
+  try {
+    tailscale = locateTailscale();
+  } catch (failure) {
+    if (required) throw failure;
+    return;
+  }
+  const node = parseTailscaleNodeStatus(tailscale.status);
+  const funnel = readFunnelConfig(tailscale.command, readUatFunnelState(), node.nodeId);
+  const reset = funnelResetPlan(tailscale.command, funnel, required);
+  if (reset) {
+    const result = spawnSync(reset.command, reset.args, { stdio: "inherit" });
+    if (result.error || result.status !== 0) {
+      throw new Error("Courtside could not disable its Funnel. Run 'tailscale funnel reset' after verifying ownership");
+    }
+  }
+  rmSync(uatFunnelStateFile, { force: true });
 }
 
 export function newBootstrapPassword() {
@@ -388,6 +644,7 @@ export function restoreDatabase(input, composeArgs, environment, execute = runIn
 }
 
 function resetUat(all) {
+  cleanupUatFunnel();
   const plans = uatResetPlans(all);
   plans.forEach(runInteractive);
   if (all) {
@@ -624,6 +881,7 @@ async function showStatus(environment, asJson) {
   const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
   const volumes = spawnSync("docker", ["volume", "ls", "--filter", `label=com.docker.compose.project=${project}`, "--format", "{{.Name}}"], { encoding: "utf8" });
   const runtime = isUat ? { mode: "uat", processes: {} } : readProcessState();
+  const funnel = isUat ? readFunnelStatusForDisplay() : undefined;
   const status = {
     environment,
     mode: runtime.mode,
@@ -650,7 +908,8 @@ async function showStatus(environment, asJson) {
     },
     health: await readHealth(isUat ? "https://localhost:8443/actuator/health" : "http://127.0.0.1:8080/actuator/health", isUat),
     volumes: volumes.stdout.trim().split(/\r?\n/).filter(Boolean),
-    containers: compose.stdout.trim().split(/\r?\n/).filter(Boolean).map(parseJson)
+    containers: compose.stdout.trim().split(/\r?\n/).filter(Boolean).map(parseJson),
+    ...(isUat ? { funnel } : {})
   };
   if (asJson) {
     process.stdout.write(`${JSON.stringify(status, null, 2)}\n`);
@@ -662,10 +921,31 @@ async function showStatus(environment, asJson) {
     });
     process.stdout.write(`Volumes: ${status.volumes.join(", ") || "none"}\n`);
     process.stdout.write(`Containers: ${status.containers.length}\n`);
+    if (isUat) {
+      process.stdout.write(`Funnel: ${funnel.ownership}${funnel.publicUrl ? ` (${funnel.publicUrl})` : ""}\n`);
+    }
     Object.entries(status.processes).forEach(([name, value]) => {
       process.stdout.write(`${name} process: ${value.running ? `PID ${value.pid}` : "stopped"}\n`);
     });
   }
+}
+
+function readFunnelStatusForDisplay() {
+  try {
+    const tailscale = locateTailscale();
+    const node = parseTailscaleNodeStatus(tailscale.status);
+    return classifyFunnelConfig(readFunnelStatusOutput(tailscale.command), readUatFunnelState(), node.nodeId);
+  } catch {
+    return { ownership: "unavailable" };
+  }
+}
+
+function readFunnelStatusOutput(command) {
+  const result = spawnSync(command, ["funnel", "status", "--json"], { encoding: "utf8" });
+  if (result.error || result.status !== 0) {
+    throw new Error("Tailscale Funnel status is unavailable");
+  }
+  return result.stdout;
 }
 
 function isListenerActive(port) {
@@ -758,7 +1038,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  status <dev|uat> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  status <dev|uat> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;
