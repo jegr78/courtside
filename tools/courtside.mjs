@@ -433,6 +433,7 @@ async function startDevelopment(options) {
     ...process.env,
     COURTSIDE_DEMO_CONFIRM_DISPOSABLE: "true",
     COURTSIDE_COOKIE_SECURE: "false",
+    COURTSIDE_ENVIRONMENT: "DEVELOPMENT",
     SPRING_DATASOURCE_URL: "jdbc:postgresql://127.0.0.1:5432/courtside_dev",
     SPRING_DATASOURCE_USERNAME: "courtside",
     SPRING_DATASOURCE_PASSWORD: "courtside-dev"

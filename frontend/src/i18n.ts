@@ -40,6 +40,17 @@ const resources = {
     "error.generic": "Das hat nicht funktioniert. Bitte versuche es erneut.",
     "validation.Size": "Die Eingabe hat nicht die erlaubte Länge.",
     "footer.source": "Quellcode",
+    "environment.uat": "UAT",
+    "environment.loading": "Build und Umgebung werden ermittelt",
+    "environment.unavailable": "Build und Umgebung konnten nicht ermittelt werden",
+    "build.unavailable": "Version nicht verfügbar",
+    "build.about": "Über Courtside",
+    "build.version": "Version",
+    "build.commit": "Commit",
+    "build.environment": "Umgebung",
+    "build.copy": "Systeminformationen kopieren",
+    "build.copied": "Kopiert",
+    "build.close": "Schließen",
     "footer.imprint": "Impressum"
   } },
   en: { translation: {
@@ -78,6 +89,17 @@ const resources = {
     "error.generic": "That did not work. Please try again.",
     "validation.Size": "The input does not have the permitted length.",
     "footer.source": "Source code",
+    "environment.uat": "UAT",
+    "environment.loading": "Build and environment are being identified",
+    "environment.unavailable": "Build and environment could not be identified",
+    "build.unavailable": "Version unavailable",
+    "build.about": "About Courtside",
+    "build.version": "Version",
+    "build.commit": "Commit",
+    "build.environment": "Environment",
+    "build.copy": "Copy system information",
+    "build.copied": "Copied",
+    "build.close": "Close",
     "footer.imprint": "Legal notice"
   } }
 };
