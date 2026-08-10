@@ -4,6 +4,9 @@ export type SessionStatus = components["schemas"]["SessionStatus"];
 export type ClubConfig = components["schemas"]["ClubConfig"];
 export type SourceOffer = components["schemas"]["SourceOffer"];
 export type Problem = components["schemas"]["Problem"];
+export type PublicCourt = components["schemas"]["PublicCourt"];
+export type Allocation = components["schemas"]["Allocation"];
+export type BookingGrid = components["schemas"]["BookingGrid"];
 
 export class ApiError extends Error {
   constructor(
@@ -49,6 +52,11 @@ export const api = {
   session: () => request<SessionStatus>("/api/session"),
   config: () => request<ClubConfig>("/api/public/config"),
   source: () => request<SourceOffer>("/api/source"),
+  courts: () => request<PublicCourt[]>("/api/public/courts"),
+  bookingGrid: () => request<BookingGrid>("/api/public/booking-grid"),
+  allocations: (date: string) => request<Allocation[]>(
+    `/api/bookings?${new URLSearchParams({ date })}`
+  ),
   login: (username: string, password: string) => request<void>("/api/session", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },

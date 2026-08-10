@@ -219,7 +219,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         number: { type: integer }
-        name: { type: string }
+        name: { type: [string, "null"] }
 
     Court:
       type: object
@@ -227,7 +227,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         number: { type: integer }
-        name: { type: string }
+        name: { type: [string, "null"] }
         active: { type: boolean }
 
     CourtRequest:
@@ -248,6 +248,16 @@ components:
         dayOfWeek: { $ref: "#/components/schemas/DayOfWeek" }
         opensAt: { type: [string, "null"], format: time }
         closesAt: { type: [string, "null"], format: time }
+
+    BookingGrid:
+      type: object
+      required: [timeZone, slotMinutes, openingHours]
+      properties:
+        timeZone: { type: string, example: Europe/Berlin }
+        slotMinutes: { type: integer, minimum: 1, maximum: 1440 }
+        openingHours:
+          type: array
+          items: { $ref: "#/components/schemas/OpeningHours" }
 
     SetOpeningHoursRequest:
       type: object
@@ -901,6 +911,19 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/OpeningHours" }
+
+  /api/public/booking-grid:
+    get:
+      tags: [opening-hours]
+      operationId: getBookingGrid
+      summary: The time zone, slot duration and weekly opening windows that define the booking grid.
+      security: []
+      responses:
+        "200":
+          description: The booking grid configuration.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingGrid" }
 
   /api/public/config:
     get:

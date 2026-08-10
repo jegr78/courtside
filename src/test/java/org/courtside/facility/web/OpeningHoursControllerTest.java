@@ -45,8 +45,19 @@ class OpeningHoursControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAnonymousCaller_whenLoadingTheBookingGrid_thenItsClockAndWindowsAreReturned()
+            throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/public/booking-grid").with(anonymous()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timeZone").value("Europe/Berlin"))
+                .andExpect(jsonPath("$.slotMinutes").value(30))
+                .andExpect(jsonPath("$.openingHours.length()").value(7));
+    }
+
+    @Test
     void whenListingPublicly_thenEveryWeekdayIsPresentEvenWhenClosed() throws Exception {
-        // given — the teardown clears opening_hours, so the club starts closed all week
+        // given
         facility.setOpeningHours(
                 DayOfWeek.MONDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
 
