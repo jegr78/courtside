@@ -283,10 +283,14 @@ Because a single booking may span multiple courts, the exclusion constraint cann
 `booking` itself:
 
 ```
-booking_series          -- the recurrence rule (only for series)
-    └──< booking        -- the booking: who, which card, participants
-            └──< court_allocation   -- one row per court; the constraint lives here
+booking_series                  -- the recurrence rule (only for series)
+    ├──< booking_series_court >── court   -- ordered target courts
+    └──< booking                -- the booking: who, which card, participants
+            └──< court_allocation       -- one row per court; the constraint lives here
 ```
+
+Series courts are rows rather than a UUID array so PostgreSQL can enforce both sides of the
+relationship. Their position preserves the order supplied by the API.
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS btree_gist;
