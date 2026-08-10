@@ -71,6 +71,30 @@ Protocol, browser, and write scenarios run only against the isolated environment
 only for diagnosis. Creating or deleting performance data requires the exact disposable
 confirmation `courtside-perf`.
 
+## Isolated environment
+
+The CLI creates the reference dataset in the independent `courtside-perf` Compose project:
+
+```text
+node tools/courtside.mjs perf
+node tools/courtside.mjs status perf
+node tools/courtside.mjs perf-logs
+node tools/courtside.mjs perf-stop
+node tools/courtside.mjs perf-reset courtside-perf
+```
+
+`perf` verifies the source, builds the local image, and starts PostgreSQL 17, the application, and
+a dedicated Caddy boundary. The application is available at `https://localhost:9443`; its local CA
+is intentionally disposable. The CLI generates one shared password, stores it only in the ignored
+`build/perf-environment.json` with owner-only permissions where supported, and creates the accounts
+`member0001` through `member1000`. Account `member1000` is reserved for contention workloads.
+
+PostgreSQL has no host port by default. Use `perf --db-port` to expose it temporarily at
+`127.0.0.1:5434`, or use `perf-db-shell` without exposing it. The reset command requires the exact
+project name and removes only the performance containers, volumes, local CA, and credential state.
+Dev, UAT, and their Funnel configuration are not addressed by any performance command. The same
+Node command plans and Docker Compose files are used on macOS, Linux, and Windows.
+
 Remote targets require a separate opt-in and cannot use ordinary load profiles. Production targets,
 persistent UAT writes, tracked credentials, tracked remote targets, and ordinary overrides of VU or
 duration caps are forbidden. Runtime credentials identify individual synthetic accounts but may

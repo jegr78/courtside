@@ -8,7 +8,8 @@ import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   processPlans, requiredPorts, restoreDatabase, startProcesses, superviseFunnel, terminate,
-  terminateChildren, uatComposeArgs, uatResetPlans
+  terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
+  writePrivateFile
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
@@ -178,6 +179,80 @@ test("given build and verify, when planning commands, then Maven remains the bui
 test("given an unsupported argument, when parsing it, then it is rejected", () => {
   // when / then
   assert.throws(() => parseArguments(["dev", "--force"]), /Unknown option/);
+});
+
+test("given performance commands, when parsing them, then lifecycle and diagnosis options are explicit", () => {
+  // when / then
+  assert.equal(parseArguments(["perf"]).command, "perf");
+  assert.equal(parseArguments(["perf", "--db-port"]).dbPort, true);
+  assert.equal(parseArguments(["status", "perf"]).environment, "perf");
+  assert.throws(() => parseArguments(["perf-reset", "wrong"]), /courtside-perf/);
+  assert.equal(parseArguments(["perf-reset", "courtside-perf"]).confirm, "courtside-perf");
+});
+
+test("given an existing credential file, when rewriting it on POSIX, then owner-only mode is restored", () => {
+  // given
+  const calls = [];
+  const filesystem = {
+    mkdirSync: (...args) => calls.push(["mkdir", ...args]),
+    writeFileSync: (...args) => calls.push(["write", ...args]),
+    chmodSync: (...args) => calls.push(["chmod", ...args])
+  };
+
+  // when
+  writePrivateFile("build/perf-environment.json", "{}\n", "linux", filesystem);
+
+  // then
+  assert.deepEqual(calls.map((call) => call[0]), ["mkdir", "write", "chmod"]);
+  assert.deepEqual(calls.at(-1), ["chmod", "build/perf-environment.json", 0o600]);
+});
+
+test("given Windows credential storage, when writing state, then unsupported POSIX chmod is skipped", () => {
+  // given
+  const calls = [];
+  const filesystem = {
+    mkdirSync: () => calls.push("mkdir"),
+    writeFileSync: () => calls.push("write"),
+    chmodSync: () => calls.push("chmod")
+  };
+
+  // when
+  writePrivateFile("build/perf-environment.json", "{}\n", "win32", filesystem);
+
+  // then
+  assert.deepEqual(calls, ["mkdir", "write"]);
+});
+
+test("given performance lifecycle commands, when planning them, then only the performance project is targeted", () => {
+  // when
+  const privateArgs = perfComposeArgs(false);
+  const exposedArgs = perfComposeArgs(true);
+  const reset = perfResetPlan();
+
+  // then
+  assert.ok(privateArgs.includes("courtside-perf"));
+  assert.equal(privateArgs.some((argument) => argument.endsWith("compose.perf-db.yaml")), false);
+  assert.equal(exposedArgs.some((argument) => argument.endsWith("compose.perf-db.yaml")), true);
+  assert.deepEqual(reset.args.slice(-3), ["down", "--volumes", "--remove-orphans"]);
+  assert.ok(reset.args.includes("courtside-perf"));
+});
+
+test("given the performance compose contract, when inspecting isolation, then resources and ports are bounded", () => {
+  // given
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
+  const databaseOverride = readFileSync(fileURLToPath(new URL("../deploy/compose.perf-db.yaml", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(compose, /^name: courtside-perf/m);
+  assert.match(composeService(compose, "app"), /cpus: 2\.0/);
+  assert.match(composeService(compose, "app"), /mem_limit: 1g/);
+  assert.match(composeService(compose, "db"), /cpus: 2\.0/);
+  assert.match(composeService(compose, "db"), /mem_limit: 2g/);
+  assert.doesNotMatch(composeService(compose, "db"), /ports:/);
+  assert.match(databaseOverride, /127\.0\.0\.1:5434:5432/);
+  assert.match(compose, /SPRING_PROFILES_ACTIVE: perf/);
+  assert.match(compose, /COURTSIDE_PERF_CONFIRM_DISPOSABLE: "true"/);
+  assert.match(compose, /COURTSIDE_ENVIRONMENT: PERFORMANCE/);
 });
 
 test("given development modes, when validating ports, then debug adds only its listener", () => {

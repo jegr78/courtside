@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { createConnection, createServer } from "node:net";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -19,6 +19,10 @@ const funnelTarget = "http://127.0.0.1:8083";
 const stateFile = join(root, "build", "dev-processes.json");
 const uatStateFile = join(root, "build", "uat-environment.json");
 const uatFunnelStateFile = join(root, "build", "uat-funnel.json");
+const perfComposeFile = join(root, "deploy", "compose.perf.yaml");
+const perfDbComposeFile = join(root, "deploy", "compose.perf-db.yaml");
+const perfProject = "courtside-perf";
+const perfStateFile = join(root, "build", "perf-environment.json");
 
 export function executableNames(platform = process.platform) {
   return {
@@ -36,7 +40,8 @@ export function parseArguments(argv) {
   const supported = new Set([
     "build", "verify", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
     "uat-share", "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore",
-    "uat-reset", "status", "help"
+    "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset",
+    "status", "help"
   ]);
   if (!command || !supported.has(command)) {
     throw new Error(command ? `Unknown command: ${command}` : "A command is required");
@@ -52,13 +57,13 @@ export function parseArguments(argv) {
     } else if (flag === "--version" && command === "uat") {
       options.version = requiredOptionValue(flags, ++index, "--version");
       validateImageVersion(options.version);
-    } else if (flag === "--skip-verify" && command === "uat") {
+    } else if (flag === "--skip-verify" && ["uat", "perf"].includes(command)) {
       options.skipVerify = true;
-    } else if (flag === "--db-port" && command === "uat") {
+    } else if (flag === "--db-port" && ["uat", "perf"].includes(command)) {
       options.dbPort = true;
     } else if (flag === "--json" && command === "status") {
       options.json = true;
-    } else if (["dev", "uat"].includes(flag) && command === "status" && !options.environment) {
+    } else if (["dev", "uat", "perf"].includes(flag) && command === "status" && !options.environment) {
       options.environment = flag;
     } else if (flag === "--confirm" && command === "uat-restore") {
       options.confirm = requiredOptionValue(flags, ++index, "--confirm");
@@ -68,18 +73,23 @@ export function parseArguments(argv) {
       options.file = flag;
     } else if (!flag.startsWith("--") && command === "uat-reset" && !options.confirm) {
       options.confirm = flag;
+    } else if (!flag.startsWith("--") && command === "perf-reset" && !options.confirm) {
+      options.confirm = flag;
     } else {
       throw new Error(`Unknown option for ${command}: ${flag}`);
     }
   }
   if (command === "status" && !options.environment) {
-    throw new Error("status requires the environment 'dev' or 'uat'");
+    throw new Error("status requires the environment 'dev', 'uat', or 'perf'");
   }
   if (command === "uat-restore" && (!options.file || options.confirm !== uatProject)) {
     throw new Error(`uat-restore requires a file and --confirm ${uatProject}`);
   }
   if (command === "uat-reset" && options.confirm !== uatProject) {
     throw new Error(`uat-reset requires the exact project name '${uatProject}'`);
+  }
+  if (command === "perf-reset" && options.confirm !== perfProject) {
+    throw new Error(`perf-reset requires the exact project name '${perfProject}'`);
   }
   return options;
 }
@@ -99,6 +109,11 @@ function validateImageVersion(version) {
 export function uatComposeArgs(withDatabasePort = false) {
   return ["compose", "-p", uatProject, "-f", uatComposeFile,
     ...(withDatabasePort ? ["-f", uatDbComposeFile] : [])];
+}
+
+export function perfComposeArgs(withDatabasePort = false) {
+  return ["compose", "-p", perfProject, "-f", perfComposeFile,
+    ...(withDatabasePort ? ["-f", perfDbComposeFile] : [])];
 }
 
 export function parseTailscaleNodeStatus(output) {
@@ -283,6 +298,15 @@ export function lifecyclePlan(command) {
   if (command === "uat-db-shell") {
     return { command: "docker", args: [...uatComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside"] };
   }
+  if (command === "perf-stop") {
+    return { command: "docker", args: [...perfComposeArgs(), "stop"] };
+  }
+  if (command === "perf-logs") {
+    return { command: "docker", args: [...perfComposeArgs(), "logs", "--follow"] };
+  }
+  if (command === "perf-db-shell") {
+    return { command: "docker", args: [...perfComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside_perf"] };
+  }
   throw new Error(`No lifecycle plan for ${command}`);
 }
 
@@ -304,7 +328,7 @@ async function main() {
       return;
     }
     validateNode();
-    if (["build", "verify", "dev", "dev-debug", "uat", "uat-share"].includes(options.command) && !options.version) {
+    if (["build", "verify", "dev", "dev-debug", "uat", "uat-share", "perf"].includes(options.command) && !options.version) {
       validateJava();
     }
     if (!["build", "help"].includes(options.command)) {
@@ -364,6 +388,20 @@ async function execute(options) {
     resetUat(options.all);
     return;
   }
+  if (options.command === "perf") {
+    startPerformance(options);
+    return;
+  }
+  if (["perf-stop", "perf-logs", "perf-db-shell"].includes(options.command)) {
+    runInteractive(lifecyclePlan(options.command));
+    return;
+  }
+  if (options.command === "perf-reset") {
+    runInteractive(perfResetPlan());
+    rmSync(perfStateFile, { force: true });
+    process.stdout.write("Performance data and local credentials removed.\n");
+    return;
+  }
   if (options.command === "status") {
     await showStatus(options.environment, options.json);
     return;
@@ -414,6 +452,50 @@ function uatEnvironment(version, password) {
     COURTSIDE_UAT_IMAGE: version ? `ghcr.io/jegr78/courtside:${version}` : "courtside:uat-local",
     COURTSIDE_UAT_ADMIN_PASSWORD: password
   };
+}
+
+function startPerformance(options) {
+  const state = readPerformanceState();
+  const password = state?.password ?? newBootstrapPassword();
+  const environment = { ...process.env, COURTSIDE_PERF_SHARED_PASSWORD: password };
+  writePrivateFile(perfStateFile,
+    `${JSON.stringify({ password, dbPort: options.dbPort }, null, 2)}\n`);
+  runInteractive(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
+  extractApplicationLayers();
+  runInteractive({ command: "docker", args: ["build", "-t", "courtside:perf-local", "."] });
+  runInteractive({
+    command: "docker",
+    args: [...perfComposeArgs(options.dbPort), "up", "-d", "--wait", "--force-recreate"],
+    environment
+  });
+  process.stdout.write("Performance: https://localhost:9443 | HTTP redirect: http://localhost:9080\n");
+  process.stdout.write(`Accounts: member0001 through member1000 | shared password: ${password}\n`);
+  if (options.dbPort) {
+    process.stdout.write("Database: jdbc:postgresql://127.0.0.1:5434/courtside_perf\n");
+  }
+}
+
+export function writePrivateFile(file, content, platform = process.platform, filesystem = {
+  mkdirSync, writeFileSync, chmodSync
+}) {
+  filesystem.mkdirSync(dirname(file), { recursive: true });
+  filesystem.writeFileSync(file, content, { mode: 0o600 });
+  if (platform !== "win32") {
+    filesystem.chmodSync(file, 0o600);
+  }
+}
+
+function readPerformanceState() {
+  try {
+    const state = JSON.parse(readFileSync(perfStateFile, "utf8"));
+    return typeof state.password === "string" && state.password.length >= 12 ? state : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function perfResetPlan() {
+  return { command: "docker", args: [...perfComposeArgs(), "down", "--volumes", "--remove-orphans"] };
 }
 
 async function shareUat() {
@@ -871,16 +953,19 @@ function canConnect(port) {
 
 async function showStatus(environment, asJson) {
   const isUat = environment === "uat";
+  const isPerf = environment === "perf";
   const uatState = readUatState();
-  const project = isUat ? uatProject : "courtside-dev";
-  const composeArgs = isUat ? uatComposeArgs(uatState.dbPort) : devComposeArgs;
+  const perfState = readPerformanceState();
+  const project = isUat ? uatProject : isPerf ? perfProject : "courtside-dev";
+  const composeArgs = isUat ? uatComposeArgs(uatState.dbPort)
+    : isPerf ? perfComposeArgs(perfState?.dbPort) : devComposeArgs;
   const compose = spawnSync("docker", [...composeArgs, "ps", "--format", "json"], {
     cwd: root, encoding: "utf8"
   });
   const git = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" });
   const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
   const volumes = spawnSync("docker", ["volume", "ls", "--filter", `label=com.docker.compose.project=${project}`, "--format", "{{.Name}}"], { encoding: "utf8" });
-  const runtime = isUat ? { mode: "uat", processes: {} } : readProcessState();
+  const runtime = isUat || isPerf ? { mode: environment, processes: {} } : readProcessState();
   const funnel = isUat ? readFunnelStatusForDisplay() : undefined;
   const status = {
     environment,
@@ -890,13 +975,17 @@ async function showStatus(environment, asJson) {
     processes: runtime.processes,
     ports: {
       database: {
-        port: isUat ? 5433 : 5432,
-        exposed: isUat ? uatState.dbPort : true,
-        reachable: isUat ? uatState.dbPort && await canConnect(5433) : await canConnect(5432)
+        port: isUat ? 5433 : isPerf ? 5434 : 5432,
+        exposed: isUat ? uatState.dbPort : isPerf ? Boolean(perfState?.dbPort) : true,
+        reachable: isUat ? uatState.dbPort && await canConnect(5433)
+          : isPerf ? Boolean(perfState?.dbPort) && await canConnect(5434) : await canConnect(5432)
       },
       ...(isUat ? {
         http: { port: 8081, reachable: await canConnect(8081) },
         https: { port: 8443, reachable: await canConnect(8443) }
+      } : isPerf ? {
+        http: { port: 9080, reachable: await canConnect(9080) },
+        https: { port: 9443, reachable: await canConnect(9443) }
       } : {
         backend: { port: 8080, reachable: await canConnect(8080) },
         frontend: { port: 5173, reachable: await canConnect(5173) },
@@ -906,7 +995,8 @@ async function showStatus(environment, asJson) {
         ? { debugger: { port: 5005, reachable: isListenerActive(5005) } }
         : {})
     },
-    health: await readHealth(isUat ? "https://localhost:8443/actuator/health" : "http://127.0.0.1:8080/actuator/health", isUat),
+    health: await readHealth(isUat ? "https://localhost:8443/actuator/health"
+      : isPerf ? "https://localhost:9443/actuator/health" : "http://127.0.0.1:8080/actuator/health", isUat || isPerf),
     volumes: volumes.stdout.trim().split(/\r?\n/).filter(Boolean),
     containers: compose.stdout.trim().split(/\r?\n/).filter(Boolean).map(parseJson),
     ...(isUat ? { funnel } : {})
@@ -914,7 +1004,7 @@ async function showStatus(environment, asJson) {
   if (asJson) {
     process.stdout.write(`${JSON.stringify(status, null, 2)}\n`);
   } else {
-    process.stdout.write(`${isUat ? "UAT" : "Dev"} @ ${status.gitVersion}${status.gitDirty ? " (dirty)" : ""}\n`);
+    process.stdout.write(`${isUat ? "UAT" : isPerf ? "Performance" : "Dev"} @ ${status.gitVersion}${status.gitDirty ? " (dirty)" : ""}\n`);
     process.stdout.write(`Health: ${status.health}\n`);
     Object.entries(status.ports).forEach(([name, value]) => {
       process.stdout.write(`${name}: 127.0.0.1:${value.port} (${value.reachable ? "reachable" : "stopped"})\n`);
@@ -1002,7 +1092,10 @@ function isProcessRunning(pid) {
 async function readHealth(url, allowLocalCertificate = false) {
   try {
     if (allowLocalCertificate) {
-      const response = await localRequest({ secure: true, port: 8443, path: "/actuator/health" });
+      const target = new URL(url);
+      const response = await localRequest({
+        secure: true, port: Number(target.port), path: target.pathname
+      });
       if (response.statusCode < 200 || response.statusCode >= 300) return `HTTP ${response.statusCode}`;
       return parseJson(response.body).status ?? "unknown";
     }
@@ -1038,7 +1131,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  status <dev|uat> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port]\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

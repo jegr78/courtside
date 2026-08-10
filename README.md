@@ -29,6 +29,8 @@ Open the application at `http://127.0.0.1:5173` and its Swagger UI at
 `http://127.0.0.1:8082/api-ui/`. For the persistent HTTPS acceptance environment, every CLI
 command, database access, certificates, API clients, backups, and reset behavior, see
 [`docs/local-environments.md`](docs/local-environments.md).
+The isolated, disposable reference environment for load tests is documented in
+[`docs/performance-testing.md`](docs/performance-testing.md).
 
 ## First start: creating the first admin
 

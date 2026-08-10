@@ -33,6 +33,14 @@ describe("BuildIdentity", () => {
     expect(screen.getByTestId("environment-marker")).toHaveTextContent("UAT");
   });
 
+  it("given a performance build, when rendered, then the disposable environment is identified", () => {
+    // given / when
+    render(<EnvironmentMarker source={{ ...source, environment: "PERFORMANCE" }} />);
+
+    // then
+    expect(screen.getByTestId("environment-marker")).toHaveTextContent("Performance test environment");
+  });
+
   it("given unavailable metadata, when rendered, then the missing identity is conspicuous", () => {
     // given / when
     render(<EnvironmentMarker identityStatus="unavailable" />);

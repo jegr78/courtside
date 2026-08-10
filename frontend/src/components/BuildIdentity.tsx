@@ -89,9 +89,9 @@ export function EnvironmentMarker({ source, identityStatus = "available" }: Envi
       {t(identityStatus === "loading" ? "environment.loading" : "environment.unavailable")}
     </div>;
   }
-  return source?.environment === "UAT"
+  return source?.environment === "UAT" || source?.environment === "PERFORMANCE"
     ? <div data-testid="environment-marker" role="status" className="bg-amber-200 px-5 py-2 text-center font-semibold text-amber-950">
-      {t("environment.uat")}
+      {t(source.environment === "UAT" ? "environment.uat" : "environment.performance")}
     </div>
     : null;
 }
