@@ -9,15 +9,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class BookingCardPermitsTest {
 
-    private static BookingCard cardRequiring(Role requiredRole) {
-        return new BookingCard("Training", "#34584A", requiredRole,
+    private static BookingCard cardAllowing(Role... allowedRoles) {
+        return new BookingCard("Training", "#34584A", Set.of(allowedRoles),
                 new short[]{}, false, false);
     }
 
     @Test
     void givenACardRequiringNoRole_whenAskedWhoItPermits_thenEveryCallerIsPermitted() {
         // given
-        BookingCard card = cardRequiring(null);
+        BookingCard card = cardAllowing();
 
         // when / then
         assertThat(card.permits(Set.of())).isTrue();
@@ -27,16 +27,17 @@ class BookingCardPermitsTest {
     @Test
     void givenACardRequiringARole_whenTheCallerHoldsIt_thenTheCallerIsPermitted() {
         // given
-        BookingCard card = cardRequiring(Role.TRAINER);
+        BookingCard card = cardAllowing(Role.TRAINER, Role.TREASURER);
 
         // when / then
         assertThat(card.permits(Set.of(Role.TRAINER))).isTrue();
+        assertThat(card.permits(Set.of(Role.TREASURER))).isTrue();
     }
 
     @Test
     void givenACardRequiringARole_whenTheCallerHoldsItAmongOthers_thenTheCallerIsPermitted() {
         // given
-        BookingCard card = cardRequiring(Role.TRAINER);
+        BookingCard card = cardAllowing(Role.TRAINER, Role.TREASURER);
 
         // when / then
         assertThat(card.permits(Set.of(Role.MEMBER, Role.TRAINER))).isTrue();
@@ -45,7 +46,7 @@ class BookingCardPermitsTest {
     @Test
     void givenACardRequiringARole_whenTheCallerHoldsOnlyOtherRoles_thenTheCallerIsNotPermitted() {
         // given
-        BookingCard card = cardRequiring(Role.TRAINER);
+        BookingCard card = cardAllowing(Role.TRAINER);
 
         // when / then
         assertThat(card.permits(Set.of(Role.MEMBER, Role.TREASURER))).isFalse();
@@ -54,7 +55,7 @@ class BookingCardPermitsTest {
     @Test
     void givenACardRequiringARole_whenTheCallerHoldsNone_thenTheCallerIsNotPermitted() {
         // given
-        BookingCard card = cardRequiring(Role.TRAINER);
+        BookingCard card = cardAllowing(Role.TRAINER);
 
         // when / then
         assertThat(card.permits(Set.of())).isFalse();
@@ -63,7 +64,7 @@ class BookingCardPermitsTest {
     @Test
     void givenACardRequiringARole_whenTheCallerIsAdmin_thenPermitsStillAnswersForTheCardAlone() {
         // given
-        BookingCard card = cardRequiring(Role.TRAINER);
+        BookingCard card = cardAllowing(Role.TRAINER);
 
         // when / then
         assertThat(card.permits(Set.of(Role.ADMIN))).isFalse();

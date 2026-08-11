@@ -18,7 +18,7 @@ describe("AdminFacilityView", () => {
     ]);
     vi.spyOn(api, "adminBookingCards").mockResolvedValue([
       {
-        id: "card-1", label: "Member booking", color: "#b85c38", requiredRole: "MEMBER",
+        id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
         allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
         guestAllowed: true, active: true
       }
@@ -33,7 +33,8 @@ describe("AdminFacilityView", () => {
     expect(await screen.findByDisplayValue("Centre Court")).toBeInTheDocument();
     expect(screen.getByDisplayValue("08:00")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Member booking")).toBeInTheDocument();
-    expect(screen.getAllByRole("combobox", { name: "Required role" })[0]).toHaveValue("MEMBER");
+    expect(screen.getAllByRole("checkbox", { name: "Member" })[0]).toBeChecked();
+    expect(screen.getAllByText(/Any selected role is sufficient/)).toHaveLength(2);
   });
 
   it("given facility data cannot load, when opening the view, then the failure replaces the loading state", async () => {
@@ -92,7 +93,7 @@ describe("AdminFacilityView", () => {
   it("given changed card access and opening hours, when saving, then the admin API receives the values", async () => {
     // given
     const changeCard = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({
-      id: "card-1", label: "Training", color: "#34584a", requiredRole: "TRAINER",
+      id: "card-1", label: "Training", color: "#34584a", allowedRoles: ["TRAINER", "SPORT_DIRECTOR"],
       allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
       guestAllowed: false, active: true
     });
@@ -106,7 +107,9 @@ describe("AdminFacilityView", () => {
     // when
     await user.clear(screen.getByTestId("card-label-card-1"));
     await user.type(screen.getByTestId("card-label-card-1"), "Training");
-    await user.selectOptions(screen.getAllByRole("combobox", { name: "Required role" })[0], "TRAINER");
+    await user.click(screen.getAllByRole("checkbox", { name: "Member" })[0]);
+    await user.click(screen.getAllByRole("checkbox", { name: "Trainer" })[0]);
+    await user.click(screen.getAllByRole("checkbox", { name: "Sport director" })[0]);
     await user.clear(screen.getByTestId("card-counts-card-1"));
     await user.type(screen.getByTestId("card-counts-card-1"), "1, 3");
     await user.click(screen.getByTestId("save-card-card-1"));
@@ -116,7 +119,7 @@ describe("AdminFacilityView", () => {
 
     // then
     expect(changeCard).toHaveBeenCalledWith("card-1", expect.objectContaining({
-      label: "Training", requiredRole: "TRAINER", allowedPlayerCounts: [1, 3]
+      label: "Training", allowedRoles: ["TRAINER", "SPORT_DIRECTOR"], allowedPlayerCounts: [1, 3]
     }));
     expect(setHours).toHaveBeenCalledWith("MONDAY", { opensAt: "09:00", closesAt: "22:00" });
   });
@@ -127,7 +130,7 @@ describe("AdminFacilityView", () => {
       id: "court-2", number: 2, name: "Garden Court", active: true
     });
     const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({
-      id: "card-2", label: "Training", color: "#b85c38", requiredRole: "TRAINER",
+      id: "card-2", label: "Training", color: "#b85c38", allowedRoles: ["TRAINER"],
       allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
       guestAllowed: false, active: true
     });
@@ -140,12 +143,12 @@ describe("AdminFacilityView", () => {
     await user.type(screen.getByTestId("new-court-name"), "Garden Court");
     await user.click(screen.getByTestId("create-court"));
     await user.type(screen.getByTestId("new-card-label"), "Training");
-    await user.selectOptions(screen.getAllByRole("combobox", { name: "Required role" })[1], "TRAINER");
+    await user.click(screen.getAllByRole("checkbox", { name: "Trainer" })[1]);
     await user.click(screen.getByTestId("create-card"));
 
     // then
     expect(createCourt).toHaveBeenCalledWith({ number: 2, name: "Garden Court" });
-    expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ label: "Training", requiredRole: "TRAINER" }));
+    expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ label: "Training", allowedRoles: ["TRAINER"] }));
   });
 });
 

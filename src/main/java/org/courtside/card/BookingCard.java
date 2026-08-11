@@ -1,16 +1,21 @@
 package org.courtside.card;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.courtside.identity.Role;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -29,9 +34,12 @@ public class BookingCard {
     @Column(nullable = false)
     private String color;
 
+    @Getter(AccessLevel.NONE)
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "booking_card_allowed_role", joinColumns = @JoinColumn(name = "booking_card_id"))
     @Enumerated(EnumType.STRING)
-    @Column(name = "required_role")
-    private Role requiredRole;
+    @Column(name = "role", nullable = false)
+    private Set<Role> allowedRoles = new HashSet<>();
 
     @Getter(AccessLevel.NONE)
     @Column(name = "allowed_player_counts", nullable = false)
@@ -64,28 +72,33 @@ public class BookingCard {
     }
 
     public boolean permits(Set<Role> callerRoles) {
-        return requiredRole == null || callerRoles.contains(requiredRole);
+        return allowedRoles.isEmpty() || callerRoles.stream().anyMatch(allowedRoles::contains);
     }
 
-    public BookingCard(String label, String color, Role requiredRole,
+    public Set<Role> getAllowedRoles() {
+        return Set.copyOf(allowedRoles);
+    }
+
+    public BookingCard(String label, String color, Set<Role> allowedRoles,
                        short[] allowedPlayerCounts, boolean countsAgainstLimits,
                        boolean guestAllowed) {
         this.id = UUID.randomUUID();
         this.label = label;
         this.color = color;
-        this.requiredRole = requiredRole;
+        this.allowedRoles = new HashSet<>(allowedRoles);
         this.allowedPlayerCounts = allowedPlayerCounts.clone();
         this.countsAgainstLimits = countsAgainstLimits;
         this.guestAllowed = guestAllowed;
         this.active = true;
     }
 
-    public void changeTo(String label, String color, Role requiredRole,
+    public void changeTo(String label, String color, Set<Role> allowedRoles,
                          short[] allowedPlayerCounts, boolean countsAgainstLimits,
                          boolean guestAllowed) {
         this.label = label;
         this.color = color;
-        this.requiredRole = requiredRole;
+        this.allowedRoles.clear();
+        this.allowedRoles.addAll(allowedRoles);
         this.allowedPlayerCounts = allowedPlayerCounts.clone();
         this.countsAgainstLimits = countsAgainstLimits;
         this.guestAllowed = guestAllowed;

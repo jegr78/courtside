@@ -6,6 +6,8 @@ import java.util.Optional;
 public enum Role {
     MEMBER,
     TRAINER,
+    SPORT_DIRECTOR,
+    YOUTH_DIRECTOR,
     GROUNDSKEEPER,
     TREASURER,
     ADMIN;

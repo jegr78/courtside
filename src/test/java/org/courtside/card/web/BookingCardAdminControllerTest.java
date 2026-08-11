@@ -82,13 +82,14 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Taster session", "color": "#c8a415",
-                                 "requiredRole": "TRAINER", "allowedPlayerCounts": [2, 4],
+                                 "allowedRoles": ["TRAINER", "SPORT_DIRECTOR"], "allowedPlayerCounts": [2, 4],
                                  "countsAgainstLimits": false, "guestAllowed": true}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.label").value("Taster session"))
-                .andExpect(jsonPath("$.requiredRole").value("TRAINER"))
+                .andExpect(jsonPath("$.allowedRoles[0]").value("TRAINER"))
+                .andExpect(jsonPath("$.allowedRoles[1]").value("SPORT_DIRECTOR"))
                 .andExpect(jsonPath("$.allowedPlayerCounts[0]").value(2))
                 .andExpect(jsonPath("$.allowedPlayerCounts[1]").value(4))
                 .andExpect(jsonPath("$.tracksPlayers").value(true))
@@ -102,7 +103,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Taster session", "color": "#c8a415",
-                                 "requiredRole": "TRAINER", "allowedPlayerCounts": [2, 4],
+                                 "allowedRoles": ["TRAINER", "YOUTH_DIRECTOR"], "allowedPlayerCounts": [2, 4],
                                  "countsAgainstLimits": false, "guestAllowed": true}
                                 """)
                         .with(csrf()))
@@ -116,7 +117,8 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.label").value("Taster session"))
-                .andExpect(jsonPath("$.requiredRole").value("TRAINER"));
+                .andExpect(jsonPath("$.allowedRoles[0]").value("TRAINER"))
+                .andExpect(jsonPath("$.allowedRoles[1]").value("YOUTH_DIRECTOR"));
     }
 
     @Test
@@ -135,7 +137,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Court maintenance", "color": "#c8a415",
-                                 "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                                 "allowedRoles": [], "allowedPlayerCounts": [], "countsAgainstLimits": false,
                                  "guestAllowed": false}
                                 """)
                         .with(csrf()))
@@ -151,7 +153,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Odd card", "color": "#c8a415",
-                                 "allowedPlayerCounts": [2, 2], "countsAgainstLimits": false,
+                                 "allowedRoles": [], "allowedPlayerCounts": [2, 2], "countsAgainstLimits": false,
                                  "guestAllowed": false}
                                 """)
                         .with(csrf()))
@@ -169,7 +171,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Null count card", "color": "#c8a415",
-                                 "allowedPlayerCounts": [2, null], "countsAgainstLimits": false,
+                                 "allowedRoles": [], "allowedPlayerCounts": [2, null], "countsAgainstLimits": false,
                                  "guestAllowed": false}
                                 """)
                         .with(csrf()))
@@ -188,7 +190,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Colorless card",
-                                 "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                                 "allowedRoles": [], "allowedPlayerCounts": [], "countsAgainstLimits": false,
                                  "guestAllowed": false}
                                 """)
                         .with(csrf()))
@@ -205,13 +207,13 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "President's card", "color": "#c8a415",
-                                 "requiredRole": "PRESIDENT", "allowedPlayerCounts": [],
+                                 "allowedRoles": ["PRESIDENT"], "allowedPlayerCounts": [],
                                  "countsAgainstLimits": false, "guestAllowed": false}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("requiredRole"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("allowedRoles[0]"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
     }
 
@@ -261,7 +263,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Match play (renamed)", "color": "#3a4a5c",
-                                 "allowedPlayerCounts": [2, 4], "countsAgainstLimits": false,
+                                 "allowedRoles": [], "allowedPlayerCounts": [2, 4], "countsAgainstLimits": false,
                                  "guestAllowed": true}
                                 """)
                         .with(csrf()))
@@ -284,7 +286,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Taster session", "color": "#3a4a5c",
-                                 "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                                 "allowedRoles": [], "allowedPlayerCounts": [], "countsAgainstLimits": false,
                                  "guestAllowed": false}
                                 """)
                         .with(csrf()))
@@ -303,7 +305,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Taster session", "color": "#3a4a5c",
-                                 "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                                 "allowedRoles": [], "allowedPlayerCounts": [], "countsAgainstLimits": false,
                                  "guestAllowed": false}
                                 """)
                         .with(csrf()))
@@ -318,7 +320,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "Nothing", "color": "#c8a415",
-                                 "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                                 "allowedRoles": [], "allowedPlayerCounts": [], "countsAgainstLimits": false,
                                  "guestAllowed": false}
                                 """)
                         .with(csrf()))
@@ -331,7 +333,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"label": "%s", "color": "%s",
-                                 "allowedPlayerCounts": [2, 4], "countsAgainstLimits": false,
+                                 "allowedRoles": [], "allowedPlayerCounts": [2, 4], "countsAgainstLimits": false,
                                  "guestAllowed": true}
                                 """.formatted(label, color))
                         .with(csrf()))

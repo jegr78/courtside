@@ -156,7 +156,7 @@ public class SeriesService {
         }
         if (!card.permits(callerRoles)) {
             throw new CardRoleRequiredException(
-                    "Card %s requires role %s".formatted(card.getId(), card.getRequiredRole()));
+                    "Card %s requires one of roles %s".formatted(card.getId(), card.getAllowedRoles()));
         }
     }
 

@@ -122,7 +122,7 @@ components:
     Role:
       type: string
       description: A permission bundle. One person often holds several.
-      enum: [MEMBER, TRAINER, GROUNDSKEEPER, TREASURER, ADMIN]
+      enum: [MEMBER, TRAINER, SPORT_DIRECTOR, YOUTH_DIRECTOR, GROUNDSKEEPER, TREASURER, ADMIN]
 
     InitialPasswordChangeRequest:
       type: object
@@ -367,15 +367,15 @@ components:
       description: |
         What kind of occupancy a booking is. Member booking, training, league match and court
         closure differ only by their card, so a new kind is a row rather than a deployment.
-      required: [id, label, color, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, active]
+      required: [id, label, color, allowedRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, active]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
         color: { type: string }
-        requiredRole:
-          oneOf:
-            - $ref: "#/components/schemas/Role"
-            - type: "null"
+        allowedRoles:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/Role" }
         allowedPlayerCounts:
           type: array
           items: { type: integer }
@@ -386,14 +386,14 @@ components:
 
     BookingCardRequest:
       type: object
-      required: [label, color, allowedPlayerCounts, countsAgainstLimits, guestAllowed]
+      required: [label, color, allowedRoles, allowedPlayerCounts, countsAgainstLimits, guestAllowed]
       properties:
         label: { type: string, maxLength: 60, pattern: ".*\\S.*" }
         color: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
-        requiredRole:
-          oneOf:
-            - $ref: "#/components/schemas/Role"
-            - type: "null"
+        allowedRoles:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/Role" }
         allowedPlayerCounts:
           type: array
           description: |

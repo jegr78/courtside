@@ -24,7 +24,8 @@ class EnumeratedColumnInListPatternTest {
         String expected = enumValuesOf("org.courtside.rules.internal.RuleType");
 
         // when
-        String actual = sqlInListValues("V5__rules.sql", "rule_type");
+        String actual = sqlInListValues(
+                "V5__rules.sql", "rule_definition_rule_type_known", "rule_type");
 
         // then
         assertThat(actual)
@@ -33,17 +34,18 @@ class EnumeratedColumnInListPatternTest {
     }
 
     @Test
-    void whenReadingTheBookingCardRequiredRoleInList_thenItAcceptsExactlyTheRoleEnumConstants()
+    void whenReadingTheBookingCardAllowedRoleInList_thenItAcceptsExactlyTheRoleEnumConstants()
             throws IOException, ReflectiveOperationException {
         // given
         String expected = enumValuesOf("org.courtside.identity.Role");
 
         // when
-        String actual = sqlInListValues("V2__booking_card.sql", "required_role");
+        String actual = sqlInListValues(
+                "V14__booking_card_allowed_roles.sql", "booking_card_allowed_role_known", "role");
 
         // then
         assertThat(actual)
-                .as("booking_card_required_role_known has drifted from org.courtside.identity.Role")
+                .as("booking_card_allowed_role_known has drifted from org.courtside.identity.Role")
                 .isEqualTo(expected);
     }
 
@@ -54,7 +56,8 @@ class EnumeratedColumnInListPatternTest {
         String expected = enumValuesOf("org.courtside.identity.Role");
 
         // when
-        String actual = sqlInListValues("V4__identity.sql", "role");
+        String actual = sqlInListValues(
+                "V14__booking_card_allowed_roles.sql", "user_account_role_role_known", "role");
 
         // then
         assertThat(actual)
@@ -70,13 +73,16 @@ class EnumeratedColumnInListPatternTest {
                 .collect(Collectors.joining(","));
     }
 
-    private static String sqlInListValues(String migrationFileName, String columnName) throws IOException {
+    private static String sqlInListValues(
+            String migrationFileName, String constraintName, String columnName) throws IOException {
         String content = Files.readString(Path.of("src/main/resources/db/migration", migrationFileName));
         Matcher matcher = Pattern
-                .compile(Pattern.quote(columnName) + "\\s+IN\\s+\\(([^)]+)\\)")
+                .compile(Pattern.quote(constraintName) + "\\s+CHECK\\s*\\(\\s*"
+                        + Pattern.quote(columnName) + "\\s+IN\\s+\\(([^)]+)\\)")
                 .matcher(content);
         assertThat(matcher.find())
-                .as("%s must contain a CHECK on %s IN (...)", migrationFileName, columnName)
+                .as("%s must contain %s with a CHECK on %s IN (...)",
+                        migrationFileName, constraintName, columnName)
                 .isTrue();
         List<String> values = Arrays.stream(matcher.group(1).split(","))
                 .map(value -> value.trim().replace("'", ""))
