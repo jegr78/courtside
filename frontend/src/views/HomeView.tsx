@@ -26,6 +26,7 @@ export function HomeView({ session, signedOut }: { session: SessionStatus; signe
         <Link to="/" data-testid="court-plan-link" aria-current={["/", "/courts"].includes(location.pathname) ? "page" : undefined} className="font-semibold underline-offset-4">{t("nav.courts")}</Link>
         {session.authenticated && <NavLink to="/my-bookings" data-testid="my-bookings-link" className="underline-offset-4">{t("nav.myBookings")}</NavLink>}
         {session.roles.includes("ADMIN") && <NavLink to="/admin/configuration" data-testid="admin-configuration-link" className="underline-offset-4">{t("nav.adminConfiguration")}</NavLink>}
+        {session.roles.includes("ADMIN") && <NavLink to="/admin/facility" data-testid="admin-facility-link" className="underline-offset-4">{t("nav.adminFacility")}</NavLink>}
       </nav>
       {session.authenticated
         ? <Button type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>
