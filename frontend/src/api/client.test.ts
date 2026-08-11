@@ -102,6 +102,22 @@ it("given a date, when loading allocations, then that date is sent as a query pa
   expect(allocations[0].cardLabel).toBe("Singles");
 });
 
+it("given a personal-booking cursor, when loading the next page, then the cursor and bound are sent", async () => {
+  // given
+  server.use(http.get("/api/my/bookings", ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    expect(query.get("cursor")).toBe("11111111-1111-1111-1111-111111111111");
+    expect(query.get("limit")).toBe("25");
+    return HttpResponse.json({ items: [], nextCursor: null });
+  }));
+
+  // when
+  const page = await api.personalBookings("11111111-1111-1111-1111-111111111111", 25);
+
+  // then
+  expect(page.items).toEqual([]);
+});
+
 it("when loading the booking grid, then its club clock and slot duration are returned", async () => {
   // given
   server.use(http.get("/api/public/booking-grid", () => HttpResponse.json({
@@ -150,6 +166,42 @@ it("given an existing booking, when cancelling it, then the booking URL is delet
 
   // when / then
   await expect(api.cancelBooking("33333333-3333-3333-3333-333333333333")).resolves.toBeUndefined();
+});
+
+it("given a series occurrence, when cancelling following occurrences, then ids and scope are encoded", async () => {
+  // given
+  server.use(http.delete("/api/booking-series/11111111-1111-1111-1111-111111111111", ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    expect(query.get("fromBookingId")).toBe("22222222-2222-2222-2222-222222222222");
+    expect(query.get("scope")).toBe("THIS_AND_FOLLOWING");
+    return new HttpResponse(null, { status: 204 });
+  }));
+
+  // when / then
+  await expect(api.cancelSeries(
+    "11111111-1111-1111-1111-111111111111",
+    "22222222-2222-2222-2222-222222222222",
+    "THIS_AND_FOLLOWING"
+  )).resolves.toBeUndefined();
+});
+
+it("given a scoped move, when previewing it, then the language-neutral request is posted", async () => {
+  // given
+  const move = {
+    fromBookingId: "22222222-2222-2222-2222-222222222222" as const,
+    scope: "WHOLE_SERIES" as const,
+    newStartTime: "19:00"
+  };
+  server.use(http.post("/api/booking-series/11111111-1111-1111-1111-111111111111/move/preview", async ({ request }) => {
+    expect(await request.json()).toEqual(move);
+    return HttpResponse.json({ moves: [], executable: true });
+  }));
+
+  // when
+  const preview = await api.previewSeriesMove("11111111-1111-1111-1111-111111111111", move);
+
+  // then
+  expect(preview.executable).toBe(true);
 });
 
 it("given a name fragment, when searching participant members, then it is encoded in the query", async () => {

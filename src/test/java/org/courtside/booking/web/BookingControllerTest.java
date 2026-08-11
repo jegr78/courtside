@@ -307,6 +307,89 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenOwnAndForeignBookings_whenListingPersonalBookings_thenOnlyOwnDetailsAreReturned()
+            throws Exception {
+        // given
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T19:00:00+02:00", "2026-05-12T20:00:00+02:00"))
+                        .with(user("major.mary").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/my/bookings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].courtIds[0]").value(courtId.toString()))
+                .andExpect(jsonPath("$.items[0].startsAt").value("2026-05-12T16:00:00Z"))
+                .andExpect(jsonPath("$.items[0].endsAt").value("2026-05-12T17:00:00Z"))
+                .andExpect(jsonPath("$.items[0].cardLabel").value("Member booking"))
+                .andExpect(jsonPath("$.items[0].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.items[0].seriesId").doesNotExist())
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenMorePersonalBookingsThanTheLimit_whenFollowingTheCursor_thenEveryBookingIsReturnedOnce()
+            throws Exception {
+        // given
+        String older = JsonPath.read(mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        String newer = JsonPath.read(mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T19:00:00+02:00", "2026-05-12T20:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        // when
+        String firstPage = mockMvc.perform(get("/api/my/bookings").param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(newer))
+                .andExpect(jsonPath("$.nextCursor").value(newer))
+                .andReturn().getResponse().getContentAsString();
+        String cursor = JsonPath.read(firstPage, "$.nextCursor");
+
+        // then
+        mockMvc.perform(get("/api/my/bookings")
+                        .param("limit", "1")
+                        .param("cursor", cursor))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(older))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
+
+    @Test
+    void givenAnonymousCaller_whenListingPersonalBookings_thenUnauthorized() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/my/bookings"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenNoPersonalBookings_whenListingThem_thenAnEmptyPageIsReturned() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/my/bookings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid() throws Exception {
         // given
         String response = mockMvc.perform(bookingPost()
