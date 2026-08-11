@@ -10,6 +10,8 @@ const courts = [
   { id: "22222222-2222-2222-2222-222222222222", number: 2, name: null }
 ];
 
+const clubInstant = (time: string) => new Date(`2026-08-10T${time}:00+02:00`);
+
 beforeEach(async () => {
   vi.restoreAllMocks();
   await i18n.changeLanguage("en");
@@ -58,7 +60,7 @@ afterEach(() => {
 
 it("given the current week, when it loads, then every day and active court is available", async () => {
   // when
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
 
   // then
   expect(await screen.findByRole("heading", { name: "Court occupancy" })).toBeInTheDocument();
@@ -81,7 +83,7 @@ it("given the current week, when it loads, then every day and active court is av
 
 it("given the current week, when opening the next week, then its seven days are loaded", async () => {
   // given
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByText("Singles");
 
   // when
@@ -97,7 +99,7 @@ it("given the current week, when opening the next week, then its seven days are 
 
 it("given another day is selected, when viewing it, then its occupancy table is shown", async () => {
   // given
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByText("Singles");
 
   // when
@@ -116,7 +118,7 @@ it("given up to four courts, when showing the day plan, then they divide its wid
   ]);
 
   // when
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
 
   // then
   const plan = await screen.findByTestId("week-grid");
@@ -131,7 +133,7 @@ it("given more than four courts, when showing the day plan, then court columns r
   })));
 
   // when
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
 
   // then
   expect(await screen.findByTestId("day-plan-table")).toHaveClass("day-plan-many-courts");
@@ -139,7 +141,7 @@ it("given more than four courts, when showing the day plan, then court columns r
 
 it("given a free future slot, when showing the day plan, then it is visibly identified and keyboard actionable", async () => {
   // when
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
 
   // then
   const slot = await screen.findByRole("button", { name: "Book Centre Court at 12:30" });
@@ -149,7 +151,7 @@ it("given a free future slot, when showing the day plan, then it is visibly iden
 
 it("given a past slot, when showing today, then it remains visible but cannot be booked", async () => {
   // when
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
 
   // then
   const slot = await screen.findByRole("button", { name: "Centre Court at 08:00 is in the past" });
@@ -173,7 +175,7 @@ it("given an own booking in the past, when showing today, then it remains visibl
   }] : []));
 
   // when
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
 
   // then
   expect(await screen.findByText("You")).toBeInTheDocument();
@@ -182,7 +184,7 @@ it("given an own booking in the past, when showing today, then it remains visibl
 
 it("given today, when showing the plan, then current time and a return action are available", async () => {
   // when
-  render(<WeekView today={new Date(2026, 7, 10, 12, 15)} />);
+  render(<WeekView today={clubInstant("12:15")} />);
 
   // then
   expect(await screen.findByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:15");
@@ -192,12 +194,12 @@ it("given today, when showing the plan, then current time and a return action ar
 it("given the plan remains open, when one minute passes, then its current-time state advances", async () => {
   // given
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  let now = new Date(2026, 7, 10, 12, 15);
+  let now = clubInstant("12:15");
   render(<WeekView clock={() => now} />);
   expect(await screen.findByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:15");
 
   // when
-  now = new Date(2026, 7, 10, 12, 16);
+  now = clubInstant("12:16");
   await vi.advanceTimersByTimeAsync(60_000);
 
   // then
@@ -207,7 +209,7 @@ it("given the plan remains open, when one minute passes, then its current-time s
 it("given the plan is open, when the refresh interval elapses and focus returns, then the selected day is refreshed", async () => {
   // given
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByTestId("week-grid");
   vi.mocked(api.allocations).mockClear();
 
@@ -228,7 +230,7 @@ it("given a booking conflict, when submission fails, then the affected day is re
     title: "Court unavailable",
     status: 409
   }));
-  render(<WeekView today={new Date(2026, 7, 10, 7)} />);
+  render(<WeekView today={clubInstant("07:00")} />);
   await userEvent.click(await screen.findByRole("button", { name: "Book Centre Court at 08:00" }));
   vi.mocked(api.allocations).mockClear();
 
@@ -248,7 +250,7 @@ it("given a booking conflict and a failed refresh, when submission fails, then t
     status: 409,
     detail: "The selected court is no longer available."
   }));
-  render(<WeekView today={new Date(2026, 7, 10, 7)} />);
+  render(<WeekView today={clubInstant("07:00")} />);
   await userEvent.click(await screen.findByRole("button", { name: "Book Centre Court at 08:00" }));
   vi.mocked(api.allocations).mockRejectedValue(new Error("refresh unavailable"));
 
@@ -288,7 +290,7 @@ it("given a red booking card, when it is shown, then its label uses the higher-c
   }] : []));
 
   // when
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
 
   // then
   expect(await screen.findByText("Training")).toHaveStyle({ color: "rgb(15, 23, 42)" });
@@ -309,7 +311,7 @@ it("given an own member booking, when it is shown, then the viewer marker and ot
   }] : []));
 
   // when
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
 
   // then
   expect(await screen.findByText("You, Major, Miles")).toBeInTheDocument();
@@ -334,7 +336,7 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
     participantLastNames: [],
     matchType: "SINGLES"
   }] : []));
-  render(<WeekView today={new Date(2026, 7, 10, 7)} />);
+  render(<WeekView today={clubInstant("07:00")} />);
   await screen.findByRole("button", { name: "Book Centre Court at 08:00" });
 
   // when
@@ -362,7 +364,7 @@ it("given booking rules reject a slot, when submitting it, then every violation 
       { code: "booking.participants.slotCount", params: { cardLabel: "Member booking", allowed: "2 or 4", actual: 1 } }
     ]
   }));
-  render(<WeekView today={new Date(2026, 7, 10, 7)} />);
+  render(<WeekView today={clubInstant("07:00")} />);
   await userEvent.click(await screen.findByRole("button", { name: "Book Centre Court at 08:00" }));
 
   // when
@@ -382,7 +384,7 @@ it("given a matching club member, when selecting them, then their person id is s
   vi.mocked(api.participantMembers).mockResolvedValue([{
     personId: "88888888-8888-8888-8888-888888888888", displayName: "Mary Major"
   }]);
-  render(<WeekView today={new Date(2026, 7, 10, 7)} />);
+  render(<WeekView today={clubInstant("07:00")} />);
   await userEvent.click(await screen.findByRole("button", { name: "Book Centre Court at 08:00" }));
 
   // when
@@ -398,7 +400,7 @@ it("given a matching club member, when selecting them, then their person id is s
 
 it("given the booking dialog is open, when pressing escape, then focus returns to the selected slot", async () => {
   // given
-  render(<WeekView today={new Date(2026, 7, 10, 7)} />);
+  render(<WeekView today={clubInstant("07:00")} />);
   const slot = await screen.findByRole("button", { name: "Book Centre Court at 08:00" });
   await userEvent.click(slot);
   expect(await screen.findByRole("dialog", { name: "Booking on 2026-08-10 at 08:00" })).toBeInTheDocument();
@@ -429,7 +431,7 @@ it("given an occupied slot, when cancelling it, then the API decides and the day
     participantLastNames: [],
     matchType: "SINGLES"
   }] : []));
-  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+  render(<WeekView today={clubInstant("12:00")} />);
   await userEvent.click(await screen.findByRole("button", { name: "You, cancel booking" }));
 
   // when
