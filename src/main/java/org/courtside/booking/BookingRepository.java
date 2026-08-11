@@ -11,6 +11,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Set;
+import org.courtside.identity.Role;
 
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
@@ -102,6 +104,26 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<UUID> findPersonalBookingIds(@Param("bookedBy") UUID bookedBy,
                                       @Param("cursor") UUID cursor,
                                       Pageable pageable);
+
+    @Query("""
+            SELECT b.id FROM Booking b
+            WHERE (:administrator = true OR EXISTS (
+                SELECT c.id FROM BookingCard c JOIN c.allowedRoles role
+                WHERE c.id = b.cardId AND role IN :roles
+            ))
+              AND (:cursor IS NULL
+                OR (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
+                    < (SELECT min(ca.startsAt) FROM CourtAllocation ca WHERE ca.booking.id = :cursor)
+                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
+                    = (SELECT min(ca.startsAt) FROM CourtAllocation ca WHERE ca.booking.id = :cursor)
+                    AND b.id < :cursor))
+            ORDER BY (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b) DESC,
+                     b.id DESC
+            """)
+    List<UUID> findManagedBookingIds(@Param("roles") Set<Role> roles,
+                                     @Param("administrator") boolean administrator,
+                                     @Param("cursor") UUID cursor,
+                                     Pageable pageable);
 
     @EntityGraph(attributePaths = "allocations")
     List<Booking> findAllByIdIn(Collection<UUID> ids);

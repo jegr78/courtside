@@ -7,6 +7,11 @@ import org.courtside.api.ApiMatchType;
 import org.courtside.api.ApiBookingStatus;
 import org.courtside.api.ApiPersonalBooking;
 import org.courtside.api.ApiPersonalBookingPage;
+import org.courtside.api.ApiManagedAppointment;
+import org.courtside.api.ApiManagedAppointmentDetail;
+import org.courtside.api.ApiManagedAppointmentPage;
+import org.courtside.api.ApiManagedParticipant;
+import org.courtside.api.ApiManagedParticipantKind;
 import org.courtside.api.BookingsApi;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CourtAllocation;
@@ -14,7 +19,9 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.MatchType;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.PersonalBookingPage;
+import org.courtside.booking.Booking;
 import org.courtside.booking.internal.AllocationVisibilityService;
+import org.courtside.booking.internal.ManagedAppointmentQuery;
 import org.courtside.booking.internal.AllocationVisibilityService.AllocationVisibility;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
@@ -44,6 +51,7 @@ class BookingController implements BookingsApi {
     private final CurrentUser currentUser;
     private final AllocationVisibilityService allocationVisibility;
     private final BookingRequestValidator crossFieldRules;
+    private final ManagedAppointmentQuery managedAppointments;
     private final ZoneId zone;
 
     BookingController(BookingService bookings,
@@ -51,12 +59,14 @@ class BookingController implements BookingsApi {
                       CurrentUser currentUser,
                       AllocationVisibilityService allocationVisibility,
                       BookingRequestValidator crossFieldRules,
+                      ManagedAppointmentQuery managedAppointments,
                       @Value("${courtside.booking.time-zone}") String zone) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
         this.allocationVisibility = allocationVisibility;
         this.crossFieldRules = crossFieldRules;
+        this.managedAppointments = managedAppointments;
         this.zone = ZoneId.of(zone);
     }
 
@@ -123,6 +133,62 @@ class BookingController implements BookingsApi {
                 })
                 .toList();
         return ResponseEntity.ok(new ApiPersonalBookingPage(items).nextCursor(page.nextCursor()));
+    }
+
+    @Override
+    public ResponseEntity<ApiManagedAppointmentPage> listManagedAppointments(UUID cursor, Integer limit) {
+        UserAccount account = currentUser.requireAccount();
+        ManagedAppointmentQuery.Page page = managedAppointments.list(account.getRoles(), cursor, limit);
+        Map<UUID, BookingCard> cardsById = cards.allCards().stream()
+                .collect(Collectors.toMap(BookingCard::getId, card -> card));
+        Map<UUID, Long> participantCounts = bookings.participantCountsFor(
+                page.bookings().stream().map(Booking::getId).toList());
+        List<ApiManagedAppointment> items = page.bookings().stream()
+                .map(booking -> toManagedAppointment(
+                        booking, cardsById, participantCounts.getOrDefault(booking.getId(), 0L)))
+                .toList();
+        return ResponseEntity.ok(new ApiManagedAppointmentPage(items).nextCursor(page.nextCursor()));
+    }
+
+    @Override
+    public ResponseEntity<ApiManagedAppointmentDetail> getManagedAppointment(UUID id) {
+        UserAccount account = currentUser.requireAccount();
+        ManagedAppointmentQuery.Detail detail = managedAppointments.get(
+                id, account.getId(), account.getRoles());
+        Booking booking = detail.booking();
+        CourtAllocation allocation = booking.getAllocations().getFirst();
+        BookingCard card = detail.card();
+        List<ApiManagedParticipant> participants = detail.participants().stream()
+                .map(this::toManagedParticipant)
+                .toList();
+        return ResponseEntity.ok(new ApiManagedAppointmentDetail(
+                booking.getId(), booking.getAllocations().stream().map(CourtAllocation::getCourtId).toList(),
+                WireTypes.toOffsetDateTime(allocation.getStartsAt()),
+                WireTypes.toOffsetDateTime(allocation.getEndsAt()), card.getLabel(), card.getColor(),
+                ApiBookingStatus.fromValue(booking.getStatus().name()), participants.size(), participants)
+                .seriesId(booking.getSeriesId())
+                .note(booking.getNote()));
+    }
+
+    private ApiManagedAppointment toManagedAppointment(Booking booking,
+                                                        Map<UUID, BookingCard> cardsById,
+                                                        long participantCount) {
+        CourtAllocation allocation = booking.getAllocations().getFirst();
+        BookingCard card = cardsById.get(booking.getCardId());
+        if (card == null) {
+            throw new IllegalStateException("A booking references an unknown card");
+        }
+        return new ApiManagedAppointment(
+                booking.getId(), booking.getAllocations().stream().map(CourtAllocation::getCourtId).toList(),
+                WireTypes.toOffsetDateTime(allocation.getStartsAt()),
+                WireTypes.toOffsetDateTime(allocation.getEndsAt()), card.getLabel(), card.getColor(),
+                ApiBookingStatus.fromValue(booking.getStatus().name()), Math.toIntExact(participantCount))
+                .seriesId(booking.getSeriesId());
+    }
+
+    private ApiManagedParticipant toManagedParticipant(ManagedAppointmentQuery.Participant participant) {
+        return new ApiManagedParticipant(
+                ApiManagedParticipantKind.fromValue(participant.kind()), participant.displayName());
     }
 
     @Override

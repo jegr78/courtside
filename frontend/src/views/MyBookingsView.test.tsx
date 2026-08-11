@@ -64,6 +64,99 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   expect(screen.getAllByText("Centre Court")).toHaveLength(2);
 });
 
+it("given an officer, when managed appointments load, then they are separated from personal bookings", async () => {
+  // given
+  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
+    id: "55555555-5555-5555-5555-555555555555",
+    courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-12T18:00:00Z",
+    endsAt: "2026-08-12T19:00:00Z",
+    cardLabel: "League match",
+    cardColor: "#3A4A5C",
+    status: "CONFIRMED",
+    participantCount: 0
+  }] });
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
+
+  // then
+  expect(await screen.findByRole("heading", { name: "Managed appointments" })).toBeInTheDocument();
+  expect(screen.getByText("League match")).toBeInTheDocument();
+  expect(screen.getByText("0 participants")).toBeInTheDocument();
+});
+
+it("given a managed appointment, when opening details, then its internal data is loaded on demand", async () => {
+  // given
+  const bookingId = "55555555-5555-5555-5555-555555555555";
+  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
+    id: bookingId,
+    courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-12T18:00:00Z",
+    endsAt: "2026-08-12T19:00:00Z",
+    cardLabel: "League match",
+    cardColor: "#3A4A5C",
+    status: "CONFIRMED",
+    participantCount: 1
+  }] });
+  vi.spyOn(api, "managedAppointment").mockResolvedValue({
+    id: bookingId,
+    courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-12T18:00:00Z",
+    endsAt: "2026-08-12T19:00:00Z",
+    cardLabel: "League match",
+    cardColor: "#3A4A5C",
+    status: "CONFIRMED",
+    participantCount: 1,
+    note: "Prepare score sheets",
+    participants: [{ kind: "MEMBER", displayName: "Jane Doe" }]
+  });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
+
+  // when
+  await userEvent.click(await screen.findByRole("button", { name: "Details" }));
+
+  // then
+  expect(await screen.findByText("Prepare score sheets")).toBeInTheDocument();
+  expect(screen.getByText("Jane Doe · Member")).toBeInTheDocument();
+  expect(api.managedAppointment).toHaveBeenCalledWith(bookingId);
+});
+
+it("given a cancelled managed appointment, when listed, then its details remain available", async () => {
+  // given
+  const bookingId = "55555555-5555-5555-5555-555555555555";
+  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
+    id: bookingId,
+    courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-12T18:00:00Z",
+    endsAt: "2026-08-12T19:00:00Z",
+    cardLabel: "League match",
+    cardColor: "#3A4A5C",
+    status: "CANCELLED",
+    participantCount: 0
+  }] });
+  vi.spyOn(api, "managedAppointment").mockResolvedValue({
+    id: bookingId,
+    courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-12T18:00:00Z",
+    endsAt: "2026-08-12T19:00:00Z",
+    cardLabel: "League match",
+    cardColor: "#3A4A5C",
+    status: "CANCELLED",
+    participantCount: 0,
+    note: "Retain for the audit trail",
+    participants: []
+  });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
+
+  // when
+  await userEvent.click(await screen.findByRole("button", { name: "Details" }));
+
+  // then
+  expect(await screen.findByText("Retain for the audit trail")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Cancel League match" })).not.toBeInTheDocument();
+});
+
 it("given another page exists, when loading more, then its bookings are appended", async () => {
   // given
   vi.mocked(api.personalBookings)

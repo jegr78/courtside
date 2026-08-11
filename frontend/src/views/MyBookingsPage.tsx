@@ -31,6 +31,6 @@ export function MyBookingsPage({ session, signedOut }: { session: SessionStatus;
     </div>
     <p className="text-muted mt-4">{t("home.welcome", { name: session.displayName })}</p>
     {error && <Alert>{error}</Alert>}
-    <MyBookingsView />
+    <MyBookingsView showManaged={session.roles.some((role) => role !== "MEMBER")} />
   </section>;
 }

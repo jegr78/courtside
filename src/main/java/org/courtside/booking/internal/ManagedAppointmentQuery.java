@@ -1,0 +1,83 @@
+package org.courtside.booking.internal;
+
+import lombok.RequiredArgsConstructor;
+import org.courtside.booking.Booking;
+import org.courtside.booking.BookingParticipant;
+import org.courtside.booking.BookingRepository;
+import org.courtside.card.BookingCard;
+import org.courtside.card.CardService;
+import org.courtside.identity.PersonRepository;
+import org.courtside.identity.Role;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Component
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ManagedAppointmentQuery {
+
+    private final BookingRepository bookings;
+    private final BookingAccessControl accessControl;
+    private final CardService cards;
+    private final PersonRepository persons;
+
+    public Page list(Set<Role> roles, UUID cursor, int limit) {
+        Set<Role> managementRoles = accessControl.managementRoles(roles);
+        if (!roles.contains(Role.ADMIN) && managementRoles.isEmpty()) {
+            return new Page(List.of(), null);
+        }
+        List<UUID> ids = bookings.findManagedBookingIds(
+                managementRoles, roles.contains(Role.ADMIN), cursor, PageRequest.of(0, limit + 1));
+        UUID nextCursor = ids.size() > limit ? ids.get(limit - 1) : null;
+        List<UUID> visibleIds = ids.stream().limit(limit).toList();
+        Map<UUID, Booking> found = bookings.findAllByIdIn(visibleIds).stream()
+                .collect(Collectors.toMap(Booking::getId, booking -> booking));
+        return new Page(visibleIds.stream().map(found::get).toList(), nextCursor);
+    }
+
+    public Detail get(UUID bookingId, UUID actor, Set<Role> roles) {
+        Booking booking = bookings.findWithAllocationsById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+        accessControl.requireRoleManagementAccess(booking, actor, roles);
+        Booking participants = bookings.findWithParticipantsById(bookingId).orElseThrow();
+        BookingCard card = cards.requireCard(booking.getCardId());
+        return new Detail(booking, card, participants.getParticipants().stream()
+                .map(this::resolveParticipant)
+                .toList());
+    }
+
+    private Participant resolveParticipant(BookingParticipant participant) {
+        String displayName = switch (participant.getKind()) {
+            case MEMBER -> persons.findById(participant.getPersonId())
+                    .orElseThrow(() -> new IllegalStateException("A booking references an unknown person"))
+                    .getDisplayName();
+            case GUEST -> participant.getGuestName();
+            case CARD -> cards.requireParticipantCard(participant.getCardId()).getLabel();
+        };
+        return new Participant(participant.getKind().name(), displayName);
+    }
+
+    public record Page(List<Booking> bookings, UUID nextCursor) {
+
+        public Page {
+            bookings = List.copyOf(bookings);
+        }
+    }
+
+    public record Detail(Booking booking, BookingCard card, List<Participant> participants) {
+
+        public Detail {
+            participants = List.copyOf(participants);
+        }
+    }
+
+    public record Participant(String kind, String displayName) {
+    }
+}
