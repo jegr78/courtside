@@ -5,6 +5,7 @@ import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { WeekView } from "./WeekView";
+import { MyBookingsView } from "./MyBookingsView";
 
 export function HomeView({ session, signedOut }: { session: SessionStatus; signedOut: () => void }) {
   const { t } = useTranslation();
@@ -27,6 +28,7 @@ export function HomeView({ session, signedOut }: { session: SessionStatus; signe
       <Button type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>
     </div>
     {error && <Alert>{error}</Alert>}
+    <MyBookingsView />
     <WeekView />
   </section>;
 }

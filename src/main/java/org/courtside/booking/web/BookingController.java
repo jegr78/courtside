@@ -4,12 +4,16 @@ import org.courtside.api.ApiAllocation;
 import org.courtside.api.ApiBookingCreated;
 import org.courtside.api.ApiCreateBookingRequest;
 import org.courtside.api.ApiMatchType;
+import org.courtside.api.ApiBookingStatus;
+import org.courtside.api.ApiPersonalBooking;
+import org.courtside.api.ApiPersonalBookingPage;
 import org.courtside.api.BookingsApi;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.MatchType;
 import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.PersonalBookingPage;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.identity.CurrentUser;
@@ -88,6 +92,32 @@ class BookingController implements BookingsApi {
         UserAccount account = currentUser.requireAccount();
         bookings.cancel(id, account.getId(), account.getRoles());
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<ApiPersonalBookingPage> listPersonalBookings(UUID cursor, Integer limit) {
+        UserAccount account = currentUser.requireAccount();
+        Map<UUID, BookingCard> cardsById = cards.allCards().stream()
+                .collect(Collectors.toMap(BookingCard::getId, card -> card));
+        PersonalBookingPage page = bookings.personalBookings(account.getId(), cursor, limit);
+        List<ApiPersonalBooking> items = page.bookings().stream()
+                .map(booking -> {
+                    List<CourtAllocation> allocations = booking.getAllocations();
+                    CourtAllocation first = allocations.getFirst();
+                    BookingCard card = cardsById.get(booking.getCardId());
+                    return new ApiPersonalBooking(
+                            booking.getId(),
+                            allocations.stream().map(CourtAllocation::getCourtId).toList(),
+                            WireTypes.toOffsetDateTime(first.getStartsAt()),
+                            WireTypes.toOffsetDateTime(first.getEndsAt()),
+                            card == null ? "?" : card.getLabel(),
+                            card == null ? "#999999" : card.getColor(),
+                            ApiBookingStatus.fromValue(booking.getStatus().name()))
+                            .seriesId(booking.getSeriesId())
+                            .note(booking.getNote());
+                })
+                .toList();
+        return ResponseEntity.ok(new ApiPersonalBookingPage(items).nextCursor(page.nextCursor()));
     }
 
     @Override

@@ -79,13 +79,17 @@ test("a seeded member can book a free slot and cancel it again", async ({ page }
   await page.getByRole("button", { name: "Book now" }).click();
 
   // then
-  const booking = page.getByRole("button", { name: "Member booking, cancel booking" });
-  await expect(booking).toBeVisible();
+  const gridBooking = page.getByRole("button", { name: "Member booking, cancel booking" });
+  await expect(gridBooking).toBeVisible();
+
+  await page.reload();
+  const personalBooking = page.getByRole("button", { name: "Cancel Member booking" });
+  await expect(personalBooking).toBeVisible();
 
   // when
-  await booking.click();
+  await personalBooking.click();
   await page.getByRole("button", { name: "Confirm cancellation" }).click();
 
   // then
-  await expect(booking).not.toBeVisible();
+  await expect(personalBooking).not.toBeVisible();
 });

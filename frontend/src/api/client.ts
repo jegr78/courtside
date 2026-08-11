@@ -12,6 +12,12 @@ export type PublicParticipantCard = components["schemas"]["PublicParticipantCard
 export type PublicParticipantMember = components["schemas"]["PublicParticipantMember"];
 export type CreateBookingRequest = components["schemas"]["CreateBookingRequest"];
 export type BookingCreated = components["schemas"]["BookingCreated"];
+export type PersonalBooking = components["schemas"]["PersonalBooking"];
+export type PersonalBookingPage = components["schemas"]["PersonalBookingPage"];
+export type CancelScope = components["schemas"]["CancelScope"];
+export type MoveRequest = components["schemas"]["MoveRequest"];
+export type MovePreview = components["schemas"]["MovePreview"];
+export type MoveExecuted = components["schemas"]["MoveExecuted"];
 
 export class ApiError extends Error {
   constructor(
@@ -73,6 +79,23 @@ export const api = {
     body: JSON.stringify(booking)
   }),
   cancelBooking: (bookingId: string) => request<void>(`/api/bookings/${bookingId}`, { method: "DELETE" }),
+  personalBookings: (cursor?: string, limit = 50) => request<PersonalBookingPage>(
+    `/api/my/bookings?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  ),
+  cancelSeries: (seriesId: string, fromBookingId: string, scope: CancelScope) => request<void>(
+    `/api/booking-series/${seriesId}?${new URLSearchParams({ fromBookingId, scope })}`,
+    { method: "DELETE" }
+  ),
+  previewSeriesMove: (seriesId: string, move: MoveRequest) => request<MovePreview>(
+    `/api/booking-series/${seriesId}/move/preview`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(move)
+    }
+  ),
+  moveSeries: (seriesId: string, move: MoveRequest) => request<MoveExecuted>(
+    `/api/booking-series/${seriesId}/move`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(move)
+    }
+  ),
   login: (username: string, password: string) => request<void>("/api/session", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
