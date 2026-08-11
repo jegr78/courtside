@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.internal.ImpactService;
 import org.courtside.facility.Court;
 import org.courtside.facility.CourtRepository;
 import org.courtside.facility.OpeningHours;
@@ -31,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -58,6 +60,9 @@ class ImpactControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingService bookings;
+
+    @Autowired
+    private ImpactService impact;
 
     @Autowired
     private JdbcClient jdbc;
@@ -230,15 +235,20 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void given51FutureBookingsOnACourt_whenAskingWhatDeactivatingItWouldAffect_thenTheListIsCappedAndTruncatedIsTrue()
+    void given51FutureBookingsOnACourt_whenRequestingBothPages_thenEveryBookingCanBeRead()
             throws Exception {
         // given
         UUID court = courts.save(new Court(1, null)).getId();
         Instant start = Instant.parse("2026-05-13T08:00:00Z");
+        UUID firstPageCursor = null;
+        UUID lastBookingId = null;
         for (int i = 0; i < 51; i++) {
             Instant slotStart = start.plusSeconds(i * 1800L);
             Instant slotEnd = slotStart.plusSeconds(1800L);
-            insertBooking(court, slotStart.toString(), slotEnd.toString(), "CONFIRMED");
+            lastBookingId = insertBooking(court, slotStart.toString(), slotEnd.toString(), "CONFIRMED");
+            if (i == 49) {
+                firstPageCursor = lastBookingId;
+            }
         }
 
         // when / then
@@ -246,7 +256,16 @@ class ImpactControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.affectedCount").value(51))
                 .andExpect(jsonPath("$.truncated").value(true))
+                .andExpect(jsonPath("$.nextCursor").value(firstPageCursor.toString()))
                 .andExpect(jsonPath("$.bookings.length()").value(50));
+        mockMvc.perform(get("/api/admin/impact/courts/" + court)
+                        .param("cursor", firstPageCursor.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.affectedCount").value(51))
+                .andExpect(jsonPath("$.truncated").value(false))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist())
+                .andExpect(jsonPath("$.bookings.length()").value(1))
+                .andExpect(jsonPath("$.bookings[0].bookingId").value(lastBookingId.toString()));
     }
 
     @Test
@@ -266,7 +285,80 @@ class ImpactControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.affectedCount").value(50))
                 .andExpect(jsonPath("$.truncated").value(false))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist())
                 .andExpect(jsonPath("$.bookings.length()").value(50));
+    }
+
+    @Test
+    void givenAnImpactRequest_whenTheLimitExceedsTheMaximum_thenItIsRejected() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/impact/courts/" + UUID.randomUUID()).param("limit", "101"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void givenAnInvalidLimit_whenCallingTheImpactService_thenItRejectsTheProgrammingError() {
+        // when / then
+        assertThatThrownBy(() -> impact.ofDeactivating(UUID.randomUUID(), null, 101))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Impact page size must be between 1 and 100");
+    }
+
+    @Test
+    void givenTwoBookingsOnACard_whenRequestingTheSecondPage_thenTheRemainingBookingIsReturned()
+            throws Exception {
+        // given
+        UUID court = courts.save(new Court(1, null)).getId();
+        UUID firstBookingId = insertBookingWithCard(TRAINING_CARD, court,
+                "2026-05-12T12:00:00Z", "2026-05-12T13:00:00Z", "CONFIRMED");
+        UUID secondBookingId = insertBookingWithCard(TRAINING_CARD, court,
+                "2026-05-12T14:00:00Z", "2026-05-12T15:00:00Z", "CONFIRMED");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/impact/booking-cards/" + TRAINING_CARD)
+                        .param("cursor", firstBookingId.toString()).param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.affectedCount").value(2))
+                .andExpect(jsonPath("$.truncated").value(false))
+                .andExpect(jsonPath("$.bookings[0].bookingId").value(secondBookingId.toString()));
+    }
+
+    @Test
+    void givenTwoTuesdayBookings_whenRequestingTheSecondClosingImpactPage_thenTheRemainingBookingIsReturned()
+            throws Exception {
+        // given
+        UUID court = courts.save(new Court(1, null)).getId();
+        UUID firstBookingId = insertBooking(
+                court, "2026-05-12T12:00:00Z", "2026-05-12T13:00:00Z", "CONFIRMED");
+        UUID secondBookingId = insertBooking(
+                court, "2026-05-12T14:00:00Z", "2026-05-12T15:00:00Z", "CONFIRMED");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/impact/opening-hours/TUESDAY")
+                        .param("cursor", firstBookingId.toString()).param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.affectedCount").value(2))
+                .andExpect(jsonPath("$.truncated").value(false))
+                .andExpect(jsonPath("$.bookings[0].bookingId").value(secondBookingId.toString()));
+    }
+
+    @Test
+    void givenACursorFromAnotherCourt_whenRequestingImpact_thenNoPositionedBookingsAreDisclosed()
+            throws Exception {
+        // given
+        UUID requestedCourt = courts.save(new Court(1, null)).getId();
+        UUID otherCourt = courts.save(new Court(2, null)).getId();
+        insertBooking(requestedCourt, "2026-05-12T12:00:00Z", "2026-05-12T13:00:00Z", "CONFIRMED");
+        UUID foreignCursor = insertBooking(
+                otherCourt, "2026-05-12T14:00:00Z", "2026-05-12T15:00:00Z", "CONFIRMED");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/impact/courts/" + requestedCourt)
+                        .param("cursor", foreignCursor.toString()).param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.affectedCount").value(1))
+                .andExpect(jsonPath("$.truncated").value(false))
+                .andExpect(jsonPath("$.bookings.length()").value(0));
     }
 
     @Test
