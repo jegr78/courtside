@@ -92,6 +92,105 @@ input[type="time"] {
   border: 1px solid var(--cs-border);
 }
 
+.day-plan-table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
+}
+
+.day-plan-table.day-plan-many-courts {
+  min-width: calc(5rem + var(--court-count) * 10rem);
+}
+
+.day-plan-time-column {
+  width: 5rem;
+}
+
+.day-plan-court-column {
+  width: calc((100% - 5rem) / var(--court-count));
+}
+
+.day-plan thead th {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  height: 48px;
+  background: var(--cs-raised);
+}
+
+.day-plan thead th:first-child {
+  z-index: 4;
+  left: 0;
+}
+
+.day-plan tbody th {
+  position: sticky;
+  z-index: 2;
+  left: 0;
+}
+
+.day-plan-slot[data-state="free"] {
+  color: var(--cs-muted);
+  outline: 1px dashed var(--cs-border);
+  outline-offset: -1px;
+}
+
+.day-plan-slot[data-state="free"]:hover {
+  color: var(--cs-text);
+  background: color-mix(in srgb, var(--club-accent) 18%, transparent);
+}
+
+.day-plan-slot[data-state="past"] {
+  color: var(--cs-muted);
+  background: repeating-linear-gradient(135deg, transparent 0 7px, var(--cs-raised) 7px 10px);
+}
+
+.current-time-line {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  left: 5rem;
+  height: 2px;
+  pointer-events: none;
+  background: var(--cs-ball);
+}
+
+.current-time-line::before {
+  position: absolute;
+  top: -4px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  content: "";
+  border-radius: 999px;
+  background: var(--cs-ball);
+}
+
+.day-plan-legend {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-right: 0.4rem;
+  vertical-align: -0.1rem;
+  border-radius: 0.2rem;
+}
+
+.day-plan-legend.free {
+  border: 1px dashed var(--cs-border);
+}
+
+.day-plan-legend.occupied {
+  background: var(--cs-clay);
+}
+
+.day-plan-legend.own {
+  background: var(--cs-ball);
+}
+
+.day-plan-legend.unavailable {
+  background: repeating-linear-gradient(135deg, transparent 0 4px, var(--cs-muted) 4px 6px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;
