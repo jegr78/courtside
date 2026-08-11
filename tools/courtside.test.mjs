@@ -10,7 +10,8 @@ import {
   processPlans, requiredPorts, restoreDatabase, startProcesses, superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, performanceBaselinePlan,
-  performanceStartupSummary
+  performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
+  resolvePublicFunnelAddresses, validatePublicAddress
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
@@ -253,6 +254,101 @@ test("given load profiles, when parsing execution, then manual runs require disp
   assert.throws(() => parseArguments(["perf-run", "browser"]), /--confirm courtside-perf/);
 });
 
+test("given a Funnel smoke, when parsing execution, then the public target and explicit confirmation are mandatory", () => {
+  // when
+  const options = parseArguments([
+    "perf-run", "funnel-smoke", "--target", "https://courtside.example.ts.net",
+    "--confirm", "courtside-uat-funnel"
+  ]);
+
+  // then
+  assert.equal(options.profile, "funnel-smoke");
+  assert.equal(options.target, "https://courtside.example.ts.net");
+  assert.throws(
+    () => parseArguments(["perf-run", "funnel-smoke", "--target", "https://courtside.example.ts.net"]),
+    /--confirm courtside-uat-funnel/
+  );
+  assert.throws(
+    () => parseArguments(["perf-run", "funnel-smoke", "--confirm", "courtside-uat-funnel"]),
+    /--target/
+  );
+  assert.throws(
+    () => parseArguments([
+      "perf-run", "funnel-smoke", "--target", "https://courtside.example.ts.net",
+      "--confirm", "courtside-uat-funnel", "--remote-write"
+    ]),
+    /cannot use --remote-write/
+  );
+  assert.throws(
+    () => parseArguments([
+      "perf-run", "funnel-smoke", "--target", "https://courtside.example.ts.net",
+      "--confirm", "courtside-uat-funnel", "--fresh"
+    ]),
+    /cannot use --fresh/
+  );
+  assert.throws(
+    () => parseArguments(["perf-run", "smoke", "--target", "https://courtside.example.ts.net"]),
+    /only valid for funnel-smoke/
+  );
+});
+
+test("given a remote target, when validating it, then only a bare public HTTPS origin is accepted", () => {
+  // when / then
+  assert.equal(validateFunnelTarget("https://courtside.example.ts.net"), "https://courtside.example.ts.net");
+  assert.throws(() => validateFunnelTarget("http://courtside.example.ts.net"), /HTTPS/);
+  assert.throws(() => validateFunnelTarget("https://localhost"), /public hostname/);
+  assert.throws(() => validateFunnelTarget("https://127.0.0.1"), /public hostname/);
+  assert.throws(() => validateFunnelTarget("https://user:secret@courtside.example.ts.net"), /credentials/);
+  assert.throws(() => validateFunnelTarget("https://courtside.example.ts.net/path"), /origin/);
+  assert.throws(() => validateFunnelTarget("https://courtside.example.ts.net?target=other"), /origin/);
+});
+
+test("given resolved Funnel addresses, when validating them, then every address must be public", async () => {
+  // given
+  const publicResolver = async () => [
+    { address: "203.0.114.10", family: 4 },
+    { address: "2001:4860:4860::8888", family: 6 }
+  ];
+  const privateResolver = async () => [{ address: "127.0.0.1", family: 4 }];
+  const mixedResolver = async () => [
+    { address: "203.0.114.10", family: 4 },
+    { address: "100.64.0.1", family: 4 }
+  ];
+
+  // when / then
+  assert.deepEqual(await resolvePublicFunnelAddresses("courtside.example.org", publicResolver), [
+    { address: "203.0.114.10", family: 4 },
+    { address: "2001:4860:4860::8888", family: 6 }
+  ]);
+  await assert.rejects(resolvePublicFunnelAddresses("courtside.example.org", privateResolver), /public address/);
+  await assert.rejects(resolvePublicFunnelAddresses("courtside.example.org", mixedResolver), /public address/);
+  assert.throws(() => validatePublicAddress("::ffff:192.168.1.20"), /public address/);
+  assert.throws(() => validatePublicAddress("fe80::1"), /public address/);
+});
+
+test("given a Funnel smoke, when planning k6, then no credentials, local trust, or target report is mounted", () => {
+  // given
+  const options = parseArguments([
+    "perf-run", "funnel-smoke", "--target", "https://courtside.example.ts.net",
+    "--confirm", "courtside-uat-funnel"
+  ]);
+
+  // when
+  const plan = funnelPerformanceRunPlan(options, "/tmp/funnel-result", "test-run");
+
+  // then
+  assert.equal(plan.command, "docker");
+  assert.ok(plan.args.includes("PERF_PROFILE=funnel-smoke"));
+  assert.ok(plan.args.includes("PERF_TARGET=https://courtside.example.ts.net"));
+  assert.ok(plan.args.includes("/scripts/funnel.js"));
+  assert.ok(plan.args.includes("/tmp/funnel-result:/results"));
+  assert.equal(plan.args.some((argument) => argument.includes("perf.json")), false);
+  assert.equal(plan.args.some((argument) => argument.includes("root.crt")), false);
+  assert.equal(plan.args.includes("K6_WEB_DASHBOARD_EXPORT=/results/report.html"), false);
+  assert.equal(plan.args.includes("--add-host"), false);
+  assert.ok(plan.args.includes("--log-output=none"));
+});
+
 test("given the browser profile, when planning k6, then Chromium and the browser journey are isolated", () => {
   // given
   const options = parseArguments(["perf-run", "browser", "--confirm", "courtside-perf"]);
@@ -383,6 +479,43 @@ test("given raw browser metrics, when building a result, then p75 Web Vitals and
   });
   assert.equal(result.metrics.browserErrors, 0);
   assert.equal(result.metrics.browserJourneyMilliseconds, 1800);
+});
+
+test("given a Funnel summary, when building a result, then UAT read-only evidence contains no target", () => {
+  // given
+  const contract = JSON.parse(readFileSync(fileURLToPath(new URL("../performance/contract.json", import.meta.url))));
+  const raw = {
+    state: { testRunDurationMs: 120_000 },
+    metrics: {
+      iterations: { values: { count: 200 } },
+      http_reqs: { values: { count: 2200, rate: 18.3 } },
+      technical_errors: { values: { rate: 0 }, thresholds: { "rate<0.01": { ok: true } } },
+      unexpected_server_errors: { values: { count: 0 }, thresholds: { "count==0": { ok: true } } },
+      read_only_api_duration: {
+        values: { "p(50)": 20, "p(90)": 30, "p(95)": 40, "p(99)": 50 },
+        thresholds: { "p(95)<500": { ok: true }, "p(99)<1000": { ok: true } }
+      },
+      http_req_duration: { values: { "p(50)": 20, "p(90)": 30, "p(95)": 40, "p(99)": 50 } }
+    }
+  };
+
+  // when
+  const result = buildPerformanceResult({
+    contract, contractDigest: `sha256:${"a".repeat(64)}`,
+    source: { version: "1.2.3", commit: "abcdef0", environment: "UAT" },
+    profileName: "funnel-smoke", startedAt: "2026-08-10T12:00:00.000Z", raw,
+    platform: "darwin", architecture: "arm64", runner: { processorCount: 8, memoryMegabytes: 32768 }
+  });
+
+  // then
+  assert.equal(result.profile.target, "funnel");
+  assert.equal(result.profile.environment, "UAT");
+  assert.equal(result.load.readShare, 1);
+  assert.equal(result.load.writeShare, 0);
+  assert.equal(result.thresholds.readOnlyApi, true);
+  assert.equal("bookingConflicts" in result.metrics, false);
+  assert.doesNotMatch(JSON.stringify(result), /example\.ts\.net/);
+  assert.doesNotThrow(() => validatePerformanceResult(result));
 });
 
 test("given an approved result, when planning baseline promotion, then its versioned path contains no machine data", () => {

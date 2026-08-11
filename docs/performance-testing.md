@@ -206,3 +206,24 @@ The Funnel smoke accepts an explicitly supplied UAT URL, performs read-only chec
 opens nor closes Funnel. It does not log or retain the target. Login, booking, cancellation, and all
 other mutations are outside that profile. Funnel lifecycle and cleanup remain owned by the attached
 `uat share` command.
+
+Start UAT and keep its share command attached in one terminal:
+
+```text
+node tools/courtside.mjs uat share
+```
+
+Copy the displayed public HTTPS origin into a second terminal and confirm the dedicated remote
+profile explicitly:
+
+```text
+node tools/courtside.mjs perf-run funnel-smoke --target https://public-name.example.ts.net --confirm courtside-uat-funnel
+```
+
+The command accepts only a bare public HTTPS origin on port 443. Before creating result files it
+requires `/api/source` to identify a versioned UAT build. The fixed two-VU, two-minute journey checks
+the HTML shell and one generated asset, PWA manifest, public configuration, booking grid and CSRF
+cookie creation. It also proves that Swagger UI, OpenAPI and Actuator return `404` through the public
+ingress. Its sanitized HTML and JSON reports contain aggregate measurements and build identity, but
+not the supplied hostname. Stop sharing with `Ctrl+C` in the attached `uat share` terminal; the
+performance command never changes Funnel or UAT lifecycle state.
