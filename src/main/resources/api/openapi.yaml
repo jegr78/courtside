@@ -1181,7 +1181,10 @@ paths:
       tags: [bookings]
       operationId: cancelBooking
       summary: Cancel a booking.
-      description: A member may cancel their own; an admin may cancel any.
+      description: |
+        The creator, an administrator, or an account currently allowed by the booking card may
+        cancel the booking. Cards without role restrictions do not grant management access to
+        unrelated accounts.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -1233,7 +1236,7 @@ paths:
       summary: What a recurrence would produce, without writing anything.
       description: |
         Mandatory before creating. Open to any authenticated caller, including one who could not
-        actually place the card — the card's role requirement is enforced when the series is
+        actually place the card — the card's allowed roles are enforced when the series is
         created, exactly as it is for a single booking.
       security:
         - sessionCookie: []
@@ -1289,7 +1292,9 @@ paths:
       tags: [booking-series]
       operationId: cancelSeries
       summary: Cancel occurrences of a series.
-      description: Calendar semantics — this one, this and all following, or the whole series.
+      description: |
+        Calendar semantics — this one, this and all following, or the whole series. The creator,
+        an administrator, or an account currently allowed by the booking card may cancel them.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -1323,6 +1328,9 @@ paths:
       tags: [booking-series]
       operationId: previewSeriesMove
       summary: Where a move would land, and what would block it.
+      description: |
+        Available to the creator, an administrator, or an account currently allowed by the
+        booking card. Authorization uses the card's current configuration.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -1356,7 +1364,9 @@ paths:
       tags: [booking-series]
       operationId: moveSeries
       summary: Move occurrences of a series.
-      description: All or nothing — if any occurrence cannot move, none does.
+      description: |
+        All or nothing — if any occurrence cannot move, none does. The creator, an administrator,
+        or an account currently allowed by the booking card may move the occurrences.
       security:
         - sessionCookie: []
           csrfToken: []

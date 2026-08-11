@@ -303,7 +303,9 @@ CREATE TABLE booking (
     note          text,
     created_at    timestamptz NOT NULL DEFAULT now(),
     cancelled_at  timestamptz,
-    cancelled_by  uuid REFERENCES user_account
+    cancelled_by  uuid REFERENCES user_account,
+    moved_at      timestamptz,
+    moved_by      uuid
 );
 
 CREATE TABLE court_allocation (

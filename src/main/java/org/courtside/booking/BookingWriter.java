@@ -1,7 +1,7 @@
 package org.courtside.booking;
 
 import org.courtside.booking.internal.BookingNotFoundException;
-import org.courtside.booking.internal.BookingNotOwnedException;
+import org.courtside.booking.internal.BookingAccessControl;
 import org.courtside.booking.internal.BookingRuleGate;
 import org.courtside.booking.internal.CardNotBookableException;
 import org.courtside.booking.internal.CardRoleRequiredException;
@@ -43,6 +43,7 @@ class BookingWriter {
     private final BookingRepository bookings;
     private final Clock clock;
     private final BookingRuleGate ruleGate;
+    private final BookingAccessControl accessControl;
     private final CardService cards;
     private final FacilityService facility;
     private final PersonRepository personRepository;
@@ -90,11 +91,7 @@ class BookingWriter {
         Booking booking = bookings.findWithAllocationsById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
 
-        if (!cancellerRoles.contains(Role.ADMIN) && !cancelledBy.equals(booking.getBookedBy())) {
-            throw new BookingNotOwnedException(
-                    "Account %s may not cancel booking %s".formatted(cancelledBy, bookingId));
-        }
-
+        accessControl.requireManagementAccess(booking, cancelledBy, cancellerRoles);
         booking.cancel(cancelledBy, clock.instant());
         bookings.saveAndFlush(booking);
     }

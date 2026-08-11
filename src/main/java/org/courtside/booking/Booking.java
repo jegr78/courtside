@@ -49,6 +49,12 @@ public class Booking {
     @Column(name = "cancelled_by")
     private UUID cancelledBy;
 
+    @Column(name = "moved_at")
+    private Instant movedAt;
+
+    @Column(name = "moved_by")
+    private UUID movedBy;
+
     @Column(name = "series_id")
     private UUID seriesId;
 
@@ -80,6 +86,11 @@ public class Booking {
 
     public void clearAllocations() {
         allocations.clear();
+    }
+
+    public void recordMove(UUID movedBy, Instant at) {
+        this.movedBy = movedBy;
+        this.movedAt = at;
     }
 
     public void cancel(UUID cancelledBy, Instant at) {

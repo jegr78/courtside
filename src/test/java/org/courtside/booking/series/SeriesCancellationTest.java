@@ -107,6 +107,22 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenATrainingSeriesCreatedByATrainer_whenAYouthDirectorCancels_thenTheActorIsRecorded() {
+        // given
+        SeriesCreationResult result = createSeries(2);
+        UUID youthDirector = UUID.randomUUID();
+
+        // when
+        seriesService.cancel(result.seriesId(), result.bookingIds().getFirst(),
+                CancelScope.WHOLE_SERIES, youthDirector, Set.of(Role.YOUTH_DIRECTOR));
+
+        // then
+        assertThat(result.bookingIds()).allSatisfy(bookingId ->
+                assertThat(bookings.findById(bookingId).orElseThrow().getCancelledBy())
+                        .isEqualTo(youthDirector));
+    }
+
+    @Test
     void givenAnAlreadyCancelledOccurrence_whenCancellingTheSeries_thenItIsNotCountedTwice() {
         // given
         SeriesCreationResult result = createSeries(3);
@@ -152,11 +168,12 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAMiddleOccurrenceOwnedByAnotherAccount_whenCancellingTheWholeSeries_thenNothingIsCancelled() {
+    void givenAMiddleOccurrenceUsesAnUnauthorizedCard_whenCancellingTheWholeSeries_thenNothingIsCancelled() {
         // given
         SeriesCreationResult result = createSeries(3);
-        jdbc.sql("UPDATE booking SET booked_by = ? WHERE id = ?")
-                .params(UUID.randomUUID(), result.bookingIds().get(1))
+        jdbc.sql("UPDATE booking SET booked_by = ?, card_id = ? WHERE id = ?")
+                .params(UUID.randomUUID(), UUID.fromString("44444444-4444-4444-4444-444444444444"),
+                        result.bookingIds().get(1))
                 .update();
 
         // when / then
