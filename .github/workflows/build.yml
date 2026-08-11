@@ -20,3 +20,11 @@ jobs:
           cache: maven
       - name: Build and test
         run: ./mvnw -B verify
+      - name: Upload visual journeys
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: visual-journeys-${{ github.run_id }}
+          path: frontend/test-results/visual-journeys
+          if-no-files-found: warn
+          retention-days: 14

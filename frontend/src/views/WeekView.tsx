@@ -137,6 +137,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
         return <button
           key={date}
           type="button"
+          data-testid={`day-selector-${date}`}
           aria-label={formatDayLong(day, language)}
           aria-pressed={selectedDate === date}
           className="border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/30"
@@ -281,12 +282,14 @@ function renderCell(
       {allocation.ownBooking && !isPast ? <button
         type="button"
         data-testid="own-allocation"
+        data-booking-id={allocation.bookingId}
+        data-card-color={allocation.cardColor}
         data-state={state}
         aria-label={t("booking.cancelLabel", { label })}
         onClick={() => cancel(allocation)}
         className={className}
         style={style}
-      >{label}</button> : <div data-state={state} className={className} style={style}>{label}</div>}
+      >{label}</button> : <div data-card-color={allocation.cardColor} data-state={state} className={className} style={style}>{label}</div>}
     </td>;
   }
   const minute = timeToMinutes(slot);
@@ -414,7 +417,7 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
 
   return <Modal labelledBy="booking-heading" closed={closed}>
-    <form onSubmit={(event) => void submit(event)} className="surface-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border p-6 shadow-2xl">
+    <form data-testid="booking-dialog" onSubmit={(event) => void submit(event)} className="surface-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border p-6 shadow-2xl">
       <h3 id="booking-heading" className="text-xl font-bold">{t("booking.title", { date: selection.date, time: selection.slot })}</h3>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>

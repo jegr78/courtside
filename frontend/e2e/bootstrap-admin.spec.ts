@@ -104,10 +104,12 @@ test("a seeded member can book a free slot and cancel it again", async ({ page }
   // then
   const gridBooking = page.getByTestId("own-allocation");
   await expect(gridBooking).toBeVisible();
+  const bookingId = await gridBooking.getAttribute("data-booking-id");
+  expect(bookingId).not.toBeNull();
 
   await page.reload();
   await page.getByTestId("my-bookings-link").click();
-  const personalBooking = page.getByTestId("personal-cancel");
+  const personalBooking = page.locator(`[data-testid="personal-cancel"][data-booking-id="${bookingId}"]`);
   await expect(personalBooking).toBeVisible();
 
   // when
