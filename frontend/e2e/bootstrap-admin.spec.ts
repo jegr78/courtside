@@ -60,3 +60,32 @@ test("a seeded member stays signed in across a reload and can sign out", async (
   await page.getByTestId("logout").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
 });
+
+test("a seeded member can book a free slot and cancel it again", async ({ page }) => {
+  // given
+  await page.goto("/");
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("home-view")).toBeVisible();
+  await page.getByTestId("week-next").click();
+  const freeSlot = page.getByRole("button", { name: /^Book Court 1 at/ }).first();
+  await expect(freeSlot).toBeVisible();
+
+  // when
+  await freeSlot.click();
+  await page.getByLabel("Search members").fill("Mary");
+  await page.getByRole("button", { name: "Add Mary Major" }).click();
+  await page.getByRole("button", { name: "Book now" }).click();
+
+  // then
+  const booking = page.getByRole("button", { name: "Member booking, cancel booking" });
+  await expect(booking).toBeVisible();
+
+  // when
+  await booking.click();
+  await page.getByRole("button", { name: "Confirm cancellation" }).click();
+
+  // then
+  await expect(booking).not.toBeVisible();
+});

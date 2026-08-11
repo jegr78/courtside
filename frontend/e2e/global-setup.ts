@@ -31,6 +31,14 @@ async function seedMember(postgres: StartedTestContainer): Promise<void> {
     FROM user_account WHERE username = 'bootstrap-admin';
     INSERT INTO user_account_role (user_account_id, role)
     VALUES ('00000000-0000-0000-0000-000000000102', 'MEMBER');
+    INSERT INTO member (id, person_id, membership_type_id)
+    VALUES ('00000000-0000-0000-0000-000000000105',
+      '00000000-0000-0000-0000-000000000101', 'cccccccc-0000-0000-0000-000000000001');
+    INSERT INTO person (id, first_name, last_name, email)
+    VALUES ('00000000-0000-0000-0000-000000000103', 'Mary', 'Major', 'mary.major@example.org');
+    INSERT INTO member (id, person_id, membership_type_id)
+    VALUES ('00000000-0000-0000-0000-000000000104',
+      '00000000-0000-0000-0000-000000000103', 'cccccccc-0000-0000-0000-000000000001');
   `;
   const result = await postgres.exec([
     "psql", "-U", "courtside", "-d", "courtside", "-v", "ON_ERROR_STOP=1", "-c", sql

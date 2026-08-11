@@ -117,3 +117,53 @@ it("when loading the booking grid, then its club clock and slot duration are ret
   expect(grid.timeZone).toBe("Europe/Berlin");
   expect(grid.slotMinutes).toBe(30);
 });
+
+it("given a booking attempt, when creating it, then the idempotency key and body are sent", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=booking-token";
+  const booking = {
+    courtIds: ["11111111-1111-1111-1111-111111111111"],
+    cardId: "22222222-2222-2222-2222-222222222222",
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T18:30:00+02:00",
+    participants: [{ guestName: "John Roe" }],
+    note: "Bring balls"
+  };
+  server.use(http.post("/api/bookings", async ({ request }) => {
+    expect(request.headers.get("Idempotency-Key")).toBe("attempt-1");
+    expect(request.headers.get("X-XSRF-TOKEN")).toBe("booking-token");
+    expect(await request.json()).toEqual(booking);
+    return HttpResponse.json({ id: "33333333-3333-3333-3333-333333333333" }, { status: 201 });
+  }));
+
+  // when
+  const created = await api.createBooking(booking, "attempt-1");
+
+  // then
+  expect(created.id).toBe("33333333-3333-3333-3333-333333333333");
+});
+
+it("given an existing booking, when cancelling it, then the booking URL is deleted", async () => {
+  // given
+  server.use(http.delete("/api/bookings/33333333-3333-3333-3333-333333333333", () =>
+    new HttpResponse(null, { status: 204 })));
+
+  // when / then
+  await expect(api.cancelBooking("33333333-3333-3333-3333-333333333333")).resolves.toBeUndefined();
+});
+
+it("given a name fragment, when searching participant members, then it is encoded in the query", async () => {
+  // given
+  server.use(http.get("/api/public/participant-members", ({ request }) => {
+    expect(new URL(request.url).searchParams.get("query")).toBe("Jane D");
+    return HttpResponse.json([{
+      personId: "11111111-1111-1111-1111-111111111111", displayName: "Jane Doe"
+    }]);
+  }));
+
+  // when
+  const members = await api.participantMembers("Jane D");
+
+  // then
+  expect(members[0].displayName).toBe("Jane Doe");
+});

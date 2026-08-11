@@ -53,7 +53,8 @@ public class SecurityConfiguration {
 
         return http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/public/booking-cards", "/api/public/participant-cards")
+                        .requestMatchers("/api/public/booking-cards", "/api/public/participant-cards",
+                                "/api/public/participant-members")
                         .access((authentication, context) -> new AuthorizationDecision(
                                 isAuthenticated(authentication.get())
                                         && !hasAuthority(authentication.get(),
