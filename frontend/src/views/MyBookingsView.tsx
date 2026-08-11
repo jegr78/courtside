@@ -93,7 +93,7 @@ function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, 
           <span>{booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
           {actionable && booking.status === "CONFIRMED" && <div className="flex flex-wrap gap-2 pt-1">
-            <Button data-testid="personal-cancel" className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel", { label: booking.cardLabel })}</Button>
+            <Button data-testid="personal-cancel" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel", { label: booking.cardLabel })}</Button>
             {booking.seriesId && <Button className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move", { label: booking.cardLabel })}</Button>}
           </div>}
         </li>)}</ul>
