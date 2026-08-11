@@ -446,7 +446,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard card = cards.createCard("Member event", "#B85C38", Set.of(Role.MEMBER),
-                new short[] { 2 }, false, true);
+                new short[] { 2 }, false, true, true);
         String bookingId = JsonPath.read(mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson(courtId, card.getId(), GUEST_PARTICIPANT))
@@ -695,7 +695,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
-    void givenASinglesBooking_whenLoadingTheGrid_thenItIsLabelledSingles() throws Exception {
+    void givenAParticipantBooking_whenLoadingTheGrid_thenItsParticipantCountIsReturned() throws Exception {
         // given
         mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -706,7 +706,8 @@ class BookingControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/bookings").param("date", "2026-05-13"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].matchType").value("SINGLES"))
+                .andExpect(jsonPath("$[0].participantCount").value(2))
+                .andExpect(jsonPath("$[0].showGenericOccupancy").value(true))
                 .andExpect(jsonPath("$[0].bookedByName").doesNotExist());
     }
 
@@ -795,6 +796,30 @@ class BookingControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenANamedCardWithParticipants_whenAnonymousCallerLoadsTheGrid_thenTheCountIsHidden()
+            throws Exception {
+        // given
+        BookingCard card = cards.createCard("Junior training", "#34584A", Set.of(Role.MEMBER),
+                new short[] {2}, false, false, false);
+        UUID participantId = accounts.findByUsername("major.mary").orElseThrow().getPerson().getId();
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(courtId, card.getId(),
+                                "{ \"personId\": \"%s\" }".formatted(participantId)))
+                        .with(user("doe.jane").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/bookings").param("date", "2026-05-12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].cardLabel").value("Junior training"))
+                .andExpect(jsonPath("$[0].showGenericOccupancy").value(false))
+                .andExpect(jsonPath("$[0].participantCount").doesNotExist())
+                .andExpect(jsonPath("$[0].participantLastNames").doesNotExist());
+    }
+
+    @Test
     void givenPasswordChangeIsRequired_whenLoadingTheGrid_thenTheAnonymousRepresentationIsReturned()
             throws Exception {
         // given
@@ -823,7 +848,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
-    void givenATrainingBookingWithNoParticipants_whenLoadingTheGrid_thenMatchTypeIsNull()
+    void givenATrainingBookingWithNoParticipants_whenLoadingTheGrid_thenParticipantCountIsNull()
             throws Exception {
         // given
         mockMvc.perform(bookingPost()
@@ -835,7 +860,8 @@ class BookingControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/bookings").param("date", "2026-05-12"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].matchType").doesNotExist());
+                .andExpect(jsonPath("$[0].participantCount").doesNotExist())
+                .andExpect(jsonPath("$[0].showGenericOccupancy").value(false));
     }
 
     @Test

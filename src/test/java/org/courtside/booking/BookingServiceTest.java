@@ -189,12 +189,13 @@ class BookingServiceTest extends AbstractIntegrationTest {
     void givenAYouthDirectorsCardAccessWasRevoked_whenCancellingAnotherOfficersBooking_thenItIsForbidden() {
         // given
         BookingCard card = cards.createCard("Club championship", "#3A4A5C",
-                Set.of(Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR), new short[0], false, false);
+                Set.of(Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR), new short[0], false, false, false);
         UUID bookingId = bookingService.create(new CreateBookingCommand(
                 List.of(courtId), card.getId(), new TimeSlot(SIX_PM, SEVEN_PM),
                 UUID.randomUUID(), null, Set.of(Role.SPORT_DIRECTOR), null, List.of(), null));
         cards.changeCard(card.getId(), card.getLabel(), card.getColor(), Set.of(Role.SPORT_DIRECTOR),
-                card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed());
+                card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed(),
+                card.isShowGenericOccupancy());
 
         // when / then
         assertThatThrownBy(() -> bookingService.cancel(

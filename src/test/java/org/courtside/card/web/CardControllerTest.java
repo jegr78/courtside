@@ -58,9 +58,9 @@ class CardControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard active = cards.createCard("Match play", "#3a4a5c", Set.of(),
-                new short[] {2, 4}, true, true);
+                new short[] {2, 4}, true, true, true);
         BookingCard retired = cards.createCard("Retired card", "#c8a415", Set.of(),
-                new short[0], false, false);
+                new short[0], false, false, false);
         cards.setCardActive(retired.getId(), false);
 
         // when / then
@@ -75,9 +75,9 @@ class CardControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard gated = cards.createCard("Trainer session", "#3a4a5c", Set.of(Role.TRAINER),
-                new short[0], false, false);
+                new short[0], false, false, false);
         BookingCard open = cards.createCard("Match play", "#3a4a5c", Set.of(),
-                new short[] {2, 4}, true, true);
+                new short[] {2, 4}, true, true, true);
 
         // when / then
         mockMvc.perform(get("/api/public/booking-cards"))
@@ -90,7 +90,7 @@ class CardControllerTest extends AbstractIntegrationTest {
     void whenListingBookingCardsPublicly_thenOnlyMemberFacingFieldsAreExposed() throws Exception {
         // given
         BookingCard card = cards.createCard(
-                "Match play", "#3a4a5c", Set.of(), new short[] {2, 4}, true, true);
+                "Match play", "#3a4a5c", Set.of(), new short[] {2, 4}, true, true, true);
         String at = "$[?(@.id=='" + card.getId() + "')]";
 
         // when / then

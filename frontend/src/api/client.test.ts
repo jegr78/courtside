@@ -89,7 +89,7 @@ it("given a date, when loading allocations, then that date is sent as a query pa
       courtId: "11111111-1111-1111-1111-111111111111",
       startsAt: "2026-08-10T18:00:00+02:00",
       endsAt: "2026-08-10T19:00:00+02:00",
-      cardLabel: "Singles",
+      cardLabel: "Member booking",
       cardColor: "#176b55"
     }]);
   }));
@@ -99,7 +99,7 @@ it("given a date, when loading allocations, then that date is sent as a query pa
 
   // then
   expect(allocations).toHaveLength(1);
-  expect(allocations[0].cardLabel).toBe("Singles");
+  expect(allocations[0].cardLabel).toBe("Member booking");
 });
 
 it("given a personal-booking cursor, when loading the next page, then the cursor and bound are sent", async () => {

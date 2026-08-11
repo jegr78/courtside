@@ -178,14 +178,6 @@ components:
       type: string
       enum: [CONFIRMED, CANCELLED]
 
-    MatchType:
-      type: string
-      description: |
-        Derived from how many players a booking has. This is what the grid shows in place of a
-        name — it answers the only question the grid has to answer without publishing who plays
-        with whom.
-      enum: [SINGLES, DOUBLES]
-
     Violation:
       type: object
       description: |
@@ -382,7 +374,7 @@ components:
       description: |
         What kind of occupancy a booking is. Member booking, training, league match and court
         closure differ only by their card, so a new kind is a row rather than a deployment.
-      required: [id, label, color, allowedRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, active]
+      required: [id, label, color, allowedRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, showGenericOccupancy, active]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
@@ -397,6 +389,9 @@ components:
         tracksPlayers: { type: boolean }
         countsAgainstLimits: { type: boolean }
         guestAllowed: { type: boolean }
+        showGenericOccupancy:
+          type: boolean
+          description: Show a neutral booked label in the member-facing court plan instead of the card label.
         active: { type: boolean }
 
     BookingCardRequest:
@@ -419,6 +414,9 @@ components:
           items: { type: integer, minimum: 1, maximum: 20 }
         countsAgainstLimits: { type: boolean }
         guestAllowed: { type: boolean }
+        showGenericOccupancy:
+          type: boolean
+          default: false
 
     ParticipantCard:
       type: object
@@ -635,7 +633,7 @@ components:
     Allocation:
       type: object
       description: One court's occupancy for one booking.
-      required: [bookingId, courtId, startsAt, endsAt, cardLabel, cardColor, ownBooking]
+      required: [bookingId, courtId, startsAt, endsAt, cardLabel, cardColor, ownBooking, showGenericOccupancy]
       properties:
         bookingId: { type: string, format: uuid }
         courtId: { type: string, format: uuid }
@@ -646,6 +644,9 @@ components:
         ownBooking:
           type: boolean
           description: True only when the authenticated viewer created this booking; always false anonymously.
+        showGenericOccupancy:
+          type: boolean
+          description: Whether member-facing views use a neutral booked label instead of the card label.
         participantLastNames:
           type: array
           description: |
@@ -658,10 +659,11 @@ components:
             Null on every member-facing response, always. Participant names are not shown for
             someone else's booking — not to guests and not to members — and this is not a setting
             a club can switch on. Only the administrative views resolve a name.
-        matchType:
-          oneOf:
-            - $ref: "#/components/schemas/MatchType"
-            - type: "null"
+        participantCount:
+          type: [integer, "null"]
+          format: int32
+          minimum: 1
+          description: Present for participant-based bookings; absent for named special occupancy.
 
     SeriesRuleRequest:
       type: object

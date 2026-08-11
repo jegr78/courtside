@@ -2,10 +2,8 @@ package org.courtside;
 
 import org.courtside.api.ApiCancelScope;
 import org.courtside.api.ApiDayOfWeek;
-import org.courtside.api.ApiMatchType;
 import org.courtside.api.ApiRole;
 import org.courtside.api.ApiRuleType;
-import org.courtside.booking.internal.MatchType;
 import org.courtside.booking.series.CancelScope;
 import org.courtside.identity.Role;
 import org.courtside.rules.internal.RuleType;
@@ -30,7 +28,6 @@ class WireEnumParityTest {
         assertParity("RuleType", ApiRuleType.values(), ApiRuleType::getValue, RuleType.values());
         assertParity("CancelScope", ApiCancelScope.values(), ApiCancelScope::getValue,
                 CancelScope.values());
-        assertParity("MatchType", ApiMatchType.values(), ApiMatchType::getValue, MatchType.values());
         assertParity("DayOfWeek", ApiDayOfWeek.values(), ApiDayOfWeek::getValue, DayOfWeek.values());
     }
 

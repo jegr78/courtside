@@ -11,7 +11,7 @@ class BookingCardPermitsTest {
 
     private static BookingCard cardAllowing(Role... allowedRoles) {
         return new BookingCard("Training", "#34584A", Set.of(allowedRoles),
-                new short[]{}, false, false);
+                new short[]{}, false, false, false);
     }
 
     @Test

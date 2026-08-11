@@ -20,7 +20,7 @@ describe("AdminFacilityView", () => {
       {
         id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
         allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-        guestAllowed: true, active: true
+        guestAllowed: true, showGenericOccupancy: true, active: true
       }
     ]);
   });
@@ -95,7 +95,7 @@ describe("AdminFacilityView", () => {
     const changeCard = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({
       id: "card-1", label: "Training", color: "#34584a", allowedRoles: ["TRAINER", "SPORT_DIRECTOR"],
       allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
-      guestAllowed: false, active: true
+      guestAllowed: false, showGenericOccupancy: false, active: true
     });
     const setHours = vi.spyOn(api, "setAdminOpeningHours").mockResolvedValue({
       dayOfWeek: "MONDAY", opensAt: "09:00:00", closesAt: "21:00:00"
@@ -110,6 +110,7 @@ describe("AdminFacilityView", () => {
     await user.click(screen.getAllByRole("checkbox", { name: "Member" })[0]);
     await user.click(screen.getAllByRole("checkbox", { name: "Trainer" })[0]);
     await user.click(screen.getAllByRole("checkbox", { name: "Sport director" })[0]);
+    await user.click(screen.getAllByRole("checkbox", { name: "Show as neutrally booked in the court plan" })[0]);
     await user.clear(screen.getByTestId("card-counts-card-1"));
     await user.type(screen.getByTestId("card-counts-card-1"), "1, 3");
     await user.click(screen.getByTestId("save-card-card-1"));
@@ -119,7 +120,8 @@ describe("AdminFacilityView", () => {
 
     // then
     expect(changeCard).toHaveBeenCalledWith("card-1", expect.objectContaining({
-      label: "Training", allowedRoles: ["TRAINER", "SPORT_DIRECTOR"], allowedPlayerCounts: [1, 3]
+      label: "Training", allowedRoles: ["TRAINER", "SPORT_DIRECTOR"], allowedPlayerCounts: [1, 3],
+      showGenericOccupancy: false
     }));
     expect(setHours).toHaveBeenCalledWith("MONDAY", { opensAt: "09:00", closesAt: "22:00" });
   });
@@ -134,7 +136,7 @@ describe("AdminFacilityView", () => {
     const createdCard: Awaited<ReturnType<typeof api.createAdminBookingCard>> = {
       id: "card-2", label: "Training", color: "#b85c38", allowedRoles: ["TRAINER"],
       allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
-      guestAllowed: false, active: true
+      guestAllowed: false, showGenericOccupancy: false, active: true
     };
     render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
     const user = userEvent.setup();

@@ -50,7 +50,8 @@ beforeEach(async () => {
     cardLabel: "Member booking",
     cardColor: "#176b55",
     ownBooking: false,
-    matchType: "SINGLES"
+    showGenericOccupancy: true,
+    participantCount: 2
   }] : []));
 });
 
@@ -78,7 +79,7 @@ it("given the current week, when it loads, then every day and active court is av
   expect(screen.getByRole("rowheader", { name: "08:00" }).closest("tr")).toHaveStyle({ height: "40px" });
   expect(screen.getByRole("list", { name: "Court plan legend" })).toBeInTheDocument();
   expect(screen.getAllByTestId("allocation")).toHaveLength(1);
-  expect(booking).toHaveTextContent("Singles");
+  expect(booking).toHaveTextContent("Booked · 2 participants");
 });
 
 it("given short booking slots, when rendering the plan, then rows retain their usable height", async () => {
@@ -95,6 +96,27 @@ it("given short booking slots, when rendering the plan, then rows retain their u
   // then
   expect((await screen.findByRole("rowheader", { name: "08:00" })).closest("tr"))
     .toHaveStyle({ height: "32px" });
+});
+
+it("given another supported participant count, when showing the booking, then no sport term is inferred", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Member booking",
+    cardColor: "#176b55",
+    ownBooking: false,
+    showGenericOccupancy: true,
+    participantCount: 6
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  expect(await screen.findByTestId("allocation")).toHaveTextContent("Booked · 6 participants");
 });
 
 it("given the current week, when opening the next week, then its seven days are loaded", async () => {
@@ -236,8 +258,9 @@ it("given an own booking in the past, when showing today, then it remains visibl
     cardLabel: "Member booking",
     cardColor: "#b85c38",
     ownBooking: true,
+    showGenericOccupancy: true,
     participantLastNames: [],
-    matchType: "SINGLES"
+    participantCount: 2
   }] : []));
 
   // when
@@ -352,14 +375,19 @@ it("given a red booking card, when it is shown, then its label uses the higher-c
     endsAt: "2026-08-10T18:30:00+02:00",
     cardLabel: "Training",
     cardColor: "#ff0000",
-    ownBooking: false
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: 3
   }] : []));
 
   // when
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  expect(await screen.findByTestId("allocation")).toHaveStyle({ color: "rgb(15, 23, 42)" });
+  const allocation = await screen.findByTestId("allocation");
+  expect(allocation).toHaveStyle({ color: "rgb(15, 23, 42)" });
+  expect(allocation).toHaveTextContent("Training");
+  expect(allocation).toHaveAttribute("data-state", "card");
 });
 
 it("given an own member booking, when it is shown, then the viewer marker and other surnames are visible", async () => {
@@ -372,8 +400,9 @@ it("given an own member booking, when it is shown, then the viewer marker and ot
     cardLabel: "Member booking",
     cardColor: "#b85c38",
     ownBooking: true,
+    showGenericOccupancy: true,
     participantLastNames: ["Major", "Miles"],
-    matchType: "DOUBLES"
+    participantCount: 4
   }] : []));
 
   // when
@@ -398,8 +427,9 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
     cardLabel: "Member booking",
     cardColor: "#b85c38",
     ownBooking: true,
+    showGenericOccupancy: true,
     participantLastNames: [],
-    matchType: "SINGLES"
+    participantCount: 2
   }] : []));
   render(<WeekView today={clubInstant("07:00")} />);
   await screen.findByRole("button", { name: "Book Centre Court at 08:00" });
@@ -491,11 +521,12 @@ it("given an occupied slot, when cancelling it, then the API decides and the day
     courtId: courts[0].id,
     startsAt: "2026-08-10T18:00:00+02:00",
     endsAt: "2026-08-10T19:00:00+02:00",
-    cardLabel: "Singles",
+    cardLabel: "Member booking",
     cardColor: "#176b55",
     ownBooking: true,
+    showGenericOccupancy: true,
     participantLastNames: [],
-    matchType: "SINGLES"
+    participantCount: 2
   }] : []));
   render(<WeekView today={clubInstant("12:00")} />);
   await userEvent.click(await screen.findByRole("button", { name: "You, cancel booking" }));
