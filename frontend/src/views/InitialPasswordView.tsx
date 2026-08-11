@@ -41,9 +41,9 @@ export function InitialPasswordView({ changed }: { changed: () => void }) {
     }
   }
 
-  return <section data-testid="initial-password-view" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl sm:p-8">
-    <h1 className="text-2xl font-bold text-slate-950">{t("password.title")}</h1>
-    <p className="mt-2 text-slate-600">{t("password.description")}</p>
+  return <section data-testid="initial-password-view" className="surface-panel w-full max-w-md rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+    <h1 className="text-2xl font-bold">{t("password.title")}</h1>
+    <p className="text-muted mt-2">{t("password.description")}</p>
     <form className="mt-6 grid gap-5" onSubmit={(event) => void submit(event)}>
       {error && <Alert>{error}</Alert>}
       <TextField id="new-password" name="password" label={t("password.new")} data-testid="new-password" type="password" autoComplete="new-password" minLength={12} required autoFocus />

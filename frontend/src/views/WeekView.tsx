@@ -75,8 +75,8 @@ export function WeekView({ today = new Date() }: WeekViewProps) {
   return <section aria-labelledby="occupancy-heading" className="mt-8">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h2 id="occupancy-heading" className="text-2xl font-bold text-slate-950">{t("week.title")}</h2>
-        {days.length > 0 && <p className="text-sm text-slate-600">{formatWeekRange(days, language)}</p>}
+        <h2 id="occupancy-heading" className="text-2xl font-bold">{t("week.title")}</h2>
+        {days.length > 0 && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
       </div>
       <div className="flex gap-2">
         <Button type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
@@ -97,33 +97,33 @@ export function WeekView({ today = new Date() }: WeekViewProps) {
           type="button"
           aria-label={formatDayLong(day, language)}
           aria-pressed={selectedDate === date}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/40"
+          className="border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/30"
           onClick={() => setSelectedDate(date)}
         >
           <span className="block text-sm font-semibold">{formatWeekday(day, language)}</span>
-          <span className="text-sm text-slate-600">{formatDayMonth(day, language)}</span>
-          <span className="mt-1 block text-xs text-slate-500">{t("week.bookingCount", { count })}</span>
+          <span className="text-muted font-value text-sm">{formatDayMonth(day, language)}</span>
+          <span className="text-muted mt-1 block text-xs">{t("week.bookingCount", { count })}</span>
         </button>;
       })}
     </div>}
 
     {error && <Alert>{error}</Alert>}
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
-    {data && <div data-testid="week-grid" data-week-offset={weekOffset} className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
+    {data && <div data-testid="week-grid" data-week-offset={weekOffset} className="border-structural mt-6 overflow-x-auto rounded-xl border">
       <table className="min-w-full border-collapse text-sm">
-        <thead className="bg-slate-100">
+        <thead className="surface-raised">
           <tr>
-            <th scope="col" className="border-b border-slate-200 px-4 py-3 text-left">{t("week.time")}</th>
+            <th scope="col" className="border-structural border-b px-4 py-3 text-left">{t("week.time")}</th>
             {data.courts.map((court) => <th
               key={court.id}
               scope="col"
-              className="min-w-40 border-b border-slate-200 px-4 py-3 text-left"
+              className="border-structural min-w-40 border-b px-4 py-3 text-left"
             >{court.name || t("court.number", { number: court.number })}</th>)}
           </tr>
         </thead>
         <tbody>
           {slots.map((slot) => <tr key={slot}>
-            <th scope="row" className="whitespace-nowrap border-b border-slate-100 px-4 py-3 text-left font-medium">
+            <th scope="row" className="font-value border-structural whitespace-nowrap border-b px-4 py-3 text-left font-medium">
               {slot}
             </th>
             {data.courts.map((court) => renderCell(
@@ -134,7 +134,7 @@ export function WeekView({ today = new Date() }: WeekViewProps) {
           </tr>)}
         </tbody>
       </table>
-      {slots.length === 0 && <p className="px-4 py-6 text-center text-slate-600">{t("week.closed")}</p>}
+      {slots.length === 0 && <p className="text-muted px-4 py-6 text-center">{t("week.closed")}</p>}
     </div>}
     {bookingSelection && data && <BookingDialog
       selection={bookingSelection}
@@ -178,7 +178,7 @@ function renderCell(
   const allocation = allocations.find((entry) => entry.courtId === court.id && formatTime(entry.startsAt, timeZone) === slot);
   if (allocation) {
     const duration = (Date.parse(allocation.endsAt) - Date.parse(allocation.startsAt)) / 60_000;
-    return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className="border-b border-slate-100 p-2 align-top">
+    return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className="border-structural border-b p-2 align-top">
       <button
         type="button"
         aria-label={t("booking.cancelLabel", { label: allocation.cardLabel })}
@@ -193,7 +193,7 @@ function renderCell(
     && timeToMinutes(formatTime(entry.startsAt, timeZone)) < minute
     && timeToMinutes(formatTime(entry.endsAt, timeZone)) > minute);
   const courtName = court.name || t("court.number", { number: court.number });
-  return isCovered ? null : <td key={court.id} className="border-b border-slate-100 p-2">
+  return isCovered ? null : <td key={court.id} className="border-structural border-b p-2">
     <button type="button" className="min-h-10 w-full rounded-lg hover:bg-(--club-accent)/40" aria-label={t("booking.open", { court: courtName, time: slot })} onClick={book}>
       <span className="sr-only">{t("week.available")}</span>
     </button>
@@ -287,7 +287,7 @@ function BookingDialog({ selection, grid, courts, closed, created }: {
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
 
   return <Modal labelledBy="booking-heading" closed={closed}>
-    <form onSubmit={(event) => void submit(event)} className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+    <form onSubmit={(event) => void submit(event)} className="surface-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border p-6 shadow-2xl">
       <h3 id="booking-heading" className="text-xl font-bold">{t("booking.title", { date: selection.date, time: selection.slot })}</h3>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
@@ -299,7 +299,7 @@ function BookingDialog({ selection, grid, courts, closed, created }: {
       </fieldset>
       <FieldViolations id="booking-courtIds-errors" violations={fieldViolations("courtIds")} />
       <label className="mt-4 grid gap-2 font-medium">{t("booking.card")}
-        <select value={cardId} onChange={(event) => setCardId(event.target.value)} required aria-invalid={fieldViolations("cardId").length > 0} aria-describedby={describedBy("cardId")} className="rounded-lg border border-slate-300 bg-white px-3 py-3">
+        <select value={cardId} onChange={(event) => setCardId(event.target.value)} required aria-invalid={fieldViolations("cardId").length > 0} aria-describedby={describedBy("cardId")} className="form-control rounded-lg border px-3 py-3">
           {bookingCards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
         </select>
       </label>
@@ -307,49 +307,49 @@ function BookingDialog({ selection, grid, courts, closed, created }: {
       <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.members")}</legend>
         <label className="grid gap-2 font-medium">{t("booking.memberSearch")}
-          <input value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="rounded-lg border border-slate-300 px-3 py-3" />
+          <input value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="form-control rounded-lg border px-3 py-3" />
         </label>
         {memberMatches.length > 0 && <ul className="grid gap-2">
           {memberMatches.map((member) => <li key={member.personId}>
-            <Button type="button" className="w-full bg-slate-600 text-left" onClick={() => {
+            <Button type="button" className="button-secondary w-full text-left" onClick={() => {
               setSelectedMembers((current) => [...current, member]);
               setMemberQuery("");
             }}>{t("booking.addMember", { name: member.displayName })}</Button>
           </li>)}
         </ul>}
-        {selectedMembers.map((member) => <div key={member.personId} className="flex items-center justify-between gap-3 rounded-lg bg-slate-100 px-3 py-2">
+        {selectedMembers.map((member) => <div key={member.personId} className="surface-raised flex items-center justify-between gap-3 rounded-lg px-3 py-2">
           <span>{member.displayName}</span>
-          <Button type="button" className="bg-slate-600 px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMember", { name: member.displayName })}</Button>
+          <Button type="button" className="button-secondary px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMember", { name: member.displayName })}</Button>
         </div>)}
       </fieldset>
       <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.guests")}</legend>
         {guestNames.map((guestName, index) => <label key={index} className="grid gap-2 font-medium">
           {index === 0 ? t("booking.guest") : t("booking.guestNumber", { number: index + 1 })}
-          <input value={guestName} onChange={(event) => setGuestNames((current) => current.map((name, currentIndex) => currentIndex === index ? event.target.value : name))} className="rounded-lg border border-slate-300 px-3 py-3" />
+          <input value={guestName} onChange={(event) => setGuestNames((current) => current.map((name, currentIndex) => currentIndex === index ? event.target.value : name))} className="form-control rounded-lg border px-3 py-3" />
         </label>)}
-        <Button type="button" className="justify-self-start bg-slate-600" onClick={() => setGuestNames((current) => [...current, ""])}>{t("booking.addGuest")}</Button>
+        <Button type="button" className="button-secondary justify-self-start" onClick={() => setGuestNames((current) => [...current, ""])}>{t("booking.addGuest")}</Button>
       </fieldset>
       <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.participantCards")}</legend>
         {participantCardIds.map((participantCardId, index) => <label key={index} className="grid gap-2 font-medium">
           {index === 0 ? t("booking.participantCard") : t("booking.participantCardNumber", { number: index + 1 })}
-          <select value={participantCardId} onChange={(event) => setParticipantCardIds((current) => current.map((id, currentIndex) => currentIndex === index ? event.target.value : id))} className="rounded-lg border border-slate-300 bg-white px-3 py-3">
+          <select value={participantCardId} onChange={(event) => setParticipantCardIds((current) => current.map((id, currentIndex) => currentIndex === index ? event.target.value : id))} className="form-control rounded-lg border px-3 py-3">
             <option value="">{t("booking.none")}</option>
             {participantCards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
           </select>
         </label>)}
-        <Button type="button" className="justify-self-start bg-slate-600" onClick={() => setParticipantCardIds((current) => [...current, ""])}>{t("booking.addParticipantCard")}</Button>
+        <Button type="button" className="button-secondary justify-self-start" onClick={() => setParticipantCardIds((current) => [...current, ""])}>{t("booking.addParticipantCard")}</Button>
       </fieldset>
       <FieldViolations id="booking-participants-errors" violations={fieldViolations("participants")} />
       <label className="mt-4 grid gap-2 font-medium">{t("booking.note")}
-        <textarea value={note} onChange={(event) => setNote(event.target.value)} aria-invalid={fieldViolations("note").length > 0} aria-describedby={describedBy("note")} className="rounded-lg border border-slate-300 px-3 py-3" />
+        <textarea value={note} onChange={(event) => setNote(event.target.value)} aria-invalid={fieldViolations("note").length > 0} aria-describedby={describedBy("note")} className="form-control rounded-lg border px-3 py-3" />
       </label>
       <FieldViolations id="booking-note-errors" violations={fieldViolations("note")} />
       <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
       {error && violations.length === 0 && <Alert>{error}</Alert>}
       <div className="mt-6 flex justify-end gap-3">
-        <Button type="button" className="bg-slate-600" onClick={closed}>{t("booking.close")}</Button>
+        <Button type="button" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>
         <Button type="submit" disabled={submitting || courtIds.length === 0 || !cardId}>{t("booking.submit")}</Button>
       </div>
     </form>
@@ -360,12 +360,12 @@ function CancellationDialog({ allocation, closed, cancelled }: { allocation: All
   const { t } = useTranslation();
   const [error, setError] = useState<string>();
   return <Modal labelledBy="cancel-heading" closed={closed}>
-    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+    <div className="surface-panel w-full max-w-md rounded-2xl border p-6 shadow-2xl">
       <h3 id="cancel-heading" className="text-xl font-bold">{t("booking.cancelTitle")}</h3>
       <p className="mt-3">{t("booking.cancelQuestion", { label: allocation.cardLabel })}</p>
       {error && <Alert>{error}</Alert>}
       <div className="mt-6 flex justify-end gap-3">
-        <Button type="button" className="bg-slate-600" onClick={closed}>{t("booking.close")}</Button>
+        <Button type="button" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>
         <Button type="button" onClick={() => void api.cancelBooking(allocation.bookingId).then(cancelled).catch((failure: unknown) => setError(problemMessage(failure, t)))}>{t("booking.cancelConfirm")}</Button>
       </div>
     </div>

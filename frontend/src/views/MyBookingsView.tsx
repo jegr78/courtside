@@ -84,10 +84,10 @@ function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, 
   const groups = groupBookings(bookings);
   return <section>
     <h3 className="text-xl font-semibold">{title}</h3>
-    {groups.length === 0 ? <p className="mt-3 text-slate-600">{empty}</p> : <div className="mt-3 grid gap-4">{groups.map((group) =>
-      <article key={group.key} className="rounded-xl border border-slate-200 p-4">
+    {groups.length === 0 ? <p className="text-muted mt-3">{empty}</p> : <div className="mt-3 grid gap-4">{groups.map((group) =>
+      <article key={group.key} className="border-structural rounded-xl border p-4">
         {group.series && <p className="mb-2 font-semibold text-(--club-primary)">{t("myBookings.series")}</p>}
-        <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} className="grid gap-1 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+        <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} className="border-structural grid gap-1 border-b pb-3 last:border-0 last:pb-0">
           <span className="font-semibold">{booking.cardLabel}</span>
           <time dateTime={booking.startsAt}>{formatDateTime(booking.startsAt, locale, timeZone)}</time>
           <span>{booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
@@ -132,14 +132,14 @@ function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, clos
   const affected = scope === "THIS" ? [booking] : scope === "WHOLE_SERIES"
     ? seriesBookings
     : seriesBookings.filter((candidate) => new Date(candidate.startsAt) >= new Date(booking.startsAt));
-  return <Modal labelledBy="cancel-personal-title" closed={closed}><div className="grid w-full max-w-lg gap-4 rounded-2xl bg-white p-6">
+  return <Modal labelledBy="cancel-personal-title" closed={closed}><div className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
     <h2 id="cancel-personal-title" className="text-xl font-bold">{t("booking.cancelTitle")}</h2>
     {booking.seriesId && <ScopeFields scope={scope} changed={setScope} t={t} />}
     <p className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
     <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatDateTime(candidate.startsAt, i18n.language, timeZone)}</li>)}</ul>
     {hasMoreBookings && scope !== "THIS" && <p>{t("myBookings.affectedIncomplete")}</p>}
     {error && <Alert>{error}</Alert>}
-    <div className="flex gap-2"><Button onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button className="bg-slate-600" onClick={closed}>{t("booking.close")}</Button></div>
+    <div className="flex gap-2"><Button onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 
@@ -166,15 +166,15 @@ function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking:
     try { await api.moveSeries(booking.seriesId!, request); await completed(); }
     catch (failure) { setError(problemMessage(failure, t)); }
   }
-  return <Modal labelledBy="move-personal-title" closed={closed}><div className="grid w-full max-w-lg gap-4 rounded-2xl bg-white p-6">
+  return <Modal labelledBy="move-personal-title" closed={closed}><div className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
     <h2 id="move-personal-title" className="text-xl font-bold">{t("myBookings.moveTitle")}</h2>
     <ScopeFields scope={scope} changed={(value) => { setScope(value); setPreview(undefined); }} t={t} />
-    <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<input type="time" value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="rounded border p-2" /></label>
-    <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input type="number" min="1" value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="rounded border p-2" /></label>
+    <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<input type="time" value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
+    <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input type="number" min="1" value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
     <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
     {error && <Alert>{error}</Alert>}
     {preview && <div><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatDateTime(move.fromStartsAt, i18n.language, timeZone)} → {formatDateTime(move.toStartsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
-    <div className="flex gap-2">{preview ? <Button disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button className="bg-slate-600" onClick={closed}>{t("booking.close")}</Button></div>
+    <div className="flex gap-2">{preview ? <Button disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

@@ -9,7 +9,7 @@ export function TextField({ label, id, ...props }: TextFieldProps) {
     {label}
     <input
       id={id}
-      className="rounded-lg border border-slate-300 bg-white px-3 py-3 text-slate-950 outline-none focus:border-(--club-primary) focus:ring-2 focus:ring-(--club-primary)/25"
+      className="form-control rounded-lg border px-3 py-3 outline-none"
       {...props}
     />
   </label>;

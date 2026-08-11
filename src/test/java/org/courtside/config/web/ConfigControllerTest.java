@@ -36,7 +36,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/public/config"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clubName").value("Courtside"))
-                .andExpect(jsonPath("$.primaryColor").value("#1f6feb"))
+                .andExpect(jsonPath("$.primaryColor").value("#B85C38"))
                 .andExpect(jsonPath("$.defaultLocale").value("de"));
     }
 
@@ -47,7 +47,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Courtside"))
                 .andExpect(jsonPath("$.short_name").value("Courtside"))
-                .andExpect(jsonPath("$.theme_color").value("#1f6feb"))
+                .andExpect(jsonPath("$.theme_color").value("#B85C38"))
                 .andExpect(jsonPath("$.icons[0].src").value("/icon.svg"));
     }
 

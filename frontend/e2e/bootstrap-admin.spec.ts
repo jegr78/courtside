@@ -1,5 +1,27 @@
 import { expect, test } from "@playwright/test";
 
+test("language and theme preferences persist across reloads", async ({ page }) => {
+  // given
+  await page.goto("/");
+
+  // then
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByLabel("Sprache")).toHaveValue("de");
+  await expect(page.getByLabel("Darstellung")).toHaveValue("dark");
+
+  // when
+  await page.getByLabel("Sprache").selectOption("en");
+  await page.getByLabel("Theme").selectOption("light");
+  await page.reload();
+
+  // then
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByLabel("Language")).toHaveValue("en");
+  await expect(page.getByLabel("Theme")).toHaveValue("light");
+});
+
 test("the application shell identifies the exact running build", async ({ page, request }) => {
   // given
   const source = await (await request.get("/api/source")).json() as {

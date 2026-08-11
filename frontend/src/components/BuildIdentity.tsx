@@ -59,7 +59,7 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
     {isOpen && source && <dialog
       ref={dialog}
       aria-labelledby="build-dialog-title"
-      className="m-auto w-full max-w-md rounded-xl bg-white p-6 text-left text-slate-900 shadow-xl backdrop:bg-slate-950/50"
+      className="surface-panel m-auto w-full max-w-md rounded-xl border p-6 text-left shadow-xl backdrop:bg-(--cs-overlay)"
       onClose={() => {
         setOpen(false);
         opener.current?.focus();
@@ -73,10 +73,10 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
       </dl>
       <a className="mt-4 inline-block underline hover:no-underline" href={source.sourceUrl}>{t("footer.source")}</a>
       <div className="mt-6 flex justify-end gap-3">
-        <button type="button" autoFocus data-testid="copy-build-identity" className="rounded-lg bg-(--club-primary) px-4 py-2 text-white" onClick={() => void copyDiagnostics()}>
+        <button type="button" autoFocus data-testid="copy-build-identity" className="rounded-lg bg-(--club-primary) px-4 py-2 text-(--club-primary-text)" onClick={() => void copyDiagnostics()}>
           {isCopied ? t("build.copied") : t("build.copy")}
         </button>
-        <button type="button" className="rounded-lg border border-slate-300 px-4 py-2" onClick={() => dialog.current?.close()}>{t("build.close")}</button>
+        <button type="button" className="button-secondary rounded-lg px-4 py-2" onClick={() => dialog.current?.close()}>{t("build.close")}</button>
       </div>
     </dialog>}
   </>;
