@@ -470,6 +470,24 @@ components:
           type: object
           additionalProperties: { type: integer }
 
+    RuleTypeConfiguration:
+      type: object
+      required: [ruleType, configurable, parameters]
+      properties:
+        ruleType: { $ref: "#/components/schemas/RuleType" }
+        configurable: { type: boolean }
+        parameters:
+          type: array
+          items: { $ref: "#/components/schemas/RuleParameter" }
+
+    RuleParameter:
+      type: object
+      required: [name, minimum, maximum]
+      properties:
+        name: { type: string }
+        minimum: { type: integer }
+        maximum: { type: integer }
+
     SetRuleRequest:
       type: object
       required: [params]
@@ -1978,6 +1996,24 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/rule-types:
+    get:
+      tags: [admin-rule-types]
+      operationId: listRuleTypes
+      summary: Every rule type and its per-rule-set configuration contract.
+      responses:
+        "200":
+          description: All rule types, including those configured outside a rule set.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RuleTypeConfiguration" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/admin/rule-sets/{id}:
     get:

@@ -2,6 +2,11 @@ import type { components } from "./schema";
 
 export type SessionStatus = components["schemas"]["SessionStatus"];
 export type ClubConfig = components["schemas"]["ClubConfig"];
+export type ClubConfigRequest = components["schemas"]["ClubConfigRequest"];
+export type RuleSet = components["schemas"]["RuleSet"];
+export type RuleType = components["schemas"]["RuleType"];
+export type RuleTypeConfiguration = components["schemas"]["RuleTypeConfiguration"];
+export type RuleDefinition = components["schemas"]["RuleDefinition"];
 export type SourceOffer = components["schemas"]["SourceOffer"];
 export type Problem = components["schemas"]["Problem"];
 export type PublicCourt = components["schemas"]["PublicCourt"];
@@ -62,6 +67,18 @@ function csrfToken(): string | undefined {
 export const api = {
   session: () => request<SessionStatus>("/api/session"),
   config: () => request<ClubConfig>("/api/public/config"),
+  adminConfig: () => request<ClubConfig>("/api/admin/config"),
+  changeAdminConfig: (config: ClubConfigRequest) => request<ClubConfig>("/api/admin/config", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config)
+  }),
+  ruleSets: () => request<RuleSet[]>("/api/admin/rule-sets"),
+  ruleTypes: () => request<RuleTypeConfiguration[]>("/api/admin/rule-types"),
+  rules: (ruleSetId: string) => request<RuleDefinition[]>(`/api/admin/rule-sets/${ruleSetId}/rules`),
+  setRule: (ruleSetId: string, ruleType: RuleType, params: Record<string, number>) => request<RuleDefinition>(
+    `/api/admin/rule-sets/${ruleSetId}/rules/${ruleType}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ params })
+    }
+  ),
   source: () => request<SourceOffer>("/api/source"),
   courts: () => request<PublicCourt[]>("/api/public/courts"),
   bookingGrid: () => request<BookingGrid>("/api/public/booking-grid"),

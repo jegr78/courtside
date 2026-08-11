@@ -31,6 +31,15 @@ async function seedJourneyData(postgres: StartedTestContainer, visualDate: strin
     FROM user_account WHERE username = 'bootstrap-admin';
     INSERT INTO user_account_role (user_account_id, role)
     VALUES ('00000000-0000-0000-0000-000000000102', 'MEMBER');
+    INSERT INTO person (id, first_name, last_name, email)
+    VALUES ('00000000-0000-0000-0000-000000000106', 'Richard', 'Miles', 'richard.miles@example.org');
+    INSERT INTO user_account
+      (id, person_id, username, password_hash, locale, enabled, password_change_required)
+    SELECT '00000000-0000-0000-0000-000000000107',
+      '00000000-0000-0000-0000-000000000106', 'configuration-admin', password_hash, 'en', true, false
+    FROM user_account WHERE username = 'bootstrap-admin';
+    INSERT INTO user_account_role (user_account_id, role)
+    VALUES ('00000000-0000-0000-0000-000000000107', 'ADMIN');
     INSERT INTO member (id, person_id, membership_type_id)
     VALUES ('00000000-0000-0000-0000-000000000105',
       '00000000-0000-0000-0000-000000000101', 'cccccccc-0000-0000-0000-000000000001');

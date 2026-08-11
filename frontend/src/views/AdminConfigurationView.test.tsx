@@ -1,0 +1,123 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
+import { ApiError, api } from "../api/client";
+import i18n from "../i18n";
+import { AdminConfigurationView } from "./AdminConfigurationView";
+
+describe("AdminConfigurationView", () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await i18n.changeLanguage("en");
+    vi.spyOn(api, "adminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      defaultLocale: "en"
+    });
+    vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
+    vi.spyOn(api, "ruleTypes").mockResolvedValue([
+      { ruleType: "OPENING_HOURS", configurable: false, parameters: [] },
+      { ruleType: "ADVANCE_WINDOW", configurable: true, parameters: [{ name: "maxDays", minimum: 1, maximum: 365 }] }
+    ]);
+    vi.spyOn(api, "rules").mockResolvedValue([
+      { ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }
+    ]);
+  });
+
+  it("given an admin, when configuration loads, then club settings and every rule type are visible", async () => {
+    // when
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByDisplayValue("Example Tennis Club")).toBeInTheDocument();
+    expect(screen.getByText("Opening hours")).toBeInTheDocument();
+    expect(screen.getByText("Configured globally for the whole facility")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("7")).toBeInTheDocument();
+    expect(screen.getByText("Allowed range: 1 to 365")).toBeInTheDocument();
+  });
+
+  it("given changed settings, when saving, then both writes use the admin API", async () => {
+    // given
+    const changeConfig = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Racquet Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      defaultLocale: "en"
+    });
+    const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
+      ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
+    });
+    const configurationChanged = vi.fn();
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={configurationChanged} /></MemoryRouter>);
+    const user = userEvent.setup();
+    await screen.findByDisplayValue("Example Tennis Club");
+
+    // when
+    await user.clear(screen.getByTestId("club-name"));
+    await user.type(screen.getByTestId("club-name"), "Example Racquet Club");
+    await user.click(screen.getByTestId("save-club-config"));
+    await user.clear(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"));
+    await user.type(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "14");
+    await user.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
+
+    // then
+    expect(changeConfig).toHaveBeenCalledWith(expect.objectContaining({ clubName: "Example Racquet Club" }));
+    expect(configurationChanged).toHaveBeenCalled();
+    expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 });
+  });
+
+  it("given the API rejects a club setting, when saving, then its validation code is reported", async () => {
+    // given
+    vi.spyOn(api, "changeAdminConfig").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:validation",
+      title: "Validation failed",
+      status: 400,
+      fieldErrors: [{ field: "primaryColor", code: "validation.Pattern", params: {} }]
+    }));
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByDisplayValue("Example Tennis Club");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("The input does not have the permitted format.");
+  });
+
+  it("given rule-set responses finish out of order, when switching sets, then only the selected set is editable", async () => {
+    // given
+    const first = deferred<Awaited<ReturnType<typeof api.rules>>>();
+    const second = deferred<Awaited<ReturnType<typeof api.rules>>>();
+    vi.spyOn(api, "ruleSets").mockResolvedValue([
+      { id: "first", name: "First", active: true },
+      { id: "second", name: "Second", active: true }
+    ]);
+    vi.spyOn(api, "rules")
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
+      ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
+    });
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByDisplayValue("Example Tennis Club");
+
+    // when
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Rule set" }), "second");
+    second.resolve([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 } }]);
+    expect(await screen.findByDisplayValue("14")).toBeInTheDocument();
+    first.resolve([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]);
+
+    // then
+    expect(screen.queryByDisplayValue("7")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
+    expect(setRule).toHaveBeenCalledWith("second", "ADVANCE_WINDOW", { maxDays: 14 });
+  });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => { resolve = complete; });
+  return { promise, resolve };
+}

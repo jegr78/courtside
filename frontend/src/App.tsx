@@ -10,6 +10,7 @@ import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
 import { LoginView } from "./views/LoginView";
 import { MyBookingsPage } from "./views/MyBookingsPage";
+import { AdminConfigurationView } from "./views/AdminConfigurationView";
 
 interface AppRoutesProps {
   session: SessionStatus;
@@ -17,9 +18,10 @@ interface AppRoutesProps {
   passwordChanged?: boolean;
   initialPasswordChanged?: () => void;
   signedOut?: () => void;
+  configurationChanged?: (config: ClubConfig) => void;
 }
 
-export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut }: AppRoutesProps) {
+export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut, configurationChanged }: AppRoutesProps) {
   if (session.passwordChangeRequired) {
     return <Routes>
       <Route path="/initial-password" element={<InitialPasswordView changed={() => initialPasswordChanged?.()} />} />
@@ -35,6 +37,9 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/my-bookings" element={session.authenticated
       ? <MyBookingsPage session={session} signedOut={() => signedOut?.()} />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
+    <Route path="/admin/configuration" element={session.roles.includes("ADMIN")
+      ? <AdminConfigurationView configurationChanged={(changed) => configurationChanged?.(changed)} />
+      : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>;
 }
@@ -127,6 +132,11 @@ export function App() {
     void navigate("/login");
   }
 
+  function configurationChanged(changed: ClubConfig) {
+    setConfig(changed);
+    applyBranding(changed);
+  }
+
   return <div className="flex min-h-screen flex-col bg-(--cs-page) text-(--cs-text)">
     <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
       <div className="flex items-center gap-3">
@@ -138,7 +148,7 @@ export function App() {
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-center justify-center px-4 py-8">
       {offline ? <Alert>{t("status.offline")}</Alert> : session
-        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} />
+        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} configurationChanged={configurationChanged} />
         : <p aria-live="polite">{t("status.loading")}</p>}
     </main>
     <footer className="text-muted flex justify-center gap-5 px-5 py-4 text-sm">

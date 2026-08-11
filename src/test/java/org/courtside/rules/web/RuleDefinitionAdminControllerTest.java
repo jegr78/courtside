@@ -164,6 +164,23 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenListingRuleTypes_thenTheirConfigurationContractIsExposed() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/rule-types"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[?(@.ruleType == 'OPENING_HOURS')].configurable").value(false))
+                .andExpect(jsonPath("$[?(@.ruleType == 'OPENING_HOURS')].parameters.length()").value(0))
+                .andExpect(jsonPath("$[?(@.ruleType == 'ADVANCE_WINDOW')].configurable").value(true))
+                .andExpect(jsonPath("$[?(@.ruleType == 'ADVANCE_WINDOW')].parameters[0].name")
+                        .value("maxDays"))
+                .andExpect(jsonPath("$[?(@.ruleType == 'ADVANCE_WINDOW')].parameters[0].minimum")
+                        .value(1))
+                .andExpect(jsonPath("$[?(@.ruleType == 'ADVANCE_WINDOW')].parameters[0].maximum")
+                        .value(365));
+    }
+
+    @Test
     void givenARule_whenDeletingIt_thenItIsRemovedAndDeletingAgainIsStillNoContent() throws Exception {
         // given
         String ruleSetId = createRuleSet("Trial");
