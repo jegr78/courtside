@@ -155,7 +155,7 @@ describe("AppRoutes", () => {
     }} refreshSession={() => Promise.resolve()} /></MemoryRouter>);
 
     // then
-    expect(screen.getByText("Courtside wird geladen …")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("given an admin session, when opening facility management, then the protected admin view is available", () => {
@@ -174,7 +174,7 @@ describe("AppRoutes", () => {
     }} refreshSession={() => Promise.resolve()} /></MemoryRouter>);
 
     // then
-    expect(screen.getByText("Courtside wird geladen …")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 });
 
@@ -227,7 +227,7 @@ describe("App build identity", () => {
 
     // then
     expect(await screen.findByTestId("courtside-mark")).toBeInTheDocument();
-    expect(screen.getByText("Example Tennis Club")).toBeInTheDocument();
+    expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club");
   });
 
   it("givenAClubLogo_whenTheShellLoads_thenTheClubOwnsTheHeader", async () => {

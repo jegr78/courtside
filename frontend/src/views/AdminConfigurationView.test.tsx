@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -31,11 +31,11 @@ describe("AdminConfigurationView", () => {
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
 
     // then
-    expect(await screen.findByDisplayValue("Example Tennis Club")).toBeInTheDocument();
-    expect(screen.getByText("Opening hours")).toBeInTheDocument();
-    expect(screen.getByText("Configured globally for the whole facility")).toBeInTheDocument();
-    expect(await screen.findByDisplayValue("7")).toBeInTheDocument();
-    expect(screen.getByText("Allowed range: 1 to 365")).toBeInTheDocument();
+    expect(await screen.findByTestId("club-name")).toHaveValue("Example Tennis Club");
+    expect(screen.getByRole("heading", { name: "Opening hours" })).toBeInTheDocument();
+    expect(screen.getByTestId("rule-OPENING_HOURS-global")).toHaveTextContent("Configured globally for the whole facility");
+    await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range")).toHaveTextContent("Allowed range: 1 to 365");
   });
 
   it("given changed settings, when saving, then both writes use the admin API", async () => {
@@ -52,7 +52,7 @@ describe("AdminConfigurationView", () => {
     const configurationChanged = vi.fn();
     render(<MemoryRouter><AdminConfigurationView configurationChanged={configurationChanged} /></MemoryRouter>);
     const user = userEvent.setup();
-    await screen.findByDisplayValue("Example Tennis Club");
+    await screen.findByTestId("club-name");
 
     // when
     await user.clear(screen.getByTestId("club-name"));
@@ -77,7 +77,7 @@ describe("AdminConfigurationView", () => {
       fieldErrors: [{ field: "primaryColor", code: "validation.Pattern", params: {} }]
     }));
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
-    await screen.findByDisplayValue("Example Tennis Club");
+    await screen.findByTestId("club-name");
 
     // when
     await userEvent.click(screen.getByTestId("save-club-config"));
@@ -101,16 +101,16 @@ describe("AdminConfigurationView", () => {
       ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
     });
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
-    await screen.findByDisplayValue("Example Tennis Club");
+    await screen.findByTestId("club-name");
 
     // when
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Rule set" }), "second");
     second.resolve([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 } }]);
-    expect(await screen.findByDisplayValue("14")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(14));
     first.resolve([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]);
 
     // then
-    expect(screen.queryByDisplayValue("7")).not.toBeInTheDocument();
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).not.toHaveValue(7);
     await userEvent.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
     expect(setRule).toHaveBeenCalledWith("second", "ADVANCE_WINDOW", { maxDays: 14 });
   });

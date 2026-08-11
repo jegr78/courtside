@@ -96,7 +96,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     }
   }
 
-  if (!config) return <p aria-live="polite">{t("status.loading")}</p>;
+  if (!config) return <p role="status">{t("status.loading")}</p>;
 
   return <section data-testid="admin-configuration-view" className="surface-panel grid w-full max-w-5xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -142,11 +142,11 @@ function RuleEditor({ type, definition, disabled, save }: { type: RuleTypeConfig
   const [params, setParams] = useState<Record<string, number>>({});
   useEffect(() => setParams(definition?.params ?? {}), [definition]);
   return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
-    <div><h3 className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <p className="text-muted">{t("admin.rules.global")}</p>}</div>
+    <div><h3 className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <p data-testid={`rule-${type.ruleType}-global`} className="text-muted">{t("admin.rules.global")}</p>}</div>
     {type.configurable && <>
       {type.parameters.map((parameter) => <div key={parameter.name} className="grid gap-1">
         <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setParams({ ...params, [parameter.name]: Number(event.target.value) })} />
-        <p className="text-muted text-sm">{t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}</p>
+        <p data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted text-sm">{t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}</p>
       </div>)}
       <Button data-testid={`save-rule-${type.ruleType}`} className="justify-self-start" disabled={disabled} type="button" onClick={() => void save(type.ruleType, params)}>{t("admin.save")}</Button>
     </>}

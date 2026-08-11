@@ -30,11 +30,11 @@ describe("AdminFacilityView", () => {
     render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
 
     // then
-    expect(await screen.findByDisplayValue("Centre Court")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("08:00")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Member booking")).toBeInTheDocument();
+    expect(await screen.findByTestId("court-name-court-1")).toHaveValue("Centre Court");
+    expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue("08:00");
+    expect(screen.getByTestId("card-label-card-1")).toHaveValue("Member booking");
     expect(screen.getAllByRole("checkbox", { name: "Member" })[0]).toBeChecked();
-    expect(screen.getAllByText(/Any selected role is sufficient/)).toHaveLength(2);
+    expect(screen.getAllByTestId("allowed-roles-hint")).toHaveLength(2);
   });
 
   it("given facility data cannot load, when opening the view, then the failure replaces the loading state", async () => {
@@ -46,7 +46,7 @@ describe("AdminFacilityView", () => {
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
-    expect(screen.queryByText("Courtside is loading …")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("given an active court, when toggling it twice, then it disappears and can be restored", async () => {
@@ -79,7 +79,7 @@ describe("AdminFacilityView", () => {
 
     // then
     expect(toggle).toBeDisabled();
-    expect(screen.getByDisplayValue("Centre Court")).toBeDisabled();
+    expect(screen.getByTestId("court-name-court-1")).toBeDisabled();
     await user.click(toggle);
     expect(setCourtActive).toHaveBeenCalledTimes(1);
 
@@ -87,7 +87,7 @@ describe("AdminFacilityView", () => {
     response.resolve({ id: "court-1", number: 1, name: "Centre Court", active: false });
 
     // then
-    expect(await screen.findByText("Activate")).toBeEnabled();
+    expect(await screen.findByTestId("toggle-court-court-1")).toBeEnabled();
   });
 
   it("given changed card access and opening hours, when saving, then the admin API receives the values", async () => {
@@ -102,7 +102,7 @@ describe("AdminFacilityView", () => {
     });
     render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
     const user = userEvent.setup();
-    await screen.findByDisplayValue("Centre Court");
+    await screen.findByTestId("court-name-court-1");
 
     // when
     await user.clear(screen.getByTestId("card-label-card-1"));
@@ -138,7 +138,7 @@ describe("AdminFacilityView", () => {
     };
     render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
     const user = userEvent.setup();
-    await screen.findByDisplayValue("Centre Court");
+    await screen.findByTestId("court-name-court-1");
 
     // when
     await user.type(screen.getByTestId("new-court-number"), "2");
