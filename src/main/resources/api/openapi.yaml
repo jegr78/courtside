@@ -552,7 +552,7 @@ components:
     Allocation:
       type: object
       description: One court's occupancy for one booking.
-      required: [bookingId, courtId, startsAt, endsAt, cardLabel, cardColor]
+      required: [bookingId, courtId, startsAt, endsAt, cardLabel, cardColor, ownBooking]
       properties:
         bookingId: { type: string, format: uuid }
         courtId: { type: string, format: uuid }
@@ -560,6 +560,15 @@ components:
         endsAt: { type: string, format: date-time }
         cardLabel: { type: string }
         cardColor: { type: string }
+        ownBooking:
+          type: boolean
+          description: True only when the authenticated viewer created this booking; always false anonymously.
+        participantLastNames:
+          type: array
+          description: |
+            Present only for the authenticated viewer's own member booking. Contains the last
+            names of other member participants in entry order. The viewer and guests are omitted.
+          items: { type: string }
         bookedByName:
           type: [string, "null"]
           description: |
@@ -1081,6 +1090,7 @@ paths:
       tags: [bookings]
       operationId: listAllocations
       summary: The occupancy grid for one day.
+      security: []
       description: |
         A day, not a range: the grid a member reads is one day wide, and the instance's own time
         zone decides where that day begins. A range would let a caller ask for a year.
@@ -1099,8 +1109,6 @@ paths:
                 items: { $ref: "#/components/schemas/Allocation" }
         "400":
           $ref: "#/components/responses/Invalid"
-        "401":
-          $ref: "#/components/responses/Unauthenticated"
     post:
       tags: [bookings]
       operationId: createBooking

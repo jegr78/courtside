@@ -27,6 +27,10 @@ public class CurrentUser {
         return accounts.findByUsername(authentication.getName());
     }
 
+    public Optional<UserAccount> accountReadyForUse() {
+        return account().filter(account -> !account.isPasswordChangeRequired());
+    }
+
     public UserAccount requireAccount() {
         return account().orElseThrow(() -> new IllegalStateException("No authenticated account"));
     }

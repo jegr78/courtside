@@ -39,6 +39,14 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Object[]> countParticipantsByBooking(@Param("bookingIds") Collection<UUID> bookingIds);
 
     @Query("""
+            SELECT p.booking.id, p.personId FROM BookingParticipant p
+            WHERE p.booking.id IN :bookingIds
+              AND p.personId IS NOT NULL
+            ORDER BY p.booking.id, p.position
+            """)
+    List<Object[]> findMemberParticipantIdsByBooking(@Param("bookingIds") Collection<UUID> bookingIds);
+
+    @Query("""
             SELECT count(distinct p) FROM BookingParticipant p
             JOIN p.booking b
             JOIN b.allocations a

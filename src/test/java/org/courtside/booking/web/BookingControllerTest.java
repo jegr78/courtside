@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -198,7 +199,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
         String key = UUID.randomUUID().toString();
         mockMvc.perform(bookingPost(key)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
                 .andExpect(status().isCreated());
 
@@ -604,6 +605,117 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].matchType").value("SINGLES"))
                 .andExpect(jsonPath("$[0].bookedByName").doesNotExist());
+    }
+
+    @Test
+    void givenOwnBookingWithAnotherMember_whenLoadingTheGrid_thenOnlyOwnershipAndSurnameAreVisible()
+            throws Exception {
+        // given
+        UUID participantId = accounts.findByUsername("major.mary").orElseThrow().getPerson().getId();
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(courtId, MEMBER_BOOKING_CARD,
+                                "{ \"personId\": \"%s\" }".formatted(participantId)))
+                        .with(user("doe.jane").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+        // when / then
+        mockMvc.perform(get("/api/bookings").param("date", "2026-05-12")
+                        .with(user("doe.jane").roles("MEMBER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ownBooking").value(true))
+                .andExpect(jsonPath("$[0].participantLastNames[0]").value("Major"))
+                .andExpect(jsonPath("$[0].bookedByName").doesNotExist());
+    }
+
+    @Test
+    void givenAnotherMembersBooking_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden()
+            throws Exception {
+        // given
+        UUID participantId = accounts.findByUsername("major.mary").orElseThrow().getPerson().getId();
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(courtId, MEMBER_BOOKING_CARD,
+                                "{ \"personId\": \"%s\" }".formatted(participantId)))
+                        .with(user("doe.jane").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/bookings").param("date", "2026-05-12")
+                        .with(user("major.mary").roles("MEMBER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ownBooking").value(false))
+                .andExpect(jsonPath("$[0].participantLastNames").doesNotExist())
+                .andExpect(jsonPath("$[0].bookedByName").doesNotExist());
+    }
+
+    @Test
+    void givenOwnBookingWithAGuest_whenLoadingTheGrid_thenTheGuestNameIsHidden() throws Exception {
+        // given
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00",
+                                "2026-05-12T19:00:00+02:00"))
+                        .with(user("doe.jane").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/bookings").param("date", "2026-05-12")
+                        .with(user("doe.jane").roles("MEMBER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ownBooking").value(true))
+                .andExpect(jsonPath("$[0].participantLastNames").isEmpty())
+                .andExpect(content().string(Matchers.not(Matchers.containsString("Partner"))));
+    }
+
+    @Test
+    void givenAnonymousCaller_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden()
+            throws Exception {
+        // given
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00",
+                                "2026-05-12T19:00:00+02:00"))
+                        .with(user("doe.jane").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/bookings").param("date", "2026-05-12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ownBooking").value(false))
+                .andExpect(jsonPath("$[0].participantLastNames").doesNotExist())
+                .andExpect(jsonPath("$[0].bookedByName").doesNotExist())
+                .andExpect(content().string(Matchers.not(Matchers.containsString("Partner"))));
+    }
+
+    @Test
+    void givenPasswordChangeIsRequired_whenLoadingTheGrid_thenTheAnonymousRepresentationIsReturned()
+            throws Exception {
+        // given
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00",
+                                "2026-05-12T19:00:00+02:00"))
+                        .with(user("doe.jane").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+        UserAccount account = accounts.findByUsername("doe.jane").orElseThrow();
+        account.requirePasswordChange();
+        accounts.save(account);
+
+        // when / then
+        mockMvc.perform(get("/api/bookings").param("date", "2026-05-12")
+                        .with(user("doe.jane").authorities(
+                                new SimpleGrantedAuthority("ROLE_MEMBER"),
+                                new SimpleGrantedAuthority("PASSWORD_CHANGE_REQUIRED"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ownBooking").value(false))
+                .andExpect(jsonPath("$[0].participantLastNames").doesNotExist())
+                .andExpect(jsonPath("$[0].bookedByName").doesNotExist())
+                .andExpect(content().string(Matchers.not(Matchers.containsString("Partner"))));
     }
 
     @Test
