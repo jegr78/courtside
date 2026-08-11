@@ -47,14 +47,20 @@ test("given the automated smoke profile, when applying thresholds, then shared-r
   assert.match(script, /unexpected_server_errors/);
 });
 
-test("given a browser journey, when inspecting it, then UI actions and API state checks stay language neutral", () => {
+test("given a browser journey, when inspecting it, then the member workflow stays in the language-neutral UI", () => {
   // when / then
   assert.match(browserScript, /getByTestId\("login-view"\)/);
   assert.match(browserScript, /getByTestId\("week-next"\)/);
-  assert.match(browserScript, /\/api\/bookings/);
-  assert.match(browserScript, /bookingId/);
-  assert.match(browserScript, /authenticated === true/);
+  assert.match(browserScript, /getByTestId\("free-slot"\)/);
+  assert.match(browserScript, /getByTestId\("booking-submit"\)/);
+  assert.match(browserScript, /waitForResponse/);
+  assert.match(browserScript, /response\.json\(\)/);
+  assert.match(browserScript, /data-testid="own-allocation"/);
+  assert.match(browserScript, /getByTestId\("my-bookings-link"\)/);
+  assert.match(browserScript, /data-testid="personal-cancel"/);
+  assert.match(browserScript, /getByTestId\("confirm-cancellation"\)/);
   assert.match(browserScript, /member.*__VU/);
+  assert.doesNotMatch(browserScript, /page\.evaluate|fetch\(|http\.(?:get|post|put|patch|del)\(/);
   assert.doesNotMatch(browserScript, /getByText|getByLabel/);
 });
 
