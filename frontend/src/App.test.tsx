@@ -126,4 +126,62 @@ describe("App build identity", () => {
     // then
     expect(screen.getByTestId("environment-warning")).toHaveAttribute("role", "alert");
   });
+
+  it("givenNoClubLogo_whenTheShellLoads_thenTheCourtsideMarkIsTheNeutralFallback", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      defaultLocale: "de"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("courtside-mark")).toBeInTheDocument();
+    expect(screen.getByText("Example Tennis Club")).toBeInTheDocument();
+  });
+
+  it("givenAClubLogo_whenTheShellLoads_thenTheClubOwnsTheHeader", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#d7e24b",
+      accentColor: "#b85c38",
+      logoUrl: "/example-logo.svg",
+      defaultLocale: "en"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("club-logo")).toHaveAttribute("src", "/example-logo.svg");
+    expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
+  });
+
+  it("givenAMidLuminanceClubColour_whenTheShellLoads_thenTheHigherContrastTextColourIsUsed", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#009688",
+      accentColor: "#d7e24b",
+      defaultLocale: "de"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    // then
+    await screen.findByTestId("courtside-mark");
+    expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
+  });
 });

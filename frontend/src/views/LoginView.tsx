@@ -31,8 +31,8 @@ export function LoginView({ refreshSession, passwordChanged = false }: { refresh
     }
   }
 
-  return <section data-testid="login-view" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl sm:p-8">
-    <h1 className="text-2xl font-bold text-slate-950">{t("auth.signIn")}</h1>
+  return <section data-testid="login-view" className="surface-panel w-full max-w-md rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+    <h1 className="text-2xl font-bold">{t("auth.signIn")}</h1>
     <form className="mt-6 grid gap-5" onSubmit={(event) => void submit(event)}>
       {passwordChanged && <Alert>{t("password.changed")}</Alert>}
       {error && <Alert>{error}</Alert>}

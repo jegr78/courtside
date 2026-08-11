@@ -6,6 +6,10 @@ export type SupportedLocale = "de" | "en";
 const resources = {
   de: { translation: {
     "app.name": "Courtside",
+    "preferences.language": "Sprache",
+    "preferences.theme": "Darstellung",
+    "preferences.dark": "Dark Mode",
+    "preferences.light": "Light Mode",
     "auth.signIn": "Bei Courtside anmelden",
     "auth.username": "Benutzername",
     "auth.password": "Passwort",
@@ -124,6 +128,10 @@ const resources = {
   } },
   en: { translation: {
     "app.name": "Courtside",
+    "preferences.language": "Language",
+    "preferences.theme": "Theme",
+    "preferences.dark": "Dark mode",
+    "preferences.light": "Light mode",
     "auth.signIn": "Sign in to Courtside",
     "auth.username": "Username",
     "auth.password": "Password",
@@ -248,9 +256,7 @@ export function supportedLocale(value?: string | null): SupportedLocale | undefi
 }
 
 export function initialLocale(): SupportedLocale {
-  const stored = explicitLocale();
-  const browser = navigator.languages.map(supportedLocale).find(Boolean);
-  return stored ?? browser ?? "de";
+  return explicitLocale() ?? "de";
 }
 
 export function explicitLocale(): SupportedLocale | undefined {
@@ -273,9 +279,12 @@ async function applyLocale(locale: SupportedLocale): Promise<void> {
   await i18n.changeLanguage(locale);
 }
 
+const startupLocale = initialLocale();
+document.documentElement.lang = startupLocale;
+
 void i18n.use(initReactI18next).init({
   resources,
-  lng: initialLocale(),
+  lng: startupLocale,
   fallbackLng: "de",
   interpolation: { escapeValue: false }
 });

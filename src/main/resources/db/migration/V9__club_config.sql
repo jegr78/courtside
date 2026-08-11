@@ -17,4 +17,4 @@ CREATE TABLE club_config (
 );
 
 INSERT INTO club_config (id, club_name, primary_color, accent_color, default_locale)
-VALUES ('00000000-0000-0000-0000-000000000001', 'Courtside', '#1f6feb', '#f78166', 'de');
+VALUES ('00000000-0000-0000-0000-000000000001', 'Courtside', '#B85C38', '#D7E24B', 'de');
