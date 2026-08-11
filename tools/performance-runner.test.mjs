@@ -5,6 +5,7 @@ import { test } from "node:test";
 
 const script = readFileSync(fileURLToPath(new URL("../performance/protocol.js", import.meta.url)), "utf8");
 const browserScript = readFileSync(fileURLToPath(new URL("../performance/browser.js", import.meta.url)), "utf8");
+const funnelScript = readFileSync(fileURLToPath(new URL("../performance/funnel.js", import.meta.url)), "utf8");
 
 test("given core API journeys, when inspecting the protocol script, then authentication and CSRF are exercised", () => {
   // when / then
@@ -67,4 +68,31 @@ test("given browser measurements, when inspecting thresholds, then p75 Web Vital
   assert.match(browserScript, /browser_requests/);
   assert.match(browserScript, /browser_journey_duration/);
   assert.match(browserScript, /browser_journey_success/);
+});
+
+test("given a public Funnel smoke, when inspecting its journey, then it is bounded and read-only", () => {
+  // when / then
+  assert.match(funnelScript, /profile\.virtualUsers/);
+  assert.match(funnelScript, /profile\.duration/);
+  assert.match(funnelScript, /blacklistIPs/);
+  assert.match(funnelScript, /127\.0\.0\.0\/8/);
+  assert.match(funnelScript, /fc00::\/7/);
+  assert.match(funnelScript, /\/api\/source/);
+  assert.match(funnelScript, /environment.*UAT/);
+  assert.match(funnelScript, /\/manifest\.webmanifest/);
+  assert.match(funnelScript, /\/api\/public\/config/);
+  assert.match(funnelScript, /\/api\/public\/booking-grid/);
+  assert.match(funnelScript, /XSRF-TOKEN/);
+  assert.match(funnelScript, /\/api-ui\//);
+  assert.match(funnelScript, /\/api\/openapi\.yaml/);
+  assert.match(funnelScript, /\/actuator\/health/);
+  assert.doesNotMatch(funnelScript, /http\.(?:post|put|patch|del)\(/);
+  assert.doesNotMatch(funnelScript, /insecureSkipTLSVerify/);
+});
+
+test("given Funnel artifacts, when exporting them, then the public target is not retained", () => {
+  // when / then
+  assert.match(funnelScript, /\/results\/raw-summary\.json/);
+  assert.match(funnelScript, /\/results\/report\.html/);
+  assert.doesNotMatch(funnelScript, /JSON\.stringify\([^)]*target/);
 });

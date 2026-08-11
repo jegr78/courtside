@@ -2,9 +2,10 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, X509Certificate } from "node:crypto";
+import { lookup as dnsLookup } from "node:dns/promises";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { createConnection, createServer } from "node:net";
+import { BlockList, createConnection, createServer, isIP } from "node:net";
 import { availableParallelism, totalmem } from "node:os";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -25,7 +26,18 @@ const perfComposeFile = join(root, "deploy", "compose.perf.yaml");
 const perfDbComposeFile = join(root, "deploy", "compose.perf-db.yaml");
 const perfTelemetryComposeFile = join(root, "deploy", "compose.perf-telemetry.yaml");
 const perfProject = "courtside-perf";
+const funnelPerformanceConfirmation = "courtside-uat-funnel";
 const perfStateFile = join(root, "build", "perf-environment.json");
+const privateAddresses = new BlockList();
+[
+  ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
+  ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.0.2.0", 24],
+  ["192.168.0.0", 16], ["198.18.0.0", 15], ["198.51.100.0", 24], ["203.0.113.0", 24],
+  ["224.0.0.0", 4], ["240.0.0.0", 4]
+].forEach(([address, prefix]) => privateAddresses.addSubnet(address, prefix, "ipv4"));
+[
+  ["::", 128], ["::1", 128], ["2001:db8::", 32], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8]
+].forEach(([address, prefix]) => privateAddresses.addSubnet(address, prefix, "ipv6"));
 
 export function executableNames(platform = process.platform) {
   return {
@@ -52,7 +64,8 @@ export function parseArguments(argv) {
   const options = {
     command, suspend: false, json: false, environment: undefined, version: undefined,
     skipVerify: false, dbPort: false, file: undefined, confirm: undefined, all: false,
-    profile: undefined, fresh: false, telemetry: false, remoteWrite: false, showCredentials: true
+    profile: undefined, fresh: false, telemetry: false, remoteWrite: false, showCredentials: true,
+    target: undefined
   };
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
@@ -91,6 +104,8 @@ export function parseArguments(argv) {
       options.fresh = true;
     } else if (flag === "--remote-write" && command === "perf-run") {
       options.remoteWrite = true;
+    } else if (flag === "--target" && command === "perf-run") {
+      options.target = requiredOptionValue(flags, ++index, "--target");
     } else if (!flag.startsWith("--") && command === "perf-promote" && !options.file) {
       options.file = flag;
     } else if (flag === "--confirm" && command === "perf-promote") {
@@ -113,10 +128,27 @@ export function parseArguments(argv) {
   }
   if (command === "perf-run") {
     const localProfiles = ["smoke", "baseline", "peak", "stress", "soak", "browser"];
-    if (!localProfiles.includes(options.profile)) {
-      throw new Error("perf-run requires a local profile: smoke, baseline, peak, stress, soak, or browser");
+    if (options.profile === "funnel-smoke") {
+      if (!options.target) {
+        throw new Error("perf-run funnel-smoke requires --target with the public Funnel URL");
+      }
+      options.target = validateFunnelTarget(options.target);
+      if (options.confirm !== funnelPerformanceConfirmation) {
+        throw new Error(`perf-run funnel-smoke requires --confirm ${funnelPerformanceConfirmation}`);
+      }
+      if (options.remoteWrite) {
+        throw new Error("perf-run funnel-smoke cannot use --remote-write");
+      }
+      if (options.fresh) {
+        throw new Error("perf-run funnel-smoke cannot use --fresh");
+      }
+    } else if (!localProfiles.includes(options.profile)) {
+      throw new Error("perf-run requires smoke, baseline, peak, stress, soak, browser, or funnel-smoke");
     }
-    if (options.profile !== "smoke" && options.confirm !== perfProject) {
+    if (localProfiles.includes(options.profile) && options.target) {
+      throw new Error("--target is only valid for funnel-smoke");
+    }
+    if (localProfiles.includes(options.profile) && options.profile !== "smoke" && options.confirm !== perfProject) {
       throw new Error(`perf-run ${options.profile} requires --confirm ${perfProject}`);
     }
     if (options.profile === "soak" && !options.fresh) {
@@ -133,6 +165,46 @@ function requiredOptionValue(values, index, option) {
   const value = values[index];
   if (!value || value.startsWith("--")) throw new Error(`${option} requires a value`);
   return value;
+}
+
+export function validateFunnelTarget(value) {
+  let target;
+  try {
+    target = new URL(value);
+  } catch {
+    throw new Error("The Funnel target must be a valid HTTPS URL");
+  }
+  if (target.protocol !== "https:") throw new Error("The Funnel target must use HTTPS");
+  if (target.username || target.password) throw new Error("The Funnel target must not contain credentials");
+  if (target.pathname !== "/" || target.search || target.hash) {
+    throw new Error("The Funnel target must be a bare origin without path, query, or fragment");
+  }
+  if (target.port || target.hostname === "localhost" || !target.hostname.includes(".") || isIP(target.hostname)) {
+    throw new Error("The Funnel target must use a public hostname on the default HTTPS port");
+  }
+  return target.origin;
+}
+
+export function validatePublicAddress(value) {
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(value)?.[1];
+  const address = mapped ?? value;
+  const family = isIP(address);
+  if (!family || privateAddresses.check(address, family === 4 ? "ipv4" : "ipv6")) {
+    throw new Error("The Funnel target must resolve only to public addresses");
+  }
+  return address;
+}
+
+export async function resolvePublicFunnelAddresses(hostname, resolver = dnsLookup) {
+  let addresses;
+  try {
+    addresses = await resolver(hostname, { all: true, verbatim: true });
+  } catch {
+    throw new Error("The Funnel target hostname could not be resolved");
+  }
+  if (!addresses.length) throw new Error("The Funnel target hostname could not be resolved");
+  addresses.forEach(({ address }) => validatePublicAddress(address));
+  return addresses;
 }
 
 function validateImageVersion(version) {
@@ -590,7 +662,31 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
   };
 }
 
+export function funnelPerformanceRunPlan(options, resultDirectory, runId = "test-run") {
+  const contract = JSON.parse(readFileSync(join(root, "performance", "contract.json"), "utf8"));
+  const image = contract.tooling.protocolImage;
+  return {
+    command: "docker",
+    args: [
+      "run", "--rm",
+      "-e", `PERF_PROFILE=${options.profile}`,
+      "-e", `PERF_RUN_ID=${runId}`,
+      "-e", `PERF_TARGET=${options.target}`,
+      "-v", `${join(root, "performance")}:/scripts:ro`,
+      "-v", `${resultDirectory}:/results`,
+      `${image.reference}@${image.digest}`,
+      "run", "--log-output=none", "--tag", `testid=${runId}`, "--tag", "profile=funnel-smoke",
+      "--summary-trend-stats", "avg,min,med,max,p(50),p(75),p(90),p(95),p(99)",
+      "/scripts/funnel.js"
+    ]
+  };
+}
+
 async function runPerformance(options) {
+  if (options.profile === "funnel-smoke") {
+    await runFunnelPerformance(options);
+    return;
+  }
   const state = readPerformanceState();
   if (!state) {
     throw new Error("Performance credentials are unavailable; run 'perf' first");
@@ -651,6 +747,96 @@ async function runPerformance(options) {
   if (runFailure) throw runFailure;
 }
 
+async function runFunnelPerformance(options) {
+  const identity = await remoteJsonRequest(options.target, "/api/source");
+  if (identity.statusCode !== 200 || identity.body.environment !== "UAT"
+      || typeof identity.body.version !== "string" || !identity.body.version.trim()
+      || typeof identity.body.commit !== "string" || !/^[0-9a-f]{7,64}$/.test(identity.body.commit)) {
+    throw new Error("The Funnel target did not identify a UAT build");
+  }
+  const startedAt = new Date().toISOString();
+  const runId = startedAt.replaceAll(":", "-");
+  const resultDirectory = join(root, "build", "performance", options.profile, runId);
+  mkdirSync(resultDirectory, { recursive: true });
+  let runFailure;
+  try {
+    runInteractive(funnelPerformanceRunPlan(options, resultDirectory, runId));
+  } catch (error) {
+    runFailure = error;
+  }
+  const rawSummary = join(resultDirectory, "raw-summary.json");
+  if (!existsSync(rawSummary)) throw runFailure ?? new Error("k6 did not produce a machine-readable summary");
+  const contractText = readFileSync(join(root, "performance", "contract.json"), "utf8");
+  const contract = JSON.parse(contractText);
+  const result = buildPerformanceResult({
+    contract,
+    contractDigest: `sha256:${createHash("sha256").update(contractText).digest("hex")}`,
+    source: identity.body,
+    profileName: options.profile,
+    startedAt,
+    raw: JSON.parse(readFileSync(rawSummary, "utf8")),
+    platform: process.platform,
+    architecture: process.arch
+  });
+  validatePerformanceResult(result);
+  writeFileSync(join(resultDirectory, "summary.json"), `${JSON.stringify(result, null, 2)}\n`);
+  process.stdout.write(`Performance results: ${resultDirectory}\n`);
+  if (runFailure) throw runFailure;
+}
+
+async function remoteJsonRequest(origin, path) {
+  const target = new URL(origin);
+  const addresses = await resolvePublicFunnelAddresses(target.hostname);
+  for (const address of addresses) {
+    try {
+      return await pinnedJsonRequest(target, path, address);
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("The Funnel target could not be reached through a validated public address");
+}
+
+function pinnedJsonRequest(target, path, resolvedAddress) {
+  return new Promise((resolveRequest, rejectRequest) => {
+    const request = httpsRequest({
+      protocol: "https:", hostname: target.hostname, port: 443, path,
+      method: "GET", headers: { Accept: "application/json" }, timeout: 10_000,
+      lookup: (_hostname, _options, callback) => {
+        callback(null, resolvedAddress.address, resolvedAddress.family);
+      }
+    }, (response) => {
+      response.on("error", rejectRequest);
+      try {
+        const connectedAddress = validatePublicAddress(response.socket.remoteAddress);
+        if (connectedAddress !== validatePublicAddress(resolvedAddress.address)) {
+          response.destroy(new Error("The Funnel target connection changed its resolved address"));
+          return;
+        }
+      } catch (error) {
+        response.destroy(error);
+        return;
+      }
+      let body = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        body += chunk;
+        if (body.length > 65_536) request.destroy(new Error("The Funnel identity response is too large"));
+      });
+      response.on("end", () => {
+        try {
+          resolveRequest({ statusCode: response.statusCode, body: JSON.parse(body) });
+        } catch {
+          rejectRequest(new Error("The Funnel target did not return a JSON build marker"));
+        }
+      });
+    });
+    request.on("timeout", () => request.destroy(new Error("The Funnel target did not respond in time")));
+    request.on("error", rejectRequest);
+    request.end();
+  });
+}
+
 export function buildPerformanceResult({
   contract, contractDigest, source, profileName, startedAt, raw, platform, architecture,
   runner = { processorCount: availableParallelism(), memoryMegabytes: Math.round(totalmem() / 1_048_576) }
@@ -658,13 +844,14 @@ export function buildPerformanceResult({
   const profile = contract.profiles[profileName];
   const workload = contract.workloads[profile.workload];
   const browserRun = profile.kind === "browser";
+  const funnelRun = profileName === "funnel-smoke";
   const latencyMetric = browserRun ? raw.metrics.browser_http_req_duration : raw.metrics.http_req_duration;
   const latency = latencyMetric.values;
   const thresholdPassed = (name) => Object.values(raw.metrics[name].thresholds).every(value => value.ok);
   const load = {
     dataset: contract.datasets[workload.dataset],
-    readShare: workload.readShare,
-    writeShare: workload.writeShare,
+    readShare: funnelRun ? 1 : workload.readShare,
+    writeShare: funnelRun ? 0 : workload.writeShare,
     ...(profile.stages
       ? { stages: profile.stages.map(stage => ({
           targetVirtualUsers: stage.target,
@@ -680,7 +867,7 @@ export function buildPerformanceResult({
     profile: {
       name: profileName,
       workload: profile.workload,
-      target: contract.targets.default,
+      target: funnelRun ? "funnel" : contract.targets.default,
       environment: source.environment,
       startedAt,
       durationSeconds: Math.round(raw.state.testRunDurationMs / 1000)
@@ -697,6 +884,10 @@ export function buildPerformanceResult({
     } : profileName === "smoke" ? {
       technicalErrorRate: thresholdPassed("technical_errors"),
       unexpectedServerErrors: thresholdPassed("unexpected_server_errors")
+    } : funnelRun ? {
+      technicalErrorRate: thresholdPassed("technical_errors"),
+      unexpectedServerErrors: thresholdPassed("unexpected_server_errors"),
+      readOnlyApi: thresholdPassed("read_only_api_duration")
     } : {
       technicalErrorRate: thresholdPassed("technical_errors"),
       unexpectedServerErrors: thresholdPassed("unexpected_server_errors"),
@@ -721,7 +912,7 @@ export function buildPerformanceResult({
           inpMilliseconds: raw.metrics.browser_web_vital_inp.values["p(75)"],
           cls: raw.metrics.browser_web_vital_cls.values["p(75)"]
         }
-      } : {
+      } : funnelRun ? {} : {
         bookingConflicts: raw.metrics.booking_conflicts?.values.count ?? 0,
         bookingConflictRate: raw.metrics.booking_conflict_rate?.values.rate ?? 0
       }),
@@ -738,7 +929,7 @@ function durationSeconds(duration) {
   return Number(match[1]) * { s: 1, m: 60, h: 3600 }[match[2]];
 }
 
-function validatePerformanceResult(result) {
+export function validatePerformanceResult(result) {
   const require = createRequire(join(root, "frontend", "package.json"));
   const Ajv = require("ajv/dist/2020").default;
   const schema = JSON.parse(readFileSync(join(root, "performance", "result.schema.json"), "utf8"));
@@ -1435,7 +1626,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;
