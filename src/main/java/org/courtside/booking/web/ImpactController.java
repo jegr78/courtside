@@ -22,27 +22,28 @@ class ImpactController implements AdminImpactApi {
     private final ImpactService impact;
 
     @Override
-    public ResponseEntity<ApiImpact> courtImpact(UUID courtId) {
-        return ResponseEntity.ok(toResponse(impact.ofDeactivating(courtId)));
+    public ResponseEntity<ApiImpact> courtImpact(UUID courtId, UUID cursor, Integer limit) {
+        return ResponseEntity.ok(toResponse(impact.ofDeactivating(courtId, cursor, limit)));
     }
 
     @Override
-    public ResponseEntity<ApiImpact> bookingCardImpact(UUID cardId) {
-        return ResponseEntity.ok(toResponse(impact.ofRetiringCard(cardId)));
+    public ResponseEntity<ApiImpact> bookingCardImpact(UUID cardId, UUID cursor, Integer limit) {
+        return ResponseEntity.ok(toResponse(impact.ofRetiringCard(cardId, cursor, limit)));
     }
 
     @Override
     public ResponseEntity<ApiImpact> openingHoursImpact(
-            ApiDayOfWeek day, LocalTime opensAt, LocalTime closesAt) {
+            ApiDayOfWeek day, LocalTime opensAt, LocalTime closesAt, UUID cursor, Integer limit) {
         DayOfWeek weekday = WireTypes.toDayOfWeek(day);
         return ResponseEntity.ok(toResponse(OpeningWindow.ofNullable(opensAt, closesAt)
-                .map(window -> impact.ofOpeningHours(weekday, window))
-                .orElseGet(() -> impact.ofClosingWeekday(weekday))));
+                .map(window -> impact.ofOpeningHours(weekday, window, cursor, limit))
+                .orElseGet(() -> impact.ofClosingWeekday(weekday, cursor, limit))));
     }
 
     private static ApiImpact toResponse(ImpactService.Impact impact) {
         return new ApiImpact(impact.affectedCount(), impact.truncated(),
-                impact.bookings().stream().map(ImpactController::toResponse).toList());
+                impact.bookings().stream().map(ImpactController::toResponse).toList())
+                .nextCursor(impact.nextCursor());
     }
 
     private static ApiAffectedBooking toResponse(ImpactService.AffectedBooking booking) {

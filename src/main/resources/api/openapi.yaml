@@ -100,6 +100,19 @@ components:
         A write without it answers `401`, not `403`: for an unauthenticated caller the missing
         token is indistinguishable from a missing session.
 
+  parameters:
+    ImpactCursor:
+      name: cursor
+      in: query
+      required: false
+      description: The opaque `nextCursor` returned by the preceding page.
+      schema: { type: string, format: uuid }
+    PageLimit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+
   schemas:
 
     DayOfWeek:
@@ -764,7 +777,11 @@ components:
         affectedCount: { type: integer }
         truncated:
           type: boolean
-          description: True when more bookings are affected than the list shows.
+          description: True when another page of affected bookings exists.
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: The cursor for the next page, or null when this is the final page.
         bookings:
           type: array
           items: { $ref: "#/components/schemas/AffectedBooking" }
@@ -2258,6 +2275,8 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
           description: The affected bookings.
@@ -2279,6 +2298,8 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
           description: The affected bookings.
@@ -2310,6 +2331,8 @@ paths:
           in: query
           required: false
           schema: { type: string, format: time }
+        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
           description: The affected bookings.
