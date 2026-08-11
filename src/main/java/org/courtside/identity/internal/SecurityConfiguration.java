@@ -67,7 +67,8 @@ public class SecurityConfiguration {
                         // The contract is not a secret and is needed before anyone can
                         // authenticate against it.
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
-                        .requestMatchers("/", "/login", "/initial-password", "/index.html",
+                        .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
+                                "/index.html",
                                 "/assets/**", "/icon.svg", "/manifest.webmanifest", "/sw.js",
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()

@@ -9,6 +9,7 @@ import { Modal } from "../components/Modal";
 interface WeekViewProps {
   today?: Date;
   clock?: () => Date;
+  canBook?: boolean;
 }
 
 interface WeekData {
@@ -27,12 +28,13 @@ interface BookingSelection {
 const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 const systemClock = () => new Date();
 
-export function WeekView({ today, clock = systemClock }: WeekViewProps) {
+export function WeekView({ today, clock = systemClock, canBook = true }: WeekViewProps) {
   const { t, i18n } = useTranslation();
   const [referenceInstant] = useState(() => today ?? clock());
   const [currentInstant, setCurrentInstant] = useState(referenceInstant);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>();
+  const [selectedCourtId, setSelectedCourtId] = useState<string>();
   const [data, setData] = useState<WeekData>();
   const [error, setError] = useState<string>();
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
@@ -51,7 +53,10 @@ export function WeekView({ today, clock = systemClock }: WeekViewProps) {
         formatDate(day), await api.allocations(formatDate(day))
       ] as const));
       if (active) {
-        setSelectedDate(weekOffset === 0 ? formatDate(clubToday) : formatDate(weekStart));
+        setSelectedDate((current) => current && days.some((day) => formatDate(day) === current)
+          ? current
+          : weekOffset === 0 ? formatDate(clubToday) : formatDate(weekStart));
+        setSelectedCourtId((current) => courts.some((court) => court.id === current) ? current : courts[0]?.id);
         setData({ grid, courts, days, allocations: new Map(dailyAllocations) });
       }
     }).catch((failure: unknown) => {
@@ -71,6 +76,15 @@ export function WeekView({ today, clock = systemClock }: WeekViewProps) {
   const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
   const slotHeight = data ? data.grid.slotMinutes * 4 / 3 : 40;
   const currentSlot = currentTime && (slots.find((slot) => slot >= currentTime) ?? slots.at(-1));
+
+  function selectDate(value: string | undefined) {
+    if (!value || !data) return;
+    const referenceDate = dateInTimeZone(referenceInstant, data.grid.timeZone);
+    const target = parseDate(value);
+    const offset = Math.floor((calendarDayNumber(target) - calendarDayNumber(startOfWeek(referenceDate))) / 7);
+    setSelectedDate(value);
+    setWeekOffset(offset);
+  }
 
   const refreshDate = useCallback(async (date: string) => {
     const allocations = await api.allocations(date);
@@ -116,7 +130,7 @@ export function WeekView({ today, clock = systemClock }: WeekViewProps) {
       </div>
     </div>
 
-    {data && <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+    {data && <div className="desktop-day-navigation mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
       {days.map((day) => {
         const date = formatDate(day);
         const count = data.allocations.get(date)?.length ?? 0;
@@ -135,6 +149,24 @@ export function WeekView({ today, clock = systemClock }: WeekViewProps) {
       })}
     </div>}
 
+    {data && <div className="mobile-day-navigation sticky top-0 z-10 mt-5 grid grid-cols-[auto_1fr_auto_auto] gap-2 surface-panel py-2">
+      <Button type="button" data-testid="day-previous" className="button-secondary px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), -1)))} aria-label={t("week.previousDay")}>‹</Button>
+      <input data-testid="selected-date" type="date" value={selectedDate ?? ""} onChange={(event) => selectDate(event.target.value)} aria-label={t("week.chooseDate")} className="form-control min-w-0 rounded-lg border px-2" />
+      <Button type="button" data-testid="day-today" className="button-secondary px-3" onClick={() => selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.today")}</Button>
+      <Button type="button" data-testid="day-next" className="button-secondary px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), 1)))} aria-label={t("week.nextDay")}>›</Button>
+    </div>}
+
+    {data && data.courts.length > 1 && <div className="mobile-court-selector surface-panel sticky top-0 z-10 mt-3 flex gap-2 overflow-x-auto py-2" role="group" aria-label={t("week.chooseCourt")}>
+      {data.courts.map((court) => <Button
+        key={court.id}
+        type="button"
+        data-testid={`court-selector-${court.number}`}
+        className={selectedCourtId === court.id ? "" : "button-secondary"}
+        aria-pressed={selectedCourtId === court.id}
+        onClick={() => setSelectedCourtId(court.id)}
+      >{court.name || t("court.number", { number: court.number })}</Button>)}
+    </div>}
+
     {error && <Alert>{error}</Alert>}
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
     {data && <div className="mt-4 flex justify-end">
@@ -150,7 +182,7 @@ export function WeekView({ today, clock = systemClock }: WeekViewProps) {
       <table data-testid="day-plan-table" className={`day-plan-table border-collapse text-sm ${data.courts.length > 4 ? "day-plan-many-courts" : ""}`}>
         <colgroup>
           <col className="day-plan-time-column" />
-          {data.courts.map((court) => <col key={court.id} data-testid="court-column" className="day-plan-court-column" />)}
+          {data.courts.map((court) => <col key={court.id} data-testid={`court-column-${court.number}`} className={`day-plan-court-column ${selectedCourtId === court.id ? "" : "mobile-court-hidden"}`} />)}
         </colgroup>
         <thead className="surface-raised">
           <tr>
@@ -158,7 +190,7 @@ export function WeekView({ today, clock = systemClock }: WeekViewProps) {
             {data.courts.map((court) => <th
               key={court.id}
               scope="col"
-              className="border-structural border-b px-4 py-3 text-left"
+              className={`border-structural border-b px-4 py-3 text-left ${selectedCourtId === court.id ? "" : "mobile-court-hidden"}`}
             >{court.name || t("court.number", { number: court.number })}</th>)}
           </tr>
         </thead>
@@ -171,7 +203,9 @@ export function WeekView({ today, clock = systemClock }: WeekViewProps) {
               court, slot, selectedAllocations, data.grid.slotMinutes, data.grid.timeZone, t,
               () => selectedDate && setBookingSelection({ date: selectedDate, slot, courtId: court.id }),
               setCancellation,
-              selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false
+              selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false,
+              canBook,
+              selectedCourtId === court.id
             ))}
           </tr>)}
         </tbody>
@@ -229,8 +263,11 @@ function renderCell(
   t: ReturnType<typeof useTranslation>["t"],
   book: () => void,
   cancel: (allocation: Allocation) => void,
-  isPast: boolean
+  isPast: boolean,
+  canBook: boolean,
+  isSelectedCourt: boolean
 ) {
+  const cellClass = `border-structural border-b ${isSelectedCourt ? "" : "mobile-court-hidden"}`;
   const allocation = allocations.find((entry) => entry.courtId === court.id && formatTime(entry.startsAt, timeZone) === slot);
   if (allocation) {
     const duration = (Date.parse(allocation.endsAt) - Date.parse(allocation.startsAt)) / 60_000;
@@ -240,9 +277,10 @@ function renderCell(
     const style = allocation.ownBooking
       ? { backgroundColor: "var(--cs-ball)", color: "var(--cs-shade)" }
       : { backgroundColor: allocation.cardColor, color: contrastColor(allocation.cardColor) };
-    return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className="border-structural border-b p-2 align-top">
+    return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className={`${cellClass} p-2 align-top`}>
       {allocation.ownBooking && !isPast ? <button
         type="button"
+        data-testid="own-allocation"
         data-state={state}
         aria-label={t("booking.cancelLabel", { label })}
         onClick={() => cancel(allocation)}
@@ -256,9 +294,10 @@ function renderCell(
     && timeToMinutes(formatTime(entry.startsAt, timeZone)) < minute
     && timeToMinutes(formatTime(entry.endsAt, timeZone)) > minute);
   const courtName = court.name || t("court.number", { number: court.number });
-  return isCovered ? null : <td key={court.id} className="border-structural border-b p-1">
-    <button
+  if (isCovered) return null;
+  const content = canBook ? <button
       type="button"
+      data-testid="free-slot"
       disabled={isPast}
       data-state={isPast ? "past" : "free"}
       className="day-plan-slot h-full w-full rounded-md px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--club-accent)"
@@ -266,7 +305,11 @@ function renderCell(
       onClick={book}
     >
       {isPast ? t("week.past") : t("week.available")}
-    </button>
+    </button> : <div data-state={isPast ? "past" : "free"} className="day-plan-slot flex h-full w-full items-center justify-center rounded-md px-2 text-sm">
+      {isPast ? t("week.past") : t("week.available")}
+    </div>;
+  return <td key={court.id} className={`${cellClass} p-1`}>
+    {content}
   </td>;
 }
 
@@ -391,11 +434,11 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
       <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.members")}</legend>
         <label className="grid gap-2 font-medium">{t("booking.memberSearch")}
-          <input value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="form-control rounded-lg border px-3 py-3" />
+          <input data-testid="member-search" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="form-control rounded-lg border px-3 py-3" />
         </label>
         {memberMatches.length > 0 && <ul className="grid gap-2">
           {memberMatches.map((member) => <li key={member.personId}>
-            <Button type="button" className="button-secondary w-full text-left" onClick={() => {
+            <Button type="button" data-testid="member-match" className="button-secondary w-full text-left" onClick={() => {
               setSelectedMembers((current) => [...current, member]);
               setMemberQuery("");
             }}>{t("booking.addMember", { name: member.displayName })}</Button>
@@ -434,7 +477,7 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
       {error && violations.length === 0 && <Alert>{error}</Alert>}
       <div className="mt-6 flex justify-end gap-3">
         <Button type="button" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>
-        <Button type="submit" disabled={submitting || courtIds.length === 0 || !cardId}>{t("booking.submit")}</Button>
+        <Button type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId}>{t("booking.submit")}</Button>
       </div>
     </form>
   </Modal>;
@@ -512,6 +555,15 @@ function dateInTimeZone(instant: Date, timeZone: string): Date {
 
 function dateInTimeZoneValue(instant: Date, timeZone?: string): string | undefined {
   return timeZone ? formatDate(dateInTimeZone(instant, timeZone)) : undefined;
+}
+
+function parseDate(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function calendarDayNumber(date: Date): number {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
 }
 
 function isPastSlot(date: string, time: string, timeZone: string, now: Date): boolean {

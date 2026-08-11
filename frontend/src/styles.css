@@ -191,6 +191,38 @@ input[type="time"] {
   background: repeating-linear-gradient(135deg, transparent 0 4px, var(--cs-muted) 4px 6px);
 }
 
+.mobile-day-navigation,
+.mobile-court-selector {
+  display: none;
+}
+
+@media (width < 1024px) {
+  .desktop-day-navigation {
+    display: none;
+  }
+
+  .mobile-day-navigation,
+  .mobile-court-selector {
+    display: flex;
+  }
+
+  .mobile-day-navigation {
+    display: grid;
+  }
+
+  .day-plan-table.day-plan-many-courts {
+    min-width: 100%;
+  }
+
+  .day-plan-court-column {
+    width: calc(100% - 5rem);
+  }
+
+  .mobile-court-hidden {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;
