@@ -28,7 +28,7 @@ describe("AppRoutes", () => {
     expect(screen.getByTestId("login-view")).toBeInTheDocument();
   });
 
-  it("given a member session, when opening sign in, then it shows the app shell", () => {
+  it("given a member session, when opening sign in, then it anchors the app shell at the top", () => {
     render(
       <MemoryRouter initialEntries={["/login"]}>
         <AppRoutes
@@ -44,7 +44,7 @@ describe("AppRoutes", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByTestId("home-view")).toBeInTheDocument();
+    expect(screen.getByTestId("home-view")).toHaveClass("self-start");
   });
 
   it("given an initial password session, when opening the app, then it requires a new password", () => {

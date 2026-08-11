@@ -18,7 +18,7 @@ export function HomeView({ session, signedOut }: { session: SessionStatus; signe
       setError(problemMessage(failure, t));
     }
   }
-  return <section data-testid="home-view" className="w-full max-w-7xl rounded-2xl bg-white p-6 shadow-xl sm:p-8">
+  return <section data-testid="home-view" className="w-full max-w-7xl self-start rounded-2xl bg-white p-6 shadow-xl sm:p-8">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h1 className="text-3xl font-bold text-slate-950">{t("home.welcome", { name: session.displayName })}</h1>
