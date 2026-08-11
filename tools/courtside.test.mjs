@@ -9,7 +9,8 @@ import {
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   processPlans, requiredPorts, restoreDatabase, startProcesses, superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
-  writePrivateFile, performanceRunPlan, buildPerformanceResult, performanceBaselinePlan
+  writePrivateFile, performanceRunPlan, buildPerformanceResult, performanceBaselinePlan,
+  performanceStartupSummary
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
@@ -21,7 +22,10 @@ function passingPerformanceResult() {
     schemaVersion: 1,
     contract: { schemaVersion: 1, digest: `sha256:${"a".repeat(64)}` },
     build: { applicationVersion: "1.2.3", gitCommit: "abcdef0" },
-    runtime: { k6Version: "2.2.0", operatingSystem: "linux", architecture: "arm64" },
+    runtime: {
+      k6Version: "2.2.0", operatingSystem: "linux", architecture: "arm64",
+      runner: { processorCount: 4, memoryMegabytes: 16384 }
+    },
     profile: {
       name: "baseline", workload: "reference", target: "system", environment: "PERFORMANCE",
       startedAt: "2026-08-10T12:00:00.000Z", durationSeconds: 600
@@ -224,6 +228,19 @@ test("given performance commands, when parsing them, then lifecycle and diagnosi
   assert.throws(() => parseArguments(["perf-promote", "summary.json"]), /--confirm courtside-perf/);
 });
 
+test("given automated performance startup, when suppressing credentials, then the password is absent from output", () => {
+  // given
+  const options = parseArguments(["perf", "--skip-verify", "--no-credential-output"]);
+
+  // when
+  const summary = performanceStartupSummary("not-for-logs", options);
+
+  // then
+  assert.equal(options.showCredentials, false);
+  assert.match(summary, /Performance: https:\/\/localhost:9443/);
+  assert.doesNotMatch(summary, /not-for-logs|shared password|Accounts:/);
+});
+
 test("given load profiles, when parsing execution, then manual runs require disposable confirmation", () => {
   // when / then
   assert.equal(parseArguments(["perf-run", "smoke"]).profile, "smoke");
@@ -314,18 +331,18 @@ test("given raw k6 metrics, when building a result, then the performance schema 
   // when
   const result = buildPerformanceResult({
     contract, contractDigest: `sha256:${"a".repeat(64)}`, source: { version: "1.2.3", commit: "abcdef0" },
-    profileName: "smoke", startedAt: "2026-08-10T12:00:00.000Z", raw, platform: "darwin", architecture: "arm64"
+    profileName: "smoke", startedAt: "2026-08-10T12:00:00.000Z", raw, platform: "darwin", architecture: "arm64",
+    runner: { processorCount: 8, memoryMegabytes: 32768 }
   });
 
   // then
   assert.equal(result.build.applicationVersion, "1.2.3");
   assert.equal(result.profile.durationSeconds, 60);
+  assert.deepEqual(result.runtime.runner, { processorCount: 8, memoryMegabytes: 32768 });
   assert.equal(result.metrics.throughputPerSecond, 5);
   assert.equal(result.metrics.bookingConflictRate, 0.25);
   assert.deepEqual(result.metrics.latencyMilliseconds, { p50: 10, p90: 20, p95: 30, p99: 40 });
-  assert.deepEqual(result.thresholds, {
-    technicalErrorRate: true, unexpectedServerErrors: true, readOnlyApi: true, login: true, booking: true
-  });
+  assert.deepEqual(result.thresholds, { technicalErrorRate: true, unexpectedServerErrors: true });
 });
 
 test("given raw browser metrics, when building a result, then p75 Web Vitals and journey evidence are retained", () => {
@@ -352,7 +369,8 @@ test("given raw browser metrics, when building a result, then p75 Web Vitals and
   // when
   const result = buildPerformanceResult({
     contract, contractDigest: `sha256:${"a".repeat(64)}`, source: { version: "1.2.3", commit: "abcdef0" },
-    profileName: "browser", startedAt: "2026-08-10T12:00:00.000Z", raw, platform: "linux", architecture: "x64"
+    profileName: "browser", startedAt: "2026-08-10T12:00:00.000Z", raw, platform: "linux", architecture: "x64",
+    runner: { processorCount: 4, memoryMegabytes: 8192 }
   });
 
   // then

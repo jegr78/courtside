@@ -5,6 +5,7 @@ import { createHash, randomBytes, X509Certificate } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { createConnection, createServer } from "node:net";
+import { availableParallelism, totalmem } from "node:os";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -51,7 +52,7 @@ export function parseArguments(argv) {
   const options = {
     command, suspend: false, json: false, environment: undefined, version: undefined,
     skipVerify: false, dbPort: false, file: undefined, confirm: undefined, all: false,
-    profile: undefined, fresh: false, telemetry: false, remoteWrite: false
+    profile: undefined, fresh: false, telemetry: false, remoteWrite: false, showCredentials: true
   };
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
@@ -66,6 +67,8 @@ export function parseArguments(argv) {
       options.dbPort = true;
     } else if (flag === "--telemetry" && command === "perf") {
       options.telemetry = true;
+    } else if (flag === "--no-credential-output" && command === "perf") {
+      options.showCredentials = false;
     } else if (flag === "--json" && command === "status") {
       options.json = true;
     } else if (["dev", "uat", "perf"].includes(flag) && command === "status" && !options.environment) {
@@ -510,15 +513,20 @@ function startPerformance(options) {
       "--remove-orphans"],
     environment
   });
-  process.stdout.write("Performance: https://localhost:9443 | HTTP redirect: http://localhost:9080\n");
-  process.stdout.write(`Accounts: member0001 through member1000 | shared password: ${password}\n`);
-  if (options.dbPort) {
-    process.stdout.write("Database: jdbc:postgresql://127.0.0.1:5434/courtside_perf\n");
-  }
-  if (options.telemetry) {
-    process.stdout.write("Prometheus: http://127.0.0.1:9090\n");
-    process.stdout.write("Grafana: http://127.0.0.1:3000\n");
-  }
+  process.stdout.write(performanceStartupSummary(password, options));
+}
+
+export function performanceStartupSummary(password, options) {
+  return [
+    "Performance: https://localhost:9443 | HTTP redirect: http://localhost:9080",
+    ...(options.showCredentials
+      ? [`Accounts: member0001 through member1000 | shared password: ${password}`]
+      : []),
+    ...(options.dbPort ? ["Database: jdbc:postgresql://127.0.0.1:5434/courtside_perf"] : []),
+    ...(options.telemetry
+      ? ["Prometheus: http://127.0.0.1:9090", "Grafana: http://127.0.0.1:3000"]
+      : [])
+  ].join("\n") + "\n";
 }
 
 export function writePrivateFile(file, content, platform = process.platform, filesystem = {
@@ -644,7 +652,8 @@ async function runPerformance(options) {
 }
 
 export function buildPerformanceResult({
-  contract, contractDigest, source, profileName, startedAt, raw, platform, architecture
+  contract, contractDigest, source, profileName, startedAt, raw, platform, architecture,
+  runner = { processorCount: availableParallelism(), memoryMegabytes: Math.round(totalmem() / 1_048_576) }
 }) {
   const profile = contract.profiles[profileName];
   const workload = contract.workloads[profile.workload];
@@ -667,7 +676,7 @@ export function buildPerformanceResult({
     schemaVersion: 1,
     contract: { schemaVersion: contract.schemaVersion, digest: contractDigest },
     build: { applicationVersion: source.version, gitCommit: source.commit },
-    runtime: { k6Version: contract.tooling.k6Version, operatingSystem: platform, architecture },
+    runtime: { k6Version: contract.tooling.k6Version, operatingSystem: platform, architecture, runner },
     profile: {
       name: profileName,
       workload: profile.workload,
@@ -685,6 +694,9 @@ export function buildPerformanceResult({
         .every(thresholdPassed),
       browserErrors: thresholdPassed("browser_errors"),
       browserJourney: thresholdPassed("browser_journey_success")
+    } : profileName === "smoke" ? {
+      technicalErrorRate: thresholdPassed("technical_errors"),
+      unexpectedServerErrors: thresholdPassed("unexpected_server_errors")
     } : {
       technicalErrorRate: thresholdPassed("technical_errors"),
       unexpectedServerErrors: thresholdPassed("unexpected_server_errors"),
@@ -1423,7 +1435,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;
