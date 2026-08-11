@@ -93,7 +93,7 @@ function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, 
           <span>{booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
           {actionable && booking.status === "CONFIRMED" && <div className="flex flex-wrap gap-2 pt-1">
-            <Button className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel", { label: booking.cardLabel })}</Button>
+            <Button data-testid="personal-cancel" className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel", { label: booking.cardLabel })}</Button>
             {booking.seriesId && <Button className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move", { label: booking.cardLabel })}</Button>}
           </div>}
         </li>)}</ul>
@@ -139,7 +139,7 @@ function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, clos
     <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatDateTime(candidate.startsAt, i18n.language, timeZone)}</li>)}</ul>
     {hasMoreBookings && scope !== "THIS" && <p>{t("myBookings.affectedIncomplete")}</p>}
     {error && <Alert>{error}</Alert>}
-    <div className="flex gap-2"><Button onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    <div className="flex gap-2"><Button data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

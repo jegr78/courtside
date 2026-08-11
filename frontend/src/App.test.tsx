@@ -18,14 +18,58 @@ describe("AppRoutes", () => {
     await i18n.changeLanguage("de");
   });
 
-  it("given an anonymous visitor, when opening a protected route, then it shows sign in", () => {
+  it("given an anonymous visitor, when opening the landing page, then the public court plan and sign-in action are shown", async () => {
+    // given
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({
+      timeZone: "Europe/Berlin",
+      slotMinutes: 30,
+      openingHours: []
+    });
+    vi.spyOn(api, "courts").mockResolvedValue([]);
+
+    // when
     render(
       <MemoryRouter initialEntries={["/"]}>
         <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} />
       </MemoryRouter>
     );
 
+    // then
+    expect(await screen.findByTestId("court-plan-view")).toBeInTheDocument();
+    expect(screen.getByTestId("sign-in-link")).toHaveAttribute("href", "/login");
+  });
+
+  it("given an anonymous visitor, when opening personal bookings, then sign in is required", () => {
+    // when
+    render(
+      <MemoryRouter initialEntries={["/my-bookings"]}>
+        <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} />
+      </MemoryRouter>
+    );
+
+    // then
     expect(screen.getByTestId("login-view")).toBeInTheDocument();
+  });
+
+  it("given an anonymous visitor, when opening the court alias, then the public plan remains directly addressable", async () => {
+    // given
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({
+      timeZone: "Europe/Berlin",
+      slotMinutes: 30,
+      openingHours: []
+    });
+    vi.spyOn(api, "courts").mockResolvedValue([]);
+
+    // when
+    render(
+      <MemoryRouter initialEntries={["/courts"]}>
+        <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} />
+      </MemoryRouter>
+    );
+
+    // then
+    expect(await screen.findByTestId("court-plan-view")).toBeInTheDocument();
+    expect(screen.getByTestId("court-plan-link")).toHaveAttribute("aria-current", "page");
   });
 
   it("given a member session, when opening sign in, then it anchors the app shell at the top", () => {
@@ -44,10 +88,9 @@ describe("AppRoutes", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByTestId("home-view")).toHaveClass("self-start");
-    const courtPlan = screen.getByRole("heading", { name: "Platzbelegung" });
-    const personalBookings = screen.getByRole("heading", { name: "Meine Buchungen" });
-    expect(courtPlan.compareDocumentPosition(personalBookings) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(screen.getByTestId("court-plan-view")).toHaveClass("self-start");
+    expect(screen.getByTestId("court-plan-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("my-bookings-link")).toHaveAttribute("href", "/my-bookings");
   });
 
   it("given an initial password session, when opening the app, then it requires a new password", () => {
@@ -69,7 +112,7 @@ describe("AppRoutes", () => {
     expect(screen.getByTestId("initial-password-view")).toBeInTheDocument();
   });
 
-  it("given a member session, when sign out succeeds, then sign in is shown without another request", async () => {
+  it("given a member session, when sign out succeeds, then the public plan offers sign in without another session request", async () => {
     // given
     vi.spyOn(api, "logout").mockResolvedValue();
     const member: SessionStatus = {
@@ -93,7 +136,7 @@ describe("AppRoutes", () => {
     await userEvent.click(screen.getByTestId("logout"));
 
     // then
-    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+    expect(await screen.findByTestId("sign-in-link")).toHaveAttribute("href", "/login");
   });
 });
 
@@ -124,7 +167,7 @@ describe("App build identity", () => {
 
     // when
     render(<MemoryRouter><App /></MemoryRouter>);
-    await screen.findByTestId("login-view");
+    await screen.findByTestId("court-plan-view");
 
     // then
     expect(screen.getByTestId("environment-warning")).toHaveAttribute("role", "alert");

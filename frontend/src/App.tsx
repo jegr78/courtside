@@ -9,6 +9,7 @@ import { applyAccountLocale, supportedLocale } from "./i18n";
 import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
 import { LoginView } from "./views/LoginView";
+import { MyBookingsPage } from "./views/MyBookingsPage";
 
 interface AppRoutesProps {
   session: SessionStatus;
@@ -25,14 +26,15 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       <Route path="*" element={<Navigate to="/initial-password" replace />} />
     </Routes>;
   }
-  if (!session.authenticated) {
-    return <Routes>
-      <Route path="/login" element={<LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>;
-  }
   return <Routes>
     <Route path="/" element={<HomeView session={session} signedOut={() => signedOut?.()} />} />
+    <Route path="/courts" element={<HomeView session={session} signedOut={() => signedOut?.()} />} />
+    <Route path="/login" element={session.authenticated
+      ? <Navigate to="/" replace />
+      : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
+    <Route path="/my-bookings" element={session.authenticated
+      ? <MyBookingsPage session={session} signedOut={() => signedOut?.()} />
+      : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>;
 }

@@ -36,4 +36,20 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
                 .andExpect(header().string("Content-Security-Policy",
                         org.hamcrest.Matchers.containsString("default-src 'self'")));
     }
+
+    @Test
+    void givenAnAnonymousVisitor_whenOpeningTheCourtPlanRoute_thenTheAppShellIsServed() throws Exception {
+        // when / then
+        mockMvc.perform(get("/courts"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/index.html"));
+    }
+
+    @Test
+    void givenAnAnonymousVisitor_whenOpeningPersonalBookings_thenTheLoginCapableAppShellIsServed() throws Exception {
+        // when / then
+        mockMvc.perform(get("/my-bookings"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/index.html"));
+    }
 }

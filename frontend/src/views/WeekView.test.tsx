@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ApiError, api } from "../api/client";
@@ -123,7 +123,7 @@ it("given up to four courts, when showing the day plan, then they divide its wid
   // then
   const plan = await screen.findByTestId("week-grid");
   expect(plan).toHaveStyle({ "--court-count": "3" });
-  expect(screen.getAllByTestId("court-column")).toHaveLength(3);
+  expect(screen.getAllByTestId(/^court-column-/)).toHaveLength(3);
 });
 
 it("given more than four courts, when showing the day plan, then court columns retain a usable minimum width", async () => {
@@ -147,6 +147,56 @@ it("given a free future slot, when showing the day plan, then it is visibly iden
   const slot = await screen.findByRole("button", { name: "Book Centre Court at 12:30" });
   expect(slot).toHaveTextContent("Available");
   expect(slot).toHaveAttribute("data-state", "free");
+});
+
+it("given an anonymous visitor, when showing a free slot, then it is visible but not interactive", async () => {
+  // when
+  render(<WeekView today={clubInstant("12:00")} canBook={false} />);
+
+  // then
+  await screen.findByTestId("week-grid");
+  expect(screen.queryByRole("button", { name: "Book Centre Court at 12:30" })).not.toBeInTheDocument();
+  expect(screen.getAllByText("Available").length).toBeGreaterThan(0);
+});
+
+it("given multiple courts, when selecting a court, then the mobile plan marks only that court as visible", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+
+  // when
+  await userEvent.click(screen.getByTestId("court-selector-2"));
+
+  // then
+  expect(screen.getByTestId("court-selector-2")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("court-column-1")).toHaveClass("mobile-court-hidden");
+  expect(screen.getByTestId("court-column-2")).not.toHaveClass("mobile-court-hidden");
+});
+
+it("given the day plan, when using compact date navigation, then the adjacent day becomes selected", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+
+  // when
+  await userEvent.click(screen.getByTestId("day-next"));
+
+  // then
+  expect(screen.getByTestId("selected-date")).toHaveValue("2026-08-11");
+  expect(screen.getByRole("button", { name: /Tuesday, August 11/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+it("given a week before daylight saving starts, when choosing the next week, then the selected date is loaded", async () => {
+  // given
+  render(<WeekView today={new Date("2026-03-23T12:00:00+01:00")} />);
+  await screen.findByTestId("week-grid");
+
+  // when
+  fireEvent.change(screen.getByTestId("selected-date"), { target: { value: "2026-03-30" } });
+
+  // then
+  await waitFor(() => expect(api.allocations).toHaveBeenCalledWith("2026-03-30"));
+  expect(screen.getByTestId("selected-date")).toHaveValue("2026-03-30");
 });
 
 it("given a past slot, when showing today, then it remains visible but cannot be booked", async () => {

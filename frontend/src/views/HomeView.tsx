@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { api, type SessionStatus } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { WeekView } from "./WeekView";
-import { MyBookingsView } from "./MyBookingsView";
 
 export function HomeView({ session, signedOut }: { session: SessionStatus; signedOut: () => void }) {
   const { t } = useTranslation();
+  const location = useLocation();
   const [error, setError] = useState<string>();
   async function logout() {
     setError(undefined);
@@ -19,16 +20,17 @@ export function HomeView({ session, signedOut }: { session: SessionStatus; signe
       setError(problemMessage(failure, t));
     }
   }
-  return <section data-testid="home-view" className="surface-panel w-full max-w-7xl self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+  return <section data-testid="court-plan-view" className="surface-panel w-full max-w-7xl self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-bold">{t("home.welcome", { name: session.displayName })}</h1>
-        <p className="text-muted mt-2">{t("home.roles", { roles: session.roles.join(", ") })}</p>
-      </div>
-      <Button type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>
+      <nav aria-label={t("nav.primary")} className="flex flex-wrap items-center gap-4">
+        <Link to="/" data-testid="court-plan-link" aria-current={["/", "/courts"].includes(location.pathname) ? "page" : undefined} className="font-semibold underline-offset-4">{t("nav.courts")}</Link>
+        {session.authenticated && <NavLink to="/my-bookings" data-testid="my-bookings-link" className="underline-offset-4">{t("nav.myBookings")}</NavLink>}
+      </nav>
+      {session.authenticated
+        ? <Button type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>
+        : <Link to="/login" data-testid="sign-in-link" className="rounded-lg bg-(--club-primary) px-4 py-3 font-semibold text-(--club-primary-text)">{t("auth.submit")}</Link>}
     </div>
     {error && <Alert>{error}</Alert>}
-    <WeekView />
-    <MyBookingsView />
+    <WeekView canBook={session.authenticated} />
   </section>;
 }

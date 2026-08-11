@@ -7,19 +7,19 @@ test("language and theme preferences persist across reloads", async ({ page }) =
   // then
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(page.getByLabel("Sprache")).toHaveValue("de");
-  await expect(page.getByLabel("Darstellung")).toHaveValue("dark");
+  await expect(page.locator("#locale-preference")).toHaveValue("de");
+  await expect(page.locator("#theme-preference")).toHaveValue("dark");
 
   // when
-  await page.getByLabel("Sprache").selectOption("en");
-  await page.getByLabel("Theme").selectOption("light");
+  await page.locator("#locale-preference").selectOption("en");
+  await page.locator("#theme-preference").selectOption("light");
   await page.reload();
 
   // then
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(page.getByLabel("Language")).toHaveValue("en");
-  await expect(page.getByLabel("Theme")).toHaveValue("light");
+  await expect(page.locator("#locale-preference")).toHaveValue("en");
+  await expect(page.locator("#theme-preference")).toHaveValue("light");
 });
 
 test("the application shell identifies the exact running build", async ({ page, request }) => {
@@ -44,7 +44,7 @@ test("the application shell identifies the exact running build", async ({ page, 
 });
 
 test("the bootstrap admin can replace the initial password and maintain a session", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/login");
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("bootstrap-admin");
   await page.getByTestId("password").fill("temporary-password");
@@ -55,62 +55,64 @@ test("the bootstrap admin can replace the initial password and maintain a sessio
   await page.getByTestId("confirm-password").fill("permanent-password");
   await page.getByTestId("password-submit").click();
 
+  await expect(page.getByTestId("sign-in-link")).toBeVisible();
+  await page.getByTestId("sign-in-link").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("bootstrap-admin");
   await page.getByTestId("password").fill("permanent-password");
   await page.getByTestId("login-submit").click();
-  await expect(page.getByTestId("home-view")).toBeVisible();
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
 
   await page.reload();
-  await expect(page.getByTestId("home-view")).toBeVisible();
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
   await page.getByTestId("logout").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
 });
 
 test("a seeded member stays signed in across a reload and can sign out", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/login");
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("doe.jane");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
 
-  await expect(page.getByTestId("home-view")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Court occupancy" })).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "Court 1" })).toBeVisible();
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await expect(page.getByTestId("week-grid")).toBeVisible();
   await page.reload();
-  await expect(page.getByTestId("home-view")).toBeVisible();
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
   await page.getByTestId("logout").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
 });
 
 test("a seeded member can book a free slot and cancel it again", async ({ page }) => {
   // given
-  await page.goto("/");
+  await page.goto("/login");
   await page.getByTestId("username").fill("doe.jane");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
-  await expect(page.getByTestId("home-view")).toBeVisible();
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
   await page.getByTestId("week-next").click();
-  const freeSlot = page.getByRole("button", { name: /^Book Court 1 at/ }).first();
+  const freeSlot = page.getByTestId("free-slot").first();
   await expect(freeSlot).toBeVisible();
 
   // when
   await freeSlot.click();
-  await page.getByLabel("Search members").fill("Mary");
-  await page.getByRole("button", { name: "Add Mary Major" }).click();
-  await page.getByRole("button", { name: "Book now" }).click();
+  await page.getByTestId("member-search").fill("Mary");
+  await page.getByTestId("member-match").click();
+  await page.getByTestId("booking-submit").click();
 
   // then
-  const gridBooking = page.getByRole("button", { name: "You, Major, cancel booking" });
+  const gridBooking = page.getByTestId("own-allocation");
   await expect(gridBooking).toBeVisible();
 
   await page.reload();
-  const personalBooking = page.getByRole("button", { name: "Cancel Member booking" });
+  await page.getByTestId("my-bookings-link").click();
+  const personalBooking = page.getByTestId("personal-cancel");
   await expect(personalBooking).toBeVisible();
 
   // when
   await personalBooking.click();
-  await page.getByRole("button", { name: "Confirm cancellation" }).click();
+  await page.getByTestId("confirm-cancellation").click();
 
   // then
   await expect(personalBooking).not.toBeVisible();
