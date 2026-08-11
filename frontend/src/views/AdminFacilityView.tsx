@@ -94,13 +94,14 @@ export function AdminFacilityView() {
     event.preventDefault();
     const key = "court:new";
     if (!beginMutation(key)) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       const created = await api.createAdminCourt({
         number: Number(formString(form, "number")), name: formString(form, "name") || undefined
       });
       setCourts((current) => [...(current ?? []), created]);
-      event.currentTarget.reset();
+      formElement.reset();
       reportSuccess();
     } catch (failure) {
       reportError(failure);
@@ -178,7 +179,8 @@ export function AdminFacilityView() {
     event.preventDefault();
     const key = "card:new";
     if (!beginMutation(key)) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       const created = await api.createAdminBookingCard({
         label: formString(form, "label"),
@@ -189,7 +191,7 @@ export function AdminFacilityView() {
         guestAllowed: form.get("guestAllowed") === "on"
       });
       setCards((current) => [...(current ?? []), created]);
-      event.currentTarget.reset();
+      formElement.reset();
       reportSuccess();
     } catch (failure) {
       reportError(failure);
@@ -283,8 +285,8 @@ function CardCreateForm({ disabled, create }: { disabled: boolean; create: (even
     <div className="grid gap-3 md:grid-cols-3">
       <TextField disabled={disabled} data-testid="new-card-label" name="label" label={t("admin.facility.label")} />
       <TextField disabled={disabled} name="color" type="color" defaultValue="#b85c38" label={t("admin.facility.color")} />
-      <RoleCheckboxes disabled={disabled} name="allowedRoles" selected={[]} />
-      <TextField disabled={disabled} name="allowedPlayerCounts" label={t("admin.facility.playerCounts")} />
+      <RoleCheckboxes disabled={disabled} name="allowedRoles" selected={[]} testIdPrefix="new-card-role" />
+      <TextField disabled={disabled} data-testid="new-card-counts" name="allowedPlayerCounts" label={t("admin.facility.playerCounts")} />
       <Checkbox disabled={disabled} name="countsAgainstLimits" label={t("admin.facility.countsAgainstLimits")} />
       <Checkbox disabled={disabled} name="guestAllowed" label={t("admin.facility.guestAllowed")} />
     </div>
@@ -292,7 +294,7 @@ function CardCreateForm({ disabled, create }: { disabled: boolean; create: (even
   </form>;
 }
 
-function RoleCheckboxes({ name, selected, disabled, changed }: { name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void }) {
+function RoleCheckboxes({ name, selected, disabled, changed, testIdPrefix }: { name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void; testIdPrefix?: string }) {
   const { t } = useTranslation();
   function toggle(role: Role, checked: boolean) {
     changed?.(checked ? [...selected, role] : selected.filter((candidate) => candidate !== role));
@@ -300,14 +302,14 @@ function RoleCheckboxes({ name, selected, disabled, changed }: { name?: string; 
   return <fieldset className="grid gap-2">
     <legend className="font-medium">{t("admin.facility.allowedRoles")}</legend>
     <div className="grid gap-2 sm:grid-cols-2">
-      {roles.map((role) => <Checkbox key={role} name={name} disabled={disabled} label={t(`role.${role}`)} checked={selected.includes(role)} value={role} changed={changed ? (checked) => toggle(role, checked) : undefined} />)}
+      {roles.map((role) => <Checkbox key={role} data-testid={testIdPrefix ? `${testIdPrefix}-${role}` : undefined} name={name} disabled={disabled} label={t(`role.${role}`)} checked={selected.includes(role)} value={role} changed={changed ? (checked) => toggle(role, checked) : undefined} />)}
     </div>
     <p className="text-sm text-[var(--cs-muted)]">{t("admin.facility.allowedRolesHint")}</p>
   </fieldset>;
 }
 
-function Checkbox({ name, label, checked, disabled, value, changed }: { name?: string; label: string; checked?: boolean; disabled?: boolean; value?: string; changed?: (checked: boolean) => void }) {
-  return <label className="flex items-center gap-3 font-medium"><input name={name} disabled={disabled} type="checkbox" value={value} checked={changed ? checked : undefined} onChange={changed ? (event) => changed(event.target.checked) : undefined} />{label}</label>;
+function Checkbox({ name, label, checked, disabled, value, changed, ...props }: { name?: string; label: string; checked?: boolean; disabled?: boolean; value?: string; changed?: (checked: boolean) => void; "data-testid"?: string }) {
+  return <label className="flex items-center gap-3 font-medium"><input data-testid={props["data-testid"]} name={name} disabled={disabled} type="checkbox" value={value} checked={changed ? checked : undefined} onChange={changed ? (event) => changed(event.target.checked) : undefined} />{label}</label>;
 }
 
 function cardRequest(card: BookingCard): BookingCardRequest {

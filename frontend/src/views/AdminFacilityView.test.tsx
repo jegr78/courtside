@@ -129,11 +129,13 @@ describe("AdminFacilityView", () => {
     const createCourt = vi.spyOn(api, "createAdminCourt").mockResolvedValue({
       id: "court-2", number: 2, name: "Garden Court", active: true
     });
-    const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({
+    const cardResponse = deferred<Awaited<ReturnType<typeof api.createAdminBookingCard>>>();
+    const createCard = vi.spyOn(api, "createAdminBookingCard").mockReturnValue(cardResponse.promise);
+    const createdCard: Awaited<ReturnType<typeof api.createAdminBookingCard>> = {
       id: "card-2", label: "Training", color: "#b85c38", allowedRoles: ["TRAINER"],
       allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
       guestAllowed: false, active: true
-    });
+    };
     render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
     const user = userEvent.setup();
     await screen.findByDisplayValue("Centre Court");
@@ -145,10 +147,13 @@ describe("AdminFacilityView", () => {
     await user.type(screen.getByTestId("new-card-label"), "Training");
     await user.click(screen.getAllByRole("checkbox", { name: "Trainer" })[1]);
     await user.click(screen.getByTestId("create-card"));
+    cardResponse.resolve(createdCard);
 
     // then
     expect(createCourt).toHaveBeenCalledWith({ number: 2, name: "Garden Court" });
     expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ label: "Training", allowedRoles: ["TRAINER"] }));
+    expect(await screen.findByRole("status")).toBeVisible();
+    expect(screen.getByTestId("new-card-label")).toHaveValue("");
   });
 });
 
