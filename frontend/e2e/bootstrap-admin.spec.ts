@@ -154,3 +154,29 @@ test("an admin changes club configuration and a booking rule through the browser
   // then
   await expect(page.locator('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeVisible();
 });
+
+test("an admin takes a court out of service and restores it through the browser", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("admin-facility-link").click();
+  await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+  const court = "dddddddd-0000-0000-0000-000000000004";
+
+  // when
+  await page.getByTestId(`toggle-court-${court}`).click();
+  await page.goto("/");
+
+  // then
+  await expect(page.getByTestId("court-column-4")).not.toBeVisible();
+
+  // when
+  await page.getByTestId("admin-facility-link").click();
+  await page.getByTestId(`toggle-court-${court}`).click();
+  await page.goto("/");
+
+  // then
+  await expect(page.getByTestId("court-column-4")).toBeVisible();
+});

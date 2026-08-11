@@ -7,6 +7,14 @@ export type RuleSet = components["schemas"]["RuleSet"];
 export type RuleType = components["schemas"]["RuleType"];
 export type RuleTypeConfiguration = components["schemas"]["RuleTypeConfiguration"];
 export type RuleDefinition = components["schemas"]["RuleDefinition"];
+export type AdminCourt = components["schemas"]["Court"];
+export type CourtRequest = components["schemas"]["CourtRequest"];
+export type OpeningHours = components["schemas"]["OpeningHours"];
+export type DayOfWeek = components["schemas"]["DayOfWeek"];
+export type SetOpeningHoursRequest = components["schemas"]["SetOpeningHoursRequest"];
+export type BookingCard = components["schemas"]["BookingCard"];
+export type BookingCardRequest = components["schemas"]["BookingCardRequest"];
+export type Role = components["schemas"]["Role"];
 export type SourceOffer = components["schemas"]["SourceOffer"];
 export type Problem = components["schemas"]["Problem"];
 export type PublicCourt = components["schemas"]["PublicCourt"];
@@ -79,6 +87,33 @@ export const api = {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ params })
     }
   ),
+  adminCourts: () => request<AdminCourt[]>("/api/admin/courts"),
+  createAdminCourt: (court: CourtRequest) => request<AdminCourt>("/api/admin/courts", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(court)
+  }),
+  changeAdminCourt: (id: string, court: CourtRequest) => request<AdminCourt>(`/api/admin/courts/${id}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(court)
+  }),
+  setAdminCourtActive: (id: string, active: boolean) => request<AdminCourt>(`/api/admin/courts/${id}/active`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+  }),
+  adminOpeningHours: () => request<OpeningHours[]>("/api/admin/opening-hours"),
+  setAdminOpeningHours: (day: DayOfWeek, hours: SetOpeningHoursRequest) => request<OpeningHours>(
+    `/api/admin/opening-hours/${day}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(hours)
+    }
+  ),
+  closeAdminDay: (day: DayOfWeek) => request<void>(`/api/admin/opening-hours/${day}`, { method: "DELETE" }),
+  adminBookingCards: () => request<BookingCard[]>("/api/admin/booking-cards"),
+  createAdminBookingCard: (card: BookingCardRequest) => request<BookingCard>("/api/admin/booking-cards", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card)
+  }),
+  changeAdminBookingCard: (id: string, card: BookingCardRequest) => request<BookingCard>(`/api/admin/booking-cards/${id}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card)
+  }),
+  setAdminBookingCardActive: (id: string, active: boolean) => request<BookingCard>(`/api/admin/booking-cards/${id}/active`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+  }),
   source: () => request<SourceOffer>("/api/source"),
   courts: () => request<PublicCourt[]>("/api/public/courts"),
   bookingGrid: () => request<BookingGrid>("/api/public/booking-grid"),

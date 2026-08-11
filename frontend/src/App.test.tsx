@@ -157,6 +157,25 @@ describe("AppRoutes", () => {
     // then
     expect(screen.getByText("Courtside wird geladen …")).toBeInTheDocument();
   });
+
+  it("given an admin session, when opening facility management, then the protected admin view is available", () => {
+    // given
+    vi.spyOn(api, "adminCourts").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "adminOpeningHours").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "adminBookingCards").mockReturnValue(new Promise<never>(() => undefined));
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/facility"]}><AppRoutes session={{
+      authenticated: true,
+      username: "admin",
+      displayName: "Example Administrator",
+      roles: ["ADMIN"],
+      passwordChangeRequired: false
+    }} refreshSession={() => Promise.resolve()} /></MemoryRouter>);
+
+    // then
+    expect(screen.getByText("Courtside wird geladen …")).toBeInTheDocument();
+  });
 });
 
 describe("App build identity", () => {
