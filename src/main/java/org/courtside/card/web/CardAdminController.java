@@ -19,8 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -38,7 +43,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
     @Override
     public ResponseEntity<ApiBookingCard> createBookingCard(ApiBookingCardRequest request) {
         BookingCard card = cards.createCard(
-                request.getLabel(), request.getColor(), roleOrNone(request.getRequiredRole()),
+                request.getLabel(), request.getColor(), roles(request.getAllowedRoles()),
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed());
         return ResponseEntity
@@ -49,7 +54,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
     @Override
     public ResponseEntity<ApiBookingCard> changeBookingCard(UUID id, ApiBookingCardRequest request) {
         return ResponseEntity.ok(toResponse(cards.changeCard(
-                id, request.getLabel(), request.getColor(), roleOrNone(request.getRequiredRole()),
+                id, request.getLabel(), request.getColor(), roles(request.getAllowedRoles()),
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed())));
     }
@@ -115,26 +120,28 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
         return result;
     }
 
-    // Unreachable while requiredRole is an enum in the document; a name that got through would
-    // become a null requirement, which is a card open to everyone.
-    private static Role roleOrNone(ApiRole requiredRole) {
-        if (requiredRole == null) {
-            return null;
+    private static Set<Role> roles(Collection<ApiRole> allowedRoles) {
+        Set<Role> result = EnumSet.noneOf(Role.class);
+        for (ApiRole allowedRole : allowedRoles) {
+            result.add(Role.named(allowedRole.getValue()).orElseThrow(() -> new IllegalStateException(
+                    "Unvalidated role name reached the card boundary: " + allowedRole.getValue())));
         }
-        return Role.named(requiredRole.getValue()).orElseThrow(() -> new IllegalStateException(
-                "Unvalidated role name reached the card boundary: " + requiredRole.getValue()));
+        return result;
     }
 
-    private static ApiRole roleName(Role requiredRole) {
-        return requiredRole == null ? null : ApiRole.fromValue(requiredRole.name());
+    private static Set<ApiRole> roleNames(Set<Role> allowedRoles) {
+        return allowedRoles.stream()
+                .sorted(Comparator.comparingInt(Enum::ordinal))
+                .map(role -> ApiRole.fromValue(role.name()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private static ApiBookingCard toResponse(BookingCard card) {
         return new ApiBookingCard(
                 card.getId(), card.getLabel(), card.getColor(),
+                roleNames(card.getAllowedRoles()),
                 toPlayerCountList(card.getAllowedPlayerCounts()), card.tracksPlayers(),
-                card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isActive())
-                .requiredRole(roleName(card.getRequiredRole()));
+                card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isActive());
     }
 
     private static ApiParticipantCard toResponse(ParticipantCard card) {

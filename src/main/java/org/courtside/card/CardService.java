@@ -64,19 +64,19 @@ public class CardService {
     }
 
     @Transactional
-    public BookingCard createCard(String label, String color, Role requiredRole,
+    public BookingCard createCard(String label, String color, Set<Role> allowedRoles,
                                   short[] allowedPlayerCounts, boolean countsAgainstLimits,
                                   boolean guestAllowed) {
-        return saveOrRejectTakenLabel(new BookingCard(label, color, requiredRole,
+        return saveOrRejectTakenLabel(new BookingCard(label, color, allowedRoles,
                 allowedPlayerCounts, countsAgainstLimits, guestAllowed));
     }
 
     @Transactional
-    public BookingCard changeCard(UUID cardId, String label, String color, Role requiredRole,
+    public BookingCard changeCard(UUID cardId, String label, String color, Set<Role> allowedRoles,
                                   short[] allowedPlayerCounts, boolean countsAgainstLimits,
                                   boolean guestAllowed) {
         BookingCard card = requireCard(cardId);
-        card.changeTo(label, color, requiredRole,
+        card.changeTo(label, color, allowedRoles,
                 allowedPlayerCounts, countsAgainstLimits, guestAllowed);
         return saveOrRejectTakenLabel(card);
     }

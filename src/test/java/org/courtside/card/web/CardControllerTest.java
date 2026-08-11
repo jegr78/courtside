@@ -13,6 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.Set;
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -55,9 +57,9 @@ class CardControllerTest extends AbstractIntegrationTest {
     void givenAnActiveAndADeactivatedBookingCard_whenListingPublicly_thenOnlyTheActiveOneIsPresent()
             throws Exception {
         // given
-        BookingCard active = cards.createCard("Match play", "#3a4a5c", null,
+        BookingCard active = cards.createCard("Match play", "#3a4a5c", Set.of(),
                 new short[] {2, 4}, true, true);
-        BookingCard retired = cards.createCard("Retired card", "#c8a415", null,
+        BookingCard retired = cards.createCard("Retired card", "#c8a415", Set.of(),
                 new short[0], false, false);
         cards.setCardActive(retired.getId(), false);
 
@@ -72,9 +74,9 @@ class CardControllerTest extends AbstractIntegrationTest {
     void givenACardGatedBehindARoleTheCallerDoesNotHold_whenListingPublicly_thenItIsAbsent()
             throws Exception {
         // given
-        BookingCard gated = cards.createCard("Trainer session", "#3a4a5c", Role.TRAINER,
+        BookingCard gated = cards.createCard("Trainer session", "#3a4a5c", Set.of(Role.TRAINER),
                 new short[0], false, false);
-        BookingCard open = cards.createCard("Match play", "#3a4a5c", null,
+        BookingCard open = cards.createCard("Match play", "#3a4a5c", Set.of(),
                 new short[] {2, 4}, true, true);
 
         // when / then
@@ -88,7 +90,7 @@ class CardControllerTest extends AbstractIntegrationTest {
     void whenListingBookingCardsPublicly_thenOnlyMemberFacingFieldsAreExposed() throws Exception {
         // given
         BookingCard card = cards.createCard(
-                "Match play", "#3a4a5c", null, new short[] {2, 4}, true, true);
+                "Match play", "#3a4a5c", Set.of(), new short[] {2, 4}, true, true);
         String at = "$[?(@.id=='" + card.getId() + "')]";
 
         // when / then
@@ -99,7 +101,7 @@ class CardControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath(at + ".allowedPlayerCounts[0]").value(2))
                 .andExpect(jsonPath(at + ".allowedPlayerCounts[1]").value(4))
                 .andExpect(jsonPath(at + ".guestAllowed").value(true))
-                .andExpect(jsonPath(at + ".requiredRole").doesNotExist())
+                .andExpect(jsonPath(at + ".allowedRoles").doesNotExist())
                 .andExpect(jsonPath(at + ".active").doesNotExist())
                 .andExpect(jsonPath(at + ".tracksPlayers").doesNotExist())
                 .andExpect(jsonPath(at + ".countsAgainstLimits").doesNotExist());

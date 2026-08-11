@@ -333,15 +333,21 @@ CREATE TABLE booking_card (
     id                    uuid       PRIMARY KEY,
     label                 text       NOT NULL,   -- "League match", "Court closed"
     color                 text       NOT NULL,   -- rendering in the grid
-    required_role         text,                  -- who may place this card
     allowed_player_counts smallint[] NOT NULL,   -- see "Player slots" below
     counts_against_limits boolean    NOT NULL,   -- counts towards member quota?
     guest_allowed         boolean    NOT NULL,
     active                boolean    NOT NULL DEFAULT true
 );
+
+CREATE TABLE booking_card_allowed_role (
+    booking_card_id uuid NOT NULL REFERENCES booking_card ON DELETE CASCADE,
+    role            text NOT NULL,
+    PRIMARY KEY (booking_card_id, role)
+);
 ```
 
-A new card type is a row in the admin backend, not a deployment.
+A new card type is a row in the admin backend, not a deployment. A card with no allowed roles
+is available to every authenticated account; otherwise holding any listed role is sufficient.
 
 ### Two kinds of card, often conflated into one
 
@@ -484,7 +490,7 @@ Adding a rule type = one validator class + one configuration row.
 Rules split along a line that matters more than it first appears:
 
 **Overridable rules restrict who may book.** Advance window, maximum open bookings, and the
-role a booking card requires are all statements about a person's entitlement. `ADMIN` sets
+roles a booking card allows are all statements about a person's entitlement. `ADMIN` sets
 them aside — no flag, no per-request opt-in, the role itself is the override. An admin
 placing a training block six weeks out is doing their job, not circumventing anything.
 
@@ -622,7 +628,7 @@ Two safeguards:
 `POST /api/booking-series/preview` lists every occurrence the rule produces up to the
 horizon, together with the court ids already occupied on that date, if any. Nothing is
 written; a preview is open to any authenticated user, including one who could not actually
-create the card in question — the card's role requirement is enforced by `BookingWriter` at
+create the card in question — the card's allowed roles are enforced by `BookingWriter` at
 creation time, exactly as it is for a single booking.
 
 ```
@@ -841,6 +847,8 @@ whether it is built or designed. **Designed means absent today.**
 | Guest (not logged in) | Read the grid, occupancy anonymised as "occupied" |
 | Member | Own bookings, own data |
 | Trainer | Place training blocks via special cards |
+| Sport director | Place training, league match and configured event blocks |
+| Youth director | Place training, league match and configured event blocks |
 | Groundskeeper | Close courts |
 | Treasurer | Financial reports and exports — **no** passwords, no access rights |
 | Admin | Master data, user accounts, configuration |
@@ -849,8 +857,8 @@ The treasurer role exists in Release 1 but has limited scope until the billing p
 lands: reports and exports only. Defining it now avoids reshuffling the permission model
 later.
 
-Roles are permission *bundles*, not a rigid enum: in a club, one person often wears several
-hats.
+Roles are independent permission bundles rather than a hierarchy: in a club, one person often
+wears several hats.
 
 ### Name visibility in the grid
 

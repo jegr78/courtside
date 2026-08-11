@@ -15,7 +15,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 
-const roles: Role[] = ["MEMBER", "TRAINER", "GROUNDSKEEPER", "TREASURER", "ADMIN"];
+const roles: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER"];
 
 export function AdminFacilityView() {
   const { t } = useTranslation();
@@ -183,7 +183,7 @@ export function AdminFacilityView() {
       const created = await api.createAdminBookingCard({
         label: formString(form, "label"),
         color: formString(form, "color"),
-        requiredRole: roleValue(form.get("requiredRole")),
+        allowedRoles: form.getAll("allowedRoles") as Role[],
         allowedPlayerCounts: playerCounts(formString(form, "allowedPlayerCounts")),
         countsAgainstLimits: form.get("countsAgainstLimits") === "on",
         guestAllowed: form.get("guestAllowed") === "on"
@@ -264,7 +264,7 @@ function CardEditor({ card, disabled, changed, save, toggle }: { card: BookingCa
     <div className="grid gap-3 md:grid-cols-3">
       <TextField disabled={disabled} data-testid={`card-label-${card.id}`} label={t("admin.facility.label")} value={card.label} onChange={(event) => changed({ ...card, label: event.target.value })} />
       <TextField disabled={disabled} type="color" label={t("admin.facility.color")} value={card.color} onChange={(event) => changed({ ...card, color: event.target.value })} />
-      <RoleSelect disabled={disabled} value={card.requiredRole ?? ""} changed={(requiredRole) => changed({ ...card, requiredRole })} />
+      <RoleCheckboxes disabled={disabled} selected={card.allowedRoles} changed={(allowedRoles) => changed({ ...card, allowedRoles })} />
       <TextField disabled={disabled} data-testid={`card-counts-${card.id}`} label={t("admin.facility.playerCounts")} value={counts} onChange={(event) => setCounts(event.target.value)} />
       <Checkbox disabled={disabled} label={t("admin.facility.countsAgainstLimits")} checked={card.countsAgainstLimits} changed={(countsAgainstLimits) => changed({ ...card, countsAgainstLimits })} />
       <Checkbox disabled={disabled} label={t("admin.facility.guestAllowed")} checked={card.guestAllowed} changed={(guestAllowed) => changed({ ...card, guestAllowed })} />
@@ -283,7 +283,7 @@ function CardCreateForm({ disabled, create }: { disabled: boolean; create: (even
     <div className="grid gap-3 md:grid-cols-3">
       <TextField disabled={disabled} data-testid="new-card-label" name="label" label={t("admin.facility.label")} />
       <TextField disabled={disabled} name="color" type="color" defaultValue="#b85c38" label={t("admin.facility.color")} />
-      <RoleSelect disabled={disabled} name="requiredRole" value={undefined} />
+      <RoleCheckboxes disabled={disabled} name="allowedRoles" selected={[]} />
       <TextField disabled={disabled} name="allowedPlayerCounts" label={t("admin.facility.playerCounts")} />
       <Checkbox disabled={disabled} name="countsAgainstLimits" label={t("admin.facility.countsAgainstLimits")} />
       <Checkbox disabled={disabled} name="guestAllowed" label={t("admin.facility.guestAllowed")} />
@@ -292,23 +292,27 @@ function CardCreateForm({ disabled, create }: { disabled: boolean; create: (even
   </form>;
 }
 
-function RoleSelect({ name, value, disabled, changed }: { name?: string; value?: Role | ""; disabled?: boolean; changed?: (role: Role | null) => void }) {
+function RoleCheckboxes({ name, selected, disabled, changed }: { name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void }) {
   const { t } = useTranslation();
-  return <label className="grid gap-2 font-medium">{t("admin.facility.requiredRole")}
-    <select name={name} disabled={disabled} aria-label={t("admin.facility.requiredRole")} className="form-control rounded-lg border px-3 py-3" value={value} onChange={changed ? (event) => changed(roleValue(event.target.value)) : undefined}>
-      <option value="">{t("admin.facility.everyone")}</option>
-      {roles.map((role) => <option key={role} value={role}>{t(`role.${role}`)}</option>)}
-    </select>
-  </label>;
+  function toggle(role: Role, checked: boolean) {
+    changed?.(checked ? [...selected, role] : selected.filter((candidate) => candidate !== role));
+  }
+  return <fieldset className="grid gap-2">
+    <legend className="font-medium">{t("admin.facility.allowedRoles")}</legend>
+    <div className="grid gap-2 sm:grid-cols-2">
+      {roles.map((role) => <Checkbox key={role} name={name} disabled={disabled} label={t(`role.${role}`)} checked={selected.includes(role)} value={role} changed={changed ? (checked) => toggle(role, checked) : undefined} />)}
+    </div>
+    <p className="text-sm text-[var(--cs-muted)]">{t("admin.facility.allowedRolesHint")}</p>
+  </fieldset>;
 }
 
-function Checkbox({ name, label, checked, disabled, changed }: { name?: string; label: string; checked?: boolean; disabled?: boolean; changed?: (checked: boolean) => void }) {
-  return <label className="flex items-center gap-3 font-medium"><input name={name} disabled={disabled} type="checkbox" checked={changed ? checked : undefined} onChange={changed ? (event) => changed(event.target.checked) : undefined} />{label}</label>;
+function Checkbox({ name, label, checked, disabled, value, changed }: { name?: string; label: string; checked?: boolean; disabled?: boolean; value?: string; changed?: (checked: boolean) => void }) {
+  return <label className="flex items-center gap-3 font-medium"><input name={name} disabled={disabled} type="checkbox" value={value} checked={changed ? checked : undefined} onChange={changed ? (event) => changed(event.target.checked) : undefined} />{label}</label>;
 }
 
 function cardRequest(card: BookingCard): BookingCardRequest {
   return {
-    label: card.label, color: card.color, requiredRole: card.requiredRole,
+    label: card.label, color: card.color, allowedRoles: card.allowedRoles,
     allowedPlayerCounts: card.allowedPlayerCounts,
     countsAgainstLimits: card.countsAgainstLimits, guestAllowed: card.guestAllowed
   };
@@ -316,10 +320,6 @@ function cardRequest(card: BookingCard): BookingCardRequest {
 
 function playerCounts(value: string): number[] {
   return value.split(",").map((count) => count.trim()).filter(Boolean).map(Number);
-}
-
-function roleValue(value: FormDataEntryValue | string | null): Role | null {
-  return value ? value as Role : null;
 }
 
 function shortTime(value: string | null | undefined): string {

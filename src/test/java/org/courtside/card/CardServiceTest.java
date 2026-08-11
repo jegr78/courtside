@@ -46,13 +46,26 @@ class CardServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenACallerHoldingSeveralRoles_whenListingBookableCards_thenACardGatedBehindAnyHeldRoleIsPresent() {
+    void givenDirectors_whenListingBookableCards_thenCardsGatedBehindAnyHeldRoleArePresent() {
         // when
-        List<BookingCard> result = cardService.bookableCards(Set.of(Role.MEMBER, Role.TRAINER));
+        List<BookingCard> sport = cardService.bookableCards(Set.of(Role.SPORT_DIRECTOR));
+        List<BookingCard> youth = cardService.bookableCards(Set.of(Role.YOUTH_DIRECTOR));
+
+        // then
+        assertThat(sport).extracting(BookingCard::getLabel)
+                .containsExactlyInAnyOrder("Member booking", "Training", "League match");
+        assertThat(youth).extracting(BookingCard::getLabel)
+                .containsExactlyInAnyOrder("Member booking", "Training", "League match");
+    }
+
+    @Test
+    void givenAnOrdinaryMember_whenListingBookableCards_thenOrganizationalCardsAreAbsent() {
+        // when
+        List<BookingCard> result = cardService.bookableCards(Set.of(Role.MEMBER));
 
         // then
         assertThat(result).extracting(BookingCard::getLabel)
-                .containsExactlyInAnyOrder("Member booking", "Training", "League match");
+                .containsExactly("Member booking");
     }
 
     @Test
