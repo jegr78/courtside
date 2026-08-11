@@ -1,11 +1,15 @@
 package org.courtside.rules.internal;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class RuleParameters {
 
     private record Bounds(int min, int max) {
+    }
+
+    public record Parameter(String name, int minimum, int maximum) {
     }
 
     private static final Map<RuleType, Map<String, Bounds>> CONTRACT = Map.of(
@@ -17,6 +21,12 @@ public final class RuleParameters {
 
     public static boolean isConfigurablePerRuleSet(RuleType type) {
         return CONTRACT.containsKey(type);
+    }
+
+    public static List<Parameter> parametersOf(RuleType type) {
+        return CONTRACT.getOrDefault(type, Map.of()).entrySet().stream()
+                .map(entry -> new Parameter(entry.getKey(), entry.getValue().min(), entry.getValue().max()))
+                .toList();
     }
 
     public static Map<String, Integer> validated(RuleType type, Map<String, Integer> params) {

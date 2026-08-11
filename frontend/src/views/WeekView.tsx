@@ -345,7 +345,7 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
   const [memberMatches, setMemberMatches] = useState<PublicParticipantMember[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<PublicParticipantMember[]>([]);
   const [note, setNote] = useState("");
-  const [violations, setViolations] = useState<Array<{ field: string; message: string }>>([]);
+  const [violations, setViolations] = useState<Array<{ field: string; code: string; message: string }>>([]);
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
@@ -504,21 +504,23 @@ function CancellationDialog({ allocation, closed, cancelled }: { allocation: All
   </Modal>;
 }
 
-function FieldViolations({ id, violations }: { id: string; violations: Array<{ field: string; message: string }> }) {
+function FieldViolations({ id, violations }: { id: string; violations: Array<{ field: string; code: string; message: string }> }) {
   if (violations.length === 0) return null;
   return <div id={id} className="mt-2 grid gap-1">
-    {violations.map((violation, index) => <p key={`${violation.field}-${index}`} data-field={violation.field} className="text-sm text-red-800">{violation.message}</p>)}
+    {violations.map((violation, index) => <p key={`${violation.field}-${index}`} data-field={violation.field} data-code={violation.code} className="text-sm text-red-800">{violation.message}</p>)}
   </div>;
 }
 
-function translatedViolations(problem: Problem, t: ReturnType<typeof useTranslation>["t"]): Array<{ field: string; message: string }> {
+function translatedViolations(problem: Problem, t: ReturnType<typeof useTranslation>["t"]): Array<{ field: string; code: string; message: string }> {
   return [
     ...(problem.violations ?? []).map((violation) => ({
       field: violationField(violation.code),
+      code: violation.code,
       message: t(violation.code, { ...violation.params, defaultValue: t("error.generic") })
     })),
     ...(problem.fieldErrors ?? []).map((violation) => ({
       field: normalizedField(violation.field),
+      code: violation.code,
       message: t(violation.code, { ...violation.params, defaultValue: t("error.generic") })
     }))
   ];

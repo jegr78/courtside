@@ -138,6 +138,25 @@ describe("AppRoutes", () => {
     // then
     expect(await screen.findByTestId("sign-in-link")).toHaveAttribute("href", "/login");
   });
+
+  it("given an admin session, when opening configuration, then the protected admin view is available", () => {
+    // given
+    vi.spyOn(api, "adminConfig").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "ruleSets").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "ruleTypes").mockReturnValue(new Promise<never>(() => undefined));
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/configuration"]}><AppRoutes session={{
+      authenticated: true,
+      username: "admin",
+      displayName: "Example Administrator",
+      roles: ["ADMIN"],
+      passwordChangeRequired: false
+    }} refreshSession={() => Promise.resolve()} /></MemoryRouter>);
+
+    // then
+    expect(screen.getByText("Courtside wird geladen …")).toBeInTheDocument();
+  });
 });
 
 describe("App build identity", () => {

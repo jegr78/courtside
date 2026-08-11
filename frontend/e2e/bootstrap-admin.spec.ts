@@ -119,3 +119,38 @@ test("a seeded member can book a free slot and cancel it again", async ({ page }
   // then
   await expect(personalBooking).not.toBeVisible();
 });
+
+test("an admin changes club configuration and a booking rule through the browser", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("admin-configuration-link").click();
+  await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
+
+  // when
+  await page.getByTestId("club-name").fill("Example Racquet Club");
+  await page.getByTestId("save-club-config").click();
+  await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");
+  await page.getByTestId("save-rule-ADVANCE_WINDOW").click();
+
+  // then
+  await expect(page.getByTestId("admin-save-success")).toBeVisible();
+  await expect(page.getByText("Example Racquet Club")).toBeVisible();
+
+  // when
+  await page.goto("/");
+  await page.getByTestId("logout").click();
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("week-next").click();
+  await page.getByTestId("free-slot").first().click();
+  await page.getByTestId("member-search").fill("Mary");
+  await page.getByTestId("member-match").click();
+  await page.getByTestId("booking-submit").click();
+
+  // then
+  await expect(page.locator('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeVisible();
+});

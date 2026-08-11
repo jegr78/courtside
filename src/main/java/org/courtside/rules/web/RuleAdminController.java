@@ -1,14 +1,18 @@
 package org.courtside.rules.web;
 
 import org.courtside.api.AdminRuleSetsApi;
+import org.courtside.api.AdminRuleTypesApi;
 import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiRuleDefinition;
 import org.courtside.api.ApiRuleSet;
 import org.courtside.api.ApiRuleSetRequest;
+import org.courtside.api.ApiRuleParameter;
 import org.courtside.api.ApiRuleType;
+import org.courtside.api.ApiRuleTypeConfiguration;
 import org.courtside.api.ApiSetRuleRequest;
 import org.courtside.rules.internal.RuleAdminService;
 import org.courtside.rules.internal.RuleDefinition;
+import org.courtside.rules.internal.RuleParameters;
 import org.courtside.rules.internal.RuleSet;
 import org.courtside.rules.internal.RuleType;
 import lombok.RequiredArgsConstructor;
@@ -16,12 +20,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-class RuleAdminController implements AdminRuleSetsApi {
+class RuleAdminController implements AdminRuleSetsApi, AdminRuleTypesApi {
 
     private final RuleAdminService ruleSets;
 
@@ -59,6 +64,19 @@ class RuleAdminController implements AdminRuleSetsApi {
     public ResponseEntity<List<ApiRuleDefinition>> listRules(UUID id) {
         return ResponseEntity.ok(ruleSets.rulesOf(id).stream()
                 .map(RuleAdminController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<List<ApiRuleTypeConfiguration>> listRuleTypes() {
+        return ResponseEntity.ok(Arrays.stream(RuleType.values())
+                .map(type -> new ApiRuleTypeConfiguration(
+                        ApiRuleType.fromValue(type.name()),
+                        RuleParameters.isConfigurablePerRuleSet(type),
+                        RuleParameters.parametersOf(type).stream()
+                                .map(parameter -> new ApiRuleParameter(
+                                        parameter.name(), parameter.minimum(), parameter.maximum()))
+                                .toList()))
                 .toList());
     }
 
