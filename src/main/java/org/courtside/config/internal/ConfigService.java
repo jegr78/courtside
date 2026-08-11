@@ -18,7 +18,11 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     private final ClubConfigurationRepository configurations;
     private final List<BookingGridConstraint> bookingGridConstraints;
 
-    public ClubConfiguration current() {
+    public ClubConfigurationSnapshot current() {
+        return ClubConfigurationSnapshot.from(currentEntity());
+    }
+
+    private ClubConfiguration currentEntity() {
         return configurations.findById(ClubConfiguration.SINGLETON_ID)
                 .orElseThrow(() -> new IllegalStateException(
                         "The club configuration row is missing"));
@@ -26,7 +30,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
 
     @Override
     public BookingSlotDuration slotDuration() {
-        return new BookingSlotDuration(current().getSlotMinutes());
+        return new BookingSlotDuration(current().slotMinutes());
     }
 
     @Override
@@ -37,12 +41,12 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     }
 
     @Transactional
-    public ClubConfiguration update(String clubName, String primaryColor, String accentColor,
-                                    String logoUrl, String imprintUrl, String defaultLocale,
-                                    int slotMinutes) {
+    public ClubConfigurationSnapshot update(String clubName, String primaryColor, String accentColor,
+                                            String logoUrl, String imprintUrl, String defaultLocale,
+                                            int slotMinutes) {
         BookingSlotDuration slotDuration = new BookingSlotDuration(slotMinutes);
         lock();
-        ClubConfiguration configuration = current();
+        ClubConfiguration configuration = currentEntity();
         if (configuration.getSlotMinutes() != slotMinutes) {
             bookingGridConstraints.stream()
                     .map(constraint -> constraint.conflictCode(slotDuration))
@@ -54,6 +58,6 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         }
         configuration.changeTo(clubName, primaryColor, accentColor,
                 logoUrl, imprintUrl, defaultLocale, slotMinutes);
-        return configuration;
+        return ClubConfigurationSnapshot.from(configuration);
     }
 }
