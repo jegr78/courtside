@@ -7,7 +7,7 @@ import org.courtside.api.ClubConfigApi;
 import org.courtside.api.ManifestApi;
 import org.courtside.api.ApiWebManifest;
 import org.courtside.api.ApiWebManifestIcon;
-import org.courtside.config.internal.ClubConfiguration;
+import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -47,24 +47,24 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
 
     @Override
     public ResponseEntity<ApiWebManifest> getWebManifest() {
-        ClubConfiguration configuration = config.current();
-        ApiWebManifestIcon icon = configuration.getLogoUrl() == null
+        ClubConfigurationSnapshot configuration = config.current();
+        ApiWebManifestIcon icon = configuration.logoUrl() == null
                 ? new ApiWebManifestIcon("/icon.svg", "any").type("image/svg+xml")
-                : new ApiWebManifestIcon(configuration.getLogoUrl(), "any");
+                : new ApiWebManifestIcon(configuration.logoUrl(), "any");
         ApiWebManifest manifest = new ApiWebManifest(
-                configuration.getClubName(), configuration.getClubName(), "/",
+                configuration.clubName(), configuration.clubName(), "/",
                 ApiWebManifest.DisplayEnum.STANDALONE,
-                configuration.getAccentColor(), configuration.getPrimaryColor(),
+                configuration.accentColor(), configuration.primaryColor(),
                 java.util.List.of(icon));
         return ResponseEntity.ok(manifest);
     }
 
-    private static ApiClubConfig toResponse(ClubConfiguration configuration) {
+    private static ApiClubConfig toResponse(ClubConfigurationSnapshot configuration) {
         return new ApiClubConfig(
-                configuration.getClubName(), configuration.getPrimaryColor(),
-                configuration.getAccentColor(), configuration.getDefaultLocale(),
-                configuration.getSlotMinutes())
-                .logoUrl(configuration.getLogoUrl())
-                .imprintUrl(configuration.getImprintUrl());
+                configuration.clubName(), configuration.primaryColor(),
+                configuration.accentColor(), configuration.defaultLocale(),
+                configuration.slotMinutes())
+                .logoUrl(configuration.logoUrl())
+                .imprintUrl(configuration.imprintUrl());
     }
 }
