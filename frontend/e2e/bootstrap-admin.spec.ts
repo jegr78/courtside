@@ -171,7 +171,7 @@ test("an admin changes club configuration and a booking rule through the browser
 
   // then
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
-  await expect(page.getByText("Example Racquet Club")).toBeVisible();
+  await expect(page.getByTestId("club-brand-name")).toHaveText("Example Racquet Club");
 
   // when
   await page.goto("/");

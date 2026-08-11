@@ -201,7 +201,7 @@ export function AdminFacilityView() {
   }
 
   if (error && (!courts || !hours || !cards)) return <Alert>{error}</Alert>;
-  if (!courts || !hours || !cards) return <p aria-live="polite">{t("status.loading")}</p>;
+  if (!courts || !hours || !cards) return <p role="status">{t("status.loading")}</p>;
 
   return <section data-testid="admin-facility-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -237,7 +237,7 @@ function CourtEditor({ court, disabled, changed, save, toggle }: { court: AdminC
   const { t } = useTranslation();
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto_auto] sm:items-end">
     <TextField disabled={disabled} type="number" label={t("admin.facility.number")} value={court.number} onChange={(event) => changed({ ...court, number: Number(event.target.value) })} />
-    <TextField disabled={disabled} label={t("admin.facility.name")} value={court.name ?? ""} onChange={(event) => changed({ ...court, name: event.target.value || null })} />
+    <TextField disabled={disabled} data-testid={`court-name-${court.id}`} label={t("admin.facility.name")} value={court.name ?? ""} onChange={(event) => changed({ ...court, name: event.target.value || null })} />
     <Button disabled={disabled} type="button" onClick={() => void save(court)}>{t("admin.save")}</Button>
     <Button disabled={disabled} data-testid={`toggle-court-${court.id}`} type="button" onClick={() => void toggle(court)}>{t(court.active ? "admin.deactivate" : "admin.activate")}</Button>
   </article>;
@@ -304,7 +304,7 @@ function RoleCheckboxes({ name, selected, disabled, changed, testIdPrefix }: { n
     <div className="grid gap-2 sm:grid-cols-2">
       {roles.map((role) => <Checkbox key={role} data-testid={testIdPrefix ? `${testIdPrefix}-${role}` : undefined} name={name} disabled={disabled} label={t(`role.${role}`)} checked={selected.includes(role)} value={role} changed={changed ? (checked) => toggle(role, checked) : undefined} />)}
     </div>
-    <p className="text-sm text-[var(--cs-muted)]">{t("admin.facility.allowedRolesHint")}</p>
+    <p data-testid="allowed-roles-hint" className="text-sm text-[var(--cs-muted)]">{t("admin.facility.allowedRolesHint")}</p>
   </fieldset>;
 }
 

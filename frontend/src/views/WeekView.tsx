@@ -289,7 +289,7 @@ function renderCell(
         onClick={() => cancel(allocation)}
         className={className}
         style={style}
-      >{label}</button> : <div data-card-color={allocation.cardColor} data-state={state} className={className} style={style}>{label}</div>}
+      >{label}</button> : <div data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}>{label}</div>}
     </td>;
   }
   const minute = timeToMinutes(slot);
@@ -308,7 +308,7 @@ function renderCell(
       onClick={book}
     >
       {isPast ? t("week.past") : t("week.available")}
-    </button> : <div data-state={isPast ? "past" : "free"} className="day-plan-slot flex h-full w-full items-center justify-center rounded-md px-2 text-sm">
+    </button> : <div data-testid="free-slot" data-state={isPast ? "past" : "free"} className="day-plan-slot flex h-full w-full items-center justify-center rounded-md px-2 text-sm">
       {isPast ? t("week.past") : t("week.available")}
     </div>;
   return <td key={court.id} className={`${cellClass} p-1`}>

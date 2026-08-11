@@ -100,6 +100,10 @@ fails on the missing `BuildProperties` bean.
 * **Sequence:** unit tests → implementation → integration tests → E2E.
 * **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. One full `./mvnw clean verify`
   before any commit that closes a task.
+* **UI test selectors are semantic and language-neutral.** Locate elements by accessible role or a
+  stable ID/test ID. Never use rendered labels, translated text, placeholders, displayed values,
+  titles or alt text as selectors. Text assertions remain valid only after the element has already
+  been selected by role or ID. `ui-selector-policy.test.mjs` enforces this for component and E2E tests.
 * **Never assert only a status code where the database could produce the same one.** A CHECK, a
   unique index or a foreign key answers 400 or 409 just as the application's own validation does,
   so a status-only assertion cannot tell the intended path from the constraint that happens to

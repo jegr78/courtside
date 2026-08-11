@@ -145,7 +145,7 @@ export function App() {
     <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
       <div className="flex items-center gap-3">
         {config?.logoUrl ? <img src={config.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
-        <span className="text-xl font-bold">{config?.clubName ?? t("app.name")}</span>
+        <span data-testid="club-brand-name" className="text-xl font-bold">{config?.clubName ?? t("app.name")}</span>
       </div>
       <Preferences />
     </header>
@@ -153,7 +153,7 @@ export function App() {
     <main className="flex flex-1 items-center justify-center px-4 py-8">
       {offline ? <Alert>{t("status.offline")}</Alert> : session
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} configurationChanged={configurationChanged} />
-        : <p aria-live="polite">{t("status.loading")}</p>}
+        : <p role="status">{t("status.loading")}</p>}
     </main>
     <footer className="text-muted flex justify-center gap-5 px-5 py-4 text-sm">
       <BuildIdentity source={source} />

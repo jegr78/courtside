@@ -21,7 +21,7 @@ test("sport and youth directors find the same managed league match", async ({ pa
     });
     await expect(leagueMatch).toBeVisible();
     await leagueMatch.getByRole("button", { name: "Details" }).click();
-    await expect(page.getByRole("dialog")).toContainText("Prepare score sheets");
+    await expect(page.getByTestId("managed-note")).toContainText("Prepare score sheets");
     await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
     await page.getByTestId("logout").click();
   }
@@ -30,7 +30,8 @@ test("sport and youth directors find the same managed league match", async ({ pa
 test("an authorized officer cancels a managed appointment through the browser", async ({ page }) => {
   // given
   await signIn(page, "sport.major");
-  const cancel = page.locator('[data-testid="managed-cancel"][data-booking-id="70000000-0000-0000-0000-000000000006"]');
+  const bookingId = "70000000-0000-0000-0000-000000000006";
+  const cancel = page.locator(`[data-testid="managed-cancel"][data-booking-id="${bookingId}"]`);
 
   // when
   await cancel.click();
@@ -38,7 +39,7 @@ test("an authorized officer cancels a managed appointment through the browser", 
 
   // then
   await expect(cancel).not.toBeVisible();
-  await expect(page.getByText("Cancelled", { exact: true })).toBeVisible();
+  await expect(page.getByTestId(`booking-${bookingId}`)).toHaveAttribute("data-status", "CANCELLED");
 });
 
 test("an ordinary member has no managed-appointments area", async ({ page }) => {

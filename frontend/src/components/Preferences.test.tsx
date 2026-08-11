@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it } from "vitest";
 import i18n, { applyAccountLocale, initialLocale } from "../i18n";
@@ -23,7 +23,7 @@ it("whenNoThemeWasSelected_thenDarkModeIsTheDefault", () => {
 
   // then
   expect(document.documentElement).toHaveClass("dark");
-  expect(screen.getByLabelText("Darstellung")).toHaveValue("dark");
+  expect(document.getElementById("theme-preference")).toHaveValue("dark");
 });
 
 it("givenDarkMode_whenSelectingLightMode_thenThePreferenceIsAppliedAndStored", async () => {
@@ -31,7 +31,7 @@ it("givenDarkMode_whenSelectingLightMode_thenThePreferenceIsAppliedAndStored", a
   render(<Preferences />);
 
   // when
-  await userEvent.selectOptions(screen.getByLabelText("Darstellung"), "light");
+  await userEvent.selectOptions(document.getElementById("theme-preference")!, "light");
 
   // then
   expect(document.documentElement).not.toHaveClass("dark");
@@ -45,11 +45,11 @@ it("givenGerman_whenSelectingEnglish_thenTheWholeInterfaceUsesAndStoresEnglish",
   render(<Preferences />);
 
   // when
-  await userEvent.selectOptions(screen.getByLabelText("Sprache"), "en");
+  await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
 
   // then
   expect(document.documentElement).toHaveAttribute("lang", "en");
-  expect(screen.getByLabelText("Language")).toHaveValue("en");
+  expect(document.getElementById("locale-preference")).toHaveValue("en");
   expect(window.localStorage.getItem("courtside.locale")).toBe("en");
 });
 

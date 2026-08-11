@@ -115,8 +115,8 @@ function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, 
     <h3 className="text-xl font-semibold">{title}</h3>
     {groups.length === 0 ? <p className="text-muted mt-3">{empty}</p> : <div className="mt-3 grid gap-4">{groups.map((group) =>
       <article key={group.key} className="border-structural rounded-xl border p-4">
-        {group.series && <p className="mb-2 font-semibold text-(--club-primary)">{t("myBookings.series")}</p>}
-        <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} className="border-structural grid gap-1 border-b pb-3 last:border-0 last:pb-0">
+        {group.series && <p data-testid="series-marker" className="mb-2 font-semibold text-(--club-primary)">{t("myBookings.series")}</p>}
+        <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} data-testid={`booking-${booking.id}`} data-status={booking.status} className="border-structural grid gap-1 border-b pb-3 last:border-0 last:pb-0">
           <span className="font-semibold">{booking.cardLabel}</span>
           <time dateTime={booking.startsAt}>{formatDateTime(booking.startsAt, locale, timeZone)}</time>
           <span>{booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
@@ -146,7 +146,7 @@ function groupBookings(bookings: Appointment[]) {
 function ScopeFields({ scope, changed, t }: { scope: CancelScope; changed: (scope: CancelScope) => void; t: Translate }) {
   return <fieldset className="grid gap-2"><legend className="font-semibold">{t("myBookings.scope")}</legend>
     {(["THIS", "THIS_AND_FOLLOWING", "WHOLE_SERIES"] as CancelScope[]).map((value) => <label key={value} className="flex gap-2">
-      <input type="radio" name="scope" checked={scope === value} onChange={() => changed(value)} />{t(`myBookings.scope.${value}`)}
+      <input data-testid={`scope-${value}`} type="radio" name="scope" checked={scope === value} onChange={() => changed(value)} />{t(`myBookings.scope.${value}`)}
     </label>)}
   </fieldset>;
 }
@@ -170,7 +170,7 @@ function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, clos
     {booking.seriesId && <ScopeFields scope={scope} changed={setScope} t={t} />}
     <p className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
     <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatDateTime(candidate.startsAt, i18n.language, timeZone)}</li>)}</ul>
-    {hasMoreBookings && scope !== "THIS" && <p>{t("myBookings.affectedIncomplete")}</p>}
+    {hasMoreBookings && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
     {error && <Alert>{error}</Alert>}
     <div className="flex gap-2"><Button data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
@@ -202,11 +202,11 @@ function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking:
   return <Modal labelledBy="move-personal-title" closed={closed}><div className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
     <h2 id="move-personal-title" className="text-xl font-bold">{t("myBookings.moveTitle")}</h2>
     <ScopeFields scope={scope} changed={(value) => { setScope(value); setPreview(undefined); }} t={t} />
-    <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<input type="time" value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
+    <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<input data-testid="move-start-time" type="time" value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
     <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input type="number" min="1" value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
     <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
     {error && <Alert>{error}</Alert>}
-    {preview && <div><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatDateTime(move.fromStartsAt, i18n.language, timeZone)} → {formatDateTime(move.toStartsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
+    {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatDateTime(move.fromStartsAt, i18n.language, timeZone)} → {formatDateTime(move.toStartsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
     <div className="flex gap-2">{preview ? <Button disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
@@ -229,9 +229,9 @@ function ManagedAppointmentDialog({ bookingId, closed }: { bookingId: string; cl
     {error && <Alert>{error}</Alert>}
     {!detail && !error && <p aria-live="polite">{t("status.loading")}</p>}
     {detail && <>
-      <p className="font-semibold">{detail.cardLabel}</p>
-      <section><h3 className="font-semibold">{t("managedAppointments.note")}</h3><p>{detail.note || t("managedAppointments.noNote")}</p></section>
-      <section><h3 className="font-semibold">{t("managedAppointments.participantDetails")}</h3>
+      <p data-testid="managed-card-label" className="font-semibold">{detail.cardLabel}</p>
+      <section data-testid="managed-note"><h3 className="font-semibold">{t("managedAppointments.note")}</h3><p>{detail.note || t("managedAppointments.noNote")}</p></section>
+      <section data-testid="managed-participants"><h3 className="font-semibold">{t("managedAppointments.participantDetails")}</h3>
         {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`}>{participant.displayName} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
       </section>
     </>}
@@ -242,9 +242,9 @@ function ManagedAppointmentDialog({ bookingId, closed }: { bookingId: string; cl
 function MoveReasons({ move, courtNames, t }: { move: MovePreview["moves"][number]; courtNames: Map<string, string>; t: Translate }) {
   const names = (ids: string[]) => ids.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ");
   return <ul className="list-disc pl-5">
-    {move.violations.map((violation) => <li key={`${move.bookingId}-${violation.code}`}>{t(violation.code, { ...violation.params, defaultValue: t("error.generic") })}</li>)}
-    {move.blockedCourtIds.length > 0 && <li>{t("myBookings.occupiedCourts", { courts: names(move.blockedCourtIds) })}</li>}
-    {move.unbookableCourtIds.length > 0 && <li>{t("myBookings.unavailableCourts", { courts: names(move.unbookableCourtIds) })}</li>}
+    {move.violations.map((violation) => <li data-code={violation.code} key={`${move.bookingId}-${violation.code}`}>{t(violation.code, { ...violation.params, defaultValue: t("error.generic") })}</li>)}
+    {move.blockedCourtIds.length > 0 && <li data-testid="occupied-courts">{t("myBookings.occupiedCourts", { courts: names(move.blockedCourtIds) })}</li>}
+    {move.unbookableCourtIds.length > 0 && <li data-testid="unavailable-courts">{t("myBookings.unavailableCourts", { courts: names(move.unbookableCourtIds) })}</li>}
   </ul>;
 }
 

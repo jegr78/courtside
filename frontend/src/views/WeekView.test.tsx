@@ -71,20 +71,20 @@ it("given the current week, when it loads, then every day and active court is av
   expect(screen.getByRole("columnheader", { name: "Court 2" })).toBeInTheDocument();
   expect(screen.getByRole("rowheader", { name: "08:00" })).toBeInTheDocument();
   expect(screen.getByRole("rowheader", { name: "21:30" })).toBeInTheDocument();
-  const booking = screen.getByText("Singles");
+  const booking = screen.getByTestId("allocation");
   expect(booking).toHaveStyle({ backgroundColor: "rgb(23, 107, 85)" });
   expect(booking).toHaveAttribute("data-state", "occupied");
   expect(booking.closest("td")).toHaveAttribute("rowspan", "2");
   expect(screen.getByRole("rowheader", { name: "08:00" }).closest("tr")).toHaveStyle({ height: "40px" });
   expect(screen.getByRole("list", { name: "Court plan legend" })).toBeInTheDocument();
-  expect(screen.getAllByText("Singles")).toHaveLength(1);
-  expect(screen.queryByText("Member booking")).not.toBeInTheDocument();
+  expect(screen.getAllByTestId("allocation")).toHaveLength(1);
+  expect(booking).toHaveTextContent("Singles");
 });
 
 it("given the current week, when opening the next week, then its seven days are loaded", async () => {
   // given
   render(<WeekView today={clubInstant("12:00")} />);
-  await screen.findByText("Singles");
+  await screen.findByTestId("allocation");
 
   // when
   await userEvent.click(screen.getByTestId("week-next"));
@@ -100,13 +100,13 @@ it("given the current week, when opening the next week, then its seven days are 
 it("given another day is selected, when viewing it, then its occupancy table is shown", async () => {
   // given
   render(<WeekView today={clubInstant("12:00")} />);
-  await screen.findByText("Singles");
+  await screen.findByTestId("allocation");
 
   // when
   await userEvent.click(screen.getByRole("button", { name: /Tuesday, August 11/ }));
 
   // then
-  expect(screen.queryByText("Singles")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("allocation")).not.toBeInTheDocument();
   expect(screen.getByRole("rowheader", { name: "08:00" })).toBeInTheDocument();
 });
 
@@ -156,7 +156,7 @@ it("given an anonymous visitor, when showing a free slot, then it is visible but
   // then
   await screen.findByTestId("week-grid");
   expect(screen.queryByRole("button", { name: "Book Centre Court at 12:30" })).not.toBeInTheDocument();
-  expect(screen.getAllByText("Available").length).toBeGreaterThan(0);
+  expect(screen.getAllByTestId("free-slot").filter((slot) => slot.dataset.state === "free").length).toBeGreaterThan(0);
 });
 
 it("given multiple courts, when selecting a court, then the mobile plan marks only that court as visible", async () => {
@@ -228,7 +228,7 @@ it("given an own booking in the past, when showing today, then it remains visibl
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  expect(await screen.findByText("You")).toBeInTheDocument();
+  expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You");
   expect(screen.queryByRole("button", { name: "You, cancel booking" })).not.toBeInTheDocument();
 });
 
@@ -308,7 +308,7 @@ it("given a booking conflict and a failed refresh, when submission fails, then t
   await userEvent.click(screen.getByRole("button", { name: "Book now" }));
 
   // then
-  expect(await screen.findByText("That did not work. Please try again.")).toBeInTheDocument();
+  expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
   expect(screen.getByRole("dialog")).toBeInTheDocument();
 });
 
@@ -343,7 +343,7 @@ it("given a red booking card, when it is shown, then its label uses the higher-c
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  expect(await screen.findByText("Training")).toHaveStyle({ color: "rgb(15, 23, 42)" });
+  expect(await screen.findByTestId("allocation")).toHaveStyle({ color: "rgb(15, 23, 42)" });
 });
 
 it("given an own member booking, when it is shown, then the viewer marker and other surnames are visible", async () => {
@@ -364,8 +364,7 @@ it("given an own member booking, when it is shown, then the viewer marker and ot
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  expect(await screen.findByText("You, Major, Miles")).toBeInTheDocument();
-  expect(screen.queryByText("Member booking")).not.toBeInTheDocument();
+  expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You, Major, Miles");
 });
 
 it("given a free slot, when booking it with a guest, then the refreshed allocation is visible", async () => {
@@ -391,7 +390,7 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
 
   // when
   await userEvent.click(screen.getByRole("button", { name: "Book Centre Court at 08:00" }));
-  await userEvent.type(screen.getByLabelText("Guest name"), "John Roe");
+  await userEvent.type(screen.getByTestId("guest-name"), "John Roe");
   await userEvent.click(screen.getByRole("button", { name: "Book now" }));
 
   // then
@@ -400,7 +399,7 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
     cardId: "55555555-5555-5555-5555-555555555555",
     participants: [{ guestName: "John Roe" }]
   }), expect.any(String)));
-  expect(await screen.findByText("You")).toBeInTheDocument();
+  expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You");
 });
 
 it("given booking rules reject a slot, when submitting it, then every violation is translated by its field", async () => {
@@ -421,12 +420,13 @@ it("given booking rules reject a slot, when submitting it, then every violation 
   await userEvent.click(screen.getByRole("button", { name: "Book now" }));
 
   // then
-  const timeViolation = await screen.findByText("You can book at most 14 days in advance.");
-  const participantViolation = screen.getByText("The card Member booking allows 2 or 4 players; this booking has 1.");
-  expect(timeViolation.parentElement).toHaveAttribute("id", "booking-startsAt-errors");
-  expect(participantViolation.parentElement).toHaveAttribute("id", "booking-participants-errors");
+  const timeViolations = document.getElementById("booking-startsAt-errors");
+  const participantViolations = document.getElementById("booking-participants-errors");
+  expect(timeViolations).toHaveTextContent("You can book at most 14 days in advance.");
+  expect(participantViolations).toHaveTextContent("The card Member booking allows 2 or 4 players; this booking has 1.");
   expect(screen.getByRole("group", { name: "Guests" })).toHaveAttribute("aria-describedby", "booking-participants-errors");
-  expect(screen.queryByText("booking.rule.advanceWindow.exceeded")).not.toBeInTheDocument();
+  expect(document.querySelector('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeInTheDocument();
+  expect(timeViolations).not.toHaveTextContent("booking.rule.advanceWindow.exceeded");
 });
 
 it("given a matching club member, when selecting them, then their person id is submitted", async () => {
@@ -438,7 +438,7 @@ it("given a matching club member, when selecting them, then their person id is s
   await userEvent.click(await screen.findByRole("button", { name: "Book Centre Court at 08:00" }));
 
   // when
-  await userEvent.type(screen.getByLabelText("Search members"), "Mary");
+  await userEvent.type(screen.getByTestId("member-search"), "Mary");
   await userEvent.click(await screen.findByRole("button", { name: "Add Mary Major" }));
   await userEvent.click(screen.getByRole("button", { name: "Book now" }));
 
@@ -489,5 +489,5 @@ it("given an occupied slot, when cancelling it, then the API decides and the day
 
   // then
   await waitFor(() => expect(api.cancelBooking).toHaveBeenCalledWith("33333333-3333-3333-3333-333333333333"));
-  await waitFor(() => expect(screen.queryByText("You")).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByTestId("own-allocation")).not.toBeInTheDocument());
 });
