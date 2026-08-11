@@ -48,6 +48,9 @@ public class BookingCard {
     @Column(name = "counts_against_limits", nullable = false)
     private boolean countsAgainstLimits;
 
+    @Column(name = "show_generic_occupancy", nullable = false)
+    private boolean showGenericOccupancy;
+
     @Column(name = "guest_allowed", nullable = false)
     private boolean guestAllowed;
 
@@ -81,7 +84,7 @@ public class BookingCard {
 
     public BookingCard(String label, String color, Set<Role> allowedRoles,
                        short[] allowedPlayerCounts, boolean countsAgainstLimits,
-                       boolean guestAllowed) {
+                       boolean guestAllowed, boolean showGenericOccupancy) {
         this.id = UUID.randomUUID();
         this.label = label;
         this.color = color;
@@ -89,12 +92,13 @@ public class BookingCard {
         this.allowedPlayerCounts = allowedPlayerCounts.clone();
         this.countsAgainstLimits = countsAgainstLimits;
         this.guestAllowed = guestAllowed;
+        this.showGenericOccupancy = showGenericOccupancy;
         this.active = true;
     }
 
     public void changeTo(String label, String color, Set<Role> allowedRoles,
                          short[] allowedPlayerCounts, boolean countsAgainstLimits,
-                         boolean guestAllowed) {
+                         boolean guestAllowed, boolean showGenericOccupancy) {
         this.label = label;
         this.color = color;
         this.allowedRoles.clear();
@@ -102,6 +106,7 @@ public class BookingCard {
         this.allowedPlayerCounts = allowedPlayerCounts.clone();
         this.countsAgainstLimits = countsAgainstLimits;
         this.guestAllowed = guestAllowed;
+        this.showGenericOccupancy = showGenericOccupancy;
     }
 
     public void activate() {

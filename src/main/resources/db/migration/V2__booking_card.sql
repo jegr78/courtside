@@ -4,6 +4,7 @@ CREATE TABLE booking_card (
     color                 text       NOT NULL,
     required_role         text,
     allowed_player_counts smallint[] NOT NULL DEFAULT '{}',
+    show_generic_occupancy boolean    NOT NULL DEFAULT false,
     counts_against_limits boolean    NOT NULL,
     guest_allowed         boolean    NOT NULL,
     active                boolean    NOT NULL DEFAULT true,
@@ -17,13 +18,14 @@ CREATE TABLE booking_card (
 );
 
 INSERT INTO booking_card
-    (id, label, color, required_role, allowed_player_counts, counts_against_limits, guest_allowed)
+    (id, label, color, required_role, allowed_player_counts, show_generic_occupancy,
+     counts_against_limits, guest_allowed)
 VALUES
     ('11111111-1111-1111-1111-111111111111', 'Member booking', '#B85C38',
-     'MEMBER',        '{2,4}', true,  true),
+     'MEMBER',        '{2,4}', true,  true,  true),
     ('22222222-2222-2222-2222-222222222222', 'Training',       '#34584A',
-     'TRAINER',       '{}',    false, false),
+     'TRAINER',       '{}',    false, false, false),
     ('33333333-3333-3333-3333-333333333333', 'League match',   '#3A4A5C',
-     'TRAINER',       '{}',    false, false),
+     'TRAINER',       '{}',    false, false, false),
     ('44444444-4444-4444-4444-444444444444', 'Court closed',   '#E8DDD4',
-     'GROUNDSKEEPER', '{}',    false, false);
+     'GROUNDSKEEPER', '{}',    false, false, false);

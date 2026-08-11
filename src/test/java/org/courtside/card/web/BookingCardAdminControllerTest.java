@@ -83,7 +83,8 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"label": "Taster session", "color": "#c8a415",
                                  "allowedRoles": ["TRAINER", "SPORT_DIRECTOR"], "allowedPlayerCounts": [2, 4],
-                                 "countsAgainstLimits": false, "guestAllowed": true}
+                                 "countsAgainstLimits": false, "guestAllowed": true,
+                                 "showGenericOccupancy": true}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isCreated())
@@ -93,6 +94,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.allowedPlayerCounts[0]").value(2))
                 .andExpect(jsonPath("$.allowedPlayerCounts[1]").value(4))
                 .andExpect(jsonPath("$.tracksPlayers").value(true))
+                .andExpect(jsonPath("$.showGenericOccupancy").value(true))
                 .andExpect(jsonPath("$.active").value(true));
     }
 

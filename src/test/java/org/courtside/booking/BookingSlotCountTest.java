@@ -64,7 +64,7 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenOneFurtherPlayer_whenBooking_thenTheBookerFillsSlotOneAndSinglesIsComplete() {
+    void givenOneFurtherPlayer_whenBooking_thenTheBookerFillsSlotOneAndTwoPlayersAreComplete() {
         // when
         UUID bookingId = book(MEMBER_BOOKING_CARD, List.of(ParticipantSpec.guest("John Roe")));
 
@@ -77,7 +77,7 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenThreeFurtherPlayers_whenBooking_thenDoublesIsComplete() {
+    void givenThreeFurtherPlayers_whenBooking_thenFourPlayersAreComplete() {
         // given
         UUID second = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
         UUID third = persons.save(new Person("Richard", "Miles", "richard@example.org")).getId();
@@ -177,7 +177,7 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenADoublesBookingNamingAnUnknownPersonId_whenBooking_thenItIsRejected() {
+    void givenAFourPlayerBookingNamingAnUnknownPersonId_whenBooking_thenItIsRejected() {
         // given
         UUID second = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
 

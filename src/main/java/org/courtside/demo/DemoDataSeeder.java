@@ -162,14 +162,14 @@ class DemoDataSeeder implements ApplicationRunner {
         }
         bookingService.create(new CreateBookingCommand(
                 List.of(court.getId()), MEMBER_BOOKING_CARD, slot, booker.account().getId(),
-                booker.person().getId(), Set.of(Role.ADMIN, Role.MEMBER), "Demo singles",
+                booker.person().getId(), Set.of(Role.ADMIN, Role.MEMBER), "Demo booking",
                 List.of(ParticipantSpec.member(partner.person().getId())), null));
     }
 
     private void createHistoricalBooking(DemoMember booker, DemoMember partner,
                                          Court court, TimeSlot slot) {
         Booking booking = new Booking(MEMBER_BOOKING_CARD, booker.account().getId(),
-                "Demo singles", clock.instant());
+                "Demo booking", clock.instant());
         booking.allocate(court.getId(), slot);
         booking.addParticipant(ParticipantSpec.member(booker.person().getId()));
         booking.addParticipant(ParticipantSpec.member(partner.person().getId()));

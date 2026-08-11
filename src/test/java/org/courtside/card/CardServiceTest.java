@@ -69,7 +69,7 @@ class CardServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenTheSeededMemberCard_whenLoadingIt_thenItAllowsSinglesAndDoubles() {
+    void givenTheSeededMemberCard_whenLoadingIt_thenItAllowsTwoAndFourPlayers() {
         // when
         BookingCard card = cardService.findCard(MEMBER_BOOKING_CARD).orElseThrow();
 

@@ -143,7 +143,7 @@ class PerformanceDataSeeder implements ApplicationRunner {
         CreateBookingCommand command = new CreateBookingCommand(
                 List.of(court.getId()), MEMBER_BOOKING_CARD, new TimeSlot(start, start.plusSeconds(3600)),
                 booker.account().getId(), booker.person().getId(), Set.of(Role.ADMIN, Role.MEMBER),
-                "Performance singles", List.of(ParticipantSpec.member(partner.person().getId())), null);
+                "Performance booking", List.of(ParticipantSpec.member(partner.person().getId())), null);
         if (command.slot().end().isBefore(clock.instant())) {
             historicalBookings.importBooking(command);
             return memberIndex + 2;

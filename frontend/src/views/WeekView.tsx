@@ -274,7 +274,7 @@ function renderCell(
     const duration = (Date.parse(allocation.endsAt) - Date.parse(allocation.startsAt)) / 60_000;
     const label = allocationLabel(allocation, t);
     const className = "h-full w-full rounded-md px-3 py-2 text-left font-semibold";
-    const state = allocation.ownBooking ? "own" : allocation.matchType ? "occupied" : "card";
+    const state = allocation.ownBooking ? "own" : allocation.showGenericOccupancy ? "occupied" : "card";
     const style = allocation.ownBooking
       ? { backgroundColor: "var(--cs-ball)", color: "var(--cs-shade)" }
       : { backgroundColor: allocation.cardColor, color: contrastColor(allocation.cardColor) };
@@ -320,10 +320,13 @@ function allocationLabel(
   allocation: Allocation,
   t: ReturnType<typeof useTranslation>["t"]
 ): string {
-  if (allocation.ownBooking && allocation.matchType) {
+  if (allocation.ownBooking && allocation.showGenericOccupancy) {
     return [t("booking.viewer"), ...(allocation.participantLastNames ?? [])].join(", ");
   }
-  return allocation.matchType ? t(`booking.matchType.${allocation.matchType}`) : allocation.cardLabel;
+  if (!allocation.showGenericOccupancy) return allocation.cardLabel;
+  return allocation.participantCount
+    ? t("booking.occupiedWithParticipants", { count: allocation.participantCount })
+    : t("booking.occupied");
 }
 
 function BookingDialog({ selection, grid, courts, closed, created, conflicted }: {

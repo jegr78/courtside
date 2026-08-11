@@ -373,19 +373,21 @@ participant rules unexpressible.
 `Looking for a partner` are participant cards — they occupy a place on court without being a
 person. A guest is a third kind of filler, carried as a name rather than a card.
 
-### Player slots: singles is two, doubles is four
+### Player slots have an exact configured count
 
-A member booking has an **exact** number of player slots — two for singles, four for doubles —
-and the booker occupies one of them. Each remaining slot is filled by a member, a guest, or a
-participant card.
+A member booking has an **exact** number of player slots selected from its booking card's
+`allowed_player_counts`, and the booker occupies one of them. Each remaining slot is filled by a
+member, a guest, or a participant card. The seeded member card permits two or four players, but
+the model does not assign sport-specific names to either count.
 
-That is what makes a ball machine work: one member plus `Ball machine` is a legitimate singles
-booking, and three members plus `Ball machine` is a legitimate doubles booking. The machine
-stands where the fourth player would.
+That is what makes a ball machine work: one member plus `Ball machine` satisfies a two-player
+booking, and three members plus `Ball machine` satisfy a four-player booking. The machine fills
+one participant slot in either case.
 
 ```sql
 booking_card
-    allowed_player_counts smallint[] NOT NULL   -- member card: '{2,4}'; training/closure: '{}'
+    allowed_player_counts   smallint[] NOT NULL -- member card: '{2,4}'; training/closure: '{}'
+    show_generic_occupancy  boolean NOT NULL    -- member card: true; named occupancy: false
 
 participant_card
     id, label, active                           -- Ball machine, Looking for a partner
@@ -405,9 +407,10 @@ An array rather than a boolean, because a boolean could only say "at least one" 
 bound: nothing would stop twenty people being attached to one court, and "exactly four" would be
 unexpressible.
 
-Deriving the match type from the slot count is also what lets the grid label a booking as
-`SINGLES` or `DOUBLES` without naming anyone, as section 10 requires. The API carries the
-constant; the frontend renders it in the viewer's language.
+The slot count is not mapped to a sport-specific label. `show_generic_occupancy` controls whether
+the grid renders a neutral localised occupancy label, optionally with the numeric participant
+count, or the configured booking-card label. This is independent of player tracking, so training,
+league matches and special events keep their configured labels even when they record participants.
 
 **`Looking for a partner` is the opt-in that section 10 anticipates.** A member leaves a slot
 open and marks it as looking for a partner; that publishes the slot, and only that slot, on
@@ -904,11 +907,10 @@ Data minimisation is the reason. A booking grid that names players publishes, to
 who plays with whom and when — a movement and social profile that the booking function does not
 need. The club's legitimate interest is that a court is occupied, not by whom.
 
-What the grid shows instead of a name is the **match type**, derived from the participant
-count: `SINGLES` for two players, `DOUBLES` for four, rendered by the frontend in the viewer's
-language. That is more useful than a name for the
-only question the grid has to answer — is this court taken, and for how long — and it carries
-no personal data.
+What the grid shows instead of a name is a neutral localised **booked** label, optionally followed
+by the numeric participant count. The count is not mapped to a sport-specific term. Named special
+occupancy keeps its configured booking-card label. This answers the only question the grid has to
+answer — is this court taken, and for how long — without carrying personal data.
 
 Consequences for the model and the API:
 

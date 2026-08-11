@@ -3,7 +3,6 @@ package org.courtside.booking.web;
 import org.courtside.api.ApiAllocation;
 import org.courtside.api.ApiBookingCreated;
 import org.courtside.api.ApiCreateBookingRequest;
-import org.courtside.api.ApiMatchType;
 import org.courtside.api.ApiBookingStatus;
 import org.courtside.api.ApiPersonalBooking;
 import org.courtside.api.ApiPersonalBookingPage;
@@ -16,7 +15,6 @@ import org.courtside.api.BookingsApi;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.CreateBookingCommand;
-import org.courtside.booking.internal.MatchType;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.PersonalBookingPage;
 import org.courtside.booking.Booking;
@@ -215,10 +213,11 @@ class BookingController implements BookingsApi {
                                      Map<UUID, AllocationVisibility> visibility) {
         BookingCard card = cardsById.get(allocation.getBooking().getCardId());
         AllocationVisibility allocationVisibility = visibility.get(allocation.getBooking().getId());
-        ApiMatchType matchType = MatchType
-                .ofSlotCount(slotCounts.getOrDefault(allocation.getBooking().getId(), 0L))
-                .map(type -> ApiMatchType.fromValue(type.name()))
-                .orElse(null);
+        long slotCount = slotCounts.getOrDefault(allocation.getBooking().getId(), 0L);
+        boolean showGenericOccupancy = card != null && card.isShowGenericOccupancy();
+        Integer participantCount = showGenericOccupancy && slotCount > 0
+                ? Math.toIntExact(slotCount)
+                : null;
 
         return new ApiAllocation(
                 allocation.getBooking().getId(),
@@ -227,10 +226,10 @@ class BookingController implements BookingsApi {
                 WireTypes.toOffsetDateTime(allocation.getEndsAt()),
                 card == null ? "?" : card.getLabel(),
                 card == null ? "#999999" : card.getColor(),
-                allocationVisibility.ownBooking())
-                .participantLastNames(matchType != null && allocationVisibility.ownBooking()
+                allocationVisibility.ownBooking(), showGenericOccupancy)
+                .participantLastNames(slotCount > 0 && allocationVisibility.ownBooking()
                         ? allocationVisibility.participantLastNames()
                         : null)
-                .matchType(matchType);
+                .participantCount(participantCount);
     }
 }

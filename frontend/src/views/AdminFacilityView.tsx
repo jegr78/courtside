@@ -188,7 +188,8 @@ export function AdminFacilityView() {
         allowedRoles: form.getAll("allowedRoles") as Role[],
         allowedPlayerCounts: playerCounts(formString(form, "allowedPlayerCounts")),
         countsAgainstLimits: form.get("countsAgainstLimits") === "on",
-        guestAllowed: form.get("guestAllowed") === "on"
+        guestAllowed: form.get("guestAllowed") === "on",
+        showGenericOccupancy: form.get("showGenericOccupancy") === "on"
       });
       setCards((current) => [...(current ?? []), created]);
       formElement.reset();
@@ -270,6 +271,7 @@ function CardEditor({ card, disabled, changed, save, toggle }: { card: BookingCa
       <TextField disabled={disabled} data-testid={`card-counts-${card.id}`} label={t("admin.facility.playerCounts")} value={counts} onChange={(event) => setCounts(event.target.value)} />
       <Checkbox disabled={disabled} label={t("admin.facility.countsAgainstLimits")} checked={card.countsAgainstLimits} changed={(countsAgainstLimits) => changed({ ...card, countsAgainstLimits })} />
       <Checkbox disabled={disabled} label={t("admin.facility.guestAllowed")} checked={card.guestAllowed} changed={(guestAllowed) => changed({ ...card, guestAllowed })} />
+      <Checkbox disabled={disabled} label={t("admin.facility.showGenericOccupancy")} checked={card.showGenericOccupancy} changed={(showGenericOccupancy) => changed({ ...card, showGenericOccupancy })} />
     </div>
     <div className="flex gap-3">
       <Button disabled={disabled} data-testid={`save-card-${card.id}`} type="button" onClick={() => void save({ ...card, allowedPlayerCounts: countsValue, tracksPlayers: countsValue.length > 0 })}>{t("admin.save")}</Button>
@@ -289,6 +291,7 @@ function CardCreateForm({ disabled, create }: { disabled: boolean; create: (even
       <TextField disabled={disabled} data-testid="new-card-counts" name="allowedPlayerCounts" label={t("admin.facility.playerCounts")} />
       <Checkbox disabled={disabled} name="countsAgainstLimits" label={t("admin.facility.countsAgainstLimits")} />
       <Checkbox disabled={disabled} name="guestAllowed" label={t("admin.facility.guestAllowed")} />
+      <Checkbox disabled={disabled} name="showGenericOccupancy" label={t("admin.facility.showGenericOccupancy")} />
     </div>
     <Button disabled={disabled} data-testid="create-card" className="justify-self-start" type="submit">{t("admin.create")}</Button>
   </form>;
@@ -316,7 +319,8 @@ function cardRequest(card: BookingCard): BookingCardRequest {
   return {
     label: card.label, color: card.color, allowedRoles: card.allowedRoles,
     allowedPlayerCounts: card.allowedPlayerCounts,
-    countsAgainstLimits: card.countsAgainstLimits, guestAllowed: card.guestAllowed
+    countsAgainstLimits: card.countsAgainstLimits, guestAllowed: card.guestAllowed,
+    showGenericOccupancy: card.showGenericOccupancy
   };
 }
 

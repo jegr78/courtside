@@ -78,7 +78,7 @@ class ParticipantCardBookingTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenOneMemberAndTheBallMachine_whenBooking_thenItIsAValidSingles() {
+    void givenOneMemberAndTheBallMachine_whenBooking_thenTwoParticipantSlotsAreValid() {
         // when
         UUID bookingId = book(List.of(ParticipantSpec.card(BALL_MACHINE)));
 
@@ -93,7 +93,7 @@ class ParticipantCardBookingTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenThreeMembersAndTheBallMachine_whenBooking_thenItIsAValidDoubles() {
+    void givenThreeMembersAndTheBallMachine_whenBooking_thenFourParticipantSlotsAreValid() {
         // given
         UUID second = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
         UUID third = persons.save(new Person("Richard", "Miles", "richard@example.org")).getId();
@@ -143,7 +143,7 @@ class ParticipantCardBookingTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenADoublesBookingNamingTheBallMachineTwice_whenBooking_thenItIsRejected() {
+    void givenAFourPlayerBookingNamingTheBallMachineTwice_whenBooking_thenItIsRejected() {
         // given
         UUID second = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
 
