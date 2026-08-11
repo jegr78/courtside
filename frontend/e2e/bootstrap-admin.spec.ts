@@ -120,6 +120,40 @@ test("a seeded member can book a free slot and cancel it again", async ({ page }
   await expect(personalBooking).not.toBeVisible();
 });
 
+test("a guest-restricted booking card rejects a guest through the browser", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("admin-facility-link").click();
+  await page.getByTestId("new-card-label").fill("Restricted event");
+  await page.getByTestId("new-card-role-MEMBER").check();
+  await page.getByTestId("new-card-counts").fill("2");
+  const cardCreated = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/booking-cards") && response.request().method() === "POST"
+  );
+  await page.getByTestId("create-card").click();
+  expect((await cardCreated).status()).toBe(201);
+  await expect(page.getByRole("status")).toBeVisible();
+  await page.goto("/");
+  await page.getByTestId("logout").click();
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("week-next").click();
+  await page.getByTestId("free-slot").first().click();
+  await page.getByTestId("booking-card").selectOption({ label: "Restricted event" });
+  await page.getByTestId("guest-name").fill("John Roe");
+
+  // when
+  await page.getByTestId("booking-submit").click();
+
+  // then
+  await expect(page.locator('[data-code="booking.participants.guestNotAllowed"]')).toBeVisible();
+  await expect(page.getByTestId("booking-dialog")).toBeVisible();
+});
+
 test("an admin changes club configuration and a booking rule through the browser", async ({ page }) => {
   // given
   await page.goto("/login");

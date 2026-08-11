@@ -430,7 +430,7 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
       </fieldset>
       <FieldViolations id="booking-courtIds-errors" violations={fieldViolations("courtIds")} />
       <label className="mt-4 grid gap-2 font-medium">{t("booking.card")}
-        <select value={cardId} onChange={(event) => setCardId(event.target.value)} required aria-invalid={fieldViolations("cardId").length > 0} aria-describedby={describedBy("cardId")} className="form-control rounded-lg border px-3 py-3">
+        <select data-testid="booking-card" value={cardId} onChange={(event) => setCardId(event.target.value)} required aria-invalid={fieldViolations("cardId").length > 0} aria-describedby={describedBy("cardId")} className="form-control rounded-lg border px-3 py-3">
           {bookingCards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
         </select>
       </label>
