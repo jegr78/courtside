@@ -40,6 +40,22 @@ async function seedJourneyData(postgres: StartedTestContainer, visualDate: strin
     FROM user_account WHERE username = 'bootstrap-admin';
     INSERT INTO user_account_role (user_account_id, role)
     VALUES ('00000000-0000-0000-0000-000000000107', 'ADMIN');
+    INSERT INTO person (id, first_name, last_name, email) VALUES
+      ('00000000-0000-0000-0000-000000000108', 'Mary', 'Major', 'sport.major@example.org'),
+      ('00000000-0000-0000-0000-000000000109', 'Richard', 'Miles', 'youth.miles@example.org');
+    INSERT INTO user_account
+      (id, person_id, username, password_hash, locale, enabled, password_change_required)
+    SELECT '00000000-0000-0000-0000-000000000110',
+      '00000000-0000-0000-0000-000000000108', 'sport.major', password_hash, 'en', true, false
+    FROM user_account WHERE username = 'bootstrap-admin';
+    INSERT INTO user_account
+      (id, person_id, username, password_hash, locale, enabled, password_change_required)
+    SELECT '00000000-0000-0000-0000-000000000111',
+      '00000000-0000-0000-0000-000000000109', 'youth.miles', password_hash, 'en', true, false
+    FROM user_account WHERE username = 'bootstrap-admin';
+    INSERT INTO user_account_role (user_account_id, role) VALUES
+      ('00000000-0000-0000-0000-000000000110', 'SPORT_DIRECTOR'),
+      ('00000000-0000-0000-0000-000000000111', 'YOUTH_DIRECTOR');
     INSERT INTO member (id, person_id, membership_type_id)
     VALUES ('00000000-0000-0000-0000-000000000105',
       '00000000-0000-0000-0000-000000000101', 'cccccccc-0000-0000-0000-000000000001');
@@ -58,8 +74,9 @@ async function seedJourneyData(postgres: StartedTestContainer, visualDate: strin
       ('70000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'CONFIRMED', '00000000-0000-0000-0000-000000000102', NULL),
       ('70000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), NULL),
       ('70000000-0000-0000-0000-000000000003', '22222222-2222-2222-2222-222222222222', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), NULL),
-      ('70000000-0000-0000-0000-000000000004', '33333333-3333-3333-3333-333333333333', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), NULL),
-      ('70000000-0000-0000-0000-000000000005', '44444444-4444-4444-4444-444444444444', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), NULL);
+      ('70000000-0000-0000-0000-000000000004', '33333333-3333-3333-3333-333333333333', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), 'Prepare score sheets'),
+      ('70000000-0000-0000-0000-000000000005', '44444444-4444-4444-4444-444444444444', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), NULL),
+      ('70000000-0000-0000-0000-000000000006', '33333333-3333-3333-3333-333333333333', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), 'Cancellation journey');
 
     INSERT INTO booking_participant (id, booking_id, kind, person_id, position) VALUES
       ('71000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'MEMBER', '00000000-0000-0000-0000-000000000101', 0),
@@ -72,7 +89,8 @@ async function seedJourneyData(postgres: StartedTestContainer, visualDate: strin
       ('72000000-0000-0000-0000-000000000002', '70000000-0000-0000-0000-000000000002', 'dddddddd-0000-0000-0000-000000000002', (DATE '${visualDate}' + TIME '09:00') AT TIME ZONE 'Europe/Berlin', (DATE '${visualDate}' + TIME '10:00') AT TIME ZONE 'Europe/Berlin', 'CONFIRMED'),
       ('72000000-0000-0000-0000-000000000003', '70000000-0000-0000-0000-000000000003', 'dddddddd-0000-0000-0000-000000000003', (DATE '${visualDate}' + TIME '08:30') AT TIME ZONE 'Europe/Berlin', (DATE '${visualDate}' + TIME '10:00') AT TIME ZONE 'Europe/Berlin', 'CONFIRMED'),
       ('72000000-0000-0000-0000-000000000004', '70000000-0000-0000-0000-000000000004', 'dddddddd-0000-0000-0000-000000000004', (DATE '${visualDate}' + TIME '10:00') AT TIME ZONE 'Europe/Berlin', (DATE '${visualDate}' + TIME '12:00') AT TIME ZONE 'Europe/Berlin', 'CONFIRMED'),
-      ('72000000-0000-0000-0000-000000000005', '70000000-0000-0000-0000-000000000005', 'dddddddd-0000-0000-0000-000000000001', (DATE '${visualDate}' + TIME '10:30') AT TIME ZONE 'Europe/Berlin', (DATE '${visualDate}' + TIME '11:30') AT TIME ZONE 'Europe/Berlin', 'CONFIRMED');
+      ('72000000-0000-0000-0000-000000000005', '70000000-0000-0000-0000-000000000005', 'dddddddd-0000-0000-0000-000000000001', (DATE '${visualDate}' + TIME '10:30') AT TIME ZONE 'Europe/Berlin', (DATE '${visualDate}' + TIME '11:30') AT TIME ZONE 'Europe/Berlin', 'CONFIRMED'),
+      ('72000000-0000-0000-0000-000000000006', '70000000-0000-0000-0000-000000000006', 'dddddddd-0000-0000-0000-000000000004', (DATE '${visualDate}' + 1 + TIME '10:00') AT TIME ZONE 'Europe/Berlin', (DATE '${visualDate}' + 1 + TIME '12:00') AT TIME ZONE 'Europe/Berlin', 'CONFIRMED');
   `;
   const result = await postgres.exec([
     "psql", "-U", "courtside", "-d", "courtside", "-v", "ON_ERROR_STOP=1", "-c", sql

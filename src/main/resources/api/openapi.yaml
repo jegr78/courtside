@@ -567,6 +567,56 @@ components:
           format: uuid
           description: Pass this booking id as `cursor` to continue after the current page.
 
+    ManagedAppointment:
+      type: object
+      required: [id, courtIds, startsAt, endsAt, cardLabel, cardColor, status, participantCount]
+      properties:
+        id: { type: string, format: uuid }
+        seriesId: { type: [string, "null"], format: uuid }
+        courtIds:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        cardLabel: { type: string }
+        cardColor: { type: string }
+        status: { $ref: "#/components/schemas/BookingStatus" }
+        participantCount: { type: integer, minimum: 0 }
+
+    ManagedAppointmentPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ManagedAppointment" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+
+    ManagedParticipantKind:
+      type: string
+      enum: [MEMBER, GUEST, CARD]
+
+    ManagedParticipant:
+      type: object
+      required: [kind, displayName]
+      properties:
+        kind: { $ref: "#/components/schemas/ManagedParticipantKind" }
+        displayName: { type: string }
+
+    ManagedAppointmentDetail:
+      allOf:
+        - $ref: "#/components/schemas/ManagedAppointment"
+        - type: object
+          required: [participants]
+          properties:
+            note: { type: [string, "null"] }
+            participants:
+              type: array
+              items: { $ref: "#/components/schemas/ManagedParticipant" }
+
     Allocation:
       type: object
       description: One court's occupancy for one booking.
@@ -1228,6 +1278,56 @@ paths:
                 $ref: "#/components/schemas/PersonalBookingPage"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+
+  /api/managed/bookings:
+    get:
+      tags: [bookings]
+      operationId: listManagedAppointments
+      summary: Appointments the signed-in account is currently authorized to manage.
+      description: |
+        Uses each booking card's current allowed roles. Cards without role restrictions do not
+        expose appointments to unrelated accounts. Administrators may manage every appointment.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Appointments visible through the caller's current management roles.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagedAppointmentPage" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /api/managed/bookings/{id}:
+    get:
+      tags: [bookings]
+      operationId: getManagedAppointment
+      summary: Management details for one appointment.
+      description: Internal notes and participant display names are returned only after authorization.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Details required to manage the appointment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagedAppointmentDetail" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/booking-series/preview:
     post:

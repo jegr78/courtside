@@ -1,30 +1,37 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type BookingGrid, type CancelScope, type MovePreview, type MoveRequest, type PersonalBooking, type PublicCourt } from "../api/client";
+import { api, type BookingGrid, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail, type ManagedAppointmentPage, type MovePreview, type MoveRequest, type PersonalBooking, type PublicCourt } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 
-export function MyBookingsView({ now = new Date() }: { now?: Date }) {
+type Appointment = PersonalBooking | ManagedAppointment;
+
+export function MyBookingsView({ now = new Date(), showManaged = false }: { now?: Date; showManaged?: boolean }) {
   const { t, i18n } = useTranslation();
   const [bookings, setBookings] = useState<PersonalBooking[]>([]);
+  const [managed, setManaged] = useState<ManagedAppointment[]>([]);
   const [courts, setCourts] = useState<PublicCourt[]>([]);
   const [grid, setGrid] = useState<BookingGrid>();
   const [nextCursor, setNextCursor] = useState<string>();
+  const [managedNextCursor, setManagedNextCursor] = useState<string>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
-  const [action, setAction] = useState<{ kind: "cancel" | "move"; booking: PersonalBooking }>();
+  const [action, setAction] = useState<{ kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }>();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [page, availableCourts, bookingGrid] = await Promise.all([
-        api.personalBookings(), api.courts(), api.bookingGrid()
+      const [page, managedPage, availableCourts, bookingGrid] = await Promise.all([
+        api.personalBookings(), showManaged ? api.managedAppointments() : Promise.resolve<ManagedAppointmentPage>({ items: [] }),
+        api.courts(), api.bookingGrid()
       ]);
       setBookings(page.items);
+      setManaged(managedPage.items);
       setNextCursor(page.nextCursor ?? undefined);
+      setManagedNextCursor(managedPage.nextCursor ?? undefined);
       setCourts(availableCourts);
       setGrid(bookingGrid);
       setError(undefined);
@@ -33,7 +40,7 @@ export function MyBookingsView({ now = new Date() }: { now?: Date }) {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [showManaged, t]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -44,6 +51,21 @@ export function MyBookingsView({ now = new Date() }: { now?: Date }) {
       const page = await api.personalBookings(nextCursor);
       setBookings((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor ?? undefined);
+      setError(undefined);
+    } catch (failure) {
+      setError(problemMessage(failure, t));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  async function loadMoreManaged() {
+    if (!managedNextCursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.managedAppointments(managedNextCursor);
+      setManaged((current) => [...current, ...page.items]);
+      setManagedNextCursor(page.nextCursor ?? undefined);
       setError(undefined);
     } catch (failure) {
       setError(problemMessage(failure, t));
@@ -70,16 +92,23 @@ export function MyBookingsView({ now = new Date() }: { now?: Date }) {
       <BookingSection title={t("myBookings.past")} empty={t("myBookings.noPast")} bookings={sections.past} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={setAction} t={t} />
     </div>}
     {nextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
-    {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={bookings.filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
+    {showManaged && !loading && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
+      <h2 id="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h2>
+      <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
+      <div className="mt-4"><BookingSection title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={setAction} t={t} /></div>
+      {managedNextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
+    </section>}
+    {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={(action.managed ? managed : bookings).filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={(action.managed ? managedNextCursor : nextCursor) !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
+    {action?.kind === "detail" && <ManagedAppointmentDialog bookingId={action.booking.id} closed={() => setAction(undefined)} />}
   </section>;
 }
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, actionable = false, action, t }: {
-  title: string; empty: string; bookings: PersonalBooking[]; courtNames: Map<string, string>;
-  locale: string; timeZone: string; actionable?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void; t: Translate;
+function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, actionable = false, managed = false, action, t }: {
+  title: string; empty: string; bookings: Appointment[]; courtNames: Map<string, string>;
+  locale: string; timeZone: string; actionable?: boolean; managed?: boolean; action: (value: { kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }) => void; t: Translate;
 }) {
   const groups = groupBookings(bookings);
   return <section>
@@ -92,17 +121,21 @@ function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, 
           <time dateTime={booking.startsAt}>{formatDateTime(booking.startsAt, locale, timeZone)}</time>
           <span>{booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
-          {actionable && booking.status === "CONFIRMED" && <div className="flex flex-wrap gap-2 pt-1">
-            <Button data-testid="personal-cancel" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel", { label: booking.cardLabel })}</Button>
-            {booking.seriesId && <Button className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move", { label: booking.cardLabel })}</Button>}
+          {managed && "participantCount" in booking && <span>{t("managedAppointments.participants", { count: booking.participantCount })}</span>}
+          {actionable && <div className="flex flex-wrap gap-2 pt-1">
+            {managed && <Button className="button-secondary px-3 py-2" onClick={() => action({ kind: "detail", booking, managed })}>{t("managedAppointments.details")}</Button>}
+            {booking.status === "CONFIRMED" && <>
+              <Button data-testid={managed ? "managed-cancel" : "personal-cancel"} data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking, managed })}>{t("myBookings.cancel", { label: booking.cardLabel })}</Button>
+              {booking.seriesId && <Button className="px-3 py-2" onClick={() => action({ kind: "move", booking, managed })}>{t("myBookings.move", { label: booking.cardLabel })}</Button>}
+            </>}
           </div>}
         </li>)}</ul>
       </article>)}</div>}
   </section>;
 }
 
-function groupBookings(bookings: PersonalBooking[]) {
-  const groups = new Map<string, PersonalBooking[]>();
+function groupBookings(bookings: Appointment[]) {
+  const groups = new Map<string, Appointment[]>();
   for (const booking of bookings) {
     const key = booking.seriesId ?? booking.id;
     groups.set(key, [...(groups.get(key) ?? []), booking]);
@@ -118,7 +151,7 @@ function ScopeFields({ scope, changed, t }: { scope: CancelScope; changed: (scop
   </fieldset>;
 }
 
-function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, closed, completed }: { booking: PersonalBooking; seriesBookings: PersonalBooking[]; hasMoreBookings: boolean; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
+function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, closed, completed }: { booking: Appointment; seriesBookings: Appointment[]; hasMoreBookings: boolean; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<CancelScope>("THIS");
   const [error, setError] = useState<string>();
@@ -143,7 +176,7 @@ function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, clos
   </div></Modal>;
 }
 
-function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking: PersonalBooking; courts: PublicCourt[]; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
+function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking: Appointment; courts: PublicCourt[]; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<CancelScope>("THIS");
   const [startTime, setStartTime] = useState("");
@@ -175,6 +208,34 @@ function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking:
     {error && <Alert>{error}</Alert>}
     {preview && <div><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatDateTime(move.fromStartsAt, i18n.language, timeZone)} → {formatDateTime(move.toStartsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
     <div className="flex gap-2">{preview ? <Button disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
+  </div></Modal>;
+}
+
+function ManagedAppointmentDialog({ bookingId, closed }: { bookingId: string; closed: () => void }) {
+  const { t } = useTranslation();
+  const [detail, setDetail] = useState<ManagedAppointmentDetail>();
+  const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    let active = true;
+    void api.managedAppointment(bookingId)
+      .then((appointment) => { if (active) setDetail(appointment); })
+      .catch((failure) => { if (active) setError(problemMessage(failure, t)); });
+    return () => { active = false; };
+  }, [bookingId, t]);
+
+  return <Modal labelledBy="managed-appointment-detail-title" closed={closed}><div className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
+    <h2 id="managed-appointment-detail-title" className="text-xl font-bold">{t("managedAppointments.detailTitle")}</h2>
+    {error && <Alert>{error}</Alert>}
+    {!detail && !error && <p aria-live="polite">{t("status.loading")}</p>}
+    {detail && <>
+      <p className="font-semibold">{detail.cardLabel}</p>
+      <section><h3 className="font-semibold">{t("managedAppointments.note")}</h3><p>{detail.note || t("managedAppointments.noNote")}</p></section>
+      <section><h3 className="font-semibold">{t("managedAppointments.participantDetails")}</h3>
+        {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`}>{participant.displayName} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
+      </section>
+    </>}
+    <div><Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

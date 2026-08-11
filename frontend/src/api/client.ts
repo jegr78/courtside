@@ -27,6 +27,9 @@ export type CreateBookingRequest = components["schemas"]["CreateBookingRequest"]
 export type BookingCreated = components["schemas"]["BookingCreated"];
 export type PersonalBooking = components["schemas"]["PersonalBooking"];
 export type PersonalBookingPage = components["schemas"]["PersonalBookingPage"];
+export type ManagedAppointment = components["schemas"]["ManagedAppointment"];
+export type ManagedAppointmentPage = components["schemas"]["ManagedAppointmentPage"];
+export type ManagedAppointmentDetail = components["schemas"]["ManagedAppointmentDetail"];
 export type CancelScope = components["schemas"]["CancelScope"];
 export type MoveRequest = components["schemas"]["MoveRequest"];
 export type MovePreview = components["schemas"]["MovePreview"];
@@ -133,6 +136,12 @@ export const api = {
   cancelBooking: (bookingId: string) => request<void>(`/api/bookings/${bookingId}`, { method: "DELETE" }),
   personalBookings: (cursor?: string, limit = 50) => request<PersonalBookingPage>(
     `/api/my/bookings?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  ),
+  managedAppointments: (cursor?: string, limit = 50) => request<ManagedAppointmentPage>(
+    `/api/managed/bookings?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  ),
+  managedAppointment: (bookingId: string) => request<ManagedAppointmentDetail>(
+    `/api/managed/bookings/${bookingId}`
   ),
   cancelSeries: (seriesId: string, fromBookingId: string, scope: CancelScope) => request<void>(
     `/api/booking-series/${seriesId}?${new URLSearchParams({ fromBookingId, scope })}`,
