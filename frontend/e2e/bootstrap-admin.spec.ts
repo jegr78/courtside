@@ -101,7 +101,7 @@ test("a seeded member can book a free slot and cancel it again", async ({ page }
   await page.getByRole("button", { name: "Book now" }).click();
 
   // then
-  const gridBooking = page.getByRole("button", { name: "Member booking, cancel booking" });
+  const gridBooking = page.getByRole("button", { name: "You, Major, cancel booking" });
   await expect(gridBooking).toBeVisible();
 
   await page.reload();

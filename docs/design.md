@@ -873,6 +873,10 @@ Consequences for the model and the API:
 
 - `AllocationResponse.bookedByName` stays null on every member-facing response. It is filled
   only by the administrative endpoints, which are a separate authorisation surface.
+- `Allocation.ownBooking` is decided from the authenticated account on the server and is always
+  false anonymously. Clients do not infer ownership.
+- An own member booking carries only the last names of other member participants. The client adds
+  its localised viewer marker; guest names never enter the grid response.
 - A booking's participant count is public; the participants are not.
 - Guest names are personal data too and follow the same rule.
 - Any future partner-finding feature must be opt-in per member and must not be built by

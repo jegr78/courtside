@@ -178,14 +178,17 @@ function renderCell(
   const allocation = allocations.find((entry) => entry.courtId === court.id && formatTime(entry.startsAt, timeZone) === slot);
   if (allocation) {
     const duration = (Date.parse(allocation.endsAt) - Date.parse(allocation.startsAt)) / 60_000;
+    const label = allocationLabel(allocation, t);
+    const className = "h-full rounded-lg px-3 py-2 font-semibold";
+    const style = { backgroundColor: allocation.cardColor, color: contrastColor(allocation.cardColor) };
     return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className="border-structural border-b p-2 align-top">
-      <button
+      {allocation.ownBooking ? <button
         type="button"
-        aria-label={t("booking.cancelLabel", { label: allocation.cardLabel })}
+        aria-label={t("booking.cancelLabel", { label })}
         onClick={() => cancel(allocation)}
-        className="h-full rounded-lg px-3 py-2 font-semibold"
-        style={{ backgroundColor: allocation.cardColor, color: contrastColor(allocation.cardColor) }}
-      >{allocation.cardLabel}</button>
+        className={className}
+        style={style}
+      >{label}</button> : <div className={className} style={style}>{label}</div>}
     </td>;
   }
   const minute = timeToMinutes(slot);
@@ -198,6 +201,16 @@ function renderCell(
       <span className="sr-only">{t("week.available")}</span>
     </button>
   </td>;
+}
+
+function allocationLabel(
+  allocation: Allocation,
+  t: ReturnType<typeof useTranslation>["t"]
+): string {
+  if (allocation.ownBooking && allocation.matchType) {
+    return [t("booking.viewer"), ...(allocation.participantLastNames ?? [])].join(", ");
+  }
+  return allocation.matchType ? t(`booking.matchType.${allocation.matchType}`) : allocation.cardLabel;
 }
 
 function BookingDialog({ selection, grid, courts, closed, created }: {

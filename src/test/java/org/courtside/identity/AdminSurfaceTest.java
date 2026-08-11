@@ -13,6 +13,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.context.WebApplicationContext;
@@ -163,7 +164,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     @Test
     void givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemSucceeds() {
         // given
-        List<MappedEndpoint> endpoints = endpointsMatching(ANONYMOUS_ALLOWED_PATHS::contains);
+        List<MappedEndpoint> endpoints = endpointsMatchingAccess(AdminSurfaceTest::isAnonymousAllowed);
         assertThat(endpoints).isNotEmpty();
 
         // when
@@ -191,7 +192,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     @Test
     void givenAnAnonymousCaller_whenCallingEveryAuthenticatedEndpoint_thenEveryOneOfThemIsUnauthorized() {
         // given
-        List<MappedEndpoint> endpoints = endpointsMatching(AUTHENTICATED_PATHS::contains);
+        List<MappedEndpoint> endpoints = endpointsMatchingAccess(AdminSurfaceTest::isAuthenticatedOnly);
         assertThat(endpoints).isNotEmpty();
 
         // when
@@ -220,7 +221,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnAuthenticatedMember_whenCallingEveryAuthenticatedEndpoint_thenNoneOfThemIsUnauthorized() {
         // given
-        List<MappedEndpoint> endpoints = endpointsMatching(AUTHENTICATED_PATHS::contains);
+        List<MappedEndpoint> endpoints = endpointsMatchingAccess(AdminSurfaceTest::isAuthenticatedOnly);
         assertThat(endpoints).isNotEmpty();
 
         // when
@@ -314,11 +315,15 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     // serves the API document as YAML.
     private String successfulAsAnonymousFailure(MappedEndpoint endpoint) {
         try {
-            mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}")
-                            .with(anonymous())
-                            .with(csrf()))
+            MockHttpServletRequestBuilder request = request(endpoint.method(), endpoint.concretePath())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+                    .with(anonymous())
+                    .with(csrf());
+            if (endpoint.method() == HttpMethod.GET && endpoint.pattern().equals("/api/bookings")) {
+                request.param("date", "2026-05-12");
+            }
+            mockMvc.perform(request)
                     .andExpect(status().is2xxSuccessful())
                     .andExpect(content().contentTypeCompatibleWith(endpoint.produces()));
             return null;
@@ -368,6 +373,19 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                         .flatMap(pattern -> methodsOf(info).stream()
                                 .map(method -> new MappedEndpoint(method, pattern, producesOf(info)))))
                 .toList();
+    }
+
+    private List<MappedEndpoint> endpointsMatchingAccess(Predicate<MappedEndpoint> accessFilter) {
+        return endpointsMatching(pattern -> true).stream().filter(accessFilter).toList();
+    }
+
+    private static boolean isAnonymousAllowed(MappedEndpoint endpoint) {
+        return ANONYMOUS_ALLOWED_PATHS.contains(endpoint.pattern())
+                || endpoint.method() == HttpMethod.GET && endpoint.pattern().equals("/api/bookings");
+    }
+
+    private static boolean isAuthenticatedOnly(MappedEndpoint endpoint) {
+        return AUTHENTICATED_PATHS.contains(endpoint.pattern()) && !isAnonymousAllowed(endpoint);
     }
 
     private static MediaType producesOf(RequestMappingInfo info) {

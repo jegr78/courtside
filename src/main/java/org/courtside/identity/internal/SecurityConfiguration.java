@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,6 +61,7 @@ public class SecurityConfiguration {
                                         && !hasAuthority(authentication.get(),
                                         CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
                         .requestMatchers("/api/public/**", "/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/bookings").permitAll()
                         .requestMatchers("/actuator/prometheus").access((authentication, context) ->
                                 new AuthorizationDecision(performanceTelemetryEnabled))
                         // The contract is not a secret and is needed before anyone can

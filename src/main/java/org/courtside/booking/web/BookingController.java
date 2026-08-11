@@ -14,6 +14,8 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.MatchType;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.PersonalBookingPage;
+import org.courtside.booking.internal.AllocationVisibilityService;
+import org.courtside.booking.internal.AllocationVisibilityService.AllocationVisibility;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.identity.CurrentUser;
@@ -40,17 +42,20 @@ class BookingController implements BookingsApi {
     private final BookingService bookings;
     private final CardService cards;
     private final CurrentUser currentUser;
+    private final AllocationVisibilityService allocationVisibility;
     private final BookingRequestValidator crossFieldRules;
     private final ZoneId zone;
 
     BookingController(BookingService bookings,
                       CardService cards,
                       CurrentUser currentUser,
+                      AllocationVisibilityService allocationVisibility,
                       BookingRequestValidator crossFieldRules,
                       @Value("${courtside.booking.time-zone}") String zone) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
+        this.allocationVisibility = allocationVisibility;
         this.crossFieldRules = crossFieldRules;
         this.zone = ZoneId.of(zone);
     }
@@ -130,16 +135,20 @@ class BookingController implements BookingsApi {
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));
         Map<UUID, Long> slotCounts = bookings.participantCountsFor(
                 allocations.stream().map(a -> a.getBooking().getId()).distinct().toList());
+        Map<UUID, AllocationVisibility> visibility = allocationVisibility.resolve(
+                allocations, currentUser.accountReadyForUse());
 
         return ResponseEntity.ok(allocations.stream()
-                .map(allocation -> toResponse(allocation, cardsById, slotCounts))
+                .map(allocation -> toResponse(allocation, cardsById, slotCounts, visibility))
                 .toList());
     }
 
     private ApiAllocation toResponse(CourtAllocation allocation,
                                      Map<UUID, BookingCard> cardsById,
-                                     Map<UUID, Long> slotCounts) {
+                                     Map<UUID, Long> slotCounts,
+                                     Map<UUID, AllocationVisibility> visibility) {
         BookingCard card = cardsById.get(allocation.getBooking().getCardId());
+        AllocationVisibility allocationVisibility = visibility.get(allocation.getBooking().getId());
         ApiMatchType matchType = MatchType
                 .ofSlotCount(slotCounts.getOrDefault(allocation.getBooking().getId(), 0L))
                 .map(type -> ApiMatchType.fromValue(type.name()))
@@ -151,7 +160,11 @@ class BookingController implements BookingsApi {
                 WireTypes.toOffsetDateTime(allocation.getStartsAt()),
                 WireTypes.toOffsetDateTime(allocation.getEndsAt()),
                 card == null ? "?" : card.getLabel(),
-                card == null ? "#999999" : card.getColor())
+                card == null ? "#999999" : card.getColor(),
+                allocationVisibility.ownBooking())
+                .participantLastNames(matchType != null && allocationVisibility.ownBooking()
+                        ? allocationVisibility.participantLastNames()
+                        : null)
                 .matchType(matchType);
     }
 }

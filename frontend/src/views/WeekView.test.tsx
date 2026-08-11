@@ -45,8 +45,10 @@ beforeEach(async () => {
     courtId: courts[0].id,
     startsAt: "2026-08-10T18:00:00+02:00",
     endsAt: "2026-08-10T19:00:00+02:00",
-    cardLabel: "Singles",
-    cardColor: "#176b55"
+    cardLabel: "Member booking",
+    cardColor: "#176b55",
+    ownBooking: false,
+    matchType: "SINGLES"
   }] : []));
 });
 
@@ -65,6 +67,7 @@ it("given the current week, when it loads, then every day and active court is av
   expect(screen.getByRole("rowheader", { name: "21:30" })).toBeInTheDocument();
   expect(screen.getByText("Singles")).toHaveStyle({ backgroundColor: "rgb(23, 107, 85)" });
   expect(screen.getAllByText("Singles")).toHaveLength(1);
+  expect(screen.queryByText("Member booking")).not.toBeInTheDocument();
 });
 
 it("given the current week, when opening the next week, then its seven days are loaded", async () => {
@@ -119,7 +122,8 @@ it("given a red booking card, when it is shown, then its label uses the higher-c
     startsAt: "2026-08-10T18:00:00+02:00",
     endsAt: "2026-08-10T18:30:00+02:00",
     cardLabel: "Training",
-    cardColor: "#ff0000"
+    cardColor: "#ff0000",
+    ownBooking: false
   }] : []));
 
   // when
@@ -127,6 +131,28 @@ it("given a red booking card, when it is shown, then its label uses the higher-c
 
   // then
   expect(await screen.findByText("Training")).toHaveStyle({ color: "rgb(15, 23, 42)" });
+});
+
+it("given an own member booking, when it is shown, then the viewer marker and other surnames are visible", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Member booking",
+    cardColor: "#b85c38",
+    ownBooking: true,
+    participantLastNames: ["Major", "Miles"],
+    matchType: "DOUBLES"
+  }] : []));
+
+  // when
+  render(<WeekView today={new Date(2026, 7, 10, 12)} />);
+
+  // then
+  expect(await screen.findByText("You, Major, Miles")).toBeInTheDocument();
+  expect(screen.queryByText("Member booking")).not.toBeInTheDocument();
 });
 
 it("given a free slot, when booking it with a guest, then the refreshed allocation is visible", async () => {
@@ -142,7 +168,10 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
     startsAt: "2026-08-10T06:00:00Z",
     endsAt: "2026-08-10T06:30:00Z",
     cardLabel: "Member booking",
-    cardColor: "#b85c38"
+    cardColor: "#b85c38",
+    ownBooking: true,
+    participantLastNames: [],
+    matchType: "SINGLES"
   }] : []));
   render(<WeekView today={new Date(2026, 7, 10, 12)} />);
   await screen.findByRole("button", { name: "Book Centre Court at 08:00" });
@@ -158,7 +187,7 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
     cardId: "55555555-5555-5555-5555-555555555555",
     participants: [{ guestName: "John Roe" }]
   }), expect.any(String)));
-  expect(await screen.findByText("Member booking")).toBeInTheDocument();
+  expect(await screen.findByText("You")).toBeInTheDocument();
 });
 
 it("given booking rules reject a slot, when submitting it, then every violation is translated by its field", async () => {
@@ -234,15 +263,18 @@ it("given an occupied slot, when cancelling it, then the API decides and the day
     startsAt: "2026-08-10T18:00:00+02:00",
     endsAt: "2026-08-10T19:00:00+02:00",
     cardLabel: "Singles",
-    cardColor: "#176b55"
+    cardColor: "#176b55",
+    ownBooking: true,
+    participantLastNames: [],
+    matchType: "SINGLES"
   }] : []));
   render(<WeekView today={new Date(2026, 7, 10, 12)} />);
-  await userEvent.click(await screen.findByRole("button", { name: "Singles, cancel booking" }));
+  await userEvent.click(await screen.findByRole("button", { name: "You, cancel booking" }));
 
   // when
   await userEvent.click(screen.getByRole("button", { name: "Confirm cancellation" }));
 
   // then
   await waitFor(() => expect(api.cancelBooking).toHaveBeenCalledWith("33333333-3333-3333-3333-333333333333"));
-  await waitFor(() => expect(screen.queryByText("Singles")).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByText("You")).not.toBeInTheDocument());
 });
