@@ -6,10 +6,12 @@ import org.courtside.member.internal.MembershipTypeNotFoundException;
 import org.courtside.member.internal.MembershipTypeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +30,18 @@ public class MemberService {
 
     public Optional<UUID> membershipTypeIdOf(UUID personId) {
         return members.findByPersonId(personId).map(Member::getMembershipTypeId);
+    }
+
+    public List<MemberParticipant> findParticipants(String query) {
+        String normalized = query.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return List.of();
+        }
+        return members.findParticipants(escapeLikePattern(normalized), PageRequest.of(0, 20));
+    }
+
+    private String escapeLikePattern(String value) {
+        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     public List<MembershipType> allMembershipTypes() {

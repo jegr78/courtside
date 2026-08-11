@@ -53,6 +53,8 @@ tags:
     description: The booking and participant cards a member may use.
   - name: bookings
     description: Booking a court, and cancelling.
+  - name: participants
+    description: Finding members who can participate in a booking.
   - name: booking-series
     description: Recurring bookings — previewing, creating, moving and cancelling.
   - name: admin-courts
@@ -335,6 +337,13 @@ components:
         id: { type: string, format: uuid }
         label: { type: string }
         capacity: { type: [integer, "null"] }
+
+    PublicParticipantMember:
+      type: object
+      required: [personId, displayName]
+      properties:
+        personId: { type: string, format: uuid }
+        displayName: { type: string }
 
     BookingCard:
       type: object
@@ -990,6 +999,30 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/PublicParticipantCard" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /api/public/participant-members:
+    get:
+      tags: [participants]
+      operationId: listParticipantMembers
+      summary: Members matching a name fragment for participant selection.
+      description: Returns at most 20 members and exposes no contact details.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 60 }
+      responses:
+        "200":
+          description: Matching members ordered by display name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PublicParticipantMember" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
 

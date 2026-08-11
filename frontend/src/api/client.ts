@@ -7,6 +7,11 @@ export type Problem = components["schemas"]["Problem"];
 export type PublicCourt = components["schemas"]["PublicCourt"];
 export type Allocation = components["schemas"]["Allocation"];
 export type BookingGrid = components["schemas"]["BookingGrid"];
+export type PublicBookingCard = components["schemas"]["PublicBookingCard"];
+export type PublicParticipantCard = components["schemas"]["PublicParticipantCard"];
+export type PublicParticipantMember = components["schemas"]["PublicParticipantMember"];
+export type CreateBookingRequest = components["schemas"]["CreateBookingRequest"];
+export type BookingCreated = components["schemas"]["BookingCreated"];
 
 export class ApiError extends Error {
   constructor(
@@ -57,6 +62,17 @@ export const api = {
   allocations: (date: string) => request<Allocation[]>(
     `/api/bookings?${new URLSearchParams({ date })}`
   ),
+  bookingCards: () => request<PublicBookingCard[]>("/api/public/booking-cards"),
+  participantCards: () => request<PublicParticipantCard[]>("/api/public/participant-cards"),
+  participantMembers: (query: string) => request<PublicParticipantMember[]>(
+    `/api/public/participant-members?${new URLSearchParams({ query })}`
+  ),
+  createBooking: (booking: CreateBookingRequest, idempotencyKey: string) => request<BookingCreated>("/api/bookings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(booking)
+  }),
+  cancelBooking: (bookingId: string) => request<void>(`/api/bookings/${bookingId}`, { method: "DELETE" }),
   login: (username: string, password: string) => request<void>("/api/session", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
