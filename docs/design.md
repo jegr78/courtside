@@ -349,7 +349,13 @@ CREATE TABLE booking_card_allowed_role (
 ```
 
 A new card type is a row in the admin backend, not a deployment. A card with no allowed roles
-is available to every authenticated account; otherwise holding any listed role is sufficient.
+is available to every authenticated member account; otherwise holding any listed role is
+sufficient. Future external accounts are never covered by an empty role list and may use only
+cards that explicitly allow `EXTERNAL_BOOKER`.
+Cards express permissions and booking behaviour, never identity. Creating, changing or cancelling
+a booking requires an authenticated account; no booking or participant card carries a shared
+credential. Codes that unlock a local device or kiosk belong to that device and do not authorize
+Courtside actions.
 
 ### Two kinds of card, often conflated into one
 
@@ -829,8 +835,9 @@ whether it is built or designed. **Designed means absent today.**
   while `Retry-After` tells a client when an address or instance cooldown ends.
 - **Admin roles:** optional TOTP second factor. **Designed, not built** — there is no second
   factor of any kind today.
-- **Card PINs** are stored hashed. They are shared secrets, but still credentials.
-  **Designed, not built** — `booking_card` carries no PIN column yet.
+- **Booking authorization:** every booking mutation has an authenticated account as its actor.
+  Booking and participant cards carry no shared credentials; account roles decide which cards the
+  actor may use. Anonymous access is read-only. *Built.*
 - **Source offer:** `GET /api/source` reports the running version, the commit it was built from
   and where its source can be obtained, unauthenticated. *Built.* An operator who forked sets
   `COURTSIDE_SOURCE_URL`; unset, it names this repository.
@@ -861,6 +868,21 @@ later.
 
 Roles are independent permission bundles rather than a hierarchy: in a club, one person often
 wears several hats.
+
+### Authenticated external accounts
+
+**Designed, not built.** A person who is not a club member may later create a full, verified
+account for club-configured external bookings. A guest account is a `Person` plus `UserAccount`
+without an active `Member` relationship; an active membership turns the same identity into a
+member account. There is no immutable account-type field, so booking history and account credit
+survive either transition.
+
+External booking is disabled until a club configures suitable booking cards, prices, participant
+limits and cancellation rules. A verified external account receives the dedicated
+`EXTERNAL_BOOKER` permission and may use only cards that explicitly allow it; an empty card role
+list never grants external access. Such bookings require sufficient account credit or a confirmed
+PayPal payment before they become binding. The authenticated external account holder is distinct
+from an accompanying guest entered as a participant. Anonymous visitors remain read-only.
 
 ### Name visibility in the grid
 

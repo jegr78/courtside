@@ -28,6 +28,19 @@ info:
     Neither carries rendered text. Each entry has a `code` naming a message and `params` holding
     the values that message interpolates, and the client resolves the pair against its own message
     catalogue. This is what makes the API usable in a language the server does not ship.
+
+    ## Authentication
+
+    Anonymous callers may read the public court plan and its anonymised occupancy. Creating,
+    changing or cancelling a booking always requires a server-side session belonging to the
+    acting account. Booking and participant cards describe permissions and participant slots;
+    they are never credentials and carry no shared secret. State-changing requests also require
+    the CSRF token declared below.
+
+    Future paid bookings by people without a club membership use verified external accounts, not
+    anonymous writes. Those accounts retain their booking and payment history and may later gain
+    an active membership without changing identity. They may use only cards that explicitly allow
+    the future `EXTERNAL_BOOKER` permission; an empty card role list never grants external access.
   license:
     name: AGPL-3.0-or-later
     identifier: AGPL-3.0-or-later
