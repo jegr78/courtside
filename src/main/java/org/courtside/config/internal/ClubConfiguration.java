@@ -39,13 +39,17 @@ public class ClubConfiguration {
     @Column(name = "default_locale", nullable = false)
     private String defaultLocale;
 
+    @Column(name = "slot_minutes", nullable = false)
+    private int slotMinutes;
+
     public void changeTo(String clubName, String primaryColor, String accentColor,
-                         String logoUrl, String imprintUrl, String defaultLocale) {
+                         String logoUrl, String imprintUrl, String defaultLocale, int slotMinutes) {
         this.clubName = clubName;
         this.primaryColor = primaryColor;
         this.accentColor = accentColor;
         this.logoUrl = logoUrl;
         this.imprintUrl = imprintUrl;
         this.defaultLocale = defaultLocale;
+        this.slotMinutes = slotMinutes;
     }
 }

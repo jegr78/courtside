@@ -18,6 +18,7 @@ import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
+import org.courtside.config.BookingGridCoordination;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Role;
 import org.courtside.rules.RuleViolation;
@@ -59,6 +60,7 @@ public class SeriesService {
     private final ParticipantCardCapacity participantCardCapacity;
     private final Clock clock;
     private final ZoneId zone;
+    private final BookingGridCoordination bookingGridCoordination;
 
     public SeriesService(SeriesSchedule schedule,
                          CourtAllocationRepository allocations,
@@ -71,6 +73,7 @@ public class SeriesService {
                          BookingAccessControl accessControl,
                          ParticipantCardCapacity participantCardCapacity,
                          Clock clock,
+                         BookingGridCoordination bookingGridCoordination,
                          @Value("${courtside.booking.time-zone}") String zone) {
         this.schedule = schedule;
         this.allocations = allocations;
@@ -83,6 +86,7 @@ public class SeriesService {
         this.accessControl = accessControl;
         this.participantCardCapacity = participantCardCapacity;
         this.clock = clock;
+        this.bookingGridCoordination = bookingGridCoordination;
         this.zone = ZoneId.of(zone);
     }
 
@@ -206,6 +210,7 @@ public class SeriesService {
     // Without it nothing persists at all; with it, a mid-flush constraint failure undoes every move.
     @Transactional
     public int move(MoveRequest request, UUID movedBy, Set<Role> callerRoles) {
+        bookingGridCoordination.lock();
         MovePreview preview = previewMove(request, movedBy, callerRoles);
 
         List<UUID> blocked = preview.moves().stream()

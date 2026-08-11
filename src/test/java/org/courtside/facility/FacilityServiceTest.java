@@ -9,6 +9,7 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FacilityServiceTest extends AbstractIntegrationTest {
 
@@ -61,5 +62,17 @@ class FacilityServiceTest extends AbstractIntegrationTest {
 
         // then
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void givenOpeningHoursOutsideTheBookingGrid_whenSavingThem_thenTheyAreRejected() {
+        // when / then
+        assertThatThrownBy(() -> facilityService.setOpeningHours(
+                DayOfWeek.MONDAY,
+                new OpeningWindow(LocalTime.of(8, 15), LocalTime.of(20, 15))))
+                .isInstanceOf(OpeningHoursGridMismatchException.class)
+                .satisfies(failure -> assertThat(
+                        ((OpeningHoursGridMismatchException) failure).getCode())
+                        .isEqualTo("facility.openingHours.slotGridMismatch"));
     }
 }

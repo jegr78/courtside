@@ -700,7 +700,7 @@ Three layers, separated by the question "who changes this?":
 |---|---|---|
 | Build | Defaults, migrations, card type templates | The project, in code |
 | Instance (`.env`) | DB credentials, SMTP, OTLP endpoint, base URL, secrets | Club admin, at deployment |
-| Database (`config` module) | Club name, colours, logo, opening hours, rules, card types, locale | The club, in the admin backend |
+| Database (`config` module) | Club name, colours, logo, opening hours, booking grid, rules, card types, locale | The club, in the admin backend |
 
 Rule of thumb: anything a club board would plausibly want to change belongs in the database
 and the admin UI. Anything requiring a restart belongs in `.env`. Nothing functional
@@ -709,6 +709,15 @@ belongs in code.
 **Branding** is served from a public endpoint `/api/public/config` that the PWA fetches at
 startup: club name, primary and accent colour, logo URL, imprint link, default locale.
 Colours are applied as CSS custom properties on `:root` — no rebuild per club.
+
+The **booking-grid duration** is a club setting between 5 and 120 minutes in five-minute steps.
+The public grid, booking rules and series validation read the current database value through the
+same configuration port. A change applies immediately to new bookings. It is rejected when a
+confirmed active or future booking, or an existing opening-hours window, would not align with the
+new grid. Historical bookings remain unchanged. Changing opening hours applies the same alignment
+rule so the public grid never offers a slot that booking validation would reject. Grid changes,
+booking writes, series moves and opening-hours changes serialize on the single club-configuration
+row so a concurrent write cannot pass validation against a stale grid.
 
 The **PWA manifest is served dynamically** so the home screen icon shows the club logo, not
 a generic Courtside symbol. This is what decides whether the product feels like "our app"

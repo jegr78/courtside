@@ -81,6 +81,22 @@ it("given the current week, when it loads, then every day and active court is av
   expect(booking).toHaveTextContent("Singles");
 });
 
+it("given short booking slots, when rendering the plan, then rows retain their usable height", async () => {
+  // given
+  vi.mocked(api.bookingGrid).mockResolvedValue({
+    timeZone: "Europe/Berlin",
+    slotMinutes: 15,
+    openingHours: [{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }]
+  });
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  expect((await screen.findByRole("rowheader", { name: "08:00" })).closest("tr"))
+    .toHaveStyle({ height: "32px" });
+});
+
 it("given the current week, when opening the next week, then its seven days are loaded", async () => {
   // given
   render(<WeekView today={clubInstant("12:00")} />);

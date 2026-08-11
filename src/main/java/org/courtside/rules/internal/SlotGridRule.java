@@ -2,6 +2,8 @@ package org.courtside.rules.internal;
 
 import org.courtside.rules.RuleContext;
 import org.courtside.rules.RuleViolation;
+import org.courtside.config.BookingGridSettings;
+import org.courtside.config.BookingSlotDuration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,12 +15,12 @@ import java.util.Map;
 @Component
 public class SlotGridRule implements BookingRule {
 
-    private final int slotMinutes;
+    private final BookingGridSettings bookingGridSettings;
     private final ZoneId zone;
 
-    public SlotGridRule(@Value("${courtside.booking.slot-minutes}") int slotMinutes,
+    public SlotGridRule(BookingGridSettings bookingGridSettings,
                         @Value("${courtside.booking.time-zone}") String zone) {
-        this.slotMinutes = slotMinutes;
+        this.bookingGridSettings = bookingGridSettings;
         this.zone = ZoneId.of(zone);
     }
 
@@ -30,16 +32,15 @@ public class SlotGridRule implements BookingRule {
     @Override
     public List<RuleViolation> check(RuleContext context) {
         ZonedDateTime start = context.slot().start().atZone(zone);
+        BookingSlotDuration slotDuration = bookingGridSettings.slotDuration();
+        int slotMinutes = slotDuration.minutes();
 
-        boolean aligned = start.getMinute() % slotMinutes == 0
-                && start.getSecond() == 0
-                && start.getNano() == 0;
-        if (!aligned) {
+        if (!slotDuration.isAligned(start.toLocalTime())) {
             return List.of(new RuleViolation("booking.rule.slotGrid.misaligned",
                     Map.of("slotMinutes", slotMinutes)));
         }
 
-        if (context.slot().duration().toMinutes() % slotMinutes != 0) {
+        if (!slotDuration.containsWholeSlots(context.slot().duration())) {
             return List.of(new RuleViolation("booking.rule.slotGrid.duration",
                     Map.of("slotMinutes", slotMinutes)));
         }

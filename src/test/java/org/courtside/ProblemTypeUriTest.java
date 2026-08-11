@@ -42,6 +42,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:invalid-opening-window",
             "urn:courtside:error:idempotency-key-reused",
             "urn:courtside:error:login-rate-limited",
+            "urn:courtside:error:opening-hours-grid-mismatch",
             "urn:courtside:error:membership-type-name-taken",
             "urn:courtside:error:membership-type-not-found",
             "urn:courtside:error:participants-invalid",
@@ -52,7 +53,8 @@ class ProblemTypeUriTest {
             "urn:courtside:error:rule-set-unresolvable",
             "urn:courtside:error:series-move-conflict",
             "urn:courtside:error:series-request-invalid",
-            "urn:courtside:error:series-not-found");
+            "urn:courtside:error:series-not-found",
+            "urn:courtside:error:slot-duration-conflict");
 
     private static final List<String> KNOWN_ADVICE_SLUGS = List.of(
             "urn:courtside:error:access-denied",

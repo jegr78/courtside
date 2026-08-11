@@ -14,6 +14,7 @@ import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.card.ParticipantCard;
 import org.courtside.facility.FacilityService;
+import org.courtside.config.BookingGridCoordination;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.shared.TimeSlot;
@@ -48,12 +49,14 @@ class BookingWriter {
     private final FacilityService facility;
     private final PersonRepository personRepository;
     private final ParticipantCardCapacity participantCardCapacity;
+    private final BookingGridCoordination bookingGridCoordination;
 
     UUID write(CreateBookingCommand command) {
         return write(command, null, null);
     }
 
     UUID write(CreateBookingCommand command, String idempotencyKey, String requestFingerprint) {
+        bookingGridCoordination.lock();
         facility.requireBookableCourts(command.courtIds());
         BookingCard card = requireBookableCard(command.cardId());
 

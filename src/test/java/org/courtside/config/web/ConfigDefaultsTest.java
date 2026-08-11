@@ -34,6 +34,7 @@ class ConfigDefaultsTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.clubName").value("Courtside"))
                 .andExpect(jsonPath("$.primaryColor").value("#B85C38"))
                 .andExpect(jsonPath("$.accentColor").value("#D7E24B"))
-                .andExpect(jsonPath("$.defaultLocale").value("de"));
+                .andExpect(jsonPath("$.defaultLocale").value("de"))
+                .andExpect(jsonPath("$.slotMinutes").value(30));
     }
 }

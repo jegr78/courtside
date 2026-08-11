@@ -12,12 +12,20 @@ import org.courtside.config.internal.ConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
 
 @RestController
 @RequiredArgsConstructor
 class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
 
     private final ConfigService config;
+    private final ConfigRequestValidator requestValidator;
+
+    @InitBinder
+    void validateRequests(WebDataBinder binder) {
+        binder.addValidators(requestValidator);
+    }
 
     @Override
     public ResponseEntity<ApiClubConfig> getClubConfig() {
@@ -33,7 +41,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
     public ResponseEntity<ApiClubConfig> changeClubConfig(ApiClubConfigRequest request) {
         return ResponseEntity.ok(toResponse(config.update(
                 request.getClubName(), request.getPrimaryColor(), request.getAccentColor(),
-                request.getLogoUrl(), request.getImprintUrl(), request.getDefaultLocale())));
+                request.getLogoUrl(), request.getImprintUrl(), request.getDefaultLocale(),
+                request.getSlotMinutes())));
     }
 
     @Override
@@ -53,7 +62,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
     private static ApiClubConfig toResponse(ClubConfiguration configuration) {
         return new ApiClubConfig(
                 configuration.getClubName(), configuration.getPrimaryColor(),
-                configuration.getAccentColor(), configuration.getDefaultLocale())
+                configuration.getAccentColor(), configuration.getDefaultLocale(),
+                configuration.getSlotMinutes())
                 .logoUrl(configuration.getLogoUrl())
                 .imprintUrl(configuration.getImprintUrl());
     }
