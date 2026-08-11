@@ -45,6 +45,9 @@ describe("AppRoutes", () => {
     );
 
     expect(screen.getByTestId("home-view")).toHaveClass("self-start");
+    const courtPlan = screen.getByRole("heading", { name: "Platzbelegung" });
+    const personalBookings = screen.getByRole("heading", { name: "Meine Buchungen" });
+    expect(courtPlan.compareDocumentPosition(personalBookings) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
   it("given an initial password session, when opening the app, then it requires a new password", () => {

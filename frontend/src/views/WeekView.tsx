@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type CSSProperties, type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type Allocation, type BookingGrid, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { problemMessage } from "../api/problem-message";
@@ -8,6 +8,7 @@ import { Modal } from "../components/Modal";
 
 interface WeekViewProps {
   today?: Date;
+  clock?: () => Date;
 }
 
 interface WeekData {
@@ -24,16 +25,19 @@ interface BookingSelection {
 }
 
 const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+const systemClock = () => new Date();
 
-export function WeekView({ today = new Date() }: WeekViewProps) {
+export function WeekView({ today, clock = systemClock }: WeekViewProps) {
   const { t, i18n } = useTranslation();
-  const [referenceInstant] = useState(today);
+  const [referenceInstant] = useState(() => today ?? clock());
+  const [currentInstant, setCurrentInstant] = useState(referenceInstant);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>();
   const [data, setData] = useState<WeekData>();
   const [error, setError] = useState<string>();
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
   const [cancellation, setCancellation] = useState<Allocation>();
+  const planRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -63,14 +67,38 @@ export function WeekView({ today = new Date() }: WeekViewProps) {
   const selectedAllocations = selectedDate ? data?.allocations.get(selectedDate) ?? [] : [];
   const slots = selectedDay && data ? slotsFor(selectedDay, data.grid) : [];
   const language = i18n.resolvedLanguage ?? i18n.language;
+  const isToday = selectedDate === dateInTimeZoneValue(currentInstant, data?.grid.timeZone);
+  const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
+  const slotHeight = data ? data.grid.slotMinutes * 4 / 3 : 40;
+  const currentSlot = currentTime && (slots.find((slot) => slot >= currentTime) ?? slots.at(-1));
 
-  async function refreshDate(date: string) {
+  const refreshDate = useCallback(async (date: string) => {
     const allocations = await api.allocations(date);
     setData((current) => current ? {
       ...current,
       allocations: new Map(current.allocations).set(date, allocations)
     } : current);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDate || !data) return;
+    const refresh = () => {
+      setCurrentInstant(clock());
+      void refreshDate(selectedDate).catch((failure: unknown) => setError(problemMessage(failure, t)));
+    };
+    const interval = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [clock, data, refreshDate, selectedDate, t]);
+
+  useEffect(() => {
+    if (!isToday || !currentSlot) return;
+    const frame = window.requestAnimationFrame(() => scrollToSlot(planRef.current, currentSlot));
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentSlot, isToday]);
 
   return <section aria-labelledby="occupancy-heading" className="mt-8">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -109,33 +137,59 @@ export function WeekView({ today = new Date() }: WeekViewProps) {
 
     {error && <Alert>{error}</Alert>}
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
-    {data && <div data-testid="week-grid" data-week-offset={weekOffset} className="border-structural mt-6 overflow-x-auto rounded-xl border">
-      <table className="min-w-full border-collapse text-sm">
+    {data && <div className="mt-4 flex justify-end">
+      {isToday && <Button type="button" className="button-secondary" onClick={() => scrollToSlot(planRef.current, currentSlot)}>{t("week.now")}</Button>}
+    </div>}
+    {data && <div
+      ref={planRef}
+      data-testid="week-grid"
+      data-week-offset={weekOffset}
+      className="day-plan border-structural relative mt-3 max-h-[70vh] overflow-auto rounded-xl border"
+      style={{ "--court-count": data.courts.length } as CSSProperties}
+    >
+      <table data-testid="day-plan-table" className={`day-plan-table border-collapse text-sm ${data.courts.length > 4 ? "day-plan-many-courts" : ""}`}>
+        <colgroup>
+          <col className="day-plan-time-column" />
+          {data.courts.map((court) => <col key={court.id} data-testid="court-column" className="day-plan-court-column" />)}
+        </colgroup>
         <thead className="surface-raised">
           <tr>
             <th scope="col" className="border-structural border-b px-4 py-3 text-left">{t("week.time")}</th>
             {data.courts.map((court) => <th
               key={court.id}
               scope="col"
-              className="border-structural min-w-40 border-b px-4 py-3 text-left"
+              className="border-structural border-b px-4 py-3 text-left"
             >{court.name || t("court.number", { number: court.number })}</th>)}
           </tr>
         </thead>
         <tbody>
-          {slots.map((slot) => <tr key={slot}>
-            <th scope="row" className="font-value border-structural whitespace-nowrap border-b px-4 py-3 text-left font-medium">
+          {slots.map((slot) => <tr key={slot} data-slot={slot} style={{ height: `${slotHeight}px` }}>
+            <th scope="row" className="font-value surface-panel border-structural whitespace-nowrap border-b px-3 text-left font-medium">
               {slot}
             </th>
             {data.courts.map((court) => renderCell(
               court, slot, selectedAllocations, data.grid.slotMinutes, data.grid.timeZone, t,
               () => selectedDate && setBookingSelection({ date: selectedDate, slot, courtId: court.id }),
-              setCancellation
+              setCancellation,
+              selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false
             ))}
           </tr>)}
         </tbody>
       </table>
+      {isToday && currentTime && slots.length > 0 && <div
+        data-testid="current-time-line"
+        aria-label={t("week.currentTime", { time: currentTime })}
+        className="current-time-line"
+        style={{ top: `${48 + currentLineOffset(currentTime, slots[0], data.grid.slotMinutes, slotHeight)}px` }}
+      />}
       {slots.length === 0 && <p className="text-muted px-4 py-6 text-center">{t("week.closed")}</p>}
     </div>}
+    {data && <ul className="text-muted mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t("week.legend")}>
+      <li><span className="day-plan-legend free" aria-hidden="true" />{t("week.available")}</li>
+      <li><span className="day-plan-legend occupied" aria-hidden="true" />{t("week.occupied")}</li>
+      <li><span className="day-plan-legend own" aria-hidden="true" />{t("week.own")}</li>
+      <li><span className="day-plan-legend unavailable" aria-hidden="true" />{t("week.unavailable")}</li>
+    </ul>}
     {bookingSelection && data && <BookingDialog
       selection={bookingSelection}
       grid={data.grid}
@@ -149,6 +203,7 @@ export function WeekView({ today = new Date() }: WeekViewProps) {
           setError(problemMessage(failure, t));
         }
       }}
+      conflicted={() => refreshDate(bookingSelection.date)}
     />}
     {cancellation && selectedDate && <CancellationDialog
       allocation={cancellation}
@@ -173,22 +228,27 @@ function renderCell(
   timeZone: string,
   t: ReturnType<typeof useTranslation>["t"],
   book: () => void,
-  cancel: (allocation: Allocation) => void
+  cancel: (allocation: Allocation) => void,
+  isPast: boolean
 ) {
   const allocation = allocations.find((entry) => entry.courtId === court.id && formatTime(entry.startsAt, timeZone) === slot);
   if (allocation) {
     const duration = (Date.parse(allocation.endsAt) - Date.parse(allocation.startsAt)) / 60_000;
     const label = allocationLabel(allocation, t);
-    const className = "h-full rounded-lg px-3 py-2 font-semibold";
-    const style = { backgroundColor: allocation.cardColor, color: contrastColor(allocation.cardColor) };
+    const className = "h-full w-full rounded-md px-3 py-2 text-left font-semibold";
+    const state = allocation.ownBooking ? "own" : allocation.matchType ? "occupied" : "card";
+    const style = allocation.ownBooking
+      ? { backgroundColor: "var(--cs-ball)", color: "var(--cs-shade)" }
+      : { backgroundColor: allocation.cardColor, color: contrastColor(allocation.cardColor) };
     return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className="border-structural border-b p-2 align-top">
-      {allocation.ownBooking ? <button
+      {allocation.ownBooking && !isPast ? <button
         type="button"
+        data-state={state}
         aria-label={t("booking.cancelLabel", { label })}
         onClick={() => cancel(allocation)}
         className={className}
         style={style}
-      >{label}</button> : <div className={className} style={style}>{label}</div>}
+      >{label}</button> : <div data-state={state} className={className} style={style}>{label}</div>}
     </td>;
   }
   const minute = timeToMinutes(slot);
@@ -196,9 +256,16 @@ function renderCell(
     && timeToMinutes(formatTime(entry.startsAt, timeZone)) < minute
     && timeToMinutes(formatTime(entry.endsAt, timeZone)) > minute);
   const courtName = court.name || t("court.number", { number: court.number });
-  return isCovered ? null : <td key={court.id} className="border-structural border-b p-2">
-    <button type="button" className="min-h-10 w-full rounded-lg hover:bg-(--club-accent)/40" aria-label={t("booking.open", { court: courtName, time: slot })} onClick={book}>
-      <span className="sr-only">{t("week.available")}</span>
+  return isCovered ? null : <td key={court.id} className="border-structural border-b p-1">
+    <button
+      type="button"
+      disabled={isPast}
+      data-state={isPast ? "past" : "free"}
+      className="day-plan-slot h-full w-full rounded-md px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--club-accent)"
+      aria-label={isPast ? t("week.pastLabel", { court: courtName, time: slot }) : t("booking.open", { court: courtName, time: slot })}
+      onClick={book}
+    >
+      {isPast ? t("week.past") : t("week.available")}
     </button>
   </td>;
 }
@@ -213,12 +280,13 @@ function allocationLabel(
   return allocation.matchType ? t(`booking.matchType.${allocation.matchType}`) : allocation.cardLabel;
 }
 
-function BookingDialog({ selection, grid, courts, closed, created }: {
+function BookingDialog({ selection, grid, courts, closed, created, conflicted }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
   closed: () => void;
   created: () => Promise<void>;
+  conflicted: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [bookingCards, setBookingCards] = useState<PublicBookingCard[]>([]);
@@ -286,6 +354,9 @@ function BookingDialog({ selection, grid, courts, closed, created }: {
       }, idempotencyKey);
       await created();
     } catch (failure) {
+      if (failure instanceof ApiError && failure.status === 409) {
+        await conflicted().catch(() => undefined);
+      }
       if (failure instanceof ApiError && failure.problem) {
         setViolations(translatedViolations(failure.problem, t));
         setIdempotencyKey(crypto.randomUUID());
@@ -437,6 +508,25 @@ function dateInTimeZone(instant: Date, timeZone: string): Date {
   }).formatToParts(instant);
   const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
   return new Date(value("year"), value("month") - 1, value("day"));
+}
+
+function dateInTimeZoneValue(instant: Date, timeZone?: string): string | undefined {
+  return timeZone ? formatDate(dateInTimeZone(instant, timeZone)) : undefined;
+}
+
+function isPastSlot(date: string, time: string, timeZone: string, now: Date): boolean {
+  return Date.parse(zonedDateTime(date, time, timeZone)) < now.getTime();
+}
+
+function currentLineOffset(currentTime: string, opensAt: string, slotMinutes: number, slotHeight: number): number {
+  return Math.max(0, (timeToMinutes(currentTime) - timeToMinutes(opensAt)) / slotMinutes * slotHeight);
+}
+
+function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
+  const target = slot ? plan?.querySelector(`[data-slot="${slot}"]`) : undefined;
+  if (target instanceof HTMLElement && typeof target.scrollIntoView === "function") {
+    target.scrollIntoView({ block: "center" });
+  }
 }
 
 function startOfWeek(date: Date): Date {

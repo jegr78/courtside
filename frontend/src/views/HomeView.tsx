@@ -28,7 +28,7 @@ export function HomeView({ session, signedOut }: { session: SessionStatus; signe
       <Button type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>
     </div>
     {error && <Alert>{error}</Alert>}
-    <MyBookingsView />
     <WeekView />
+    <MyBookingsView />
   </section>;
 }

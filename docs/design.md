@@ -882,6 +882,18 @@ Consequences for the model and the API:
 - Any future partner-finding feature must be opt-in per member and must not be built by
   loosening this rule.
 
+### Day plan interaction
+
+The multi-court day plan is the primary member view. One to four active courts share its available
+width; larger facilities keep a usable court width and scroll horizontally. Court headings and the
+time axis remain fixed while the plan scrolls, and a 30-minute slot occupies 40 pixels on desktop.
+An occupancy spans its complete duration instead of repeating in each slot.
+
+Free, occupied, own and unavailable states combine text or a pattern with colour. Past slots remain
+visible but cannot open the booking form. On the current day, the plan marks the current time,
+initially moves to the next slot and offers a return-to-now action. It refreshes after mutations,
+after a booking conflict, whenever the window regains focus and once per minute.
+
 ---
 
 ## 11. Data Protection
