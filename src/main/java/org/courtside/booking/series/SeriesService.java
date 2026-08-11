@@ -2,7 +2,7 @@ package org.courtside.booking.series;
 
 import org.courtside.booking.Booking;
 import org.courtside.booking.internal.BookingNotFoundException;
-import org.courtside.booking.internal.BookingNotOwnedException;
+import org.courtside.booking.internal.BookingAccessControl;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingRuleCheck;
 import org.courtside.booking.internal.BookingRuleGate;
@@ -55,6 +55,7 @@ public class SeriesService {
     private final FacilityService facility;
     private final CardService cards;
     private final BookingRuleGate ruleGate;
+    private final BookingAccessControl accessControl;
     private final ParticipantCardCapacity participantCardCapacity;
     private final Clock clock;
     private final ZoneId zone;
@@ -67,6 +68,7 @@ public class SeriesService {
                          FacilityService facility,
                          CardService cards,
                          BookingRuleGate ruleGate,
+                         BookingAccessControl accessControl,
                          ParticipantCardCapacity participantCardCapacity,
                          Clock clock,
                          @Value("${courtside.booking.time-zone}") String zone) {
@@ -78,6 +80,7 @@ public class SeriesService {
         this.facility = facility;
         this.cards = cards;
         this.ruleGate = ruleGate;
+        this.accessControl = accessControl;
         this.participantCardCapacity = participantCardCapacity;
         this.clock = clock;
         this.zone = ZoneId.of(zone);
@@ -184,7 +187,8 @@ public class SeriesService {
 
         List<Booking> affected =
                 affectedBookings(request.seriesId(), request.fromBookingId(), request.scope());
-        requireOwnerOrAdmin(affected, movedBy, callerRoles);
+        affected.forEach(booking ->
+                accessControl.requireManagementAccess(booking, movedBy, callerRoles));
 
         List<UUID> movingIds = affected.stream().map(Booking::getId).toList();
         List<PlannedMove> planned = affected.stream()
@@ -234,6 +238,7 @@ public class SeriesService {
 
         executions.forEach(execution -> execution.courtIds().forEach(
                 courtId -> execution.booking().allocate(courtId, execution.slot())));
+        executions.forEach(execution -> execution.booking().recordMove(movedBy, clock.instant()));
         try {
             bookingRepository.flush();
         } catch (DataIntegrityViolationException e) {
@@ -261,19 +266,6 @@ public class SeriesService {
                 ? currentCourtsOf(booking)
                 : request.newCourtIds();
         return new MoveExecution(booking, courtIds, move.to());
-    }
-
-    private void requireOwnerOrAdmin(List<Booking> affected, UUID movedBy, Set<Role> callerRoles) {
-        if (callerRoles.contains(Role.ADMIN)) {
-            return;
-        }
-        affected.stream()
-                .filter(booking -> !movedBy.equals(booking.getBookedBy()))
-                .findFirst()
-                .ifPresent(booking -> {
-                    throw new BookingNotOwnedException(
-                            "Account %s may not move booking %s".formatted(movedBy, booking.getId()));
-                });
     }
 
     private void requireNoNonOverridableViolations(MoveExecution execution) {

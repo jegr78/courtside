@@ -8,7 +8,7 @@ public class BookingNotOwnedException extends DomainFailure {
 
     public static final ProblemType PROBLEM_TYPE = new ProblemType(
             "booking-not-owned", HttpStatus.FORBIDDEN,
-            "Not allowed", "You may only change your own bookings");
+            "Not allowed", "You may only change bookings you own or are authorized to manage");
 
     public BookingNotOwnedException(String message) {
         super(message);

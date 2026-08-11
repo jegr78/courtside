@@ -420,7 +420,8 @@ class BookingControllerTest extends AbstractIntegrationTest {
         // when
         mockMvc.perform(delete("/api/bookings/{id}", id).with(csrf()))
                 .andExpect(status().isForbidden())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-owned"));
 
         // then
         assertThat(bookings.findById(id).orElseThrow().getStatus())

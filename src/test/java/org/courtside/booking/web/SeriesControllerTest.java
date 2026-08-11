@@ -305,7 +305,8 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.title").value("Not allowed"))
-                .andExpect(jsonPath("$.detail").value("You may only change your own bookings"))
+                .andExpect(jsonPath("$.detail").value(
+                        "You may only change bookings you own or are authorized to manage"))
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-owned"));
     }
 

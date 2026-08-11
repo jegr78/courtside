@@ -7,6 +7,9 @@ import org.courtside.facility.CourtRepository;
 import org.courtside.facility.OpeningHours;
 import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.shared.OpeningWindow;
+import org.courtside.card.CardService;
+import org.courtside.card.BookingCard;
+import org.courtside.booking.internal.BookingNotOwnedException;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -34,6 +37,8 @@ class BookingServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID LEAGUE_MATCH_CARD =
+            UUID.fromString("33333333-3333-3333-3333-333333333333");
 
     private static final Instant SIX_PM = Instant.parse("2026-05-12T16:00:00Z");
     private static final Instant SEVEN_PM = Instant.parse("2026-05-12T17:00:00Z");
@@ -44,6 +49,9 @@ class BookingServiceTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingRepository bookings;
+
+    @Autowired
+    private CardService cards;
 
     @Autowired
     private CourtRepository courts;
@@ -144,6 +152,54 @@ class BookingServiceTest extends AbstractIntegrationTest {
         assertThat(booking.getAllocations()).singleElement()
                 .extracting(CourtAllocation::getStatus)
                 .isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    @Test
+    void givenALeagueMatchCreatedByASportDirector_whenAYouthDirectorCancels_thenTheActorIsRecorded() {
+        // given
+        UUID sportDirector = UUID.randomUUID();
+        UUID youthDirector = UUID.randomUUID();
+        UUID bookingId = bookingService.create(new CreateBookingCommand(
+                List.of(courtId), LEAGUE_MATCH_CARD, new TimeSlot(SIX_PM, SEVEN_PM),
+                sportDirector, null, Set.of(Role.SPORT_DIRECTOR), null, List.of(), null));
+
+        // when
+        bookingService.cancel(bookingId, youthDirector, Set.of(Role.YOUTH_DIRECTOR));
+
+        // then
+        Booking booking = bookings.findById(bookingId).orElseThrow();
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(booking.getCancelledBy()).isEqualTo(youthDirector);
+    }
+
+    @Test
+    void givenALeagueMatchCreatedByASportDirector_whenAnUnrelatedMemberCancels_thenItIsForbidden() {
+        // given
+        UUID bookingId = bookingService.create(new CreateBookingCommand(
+                List.of(courtId), LEAGUE_MATCH_CARD, new TimeSlot(SIX_PM, SEVEN_PM),
+                UUID.randomUUID(), null, Set.of(Role.SPORT_DIRECTOR), null, List.of(), null));
+
+        // when / then
+        assertThatThrownBy(() -> bookingService.cancel(
+                bookingId, UUID.randomUUID(), Set.of(Role.MEMBER)))
+                .isInstanceOf(BookingNotOwnedException.class);
+    }
+
+    @Test
+    void givenAYouthDirectorsCardAccessWasRevoked_whenCancellingAnotherOfficersBooking_thenItIsForbidden() {
+        // given
+        BookingCard card = cards.createCard("Club championship", "#3A4A5C",
+                Set.of(Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR), new short[0], false, false);
+        UUID bookingId = bookingService.create(new CreateBookingCommand(
+                List.of(courtId), card.getId(), new TimeSlot(SIX_PM, SEVEN_PM),
+                UUID.randomUUID(), null, Set.of(Role.SPORT_DIRECTOR), null, List.of(), null));
+        cards.changeCard(card.getId(), card.getLabel(), card.getColor(), Set.of(Role.SPORT_DIRECTOR),
+                card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed());
+
+        // when / then
+        assertThatThrownBy(() -> bookingService.cancel(
+                bookingId, UUID.randomUUID(), Set.of(Role.YOUTH_DIRECTOR)))
+                .isInstanceOf(BookingNotOwnedException.class);
     }
 
     @Test

@@ -40,6 +40,8 @@ class SeriesMoveTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
             UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID LEAGUE_MATCH_CARD =
+            UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final UUID MEMBER_BOOKING_CARD =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID BALL_MACHINE =
@@ -175,6 +177,25 @@ class SeriesMoveTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenALeagueMatchCreatedByASportDirector_whenAYouthDirectorMoves_thenTheActorIsRecorded() {
+        // given
+        SeriesCreationResult series = createLeagueMatchSeries(2);
+        UUID youthDirector = UUID.randomUUID();
+
+        // when
+        seriesService.move(new MoveRequest(
+                series.seriesId(), series.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
+                LocalTime.of(20, 0), null, null), youthDirector, Set.of(Role.YOUTH_DIRECTOR));
+
+        // then
+        assertThat(series.bookingIds()).allSatisfy(bookingId -> {
+            Booking booking = bookings.findById(bookingId).orElseThrow();
+            assertThat(booking.getMovedBy()).isEqualTo(youthDirector);
+            assertThat(booking.getMovedAt()).isEqualTo(Instant.parse("2026-04-01T10:00:00Z"));
+        });
+    }
+
+    @Test
     void givenTheTargetCourtIsInactive_whenMoving_thenTheMoveIsRejected() {
         // given
         SeriesCreationResult series = createSeries(2);
@@ -301,5 +322,20 @@ class SeriesMoveTest extends AbstractIntegrationTest {
                 .map(occurrence -> occurrence.slot().start())
                 .toList();
         return seriesService.create(rule, starts, trainer, null, Set.of(Role.TRAINER), "Training");
+    }
+
+    private SeriesCreationResult createLeagueMatchSeries(int count) {
+        UUID sportDirector = UUID.randomUUID();
+        SeriesRule rule = new SeriesRule(
+                List.of(courtOne), LEAGUE_MATCH_CARD,
+                LocalDate.of(2026, 4, 7), LocalTime.of(18, 0), 120,
+                1, Set.of(DayOfWeek.TUESDAY), null, count);
+        List<Instant> starts = seriesService.preview(
+                        rule, sportDirector, null, Set.of(Role.SPORT_DIRECTOR))
+                .occurrences().stream()
+                .map(occurrence -> occurrence.slot().start())
+                .toList();
+        return seriesService.create(rule, starts, sportDirector, null,
+                Set.of(Role.SPORT_DIRECTOR), "League match");
     }
 }

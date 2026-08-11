@@ -225,6 +225,20 @@ class SeriesMovePreviewTest extends AbstractIntegrationTest {
                 .isInstanceOf(BookingNotOwnedException.class);
     }
 
+    @Test
+    void givenATrainingSeriesCreatedByATrainer_whenAYouthDirectorPreviewsAMove_thenItIsAllowed() {
+        // given
+        SeriesCreationResult series = createSeries(2);
+
+        // when
+        MovePreview preview = seriesService.previewMove(new MoveRequest(
+                series.seriesId(), series.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
+                LocalTime.of(20, 0), null, null), UUID.randomUUID(), Set.of(Role.YOUTH_DIRECTOR));
+
+        // then
+        assertThat(preview.isExecutable()).isTrue();
+    }
+
     private SeriesPreview previewAsTrainer(SeriesRule rule) {
         return seriesService.preview(rule, trainer, null, Set.of(Role.TRAINER));
     }
