@@ -457,7 +457,7 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
         <legend className="font-semibold">{t("booking.guests")}</legend>
         {guestNames.map((guestName, index) => <label key={index} className="grid gap-2 font-medium">
           {index === 0 ? t("booking.guest") : t("booking.guestNumber", { number: index + 1 })}
-          <input value={guestName} onChange={(event) => setGuestNames((current) => current.map((name, currentIndex) => currentIndex === index ? event.target.value : name))} className="form-control rounded-lg border px-3 py-3" />
+          <input data-testid="guest-name" value={guestName} onChange={(event) => setGuestNames((current) => current.map((name, currentIndex) => currentIndex === index ? event.target.value : name))} className="form-control rounded-lg border px-3 py-3" />
         </label>)}
         <Button type="button" className="button-secondary justify-self-start" onClick={() => setGuestNames((current) => [...current, ""])}>{t("booking.addGuest")}</Button>
       </fieldset>

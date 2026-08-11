@@ -37,69 +37,13 @@ function username() {
   return `member${String(__VU).padStart(4, "0")}`;
 }
 
-function bookingInput() {
-  const start = new Date(Date.now() + (2 + (__ITER % 5)) * 86_400_000);
-  start.setUTCHours(10 + __VU, 0, 0, 0);
-  return {
-    startsAt: start.toISOString(),
-    endsAt: new Date(start.getTime() + 3_600_000).toISOString(),
-    idempotencyKey: `k6-browser-${__ENV.PERF_RUN_ID}-${__VU}-${__ITER}`
-  };
-}
-
-async function createBooking(page) {
-  return page.evaluate(async (serialized) => {
-    const input = JSON.parse(serialized);
-    const token = decodeURIComponent(document.cookie.split("; ")
-      .find((entry) => entry.startsWith("XSRF-TOKEN="))?.substring("XSRF-TOKEN=".length) ?? "");
-    const [cardsResponse, courtsResponse] = await Promise.all([
-      fetch("/api/public/booking-cards"), fetch("/api/public/courts")
-    ]);
-    const cards = await cardsResponse.json();
-    const courts = await courtsResponse.json();
-    const response = await fetch("/api/bookings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-XSRF-TOKEN": token,
-        "Idempotency-Key": input.idempotencyKey
-      },
-      body: JSON.stringify({
-        courtIds: [courts[(input.virtualUser - 1) % courts.length].id],
-        cardId: cards[0].id,
-        startsAt: input.startsAt,
-        endsAt: input.endsAt,
-        participants: [{ guestName: "Browser Test Guest" }]
-      })
-    });
-    return { status: response.status, body: await response.json() };
-  }, JSON.stringify({ ...bookingInput(), virtualUser: __VU }));
-}
-
-async function authenticatedSession(page) {
-  return page.evaluate(async () => {
-    const response = await fetch("/api/session");
-    return { status: response.status, body: await response.json() };
-  });
-}
-
-async function allocationExists(page, bookingId, startsAt) {
-  return page.evaluate(async (serialized) => {
-    const input = JSON.parse(serialized);
-    const response = await fetch(`/api/bookings?date=${input.startsAt.slice(0, 10)}`);
-    const allocations = await response.json();
-    return { status: response.status, found: allocations.some((entry) => entry.bookingId === input.bookingId) };
-  }, JSON.stringify({ bookingId, startsAt }));
-}
-
 async function cancelBooking(page, bookingId) {
-  return page.evaluate(async (id) => {
-    const token = decodeURIComponent(document.cookie.split("; ")
-      .find((entry) => entry.startsWith("XSRF-TOKEN="))?.substring("XSRF-TOKEN=".length) ?? "");
-    return (await fetch(`/api/bookings/${id}`, {
-      method: "DELETE", headers: { "X-XSRF-TOKEN": token }
-    })).status;
-  }, bookingId);
+  await page.goto(`${target}/my-bookings`, { waitUntil: "networkidle" });
+  const cancellation = page.locator(`[data-testid="personal-cancel"][data-booking-id="${bookingId}"]`);
+  await cancellation.waitFor();
+  await cancellation.click();
+  await page.getByTestId("confirm-cancellation").click();
+  await cancellation.waitFor({ state: "detached" });
 }
 
 export default async function () {
@@ -137,24 +81,30 @@ export default async function () {
     await page.getByTestId("username").fill(username());
     await page.getByTestId("password").fill(credentials.password);
     await page.getByTestId("login-submit").click();
-    await page.getByTestId("home-view").waitFor();
+    await page.getByTestId("court-plan-view").waitFor();
     await page.getByTestId("week-grid").waitFor();
     await page.getByTestId("week-next").click();
     await page.locator('[data-testid="week-grid"][data-week-offset="1"]').waitFor();
-    await page.getByTestId("week-previous").click();
-    await page.locator('[data-testid="week-grid"][data-week-offset="0"]').waitFor();
-    const input = bookingInput();
-    const created = await createBooking(page);
-    bookingId = created.body?.id;
-    const allocation = bookingId ? await allocationExists(page, bookingId, input.startsAt) : undefined;
+    await page.getByTestId("free-slot").nth(__VU - 1).click();
+    await page.getByTestId("guest-name").fill("Browser Test Guest");
+    const bookingResponsePromise = page.waitForResponse(`${target}/api/bookings`);
+    await page.getByTestId("booking-submit").click();
+    const response = await bookingResponsePromise;
+    if (response.status() !== 201) throw new Error(`The booking UI returned status ${response.status()}`);
+    bookingId = (await response.json()).id;
+    if (!bookingId) throw new Error("The booking UI returned no booking id");
+    const ownAllocation = page.locator(`[data-testid="own-allocation"][data-booking-id="${bookingId}"]`);
+    await ownAllocation.waitFor();
     await page.reload({ waitUntil: "networkidle" });
-    await page.getByTestId("home-view").waitFor();
-    const session = await authenticatedSession(page);
-    journeyPassed = check({ created, allocation, session }, {
-      "browser booking was created": (value) => value.created.status === 201 && Boolean(value.created.body?.id),
-      "browser booking is visible": (value) => value.allocation?.status === 200 && value.allocation.found,
-      "browser session survives reload": (value) => value.session.status === 200 && value.session.body.authenticated === true
-    });
+    await page.getByTestId("court-plan-view").waitFor();
+    await page.getByTestId("my-bookings-link").click();
+    const cancellation = page.locator(`[data-testid="personal-cancel"][data-booking-id="${bookingId}"]`);
+    await cancellation.waitFor();
+    await cancellation.click();
+    await page.getByTestId("confirm-cancellation").click();
+    await cancellation.waitFor({ state: "detached" });
+    bookingId = undefined;
+    journeyPassed = check(true, { "browser booking workflow completes": (completed) => completed });
     technicalErrors.add(!journeyPassed);
   } catch (error) {
     browserErrors.add(1);
@@ -163,8 +113,7 @@ export default async function () {
   } finally {
     if (bookingId) {
       try {
-        const status = await cancelBooking(page, bookingId);
-        if (status !== 204) technicalErrors.add(true);
+        await cancelBooking(page, bookingId);
       } catch {
         browserErrors.add(1);
         technicalErrors.add(true);
