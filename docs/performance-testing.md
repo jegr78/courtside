@@ -39,24 +39,26 @@ requires an operator to supervise `uat share` separately.
 
 ## Result semantics
 
-Technical request failures and unexpected server errors determine test health. An expected booking
-conflict is a domain outcome with status `409` and increments `booking_conflicts`; it is not a
-transport failure. Reports include p50, p90, p95, p99, throughput, iteration and request counts,
-technical error rate, server-error count, threshold results, and optional conflict and Web Vitals
-metrics.
+Technical request failures and unexpected server errors determine automated smoke health. An
+expected booking conflict is a domain outcome with status `409` and increments `booking_conflicts`;
+it is not a transport failure. Reports include p50, p90, p95, p99, throughput, iteration and request
+counts, technical error rate, server-error count, threshold results, and optional conflict and Web
+Vitals metrics.
 
 Initial budgets are p95 500 ms and p99 1,000 ms for read-only APIs, p95 750 ms for login, and p95
 1,000 ms plus p99 2,000 ms for booking. Technical errors remain below one percent and unexpected
 server errors remain zero. Browser results use p75 budgets of 2,500 ms LCP, 200 ms INP, and 0.1 CLS.
 These are explicit starting budgets; changing them requires a reviewed contract change rather than
-an automatic adjustment to a slow run.
+an automatic adjustment to a slow run. Shared-runner smoke reports retain latency measurements but
+do not fail on absolute latency budgets because runner variation is not a product regression.
 
 ## Comparable resources
 
 Reference runs constrain the application to 2 CPUs and 1,024 MiB, PostgreSQL to 2 CPUs and 2,048
 MiB, and Caddy to 0.5 CPU and 256 MiB. Observability services run outside those application budgets.
 A result also records the contract version and digest, application version, commit, k6 version,
-operating system, architecture, profile, verified environment marker, target, start time, duration,
+operating system, architecture, runner processor count and memory, profile, verified environment
+marker, target, start time, duration,
 actual dataset, read/write shares, virtual users or stages, and resource limits. A profile name alone
 does not establish comparability because its configuration may change in a later contract.
 
@@ -176,15 +178,29 @@ The stored summary contains only contract-approved build, runtime, load, resourc
 metric fields. Credentials, hostnames, remote URLs, identities, and addresses cannot pass the
 closed result schema. Failed and stale-contract results are rejected and never replace a baseline.
 
+## Automation and approved baselines
+
+The `performance smoke` workflow runs weekly and on explicit dispatch. It creates only the local
+disposable performance environment, executes the bounded two-VU smoke profile, and uploads HTML and
+JSON reports for fourteen days even when the run fails. It has no pull-request trigger, accepts no
+target input, and never promotes a baseline. Pull requests continue to use the deterministic build
+workflow as their required gate.
+
+An approved reference baseline comes from the `baseline` profile on a documented local or dedicated
+runner whose processor count, memory, operating system, and architecture remain comparable. Review
+the successful report and its resource metadata before using `perf-promote`; shared hosted runners
+are diagnostic smoke environments and do not produce reference baselines.
+
 Remote targets require a separate opt-in and cannot use ordinary load profiles. Production targets,
 persistent UAT writes, tracked credentials, tracked remote targets, and ordinary overrides of VU or
 duration caps are forbidden. Runtime credentials identify individual synthetic accounts but may
 share one generated environment password.
 
-Every result reports the two mandatory technical threshold outcomes. Protocol profiles additionally
-report read-only, login, and booking budgets; browser results report Web Vitals; Funnel smoke reports
-the read-only budget. The closed result schema rejects unknown threshold names, missing evidence,
-unrecorded load parameters, and profile/target/environment combinations outside the contract.
+Every result reports the two mandatory technical threshold outcomes. Reference load profiles
+additionally report read-only, login, and booking budgets; browser results report Web Vitals; Funnel
+smoke reports the read-only budget. The closed result schema rejects unknown threshold names,
+missing evidence, unrecorded load parameters, and profile/target/environment combinations outside
+the contract.
 
 The Funnel smoke accepts an explicitly supplied UAT URL, performs read-only checks, and neither
 opens nor closes Funnel. It does not log or retain the target. Login, booking, cancellation, and all

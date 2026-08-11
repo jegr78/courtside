@@ -122,7 +122,8 @@ test("given a performance result, when validating its documented shape, then com
   ]);
   assert.deepEqual(schema.properties.contract.required, ["schemaVersion", "digest"]);
   assert.deepEqual(schema.properties.build.required, ["applicationVersion", "gitCommit"]);
-  assert.deepEqual(schema.properties.runtime.required, ["k6Version", "operatingSystem", "architecture"]);
+  assert.deepEqual(schema.properties.runtime.required, ["k6Version", "operatingSystem", "architecture", "runner"]);
+  assert.deepEqual(schema.properties.runtime.properties.runner.required, ["processorCount", "memoryMegabytes"]);
   assert.deepEqual(schema.properties.metrics.required, [
     "iterations", "requests", "throughputPerSecond", "technicalErrorRate", "unexpectedServerErrors", "latencyMilliseconds"
   ]);
@@ -141,7 +142,10 @@ test("given incomplete or unsafe result claims, when validating them, then the s
       digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     build: { applicationVersion: "1.0.0", gitCommit: "abcdef0" },
-    runtime: { k6Version: "2.2.0", operatingSystem: "linux", architecture: "arm64" },
+    runtime: {
+      k6Version: "2.2.0", operatingSystem: "linux", architecture: "arm64",
+      runner: { processorCount: 4, memoryMegabytes: 8192 }
+    },
     profile: {
       name: "baseline",
       workload: "reference",
@@ -182,11 +186,20 @@ test("given incomplete or unsafe result claims, when validating them, then the s
 
   // when / then
   assert.equal(validate(valid), true, JSON.stringify(validate.errors));
+  const smoke = {
+    ...valid,
+    profile: { ...valid.profile, name: "smoke", durationSeconds: 60 },
+    load: { ...valid.load, virtualUsers: 2 },
+    thresholds: { technicalErrorRate: true, unexpectedServerErrors: true }
+  };
+  assert.equal(validate(smoke), true, JSON.stringify(validate.errors));
+  assert.equal(validate({ ...valid, thresholds: smoke.thresholds }), false);
   assert.equal(validate({ ...valid, thresholds: {} }), false);
   assert.equal(validate({ ...valid, contract: { schemaVersion: 1 } }), false);
   assert.equal(validate({ ...valid, load: { ...valid.load, virtualUsers: undefined } }), false);
   assert.equal(validate({ ...valid, profile: { ...valid.profile, target: "funnel" } }), false);
   assert.equal(validate({ ...valid, profile: { ...valid.profile, environment: "UAT" } }), false);
+  assert.equal(validate({ ...valid, runtime: { ...valid.runtime, machineName: "runner-1" } }), false);
   assert.equal(validate({
     ...valid,
     profile: { ...valid.profile, name: "funnel-smoke", target: "system", environment: "PERFORMANCE" }

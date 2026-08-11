@@ -25,15 +25,17 @@ export const options = {
   thresholds: {
     technical_errors: [contract.thresholds.technicalErrorRate],
     unexpected_server_errors: [contract.thresholds.unexpectedServerErrors],
-    read_only_api_duration: [
-      `p(95)<${contract.thresholds.readOnlyApi.p95Milliseconds}`,
-      `p(99)<${contract.thresholds.readOnlyApi.p99Milliseconds}`
-    ],
-    login_duration: [`p(95)<${contract.thresholds.login.p95Milliseconds}`],
-    booking_duration: [
-      `p(95)<${contract.thresholds.booking.p95Milliseconds}`,
-      `p(99)<${contract.thresholds.booking.p99Milliseconds}`
-    ]
+    ...(profileName === "smoke" ? {} : {
+      read_only_api_duration: [
+        `p(95)<${contract.thresholds.readOnlyApi.p95Milliseconds}`,
+        `p(99)<${contract.thresholds.readOnlyApi.p99Milliseconds}`
+      ],
+      login_duration: [`p(95)<${contract.thresholds.login.p95Milliseconds}`],
+      booking_duration: [
+        `p(95)<${contract.thresholds.booking.p95Milliseconds}`,
+        `p(99)<${contract.thresholds.booking.p99Milliseconds}`
+      ]
+    })
   }
 };
 

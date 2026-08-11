@@ -1,0 +1,45 @@
+name: performance smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - name: Start disposable performance environment
+        run: node tools/courtside.mjs perf --skip-verify --no-credential-output
+      - name: Run bounded smoke profile
+        run: node tools/courtside.mjs perf-run smoke
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: performance-smoke-${{ github.run_id }}
+          path: build/performance/smoke
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remove disposable environment
+        if: always()
+        run: node tools/courtside.mjs perf-reset courtside-perf

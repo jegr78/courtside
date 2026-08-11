@@ -40,11 +40,20 @@
     "runtime": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["k6Version", "operatingSystem", "architecture"],
+      "required": ["k6Version", "operatingSystem", "architecture", "runner"],
       "properties": {
         "k6Version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
         "operatingSystem": { "type": "string", "enum": ["linux", "darwin", "win32"] },
-        "architecture": { "type": "string", "enum": ["x64", "arm64"] }
+        "architecture": { "type": "string", "enum": ["x64", "arm64"] },
+        "runner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["processorCount", "memoryMegabytes"],
+          "properties": {
+            "processorCount": { "type": "integer", "minimum": 1 },
+            "memoryMegabytes": { "type": "integer", "minimum": 1 }
+          }
+        }
       }
     },
     "profile": {
@@ -222,7 +231,7 @@
           "profile": {
             "type": "object",
             "properties": {
-              "name": { "enum": ["smoke", "baseline", "peak", "stress", "soak"] }
+              "name": { "enum": ["baseline", "peak", "stress", "soak"] }
             }
           }
         }

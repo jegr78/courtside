@@ -39,6 +39,13 @@ test("given a completed run, when exporting results, then HTML and machine summa
   assert.match(script, /\/results\/raw-summary\.json/);
 });
 
+test("given the automated smoke profile, when applying thresholds, then shared-runner latency stays diagnostic", () => {
+  // when / then
+  assert.match(script, /profileName === "smoke" \? \{\} :/);
+  assert.match(script, /technical_errors/);
+  assert.match(script, /unexpected_server_errors/);
+});
+
 test("given a browser journey, when inspecting it, then UI actions and API state checks stay language neutral", () => {
   // when / then
   assert.match(browserScript, /getByTestId\("login-view"\)/);
