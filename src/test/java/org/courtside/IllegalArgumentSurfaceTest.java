@@ -23,6 +23,7 @@ class IllegalArgumentSurfaceTest {
             "org/courtside/booking/BookingRuleCheck.java",
             "org/courtside/booking/series/MoveRequest.java",
             "org/courtside/booking/series/SeriesRule.java",
+            "org/courtside/config/BookingSlotDuration.java",
             "org/courtside/shared/CodedDomainFailure.java",
             "org/courtside/shared/ProblemType.java",
             "org/courtside/shared/TimeSlot.java");

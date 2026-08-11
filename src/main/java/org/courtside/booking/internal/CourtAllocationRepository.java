@@ -14,6 +14,25 @@ import java.util.UUID;
 
 public interface CourtAllocationRepository extends JpaRepository<CourtAllocation, UUID> {
 
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1 FROM court_allocation a
+                WHERE a.status = 'CONFIRMED'
+                  AND a.ends_at > :from
+                  AND (
+                    MOD(EXTRACT(EPOCH FROM
+                        (timezone(:zone, a.starts_at)
+                         - date_trunc('day', timezone(:zone, a.starts_at))))::bigint,
+                        :slotSeconds) <> 0
+                    OR MOD(EXTRACT(EPOCH FROM (a.ends_at - a.starts_at))::bigint,
+                        :slotSeconds) <> 0
+                  )
+            )
+            """, nativeQuery = true)
+    boolean existsFutureConflictWithGrid(@Param("from") Instant from,
+                                         @Param("zone") String zone,
+                                         @Param("slotSeconds") int slotSeconds);
+
     @Query("""
             SELECT a FROM CourtAllocation a
             JOIN FETCH a.booking

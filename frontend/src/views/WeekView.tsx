@@ -74,7 +74,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
   const language = i18n.resolvedLanguage ?? i18n.language;
   const isToday = selectedDate === dateInTimeZoneValue(currentInstant, data?.grid.timeZone);
   const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
-  const slotHeight = data ? data.grid.slotMinutes * 4 / 3 : 40;
+  const slotHeight = data ? Math.max(32, data.grid.slotMinutes * 4 / 3) : 40;
   const currentSlot = currentTime && (slots.find((slot) => slot >= currentTime) ?? slots.at(-1));
 
   function selectDate(value: string | undefined) {

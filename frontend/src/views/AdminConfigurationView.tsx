@@ -120,6 +120,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <option value="de">Deutsch</option><option value="en">English</option>
         </select>
       </label>
+      <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => setConfig({ ...config, slotMinutes: Number(event.target.value) })} />
       <Button data-testid="save-club-config" className="justify-self-start" type="submit">{t("admin.save")}</Button>
     </form>
     <div className="grid gap-5">

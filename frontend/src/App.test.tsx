@@ -218,7 +218,8 @@ describe("App build identity", () => {
       clubName: "Example Tennis Club",
       primaryColor: "#b85c38",
       accentColor: "#d7e24b",
-      defaultLocale: "de"
+      defaultLocale: "de",
+      slotMinutes: 30
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -238,7 +239,8 @@ describe("App build identity", () => {
       primaryColor: "#d7e24b",
       accentColor: "#b85c38",
       logoUrl: "/example-logo.svg",
-      defaultLocale: "en"
+      defaultLocale: "en",
+      slotMinutes: 30
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -257,7 +259,8 @@ describe("App build identity", () => {
       clubName: "Example Tennis Club",
       primaryColor: "#009688",
       accentColor: "#d7e24b",
-      defaultLocale: "de"
+      defaultLocale: "de",
+      slotMinutes: 30
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 

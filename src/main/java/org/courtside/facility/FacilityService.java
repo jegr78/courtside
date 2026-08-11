@@ -3,6 +3,9 @@ package org.courtside.facility;
 import org.courtside.facility.internal.CourtNumberTakenException;
 import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.OpeningWindow;
+import org.courtside.config.BookingGridSettings;
+import org.courtside.config.BookingSlotDuration;
+import org.courtside.config.BookingGridCoordination;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,8 @@ public class FacilityService {
 
     private final CourtRepository courts;
     private final OpeningHoursRepository openingHours;
+    private final BookingGridSettings bookingGridSettings;
+    private final BookingGridCoordination bookingGridCoordination;
 
     public List<Court> activeCourts() {
         return courts.findByActiveTrueOrderByNumberAsc();
@@ -85,6 +90,12 @@ public class FacilityService {
     @Transactional
     public OpeningHours setOpeningHours(DayOfWeek day, OpeningWindow window) {
         OpeningWindow required = OpeningWindow.required(window);
+        bookingGridCoordination.lock();
+        BookingSlotDuration slotDuration = bookingGridSettings.slotDuration();
+        if (!slotDuration.isAligned(required.opensAt())
+                || !slotDuration.isAligned(required.closesAt())) {
+            throw new OpeningHoursGridMismatchException(slotDuration.minutes());
+        }
         return openingHours.findByDayOfWeek(day.getValue())
                 .map(hours -> {
                     hours.changeTo(required);

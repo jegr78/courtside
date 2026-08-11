@@ -286,7 +286,7 @@ components:
       required: [timeZone, slotMinutes, openingHours]
       properties:
         timeZone: { type: string, example: Europe/Berlin }
-        slotMinutes: { type: integer, minimum: 1, maximum: 1440 }
+        slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         openingHours:
           type: array
           items: { $ref: "#/components/schemas/OpeningHours" }
@@ -300,7 +300,7 @@ components:
 
     ClubConfig:
       type: object
-      required: [clubName, primaryColor, accentColor, defaultLocale]
+      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes]
       properties:
         clubName: { type: string }
         primaryColor: { type: string }
@@ -308,10 +308,11 @@ components:
         logoUrl: { type: [string, "null"] }
         imprintUrl: { type: [string, "null"] }
         defaultLocale: { type: string }
+        slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
 
     ClubConfigRequest:
       type: object
-      required: [clubName, primaryColor, accentColor, defaultLocale]
+      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes]
       properties:
         clubName: { type: string, maxLength: 100, pattern: ".*\\S.*" }
         primaryColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
@@ -325,6 +326,7 @@ components:
           maxLength: 500
           pattern: "^(https?://.+|/[^/\\\\].*|/)$"
         defaultLocale: { type: string, pattern: "^(de|en)$" }
+        slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
 
     WebManifest:
       type: object
@@ -2320,7 +2322,7 @@ paths:
     put:
       tags: [admin-config]
       operationId: changeClubConfig
-      summary: Change the club's name and branding.
+      summary: Change the club's presentation and booking-grid settings.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2337,6 +2339,8 @@ paths:
               schema: { $ref: "#/components/schemas/ClubConfig" }
         "400":
           $ref: "#/components/responses/Invalid"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":

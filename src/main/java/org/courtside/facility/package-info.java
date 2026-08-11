@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Facility",
-        allowedDependencies = {})
+        allowedDependencies = {"config"})
 package org.courtside.facility;
