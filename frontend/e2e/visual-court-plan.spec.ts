@@ -19,13 +19,13 @@ for (const locale of locales) {
       await page.locator("#theme-preference").selectOption("dark");
 
       // then
-      await capture(page, locale, viewport.name, "01-login-dark");
+      await captureFullPage(page, locale, viewport.name, "01-login-dark");
 
       // when
       await page.locator("#theme-preference").selectOption("light");
 
       // then
-      await capture(page, locale, viewport.name, "02-login-light");
+      await captureFullPage(page, locale, viewport.name, "02-login-light");
 
       // when
       await page.locator("#theme-preference").selectOption("dark");
@@ -49,12 +49,12 @@ for (const locale of locales) {
       await expect(page.locator('[data-card-color="#E8DDD4"]')).toHaveCount(1);
       await expect(page.getByTestId("free-slot").first()).toBeVisible();
       await page.getByTestId("week-grid").evaluate((plan) => plan.scrollTo(0, 0));
-      await capture(page, locale, viewport.name, "03-court-plan-dark");
+      await captureFullPage(page, locale, viewport.name, "03-court-plan-dark");
 
       if (viewport.width < 1024) {
         for (const court of [2, 3, 4]) {
           await page.getByTestId(`court-selector-${court}`).click();
-          await capture(page, locale, viewport.name, `04-court-${court}-dark`);
+          await captureFullPage(page, locale, viewport.name, `04-court-${court}-dark`);
         }
         await page.getByTestId("court-selector-1").click();
       }
@@ -63,28 +63,44 @@ for (const locale of locales) {
       await page.locator("#theme-preference").selectOption("light");
 
       // then
-      await capture(page, locale, viewport.name, "05-court-plan-light");
+      await captureFullPage(page, locale, viewport.name, "05-court-plan-light");
 
       // when
       await page.getByTestId("free-slot").first().click();
       await expect(page.getByTestId("booking-dialog")).toBeVisible();
 
       // then
-      await capture(page, locale, viewport.name, "06-booking-dialog-light");
+      await expect(page.getByTestId("booking-close")).toBeInViewport({ ratio: 1 });
+      await expect(page.getByTestId("booking-submit")).toBeInViewport({ ratio: 1 });
+      const lightDialog = await captureViewport(page, locale, viewport.name, "06-booking-dialog-light");
+      expect(pngDimensions(lightDialog)).toEqual({ width: viewport.width, height: viewport.height });
 
       // when
       await page.locator("#theme-preference").selectOption("dark");
 
       // then
-      await capture(page, locale, viewport.name, "07-booking-dialog-dark");
+      const darkDialog = await captureViewport(page, locale, viewport.name, "07-booking-dialog-dark");
+      expect(pngDimensions(darkDialog)).toEqual({ width: viewport.width, height: viewport.height });
     });
   }
 }
 
-async function capture(page: Page, locale: string, viewport: string, step: string): Promise<void> {
+function captureFullPage(page: Page, locale: string, viewport: string, step: string): Promise<Buffer> {
+  return capture(page, locale, viewport, step, true);
+}
+
+function captureViewport(page: Page, locale: string, viewport: string, step: string): Promise<Buffer> {
+  return capture(page, locale, viewport, step, false);
+}
+
+async function capture(page: Page, locale: string, viewport: string, step: string, fullPage: boolean): Promise<Buffer> {
   const directory = resolve("test-results", "visual-journeys", locale, viewport);
   await mkdir(directory, { recursive: true });
-  await page.screenshot({ path: resolve(directory, `${step}.png`), fullPage: true, animations: "disabled" });
+  return page.screenshot({ path: resolve(directory, `${step}.png`), fullPage, animations: "disabled" });
+}
+
+function pngDimensions(image: Buffer): { width: number; height: number } {
+  return { width: image.readUInt32BE(16), height: image.readUInt32BE(20) };
 }
 
 function visualJourneyDate(): string {

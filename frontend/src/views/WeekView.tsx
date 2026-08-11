@@ -417,7 +417,8 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
 
   return <Modal labelledBy="booking-heading" closed={closed}>
-    <form data-testid="booking-dialog" onSubmit={(event) => void submit(event)} className="surface-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border p-6 shadow-2xl">
+    <form data-testid="booking-dialog" onSubmit={(event) => void submit(event)} className="surface-panel flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
+      <div className="overflow-y-auto p-6">
       <h3 id="booking-heading" className="text-xl font-bold">{t("booking.title", { date: selection.date, time: selection.slot })}</h3>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
@@ -478,8 +479,9 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
       <FieldViolations id="booking-note-errors" violations={fieldViolations("note")} />
       <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
       {error && violations.length === 0 && <Alert>{error}</Alert>}
-      <div className="mt-6 flex justify-end gap-3">
-        <Button type="button" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>
+      </div>
+      <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
+        <Button type="button" data-testid="booking-close" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>
         <Button type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId}>{t("booking.submit")}</Button>
       </div>
     </form>
