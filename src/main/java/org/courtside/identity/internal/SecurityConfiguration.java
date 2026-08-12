@@ -18,7 +18,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration(proxyBeanMethods = false)
@@ -32,6 +34,12 @@ public class SecurityConfiguration {
     private static final int PARALLELISM = 1;
     private static final int SALT_LENGTH_IN_BYTES = 16;
     private static final int HASH_LENGTH_IN_BYTES = 32;
+    private static final String LOGIN_PROCESSING_URL = "/api/session";
+
+    private static RequestMatcher loginEndpoint() {
+        return PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.POST, LOGIN_PROCESSING_URL);
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -88,7 +96,7 @@ public class SecurityConfiguration {
                                         && !hasAuthority(authentication.get(),
                                         CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED))))
                 .formLogin(form -> form
-                        .loginProcessingUrl("/api/session")
+                        .loginProcessingUrl(LOGIN_PROCESSING_URL)
                         .successHandler((request, response, authentication) -> {
                             loginAttemptProtection.clear(request.getRemoteAddr());
                             if (authentication.getAuthorities().stream().anyMatch(authority ->
@@ -99,8 +107,8 @@ public class SecurityConfiguration {
                             response.setStatus(HttpStatus.OK.value());
                         })
                         .failureHandler(authenticationEntryPoint::commence))
-                .addFilterBefore(new LoginAttemptFilter(loginAttemptProtection, loginRateLimitHandler),
-                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), loginAttemptProtection,
+                        loginRateLimitHandler), UsernamePasswordAuthenticationFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
                         .logoutSuccessHandler((request, response, authentication) ->
