@@ -13,10 +13,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -35,11 +33,8 @@ public class ManagedAppointmentQuery {
         }
         List<UUID> ids = bookings.findManagedBookingIds(
                 managementRoles, roles.contains(Role.ADMIN), cursor, PageRequest.of(0, limit + 1));
-        UUID nextCursor = ids.size() > limit ? ids.get(limit - 1) : null;
-        List<UUID> visibleIds = ids.stream().limit(limit).toList();
-        Map<UUID, Booking> found = bookings.findAllByIdIn(visibleIds).stream()
-                .collect(Collectors.toMap(Booking::getId, booking -> booking));
-        return new Page(visibleIds.stream().map(found::get).toList(), nextCursor);
+        CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);
+        return new Page(page.items(), page.nextCursor());
     }
 
     public Detail get(UUID bookingId, UUID actor, Set<Role> roles) {
