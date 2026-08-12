@@ -42,8 +42,12 @@ public class ClubConfiguration {
     @Column(name = "slot_minutes", nullable = false)
     private int slotMinutes;
 
+    @Column(name = "time_zone", nullable = false)
+    private String timeZone;
+
     public void changeTo(String clubName, String primaryColor, String accentColor,
-                         String logoUrl, String imprintUrl, String defaultLocale, int slotMinutes) {
+                         String logoUrl, String imprintUrl, String defaultLocale, int slotMinutes,
+                         String timeZone) {
         this.clubName = clubName;
         this.primaryColor = primaryColor;
         this.accentColor = accentColor;
@@ -51,5 +55,6 @@ public class ClubConfiguration {
         this.imprintUrl = imprintUrl;
         this.defaultLocale = defaultLocale;
         this.slotMinutes = slotMinutes;
+        this.timeZone = timeZone;
     }
 }

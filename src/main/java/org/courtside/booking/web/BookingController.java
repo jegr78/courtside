@@ -27,7 +27,6 @@ import org.courtside.identity.CurrentUser;
 import org.courtside.identity.UserAccount;
 import org.courtside.shared.TimeSlot;
 import org.courtside.shared.WireTypes;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.InitBinder;
@@ -35,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import org.courtside.config.ClubTimeZone;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -50,7 +49,7 @@ class BookingController implements BookingsApi {
     private final AllocationVisibilityService allocationVisibility;
     private final BookingRequestValidator crossFieldRules;
     private final ManagedAppointmentQuery managedAppointments;
-    private final ZoneId zone;
+    private final ClubTimeZone timeZone;
 
     BookingController(BookingService bookings,
                       CardService cards,
@@ -58,14 +57,14 @@ class BookingController implements BookingsApi {
                       AllocationVisibilityService allocationVisibility,
                       BookingRequestValidator crossFieldRules,
                       ManagedAppointmentQuery managedAppointments,
-                      @Value("${courtside.booking.time-zone}") String zone) {
+                      ClubTimeZone timeZone) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
         this.allocationVisibility = allocationVisibility;
         this.crossFieldRules = crossFieldRules;
         this.managedAppointments = managedAppointments;
-        this.zone = ZoneId.of(zone);
+        this.timeZone = timeZone;
     }
 
     @InitBinder
@@ -192,8 +191,8 @@ class BookingController implements BookingsApi {
     @Override
     public ResponseEntity<List<ApiAllocation>> listAllocations(LocalDate date) {
         List<CourtAllocation> allocations = bookings.allocationsBetween(
-                date.atStartOfDay(zone).toInstant(),
-                date.plusDays(1).atStartOfDay(zone).toInstant());
+                date.atStartOfDay(timeZone.zoneId()).toInstant(),
+                date.plusDays(1).atStartOfDay(timeZone.zoneId()).toInstant());
 
         Map<UUID, BookingCard> cardsById = cards.allCards().stream()
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));

@@ -7,7 +7,8 @@ public record ClubConfigurationSnapshot(
         String logoUrl,
         String imprintUrl,
         String defaultLocale,
-        int slotMinutes) {
+        int slotMinutes,
+        String timeZone) {
 
     static ClubConfigurationSnapshot from(ClubConfiguration configuration) {
         return new ClubConfigurationSnapshot(
@@ -17,6 +18,7 @@ public record ClubConfigurationSnapshot(
                 configuration.getLogoUrl(),
                 configuration.getImprintUrl(),
                 configuration.getDefaultLocale(),
-                configuration.getSlotMinutes());
+                configuration.getSlotMinutes(),
+                configuration.getTimeZone());
     }
 }

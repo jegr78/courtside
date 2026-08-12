@@ -6,7 +6,6 @@ import org.courtside.card.CardService;
 import org.courtside.facility.CourtNotFoundException;
 import org.courtside.facility.FacilityService;
 import org.courtside.shared.OpeningWindow;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,7 +14,7 @@ import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
-import java.time.ZoneId;
+import org.courtside.config.ClubTimeZone;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,16 +32,15 @@ public class ImpactService {
     private final FacilityService facility;
     private final CardService cards;
     private final Clock clock;
-    private final ZoneId zone;
+    private final ClubTimeZone timeZone;
 
     public ImpactService(CourtAllocationRepository allocations, FacilityService facility,
-                         CardService cards, Clock clock,
-                         @Value("${courtside.booking.time-zone}") String zone) {
+                         CardService cards, Clock clock, ClubTimeZone timeZone) {
         this.allocations = allocations;
         this.facility = facility;
         this.cards = cards;
         this.clock = clock;
-        this.zone = ZoneId.of(zone);
+        this.timeZone = timeZone;
     }
 
     public record AffectedBooking(UUID bookingId, List<UUID> courtIds, Instant startsAt, Instant endsAt) {
@@ -85,10 +83,10 @@ public class ImpactService {
         validateLimit(limit);
         Instant from = clock.instant();
         List<UUID> bookingIds = allocations.findImpactBookingIdsByOpeningHours(
-                from, zone.getId(), day.getValue(), closed, opensAt, closesAt,
+                from, timeZone.id(), day.getValue(), closed, opensAt, closesAt,
                 cursor == null, cursorOrFirstPage(cursor), page(limit));
         long affectedCount = allocations.countImpactBookingsByOpeningHours(
-                from, zone.getId(), day.getValue(), closed, opensAt, closesAt);
+                from, timeZone.id(), day.getValue(), closed, opensAt, closesAt);
         return impactOf(bookingIds, affectedCount, limit);
     }
 

@@ -3,8 +3,19 @@ package org.courtside.config;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.config.internal.ConfigService;
 import org.courtside.facility.FacilityService;
+import org.courtside.booking.BookingService;
+import org.courtside.booking.BookingRulesViolatedException;
+import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.ParticipantSpec;
+import org.courtside.facility.Court;
+import org.courtside.facility.CourtRepository;
+import org.courtside.identity.Person;
+import org.courtside.identity.PersonRepository;
+import org.courtside.identity.Role;
 import org.courtside.facility.OpeningHoursGridMismatchException;
+import org.courtside.rules.RuleViolation;
 import org.courtside.shared.OpeningWindow;
+import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -12,7 +23,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalTime;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -36,6 +51,15 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
     private FacilityService facility;
 
     @Autowired
+    private BookingService bookings;
+
+    @Autowired
+    private CourtRepository courts;
+
+    @Autowired
+    private PersonRepository persons;
+
+    @Autowired
     private PlatformTransactionManager transactions;
 
     @Autowired
@@ -45,7 +69,8 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
     void givenAnInvalidSlotDuration_whenUpdatingThroughTheService_thenTheInvariantIsRejected() {
         // when / then
         assertThatThrownBy(() -> config.update(
-                "Example Tennis Club", "#b85c38", "#d7e24b", null, null, "de", 7))
+                "Example Tennis Club", "#b85c38", "#d7e24b", null, null, "de", 7,
+                "Europe/Berlin"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("five-minute steps");
     }
@@ -83,6 +108,58 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> openingHoursChange.get(5, TimeUnit.SECONDS))
                     .isInstanceOf(ExecutionException.class)
                     .hasCauseInstanceOf(OpeningHoursGridMismatchException.class);
+        } finally {
+            allowCommit.countDown();
+        }
+    }
+
+    @Test
+    void givenAnUncommittedTimeZoneChange_whenABookingIsCreated_thenTheWriterWaitsForTheChange()
+            throws Exception {
+        // given
+        UUID courtId = courts.save(new Court(1, "Court 1")).getId();
+        UUID personId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        UUID accountId = UUID.randomUUID();
+        facility.setOpeningHours(DayOfWeek.TUESDAY,
+                new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+        CreateBookingCommand command = new CreateBookingCommand(
+                List.of(courtId),
+                UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                new TimeSlot(Instant.parse("2026-09-15T16:00:00Z"),
+                        Instant.parse("2026-09-15T17:00:00Z")),
+                accountId, personId, Set.of(Role.MEMBER), null,
+                List.of(ParticipantSpec.guest("Partner")), null);
+        CountDownLatch zoneChanged = new CountDownLatch(1);
+        CountDownLatch allowCommit = new CountDownLatch(1);
+
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<?> timeZoneChange = pool.submit(() -> new TransactionTemplate(transactions)
+                    .executeWithoutResult(status -> {
+                        coordination.lock();
+                        jdbc.sql("""
+                                UPDATE club_config SET time_zone = 'Pacific/Auckland'
+                                WHERE id = '00000000-0000-0000-0000-000000000001'
+                                """).update();
+                        zoneChanged.countDown();
+                        await(allowCommit);
+                    }));
+            assertThat(zoneChanged.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // when
+            Future<?> booking = pool.submit(() -> bookings.create(command));
+
+            // then
+            assertThatThrownBy(() -> booking.get(250, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+            allowCommit.countDown();
+            timeZoneChange.get(5, TimeUnit.SECONDS);
+            assertThatThrownBy(() -> booking.get(5, TimeUnit.SECONDS))
+                    .isInstanceOfSatisfying(ExecutionException.class, failure ->
+                            assertThat(failure.getCause())
+                                    .isInstanceOfSatisfying(BookingRulesViolatedException.class,
+                                            rejection -> assertThat(rejection.getViolations())
+                                                    .extracting(RuleViolation::code)
+                                                    .contains("booking.rule.openingHours.closed")));
         } finally {
             allowCommit.countDown();
         }

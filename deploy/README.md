@@ -30,9 +30,9 @@ Fill in `.env`:
   login can do nothing except replace it.
 - `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` — the administrator's first and last name.
 - `COURTSIDE_DOMAIN` — the name your members will type. Only needed for the reverse proxy below.
-- `COURTSIDE_TIME_ZONE` — the club's zone, as an IANA identifier such as `Europe/Berlin`. Every
-  booking is stored as an instant; this decides which day a member sees it on. An invalid value
-  stops the instance rather than half-working.
+
+The initial club time zone is `Europe/Berlin`. Change it to the club's IANA zone in the admin
+configuration before members create bookings.
 
 Then start it:
 
@@ -111,7 +111,6 @@ default.
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
 | `COURTSIDE_DOMAIN` | *required with the proxy* | The public name Caddy obtains a certificate for. |
-| `COURTSIDE_TIME_ZONE` | `Europe/Berlin` | The club's IANA time zone. |
 | `COURTSIDE_MEMORY` | `1g` | Memory ceiling for the application container. |
 | `COURTSIDE_COOKIE_SECURE` | `true` | Sends the session cookie over HTTPS only. Lower it only for a local test. |
 | `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` | `20` | Login attempts allowed per source address and window. |

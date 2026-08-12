@@ -219,7 +219,8 @@ describe("App build identity", () => {
       primaryColor: "#b85c38",
       accentColor: "#d7e24b",
       defaultLocale: "de",
-      slotMinutes: 30
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -240,7 +241,8 @@ describe("App build identity", () => {
       accentColor: "#b85c38",
       logoUrl: "/example-logo.svg",
       defaultLocale: "en",
-      slotMinutes: 30
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
@@ -260,7 +262,8 @@ describe("App build identity", () => {
       primaryColor: "#009688",
       accentColor: "#d7e24b",
       defaultLocale: "de",
-      slotMinutes: 30
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
     });
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 

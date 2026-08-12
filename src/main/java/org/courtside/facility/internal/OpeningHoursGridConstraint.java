@@ -15,7 +15,7 @@ class OpeningHoursGridConstraint implements BookingGridConstraint {
     private final OpeningHoursRepository openingHours;
 
     @Override
-    public Optional<String> conflictCode(BookingSlotDuration slotDuration) {
+    public Optional<String> conflictCode(BookingSlotDuration slotDuration, java.time.ZoneId timeZone) {
         return openingHours.findAll().stream()
                 .anyMatch(hours -> !slotDuration.isAligned(hours.getOpensAt())
                         || !slotDuration.isAligned(hours.getClosesAt()))

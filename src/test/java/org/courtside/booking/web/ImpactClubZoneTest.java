@@ -6,7 +6,6 @@ import org.courtside.facility.CourtRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -28,7 +27,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // At UTC+10:30 in June, far enough that filtering on the server's or the database's zone instead
 // of the club's would misclassify this booking's weekday.
 @WithMockUser(username = "admin", roles = "ADMIN")
-@SpringBootTest(properties = "courtside.booking.time-zone=Australia/Lord_Howe")
 class ImpactClubZoneTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -49,6 +47,7 @@ class ImpactClubZoneTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbc.sql("UPDATE club_config SET time_zone = ?").param(ZONE.getId()).update();
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 

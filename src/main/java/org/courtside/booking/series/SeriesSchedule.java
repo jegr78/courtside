@@ -1,12 +1,12 @@
 package org.courtside.booking.series;
 
 import org.courtside.shared.TimeSlot;
+import org.courtside.config.ClubTimeZone;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,12 +14,12 @@ import java.util.List;
 @Component
 public class SeriesSchedule {
 
-    private final ZoneId zone;
+    private final ClubTimeZone timeZone;
     private final int horizonMonths;
 
-    public SeriesSchedule(@Value("${courtside.booking.time-zone}") String zone,
+    public SeriesSchedule(ClubTimeZone timeZone,
                           @Value("${courtside.booking.series-horizon-months}") int horizonMonths) {
-        this.zone = ZoneId.of(zone);
+        this.timeZone = timeZone;
         this.horizonMonths = horizonMonths;
     }
 
@@ -60,7 +60,7 @@ public class SeriesSchedule {
     // The local wall-clock time is what a club agrees on, so each occurrence is resolved in the
     // club's zone rather than by adding seven days to the previous instant across a DST change.
     private TimeSlot slotOn(LocalDate day, SeriesRule rule) {
-        var start = day.atTime(rule.startTime()).atZone(zone);
+        var start = day.atTime(rule.startTime()).atZone(timeZone.zoneId());
         return new TimeSlot(start.toInstant(),
                 start.plusMinutes(rule.durationMinutes()).toInstant());
     }

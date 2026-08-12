@@ -50,7 +50,7 @@ public abstract class AbstractIntegrationTest {
     static void captureSeededClubConfig(@Autowired JdbcClient jdbc) {
         seededClubConfig = jdbc.sql("""
                 SELECT club_name, primary_color, accent_color, logo_url, imprint_url, default_locale,
-                       slot_minutes
+                       slot_minutes, time_zone
                 FROM club_config
                 WHERE id = '00000000-0000-0000-0000-000000000001'
                 """).query().singleRow();
@@ -126,7 +126,7 @@ public abstract class AbstractIntegrationTest {
                 UPDATE club_config
                 SET club_name = :club_name, primary_color = :primary_color, accent_color = :accent_color,
                     logo_url = :logo_url, imprint_url = :imprint_url, default_locale = :default_locale,
-                    slot_minutes = :slot_minutes
+                    slot_minutes = :slot_minutes, time_zone = :time_zone
                 WHERE id = '00000000-0000-0000-0000-000000000001'
                 """).params(seededClubConfig).update();
     }

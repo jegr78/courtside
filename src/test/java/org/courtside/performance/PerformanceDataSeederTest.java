@@ -50,7 +50,8 @@ class PerformanceDataSeederTest {
         PerformanceDataSeeder seeder = new PerformanceDataSeeder(
                 persons, accounts, members, facility, mock(BookingService.class),
                 mock(HistoricalBookingImporter.class), bookings, mock(PasswordEncoder.class),
-                new PerformanceProperties(true, "performance-password"), Clock.systemUTC());
+                new PerformanceProperties(true, "performance-password"), Clock.systemUTC(),
+                () -> java.time.ZoneId.of("Europe/Berlin"));
 
         // when / then
         assertThatCode(() -> seeder.run(new DefaultApplicationArguments(new String[0])))
@@ -83,7 +84,8 @@ class PerformanceDataSeederTest {
         PerformanceDataSeeder seeder = new PerformanceDataSeeder(
                 persons, accounts, members, facility, bookingService, historicalBookings, bookings, passwordEncoder,
                 new PerformanceProperties(true, "performance-password"),
-                Clock.fixed(Instant.parse("2026-08-10T12:00:00Z"), ZoneOffset.UTC));
+                Clock.fixed(Instant.parse("2026-08-10T12:00:00Z"), ZoneOffset.UTC),
+                () -> java.time.ZoneId.of("Europe/Berlin"));
 
         // when
         seeder.run(new DefaultApplicationArguments(new String[0]));

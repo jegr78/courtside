@@ -54,7 +54,8 @@ class ProblemTypeUriTest {
             "urn:courtside:error:series-move-conflict",
             "urn:courtside:error:series-request-invalid",
             "urn:courtside:error:series-not-found",
-            "urn:courtside:error:slot-duration-conflict");
+            "urn:courtside:error:slot-duration-conflict",
+            "urn:courtside:error:time-zone-conflict");
 
     private static final List<String> KNOWN_ADVICE_SLUGS = List.of(
             "urn:courtside:error:access-denied",

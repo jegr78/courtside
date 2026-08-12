@@ -292,7 +292,7 @@ components:
 
     ClubConfig:
       type: object
-      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes]
+      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes, timeZone]
       properties:
         clubName: { type: string }
         primaryColor: { type: string }
@@ -301,10 +301,11 @@ components:
         imprintUrl: { type: [string, "null"] }
         defaultLocale: { type: string }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
+        timeZone: { type: string, example: Europe/Berlin }
 
     ClubConfigRequest:
       type: object
-      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes]
+      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes, timeZone]
       properties:
         clubName: { type: string, maxLength: 100, pattern: ".*\\S.*" }
         primaryColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
@@ -319,6 +320,7 @@ components:
           pattern: "^(https?://.+|/[^/\\\\].*|/)$"
         defaultLocale: { type: string, pattern: "^(de|en)$" }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
+        timeZone: { type: string, minLength: 1, maxLength: 100, example: Europe/Berlin }
 
     WebManifest:
       type: object

@@ -162,6 +162,7 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("login-submit").click();
   await page.getByTestId("admin-configuration-link").click();
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
+  await expect(page.getByTestId("time-zone")).toHaveValue("Europe/Berlin");
 
   // when
   await page.getByTestId("club-name").fill("Example Racquet Club");

@@ -8,15 +8,17 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SlotGridRuleTest {
 
     private final SlotGridRule rule = new SlotGridRule(
-            () -> new BookingSlotDuration(30), "Europe/Berlin");
+            () -> new BookingSlotDuration(30), () -> ZoneId.of("Europe/Berlin"));
 
     @Test
     void givenAThirtyMinuteGrid_whenBookingAlignedToIt_thenNoViolation() {
@@ -55,7 +57,7 @@ class SlotGridRuleTest {
         // given
         AtomicInteger slotMinutes = new AtomicInteger(30);
         SlotGridRule changingRule = new SlotGridRule(
-                () -> new BookingSlotDuration(slotMinutes.get()), "Europe/Berlin");
+                () -> new BookingSlotDuration(slotMinutes.get()), () -> ZoneId.of("Europe/Berlin"));
         slotMinutes.set(15);
 
         // when
@@ -64,6 +66,23 @@ class SlotGridRuleTest {
 
         // then
         assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void givenTheClubChangesItsTimeZone_whenCheckingTheNextBooking_thenTheCurrentSettingIsUsed() {
+        // given
+        AtomicReference<ZoneId> timeZone = new AtomicReference<>(ZoneId.of("Europe/Berlin"));
+        SlotGridRule changingRule = new SlotGridRule(
+                () -> new BookingSlotDuration(30), timeZone::get);
+        timeZone.set(ZoneId.of("Asia/Kathmandu"));
+
+        // when
+        var violations = changingRule.check(contextFor(
+                "2026-05-12T16:00:00Z", "2026-05-12T17:00:00Z"));
+
+        // then
+        assertThat(violations).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.slotGrid.misaligned");
     }
 
     @ParameterizedTest
@@ -77,7 +96,7 @@ class SlotGridRuleTest {
             String misalignedStart, String misalignedEnd) {
         // given
         SlotGridRule longGridRule = new SlotGridRule(
-                () -> new BookingSlotDuration(minutes), "Europe/Berlin");
+                () -> new BookingSlotDuration(minutes), () -> ZoneId.of("Europe/Berlin"));
 
         // when
         var aligned = longGridRule.check(contextFor(
