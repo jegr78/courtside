@@ -467,6 +467,28 @@ class BookingControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACardBookableByTrainersButManagedByNobody_whenATrainerListsManagedAppointments_thenNothingIsDisclosed()
+            throws Exception {
+        // given
+        BookingCard card = cards.createCard("Open practice", "#34584A", Set.of(Role.TRAINER),
+                Set.of(), new short[] { 2 }, false, true, true);
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(courtId, card.getId(), GUEST_PARTICIPANT))
+                        .with(user("trainer.john").roles("TRAINER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings")
+                        .with(user("trainer.john").roles("TRAINER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
+
+    @Test
     void givenACardBookableByMembersAndTrainers_whenATrainerOpensAMemberAppointment_thenItIsRefused()
             throws Exception {
         // given
