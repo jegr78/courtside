@@ -52,7 +52,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                                             String logoUrl, String imprintUrl, String defaultLocale,
                                             int slotMinutes, String timeZone) {
         BookingSlotDuration slotDuration = new BookingSlotDuration(slotMinutes);
-        ZoneId zoneId = ZoneId.of(timeZone);
+        ZoneId.of(timeZone);
         lock();
         ClubConfiguration configuration = currentEntity();
         if (configuration.getSlotMinutes() != slotMinutes) {

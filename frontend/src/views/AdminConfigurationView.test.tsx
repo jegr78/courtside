@@ -103,7 +103,26 @@ describe("AdminConfigurationView", () => {
     const field = await screen.findByTestId("time-zone");
 
     expect(field.tagName).toBe("SELECT");
-    expect(within(field).getByRole("option", { name: "Europe/Berlin" })).toBeInTheDocument();
+    const optionValues = within(field).getAllByRole("option").map((option) => (option as HTMLOptionElement).value);
+    expect(optionValues).toContain("Europe/Berlin");
+  });
+
+  it("given a stored time zone the browser does not list, when configuration loads, then the control still shows it", async () => {
+    // given
+    vi.spyOn(api, "adminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      defaultLocale: "en",
+      slotMinutes: 30,
+      timeZone: "US/Eastern"
+    });
+
+    // when
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("time-zone")).toHaveValue("US/Eastern");
   });
 
   it("given rule-set responses finish out of order, when switching sets, then only the selected set is editable", async () => {

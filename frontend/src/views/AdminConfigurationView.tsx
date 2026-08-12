@@ -15,8 +15,9 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 
-function timeZones(): string[] {
-  return Intl.supportedValuesOf("timeZone");
+function timeZones(current: string): string[] {
+  const known = Intl.supportedValuesOf("timeZone");
+  return known.includes(current) ? known : [current, ...known];
 }
 
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
@@ -131,7 +132,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <select data-testid="time-zone" className="form-control rounded-lg border px-3 py-3"
                   value={config.timeZone}
                   onChange={(event) => setConfig({ ...config, timeZone: event.target.value })}>
-            {timeZones().map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+            {timeZones(config.timeZone).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
           </select>
         </label>
         <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
