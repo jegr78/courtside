@@ -9,8 +9,9 @@ import { formatDateTime } from "../time/clubZone";
 
 type Appointment = PersonalBooking | ManagedAppointment;
 
-export function MyBookingsView({ now = new Date(), showManaged = false }: { now?: Date; showManaged?: boolean }) {
+export function MyBookingsView({ now, showManaged = false }: { now?: Date; showManaged?: boolean }) {
   const { t, i18n } = useTranslation();
+  const [reference] = useState(() => now ?? new Date());
   const [bookings, setBookings] = useState<PersonalBooking[]>([]);
   const [managed, setManaged] = useState<ManagedAppointment[]>([]);
   const [courts, setCourts] = useState<PublicCourt[]>([]);
@@ -77,12 +78,12 @@ export function MyBookingsView({ now = new Date(), showManaged = false }: { now?
 
   const sections = useMemo(() => ({
     upcoming: bookings
-      .filter((booking) => booking.status === "CONFIRMED" && new Date(booking.endsAt) >= now)
+      .filter((booking) => booking.status === "CONFIRMED" && new Date(booking.endsAt) >= reference)
       .toSorted((left, right) => left.startsAt.localeCompare(right.startsAt)),
     past: bookings
-      .filter((booking) => booking.status === "CANCELLED" || new Date(booking.endsAt) < now)
+      .filter((booking) => booking.status === "CANCELLED" || new Date(booking.endsAt) < reference)
       .toSorted((left, right) => right.startsAt.localeCompare(left.startsAt))
-  }), [bookings, now]);
+  }), [bookings, reference]);
 
   const courtNames = new Map(courts.map((court) => [court.id, court.name ?? t("court.number", { number: court.number })]));
   return <section className="mt-8" aria-labelledby="my-bookings-title">
