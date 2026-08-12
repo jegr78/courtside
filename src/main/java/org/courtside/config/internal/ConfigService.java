@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 import java.time.ZoneId;
 
 @Service
@@ -52,30 +54,33 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                                             String logoUrl, String imprintUrl, String defaultLocale,
                                             int slotMinutes, String timeZone) {
         BookingSlotDuration slotDuration = new BookingSlotDuration(slotMinutes);
-        ZoneId.of(timeZone);
+        ZoneId zoneId = ZoneId.of(timeZone);
         lock();
         ClubConfiguration configuration = currentEntity();
-        if (configuration.getSlotMinutes() != slotMinutes) {
-            ZoneId currentZone = ZoneId.of(configuration.getTimeZone());
-            bookingGridConstraints.stream()
-                    .map(constraint -> constraint.conflictCode(slotDuration, currentZone))
-                    .flatMap(java.util.Optional::stream)
-                    .findFirst()
-                    .ifPresent(code -> {
-                        throw new SlotDurationConflictException(code, slotMinutes);
-                    });
-        }
+
         if (!configuration.getTimeZone().equals(timeZone)) {
-            bookingGridConstraints.stream()
-                    .map(constraint -> constraint.timeZoneConflictCode())
-                    .flatMap(java.util.Optional::stream)
-                    .findFirst()
+            firstConflict(constraint -> constraint.timeZoneConflictCode())
                     .ifPresent(code -> {
                         throw new TimeZoneConflictException(code, timeZone);
                     });
         }
+        if (configuration.getSlotMinutes() != slotMinutes) {
+            firstConflict(constraint -> constraint.conflictCode(slotDuration, zoneId))
+                    .ifPresent(code -> {
+                        throw new SlotDurationConflictException(code, slotMinutes);
+                    });
+        }
+
         configuration.changeTo(clubName, primaryColor, accentColor,
                 logoUrl, imprintUrl, defaultLocale, slotMinutes, timeZone);
         return ClubConfigurationSnapshot.from(configuration);
+    }
+
+    private Optional<String> firstConflict(
+            Function<BookingGridConstraint, Optional<String>> question) {
+        return bookingGridConstraints.stream()
+                .map(question)
+                .flatMap(Optional::stream)
+                .findFirst();
     }
 }
