@@ -67,7 +67,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         }
         if (!configuration.getTimeZone().equals(timeZone)) {
             bookingGridConstraints.stream()
-                    .map(constraint -> constraint.timeZoneConflictCode(zoneId))
+                    .map(constraint -> constraint.timeZoneConflictCode())
                     .flatMap(java.util.Optional::stream)
                     .findFirst()
                     .ifPresent(code -> {

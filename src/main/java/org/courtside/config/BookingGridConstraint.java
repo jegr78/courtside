@@ -7,7 +7,7 @@ public interface BookingGridConstraint {
 
     Optional<String> conflictCode(BookingSlotDuration slotDuration, ZoneId timeZone);
 
-    default Optional<String> timeZoneConflictCode(ZoneId timeZone) {
+    default Optional<String> timeZoneConflictCode() {
         return Optional.empty();
     }
 }

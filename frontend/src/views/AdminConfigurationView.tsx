@@ -15,6 +15,10 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 
+function timeZones(): string[] {
+  return Intl.supportedValuesOf("timeZone");
+}
+
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const [config, setConfig] = useState<ClubConfigRequest>();
@@ -122,7 +126,14 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       </label>
       <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => setConfig({ ...config, slotMinutes: Number(event.target.value) })} />
       <div className="grid gap-1">
-        <TextField data-testid="time-zone" label={t("admin.config.timeZone")} value={config.timeZone} onChange={(event) => setConfig({ ...config, timeZone: event.target.value })} />
+        <label className="grid gap-2 font-medium">
+          {t("admin.config.timeZone")}
+          <select data-testid="time-zone" className="form-control rounded-lg border px-3 py-3"
+                  value={config.timeZone}
+                  onChange={(event) => setConfig({ ...config, timeZone: event.target.value })}>
+            {timeZones().map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+          </select>
+        </label>
         <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
       </div>
       <Button data-testid="save-club-config" className="justify-self-start" type="submit">{t("admin.save")}</Button>
