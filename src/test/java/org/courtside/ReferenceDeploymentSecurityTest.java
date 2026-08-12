@@ -23,6 +23,38 @@ class ReferenceDeploymentSecurityTest {
             "(?m)^\\theader \\{\\R(?<fields>(?:\\t\\t.*\\R)*)\\t}$");
 
     @Test
+    void whenReadingImageSources_thenEveryThirdPartyImageIsPinnedByDigest() throws IOException {
+        // given
+        List<Path> sources = List.of(
+                Path.of("Dockerfile"), Path.of("deploy/compose.yaml"),
+                Path.of("deploy/compose.uat.yaml"), Path.of("deploy/compose.perf.yaml"));
+
+        // when / then
+        for (Path source : sources) {
+            Files.readAllLines(source).stream()
+                    .map(String::strip)
+                    .filter(line -> line.startsWith("FROM ") || line.startsWith("image:"))
+                    .filter(line -> !line.contains("courtside"))
+                    .forEach(line -> assertThat(line)
+                            .as("%s pins its image by digest", source)
+                            .contains("@sha256:"));
+        }
+    }
+
+    @Test
+    void whenReadingProductionCompose_thenOwnImageIsSelectedByVersionNotDigest() throws IOException {
+        // given
+        List<String> ownImageLines = Files.readAllLines(Path.of("deploy/compose.yaml")).stream()
+                .map(String::strip)
+                .filter(line -> line.startsWith("image:") && line.contains("courtside"))
+                .toList();
+
+        // when / then
+        assertThat(ownImageLines).containsExactly(
+                "image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}");
+    }
+
+    @Test
     void whenReadingComposeFile_thenApplicationPortIsBoundToLoopback() throws IOException {
         // when
         String compose = Files.readString(Path.of("deploy/compose.yaml"));
