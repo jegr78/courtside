@@ -106,12 +106,13 @@ class AdvanceWindowRuleTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAWindowOfTwoDays_whenBookingJustAfterMidnightOnTheFirstDayOutside_thenExceededViolation() {
-        // given — minutes past midnight must get the same answer as an hour later on the same date
+    void givenAWindowOfTwoDays_whenBookingLateOnTheSameFirstDayOutside_thenExceededViolation() {
+        // given — 07:00 and 15:00 target the same club-local date; only the calendar date, not
+        // the hour, may decide the answer
         ruleAdminService.setRule(STANDARD_RULE_SET, RuleType.ADVANCE_WINDOW, Map.of("maxDays", 2));
 
         // when
-        var violations = rule.check(contextAt("2026-05-14T00:30:00+02:00"));
+        var violations = rule.check(contextAt("2026-05-14T15:00:00+02:00"));
 
         // then
         assertThat(violations).extracting(RuleViolation::code)
