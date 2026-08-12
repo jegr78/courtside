@@ -11,19 +11,27 @@ const backendKeys = () => readFileSync(join(root, "src/main/resources/messages.p
   .filter((line) => line.trim() && !line.trim().startsWith("#"))
   .map((line) => line.slice(0, line.indexOf("=")).trim());
 
-const clientKeys = () => {
+const keysOf = (block) => new Set([...block.matchAll(/^\s*"([^"]+)":/gm)].map((match) => match[1]));
+
+const localeKeys = () => {
   const source = readFileSync(join(root, "frontend/src/i18n.ts"), "utf8");
-  return new Set([...source.matchAll(/^\s*"([^"]+)":/gm)].map((match) => match[1]));
+  const blocks = source.match(
+    /^ {2}de: \{ translation: \{\n([\s\S]*?)\n {2}\} \},\n {2}en: \{ translation: \{\n([\s\S]*?)\n {2}\} \}\n\};/m
+  );
+  assert.ok(blocks, "could not locate the de and en translation blocks in i18n.ts");
+  return { de: keysOf(blocks[1]), en: keysOf(blocks[2]) };
 };
 
-test("given every backend message key, when checking the web client bundle, then each key is translated", () => {
+test("given every backend message key, when checking each locale of the web client bundle, then every key is translated there", () => {
   // given
-  const translated = clientKeys();
+  const { de, en } = localeKeys();
+  const keys = backendKeys();
 
   // when
-  const missing = backendKeys().filter((key) => !translated.has(key));
+  const missingDe = keys.filter((key) => !de.has(key));
+  const missingEn = keys.filter((key) => !en.has(key));
 
   // then
-  assert.deepEqual(missing, [],
-    `The web client renders these codes as error.generic: ${missing.join(", ")}`);
+  assert.deepEqual(missingDe, [], `de renders these codes as error.generic: ${missingDe.join(", ")}`);
+  assert.deepEqual(missingEn, [], `en renders these codes as error.generic: ${missingEn.join(", ")}`);
 });
