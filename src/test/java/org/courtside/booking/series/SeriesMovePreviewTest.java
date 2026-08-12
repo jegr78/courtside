@@ -226,6 +226,21 @@ class SeriesMovePreviewTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACancelledOccurrenceOfAnotherAccountsSeries_whenPreviewingItsMove_thenAccessIsRefused() {
+        // given
+        SeriesCreationResult series = createSeries(2);
+        UUID cancelledOccurrence = series.bookingIds().getFirst();
+        seriesService.cancel(series.seriesId(), cancelledOccurrence, CancelScope.THIS,
+                trainer, Set.of(Role.TRAINER));
+
+        // when / then
+        assertThatThrownBy(() -> seriesService.previewMove(new MoveRequest(
+                series.seriesId(), cancelledOccurrence, CancelScope.THIS,
+                LocalTime.of(19, 0), null, null), UUID.randomUUID(), Set.of(Role.MEMBER)))
+                .isInstanceOf(BookingNotOwnedException.class);
+    }
+
+    @Test
     void givenATrainingSeriesCreatedByATrainer_whenAYouthDirectorPreviewsAMove_thenItIsAllowed() {
         // given
         SeriesCreationResult series = createSeries(2);
