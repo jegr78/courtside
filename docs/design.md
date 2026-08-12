@@ -346,12 +346,24 @@ CREATE TABLE booking_card_allowed_role (
     role            text NOT NULL,
     PRIMARY KEY (booking_card_id, role)
 );
+
+CREATE TABLE booking_card_managing_role (
+    booking_card_id uuid NOT NULL REFERENCES booking_card ON DELETE CASCADE,
+    role            text NOT NULL,
+    PRIMARY KEY (booking_card_id, role)
+);
 ```
 
 A new card type is a row in the admin backend, not a deployment. A card with no allowed roles
 is available to every authenticated member account; otherwise holding any listed role is
 sufficient. Future external accounts are never covered by an empty role list and may use only
 cards that explicitly allow `EXTERNAL_BOOKER`.
+
+The two role tables read in opposite directions, and deliberately so. An empty *allowed* set
+opens the card to everyone, because a card nobody gated is a card for the whole club. An empty
+*managing* set opens it to nobody but the admin, because access to other people's bookings is
+something a club grants rather than forgets to withhold. Section 10 covers what a managing role
+may then see.
 Cards express permissions and booking behaviour, never identity. Creating, changing or cancelling
 a booking requires an authenticated account; no booking or participant card carries a shared
 credential. Codes that unlock a local device or kiosk belong to that device and do not authorize
@@ -881,6 +893,15 @@ later.
 Roles are independent permission bundles rather than a hierarchy: in a club, one person often
 wears several hats.
 
+A booking card names two role sets, and they answer different questions. Its **booking roles**
+decide who may place an occupancy with it. Its **managing roles** decide who may open, read and
+cancel every booking already made on it. A card bookable by members and trainers alike therefore
+does not hand a trainer the participants of a member's booking; only naming the trainer among the
+card's managing roles does that. An empty managing set leaves the card's bookings to their own
+booker and to the admin, which is what a member card wants. Naming `Member` there grants nobody:
+the check drops the member role before it matches, so no configuration turns every member into a
+manager of every booking.
+
 ### Authenticated external accounts
 
 **Designed, not built.** A person who is not a club member may later create a full, verified
@@ -899,9 +920,12 @@ from an accompanying guest entered as a participant. Anonymous visitors remain r
 ### Name visibility in the grid
 
 **Participant names are never shown for someone else's booking — not to guests, and not to
-logged-in members.** Only two views resolve names: a member's own booking, and the
-administrative views (Admin, and Treasurer where a report requires it). This is not an
-instance setting and clubs cannot switch it on.
+logged-in members.** Three surfaces resolve names: a member's own booking, the administrative
+views (Admin, and Treasurer where a report requires it), and the managed-appointment view of the
+roles a booking card names as managing. The last exists because an officer answerable for an
+appointment has to know who is in it, and the club decides per card which roles carry that
+responsibility. The grid itself is none of them: it is not an instance setting and clubs cannot
+switch it on.
 
 Data minimisation is the reason. A booking grid that names players publishes, to every member,
 who plays with whom and when — a movement and social profile that the booking function does not
@@ -922,6 +946,10 @@ Consequences for the model and the API:
   its localised viewer marker; guest names never enter the grid response.
 - A booking's participant count is public; the participants are not.
 - Guest names are personal data too and follow the same rule.
+- The managed-appointment detail is not the grid. It resolves every participant of the booking,
+  guests included, for a card's managing roles and for an admin. Widening a card's managing roles
+  therefore widens who reads those names, which is why the set starts empty and a club has to
+  choose it deliberately rather than inheriting it from who may book the card.
 - Any future partner-finding feature must be opt-in per member and must not be built by
   loosening this rule.
 

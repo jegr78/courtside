@@ -99,6 +99,72 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenCreatingACardWithManagingRoles_thenTheyAreReturnedApartFromTheBookingRoles()
+            throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Junior squad", "color": "#c8a415",
+                                 "allowedRoles": ["MEMBER", "TRAINER"],
+                                 "managingRoles": ["SPORT_DIRECTOR"],
+                                 "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                                 "guestAllowed": false}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.allowedRoles[0]").value("MEMBER"))
+                .andExpect(jsonPath("$.allowedRoles[1]").value("TRAINER"))
+                .andExpect(jsonPath("$.managingRoles.length()").value(1))
+                .andExpect(jsonPath("$.managingRoles[0]").value("SPORT_DIRECTOR"));
+    }
+
+    @Test
+    void whenCreatingACardWithoutManagingRoles_thenNobodyManagesItsBookings() throws Exception {
+        // given
+        String id = createCard("Taster session", "#c8a415");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/booking-cards/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.managingRoles").isEmpty());
+        assertThat(cardService.requireCard(UUID.fromString(id)).getManagingRoles()).isEmpty();
+    }
+
+    @Test
+    void givenACardManagedByATrainer_whenTheManagingRolesAreCleared_thenTheStoredSetIsEmpty()
+            throws Exception {
+        // given
+        String id = JsonPath.read(mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Junior squad", "color": "#c8a415",
+                                 "allowedRoles": ["TRAINER"], "managingRoles": ["TRAINER"],
+                                 "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                                 "guestAllowed": false}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        // when
+        mockMvc.perform(put("/api/admin/booking-cards/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Junior squad", "color": "#c8a415",
+                                 "allowedRoles": ["TRAINER"], "managingRoles": [],
+                                 "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                                 "guestAllowed": false}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.managingRoles").isEmpty());
+
+        // then
+        assertThat(cardService.requireCard(UUID.fromString(id)).getManagingRoles()).isEmpty();
+    }
+
+    @Test
     void whenCreatingABookingCard_thenTheLocationHeaderResolvesToTheCreatedCard() throws Exception {
         // given
         MvcResult created = mockMvc.perform(post("/api/admin/booking-cards")

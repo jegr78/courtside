@@ -108,7 +108,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("""
             SELECT b.id FROM Booking b
             WHERE (:administrator = true OR EXISTS (
-                SELECT c.id FROM BookingCard c JOIN c.allowedRoles role
+                SELECT c.id FROM BookingCard c JOIN c.managingRoles role
                 WHERE c.id = b.cardId AND role IN :roles
             ))
               AND (:cursor IS NULL

@@ -44,6 +44,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
     public ResponseEntity<ApiBookingCard> createBookingCard(ApiBookingCardRequest request) {
         BookingCard card = cards.createCard(
                 request.getLabel(), request.getColor(), roles(request.getAllowedRoles()),
+                roles(request.getManagingRoles()),
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()));
         return ResponseEntity
@@ -55,6 +56,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
     public ResponseEntity<ApiBookingCard> changeBookingCard(UUID id, ApiBookingCardRequest request) {
         return ResponseEntity.ok(toResponse(cards.changeCard(
                 id, request.getLabel(), request.getColor(), roles(request.getAllowedRoles()),
+                roles(request.getManagingRoles()),
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()))));
     }
@@ -120,11 +122,14 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
         return result;
     }
 
-    private static Set<Role> roles(Collection<ApiRole> allowedRoles) {
+    private static Set<Role> roles(Collection<ApiRole> requested) {
         Set<Role> result = EnumSet.noneOf(Role.class);
-        for (ApiRole allowedRole : allowedRoles) {
-            result.add(Role.named(allowedRole.getValue()).orElseThrow(() -> new IllegalStateException(
-                    "Unvalidated role name reached the card boundary: " + allowedRole.getValue())));
+        if (requested == null) {
+            return result;
+        }
+        for (ApiRole role : requested) {
+            result.add(Role.named(role.getValue()).orElseThrow(() -> new IllegalStateException(
+                    "Unvalidated role name reached the card boundary: " + role.getValue())));
         }
         return result;
     }
@@ -139,7 +144,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
     private static ApiBookingCard toResponse(BookingCard card) {
         return new ApiBookingCard(
                 card.getId(), card.getLabel(), card.getColor(),
-                roleNames(card.getAllowedRoles()),
+                roleNames(card.getAllowedRoles()), roleNames(card.getManagingRoles()),
                 toPlayerCountList(card.getAllowedPlayerCounts()), card.tracksPlayers(),
                 card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isShowGenericOccupancy(),
                 card.isActive());

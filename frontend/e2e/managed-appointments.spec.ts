@@ -42,6 +42,16 @@ test("an authorized officer cancels a managed appointment through the browser", 
   await expect(page.getByTestId(`booking-${bookingId}`)).toHaveAttribute("data-status", "CANCELLED");
 });
 
+test("an officer sees only the appointments the card's managing roles cover", async ({ page }) => {
+  // given
+  await signIn(page, "keeper.roe");
+
+  // when / then
+  await expect(page.getByRole("heading", { name: "Managed appointments" })).toBeVisible();
+  await expect(page.getByTestId("booking-70000000-0000-0000-0000-000000000005")).toBeVisible();
+  await expect(page.getByTestId("booking-70000000-0000-0000-0000-000000000004")).toHaveCount(0);
+});
+
 test("an ordinary member has no managed-appointments area", async ({ page }) => {
   // when
   await signIn(page, "doe.jane");

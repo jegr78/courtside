@@ -57,9 +57,9 @@ class CardControllerTest extends AbstractIntegrationTest {
     void givenAnActiveAndADeactivatedBookingCard_whenListingPublicly_thenOnlyTheActiveOneIsPresent()
             throws Exception {
         // given
-        BookingCard active = cards.createCard("Match play", "#3a4a5c", Set.of(),
+        BookingCard active = cards.createCard("Match play", "#3a4a5c", Set.of(), Set.of(),
                 new short[] {2, 4}, true, true, true);
-        BookingCard retired = cards.createCard("Retired card", "#c8a415", Set.of(),
+        BookingCard retired = cards.createCard("Retired card", "#c8a415", Set.of(), Set.of(),
                 new short[0], false, false, false);
         cards.setCardActive(retired.getId(), false);
 
@@ -74,9 +74,9 @@ class CardControllerTest extends AbstractIntegrationTest {
     void givenACardGatedBehindARoleTheCallerDoesNotHold_whenListingPublicly_thenItIsAbsent()
             throws Exception {
         // given
-        BookingCard gated = cards.createCard("Trainer session", "#3a4a5c", Set.of(Role.TRAINER),
+        BookingCard gated = cards.createCard("Trainer session", "#3a4a5c", Set.of(Role.TRAINER), Set.of(),
                 new short[0], false, false, false);
-        BookingCard open = cards.createCard("Match play", "#3a4a5c", Set.of(),
+        BookingCard open = cards.createCard("Match play", "#3a4a5c", Set.of(), Set.of(),
                 new short[] {2, 4}, true, true, true);
 
         // when / then
@@ -90,7 +90,7 @@ class CardControllerTest extends AbstractIntegrationTest {
     void whenListingBookingCardsPublicly_thenOnlyMemberFacingFieldsAreExposed() throws Exception {
         // given
         BookingCard card = cards.createCard(
-                "Match play", "#3a4a5c", Set.of(), new short[] {2, 4}, true, true, true);
+                "Match play", "#3a4a5c", Set.of(), Set.of(), new short[] {2, 4}, true, true, true);
         String at = "$[?(@.id=='" + card.getId() + "')]";
 
         // when / then
