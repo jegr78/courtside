@@ -3,12 +3,14 @@ package org.courtside.rules;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.rules.internal.AdvanceWindowRule;
 import org.courtside.rules.internal.RuleAdminService;
+import org.courtside.rules.internal.RuleType;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,6 +80,46 @@ class AdvanceWindowRuleTest extends AbstractIntegrationTest {
         assertThat(violations).isEmpty();
     }
 
+    @Test
+    void givenAWindowOfTwoDays_whenBookingLateOnTheLastPermittedDay_thenNoViolation() {
+        // given
+        ruleAdminService.setRule(STANDARD_RULE_SET, RuleType.ADVANCE_WINDOW, Map.of("maxDays", 2));
+
+        // when
+        var violations = rule.check(contextAt("2026-05-13T21:00:00+02:00"));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void givenAWindowOfTwoDays_whenBookingEarlyOnTheFirstDayOutside_thenExceededViolation() {
+        // given
+        ruleAdminService.setRule(STANDARD_RULE_SET, RuleType.ADVANCE_WINDOW, Map.of("maxDays", 2));
+
+        // when
+        var violations = rule.check(contextAt("2026-05-14T07:00:00+02:00"));
+
+        // then
+        assertThat(violations).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.advanceWindow.exceeded");
+    }
+
+    @Test
+    void givenAWindowOfTwoDays_whenBookingJustAfterMidnightOnTheFirstDayOutside_thenExceededViolation() {
+        // given — the old rule read this as 36.5 hours away, less than the 48-hour window, and let
+        // it through; a member booking minutes past midnight must get the same answer as one an
+        // hour later, because both target the same club-local calendar date
+        ruleAdminService.setRule(STANDARD_RULE_SET, RuleType.ADVANCE_WINDOW, Map.of("maxDays", 2));
+
+        // when
+        var violations = rule.check(contextAt("2026-05-14T00:30:00+02:00"));
+
+        // then
+        assertThat(violations).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.advanceWindow.exceeded");
+    }
+
     private RuleContext contextFor(UUID membershipTypeId, Instant start) {
         return new RuleContext(
                 UUID.randomUUID(),
@@ -85,5 +127,9 @@ class AdvanceWindowRuleTest extends AbstractIntegrationTest {
                 new TimeSlot(start, start.plus(1, ChronoUnit.HOURS)),
                 UUID.randomUUID(),
                 membershipTypeId);
+    }
+
+    private RuleContext contextAt(String start) {
+        return contextFor(STANDARD, Instant.parse(start));
     }
 }
