@@ -190,6 +190,8 @@ public class SeriesService {
 
         List<Booking> affected =
                 affectedBookings(request.seriesId(), request.fromBookingId(), request.scope());
+        affected.forEach(booking ->
+                accessControl.requireManagementAccess(booking, movedBy, callerRoles));
 
         List<UUID> movingIds = affected.stream().map(Booking::getId).toList();
         List<PlannedMove> planned = affected.stream()
