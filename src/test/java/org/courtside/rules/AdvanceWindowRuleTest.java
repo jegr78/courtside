@@ -107,9 +107,7 @@ class AdvanceWindowRuleTest extends AbstractIntegrationTest {
 
     @Test
     void givenAWindowOfTwoDays_whenBookingJustAfterMidnightOnTheFirstDayOutside_thenExceededViolation() {
-        // given — the old rule read this as 36.5 hours away, less than the 48-hour window, and let
-        // it through; a member booking minutes past midnight must get the same answer as one an
-        // hour later, because both target the same club-local calendar date
+        // given — minutes past midnight must get the same answer as an hour later on the same date
         ruleAdminService.setRule(STANDARD_RULE_SET, RuleType.ADVANCE_WINDOW, Map.of("maxDays", 2));
 
         // when
