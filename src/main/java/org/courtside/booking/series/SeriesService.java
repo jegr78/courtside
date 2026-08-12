@@ -23,7 +23,6 @@ import org.courtside.facility.FacilityService;
 import org.courtside.identity.Role;
 import org.courtside.rules.RuleViolation;
 import org.courtside.shared.TimeSlot;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +31,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
-import java.time.ZoneId;
+import org.courtside.config.ClubTimeZone;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -59,7 +58,7 @@ public class SeriesService {
     private final BookingAccessControl accessControl;
     private final ParticipantCardCapacity participantCardCapacity;
     private final Clock clock;
-    private final ZoneId zone;
+    private final ClubTimeZone timeZone;
     private final BookingGridCoordination bookingGridCoordination;
 
     public SeriesService(SeriesSchedule schedule,
@@ -74,7 +73,7 @@ public class SeriesService {
                          ParticipantCardCapacity participantCardCapacity,
                          Clock clock,
                          BookingGridCoordination bookingGridCoordination,
-                         @Value("${courtside.booking.time-zone}") String zone) {
+                         ClubTimeZone timeZone) {
         this.schedule = schedule;
         this.allocations = allocations;
         this.bookings = bookings;
@@ -87,7 +86,7 @@ public class SeriesService {
         this.participantCardCapacity = participantCardCapacity;
         this.clock = clock;
         this.bookingGridCoordination = bookingGridCoordination;
-        this.zone = ZoneId.of(zone);
+        this.timeZone = timeZone;
     }
 
     @Transactional(readOnly = true)
@@ -374,7 +373,7 @@ public class SeriesService {
     }
 
     private TimeSlot targetSlot(TimeSlot from, MoveRequest request) {
-        ZonedDateTime current = from.start().atZone(zone);
+        ZonedDateTime current = from.start().atZone(timeZone.zoneId());
         LocalTime startTime = request.newStartTime() == null
                 ? current.toLocalTime()
                 : request.newStartTime();
@@ -382,7 +381,7 @@ public class SeriesService {
                 ? (int) Duration.between(from.start(), from.end()).toMinutes()
                 : request.newDurationMinutes();
 
-        ZonedDateTime start = current.toLocalDate().atTime(startTime).atZone(zone);
+        ZonedDateTime start = current.toLocalDate().atTime(startTime).atZone(timeZone.zoneId());
         return new TimeSlot(start.toInstant(), start.plusMinutes(minutes).toInstant());
     }
 

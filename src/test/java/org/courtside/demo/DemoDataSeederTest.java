@@ -64,7 +64,7 @@ class DemoDataSeederTest {
         assertThat(courts.count()).isEqualTo(courtCount).isEqualTo(2);
         assertThat(bookings.count()).isEqualTo(bookingCount).isEqualTo(2);
         assertThat(jdbc.sql("SELECT count(*) FROM flyway_schema_history").query(Long.class).single())
-                .isEqualTo(16);
+                .isEqualTo(17);
         assertThat(jdbc.sql("SELECT date(starts_at AT TIME ZONE 'Europe/Berlin') "
                 + "FROM court_allocation ORDER BY starts_at").query(LocalDate.class).list())
                 .containsExactly(LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 18));

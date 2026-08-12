@@ -121,6 +121,10 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         </select>
       </label>
       <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => setConfig({ ...config, slotMinutes: Number(event.target.value) })} />
+      <div className="grid gap-1">
+        <TextField data-testid="time-zone" label={t("admin.config.timeZone")} value={config.timeZone} onChange={(event) => setConfig({ ...config, timeZone: event.target.value })} />
+        <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
+      </div>
       <Button data-testid="save-club-config" className="justify-self-start" type="submit">{t("admin.save")}</Button>
     </form>
     <div className="grid gap-5">

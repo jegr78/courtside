@@ -5,7 +5,7 @@ import org.courtside.api.ApiOpeningHours;
 import org.courtside.api.OpeningHoursApi;
 import org.courtside.facility.FacilityService;
 import org.courtside.config.BookingGridSettings;
-import org.springframework.beans.factory.annotation.Value;
+import org.courtside.config.ClubTimeZone;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -15,11 +15,11 @@ import java.util.List;
 class OpeningHoursController implements OpeningHoursApi {
 
     private final FacilityService facility;
-    private final String timeZone;
+    private final ClubTimeZone timeZone;
     private final BookingGridSettings bookingGridSettings;
 
     OpeningHoursController(FacilityService facility,
-                           @Value("${courtside.booking.time-zone}") String timeZone,
+                           ClubTimeZone timeZone,
                            BookingGridSettings bookingGridSettings) {
         this.facility = facility;
         this.timeZone = timeZone;
@@ -34,7 +34,7 @@ class OpeningHoursController implements OpeningHoursApi {
     @Override
     public ResponseEntity<ApiBookingGrid> getBookingGrid() {
         return ResponseEntity.ok(new ApiBookingGrid(
-                timeZone, bookingGridSettings.slotMinutes(), openingHours()));
+                timeZone.id(), bookingGridSettings.slotMinutes(), openingHours()));
     }
 
     private List<ApiOpeningHours> openingHours() {

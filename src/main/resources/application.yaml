@@ -47,7 +47,6 @@ courtside:
       window: ${COURTSIDE_LOGIN_GLOBAL_WINDOW:1m}
       block: ${COURTSIDE_LOGIN_GLOBAL_BLOCK:1m}
   booking:
-    time-zone: ${COURTSIDE_TIME_ZONE:Europe/Berlin}
     series-horizon-months: 12
 
 management:

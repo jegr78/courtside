@@ -33,6 +33,8 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
                                          @Param("zone") String zone,
                                          @Param("slotSeconds") int slotSeconds);
 
+    boolean existsByStatusAndEndsAtAfter(org.courtside.booking.BookingStatus status, Instant from);
+
     @Query("""
             SELECT a FROM CourtAllocation a
             JOIN FETCH a.booking

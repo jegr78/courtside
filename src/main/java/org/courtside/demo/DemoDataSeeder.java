@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import org.courtside.config.ClubTimeZone;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
@@ -58,14 +59,14 @@ class DemoDataSeeder implements ApplicationRunner {
     private final DemoProperties properties;
     private final String adminUsername;
     private final String adminPassword;
-    private final String timeZone;
+    private final ClubTimeZone timeZone;
 
     DemoDataSeeder(PersonRepository persons, UserAccountRepository accounts, MemberRepository members,
                    FacilityService facility, BookingService bookingService, BookingRepository bookings,
                    PasswordEncoder passwordEncoder, Clock clock, DemoProperties properties,
                    @Value("${courtside.bootstrap-admin.username}") String adminUsername,
                    @Value("${courtside.bootstrap-admin.password}") String adminPassword,
-                   @Value("${courtside.booking.time-zone}") String timeZone) {
+                   ClubTimeZone timeZone) {
         this.persons = persons;
         this.accounts = accounts;
         this.members = members;
@@ -145,7 +146,7 @@ class DemoDataSeeder implements ApplicationRunner {
     }
 
     private void createBookings(DemoMember jane, DemoMember john, List<Court> courts) {
-        ZoneId zone = ZoneId.of(timeZone);
+        ZoneId zone = timeZone.zoneId();
         LocalDate today = LocalDate.now(clock.withZone(zone));
         LocalDate monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         TimeSlot currentWeek = slot(monday.plusDays(1), LocalTime.of(18, 0), zone);

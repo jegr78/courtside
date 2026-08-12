@@ -15,7 +15,8 @@ describe("AdminConfigurationView", () => {
       primaryColor: "#b85c38",
       accentColor: "#d7e24b",
       defaultLocale: "en",
-      slotMinutes: 30
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
     });
     vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
     vi.spyOn(api, "ruleTypes").mockResolvedValue([
@@ -34,6 +35,7 @@ describe("AdminConfigurationView", () => {
     // then
     expect(await screen.findByTestId("club-name")).toHaveValue("Example Tennis Club");
     expect(screen.getByTestId("slot-minutes")).toHaveValue(30);
+    expect(screen.getByTestId("time-zone")).toHaveValue("Europe/Berlin");
     expect(screen.getByRole("heading", { name: "Opening hours" })).toBeInTheDocument();
     expect(screen.getByTestId("rule-OPENING_HOURS-global")).toHaveTextContent("Configured globally for the whole facility");
     await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));
@@ -47,7 +49,8 @@ describe("AdminConfigurationView", () => {
       primaryColor: "#b85c38",
       accentColor: "#d7e24b",
       defaultLocale: "en",
-      slotMinutes: 15
+      slotMinutes: 15,
+      timeZone: "Pacific/Auckland"
     });
     const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
       ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
@@ -62,13 +65,17 @@ describe("AdminConfigurationView", () => {
     await user.type(screen.getByTestId("club-name"), "Example Racquet Club");
     await user.clear(screen.getByTestId("slot-minutes"));
     await user.type(screen.getByTestId("slot-minutes"), "15");
+    await user.clear(screen.getByTestId("time-zone"));
+    await user.type(screen.getByTestId("time-zone"), "Pacific/Auckland");
     await user.click(screen.getByTestId("save-club-config"));
     await user.clear(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"));
     await user.type(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "14");
     await user.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
 
     // then
-    expect(changeConfig).toHaveBeenCalledWith(expect.objectContaining({ clubName: "Example Racquet Club", slotMinutes: 15 }));
+    expect(changeConfig).toHaveBeenCalledWith(expect.objectContaining({
+      clubName: "Example Racquet Club", slotMinutes: 15, timeZone: "Pacific/Auckland"
+    }));
     expect(configurationChanged).toHaveBeenCalled();
     expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 });
   });

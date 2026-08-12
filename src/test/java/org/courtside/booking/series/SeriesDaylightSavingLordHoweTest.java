@@ -11,7 +11,6 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.DayOfWeek;
@@ -33,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // Lord_Howe shifts half an hour, on other dates, in the opposite direction to Berlin: code that
 // assumed "one hour" passes every Berlin-only test and drifts here.
-@SpringBootTest(properties = "courtside.booking.time-zone=Australia/Lord_Howe")
 class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -64,6 +62,7 @@ class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        jdbc.sql("UPDATE club_config SET time_zone = ?").param(ZONE.getId()).update();
         court = courts.save(new Court(1, "Court 1")).getId();
 
         for (DayOfWeek day : DayOfWeek.values()) {

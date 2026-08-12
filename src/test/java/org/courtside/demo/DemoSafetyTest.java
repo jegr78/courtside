@@ -85,7 +85,8 @@ class DemoSafetyTest {
                 mock(PersonRepository.class), accounts, mock(MemberRepository.class),
                 mock(FacilityService.class), mock(BookingService.class), mock(BookingRepository.class),
                 mock(PasswordEncoder.class), Clock.systemUTC(),
-                new DemoProperties(true, "member-password"), "admin", "admin-password", "Europe/Berlin");
+                new DemoProperties(true, "member-password"), "admin", "admin-password",
+                () -> java.time.ZoneId.of("Europe/Berlin"));
 
         // when / then
         assertThatThrownBy(() -> seeder.run(new DefaultApplicationArguments(new String[0])))

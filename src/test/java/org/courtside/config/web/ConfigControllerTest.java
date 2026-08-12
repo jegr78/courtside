@@ -42,7 +42,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.clubName").value("Courtside"))
                 .andExpect(jsonPath("$.primaryColor").value("#B85C38"))
                 .andExpect(jsonPath("$.defaultLocale").value("de"))
-                .andExpect(jsonPath("$.slotMinutes").value(30));
+                .andExpect(jsonPath("$.slotMinutes").value(30))
+                .andExpect(jsonPath("$.timeZone").value("Europe/Berlin"));
     }
 
     @Test
@@ -105,6 +106,51 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAdmin_whenChangingTheTimeZone_thenTheBookingGridUsesTheNewValue()
+            throws Exception {
+        // when
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "Europe/Berlin", "Pacific/Auckland"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timeZone").value("Pacific/Auckland"));
+
+        // then
+        mockMvc.perform(get("/api/public/booking-grid"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timeZone").value("Pacific/Auckland"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnInvalidTimeZone_whenChangingTheConfig_thenItIsRejected() throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "Europe/Berlin", "Moon/Tranquility"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("timeZone"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFixedOffsetTimeZone_whenChangingTheConfig_thenItIsRejected() throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "Europe/Berlin", "+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("timeZone"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAFutureBookingOutsideTheNewGrid_whenChangingTheSlotDuration_thenItIsRejected()
             throws Exception {
         // given
@@ -134,6 +180,40 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:slot-duration-conflict"))
                 .andExpect(jsonPath("$.violations[0].code").value("config.slotMinutes.futureBookingConflict"))
                 .andExpect(jsonPath("$.violations[0].params.slotMinutes").value(60));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFutureBooking_whenChangingTheTimeZone_thenItIsRejected() throws Exception {
+        // given
+        jdbc.sql("""
+                INSERT INTO court (id, number, active)
+                VALUES ('dddddddd-0000-0000-0000-000000000001', 1, true)
+                """).update();
+        jdbc.sql("""
+                INSERT INTO booking (id, card_id, status)
+                VALUES ('aaaaaaaa-0000-0000-0000-000000000001',
+                        '11111111-1111-1111-1111-111111111111', 'CONFIRMED')
+                """).update();
+        jdbc.sql("""
+                INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
+                VALUES ('bbbbbbbb-0000-0000-0000-000000000001',
+                        'aaaaaaaa-0000-0000-0000-000000000001',
+                        'dddddddd-0000-0000-0000-000000000001',
+                        '2026-09-12T16:30:00Z', '2026-09-12T17:00:00Z', 'CONFIRMED')
+                """).update();
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "Europe/Berlin", "Pacific/Auckland"))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:time-zone-conflict"))
+                .andExpect(jsonPath("$.violations[0].code").value(
+                        "config.timeZone.futureBookingConflict"))
+                .andExpect(jsonPath("$.violations[0].params.timeZone").value("Pacific/Auckland"));
     }
 
     @Test
@@ -178,7 +258,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "blue",
-                                 "accentColor": "#f78166", "defaultLocale": "de", "slotMinutes": 30}
+                                 "accentColor": "#f78166", "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -195,7 +275,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "accentColor": "#f78166",
-                                 "defaultLocale": "de", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -213,7 +293,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
-                                 "defaultLocale": "de", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -231,7 +311,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
-                                 "accentColor": "#f78166", "slotMinutes": 30}
+                                 "accentColor": "#f78166", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -250,7 +330,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "logoUrl": "javascript:alert(1)",
-                                 "defaultLocale": "de", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -272,7 +352,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "%s", "primaryColor": "#004f2d",
-                                 "accentColor": "#f78166", "defaultLocale": "de", "slotMinutes": 30}
+                                 "accentColor": "#f78166", "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                                 """.formatted("A".repeat(101)))
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -293,7 +373,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "logoUrl": "//evil.example/x.png",
-                                 "defaultLocale": "de", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -308,7 +388,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
-                                 "accentColor": "#f78166", "defaultLocale": "fr", "slotMinutes": 30}
+                                 "accentColor": "#f78166", "defaultLocale": "fr", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -327,7 +407,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "logoUrl": "/\\\\evil.example",
-                                 "defaultLocale": "de", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -338,7 +418,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
         return """
                 {"clubName": "%s", "primaryColor": "#004f2d", "accentColor": "#c8a415",
                  "logoUrl": "/branding/logo.svg", "imprintUrl": "https://example-tennis-club.example/imprint",
-                 "defaultLocale": "de", "slotMinutes": 30}
+                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
                 """.formatted(clubName);
     }
 }

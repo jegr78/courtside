@@ -5,9 +5,11 @@ import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Transactional
 class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -30,7 +32,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
         // when
         ClubConfigurationSnapshot snapshot = config.update(
                 "Example Tennis Club", "#34584A", "#D7E24B",
-                "/logo.svg", "/imprint", "en", 15);
+                "/logo.svg", "/imprint", "en", 15, "Pacific/Auckland");
 
         // then
         assertThat(snapshot.getClass().isRecord()).isTrue();
@@ -41,5 +43,6 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
         assertThat(snapshot.imprintUrl()).isEqualTo("/imprint");
         assertThat(snapshot.defaultLocale()).isEqualTo("en");
         assertThat(snapshot.slotMinutes()).isEqualTo(15);
+        assertThat(snapshot.timeZone()).isEqualTo("Pacific/Auckland");
     }
 }

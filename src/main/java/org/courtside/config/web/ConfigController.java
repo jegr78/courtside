@@ -42,7 +42,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
         return ResponseEntity.ok(toResponse(config.update(
                 request.getClubName(), request.getPrimaryColor(), request.getAccentColor(),
                 request.getLogoUrl(), request.getImprintUrl(), request.getDefaultLocale(),
-                request.getSlotMinutes())));
+                request.getSlotMinutes(), request.getTimeZone())));
     }
 
     @Override
@@ -63,7 +63,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
         return new ApiClubConfig(
                 configuration.clubName(), configuration.primaryColor(),
                 configuration.accentColor(), configuration.defaultLocale(),
-                configuration.slotMinutes())
+                configuration.slotMinutes(), configuration.timeZone())
                 .logoUrl(configuration.logoUrl())
                 .imprintUrl(configuration.imprintUrl());
     }

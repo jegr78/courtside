@@ -4,7 +4,7 @@ import org.courtside.facility.FacilityService;
 import org.courtside.facility.OpeningHours;
 import org.courtside.rules.RuleContext;
 import org.courtside.rules.RuleViolation;
-import org.springframework.beans.factory.annotation.Value;
+import org.courtside.config.ClubTimeZone;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalTime;
@@ -18,12 +18,11 @@ import java.util.Optional;
 public class OpeningHoursRule implements BookingRule {
 
     private final FacilityService facility;
-    private final ZoneId zone;
+    private final ClubTimeZone timeZone;
 
-    public OpeningHoursRule(FacilityService facility,
-                            @Value("${courtside.booking.time-zone}") String zone) {
+    public OpeningHoursRule(FacilityService facility, ClubTimeZone timeZone) {
         this.facility = facility;
-        this.zone = ZoneId.of(zone);
+        this.timeZone = timeZone;
     }
 
     @Override
@@ -33,6 +32,7 @@ public class OpeningHoursRule implements BookingRule {
 
     @Override
     public List<RuleViolation> check(RuleContext context) {
+        ZoneId zone = timeZone.zoneId();
         ZonedDateTime start = context.slot().start().atZone(zone);
         ZonedDateTime end = context.slot().end().atZone(zone);
 

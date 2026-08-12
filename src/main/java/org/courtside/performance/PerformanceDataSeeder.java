@@ -7,6 +7,7 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.HistoricalBookingImporter;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.facility.Court;
+import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -62,6 +63,7 @@ class PerformanceDataSeeder implements ApplicationRunner {
     private final PasswordEncoder passwordEncoder;
     private final PerformanceProperties properties;
     private final Clock clock;
+    private final ClubTimeZone timeZone;
 
     @Override
     @Transactional
@@ -123,7 +125,7 @@ class PerformanceDataSeeder implements ApplicationRunner {
     }
 
     private void createBookings(List<PerformanceMember> seededMembers, List<Court> courts) {
-        ZoneId zone = ZoneId.of("Europe/Berlin");
+        ZoneId zone = timeZone.zoneId();
         LocalDate today = LocalDate.now(clock.withZone(zone));
         int memberIndex = 0;
         for (int dayOffset = -7; dayOffset < 7; dayOffset++) {

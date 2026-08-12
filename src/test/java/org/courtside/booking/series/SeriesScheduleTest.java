@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,7 +32,7 @@ class SeriesScheduleTest {
     private static final UUID COURT = UUID.randomUUID();
     private static final UUID CARD = UUID.randomUUID();
 
-    private final SeriesSchedule schedule = new SeriesSchedule("Europe/Berlin", 12);
+    private final SeriesSchedule schedule = new SeriesSchedule(() -> BERLIN, 12);
 
     @Test
     void givenAWeeklyRuleWithAnEndDate_whenExpanding_thenEveryMatchingTuesdayIsReturned() {
@@ -167,7 +168,7 @@ class SeriesScheduleTest {
                 1, Set.of(transitionDate.getDayOfWeek()), null, 2);
 
         // when
-        List<TimeSlot> slots = new SeriesSchedule(zoneId, 12).expand(rule).slots();
+        List<TimeSlot> slots = new SeriesSchedule(() -> zone, 12).expand(rule).slots();
 
         // then
         assertThat(slots).extracting(slot -> LocalDateTime.ofInstant(slot.start(), zone))
@@ -187,13 +188,29 @@ class SeriesScheduleTest {
         SeriesRule rule = rule(LocalDate.of(2026, 10, 20), 1, Set.of(DayOfWeek.TUESDAY), null, 2);
 
         // when
-        List<TimeSlot> slots = new SeriesSchedule("Asia/Kathmandu", 12).expand(rule).slots();
+        List<TimeSlot> slots = new SeriesSchedule(() -> zone, 12).expand(rule).slots();
 
         // then
         assertThat(slots.getFirst().start()).isEqualTo(Instant.parse("2026-10-20T12:15:00Z"));
         assertThat(slots.getLast().start()).isEqualTo(Instant.parse("2026-10-27T12:15:00Z"));
         assertThat(slots.getLast().start())
                 .isEqualTo(slots.getFirst().start().plus(7, ChronoUnit.DAYS));
+    }
+
+    @Test
+    void givenTheClubChangesItsTimeZone_whenExpandingTheNextSeries_thenTheCurrentZoneIsUsed() {
+        // given
+        AtomicReference<ZoneId> timeZone = new AtomicReference<>(BERLIN);
+        SeriesSchedule changingSchedule = new SeriesSchedule(timeZone::get, 12);
+        timeZone.set(ZoneId.of("Pacific/Auckland"));
+        SeriesRule rule = rule(LocalDate.of(2026, 10, 20), 1,
+                Set.of(DayOfWeek.TUESDAY), null, 1);
+
+        // when
+        TimeSlot slot = changingSchedule.expand(rule).slots().getFirst();
+
+        // then
+        assertThat(slot.start()).isEqualTo(Instant.parse("2026-10-20T05:00:00Z"));
     }
 
     @Test
