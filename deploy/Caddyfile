@@ -10,7 +10,6 @@
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
-		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
 		Permissions-Policy "geolocation=(), camera=(), microphone=()"
 		-Server
 	}

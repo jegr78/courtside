@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,5 +44,29 @@ class ReferenceDeploymentSecurityTest {
                 "header_up X-Forwarded-For {remote_host}",
                 "header_up X-Forwarded-Host {host}",
                 "header_up X-Forwarded-Proto {scheme}");
+    }
+
+    @Test
+    void whenReadingCaddyfile_thenTheApplicationContentSecurityPolicyIsNotReplaced() throws IOException {
+        // when
+        String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
+
+        // then
+        assertThat(caddyfile).doesNotContain("Content-Security-Policy");
+    }
+
+    @Test
+    void whenReadingEveryCaddyfile_thenTheSecurityHeadersAgree() throws IOException {
+        // given
+        List<String> headerFields = List.of(
+                "Strict-Transport-Security", "X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy");
+
+        // when
+        String production = Files.readString(Path.of("deploy/Caddyfile"));
+        String uat = Files.readString(Path.of("deploy/Caddyfile.uat"));
+
+        // then
+        headerFields.forEach(field -> assertThat(production).contains(field));
+        headerFields.forEach(field -> assertThat(uat).contains(field));
     }
 }
