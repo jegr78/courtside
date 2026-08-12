@@ -320,7 +320,16 @@ components:
           pattern: "^(https?://.+|/[^/\\\\].*|/)$"
         defaultLocale: { type: string, pattern: "^(de|en)$" }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
-        timeZone: { type: string, minLength: 1, maxLength: 100, example: Europe/Berlin }
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[A-Za-z][A-Za-z0-9+_-]*(/[A-Za-z0-9+._-]+)*$"
+          description: |
+            An IANA time zone identifier such as `Europe/Berlin`. A fixed-offset identifier is
+            refused: the club grid has to follow daylight saving. It can only be changed while
+            no confirmed future booking exists.
+          example: Europe/Berlin
 
     WebManifest:
       type: object
