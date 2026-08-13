@@ -34,4 +34,5 @@ test("given every backend message key, when checking each locale of the web clie
   // then
   assert.deepEqual(missingDe, [], `de renders these codes as error.generic: ${missingDe.join(", ")}`);
   assert.deepEqual(missingEn, [], `en renders these codes as error.generic: ${missingEn.join(", ")}`);
+  assert.deepEqual(de, en, "the de and en client bundles must define the same keys");
 });
