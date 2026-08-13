@@ -15,7 +15,7 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.match(accessibility, /a booking is operable using only the keyboard/);
   assert.match(playwright, /name: "webkit-accessibility"/);
   assert.match(playwright, /testMatch: \/accessibility\\\.spec/);
-  assert.match(pom, /playwright install --with-deps chromium webkit/);
+  assert.match(pom, /exec -- playwright install --with-deps chromium webkit/);
 });
 
 test("given automation cannot decide assistive-technology usability, when qualifying a release, then the manual evidence stays explicit", () => {

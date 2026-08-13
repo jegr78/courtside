@@ -204,7 +204,7 @@
                         <id>install-playwright-browsers</id>
                         <phase>pre-integration-test</phase>
                         <goals><goal>npm</goal></goals>
-                        <configuration><arguments>exec playwright install --with-deps chromium webkit</arguments></configuration>
+                        <configuration><arguments>exec -- playwright install --with-deps chromium webkit</arguments></configuration>
                     </execution>
                     <execution>
                         <id>npm-e2e</id>
