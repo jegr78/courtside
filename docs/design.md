@@ -952,8 +952,7 @@ Consequences for the model and the API:
   therefore widens who reads those names, which is why the API default for a card's managing set
   is empty: creating or changing a card never inherits management from who may book it, a club
   chooses it deliberately. The cards a fresh install ships with are the one exception in data, not
-  in rule — their managing roles were backfilled from the officer roles that already had access to
-  them, so installing Courtside does not itself take management away from anyone who held it.
+  in rule: their managing roles start as the officer roles that may book them.
 - Any future partner-finding feature must be opt-in per member and must not be built by
   loosening this rule.
 
