@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,12 +36,16 @@ class ReferenceDeploymentSecurityTest {
     @Test
     void whenReadingImageSources_thenEveryThirdPartyImageIsPinnedByDigest() throws IOException {
         // given
-        List<Path> sources = List.of(
-                Path.of("Dockerfile"), Path.of("deploy/compose.yaml"),
-                Path.of("deploy/compose.uat.yaml"), Path.of("deploy/compose.perf.yaml"));
+        List<Path> sources;
+        try (var deploymentFiles = Files.list(Path.of("deploy"))) {
+            sources = deploymentFiles
+                    .filter(path -> path.getFileName().toString().matches("compose(?:\\..+)?\\.yaml"))
+                    .sorted()
+                    .toList();
+        }
 
         // when / then
-        for (Path source : sources) {
+        for (Path source : Stream.concat(Stream.of(Path.of("Dockerfile")), sources.stream()).toList()) {
             Files.readAllLines(source).stream()
                     .map(String::strip)
                     .filter(line -> line.startsWith("FROM ") || line.startsWith("image:"))
