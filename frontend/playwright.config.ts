@@ -7,8 +7,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   use: {
-    baseURL: "http://127.0.0.1:18080",
-    trace: "retain-on-failure"
+    trace: "off",
+    screenshot: "off",
+    video: "off"
   },
   globalSetup: "./e2e/global-setup.ts"
 });

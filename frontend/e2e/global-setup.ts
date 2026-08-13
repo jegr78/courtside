@@ -3,13 +3,13 @@ import { readdirSync, rmSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
-async function waitForApplication(application: ChildProcess): Promise<void> {
+async function waitForApplication(application: ChildProcess, baseURL: string): Promise<void> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (application.exitCode !== null) {
       throw new Error(`Courtside stopped with exit code ${application.exitCode}`);
     }
     try {
-      const response = await fetch("http://127.0.0.1:18080/actuator/health");
+      const response = await fetch(`${baseURL}/actuator/health`);
       if (response.ok) {
         return;
       }
@@ -120,7 +120,7 @@ function applicationJar(): string {
   return candidates[0].path;
 }
 
-function tomorrowInBerlin(): string {
+export function tomorrowInBerlin(): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit"
   }).formatToParts(new Date());
@@ -128,13 +128,55 @@ function tomorrowInBerlin(): string {
   return new Date(Date.UTC(part("year"), part("month") - 1, part("day") + 1)).toISOString().slice(0, 10);
 }
 
-export default async function globalSetup(): Promise<() => Promise<void>> {
+export interface JourneyService {
+  baseURL: string;
+  visualDate: string;
+  reset(): Promise<void>;
+  stop(): Promise<void>;
+}
+
+async function snapshotJourneyData(postgres: StartedTestContainer): Promise<string[]> {
+  const tablesResult = await postgres.exec([
+    "psql", "-U", "courtside", "-d", "courtside", "-At", "-c",
+    "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'flyway_schema_history' ORDER BY tablename"
+  ]);
+  if (tablesResult.exitCode !== 0) {
+    throw new Error(`Could not inspect the journey schema: ${tablesResult.stderr}`);
+  }
+  const tables = tablesResult.stdout.trim().split("\n").filter(Boolean);
+  const snapshot = `CREATE SCHEMA journey_baseline; ${tables.map((table) =>
+    `CREATE TABLE journey_baseline.${table} AS TABLE public.${table};`).join(" ")}`;
+  const snapshotResult = await postgres.exec([
+    "psql", "-U", "courtside", "-d", "courtside", "-v", "ON_ERROR_STOP=1", "-c", snapshot
+  ]);
+  if (snapshotResult.exitCode !== 0) {
+    throw new Error(`Could not capture the journey baseline: ${snapshotResult.stderr}`);
+  }
+  return tables;
+}
+
+async function resetJourneyData(postgres: StartedTestContainer, tables: string[]): Promise<void> {
+  const sql = `
+    TRUNCATE TABLE ${tables.map((table) => `public.${table}`).join(", ")} RESTART IDENTITY CASCADE;
+    SET session_replication_role = replica;
+    ${tables.map((table) => `INSERT INTO public.${table} SELECT * FROM journey_baseline.${table};`).join(" ")}
+    SET session_replication_role = origin;
+  `;
+  const result = await postgres.exec([
+    "psql", "-U", "courtside", "-d", "courtside", "-v", "ON_ERROR_STOP=1", "-c", sql
+  ]);
+  if (result.exitCode !== 0) {
+    throw new Error(`Could not restore the journey baseline: ${result.stderr}`);
+  }
+}
+
+export async function startJourneyService(workerIndex: number): Promise<JourneyService> {
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
   try {
-    rmSync(resolve("test-results", "visual-journeys"), { recursive: true, force: true });
     const visualDate = tomorrowInBerlin();
-    process.env.COURTSIDE_VISUAL_JOURNEY_DATE = visualDate;
+    const port = 18080 + workerIndex;
+    const baseURL = `http://127.0.0.1:${port}`;
     postgres = await new GenericContainer(
       "postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
       .withEnvironment({
@@ -148,7 +190,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     application = spawn(java, ["-jar", applicationJar()], {
       env: {
         ...process.env,
-        SERVER_PORT: "18080",
+        SERVER_PORT: String(port),
         SPRING_DATASOURCE_URL: `jdbc:postgresql://${postgres.getHost()}:${postgres.getMappedPort(5432)}/courtside`,
         SPRING_DATASOURCE_USERNAME: "courtside",
         SPRING_DATASOURCE_PASSWORD: "courtside",
@@ -159,15 +201,25 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       },
       stdio: "inherit"
     });
-    await waitForApplication(application);
+    await waitForApplication(application, baseURL);
     await seedJourneyData(postgres, visualDate);
+    const tables = await snapshotJourneyData(postgres);
+    return {
+      baseURL,
+      visualDate,
+      reset: () => resetJourneyData(postgres!, tables),
+      stop: async () => {
+        application?.kill();
+        await postgres?.stop();
+      }
+    };
   } catch (error) {
     application?.kill();
     await postgres?.stop();
     throw error;
   }
-  return async () => {
-    application?.kill();
-    await postgres?.stop();
-  };
+}
+
+export default function globalSetup(): void {
+  rmSync(resolve("test-results", "visual-journeys"), { recursive: true, force: true });
 }

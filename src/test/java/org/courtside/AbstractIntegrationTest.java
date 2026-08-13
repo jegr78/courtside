@@ -9,184 +9,106 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.Set;
 
-// Top-level and not nested: Spring Framework 7.1 stops ignoring a nested @Configuration as a
-// subclass's default, which would apply them twice.
 @SpringBootTest
 @ActiveProfiles("test")
 @Import({TestcontainersConfiguration.class, FixedClockConfiguration.class})
 public abstract class AbstractIntegrationTest {
 
-    private static final List<String> TABLES_IN_DELETION_ORDER = List.of(
-            "login_attempt_limit",
-            "booking_participant",
-            "court_allocation",
-            "booking",
-            "booking_series",
-            "user_account_role",
-            "user_account",
-            "member",
-            "person",
-            "opening_hours",
-            "court");
-
-    private static Map<String, Object> seededClubConfig;
-    private static Map<UUID, Boolean> seededBookingCardActiveById;
-    private static Map<UUID, Boolean> seededParticipantCardActiveById;
-    private static Map<UUID, RuleSetSeed> seededRuleSetById;
-    private static Map<UUID, MembershipTypeSeed> seededMembershipTypeById;
-    private static Map<UUID, RuleDefinitionSeed> seededRuleDefinitionById;
+    private static final String BASELINE_SCHEMA = "test_baseline";
+    private static final Set<String> SEEDED_TABLES = Set.of(
+            "booking_card",
+            "booking_card_allowed_role",
+            "booking_card_managing_role",
+            "club_config",
+            "membership_type",
+            "participant_card",
+            "rule_definition",
+            "rule_set");
+    private static List<String> baselineTables;
+    private static List<String> insertionOrder;
 
     @Autowired
     private JdbcClient jdbc;
 
-    // Captured in @BeforeAll and not lazily: a subclass's own @BeforeAll runs later and could
-    // otherwise write to club_config before the seed was ever read.
     @BeforeAll
-    static void captureSeededClubConfig(@Autowired JdbcClient jdbc) {
-        seededClubConfig = jdbc.sql("""
-                SELECT club_name, primary_color, accent_color, logo_url, imprint_url, default_locale,
-                       slot_minutes, time_zone
-                FROM club_config
-                WHERE id = '00000000-0000-0000-0000-000000000001'
-                """).query().singleRow();
+    static synchronized void captureDatabaseBaseline(@Autowired JdbcClient jdbc) {
+        jdbc.sql("CREATE SCHEMA IF NOT EXISTS " + BASELINE_SCHEMA).update();
+        baselineTables = publicTables(jdbc);
+        insertionOrder = insertionOrder(jdbc, baselineTables);
+        Set<String> capturedTables = new HashSet<>(jdbc.sql("""
+                        SELECT tablename FROM pg_tables WHERE schemaname = :schema
+                        """).param("schema", BASELINE_SCHEMA).query(String.class).list());
+        baselineTables.stream()
+                .filter(table -> !capturedTables.contains(table))
+                .forEach(table -> jdbc.sql("CREATE TABLE " + BASELINE_SCHEMA + "." + table
+                        + " AS TABLE public." + table + (SEEDED_TABLES.contains(table) ? "" : " WITH NO DATA"))
+                        .update());
     }
 
-    // Never blanket-deleted, because other tests address these rows by fixed seeded id.
-    @BeforeAll
-    static void captureSeededCardCatalog(@Autowired JdbcClient jdbc) {
-        seededBookingCardActiveById = activeById(jdbc, "booking_card");
-        seededParticipantCardActiveById = activeById(jdbc, "participant_card");
-    }
-
-    private static Map<UUID, Boolean> activeById(JdbcClient jdbc, String table) {
-        return jdbc.sql("SELECT id, active FROM " + table)
-                .query((rs, rowNum) -> Map.entry(
-                        (UUID) rs.getObject("id"), rs.getBoolean("active")))
-                .list().stream()
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-    }
-
-    // Same as the card catalog: other tests read these rows by literal UUID, so a blanket delete
-    // would take the seed with them.
-    @BeforeAll
-    static void captureSeededRuleConfiguration(@Autowired JdbcClient jdbc) {
-        seededRuleSetById = jdbc.sql("SELECT id, name, active FROM rule_set")
-                .query((rs, rowNum) -> Map.entry((UUID) rs.getObject("id"), new RuleSetSeed(
-                        rs.getString("name"), rs.getBoolean("active"))))
-                .list().stream()
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-        seededMembershipTypeById = jdbc.sql("SELECT id, name, rule_set_id, active FROM membership_type")
-                .query((rs, rowNum) -> Map.entry((UUID) rs.getObject("id"), new MembershipTypeSeed(
-                        rs.getString("name"), (UUID) rs.getObject("rule_set_id"), rs.getBoolean("active"))))
-                .list().stream()
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-        seededRuleDefinitionById = jdbc.sql(
-                        "SELECT id, rule_set_id, rule_type, params::text AS params FROM rule_definition")
-                .query((rs, rowNum) -> Map.entry((UUID) rs.getObject("id"), new RuleDefinitionSeed(
-                        (UUID) rs.getObject("rule_set_id"), rs.getString("rule_type"), rs.getString("params"))))
-                .list().stream()
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-    }
-
-    // Both phases, because @AfterEach alone still exposes the bootstrap seed to a JVM's first
-    // test. The card restore is inline, since Jupiter does not order sibling lifecycle methods.
     @BeforeEach
     @AfterEach
-    protected void deleteTransactionalData() {
-        TABLES_IN_DELETION_ORDER.forEach(table -> jdbc.sql("DELETE FROM " + table).update());
-        restoreCardCatalog("booking_card", seededBookingCardActiveById);
-        restoreCardCatalog("participant_card", seededParticipantCardActiveById);
-        restoreMembershipTypes();
-        restoreRuleSets();
-        restoreRuleDefinitions();
+    protected void restoreDatabaseBaseline() {
+        List<String> currentTables = publicTables(jdbc);
+        if (!currentTables.equals(baselineTables)) {
+            throw new IllegalStateException("Integration-test schema changed after baseline capture: " + currentTables);
+        }
+        jdbc.sql("TRUNCATE TABLE " + String.join(", ", baselineTables.stream()
+                .map(table -> "public." + table).toList()) + " RESTART IDENTITY CASCADE").update();
+        insertionOrder.forEach(table -> jdbc.sql("INSERT INTO public." + table
+                + " SELECT * FROM " + BASELINE_SCHEMA + "." + table).update());
     }
 
-    private void restoreCardCatalog(String table, Map<UUID, Boolean> seededActiveById) {
-        jdbc.sql("DELETE FROM " + table + " WHERE id NOT IN (:ids)")
-                .param("ids", seededActiveById.keySet())
-                .update();
-        seededActiveById.forEach((id, active) -> jdbc.sql(
-                        "UPDATE " + table + " SET active = :active WHERE id = :id")
-                .param("active", active)
-                .param("id", id)
-                .update());
-    }
-
-    // Restored rather than deleted, since club_config must always hold exactly one row. Raw SQL,
-    // so the fixture does not depend on the code it exists to let other tests trust.
-    @BeforeEach
-    @AfterEach
-    protected void restoreClubConfig() {
-        jdbc.sql("""
-                UPDATE club_config
-                SET club_name = :club_name, primary_color = :primary_color, accent_color = :accent_color,
-                    logo_url = :logo_url, imprint_url = :imprint_url, default_locale = :default_locale,
-                    slot_minutes = :slot_minutes, time_zone = :time_zone
-                WHERE id = '00000000-0000-0000-0000-000000000001'
-                """).params(seededClubConfig).update();
-    }
-
-    // Before restoreRuleSets(): membership_type.rule_set_id has no ON DELETE, so a seeded row
-    // still pointing at a test-created rule set would block its deletion.
-    private void restoreMembershipTypes() {
-        jdbc.sql("DELETE FROM membership_type WHERE id NOT IN (:ids)")
-                .param("ids", seededMembershipTypeById.keySet())
-                .update();
-        seededMembershipTypeById.forEach((id, seed) -> jdbc.sql("""
-                        UPDATE membership_type SET name = :name, rule_set_id = :ruleSetId, active = :active
-                        WHERE id = :id
+    private static List<String> publicTables(JdbcClient jdbc) {
+        return jdbc.sql("""
+                        SELECT tablename
+                        FROM pg_tables
+                        WHERE schemaname = 'public'
+                          AND tablename <> 'flyway_schema_history'
+                        ORDER BY tablename
                         """)
-                .param("name", seed.name())
-                .param("ruleSetId", seed.ruleSetId())
-                .param("active", seed.active())
-                .param("id", id)
-                .update());
+                .query(String.class)
+                .list();
     }
 
-    private void restoreRuleSets() {
-        jdbc.sql("DELETE FROM rule_set WHERE id NOT IN (:ids)")
-                .param("ids", seededRuleSetById.keySet())
-                .update();
-        seededRuleSetById.forEach((id, seed) -> jdbc.sql(
-                        "UPDATE rule_set SET name = :name, active = :active WHERE id = :id")
-                .param("name", seed.name())
-                .param("active", seed.active())
-                .param("id", id)
-                .update());
-    }
-
-    // Delete-by-id-not-in-seed then upsert, rather than update in place: a re-created definition
-    // gets a fresh id, which only the delete clause catches.
-    private void restoreRuleDefinitions() {
-        jdbc.sql("DELETE FROM rule_definition WHERE id NOT IN (:ids)")
-                .param("ids", seededRuleDefinitionById.keySet())
-                .update();
-        seededRuleDefinitionById.forEach((id, seed) -> jdbc.sql("""
-                        INSERT INTO rule_definition (id, rule_set_id, rule_type, params)
-                        VALUES (:id, :ruleSetId, :ruleType, :params::jsonb)
-                        ON CONFLICT (id) DO UPDATE
-                        SET rule_set_id = EXCLUDED.rule_set_id,
-                            rule_type = EXCLUDED.rule_type,
-                            params = EXCLUDED.params
+    private static List<String> insertionOrder(JdbcClient jdbc, List<String> tables) {
+        List<ForeignKey> foreignKeys = jdbc.sql("""
+                        SELECT child.relname, parent.relname
+                        FROM pg_constraint constraint_definition
+                        JOIN pg_class child ON child.oid = constraint_definition.conrelid
+                        JOIN pg_namespace child_schema ON child_schema.oid = child.relnamespace
+                        JOIN pg_class parent ON parent.oid = constraint_definition.confrelid
+                        JOIN pg_namespace parent_schema ON parent_schema.oid = parent.relnamespace
+                        WHERE constraint_definition.contype = 'f'
+                          AND child_schema.nspname = 'public'
+                          AND parent_schema.nspname = 'public'
                         """)
-                .param("id", id)
-                .param("ruleSetId", seed.ruleSetId())
-                .param("ruleType", seed.ruleType())
-                .param("params", seed.params())
-                .update());
+                .query((result, row) -> new ForeignKey(result.getString(1), result.getString(2)))
+                .list();
+        List<String> remaining = new ArrayList<>(tables);
+        List<String> ordered = new ArrayList<>();
+        Set<String> inserted = new HashSet<>();
+        while (!remaining.isEmpty()) {
+            List<String> ready = remaining.stream()
+                    .filter(table -> foreignKeys.stream()
+                            .filter(key -> key.child().equals(table) && !key.parent().equals(table))
+                            .allMatch(key -> inserted.contains(key.parent())))
+                    .toList();
+            if (ready.isEmpty()) {
+                throw new IllegalStateException("Foreign-key cycle prevents integration-test baseline restore: "
+                        + remaining);
+            }
+            ordered.addAll(ready);
+            inserted.addAll(ready);
+            remaining.removeAll(ready);
+        }
+        return List.copyOf(ordered);
     }
 
-    private record MembershipTypeSeed(String name, UUID ruleSetId, boolean active) {
-    }
-
-    private record RuleSetSeed(String name, boolean active) {
-    }
-
-    private record RuleDefinitionSeed(UUID ruleSetId, String ruleType, String params) {
+    private record ForeignKey(String child, String parent) {
     }
 }

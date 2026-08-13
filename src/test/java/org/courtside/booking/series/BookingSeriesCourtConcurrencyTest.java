@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.Court;
 import org.courtside.facility.CourtRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.postgresql.util.PSQLException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -26,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class BookingSeriesCourtConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -63,7 +65,9 @@ class BookingSeriesCourtConcurrencyTest extends AbstractIntegrationTest {
             var second = pool.submit(removeCourt(seriesId, secondCourt, deletionsReady));
 
             // then
-            assertThat(Arrays.asList(first.get(), second.get())).satisfiesExactlyInAnyOrder(
+            assertThat(Arrays.asList(
+                    first.get(20, TimeUnit.SECONDS),
+                    second.get(20, TimeUnit.SECONDS))).satisfiesExactlyInAnyOrder(
                     result -> assertThat(result).isNull(),
                     result -> {
                         assertThat(result).isNotNull();

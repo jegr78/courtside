@@ -1,6 +1,7 @@
 package org.courtside.booking;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.PostgresDiagnostics;
 import org.courtside.facility.Court;
 import org.courtside.facility.CourtRepository;
 import org.courtside.facility.OpeningHours;
@@ -12,6 +13,7 @@ import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -29,9 +31,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -93,15 +97,18 @@ class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
             return bookingId[0];
         };
         Callable<UUID> retryRequest = () -> {
-            firstIsInPlace.await();
+            await(firstIsInPlace);
             return bookingService.create(command, key);
         };
 
         // when
         List<UUID> bookingIds;
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
-            List<Future<UUID>> futures = pool.invokeAll(List.of(holdFirstRequestUncommitted, retryRequest));
-            bookingIds = List.of(futures.get(0).get(), futures.get(1).get());
+            List<Future<UUID>> futures = List.of(
+                    pool.submit(holdFirstRequestUncommitted), pool.submit(retryRequest));
+            bookingIds = List.of(
+                    PostgresDiagnostics.await(futures.get(0), Duration.ofSeconds(20), jdbc, "First request"),
+                    PostgresDiagnostics.await(futures.get(1), Duration.ofSeconds(20), jdbc, "Retry request"));
         }
 
         // then
@@ -117,7 +124,8 @@ class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
             }
             sleepBriefly();
         }
-        throw new AssertionError("No retry waited for the idempotency key");
+        throw new AssertionError("No retry waited for the idempotency key. "
+                + PostgresDiagnostics.waitsAndLocks(jdbc));
     }
 
     private int sessionsBlockedOnALock() {
@@ -139,6 +147,12 @@ class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(failure);
+        }
+    }
+
+    private static void await(CountDownLatch latch) throws InterruptedException {
+        if (!latch.await(20, TimeUnit.SECONDS)) {
+            throw new AssertionError("The first request did not reach the contention point");
         }
     }
 }
