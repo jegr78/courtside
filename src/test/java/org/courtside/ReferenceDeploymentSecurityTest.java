@@ -5,11 +5,9 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -68,28 +66,28 @@ class ReferenceDeploymentSecurityTest {
         // when
         String production = Files.readString(Path.of("deploy/Caddyfile"));
         String uat = Files.readString(Path.of("deploy/Caddyfile.uat"));
-        Set<String> productionFields = headerFields(production, PRODUCTION_SITE_BLOCK);
-        Set<String> uatFields = headerFields(uat, UAT_PUBLIC_SITE_BLOCK);
-        Set<String> expectedUatFields = new HashSet<>(productionFields);
-        expectedUatFields.remove("Strict-Transport-Security");
+        List<String> productionHeaders = headerDirectives(production, PRODUCTION_SITE_BLOCK);
+        List<String> uatHeaders = headerDirectives(uat, UAT_PUBLIC_SITE_BLOCK);
+        List<String> expectedUatHeaders = productionHeaders.stream()
+                .filter(directive -> !fieldName(directive).equals("Strict-Transport-Security"))
+                .toList();
 
         // then
-        assertThat(uatFields)
+        assertThat(uatHeaders)
                 .as("Caddyfile.uat's public https://localhost block omits Strict-Transport-Security "
                         + "because HSTS is host- not port-scoped: setting it there would force every "
                         + "other localhost port in the same browser into HTTPS for the max-age duration")
-                .containsExactlyInAnyOrderElementsOf(expectedUatFields);
+                .containsExactlyInAnyOrderElementsOf(expectedUatHeaders);
     }
 
-    private static Set<String> headerFields(String caddyfile, Pattern siteBlock) {
+    private static List<String> headerDirectives(String caddyfile, Pattern siteBlock) {
         Matcher site = siteBlock.matcher(caddyfile);
         assertThat(site.find()).isTrue();
         Matcher header = HEADER_BLOCK.matcher(site.group("body"));
         assertThat(header.find()).isTrue();
         return header.group("fields").lines()
                 .map(String::strip)
-                .map(ReferenceDeploymentSecurityTest::fieldName)
-                .collect(Collectors.toSet());
+                .toList();
     }
 
     private static String fieldName(String directive) {
