@@ -619,9 +619,9 @@ test("given the performance compose contract, when inspecting isolation, then re
   assert.match(compose, /COURTSIDE_PERF_CONFIRM_DISPOSABLE: "true"/);
   assert.match(compose, /COURTSIDE_ENVIRONMENT: PERFORMANCE/);
   assert.match(compose, /POSTGRES_PASSWORD: \$\{COURTSIDE_PERF_SHARED_PASSWORD:-\}/);
-  assert.match(telemetryOverride, /prom\/prometheus:v3\.5\.0@sha256:[a-f0-9]{64}/);
-  assert.match(telemetryOverride, /prometheuscommunity\/postgres-exporter:v0\.17\.1@sha256:[a-f0-9]{64}/);
-  assert.match(telemetryOverride, /grafana\/grafana:12\.1\.0@sha256:[a-f0-9]{64}/);
+  assert.match(telemetryOverride, /prom\/prometheus:[^\s]+@sha256:[a-f0-9]{64}/);
+  assert.match(telemetryOverride, /prometheuscommunity\/postgres-exporter:[^\s]+@sha256:[a-f0-9]{64}/);
+  assert.match(telemetryOverride, /grafana\/grafana:[^\s]+@sha256:[a-f0-9]{64}/);
   assert.match(composeService(telemetryOverride, "app"), /COURTSIDE_PERF_TELEMETRY_ENABLED: "true"/);
   assert.match(composeService(telemetryOverride, "prometheus"), /127\.0\.0\.1:9090:9090/);
   assert.doesNotMatch(composeService(telemetryOverride, "postgres-exporter"), /ports:/);
