@@ -73,6 +73,38 @@ class OpeningHoursRuleTest extends AbstractIntegrationTest {
                 .containsExactly("booking.rule.openingHours.closed");
     }
 
+    @Test
+    void givenOpeningHoursUntilTen_whenBookingRunsPastMidnight_thenOutsideViolation() {
+        // when
+        var violations = rule.check(
+                contextFor("2026-05-12T21:00:00+02:00", "2026-05-13T01:00:00+02:00"));
+
+        // then
+        assertThat(violations).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.openingHours.outside");
+    }
+
+    @Test
+    void givenOpeningHoursUntilTen_whenBookingSpansAWholeWeek_thenOutsideViolation() {
+        // when
+        var violations = rule.check(
+                contextFor("2026-05-12T21:00:00+02:00", "2026-05-19T21:00:00+02:00"));
+
+        // then
+        assertThat(violations).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.openingHours.outside");
+    }
+
+    @Test
+    void givenOpeningHoursUntilTen_whenBookingEndsExactlyAtClosingTime_thenNoViolation() {
+        // when
+        var violations = rule.check(
+                contextFor("2026-05-12T21:00:00+02:00", "2026-05-12T22:00:00+02:00"));
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
     private RuleContext contextFor(String start, String end) {
         return new RuleContext(
                 UUID.randomUUID(),

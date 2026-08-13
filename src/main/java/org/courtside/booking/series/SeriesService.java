@@ -176,7 +176,7 @@ public class SeriesService {
     @Transactional
     public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
                       UUID cancelledBy, Set<Role> cancellerRoles) {
-        requireSeriesAndBooking(seriesId, fromBookingId);
+        requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
 
         List<Booking> affected = affectedBookings(seriesId, fromBookingId, scope);
         affected.forEach(booking ->
@@ -186,7 +186,7 @@ public class SeriesService {
 
     @Transactional(readOnly = true)
     public MovePreview previewMove(MoveRequest request, UUID movedBy, Set<Role> callerRoles) {
-        requireSeriesAndBooking(request.seriesId(), request.fromBookingId());
+        requireManagementAccessTo(request.seriesId(), request.fromBookingId(), movedBy, callerRoles);
 
         List<Booking> affected =
                 affectedBookings(request.seriesId(), request.fromBookingId(), request.scope());
@@ -339,6 +339,14 @@ public class SeriesService {
             throw new SeriesRequestInvalidException("booking.series.bookingNotInSeries",
                     Map.of("field", "fromBookingId"));
         }
+    }
+
+    private void requireManagementAccessTo(UUID seriesId, UUID fromBookingId,
+                                           UUID actor, Set<Role> actorRoles) {
+        requireSeriesAndBooking(seriesId, fromBookingId);
+        Booking from = bookingRepository.findWithAllocationsById(fromBookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + fromBookingId));
+        accessControl.requireManagementAccess(from, actor, actorRoles);
     }
 
     private List<Booking> affectedBookings(UUID seriesId, UUID fromBookingId, CancelScope scope) {
