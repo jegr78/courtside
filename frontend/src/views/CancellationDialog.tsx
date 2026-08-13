@@ -16,7 +16,7 @@ export function CancellationDialog({ allocation, closed, cancelled }: { allocati
       {error && <Alert>{error}</Alert>}
       <div className="mt-6 flex justify-end gap-3">
         <Button type="button" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>
-        <Button type="button" onClick={() => void api.cancelBooking(allocation.bookingId).then(cancelled).catch((failure: unknown) => setError(problemMessage(failure, t)))}>{t("booking.cancelConfirm")}</Button>
+        <Button type="button" data-testid="confirm-cancellation" onClick={() => void api.cancelBooking(allocation.bookingId).then(cancelled).catch((failure: unknown) => setError(problemMessage(failure, t)))}>{t("booking.cancelConfirm")}</Button>
       </div>
     </div>
   </Modal>;

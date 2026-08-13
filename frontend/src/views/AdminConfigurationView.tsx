@@ -143,7 +143,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
       <label className="grid gap-2 font-medium">
         {t("admin.rules.ruleSet")}
-        <select className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => selectRuleSet(event.target.value)}>
+        <select data-testid="rule-set" className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => selectRuleSet(event.target.value)}>
           {ruleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
         </select>
       </label>
@@ -159,7 +159,7 @@ function RuleEditor({ type, definition, disabled, save }: { type: RuleTypeConfig
   const [params, setParams] = useState<Record<string, number>>({});
   useEffect(() => setParams(definition?.params ?? {}), [definition]);
   return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
-    <div><h3 className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <p data-testid={`rule-${type.ruleType}-global`} className="text-muted">{t("admin.rules.global")}</p>}</div>
+    <div><h3 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <p data-testid={`rule-${type.ruleType}-global`} className="text-muted">{t("admin.rules.global")}</p>}</div>
     {type.configurable && <>
       {type.parameters.map((parameter) => <div key={parameter.name} className="grid gap-1">
         <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setParams({ ...params, [parameter.name]: Number(event.target.value) })} />

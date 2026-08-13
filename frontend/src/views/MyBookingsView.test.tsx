@@ -57,9 +57,11 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
 
   // then
-  expect(await screen.findByRole("heading", { name: "My bookings" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Upcoming" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Past" })).toBeInTheDocument();
+  const title = await screen.findByTestId("my-bookings-title");
+  expect(title).toHaveRole("heading");
+  expect(title).toHaveTextContent("My bookings");
+  expect(screen.getByTestId("upcoming-bookings")).toHaveTextContent("Upcoming");
+  expect(screen.getByTestId("past-bookings")).toHaveTextContent("Past");
   expect(screen.getAllByTestId("series-marker")).toHaveLength(2);
   expect(screen.getByTestId(`booking-${upcomingId}`)).toHaveTextContent("Centre Court");
   expect(screen.getByTestId("booking-44444444-4444-4444-4444-444444444444")).toHaveTextContent("Centre Court");
@@ -82,7 +84,9 @@ it("given an officer, when managed appointments load, then they are separated fr
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
 
   // then
-  expect(await screen.findByRole("heading", { name: "Managed appointments" })).toBeInTheDocument();
+  const title = await screen.findByTestId("managed-appointments-title");
+  expect(title).toHaveRole("heading");
+  expect(title).toHaveTextContent("Managed appointments");
   expect(screen.getByTestId("booking-55555555-5555-5555-5555-555555555555")).toHaveTextContent("League match");
   expect(screen.getByTestId("booking-55555555-5555-5555-5555-555555555555")).toHaveTextContent("0 participants");
 });
@@ -115,7 +119,7 @@ it("given a managed appointment, when opening details, then its internal data is
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
 
   // when
-  await userEvent.click(await screen.findByRole("button", { name: "Details" }));
+  await userEvent.click(await screen.findByTestId("managed-details"));
 
   // then
   expect(await screen.findByTestId("managed-note")).toHaveTextContent("Prepare score sheets");
@@ -151,11 +155,11 @@ it("given a cancelled managed appointment, when listed, then its details remain 
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
 
   // when
-  await userEvent.click(await screen.findByRole("button", { name: "Details" }));
+  await userEvent.click(await screen.findByTestId("managed-details"));
 
   // then
   expect(await screen.findByTestId("managed-note")).toHaveTextContent("Retain for the audit trail");
-  expect(screen.queryByRole("button", { name: "Cancel League match" })).not.toBeInTheDocument();
+  expect(screen.queryByTestId("managed-cancel")).not.toBeInTheDocument();
 });
 
 it("given another page exists, when loading more, then its bookings are appended", async () => {
@@ -174,7 +178,7 @@ it("given another page exists, when loading more, then its bookings are appended
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
 
   // when
-  await userEvent.click(await screen.findByRole("button", { name: "Load more bookings" }));
+  await userEvent.click(await screen.findByTestId("load-more-bookings"));
 
   // then
   expect(await screen.findByTestId(`booking-${upcomingId}`)).toHaveTextContent("Member booking");
@@ -192,7 +196,7 @@ it("given more bookings exist, when previewing a series cancellation, then the i
     nextCursor: upcomingId
   });
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
-  await userEvent.click(await screen.findByRole("button", { name: "Cancel Member booking" }));
+  await userEvent.click(await screen.findByTestId("personal-cancel"));
 
   // when
   await userEvent.click(screen.getByTestId("scope-WHOLE_SERIES"));
@@ -217,11 +221,11 @@ it("given the browser and club use different zones, when loaded, then booking ti
 it("given a series occurrence, when cancelling this and following, then the series endpoint receives that scope", async () => {
   // given
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
-  await userEvent.click(await screen.findByRole("button", { name: "Cancel Member booking" }));
+  await userEvent.click(await screen.findByTestId("personal-cancel"));
 
   // when
   await userEvent.click(screen.getByTestId("scope-THIS_AND_FOLLOWING"));
-  await userEvent.click(screen.getByRole("button", { name: "Confirm cancellation" }));
+  await userEvent.click(screen.getByTestId("confirm-cancellation"));
 
   // then
   await waitFor(() => expect(api.cancelSeries).toHaveBeenCalledWith(seriesId, upcomingId, "THIS_AND_FOLLOWING"));
@@ -230,17 +234,17 @@ it("given a series occurrence, when cancelling this and following, then the seri
 it("given a series occurrence, when previewing and confirming a move, then the same scoped request is executed", async () => {
   // given
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
-  await userEvent.click(await screen.findByRole("button", { name: "Move Member booking" }));
+  await userEvent.click(await screen.findByTestId("move-booking"));
   await userEvent.click(screen.getByTestId("scope-WHOLE_SERIES"));
   await userEvent.clear(screen.getByTestId("move-start-time"));
   await userEvent.type(screen.getByTestId("move-start-time"), "19:00");
 
   // when
-  await userEvent.click(screen.getByRole("button", { name: "Preview move" }));
+  await userEvent.click(screen.getByTestId("preview-move"));
 
   // then
   expect(await screen.findByTestId("move-preview")).toHaveTextContent("1 occurrence can be moved.");
-  await userEvent.click(screen.getByRole("button", { name: "Confirm move" }));
+  await userEvent.click(screen.getByTestId("confirm-move"));
   await waitFor(() => expect(api.moveSeries).toHaveBeenCalledWith(seriesId, expect.objectContaining({
     fromBookingId: upcomingId, scope: "WHOLE_SERIES", newStartTime: "19:00"
   })));
@@ -261,15 +265,15 @@ it("given a move is blocked, when previewed, then every reason is translated and
     }]
   });
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
-  await userEvent.click(await screen.findByRole("button", { name: "Move Member booking" }));
+  await userEvent.click(await screen.findByTestId("move-booking"));
   await userEvent.type(screen.getByTestId("move-start-time"), "22:00");
 
   // when
-  await userEvent.click(screen.getByRole("button", { name: "Preview move" }));
+  await userEvent.click(screen.getByTestId("preview-move"));
 
   // then
   expect(await screen.findByTestId("move-preview")).toHaveTextContent("The facility is closed on this day.");
   expect(screen.getByTestId("occupied-courts")).toHaveTextContent("Occupied courts: Centre Court");
   expect(screen.getByTestId("unavailable-courts")).toHaveTextContent("Unavailable courts: Centre Court");
-  expect(screen.getByRole("button", { name: "Confirm move" })).toBeDisabled();
+  expect(screen.getByTestId("confirm-move")).toBeDisabled();
 });
