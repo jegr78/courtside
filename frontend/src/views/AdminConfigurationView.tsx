@@ -143,7 +143,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
       <label className="grid gap-2 font-medium">
         {t("admin.rules.ruleSet")}
-        <select className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => selectRuleSet(event.target.value)}>
+        <select data-testid="rule-set" className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => selectRuleSet(event.target.value)}>
           {ruleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
         </select>
       </label>

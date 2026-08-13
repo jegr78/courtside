@@ -69,7 +69,7 @@ describe("BuildIdentity", () => {
     ].join("\n"));
 
     // when
-    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await userEvent.click(screen.getByTestId("close-build-identity"));
 
     // then
     expect(screen.getByTestId("build-identity")).toHaveFocus();

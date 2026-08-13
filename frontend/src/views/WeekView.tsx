@@ -116,7 +116,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
   return <section aria-labelledby="occupancy-heading" className="mt-8">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h2 id="occupancy-heading" className="text-2xl font-bold">{t("week.title")}</h2>
+        <h2 id="occupancy-heading" data-testid="occupancy-heading" className="text-2xl font-bold">{t("week.title")}</h2>
         {days.length > 0 && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
       </div>
       <div className="flex gap-2">
@@ -170,7 +170,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
     {error && <Alert>{error}</Alert>}
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
     {data && <div className="mt-4 flex justify-end">
-      {isToday && <Button type="button" className="button-secondary" onClick={() => scrollToSlot(planRef.current, currentSlot)}>{t("week.now")}</Button>}
+      {isToday && <Button type="button" data-testid="current-time" className="button-secondary" onClick={() => scrollToSlot(planRef.current, currentSlot)}>{t("week.now")}</Button>}
     </div>}
     {data && <div
       ref={planRef}
@@ -189,6 +189,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
             <th scope="col" className="border-structural border-b px-4 py-3 text-left">{t("week.time")}</th>
             {data.courts.map((court) => <th
               key={court.id}
+              data-testid={`court-heading-${court.number}`}
               scope="col"
               className={`border-structural border-b px-4 py-3 text-left ${selectedCourtId === court.id ? "" : "mobile-court-hidden"}`}
             >{court.name || t("court.number", { number: court.number })}</th>)}
@@ -196,7 +197,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
         </thead>
         <tbody>
           {slots.map((slot) => <tr key={slot} data-slot={slot} style={{ height: `${slotHeight}px` }}>
-            <th scope="row" className="font-value surface-panel border-structural whitespace-nowrap border-b px-3 text-left font-medium">
+            <th scope="row" data-testid={`slot-heading-${slot}`} className="font-value surface-panel border-structural whitespace-nowrap border-b px-3 text-left font-medium">
               {slot}
             </th>
             {data.courts.map((court) => renderCell(
@@ -218,7 +219,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
       />}
       {slots.length === 0 && <p className="text-muted px-4 py-6 text-center">{t("week.closed")}</p>}
     </div>}
-    {data && <ul className="text-muted mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t("week.legend")}>
+    {data && <ul data-testid="court-plan-legend" className="text-muted mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t("week.legend")}>
       <li><span className="day-plan-legend free" aria-hidden="true" />{t("week.available")}</li>
       <li><span className="day-plan-legend occupied" aria-hidden="true" />{t("week.occupied")}</li>
       <li><span className="day-plan-legend own" aria-hidden="true" />{t("week.own")}</li>
@@ -300,6 +301,8 @@ function renderCell(
   const content = canBook ? <button
       type="button"
       data-testid="free-slot"
+      data-court-number={court.number}
+      data-slot={slot}
       disabled={isPast}
       data-state={isPast ? "past" : "free"}
       className="day-plan-slot h-full w-full rounded-md px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--club-accent)"
@@ -307,7 +310,7 @@ function renderCell(
       onClick={book}
     >
       {isPast ? t("week.past") : t("week.available")}
-    </button> : <div data-testid="free-slot" data-state={isPast ? "past" : "free"} className="day-plan-slot flex h-full w-full items-center justify-center rounded-md px-2 text-sm">
+    </button> : <div data-testid="free-slot" data-court-number={court.number} data-slot={slot} data-state={isPast ? "past" : "free"} className="day-plan-slot flex h-full w-full items-center justify-center rounded-md px-2 text-sm">
       {isPast ? t("week.past") : t("week.available")}
     </div>;
   return <td key={court.id} className={`${cellClass} p-1`}>

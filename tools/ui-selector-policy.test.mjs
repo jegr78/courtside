@@ -5,7 +5,17 @@ import { test } from "node:test";
 
 const frontend = fileURLToPath(new URL("../frontend", import.meta.url));
 const forbiddenQuery = /\b(?:find|get|query)(?:All)?By(?:Text|LabelText|PlaceholderText|DisplayValue|Title|AltText)\s*\(/g;
-const forbiddenRoleName = /\bgetByRole\s*\([^,]+,\s*\{[^}]*\bname\s*:\s*["'`]/g;
+const forbiddenRoleName = /\b(?:find|get|query)(?:All)?ByRole\s*\([^,]+,\s*\{[^}]*\bname\s*:\s*["'`/]/g;
+
+test("given role queries, when their accessible name is rendered copy, then every query variant is forbidden", () => {
+  // when / then
+  for (const query of ["findByRole", "findAllByRole", "getByRole", "getAllByRole", "queryByRole", "queryAllByRole"]) {
+    assert.match(`screen.${query}("button", { name: "Save" })`, new RegExp(forbiddenRoleName.source));
+    assert.match(`screen.${query}("button", { name: /Save/ })`, new RegExp(forbiddenRoleName.source));
+  }
+  assert.doesNotMatch("screen.getByRole(role, { name: accessibleName })", new RegExp(forbiddenRoleName.source));
+  assert.doesNotMatch("screen.getByRole(role)", new RegExp(forbiddenRoleName.source));
+});
 
 test("given UI tests, when selecting elements, then rendered copy is never the locator", () => {
   // given
@@ -14,9 +24,7 @@ test("given UI tests, when selecting elements, then rendered copy is never the l
   // when
   const violations = testFiles.flatMap((path) => {
     const source = readFileSync(path, "utf8");
-    const forbidden = path.includes("/e2e/")
-      ? new RegExp(`${forbiddenQuery.source}|${forbiddenRoleName.source}`, "g")
-      : forbiddenQuery;
+    const forbidden = new RegExp(`${forbiddenQuery.source}|${forbiddenRoleName.source}`, "g");
     return [...source.matchAll(forbidden)].map((match) =>
       `${path.slice(frontend.length + 1)}:${source.slice(0, match.index).split("\n").length}`
     );

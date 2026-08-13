@@ -76,7 +76,7 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
         <button type="button" autoFocus data-testid="copy-build-identity" className="rounded-lg bg-(--club-primary) px-4 py-2 text-(--club-primary-text)" onClick={() => void copyDiagnostics()}>
           {isCopied ? t("build.copied") : t("build.copy")}
         </button>
-        <button type="button" className="button-secondary rounded-lg px-4 py-2" onClick={() => dialog.current?.close()}>{t("build.close")}</button>
+        <button type="button" data-testid="close-build-identity" className="button-secondary rounded-lg px-4 py-2" onClick={() => dialog.current?.close()}>{t("build.close")}</button>
       </div>
     </dialog>}
   </>;

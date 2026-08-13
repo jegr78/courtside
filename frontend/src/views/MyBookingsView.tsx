@@ -87,17 +87,17 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
 
   const courtNames = new Map(courts.map((court) => [court.id, court.name ?? t("court.number", { number: court.number })]));
   return <section className="mt-8" aria-labelledby="my-bookings-title">
-    <h2 id="my-bookings-title" className="text-2xl font-bold">{t("myBookings.title")}</h2>
+    <h2 id="my-bookings-title" data-testid="my-bookings-title" className="text-2xl font-bold">{t("myBookings.title")}</h2>
     {error && <Alert>{error}</Alert>}
     {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-8 lg:grid-cols-2">
-      <BookingSection title={t("myBookings.upcoming")} empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable action={setAction} t={t} />
-      <BookingSection title={t("myBookings.past")} empty={t("myBookings.noPast")} bookings={sections.past} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={setAction} t={t} />
+      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable action={setAction} t={t} />
+      <BookingSection testId="past-bookings" title={t("myBookings.past")} empty={t("myBookings.noPast")} bookings={sections.past} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={setAction} t={t} />
     </div>}
-    {nextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
+    {nextCursor && <Button data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
     {showManaged && !loading && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
       <h2 id="managed-appointments-title" data-testid="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h2>
       <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
-      <div className="mt-4"><BookingSection title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={setAction} t={t} /></div>
+      <div className="mt-4"><BookingSection testId="managed-bookings" title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={setAction} t={t} /></div>
       {managedNextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
     </section>}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={(action.managed ? managed : bookings).filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={(action.managed ? managedNextCursor : nextCursor) !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
@@ -108,12 +108,12 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, actionable = false, managed = false, action, t }: {
-  title: string; empty: string; bookings: Appointment[]; courtNames: Map<string, string>;
+function BookingSection({ testId, title, empty, bookings, courtNames, locale, timeZone, actionable = false, managed = false, action, t }: {
+  testId: string; title: string; empty: string; bookings: Appointment[]; courtNames: Map<string, string>;
   locale: string; timeZone: string; actionable?: boolean; managed?: boolean; action: (value: { kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }) => void; t: Translate;
 }) {
   const groups = groupBookings(bookings);
-  return <section>
+  return <section data-testid={testId}>
     <h3 className="text-xl font-semibold">{title}</h3>
     {groups.length === 0 ? <p className="text-muted mt-3">{empty}</p> : <div className="mt-3 grid gap-4">{groups.map((group) =>
       <article key={group.key} className="border-structural rounded-xl border p-4">
@@ -128,7 +128,7 @@ function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, 
             {managed && <Button data-testid="managed-details" className="button-secondary px-3 py-2" onClick={() => action({ kind: "detail", booking, managed })}>{t("managedAppointments.details")}</Button>}
             {booking.status === "CONFIRMED" && <>
               <Button data-testid={managed ? "managed-cancel" : "personal-cancel"} data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking, managed })}>{t("myBookings.cancel", { label: booking.cardLabel })}</Button>
-              {booking.seriesId && <Button className="px-3 py-2" onClick={() => action({ kind: "move", booking, managed })}>{t("myBookings.move", { label: booking.cardLabel })}</Button>}
+              {booking.seriesId && <Button data-testid="move-booking" className="px-3 py-2" onClick={() => action({ kind: "move", booking, managed })}>{t("myBookings.move", { label: booking.cardLabel })}</Button>}
             </>}
           </div>}
         </li>)}</ul>
@@ -209,7 +209,7 @@ function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking:
     <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
     {error && <Alert>{error}</Alert>}
     {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatDateTime(move.fromStartsAt, i18n.language, timeZone)} → {formatDateTime(move.toStartsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
-    <div className="flex gap-2">{preview ? <Button disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    <div className="flex gap-2">{preview ? <Button data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

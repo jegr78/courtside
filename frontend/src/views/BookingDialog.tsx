@@ -141,7 +141,7 @@ export function BookingDialog({ selection, grid, courts, closed, created, confli
           <Button type="button" className="button-secondary px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMember", { name: member.displayName })}</Button>
         </div>)}
       </fieldset>
-      <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
+      <fieldset data-testid="guest-participants" className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.guests")}</legend>
         {guestNames.map((guestName, index) => <label key={index} className="grid gap-2 font-medium">
           {index === 0 ? t("booking.guest") : t("booking.guestNumber", { number: index + 1 })}

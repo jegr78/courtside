@@ -33,7 +33,7 @@ describe("AdminFacilityView", () => {
     expect(await screen.findByTestId("court-name-court-1")).toHaveValue("Centre Court");
     expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue("08:00");
     expect(screen.getByTestId("card-label-card-1")).toHaveValue("Member booking");
-    expect(screen.getAllByRole("checkbox", { name: "Member" })[0]).toBeChecked();
+    expect(screen.getByTestId("card-allowed-roles-card-1-MEMBER")).toBeChecked();
     expect(screen.getAllByTestId("allowed-roles-hint")).toHaveLength(2);
   });
 
@@ -107,10 +107,10 @@ describe("AdminFacilityView", () => {
     // when
     await user.clear(screen.getByTestId("card-label-card-1"));
     await user.type(screen.getByTestId("card-label-card-1"), "Training");
-    await user.click(screen.getAllByRole("checkbox", { name: "Member" })[0]);
-    await user.click(screen.getAllByRole("checkbox", { name: "Trainer" })[0]);
-    await user.click(screen.getAllByRole("checkbox", { name: "Sport director" })[0]);
-    await user.click(screen.getAllByRole("checkbox", { name: "Show as neutrally booked in the court plan" })[0]);
+    await user.click(screen.getByTestId("card-allowed-roles-card-1-MEMBER"));
+    await user.click(screen.getByTestId("card-allowed-roles-card-1-TRAINER"));
+    await user.click(screen.getByTestId("card-allowed-roles-card-1-SPORT_DIRECTOR"));
+    await user.click(screen.getByTestId("card-generic-occupancy-card-1"));
     await user.clear(screen.getByTestId("card-counts-card-1"));
     await user.type(screen.getByTestId("card-counts-card-1"), "1, 3");
     await user.click(screen.getByTestId("save-card-card-1"));

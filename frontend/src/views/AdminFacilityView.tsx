@@ -270,12 +270,12 @@ function CardEditor({ card, disabled, changed, save, toggle }: { card: BookingCa
     <div className="grid gap-3 md:grid-cols-3">
       <TextField disabled={disabled} data-testid={`card-label-${card.id}`} label={t("admin.facility.label")} value={card.label} onChange={(event) => changed({ ...card, label: event.target.value })} />
       <TextField disabled={disabled} type="color" label={t("admin.facility.color")} value={card.color} onChange={(event) => changed({ ...card, color: event.target.value })} />
-      <AllowedRoleCheckboxes disabled={disabled} selected={card.allowedRoles} changed={(allowedRoles) => changed({ ...card, allowedRoles })} />
+      <AllowedRoleCheckboxes disabled={disabled} testIdPrefix={`card-allowed-roles-${card.id}`} selected={card.allowedRoles} changed={(allowedRoles) => changed({ ...card, allowedRoles })} />
       <ManagingRoleCheckboxes disabled={disabled} testIdPrefix={`card-managing-roles-${card.id}`} selected={card.managingRoles} changed={(managingRoles) => changed({ ...card, managingRoles })} />
       <TextField disabled={disabled} data-testid={`card-counts-${card.id}`} label={t("admin.facility.playerCounts")} value={counts} onChange={(event) => setCounts(event.target.value)} />
       <Checkbox disabled={disabled} label={t("admin.facility.countsAgainstLimits")} checked={card.countsAgainstLimits} changed={(countsAgainstLimits) => changed({ ...card, countsAgainstLimits })} />
       <Checkbox disabled={disabled} label={t("admin.facility.guestAllowed")} checked={card.guestAllowed} changed={(guestAllowed) => changed({ ...card, guestAllowed })} />
-      <Checkbox disabled={disabled} label={t("admin.facility.showGenericOccupancy")} checked={card.showGenericOccupancy} changed={(showGenericOccupancy) => changed({ ...card, showGenericOccupancy })} />
+      <Checkbox disabled={disabled} data-testid={`card-generic-occupancy-${card.id}`} label={t("admin.facility.showGenericOccupancy")} checked={card.showGenericOccupancy} changed={(showGenericOccupancy) => changed({ ...card, showGenericOccupancy })} />
     </div>
     <div className="flex gap-3">
       <Button disabled={disabled} data-testid={`save-card-${card.id}`} type="button" onClick={() => void save({ ...card, allowedPlayerCounts: countsValue, tracksPlayers: countsValue.length > 0 })}>{t("admin.save")}</Button>
