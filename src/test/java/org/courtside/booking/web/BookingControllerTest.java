@@ -445,7 +445,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     void givenACardPermittingMembers_whenAnotherMemberUsesManagementApi_thenNothingIsDisclosed()
             throws Exception {
         // given
-        BookingCard card = cards.createCard("Member event", "#B85C38", Set.of(Role.MEMBER),
+        BookingCard card = cards.createCard("Member event", "#B85C38", Set.of(Role.MEMBER), Set.of(),
                 new short[] { 2 }, false, true, true);
         String bookingId = JsonPath.read(mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -464,6 +464,74 @@ class BookingControllerTest extends AbstractIntegrationTest {
                         .with(user("major.mary").roles("MEMBER")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-owned"));
+    }
+
+    @Test
+    void givenACardBookableByTrainersButManagedByNobody_whenATrainerListsManagedAppointments_thenNothingIsDisclosed()
+            throws Exception {
+        // given
+        BookingCard card = cards.createCard("Open practice", "#34584A", Set.of(Role.TRAINER),
+                Set.of(), new short[] { 2 }, false, true, true);
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(courtId, card.getId(), GUEST_PARTICIPANT))
+                        .with(user("trainer.john").roles("TRAINER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings")
+                        .with(user("trainer.john").roles("TRAINER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
+
+    @Test
+    void givenACardBookableByMembersAndTrainers_whenATrainerOpensAMemberAppointment_thenItIsRefused()
+            throws Exception {
+        // given
+        BookingCard card = cards.createCard("Open practice", "#B85C38",
+                Set.of(Role.MEMBER, Role.TRAINER), Set.of(), new short[] { 2 }, false, true, true);
+        String bookingId = JsonPath.read(mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(courtId, card.getId(), GUEST_PARTICIPANT))
+                        .with(user("doe.jane").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings/{id}", bookingId)
+                        .with(user("trainer.john").roles("TRAINER")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-owned"));
+    }
+
+    @Test
+    void givenACardManagedByTrainers_whenATrainerOpensAnAppointmentOnIt_thenTheParticipantsAreShown()
+            throws Exception {
+        // given
+        BookingCard card = cards.createCard("Junior squad", "#34584A", Set.of(Role.TRAINER),
+                Set.of(Role.TRAINER), new short[] { 2 }, false, true, true);
+        String bookingId = JsonPath.read(mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(courtId, card.getId(), GUEST_PARTICIPANT))
+                        .with(user("trainer.john").roles("TRAINER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings/{id}", bookingId)
+                        .with(user("trainer.john").roles("TRAINER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(bookingId))
+                .andExpect(jsonPath("$.participants[0].kind").value("MEMBER"))
+                .andExpect(jsonPath("$.participants[0].displayName").value("John Roe"))
+                .andExpect(jsonPath("$.participants[1].kind").value("GUEST"))
+                .andExpect(jsonPath("$.participants[1].displayName").value("Partner"));
     }
 
     @Test
@@ -799,7 +867,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     void givenANamedCardWithParticipants_whenAnonymousCallerLoadsTheGrid_thenTheCountIsHidden()
             throws Exception {
         // given
-        BookingCard card = cards.createCard("Junior training", "#34584A", Set.of(Role.MEMBER),
+        BookingCard card = cards.createCard("Junior training", "#34584A", Set.of(Role.MEMBER), Set.of(),
                 new short[] {2}, false, false, false);
         UUID participantId = accounts.findByUsername("major.mary").orElseThrow().getPerson().getId();
         mockMvc.perform(bookingPost()

@@ -94,7 +94,7 @@ export function MyBookingsView({ now = new Date(), showManaged = false }: { now?
     </div>}
     {nextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
     {showManaged && !loading && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
-      <h2 id="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h2>
+      <h2 id="managed-appointments-title" data-testid="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h2>
       <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
       <div className="mt-4"><BookingSection title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={setAction} t={t} /></div>
       {managedNextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
@@ -124,7 +124,7 @@ function BookingSection({ title, empty, bookings, courtNames, locale, timeZone, 
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
           {managed && "participantCount" in booking && <span>{t("managedAppointments.participants", { count: booking.participantCount })}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
-            {managed && <Button className="button-secondary px-3 py-2" onClick={() => action({ kind: "detail", booking, managed })}>{t("managedAppointments.details")}</Button>}
+            {managed && <Button data-testid="managed-details" className="button-secondary px-3 py-2" onClick={() => action({ kind: "detail", booking, managed })}>{t("managedAppointments.details")}</Button>}
             {booking.status === "CONFIRMED" && <>
               <Button data-testid={managed ? "managed-cancel" : "personal-cancel"} data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking, managed })}>{t("myBookings.cancel", { label: booking.cardLabel })}</Button>
               {booking.seriesId && <Button className="px-3 py-2" onClick={() => action({ kind: "move", booking, managed })}>{t("myBookings.move", { label: booking.cardLabel })}</Button>}
@@ -236,7 +236,7 @@ function ManagedAppointmentDialog({ bookingId, closed }: { bookingId: string; cl
         {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`}>{participant.displayName} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
       </section>
     </>}
-    <div><Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    <div><Button data-testid="close-managed-appointment" className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

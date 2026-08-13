@@ -19,7 +19,7 @@ describe("AdminFacilityView", () => {
     vi.spyOn(api, "adminBookingCards").mockResolvedValue([
       {
         id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
-        allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
+        managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
         guestAllowed: true, showGenericOccupancy: true, active: true
       }
     ]);
@@ -94,7 +94,7 @@ describe("AdminFacilityView", () => {
     // given
     const changeCard = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({
       id: "card-1", label: "Training", color: "#34584a", allowedRoles: ["TRAINER", "SPORT_DIRECTOR"],
-      allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
+      managingRoles: ["SPORT_DIRECTOR"], allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
       guestAllowed: false, showGenericOccupancy: false, active: true
     });
     const setHours = vi.spyOn(api, "setAdminOpeningHours").mockResolvedValue({
@@ -120,10 +120,32 @@ describe("AdminFacilityView", () => {
 
     // then
     expect(changeCard).toHaveBeenCalledWith("card-1", expect.objectContaining({
-      label: "Training", allowedRoles: ["TRAINER", "SPORT_DIRECTOR"], allowedPlayerCounts: [1, 3],
-      showGenericOccupancy: false
+      label: "Training", allowedRoles: ["TRAINER", "SPORT_DIRECTOR"],
+      managingRoles: [], allowedPlayerCounts: [1, 3], showGenericOccupancy: false
     }));
     expect(setHours).toHaveBeenCalledWith("MONDAY", { opensAt: "09:00", closesAt: "22:00" });
+  });
+
+  it("given a card, when choosing who manages its bookings, then member is not offered and the choice is saved", async () => {
+    // given
+    const changeCard = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({
+      id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
+      managingRoles: ["TRAINER"], allowedPlayerCounts: [2, 4], tracksPlayers: true,
+      countsAgainstLimits: true, guestAllowed: true, showGenericOccupancy: true, active: true
+    });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    const user = userEvent.setup();
+    await screen.findByTestId("court-name-court-1");
+
+    // when
+    await user.click(screen.getByTestId("card-managing-roles-card-1-TRAINER"));
+    await user.click(screen.getByTestId("save-card-card-1"));
+
+    // then
+    expect(screen.queryByTestId("card-managing-roles-card-1-MEMBER")).not.toBeInTheDocument();
+    expect(changeCard).toHaveBeenCalledWith("card-1", expect.objectContaining({
+      allowedRoles: ["MEMBER"], managingRoles: ["TRAINER"]
+    }));
   });
 
   it("given new facility data, when creating it, then courts and cards are added through the admin API", async () => {
@@ -135,7 +157,7 @@ describe("AdminFacilityView", () => {
     const createCard = vi.spyOn(api, "createAdminBookingCard").mockReturnValue(cardResponse.promise);
     const createdCard: Awaited<ReturnType<typeof api.createAdminBookingCard>> = {
       id: "card-2", label: "Training", color: "#b85c38", allowedRoles: ["TRAINER"],
-      allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
+      managingRoles: ["TRAINER"], allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
       guestAllowed: false, showGenericOccupancy: false, active: true
     };
     render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
@@ -147,13 +169,16 @@ describe("AdminFacilityView", () => {
     await user.type(screen.getByTestId("new-court-name"), "Garden Court");
     await user.click(screen.getByTestId("create-court"));
     await user.type(screen.getByTestId("new-card-label"), "Training");
-    await user.click(screen.getAllByRole("checkbox", { name: "Trainer" })[1]);
+    await user.click(screen.getByTestId("new-card-role-TRAINER"));
+    await user.click(screen.getByTestId("new-card-managing-roles-TRAINER"));
     await user.click(screen.getByTestId("create-card"));
     cardResponse.resolve(createdCard);
 
     // then
     expect(createCourt).toHaveBeenCalledWith({ number: 2, name: "Garden Court" });
-    expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ label: "Training", allowedRoles: ["TRAINER"] }));
+    expect(createCard).toHaveBeenCalledWith(expect.objectContaining({
+      label: "Training", allowedRoles: ["TRAINER"], managingRoles: ["TRAINER"]
+    }));
     expect(await screen.findByRole("status")).toBeVisible();
     expect(screen.getByTestId("new-card-label")).toHaveValue("");
   });

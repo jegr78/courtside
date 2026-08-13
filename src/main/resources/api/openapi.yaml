@@ -376,7 +376,7 @@ components:
       description: |
         What kind of occupancy a booking is. Member booking, training, league match and court
         closure differ only by their card, so a new kind is a row rather than a deployment.
-      required: [id, label, color, allowedRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, showGenericOccupancy, active]
+      required: [id, label, color, allowedRoles, managingRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, showGenericOccupancy, active]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
@@ -384,6 +384,13 @@ components:
         allowedRoles:
           type: array
           uniqueItems: true
+          items: { $ref: "#/components/schemas/Role" }
+        managingRoles:
+          type: array
+          uniqueItems: true
+          description: |
+            The roles that may open, read and cancel every booking made on this card,
+            independently of who may book with it. Empty means only an admin may.
           items: { $ref: "#/components/schemas/Role" }
         allowedPlayerCounts:
           type: array
@@ -405,6 +412,13 @@ components:
         allowedRoles:
           type: array
           uniqueItems: true
+          items: { $ref: "#/components/schemas/Role" }
+        managingRoles:
+          type: array
+          uniqueItems: true
+          description: |
+            The roles that may open, read and cancel every booking made on this card,
+            independently of who may book with it. Absent or empty means only an admin may.
           items: { $ref: "#/components/schemas/Role" }
         allowedPlayerCounts:
           type: array
