@@ -368,6 +368,24 @@ test("given the browser profile, when planning k6, then Chromium and the browser
   assert.ok(plan.args.some((argument) => argument.includes("p(75)")));
 });
 
+test("given a private credentials file, when planning k6, then the container runs as the user that owns it", () => {
+  // given
+  const options = parseArguments(["perf-run", "peak", "--confirm", "courtside-perf"]);
+  const funnel = parseArguments([
+    "perf-run", "funnel-smoke", "--target", "https://courtside.example.ts.net",
+    "--confirm", "courtside-uat-funnel"
+  ]);
+
+  // when
+  const plan = performanceRunPlan(options, "/tmp/performance-result", "/tmp/performance-root.crt");
+  const funnelPlan = funnelPerformanceRunPlan(funnel, "/tmp/funnel-result", "test-run");
+
+  // then
+  const expected = `${process.getuid()}:${process.getgid()}`;
+  assert.equal(plan.args[plan.args.indexOf("--user") + 1], expected);
+  assert.equal(funnelPlan.args[funnelPlan.args.indexOf("--user") + 1], expected);
+});
+
 test("given a protocol profile, when planning k6, then the pinned image and isolated artifacts are used", () => {
   // given
   const options = parseArguments(["perf-run", "peak", "--confirm", "courtside-perf"]);

@@ -624,6 +624,10 @@ export function perfResetPlan() {
   return { command: "docker", args: [...perfComposeArgs(false, true), "down", "--volumes", "--remove-orphans"] };
 }
 
+export function containerUserArguments(platform = process.platform) {
+  return platform === "win32" ? [] : ["--user", `${process.getuid()}:${process.getgid()}`];
+}
+
 export function performanceVersion() {
   return performanceImage("k6").split(":")[1].split("@")[0];
 }
@@ -648,7 +652,7 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
   return {
     command: "docker",
     args: [
-      "run", "--rm", "--add-host", "host.docker.internal:host-gateway",
+      "run", "--rm", ...containerUserArguments(), "--add-host", "host.docker.internal:host-gateway",
       "-e", `PERF_PROFILE=${options.profile}`,
       "-e", `PERF_RUN_ID=${runId}`,
       "-e", "PERF_TARGET=https://host.docker.internal:9443",
@@ -681,7 +685,7 @@ export function funnelPerformanceRunPlan(options, resultDirectory, runId = "test
   return {
     command: "docker",
     args: [
-      "run", "--rm",
+      "run", "--rm", ...containerUserArguments(),
       "-e", `PERF_PROFILE=${options.profile}`,
       "-e", `PERF_RUN_ID=${runId}`,
       "-e", `PERF_TARGET=${options.target}`,
