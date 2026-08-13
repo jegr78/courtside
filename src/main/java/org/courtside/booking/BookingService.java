@@ -1,6 +1,7 @@
 package org.courtside.booking;
 
 import org.courtside.booking.internal.CourtAllocationRepository;
+import org.courtside.booking.internal.CursorPage;
 import org.courtside.booking.internal.IdempotencyKeyRaceException;
 import org.courtside.booking.internal.IdempotencyKeyReusedException;
 import org.courtside.identity.Role;
@@ -8,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -89,15 +91,11 @@ public class BookingService {
         return allocations.findConfirmedStartingBetween(from, to);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PersonalBookingPage personalBookings(UUID bookedBy, UUID cursor, int limit) {
         List<UUID> ids = bookings.findPersonalBookingIds(bookedBy, cursor, PageRequest.of(0, limit + 1));
-        UUID nextCursor = ids.size() > limit ? ids.get(limit - 1) : null;
-        List<UUID> visibleIds = ids.stream().limit(limit).toList();
-        Map<UUID, Booking> found = bookings.findAllByIdIn(visibleIds).stream()
-                .collect(Collectors.toMap(Booking::getId, booking -> booking));
-        return new PersonalBookingPage(
-                visibleIds.stream().map(found::get).toList(), nextCursor);
+        CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);
+        return new PersonalBookingPage(page.items(), page.nextCursor());
     }
 
     @Transactional(readOnly = true)
