@@ -128,8 +128,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnInvalidTimeZone_whenChangingTheConfig_thenItIsRejected() throws Exception {
-        // when / then — "Moon/Tranquility" matches the contract's pattern, so only
-        // ConfigRequestValidator's IANA lookup can catch it
+        // when / then
         mockMvc.perform(put("/api/admin/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(configJson("Example Tennis Club").replace(
@@ -143,7 +142,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAFixedOffsetTimeZone_whenChangingTheConfig_thenItIsRejected() throws Exception {
-        // when / then — "+02:00" fails the contract's pattern outright
+        // when / then
         mockMvc.perform(put("/api/admin/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(configJson("Example Tennis Club").replace(
