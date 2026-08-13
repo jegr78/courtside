@@ -15,14 +15,14 @@ test("sport and youth directors find the same managed league match", async ({ pa
     await signIn(page, username);
 
     // when / then
-    await expect(page.getByRole("heading", { name: "Managed appointments" })).toBeVisible();
+    await expect(page.getByTestId("managed-appointments-title")).toBeVisible();
     const leagueMatch = page.locator("article").filter({
       has: page.locator('[data-booking-id="70000000-0000-0000-0000-000000000004"]')
     });
     await expect(leagueMatch).toBeVisible();
-    await leagueMatch.getByRole("button", { name: "Details" }).click();
+    await leagueMatch.getByTestId("managed-details").click();
     await expect(page.getByTestId("managed-note")).toContainText("Prepare score sheets");
-    await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+    await page.getByTestId("close-managed-appointment").click();
     await page.getByTestId("logout").click();
   }
 });
@@ -47,7 +47,7 @@ test("an officer sees only the appointments the card's managing roles cover", as
   await signIn(page, "keeper.roe");
 
   // when / then
-  await expect(page.getByRole("heading", { name: "Managed appointments" })).toBeVisible();
+  await expect(page.getByTestId("managed-appointments-title")).toBeVisible();
   await expect(page.getByTestId("booking-70000000-0000-0000-0000-000000000005")).toBeVisible();
   await expect(page.getByTestId("booking-70000000-0000-0000-0000-000000000004")).toHaveCount(0);
 });
@@ -57,5 +57,5 @@ test("an ordinary member has no managed-appointments area", async ({ page }) => 
   await signIn(page, "doe.jane");
 
   // then
-  await expect(page.getByRole("heading", { name: "Managed appointments" })).not.toBeVisible();
+  await expect(page.getByTestId("managed-appointments-title")).toHaveCount(0);
 });

@@ -5,6 +5,7 @@ import { test } from "node:test";
 
 const frontend = fileURLToPath(new URL("../frontend", import.meta.url));
 const forbiddenQuery = /\b(?:find|get|query)(?:All)?By(?:Text|LabelText|PlaceholderText|DisplayValue|Title|AltText)\s*\(/g;
+const forbiddenRoleName = /\bgetByRole\s*\([^,]+,\s*\{[^}]*\bname\s*:\s*["'`]/g;
 
 test("given UI tests, when selecting elements, then rendered copy is never the locator", () => {
   // given
@@ -13,7 +14,10 @@ test("given UI tests, when selecting elements, then rendered copy is never the l
   // when
   const violations = testFiles.flatMap((path) => {
     const source = readFileSync(path, "utf8");
-    return [...source.matchAll(forbiddenQuery)].map((match) =>
+    const forbidden = path.includes("/e2e/")
+      ? new RegExp(`${forbiddenQuery.source}|${forbiddenRoleName.source}`, "g")
+      : forbiddenQuery;
+    return [...source.matchAll(forbidden)].map((match) =>
       `${path.slice(frontend.length + 1)}:${source.slice(0, match.index).split("\n").length}`
     );
   });
