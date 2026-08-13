@@ -30,8 +30,7 @@ class AdvanceWindowRuleTest extends AbstractIntegrationTest {
 
     @Test
     void givenADeactivatedRuleSet_whenBookingBeyondItsWindow_thenTheRuleStillGovernsExistingMembers() {
-        // given — deactivation removes a rule set from the picker, it does not disarm it for a
-        // membership type still pointing at it
+        // given
         ruleAdminService.setRuleSetActive(STANDARD_RULE_SET, false);
 
         // when
@@ -107,8 +106,7 @@ class AdvanceWindowRuleTest extends AbstractIntegrationTest {
 
     @Test
     void givenAWindowOfTwoDays_whenBookingLateOnTheSameFirstDayOutside_thenExceededViolation() {
-        // given — 07:00 and 15:00 target the same club-local date; only the calendar date, not
-        // the hour, may decide the answer
+        // given
         ruleAdminService.setRule(STANDARD_RULE_SET, RuleType.ADVANCE_WINDOW, Map.of("maxDays", 2));
 
         // when
