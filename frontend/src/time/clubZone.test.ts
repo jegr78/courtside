@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { isPastSlot, zonedDateTime } from "./clubZone";
+import { bookingTimeSlot, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
 
 const localTimeIn = (isoInstant: string, timeZone: string) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -98,4 +98,29 @@ it("given a slot in the hour before a spring-forward transition and now just bef
 
   // then
   expect(past).toBe(false);
+});
+
+it("given a slot crossing a spring-forward gap, when building its booking interval, then its duration stays unchanged", () => {
+  // when
+  const slot = bookingTimeSlot("2026-03-29", "01:30", "Europe/Berlin", 30);
+
+  // then
+  expect(Date.parse(slot.endsAt) - Date.parse(slot.startsAt)).toBe(30 * 60_000);
+  expect(localTimeIn(slot.endsAt, "Europe/Berlin")).toBe("29/03/2026, 03:00");
+});
+
+it("given a nonexistent wall-clock time, when validating it, then it is rejected", () => {
+  // when
+  const valid = isValidZonedDateTime("2026-03-29", "02:30", "Europe/Berlin");
+
+  // then
+  expect(valid).toBe(false);
+});
+
+it("given a duplicated fall-back time, when resolving its zoned instant, then the earlier occurrence is selected", () => {
+  // when
+  const instant = zonedDateTime("2026-10-25", "02:30", "Europe/Berlin");
+
+  // then
+  expect(instant).toBe("2026-10-25T02:30:00+02:00");
 });

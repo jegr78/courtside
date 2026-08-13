@@ -6,8 +6,8 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import {
-  addDays, addMinutes, calendarDayNumber, dateInTimeZone, dateInTimeZoneValue,
-  formatDate, formatTime, isPastSlot, parseDate, startOfWeek, timeToMinutes, weekDays, zonedDateTime
+  addDays, bookingTimeSlot, calendarDayNumber, dateInTimeZone, dateInTimeZoneValue,
+  formatDate, formatTime, isPastSlot, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes, weekDays
 } from "../time/clubZone";
 
 interface WeekViewProps {
@@ -390,8 +390,9 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
     setError(undefined);
     setViolations([]);
     try {
-      const startsAt = zonedDateTime(selection.date, selection.slot, grid.timeZone);
-      const endsAt = zonedDateTime(selection.date, addMinutes(selection.slot, grid.slotMinutes), grid.timeZone);
+      const { startsAt, endsAt } = bookingTimeSlot(
+        selection.date, selection.slot, grid.timeZone, grid.slotMinutes
+      );
       const participants = [
         ...selectedMembers.map((member) => ({ personId: member.personId })),
         ...guestNames.map((name) => name.trim()).filter(Boolean).map((guestName) => ({ guestName })),
@@ -566,7 +567,7 @@ function slotsFor(day: Date, grid: BookingGrid): string[] {
   return Array.from({ length: Math.ceil((end - start) / grid.slotMinutes) }, (_, index) => {
     const minutes = start + index * grid.slotMinutes;
     return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-  });
+  }).filter((time) => isValidZonedDateTime(formatDate(day), time, grid.timeZone));
 }
 
 function formatWeekday(date: Date, language: string): string {

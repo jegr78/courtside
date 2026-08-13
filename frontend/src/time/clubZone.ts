@@ -1,8 +1,41 @@
 export function zonedDateTime(date: string, time: string, timeZone: string): string {
   const wallClock = Date.parse(`${date}T${time}:00Z`);
-  const guess = new Date(wallClock - offsetAt(new Date(wallClock), timeZone));
-  const corrected = new Date(wallClock - offsetAt(guess, timeZone));
-  return `${date}T${time}:00${offsetLabel(offsetAt(corrected, timeZone))}`;
+  const offsets = new Set([
+    offsetAt(new Date(wallClock - 86_400_000), timeZone),
+    offsetAt(new Date(wallClock), timeZone),
+    offsetAt(new Date(wallClock + 86_400_000), timeZone)
+  ]);
+  const match = [...offsets]
+    .map((offset) => ({ instant: new Date(wallClock - offset), offset }))
+    .filter(({ instant }) => localDateTime(instant, timeZone) === `${date}T${time}`)
+    .sort((left, right) => left.instant.getTime() - right.instant.getTime())[0];
+  if (!match) throw new RangeError(`The wall-clock time does not exist in ${timeZone}`);
+  return `${date}T${time}:00${offsetLabel(match.offset)}`;
+}
+
+export function isValidZonedDateTime(date: string, time: string, timeZone: string): boolean {
+  try {
+    zonedDateTime(date, time, timeZone);
+    return true;
+  } catch (failure) {
+    if (failure instanceof RangeError) return false;
+    throw failure;
+  }
+}
+
+export function bookingTimeSlot(date: string, time: string, timeZone: string, durationMinutes: number) {
+  const startsAt = zonedDateTime(date, time, timeZone);
+  const endsAt = new Date(Date.parse(startsAt) + durationMinutes * 60_000).toISOString();
+  return { startsAt, endsAt };
+}
+
+function localDateTime(instant: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit"
+  }).formatToParts(instant);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+  return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`;
 }
 
 function offsetAt(instant: Date, timeZone: string): number {
@@ -79,11 +112,6 @@ export function weekDays(start: Date): Date[] {
 
 export function calendarDayNumber(date: Date): number {
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
-}
-
-export function addMinutes(time: string, minutes: number): string {
-  const total = timeToMinutes(time) + minutes;
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 export function timeToMinutes(time: string): number {
