@@ -45,12 +45,25 @@ class CursorPageTest {
         assertThat(page.items()).extracting(Item::id).containsExactly(first, second);
     }
 
+    @Test
+    void givenALoaderThatReturnsFewerEntitiesThanIds_whenPaging_thenTheMissingIdIsDropped() {
+        // when
+        CursorPage.Result<Item> page = CursorPage.of(List.of(first, second, third), 3, this::loadOmittingSecond, Item::id);
+
+        // then
+        assertThat(page.items()).extracting(Item::id).containsExactly(first, third);
+    }
+
     private List<Item> loadInAnyOrder(List<UUID> ids) {
         return ids.stream().map(Item::new).toList();
     }
 
     private List<Item> loadReversed(List<UUID> ids) {
         return loadInAnyOrder(ids).reversed();
+    }
+
+    private List<Item> loadOmittingSecond(List<UUID> ids) {
+        return ids.stream().filter(id -> !id.equals(second)).map(Item::new).toList();
     }
 
     private record Item(UUID id) {
