@@ -201,10 +201,10 @@
                         <configuration><arguments>audit --audit-level=high</arguments></configuration>
                     </execution>
                     <execution>
-                        <id>install-playwright-chromium</id>
+                        <id>install-playwright-browsers</id>
                         <phase>pre-integration-test</phase>
                         <goals><goal>npm</goal></goals>
-                        <configuration><arguments>exec playwright install chromium</arguments></configuration>
+                        <configuration><arguments>exec playwright install chromium webkit</arguments></configuration>
                     </execution>
                     <execution>
                         <id>npm-e2e</id>

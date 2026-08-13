@@ -32,7 +32,7 @@ class ConfigDefaultsTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/public/config"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clubName").value("Courtside"))
-                .andExpect(jsonPath("$.primaryColor").value("#B85C38"))
+                .andExpect(jsonPath("$.primaryColor").value("#AF5030"))
                 .andExpect(jsonPath("$.accentColor").value("#D7E24B"))
                 .andExpect(jsonPath("$.defaultLocale").value("de"))
                 .andExpect(jsonPath("$.slotMinutes").value(30));

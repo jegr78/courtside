@@ -21,8 +21,7 @@ export function Modal({ labelledBy, closed, children }: { labelledBy: string; cl
       return;
     }
     if (event.key !== "Tab") return;
-    const focusable = Array.from(dialog.current?.querySelectorAll<HTMLElement>(focusableSelector()) ?? [])
-      .filter((element) => !element.hasAttribute("disabled"));
+    const focusable = Array.from(dialog.current?.querySelectorAll<HTMLElement>(focusableSelector()) ?? []);
     if (focusable.length === 0) return;
     const current = focusable.indexOf(document.activeElement as HTMLElement);
     const next = event.shiftKey
@@ -46,5 +45,5 @@ export function Modal({ labelledBy, closed, children }: { labelledBy: string; cl
 }
 
 function focusableSelector(): string {
-  return "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
+  return "button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])";
 }

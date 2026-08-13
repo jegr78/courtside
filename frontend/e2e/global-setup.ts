@@ -78,6 +78,13 @@ async function seedJourneyData(postgres: StartedTestContainer, visualDate: strin
       ('dddddddd-0000-0000-0000-000000000003', 3, NULL),
       ('dddddddd-0000-0000-0000-000000000004', 4, NULL);
 
+    INSERT INTO booking_series (id, card_id, starts_on, start_time, duration_minutes, interval_weeks,
+      weekdays, occurrence_count, created_by)
+    VALUES ('73000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+      DATE '${visualDate}', TIME '09:00', 60, 1, ARRAY[1], 2, '00000000-0000-0000-0000-000000000102');
+    INSERT INTO booking_series_court (booking_series_id, court_id, position)
+    VALUES ('73000000-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000001', 0);
+
     INSERT INTO booking (id, card_id, status, booked_by, note) VALUES
       ('70000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'CONFIRMED', '00000000-0000-0000-0000-000000000102', NULL),
       ('70000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), NULL),
@@ -85,6 +92,8 @@ async function seedJourneyData(postgres: StartedTestContainer, visualDate: strin
       ('70000000-0000-0000-0000-000000000004', '33333333-3333-3333-3333-333333333333', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), 'Prepare score sheets'),
       ('70000000-0000-0000-0000-000000000005', '44444444-4444-4444-4444-444444444444', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), NULL),
       ('70000000-0000-0000-0000-000000000006', '33333333-3333-3333-3333-333333333333', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), 'Cancellation journey');
+    UPDATE booking SET series_id = '73000000-0000-0000-0000-000000000001'
+    WHERE id = '70000000-0000-0000-0000-000000000001';
 
     INSERT INTO booking_participant (id, booking_id, kind, person_id, position) VALUES
       ('71000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'MEMBER', '00000000-0000-0000-0000-000000000101', 0),
