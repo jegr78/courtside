@@ -10,6 +10,7 @@ test("given periodic stability evidence, when reading its workflow, then order a
   assert.match(workflow, /reversealphabetical, random/);
   assert.match(workflow, /surefire\.runOrder\.random\.seed/);
   assert.match(workflow, /--workers=2/);
+  assert.match(workflow, /for attempt in 1 2 3/);
   assert.doesNotMatch(workflow, /retries:/);
   assert.match(workflow, /Upload first-attempt evidence/);
   assert.match(workflow, /Upload first-attempt browser evidence/);
@@ -18,6 +19,7 @@ test("given periodic stability evidence, when reading its workflow, then order a
 test("given a required build failure, when collecting evidence, then backend and browser diagnostics survive", () => {
   assert.match(build, /timeout-minutes: 25/);
   assert.match(build, /target\/surefire-reports\/\*\.xml/);
-  assert.match(build, /frontend\/test-results/);
-  assert.match(build, /frontend\/playwright-report/);
+  assert.match(build, /frontend\/test-results\/visual-journeys/);
+  assert.doesNotMatch(build, /frontend\/playwright-report/);
+  assert.doesNotMatch(workflow, /frontend\/playwright-report/);
 });

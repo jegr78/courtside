@@ -28,7 +28,6 @@ jobs:
           name: test-evidence-${{ github.run_id }}
           path: |
             target/surefire-reports/*.xml
-            frontend/test-results
-            frontend/playwright-report
+            frontend/test-results/visual-journeys
           if-no-files-found: warn
           retention-days: 14

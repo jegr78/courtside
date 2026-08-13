@@ -1,9 +1,11 @@
 package org.courtside.identity.internal;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.PostgresDiagnostics;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.Duration;
@@ -25,6 +27,9 @@ class LoginAttemptProtectionConcurrencyTest extends AbstractIntegrationTest {
     @Autowired
     private LoginAttemptProtection protection;
 
+    @Autowired
+    private JdbcClient jdbc;
+
     @Test
     void givenConcurrentAttemptsFromOneAddress_whenTheyRegister_thenTheLimitIsAtomic()
             throws Exception {
@@ -37,9 +42,10 @@ class LoginAttemptProtectionConcurrencyTest extends AbstractIntegrationTest {
         // when
         List<Optional<Duration>> results;
         try (var executor = Executors.newFixedThreadPool(3)) {
-            results = executor.invokeAll(attempts).stream().map(future -> {
+            results = attempts.stream().map(executor::submit).map(future -> {
                 try {
-                    return future.get(20, TimeUnit.SECONDS);
+                    return PostgresDiagnostics.await(
+                            future, Duration.ofSeconds(20), jdbc, "Concurrent login attempt");
                 } catch (Exception exception) {
                     throw new IllegalStateException("Concurrent attempt failed", exception);
                 }

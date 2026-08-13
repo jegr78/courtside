@@ -104,10 +104,11 @@ class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
         // when
         List<UUID> bookingIds;
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
-            List<Future<UUID>> futures = pool.invokeAll(List.of(holdFirstRequestUncommitted, retryRequest));
+            List<Future<UUID>> futures = List.of(
+                    pool.submit(holdFirstRequestUncommitted), pool.submit(retryRequest));
             bookingIds = List.of(
-                    futures.get(0).get(20, TimeUnit.SECONDS),
-                    futures.get(1).get(20, TimeUnit.SECONDS));
+                    PostgresDiagnostics.await(futures.get(0), Duration.ofSeconds(20), jdbc, "First request"),
+                    PostgresDiagnostics.await(futures.get(1), Duration.ofSeconds(20), jdbc, "Retry request"));
         }
 
         // then

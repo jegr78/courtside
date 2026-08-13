@@ -113,11 +113,11 @@ class BookingConcurrencyTest extends AbstractIntegrationTest {
         // when
         List<Outcome> outcomes;
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
-            List<Future<Outcome>> futures =
-                    pool.invokeAll(List.of(holdTheSlotUncommitted, contendForTheSlot));
+            List<Future<Outcome>> futures = List.of(
+                    pool.submit(holdTheSlotUncommitted), pool.submit(contendForTheSlot));
             outcomes = List.of(
-                    futures.get(0).get(20, TimeUnit.SECONDS),
-                    futures.get(1).get(20, TimeUnit.SECONDS));
+                    PostgresDiagnostics.await(futures.get(0), Duration.ofSeconds(20), jdbc, "First booking"),
+                    PostgresDiagnostics.await(futures.get(1), Duration.ofSeconds(20), jdbc, "Competing booking"));
         }
 
         // then

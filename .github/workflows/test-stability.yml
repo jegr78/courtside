@@ -59,14 +59,16 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Prove browser isolation with two workers
         working-directory: frontend
-        run: npm run test:e2e -- --workers=2
+        run: |
+          for attempt in 1 2 3; do
+            npm run test:e2e -- --workers=2
+          done
       - name: Upload first-attempt browser evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: browser-isolation-${{ github.run_id }}
           path: |
-            frontend/test-results
-            frontend/playwright-report
+            frontend/test-results/visual-journeys
           if-no-files-found: warn
           retention-days: 14

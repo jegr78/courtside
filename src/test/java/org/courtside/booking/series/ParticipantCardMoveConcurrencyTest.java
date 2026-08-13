@@ -139,11 +139,12 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
         // when
         List<Outcome> outcomes;
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
-            List<Future<Outcome>> futures = pool.invokeAll(
-                    List.of(holdMoveUncommitted, contendForParticipantCard));
+            List<Future<Outcome>> futures = List.of(
+                    pool.submit(holdMoveUncommitted), pool.submit(contendForParticipantCard));
             outcomes = List.of(
-                    futures.get(0).get(20, TimeUnit.SECONDS),
-                    futures.get(1).get(20, TimeUnit.SECONDS));
+                    PostgresDiagnostics.await(futures.get(0), Duration.ofSeconds(20), jdbc, "Series move"),
+                    PostgresDiagnostics.await(
+                            futures.get(1), Duration.ofSeconds(20), jdbc, "Participant-card booking"));
         }
 
         // then

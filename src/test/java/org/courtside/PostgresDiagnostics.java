@@ -2,6 +2,13 @@ package org.courtside;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
 
+import java.time.Duration;
+import java.util.Comparator;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 public final class PostgresDiagnostics {
 
     private PostgresDiagnostics() {
@@ -21,6 +28,26 @@ public final class PostgresDiagnostics {
                         result.getString("wait_event_type"), result.getString("wait_event"),
                         result.getString("locktype"), result.getString("mode"), result.getBoolean("granted")))
                 .list()
+                .toString();
+    }
+
+    public static <T> T await(Future<T> future, Duration timeout, JdbcClient jdbc, String operation)
+            throws InterruptedException, ExecutionException {
+        try {
+            return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException failure) {
+            future.cancel(true);
+            throw new AssertionError(operation + " timed out after " + timeout
+                    + ". PostgreSQL: " + waitsAndLocks(jdbc) + ". Threads: " + threadStates(), failure);
+        }
+    }
+
+    private static String threadStates() {
+        return Thread.getAllStackTraces().entrySet().stream()
+                .sorted(Comparator.comparing(entry -> entry.getKey().getName()))
+                .map(entry -> entry.getKey().getName() + "=" + entry.getKey().getState() + ":"
+                        + java.util.Arrays.toString(entry.getValue()))
+                .toList()
                 .toString();
     }
 }
