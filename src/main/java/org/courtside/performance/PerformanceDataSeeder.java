@@ -146,8 +146,13 @@ class PerformanceDataSeeder implements ApplicationRunner {
                 List.of(court.getId()), MEMBER_BOOKING_CARD, new TimeSlot(start, start.plusSeconds(3600)),
                 booker.account().getId(), booker.person().getId(), Set.of(Role.ADMIN, Role.MEMBER),
                 "Performance booking", List.of(ParticipantSpec.member(partner.person().getId())), null);
-        if (command.slot().end().isBefore(clock.instant())) {
+        Instant now = clock.instant();
+        if (command.slot().end().isBefore(now)) {
             historicalBookings.importBooking(command);
+            return memberIndex + 2;
+        }
+        // A slot already under way is neither importable as history nor acceptable to the rules.
+        if (command.slot().start().isBefore(now)) {
             return memberIndex + 2;
         }
         try {
