@@ -652,10 +652,10 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
   return {
     command: "docker",
     args: [
-      "run", "--rm", ...containerUserArguments(), "--add-host", "host.docker.internal:host-gateway",
+      "run", "--rm", ...containerUserArguments(), "--network", "courtside-perf_load",
       "-e", `PERF_PROFILE=${options.profile}`,
       "-e", `PERF_RUN_ID=${runId}`,
-      "-e", "PERF_TARGET=https://host.docker.internal:9443",
+      "-e", "PERF_TARGET=https://proxy:443",
       "-e", "K6_WEB_DASHBOARD=true",
       "-e", "K6_WEB_DASHBOARD_EXPORT=/results/report.html",
       ...(browserRun ? [
@@ -663,7 +663,7 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
         "-e", `K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=${certificatePin}`
       ] : []),
       ...(options.remoteWrite ? [
-        "-e", "K6_PROMETHEUS_RW_SERVER_URL=http://host.docker.internal:9090/api/v1/write",
+        "-e", "K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write",
         "-e", "K6_PROMETHEUS_RW_TREND_STATS=p(50),p(90),p(95),p(99),min,max,avg,med"
       ] : []),
       "-e", "SSL_CERT_FILE=/certs/root.crt",
@@ -721,7 +721,7 @@ async function runPerformance(options) {
     args: [...perfComposeArgs(), "cp", "proxy:/data/caddy/pki/authorities/local/root.crt", certificateFile]
   });
   const identity = await localRequest({
-    secure: true, port: 9443, path: "/api/source", ca: readFileSync(certificateFile), servername: "host.docker.internal"
+    secure: true, port: 9443, path: "/api/source", ca: readFileSync(certificateFile), servername: "localhost"
   });
   const source = parseJson(identity.body);
   if (identity.statusCode !== 200 || source.environment !== "PERFORMANCE") {

@@ -2,7 +2,7 @@ http://localhost:80 {
 	redir https://localhost:9443{uri} permanent
 }
 
-https://localhost:443, https://host.docker.internal:443 {
+https://localhost:443, https://proxy:443 {
 	tls internal
 	encode zstd gzip
 
