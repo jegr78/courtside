@@ -364,6 +364,7 @@ opens the card to everyone, because a card nobody gated is a card for the whole 
 *managing* set opens it to nobody but the admin, because access to other people's bookings is
 something a club grants rather than forgets to withhold. Section 10 covers what a managing role
 may then see.
+
 Cards express permissions and booking behaviour, never identity. Creating, changing or cancelling
 a booking requires an authenticated account; no booking or participant card carries a shared
 credential. Codes that unlock a local device or kiosk belong to that device and do not authorize
@@ -948,8 +949,11 @@ Consequences for the model and the API:
 - Guest names are personal data too and follow the same rule.
 - The managed-appointment detail is not the grid. It resolves every participant of the booking,
   guests included, for a card's managing roles and for an admin. Widening a card's managing roles
-  therefore widens who reads those names, which is why the set starts empty and a club has to
-  choose it deliberately rather than inheriting it from who may book the card.
+  therefore widens who reads those names, which is why the API default for a card's managing set
+  is empty: creating or changing a card never inherits management from who may book it, a club
+  chooses it deliberately. The cards a fresh install ships with are the one exception in data, not
+  in rule — their managing roles were backfilled from the officer roles that already had access to
+  them, so installing Courtside does not itself take management away from anyone who held it.
 - Any future partner-finding feature must be opt-in per member and must not be built by
   loosening this rule.
 
