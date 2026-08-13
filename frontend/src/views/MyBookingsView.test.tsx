@@ -57,7 +57,9 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
 
   // then
-  expect(await screen.findByTestId("my-bookings-title")).toHaveTextContent("My bookings");
+  const title = await screen.findByTestId("my-bookings-title");
+  expect(title).toHaveRole("heading");
+  expect(title).toHaveTextContent("My bookings");
   expect(screen.getByTestId("upcoming-bookings")).toHaveTextContent("Upcoming");
   expect(screen.getByTestId("past-bookings")).toHaveTextContent("Past");
   expect(screen.getAllByTestId("series-marker")).toHaveLength(2);
@@ -82,7 +84,9 @@ it("given an officer, when managed appointments load, then they are separated fr
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
 
   // then
-  expect(await screen.findByTestId("managed-appointments-title")).toHaveTextContent("Managed appointments");
+  const title = await screen.findByTestId("managed-appointments-title");
+  expect(title).toHaveRole("heading");
+  expect(title).toHaveTextContent("Managed appointments");
   expect(screen.getByTestId("booking-55555555-5555-5555-5555-555555555555")).toHaveTextContent("League match");
   expect(screen.getByTestId("booking-55555555-5555-5555-5555-555555555555")).toHaveTextContent("0 participants");
 });

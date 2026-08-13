@@ -69,7 +69,10 @@ describe("BuildIdentity", () => {
     ].join("\n"));
 
     // when
-    await userEvent.click(screen.getByTestId("close-build-identity"));
+    const close = screen.getByTestId("close-build-identity");
+    expect(close).toHaveRole("button");
+    expect(close).toHaveAccessibleName("Close");
+    await userEvent.click(close);
 
     // then
     expect(screen.getByTestId("build-identity")).toHaveFocus();

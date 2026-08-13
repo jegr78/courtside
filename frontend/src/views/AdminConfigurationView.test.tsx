@@ -36,7 +36,8 @@ describe("AdminConfigurationView", () => {
     expect(await screen.findByTestId("club-name")).toHaveValue("Example Tennis Club");
     expect(screen.getByTestId("slot-minutes")).toHaveValue(30);
     expect(screen.getByTestId("time-zone")).toHaveValue("Europe/Berlin");
-    expect(screen.getByTestId("rule-OPENING_HOURS-global").closest("section")).toBeInTheDocument();
+    expect(screen.getByTestId("rule-OPENING_HOURS-title")).toHaveRole("heading");
+    expect(screen.getByTestId("rule-OPENING_HOURS-title")).toHaveTextContent("Opening hours");
     expect(screen.getByTestId("rule-OPENING_HOURS-global")).toHaveTextContent("Configured globally for the whole facility");
     await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range")).toHaveTextContent("Allowed range: 1 to 365");
@@ -143,7 +144,10 @@ describe("AdminConfigurationView", () => {
     await screen.findByTestId("club-name");
 
     // when
-    await userEvent.selectOptions(screen.getByTestId("rule-set"), "second");
+    const ruleSet = screen.getByTestId("rule-set");
+    expect(ruleSet).toHaveRole("combobox");
+    expect(ruleSet).toHaveAccessibleName("Rule set");
+    await userEvent.selectOptions(ruleSet, "second");
     second.resolve([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 } }]);
     await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(14));
     first.resolve([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]);

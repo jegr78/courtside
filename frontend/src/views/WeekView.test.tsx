@@ -75,12 +75,15 @@ it("given the current week, when it loads, then every day and active court is av
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  expect(await screen.findByTestId("occupancy-heading")).toHaveTextContent("Court occupancy");
+  const title = await screen.findByTestId("occupancy-heading");
+  expect(title).toHaveRole("heading");
+  expect(title).toHaveTextContent("Court occupancy");
   expect(api.allocations).toHaveBeenCalledTimes(7);
   expect(api.allocations).toHaveBeenCalledWith("2026-08-10");
   expect(api.allocations).toHaveBeenCalledWith("2026-08-16");
   expect(screen.getByTestId("court-heading-1")).toHaveTextContent("Centre Court");
   expect(screen.getByTestId("court-heading-2")).toHaveTextContent("Court 2");
+  expect(screen.getByTestId("court-heading-1")).toHaveRole("columnheader");
   expect(screen.getByTestId("slot-heading-08:00")).toHaveTextContent("08:00");
   expect(screen.getByTestId("slot-heading-21:30")).toHaveTextContent("21:30");
   const booking = screen.getByTestId("allocation");
@@ -88,7 +91,7 @@ it("given the current week, when it loads, then every day and active court is av
   expect(booking).toHaveAttribute("data-state", "occupied");
   expect(booking.closest("td")).toHaveAttribute("rowspan", "2");
   expect(screen.getByTestId("slot-heading-08:00").closest("tr")).toHaveStyle({ height: "40px" });
-  expect(screen.getByTestId("court-plan-legend")).toBeInTheDocument();
+  expect(screen.getByTestId("court-plan-legend")).toHaveRole("list");
   expect(screen.getAllByTestId("allocation")).toHaveLength(1);
   expect(booking).toHaveTextContent("Booked · 2 participants");
 });

@@ -159,7 +159,7 @@ function RuleEditor({ type, definition, disabled, save }: { type: RuleTypeConfig
   const [params, setParams] = useState<Record<string, number>>({});
   useEffect(() => setParams(definition?.params ?? {}), [definition]);
   return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
-    <div><h3 className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <p data-testid={`rule-${type.ruleType}-global`} className="text-muted">{t("admin.rules.global")}</p>}</div>
+    <div><h3 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <p data-testid={`rule-${type.ruleType}-global`} className="text-muted">{t("admin.rules.global")}</p>}</div>
     {type.configurable && <>
       {type.parameters.map((parameter) => <div key={parameter.name} className="grid gap-1">
         <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setParams({ ...params, [parameter.name]: Number(event.target.value) })} />

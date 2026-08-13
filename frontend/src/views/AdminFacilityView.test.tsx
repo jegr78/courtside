@@ -33,7 +33,10 @@ describe("AdminFacilityView", () => {
     expect(await screen.findByTestId("court-name-court-1")).toHaveValue("Centre Court");
     expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue("08:00");
     expect(screen.getByTestId("card-label-card-1")).toHaveValue("Member booking");
-    expect(screen.getByTestId("card-allowed-roles-card-1-MEMBER")).toBeChecked();
+    const memberRole = screen.getByTestId("card-allowed-roles-card-1-MEMBER");
+    expect(memberRole).toHaveRole("checkbox");
+    expect(memberRole).toHaveAccessibleName("Member");
+    expect(memberRole).toBeChecked();
     expect(screen.getAllByTestId("allowed-roles-hint")).toHaveLength(2);
   });
 
