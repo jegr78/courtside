@@ -89,7 +89,7 @@ it("given a slot after now, when checking whether it is past, then it is false",
   expect(past).toBe(false);
 });
 
-it("given a slot before a spring-forward transition and now between the single-lookup and corrected instant, when checking whether it is past, then it is false", () => {
+it("given a slot in the hour before a spring-forward transition and now just before that transition, when checking whether it is past, then it is false", () => {
   // given
   const now = new Date("2026-03-29T00:00:00Z");
 
