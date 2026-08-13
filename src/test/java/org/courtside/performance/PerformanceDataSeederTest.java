@@ -2,6 +2,7 @@ package org.courtside.performance;
 
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
+import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.HistoricalBookingImporter;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
@@ -9,6 +10,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -100,5 +102,53 @@ class PerformanceDataSeederTest {
                 + mockingDetails(historicalBookings).getInvocations().size();
         assertThat(domainServiceCalls).isEqualTo(PerformanceDataSeeder.BOOKING_COUNT);
         verify(bookings, never()).save(any());
+    }
+
+    @Test
+    void givenASlotAlreadyUnderWay_whenSeedingPerformanceData_thenItIsNeitherBookedNorImported() throws Exception {
+        // given
+        PersonRepository persons = mock(PersonRepository.class);
+        UserAccountRepository accounts = mock(UserAccountRepository.class);
+        MemberRepository members = mock(MemberRepository.class);
+        FacilityService facility = mock(FacilityService.class);
+        BookingService bookingService = mock(BookingService.class);
+        HistoricalBookingImporter historicalBookings = mock(HistoricalBookingImporter.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        Court baseline = new Court(1, null);
+        when(accounts.existsByUsername(PerformanceDataSeeder.MARKER_USERNAME)).thenReturn(false);
+        when(accounts.count()).thenReturn(1L);
+        when(members.count()).thenReturn(0L);
+        when(bookings.count()).thenReturn(0L);
+        when(persons.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(passwordEncoder.encode("performance-password")).thenReturn("password-hash");
+        when(facility.allCourts()).thenReturn(List.of(baseline));
+        when(facility.changeCourt(baseline.getId(), 1, "Court 1")).thenReturn(new Court(1, "Court 1"));
+        for (int number = 2; number <= PerformanceDataSeeder.COURT_COUNT; number++) {
+            when(facility.createCourt(number, "Court " + number)).thenReturn(new Court(number, "Court " + number));
+        }
+        Instant halfwayThroughTheEveningSlot = Instant.parse("2026-08-10T16:30:00Z");
+        PerformanceDataSeeder seeder = new PerformanceDataSeeder(
+                persons, accounts, members, facility, bookingService, historicalBookings, bookings, passwordEncoder,
+                new PerformanceProperties(true, "performance-password"),
+                Clock.fixed(halfwayThroughTheEveningSlot, ZoneOffset.UTC),
+                () -> java.time.ZoneId.of("Europe/Berlin"));
+
+        // when
+        seeder.run(new DefaultApplicationArguments(new String[0]));
+
+        // then
+        ArgumentCaptor<CreateBookingCommand> created = ArgumentCaptor.forClass(CreateBookingCommand.class);
+        ArgumentCaptor<CreateBookingCommand> imported = ArgumentCaptor.forClass(CreateBookingCommand.class);
+        verify(bookingService, atLeastOnce()).create(created.capture());
+        verify(historicalBookings, atLeastOnce()).importBooking(imported.capture());
+        assertThat(created.getAllValues())
+                .as("the booking rules refuse a slot that has already started")
+                .allSatisfy(command -> assertThat(command.slot().start())
+                        .isAfterOrEqualTo(halfwayThroughTheEveningSlot));
+        assertThat(imported.getAllValues())
+                .as("a historical booking must have ended")
+                .allSatisfy(command -> assertThat(command.slot().end())
+                        .isBefore(halfwayThroughTheEveningSlot));
     }
 }
