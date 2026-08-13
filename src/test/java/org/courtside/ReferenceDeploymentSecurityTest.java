@@ -6,8 +6,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,6 +23,50 @@ class ReferenceDeploymentSecurityTest {
             "(?m)^https://localhost:443 \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern HEADER_BLOCK = Pattern.compile(
             "(?m)^\\theader \\{\\R(?<fields>(?:\\t\\t.*\\R)*)\\t}$");
+
+    private static final String GHCR_RELEASE_IMAGE =
+            "image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}";
+    private static final String UAT_LOCAL_IMAGE_ALIAS =
+            "image: ${COURTSIDE_UAT_IMAGE:-courtside:uat-local}";
+    private static final String PERF_LOCAL_IMAGE_ALIAS =
+            "image: courtside:perf-local";
+    private static final Set<String> OWN_IMAGE_REFERENCES =
+            Set.of(GHCR_RELEASE_IMAGE, UAT_LOCAL_IMAGE_ALIAS, PERF_LOCAL_IMAGE_ALIAS);
+
+    @Test
+    void whenReadingImageSources_thenEveryThirdPartyImageIsPinnedByDigest() throws IOException {
+        // given
+        List<Path> sources;
+        try (var deploymentFiles = Files.list(Path.of("deploy"))) {
+            sources = deploymentFiles
+                    .filter(path -> path.getFileName().toString().matches("compose(?:\\..+)?\\.yaml"))
+                    .sorted()
+                    .toList();
+        }
+
+        // when / then
+        for (Path source : Stream.concat(Stream.of(Path.of("Dockerfile")), sources.stream()).toList()) {
+            Files.readAllLines(source).stream()
+                    .map(String::strip)
+                    .filter(line -> line.startsWith("FROM ") || line.startsWith("image:"))
+                    .filter(line -> !OWN_IMAGE_REFERENCES.contains(line))
+                    .forEach(line -> assertThat(line)
+                            .as("%s pins its image by digest", source)
+                            .contains("@sha256:"));
+        }
+    }
+
+    @Test
+    void whenReadingProductionCompose_thenOwnImageIsSelectedByVersionNotDigest() throws IOException {
+        // given
+        List<String> ownImageLines = Files.readAllLines(Path.of("deploy/compose.yaml")).stream()
+                .map(String::strip)
+                .filter(OWN_IMAGE_REFERENCES::contains)
+                .toList();
+
+        // when / then
+        assertThat(ownImageLines).containsExactly(GHCR_RELEASE_IMAGE);
+    }
 
     @Test
     void whenReadingComposeFile_thenApplicationPortIsBoundToLoopback() throws IOException {
