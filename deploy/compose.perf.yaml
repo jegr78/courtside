@@ -76,6 +76,7 @@ services:
       - caddy-config:/config
     networks:
       - frontend
+      - load
 
 volumes:
   db:
@@ -85,3 +86,4 @@ volumes:
 networks:
   backend:
   frontend:
+  load:

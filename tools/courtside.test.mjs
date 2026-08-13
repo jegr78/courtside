@@ -398,7 +398,9 @@ test("given a protocol profile, when planning k6, then the pinned image and isol
   assert.ok(plan.args.some((argument) => /^grafana\/k6:[^-\s]+@sha256:[a-f0-9]{64}$/.test(argument)));
   assert.ok(plan.args.includes("PERF_PROFILE=peak"));
   assert.ok(plan.args.includes("PERF_RUN_ID=test-run"));
-  assert.ok(plan.args.includes("PERF_TARGET=https://host.docker.internal:9443"));
+  assert.ok(plan.args.includes("PERF_TARGET=https://proxy:443"));
+  assert.equal(plan.args[plan.args.indexOf("--network") + 1], "courtside-perf_load");
+  assert.equal(plan.args.includes("--add-host"), false);
   assert.ok(plan.args.includes("/tmp/performance-result:/results"));
   assert.ok(plan.args.some((argument) => argument.endsWith(":/run/courtside/perf.json:ro")));
   assert.ok(plan.args.includes("K6_WEB_DASHBOARD_EXPORT=/results/report.html"));
@@ -418,7 +420,7 @@ test("given remote write is selected, when planning k6, then Prometheus remains 
   const plan = performanceRunPlan(options, "/tmp/performance-result", "/tmp/performance-root.crt");
 
   // then
-  assert.ok(plan.args.includes("K6_PROMETHEUS_RW_SERVER_URL=http://host.docker.internal:9090/api/v1/write"));
+  assert.ok(plan.args.includes("K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write"));
   assert.ok(plan.args.includes("experimental-prometheus-rw"));
   assert.ok(plan.args.includes("K6_WEB_DASHBOARD_EXPORT=/results/report.html"));
 });
@@ -651,7 +653,7 @@ test("given the performance compose contract, when inspecting isolation, then re
   assert.match(dashboard, /pg_stat_database_numbackends/);
   assert.match(dashboard, /k6_http_req_duration/);
   const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.perf", import.meta.url)), "utf8");
-  assert.match(caddy, /https:\/\/host\.docker\.internal:443/);
+  assert.match(caddy, /^https:\/\/localhost:443, https:\/\/proxy:443 \{$/m);
 });
 
 test("given development modes, when validating ports, then debug adds only its listener", () => {
