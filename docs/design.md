@@ -14,10 +14,17 @@
 
 ## 0. What is built today
 
-Eight modules exist: `booking`, `card`, `config`, `facility`, `identity`, `member`, `rules`,
-`shared`. The `notification`, `reporting` and `integration` modules of section 3 are designed and
-not built, so nothing consumes domain events yet and the `domain_event` table does not exist. No
-port interface has been introduced, because no second adapter has needed one.
+Eleven modules exist: `api`, `booking`, `card`, `config`, `demo`, `facility`, `identity`, `member`,
+`performance`, `rules`, `shared`. `api` holds the OpenAPI-generated request, response and
+controller-interface types and carries no logic of its own, which is why it is declared shared
+alongside `shared` rather than given `allowedDependencies` of its own. `demo` and `performance`
+seed disposable environments — a walkthrough dataset and a synthetic load-test dataset — and each
+refuses to start unless its environment guard confirms the database it is about to fill is the
+disposable one it names (`courtside_dev` for `demo`, `courtside_perf` for `performance`), not
+whatever the deployment happens to point at. The `notification`, `reporting` and `integration`
+modules of section 3 are designed and not built, so nothing consumes domain events yet and the
+`domain_event` table does not exist. No port interface has been introduced, because no second
+adapter has needed one.
 
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
@@ -27,6 +34,10 @@ controller implements an interface generated from it, and an instance serves the
 actually answers to at `GET /api/openapi.yaml`. A tagged release builds a multi-arch container
 image, publishes it to GHCR signed with cosign and carrying an SBOM attestation, and attaches the
 OpenAPI document to the release.
+
+The web client is built and covered by tests too: the court plan as the public landing page,
+personal booking management, managed appointments for officers, and the browser admin surface for
+configuration and facilities.
 
 Designed and not built: the observability stack of section 9 beyond the health endpoint,
 container image scanning, CSV import, and reports and exports.
@@ -716,7 +727,7 @@ Three layers, separated by the question "who changes this?":
 |---|---|---|
 | Build | Defaults, migrations, card type templates | The project, in code |
 | Instance (`.env`) | DB credentials, SMTP, OTLP endpoint, base URL, secrets | Club admin, at deployment |
-| Database (`config` module) | Club name, colours, logo, opening hours, booking grid, rules, card types, locale | The club, in the admin backend |
+| Database (`config` module) | Club name, colours, logo, opening hours, booking grid, time zone, rules, card types, locale | The club, in the admin backend |
 
 Rule of thumb: anything a club board would plausibly want to change belongs in the database
 and the admin UI. Anything requiring a restart belongs in `.env`. Nothing functional
@@ -735,9 +746,11 @@ rule so the public grid never offers a slot that booking validation would reject
 booking writes, series moves and opening-hours changes serialize on the single club-configuration
 row so a concurrent write cannot pass validation against a stale grid.
 
-The **club time zone** is managed configuration rather than an environment variable. Changing it
-is rejected while any confirmed future booking exists because the instant already promised to a
-member must not acquire a different club-local meaning. Historical bookings remain unchanged.
+The **club time zone** is managed configuration rather than an environment variable. Every
+zone-dependent read resolves it through the same configuration port as the booking grid, so no
+reader keeps its own copy. Changing it is refused while any confirmed booking that has not yet
+ended exists, whatever the new zone would be, because the instant already promised to a member
+must not acquire a different club-local meaning. Historical bookings remain unchanged.
 
 The **PWA manifest is served dynamically** so the home screen icon shows the club logo, not
 a generic Courtside symbol. This is what decides whether the product feels like "our app"
