@@ -149,6 +149,17 @@ Back up before an upgrade. The database holds everything; the containers hold no
 docker compose exec -T db pg_dump -U courtside courtside | gzip > courtside-$(date +%F).sql.gz
 ```
 
+## Image updates between releases
+
+`postgres:17-alpine` and `caddy:2-alpine` in `compose.yaml` are pinned by digest, not by floating
+tag, so `docker compose pull` alone will never change them. That is deliberate — a club's database
+and reverse proxy should not change without anyone deciding it should — but it means the digests do
+not update themselves. Dependabot opens a pull request against this repository when either image
+gets a new patch release; a maintainer bumping the digest here is how it reaches your instance.
+Until then, you can raise it yourself: look up the current tag's digest with
+`docker buildx imagetools inspect postgres:17-alpine` (or `caddy:2-alpine`) and replace the
+`@sha256:…` suffix in `compose.yaml`.
+
 ## Two things to adjust before the web client arrives
 
 - The `Content-Security-Policy` in the `Caddyfile` is `default-src 'none'`, which is right for a
