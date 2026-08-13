@@ -29,3 +29,16 @@ updates:
     directory: "/deploy"
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
+      - dependency-name: caddy
+        update-types: ["version-update:semver-major"]
+      - dependency-name: grafana/grafana
+        update-types: ["version-update:semver-major"]
+      - dependency-name: prom/prometheus
+        update-types: ["version-update:semver-major"]
+      - dependency-name: prometheuscommunity/postgres-exporter
+        update-types: ["version-update:semver-major"]
+      - dependency-name: swaggerapi/swagger-ui
+        update-types: ["version-update:semver-major"]
