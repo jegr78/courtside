@@ -30,3 +30,17 @@ test("given a smoke failure, when the workflow completes, then reports survive a
   assert.match(workflow, /node tools\/courtside\.mjs perf-reset courtside-perf/);
   assert.doesNotMatch(workflow, /perf-promote|performance\/baselines/);
 });
+
+test("given a smoke failure, when collecting diagnostics, then container logs are captured before cleanup", () => {
+  // given
+  const capture = workflow.indexOf("node tools/courtside.mjs perf-logs --no-follow");
+  const upload = workflow.indexOf("uses: actions/upload-artifact@");
+  const cleanup = workflow.indexOf("node tools/courtside.mjs perf-reset courtside-perf");
+
+  // when / then
+  assert.match(workflow, /- name: Capture container logs\n        if: failure\(\)/);
+  assert.match(workflow, /> build\/performance\/smoke\/container-logs\.txt 2>&1 \|\| true/);
+  assert.ok(capture >= 0);
+  assert.ok(capture < upload);
+  assert.ok(upload < cleanup);
+});
