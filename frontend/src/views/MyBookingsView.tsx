@@ -5,6 +5,7 @@ import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
+import { formatDateTime } from "../time/clubZone";
 
 type Appointment = PersonalBooking | ManagedAppointment;
 
@@ -246,9 +247,4 @@ function MoveReasons({ move, courtNames, t }: { move: MovePreview["moves"][numbe
     {move.blockedCourtIds.length > 0 && <li data-testid="occupied-courts">{t("myBookings.occupiedCourts", { courts: names(move.blockedCourtIds) })}</li>}
     {move.unbookableCourtIds.length > 0 && <li data-testid="unavailable-courts">{t("myBookings.unavailableCourts", { courts: names(move.unbookableCourtIds) })}</li>}
   </ul>;
-}
-
-function formatDateTime(timestamp: string, locale: string, timeZone: string): string {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone })
-    .format(new Date(timestamp));
 }
