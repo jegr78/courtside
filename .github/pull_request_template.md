@@ -4,7 +4,7 @@
 
 ## Quality evidence
 
-See the maintained [quality strategy](../docs/quality-strategy.md).
+See the maintained [quality strategy](https://github.com/jegr78/courtside/blob/main/docs/quality-strategy.md).
 
 - Affected risk IDs:
 - Positive boundaries exercised:

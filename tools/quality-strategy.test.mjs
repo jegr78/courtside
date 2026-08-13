@@ -18,16 +18,20 @@ test("given the quality strategy, when reviewing product risks, then every maint
     assert.match(strategy, new RegExp(`### ${area}`));
   }
   for (const field of [
-    "Impact", "Likelihood", "Invariant", "Boundaries", "Level", "Frequency",
+    "Impact", "Likelihood", "Invariant", "Positive boundaries", "Negative boundaries", "Level", "Frequency",
     "Environment", "Synthetic data", "Evidence", "Owner", "Residual risk"
   ]) {
     assert.match(strategy, new RegExp(`\\| ${field} `));
   }
+  assert.equal(strategy.match(/\| Positive boundaries \| Negative boundaries \|/g)?.length, 6);
 });
 
 test("given a pull request, when declaring quality evidence, then the maintained strategy is the source", () => {
   // when / then
-  assert.match(pullRequestTemplate, /docs\/quality-strategy\.md/);
+  assert.match(
+    pullRequestTemplate,
+    /https:\/\/github\.com\/jegr78\/courtside\/blob\/main\/docs\/quality-strategy\.md/
+  );
   assert.match(pullRequestTemplate, /Affected risk IDs/);
   assert.match(pullRequestTemplate, /Evidence/);
   assert.match(pullRequestTemplate, /Residual risk/);
