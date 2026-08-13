@@ -5,9 +5,9 @@ import org.courtside.facility.OpeningHours;
 import org.courtside.rules.RuleContext;
 import org.courtside.rules.RuleViolation;
 import org.courtside.config.ClubTimeZone;
+import org.courtside.shared.OpeningWindow;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -42,11 +42,12 @@ public class OpeningHoursRule implements BookingRule {
                     Map.of("day", start.getDayOfWeek().name())));
         }
 
-        LocalTime opensAt = hours.get().getOpensAt();
-        LocalTime closesAt = hours.get().getClosesAt();
-        if (start.toLocalTime().isBefore(opensAt) || end.toLocalTime().isAfter(closesAt)) {
+        OpeningWindow window = new OpeningWindow(hours.get().getOpensAt(), hours.get().getClosesAt());
+        if (!start.toLocalDate().equals(end.toLocalDate())
+                || !window.covers(start.toLocalTime(), end.toLocalTime())) {
             return List.of(new RuleViolation("booking.rule.openingHours.outside",
-                    Map.of("opensAt", opensAt.toString(), "closesAt", closesAt.toString())));
+                    Map.of("opensAt", window.opensAt().toString(),
+                           "closesAt", window.closesAt().toString())));
         }
         return List.of();
     }

@@ -5,6 +5,10 @@ import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
+import {
+  addDays, bookingTimeSlot, calendarDayNumber, dateInTimeZone, dateInTimeZoneValue,
+  formatDate, formatTime, isPastSlot, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes, weekDays
+} from "../time/clubZone";
 
 interface WeekViewProps {
   today?: Date;
@@ -386,8 +390,9 @@ function BookingDialog({ selection, grid, courts, closed, created, conflicted }:
     setError(undefined);
     setViolations([]);
     try {
-      const startsAt = zonedDateTime(selection.date, selection.slot, grid.timeZone);
-      const endsAt = zonedDateTime(selection.date, addMinutes(selection.slot, grid.slotMinutes), grid.timeZone);
+      const { startsAt, endsAt } = bookingTimeSlot(
+        selection.date, selection.slot, grid.timeZone, grid.slotMinutes
+      );
       const participants = [
         ...selectedMembers.map((member) => ({ personId: member.personId })),
         ...guestNames.map((name) => name.trim()).filter(Boolean).map((guestName) => ({ guestName })),
@@ -541,45 +546,6 @@ function normalizedField(field: string): string {
   return ["startsAt", "endsAt", "cardId", "note"].includes(field) ? field === "endsAt" ? "startsAt" : field : "general";
 }
 
-function addMinutes(time: string, minutes: number): string {
-  const total = timeToMinutes(time) + minutes;
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-}
-
-function zonedDateTime(date: string, time: string, timeZone: string): string {
-  const local = new Date(`${date}T${time}:00Z`);
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone, timeZoneName: "longOffset", hour: "2-digit"
-  }).formatToParts(local);
-  const offset = parts.find((part) => part.type === "timeZoneName")?.value.replace("GMT", "") || "+00:00";
-  return `${date}T${time}:00${offset}`;
-}
-
-function dateInTimeZone(instant: Date, timeZone: string): Date {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone, year: "numeric", month: "2-digit", day: "2-digit"
-  }).formatToParts(instant);
-  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
-  return new Date(value("year"), value("month") - 1, value("day"));
-}
-
-function dateInTimeZoneValue(instant: Date, timeZone?: string): string | undefined {
-  return timeZone ? formatDate(dateInTimeZone(instant, timeZone)) : undefined;
-}
-
-function parseDate(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function calendarDayNumber(date: Date): number {
-  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
-}
-
-function isPastSlot(date: string, time: string, timeZone: string, now: Date): boolean {
-  return Date.parse(zonedDateTime(date, time, timeZone)) < now.getTime();
-}
-
 function currentLineOffset(currentTime: string, opensAt: string, slotMinutes: number, slotHeight: number): number {
   return Math.max(0, (timeToMinutes(currentTime) - timeToMinutes(opensAt)) / slotMinutes * slotHeight);
 }
@@ -589,25 +555,6 @@ function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
   if (target instanceof HTMLElement && typeof target.scrollIntoView === "function") {
     target.scrollIntoView({ block: "center" });
   }
-}
-
-function startOfWeek(date: Date): Date {
-  return addDays(date, -((date.getDay() + 6) % 7));
-}
-
-function addDays(date: Date, count: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + count);
-}
-
-function weekDays(start: Date): Date[] {
-  return Array.from({ length: 7 }, (_, index) => addDays(start, index));
-}
-
-function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function slotsFor(day: Date, grid: BookingGrid): string[] {
@@ -620,12 +567,7 @@ function slotsFor(day: Date, grid: BookingGrid): string[] {
   return Array.from({ length: Math.ceil((end - start) / grid.slotMinutes) }, (_, index) => {
     const minutes = start + index * grid.slotMinutes;
     return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-  });
-}
-
-function timeToMinutes(time: string): number {
-  const [hours, minutes] = time.split(":").map(Number);
-  return hours * 60 + minutes;
+  }).filter((time) => isValidZonedDateTime(formatDate(day), time, grid.timeZone));
 }
 
 function formatWeekday(date: Date, language: string): string {
@@ -643,14 +585,6 @@ function formatDayLong(date: Date, language: string): string {
 function formatWeekRange(days: Date[], language: string): string {
   const formatter = new Intl.DateTimeFormat(language, { year: "numeric", month: "short", day: "numeric" });
   return `${formatter.format(days[0])} – ${formatter.format(days[6])}`;
-}
-
-function formatTime(timestamp: string, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23"
-  }).formatToParts(new Date(timestamp));
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
-  return `${value("hour")}:${value("minute")}`;
 }
 
 function contrastColor(color: string): string {

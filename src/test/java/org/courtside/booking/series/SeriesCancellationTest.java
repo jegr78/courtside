@@ -183,6 +183,20 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         assertThat(statusesOf(result)).allMatch(BookingStatus.CONFIRMED::equals);
     }
 
+    @Test
+    void givenACancelledOccurrenceOfAnotherAccountsSeries_whenCancellingIt_thenAccessIsRefused() {
+        // given
+        SeriesCreationResult result = createSeries(2);
+        UUID cancelledOccurrence = result.bookingIds().getFirst();
+        seriesService.cancel(result.seriesId(), cancelledOccurrence, CancelScope.THIS,
+                trainer, Set.of(Role.TRAINER));
+
+        // when / then
+        assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), cancelledOccurrence,
+                CancelScope.THIS, UUID.randomUUID(), Set.of(Role.MEMBER)))
+                .isInstanceOf(BookingNotOwnedException.class);
+    }
+
     private List<BookingStatus> statusesOf(SeriesCreationResult result) {
         return result.bookingIds().stream()
                 .map(id -> bookings.findById(id).orElseThrow().getStatus())

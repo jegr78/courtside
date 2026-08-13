@@ -5,7 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpMethod;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -15,13 +15,13 @@ import java.util.Optional;
 @RequiredArgsConstructor
 class LoginAttemptFilter extends OncePerRequestFilter {
 
+    private final RequestMatcher loginEndpoint;
     private final LoginAttemptProtection protection;
     private final LoginRateLimitHandler handler;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !HttpMethod.POST.matches(request.getMethod())
-                || !(request.getContextPath() + "/api/session").equals(request.getRequestURI());
+        return !loginEndpoint.matches(request);
     }
 
     @Override

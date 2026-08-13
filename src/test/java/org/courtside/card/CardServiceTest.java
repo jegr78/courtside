@@ -93,6 +93,27 @@ class CardServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenLoadingTheSeededCards_thenOnlyOfficerRolesManageThemAndTheMemberCardNamesNone() {
+        // when
+        List<BookingCard> result = cardService.activeCards();
+
+        // then
+        assertThat(managingRolesOf(result, "Member booking")).isEmpty();
+        assertThat(managingRolesOf(result, "Training")).containsExactlyInAnyOrder(
+                Role.TRAINER, Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR);
+        assertThat(managingRolesOf(result, "League match")).containsExactlyInAnyOrder(
+                Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR);
+        assertThat(managingRolesOf(result, "Court closed")).containsExactly(Role.GROUNDSKEEPER);
+    }
+
+    private static Set<Role> managingRolesOf(List<BookingCard> cards, String label) {
+        return cards.stream()
+                .filter(card -> card.getLabel().equals(label))
+                .findFirst().orElseThrow()
+                .getManagingRoles();
+    }
+
+    @Test
     void whenLoadingActiveParticipantCards_thenBallMachineAndPartnerWantedAreReturned() {
         // when
         List<ParticipantCard> participantCards = cardService.activeParticipantCards();

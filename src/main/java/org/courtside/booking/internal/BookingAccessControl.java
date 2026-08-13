@@ -35,7 +35,7 @@ public class BookingAccessControl {
             return;
         }
         BookingCard card = cards.requireCard(booking.getCardId());
-        if (!card.getAllowedRoles().isEmpty() && card.permits(managementRoles(actorRoles))) {
+        if (card.permitsManagement(managementRoles(actorRoles))) {
             return;
         }
         throw new BookingNotOwnedException(

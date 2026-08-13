@@ -42,6 +42,13 @@ public class BookingCard {
     private Set<Role> allowedRoles = new HashSet<>();
 
     @Getter(AccessLevel.NONE)
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "booking_card_managing_role", joinColumns = @JoinColumn(name = "booking_card_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private Set<Role> managingRoles = new HashSet<>();
+
+    @Getter(AccessLevel.NONE)
     @Column(name = "allowed_player_counts", nullable = false)
     private short[] allowedPlayerCounts;
 
@@ -82,13 +89,22 @@ public class BookingCard {
         return Set.copyOf(allowedRoles);
     }
 
-    public BookingCard(String label, String color, Set<Role> allowedRoles,
+    public boolean permitsManagement(Set<Role> callerRoles) {
+        return !managingRoles.isEmpty() && callerRoles.stream().anyMatch(managingRoles::contains);
+    }
+
+    public Set<Role> getManagingRoles() {
+        return Set.copyOf(managingRoles);
+    }
+
+    public BookingCard(String label, String color, Set<Role> allowedRoles, Set<Role> managingRoles,
                        short[] allowedPlayerCounts, boolean countsAgainstLimits,
                        boolean guestAllowed, boolean showGenericOccupancy) {
         this.id = UUID.randomUUID();
         this.label = label;
         this.color = color;
         this.allowedRoles = new HashSet<>(allowedRoles);
+        this.managingRoles = new HashSet<>(managingRoles);
         this.allowedPlayerCounts = allowedPlayerCounts.clone();
         this.countsAgainstLimits = countsAgainstLimits;
         this.guestAllowed = guestAllowed;
@@ -96,13 +112,15 @@ public class BookingCard {
         this.active = true;
     }
 
-    public void changeTo(String label, String color, Set<Role> allowedRoles,
+    public void changeTo(String label, String color, Set<Role> allowedRoles, Set<Role> managingRoles,
                          short[] allowedPlayerCounts, boolean countsAgainstLimits,
                          boolean guestAllowed, boolean showGenericOccupancy) {
         this.label = label;
         this.color = color;
         this.allowedRoles.clear();
         this.allowedRoles.addAll(allowedRoles);
+        this.managingRoles.clear();
+        this.managingRoles.addAll(managingRoles);
         this.allowedPlayerCounts = allowedPlayerCounts.clone();
         this.countsAgainstLimits = countsAgainstLimits;
         this.guestAllowed = guestAllowed;

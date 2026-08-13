@@ -50,6 +50,22 @@ class EnumeratedColumnInListPatternTest {
     }
 
     @Test
+    void whenReadingTheBookingCardManagingRoleInList_thenItAcceptsExactlyTheRoleEnumConstants()
+            throws IOException, ReflectiveOperationException {
+        // given
+        String expected = enumValuesOf("org.courtside.identity.Role");
+
+        // when
+        String actual = sqlInListValues(
+                "V18__booking_card_managing_roles.sql", "booking_card_managing_role_known", "role");
+
+        // then
+        assertThat(actual)
+                .as("booking_card_managing_role_known has drifted from org.courtside.identity.Role")
+                .isEqualTo(expected);
+    }
+
+    @Test
     void whenReadingTheUserAccountRoleInList_thenItAcceptsExactlyTheRoleEnumConstants()
             throws IOException, ReflectiveOperationException {
         // given

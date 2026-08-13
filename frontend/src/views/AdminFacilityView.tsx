@@ -16,6 +16,8 @@ import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 
 const roles: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER"];
+// The server strips MEMBER before matching a managing role, so offering it here would grant nobody.
+const managingRoleOptions: Role[] = roles.filter((role) => role !== "MEMBER");
 
 export function AdminFacilityView() {
   const { t } = useTranslation();
@@ -186,6 +188,7 @@ export function AdminFacilityView() {
         label: formString(form, "label"),
         color: formString(form, "color"),
         allowedRoles: form.getAll("allowedRoles") as Role[],
+        managingRoles: form.getAll("managingRoles") as Role[],
         allowedPlayerCounts: playerCounts(formString(form, "allowedPlayerCounts")),
         countsAgainstLimits: form.get("countsAgainstLimits") === "on",
         guestAllowed: form.get("guestAllowed") === "on",
@@ -267,7 +270,8 @@ function CardEditor({ card, disabled, changed, save, toggle }: { card: BookingCa
     <div className="grid gap-3 md:grid-cols-3">
       <TextField disabled={disabled} data-testid={`card-label-${card.id}`} label={t("admin.facility.label")} value={card.label} onChange={(event) => changed({ ...card, label: event.target.value })} />
       <TextField disabled={disabled} type="color" label={t("admin.facility.color")} value={card.color} onChange={(event) => changed({ ...card, color: event.target.value })} />
-      <RoleCheckboxes disabled={disabled} selected={card.allowedRoles} changed={(allowedRoles) => changed({ ...card, allowedRoles })} />
+      <AllowedRoleCheckboxes disabled={disabled} selected={card.allowedRoles} changed={(allowedRoles) => changed({ ...card, allowedRoles })} />
+      <ManagingRoleCheckboxes disabled={disabled} testIdPrefix={`card-managing-roles-${card.id}`} selected={card.managingRoles} changed={(managingRoles) => changed({ ...card, managingRoles })} />
       <TextField disabled={disabled} data-testid={`card-counts-${card.id}`} label={t("admin.facility.playerCounts")} value={counts} onChange={(event) => setCounts(event.target.value)} />
       <Checkbox disabled={disabled} label={t("admin.facility.countsAgainstLimits")} checked={card.countsAgainstLimits} changed={(countsAgainstLimits) => changed({ ...card, countsAgainstLimits })} />
       <Checkbox disabled={disabled} label={t("admin.facility.guestAllowed")} checked={card.guestAllowed} changed={(guestAllowed) => changed({ ...card, guestAllowed })} />
@@ -287,7 +291,8 @@ function CardCreateForm({ disabled, create }: { disabled: boolean; create: (even
     <div className="grid gap-3 md:grid-cols-3">
       <TextField disabled={disabled} data-testid="new-card-label" name="label" label={t("admin.facility.label")} />
       <TextField disabled={disabled} name="color" type="color" defaultValue="#b85c38" label={t("admin.facility.color")} />
-      <RoleCheckboxes disabled={disabled} name="allowedRoles" selected={[]} testIdPrefix="new-card-role" />
+      <AllowedRoleCheckboxes disabled={disabled} name="allowedRoles" selected={[]} testIdPrefix="new-card-role" />
+      <ManagingRoleCheckboxes disabled={disabled} name="managingRoles" selected={[]} testIdPrefix="new-card-managing-roles" />
       <TextField disabled={disabled} data-testid="new-card-counts" name="allowedPlayerCounts" label={t("admin.facility.playerCounts")} />
       <Checkbox disabled={disabled} name="countsAgainstLimits" label={t("admin.facility.countsAgainstLimits")} />
       <Checkbox disabled={disabled} name="guestAllowed" label={t("admin.facility.guestAllowed")} />
@@ -297,18 +302,26 @@ function CardCreateForm({ disabled, create }: { disabled: boolean; create: (even
   </form>;
 }
 
-function RoleCheckboxes({ name, selected, disabled, changed, testIdPrefix }: { name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void; testIdPrefix?: string }) {
+function RoleCheckboxes({ options, legendKey, hintKey, hintTestId, name, selected, disabled, changed, testIdPrefix }: { options: Role[]; legendKey: string; hintKey: string; hintTestId: string; name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void; testIdPrefix?: string }) {
   const { t } = useTranslation();
   function toggle(role: Role, checked: boolean) {
     changed?.(checked ? [...selected, role] : selected.filter((candidate) => candidate !== role));
   }
   return <fieldset className="grid gap-2">
-    <legend className="font-medium">{t("admin.facility.allowedRoles")}</legend>
+    <legend className="font-medium">{t(legendKey)}</legend>
     <div className="grid gap-2 sm:grid-cols-2">
-      {roles.map((role) => <Checkbox key={role} data-testid={testIdPrefix ? `${testIdPrefix}-${role}` : undefined} name={name} disabled={disabled} label={t(`role.${role}`)} checked={selected.includes(role)} value={role} changed={changed ? (checked) => toggle(role, checked) : undefined} />)}
+      {options.map((role) => <Checkbox key={role} data-testid={testIdPrefix ? `${testIdPrefix}-${role}` : undefined} name={name} disabled={disabled} label={t(`role.${role}`)} checked={selected.includes(role)} value={role} changed={changed ? (checked) => toggle(role, checked) : undefined} />)}
     </div>
-    <p data-testid="allowed-roles-hint" className="text-sm text-[var(--cs-muted)]">{t("admin.facility.allowedRolesHint")}</p>
+    <p data-testid={hintTestId} className="text-sm text-[var(--cs-muted)]">{t(hintKey)}</p>
   </fieldset>;
+}
+
+function AllowedRoleCheckboxes(props: { name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void; testIdPrefix?: string }) {
+  return <RoleCheckboxes {...props} options={roles} legendKey="admin.facility.allowedRoles" hintKey="admin.facility.allowedRolesHint" hintTestId="allowed-roles-hint" />;
+}
+
+function ManagingRoleCheckboxes(props: { name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void; testIdPrefix?: string }) {
+  return <RoleCheckboxes {...props} options={managingRoleOptions} legendKey="admin.facility.managingRoles" hintKey="admin.facility.managingRolesHint" hintTestId="managing-roles-hint" />;
 }
 
 function Checkbox({ name, label, checked, disabled, value, changed, ...props }: { name?: string; label: string; checked?: boolean; disabled?: boolean; value?: string; changed?: (checked: boolean) => void; "data-testid"?: string }) {
@@ -318,7 +331,7 @@ function Checkbox({ name, label, checked, disabled, value, changed, ...props }: 
 function cardRequest(card: BookingCard): BookingCardRequest {
   return {
     label: card.label, color: card.color, allowedRoles: card.allowedRoles,
-    allowedPlayerCounts: card.allowedPlayerCounts,
+    managingRoles: card.managingRoles, allowedPlayerCounts: card.allowedPlayerCounts,
     countsAgainstLimits: card.countsAgainstLimits, guestAllowed: card.guestAllowed,
     showGenericOccupancy: card.showGenericOccupancy
   };

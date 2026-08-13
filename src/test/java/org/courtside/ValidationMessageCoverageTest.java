@@ -52,6 +52,8 @@ class ValidationMessageCoverageTest {
         CODE_CARRYING_EXCEPTION_SIMPLE_NAMES.forEach(name -> patterns.add(
                 Pattern.compile("new\\s+" + name + "\\(\\s*\"([^\"]+)\"")));
         patterns.add(Pattern.compile("\"code\"\\s*,\\s*\"([^\"]+)\"(?!\\s*\\+)"));
+        patterns.add(Pattern.compile("Optional\\.of\\(\\s*\"((?:booking|card|config|court|facility|"
+                + "identity|membershipType|openingWindow|request|rule)\\.[^\"]+)\""));
         return patterns;
     }
 
