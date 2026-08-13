@@ -11,6 +11,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.OffsetDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -133,7 +135,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                                 "Europe/Berlin", "Moon/Tranquility"))
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("timeZone"));
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("timeZone"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TimeZone"));
     }
 
     @Test
@@ -146,7 +149,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                                 "Europe/Berlin", "+02:00"))
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("timeZone"));
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("timeZone"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
     }
 
     @Test
@@ -214,6 +218,28 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].code").value(
                         "config.timeZone.futureBookingConflict"))
                 .andExpect(jsonPath("$.violations[0].params.timeZone").value("Pacific/Auckland"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFutureBooking_whenChangingGridAndTimeZoneTogether_thenBothGatesSeeTheNewValues()
+            throws Exception {
+        // given
+        confirmedBookingAt("2026-08-20T16:00:00Z", "2026-08-20T17:00:00Z");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"clubName": "Example Tennis Club", "primaryColor": "#1f6feb",
+                                 "accentColor": "#f78166", "defaultLocale": "en",
+                                 "timeZone": "Pacific/Auckland", "slotMinutes": 45}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:time-zone-conflict"))
+                .andExpect(jsonPath("$.violations[0].code")
+                        .value("config.timeZone.futureBookingConflict"));
     }
 
     @Test
@@ -412,6 +438,28 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("logoUrl"));
+    }
+
+    private void confirmedBookingAt(String startsAt, String endsAt) {
+        jdbc.sql("""
+                INSERT INTO court (id, number, active)
+                VALUES ('dddddddd-0000-0000-0000-000000000001', 1, true)
+                ON CONFLICT (id) DO NOTHING
+                """).update();
+        jdbc.sql("""
+                INSERT INTO booking (id, card_id, status)
+                VALUES ('aaaaaaaa-0000-0000-0000-000000000001',
+                        '11111111-1111-1111-1111-111111111111', 'CONFIRMED')
+                ON CONFLICT (id) DO NOTHING
+                """).update();
+        jdbc.sql("""
+                INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
+                VALUES ('bbbbbbbb-0000-0000-0000-000000000001',
+                        'aaaaaaaa-0000-0000-0000-000000000001',
+                        'dddddddd-0000-0000-0000-000000000001', ?, ?, 'CONFIRMED')
+                """)
+                .params(OffsetDateTime.parse(startsAt), OffsetDateTime.parse(endsAt))
+                .update();
     }
 
     private static String configJson(String clubName) {

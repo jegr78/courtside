@@ -143,6 +143,26 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenStoringABlankTimeZone_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE club_config SET time_zone = '   '
+                WHERE id = '00000000-0000-0000-0000-000000000001'
+                """).update())
+                .hasMessageContaining("club_config_time_zone_not_blank");
+    }
+
+    @Test
+    void whenStoringAnUnknownTimeZone_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE club_config SET time_zone = 'Moon/Tranquility'
+                WHERE id = '00000000-0000-0000-0000-000000000001'
+                """).update())
+                .hasMessageContaining("club_config_time_zone_known");
+    }
+
+    @Test
     void whenInsertingARuleDefinitionThatIsNotAKnownRuleType_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""
