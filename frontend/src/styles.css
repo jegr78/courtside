@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --cs-clay: #b85c38;
+  --cs-clay: #af5030;
   --cs-ball: #d7e24b;
   --cs-shade: #17211d;
   --cs-line: #fcfbf9;
@@ -15,7 +15,7 @@
   --cs-input: #111b16;
   --cs-overlay: rgb(16 23 19 / 75%);
   --cs-shadow: rgb(0 0 0 / 28%);
-  --club-primary: #b85c38;
+  --club-primary: #af5030;
   --club-primary-text: #fcfbf9;
   --club-accent: #d7e24b;
   font-family: "Archivo Variable", Archivo, ui-sans-serif, system-ui, sans-serif;

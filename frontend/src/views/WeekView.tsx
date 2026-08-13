@@ -139,7 +139,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
           data-testid={`day-selector-${date}`}
           aria-label={formatDayLong(day, language)}
           aria-pressed={selectedDate === date}
-          className="border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/30"
+          className="border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/15"
           onClick={() => setSelectedDate(date)}
         >
           <span className="block text-sm font-semibold">{formatWeekday(day, language)}</span>
@@ -176,6 +176,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
       ref={planRef}
       data-testid="week-grid"
       data-week-offset={weekOffset}
+      tabIndex={0}
       className="day-plan border-structural relative mt-3 max-h-[70vh] overflow-auto rounded-xl border"
       style={{ "--court-count": data.courts.length } as CSSProperties}
     >
@@ -213,6 +214,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
       </table>
       {isToday && currentTime && slots.length > 0 && <div
         data-testid="current-time-line"
+        role="img"
         aria-label={t("week.currentTime", { time: currentTime })}
         className="current-time-line"
         style={{ top: `${48 + currentLineOffset(currentTime, slots[0], data.grid.slotMinutes, slotHeight)}px` }}
