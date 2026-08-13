@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -65,8 +65,7 @@ describe("AdminConfigurationView", () => {
     await user.type(screen.getByTestId("club-name"), "Example Racquet Club");
     await user.clear(screen.getByTestId("slot-minutes"));
     await user.type(screen.getByTestId("slot-minutes"), "15");
-    await user.clear(screen.getByTestId("time-zone"));
-    await user.type(screen.getByTestId("time-zone"), "Pacific/Auckland");
+    await user.selectOptions(screen.getByTestId("time-zone"), "Pacific/Auckland");
     await user.click(screen.getByTestId("save-club-config"));
     await user.clear(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"));
     await user.type(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "14");
@@ -96,6 +95,34 @@ describe("AdminConfigurationView", () => {
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("The input does not have the permitted format.");
+  });
+
+  it("offers the club time zone as a list of known zones", async () => {
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    const field = await screen.findByTestId("time-zone");
+
+    expect(field.tagName).toBe("SELECT");
+    const optionValues = within(field).getAllByRole("option").map((option) => (option as HTMLOptionElement).value);
+    expect(optionValues).toContain("Europe/Berlin");
+  });
+
+  it("given a stored time zone the browser does not list, when configuration loads, then the control still shows it", async () => {
+    // given
+    vi.spyOn(api, "adminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      defaultLocale: "en",
+      slotMinutes: 30,
+      timeZone: "US/Eastern"
+    });
+
+    // when
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("time-zone")).toHaveValue("US/Eastern");
   });
 
   it("given rule-set responses finish out of order, when switching sets, then only the selected set is editable", async () => {

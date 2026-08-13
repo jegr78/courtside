@@ -29,7 +29,7 @@ class FutureBookingGridInspector implements BookingGridConstraint {
     }
 
     @Override
-    public Optional<String> timeZoneConflictCode(ZoneId candidate) {
+    public Optional<String> timeZoneConflictCode() {
         return allocations.existsByStatusAndEndsAtAfter(BookingStatus.CONFIRMED, clock.instant())
                 ? Optional.of("config.timeZone.futureBookingConflict")
                 : Optional.empty();

@@ -735,6 +735,10 @@ rule so the public grid never offers a slot that booking validation would reject
 booking writes, series moves and opening-hours changes serialize on the single club-configuration
 row so a concurrent write cannot pass validation against a stale grid.
 
+The **club time zone** is managed configuration rather than an environment variable. Changing it
+is rejected while any confirmed future booking exists because the instant already promised to a
+member must not acquire a different club-local meaning. Historical bookings remain unchanged.
+
 The **PWA manifest is served dynamically** so the home screen icon shows the club logo, not
 a generic Courtside symbol. This is what decides whether the product feels like "our app"
 to a club.
