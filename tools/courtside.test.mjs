@@ -368,6 +368,22 @@ test("given the browser profile, when planning k6, then Chromium and the browser
   assert.ok(plan.args.some((argument) => argument.includes("p(75)")));
 });
 
+test("given a finished performance run, when planning its logs, then they can be captured without following", () => {
+  // given
+  const following = parseArguments(["perf-logs"]);
+  const once = parseArguments(["perf-logs", "--no-follow"]);
+
+  // when
+  const followPlan = lifecyclePlan(following.command, following);
+  const capturePlan = lifecyclePlan(once.command, once);
+
+  // then
+  assert.ok(followPlan.args.includes("--follow"));
+  assert.equal(capturePlan.args.includes("--follow"), false);
+  assert.ok(capturePlan.args.includes("--no-color"));
+  assert.ok(capturePlan.args.includes("logs"));
+});
+
 test("given a private credentials file, when planning k6, then the container runs as the user that owns it", () => {
   // given
   const options = parseArguments(["perf-run", "peak", "--confirm", "courtside-perf"]);

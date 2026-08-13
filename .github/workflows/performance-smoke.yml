@@ -32,6 +32,12 @@ jobs:
         run: node tools/courtside.mjs perf --skip-verify --no-credential-output
       - name: Run bounded smoke profile
         run: node tools/courtside.mjs perf-run smoke
+      - name: Capture container logs
+        if: failure()
+        run: |
+          mkdir -p build/performance/smoke
+          node tools/courtside.mjs perf-logs --no-follow > build/performance/smoke/container-logs.txt 2>&1 || true
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
