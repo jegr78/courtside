@@ -155,7 +155,8 @@ docker compose exec -T db pg_dump -U courtside courtside | gzip > courtside-$(da
 tag, so `docker compose pull` alone will never change them. That is deliberate — a club's database
 and reverse proxy should not change without anyone deciding it should — but it means the digests do
 not update themselves. Dependabot opens a pull request against this repository when either image
-gets a new patch release; a maintainer bumping the digest here is how it reaches your instance.
+gets a new patch release; a maintainer bumping the digest here is how it reaches your instance —
+take the updated `compose.yaml` and run `docker compose up -d` to apply it.
 Until then, you can raise it yourself: look up the current tag's digest with
 `docker buildx imagetools inspect postgres:17-alpine` (or `caddy:2-alpine`) and replace the
 `@sha256:…` suffix in `compose.yaml`.
