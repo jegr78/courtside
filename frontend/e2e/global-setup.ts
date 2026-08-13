@@ -135,7 +135,8 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     rmSync(resolve("test-results", "visual-journeys"), { recursive: true, force: true });
     const visualDate = tomorrowInBerlin();
     process.env.COURTSIDE_VISUAL_JOURNEY_DATE = visualDate;
-    postgres = await new GenericContainer("postgres:17-alpine")
+    postgres = await new GenericContainer(
+      "postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
       .withEnvironment({
         POSTGRES_DB: "courtside",
         POSTGRES_USER: "courtside",
