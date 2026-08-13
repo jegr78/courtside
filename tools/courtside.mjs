@@ -94,6 +94,8 @@ export function parseArguments(argv) {
       options.file = flag;
     } else if (!flag.startsWith("--") && command === "uat-reset" && !options.confirm) {
       options.confirm = flag;
+    } else if (flag === "--no-follow" && command === "perf-logs") {
+      options.noFollow = true;
     } else if (!flag.startsWith("--") && command === "perf-reset" && !options.confirm) {
       options.confirm = flag;
     } else if (!flag.startsWith("--") && command === "perf-run" && !options.profile) {
@@ -390,7 +392,7 @@ export function requiredPorts(options, runningServices = new Set()) {
   ];
 }
 
-export function lifecyclePlan(command) {
+export function lifecyclePlan(command, options = {}) {
   if (command === "dev-stop") {
     return { command: "docker", args: [...devComposeArgs, "stop"] };
   }
@@ -410,7 +412,11 @@ export function lifecyclePlan(command) {
     return { command: "docker", args: [...perfComposeArgs(false, true), "stop"] };
   }
   if (command === "perf-logs") {
-    return { command: "docker", args: [...perfComposeArgs(false, true), "logs", "--follow"] };
+    return {
+      command: "docker",
+      args: [...perfComposeArgs(false, true), "logs",
+        ...(options.noFollow ? ["--no-color"] : ["--follow"])]
+    };
   }
   if (command === "perf-db-shell") {
     return { command: "docker", args: [...perfComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside_perf"] };
@@ -455,21 +461,21 @@ async function execute(options) {
     return;
   }
   if (options.command === "dev-stop") {
-    runInteractive(lifecyclePlan(options.command));
+    runInteractive(lifecyclePlan(options.command, options));
     return;
   }
   if (options.command === "dev-reset") {
-    runInteractive(lifecyclePlan(options.command));
+    runInteractive(lifecyclePlan(options.command, options));
     process.stdout.write("Development data removed. Run 'dev' to create it again.\n");
     return;
   }
   if (options.command === "uat-stop") {
     cleanupUatFunnel();
-    runInteractive(lifecyclePlan(options.command));
+    runInteractive(lifecyclePlan(options.command, options));
     return;
   }
   if (["uat-logs", "uat-db-shell"].includes(options.command)) {
-    runInteractive(lifecyclePlan(options.command));
+    runInteractive(lifecyclePlan(options.command, options));
     return;
   }
   if (options.command === "uat") {
@@ -501,7 +507,7 @@ async function execute(options) {
     return;
   }
   if (["perf-stop", "perf-logs", "perf-db-shell"].includes(options.command)) {
-    runInteractive(lifecyclePlan(options.command));
+    runInteractive(lifecyclePlan(options.command, options));
     return;
   }
   if (options.command === "perf-reset") {
