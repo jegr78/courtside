@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+function freeSlot(page: import("@playwright/test").Page, court: number, slot: string) {
+  return page.locator(`[data-testid="free-slot"][data-court-number="${court}"][data-slot="${slot}"][data-state="free"]`);
+}
+
 test("language and theme preferences persist across reloads", async ({ page }) => {
   // given
   await page.goto("/");
@@ -92,11 +96,11 @@ test("a seeded member can book a free slot and cancel it again", async ({ page }
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
   await page.getByTestId("week-next").click();
-  const freeSlot = page.getByTestId("free-slot").first();
-  await expect(freeSlot).toBeVisible();
+  const targetSlot = freeSlot(page, 2, "12:00");
+  await expect(targetSlot).toBeVisible();
 
   // when
-  await freeSlot.click();
+  await targetSlot.click();
   await page.getByTestId("member-search").fill("Mary");
   await page.getByTestId("member-match").click();
   await page.getByTestId("booking-submit").click();
@@ -142,7 +146,7 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await page.getByTestId("week-next").click();
-  await page.getByTestId("free-slot").first().click();
+  await freeSlot(page, 3, "13:00").click();
   await page.getByTestId("booking-card").selectOption({ label: "Restricted event" });
   await page.getByTestId("guest-name").fill("John Roe");
 
@@ -181,7 +185,7 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await page.getByTestId("week-next").click();
-  await page.getByTestId("free-slot").first().click();
+  await freeSlot(page, 4, "14:00").click();
   await page.getByTestId("member-search").fill("Mary");
   await page.getByTestId("member-match").click();
   await page.getByTestId("booking-submit").click();

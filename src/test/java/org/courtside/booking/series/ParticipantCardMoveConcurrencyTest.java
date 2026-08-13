@@ -1,6 +1,7 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.PostgresDiagnostics;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
@@ -18,6 +19,7 @@ import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
@@ -37,10 +39,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -118,7 +122,7 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
             return Outcome.MOVED;
         };
         Callable<Outcome> contendForParticipantCard = () -> {
-            moveIsInPlace.await();
+            await(moveIsInPlace);
             try {
                 bookingService.create(new CreateBookingCommand(
                         List.of(competingCourt), MEMBER_BOOKING_CARD,
@@ -137,7 +141,9 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
             List<Future<Outcome>> futures = pool.invokeAll(
                     List.of(holdMoveUncommitted, contendForParticipantCard));
-            outcomes = List.of(futures.get(0).get(), futures.get(1).get());
+            outcomes = List.of(
+                    futures.get(0).get(20, TimeUnit.SECONDS),
+                    futures.get(1).get(20, TimeUnit.SECONDS));
         }
 
         // then
@@ -165,7 +171,8 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
             }
             sleepBriefly();
         }
-        throw new AssertionError("No session waited for the participant card lock");
+        throw new AssertionError("No session waited for the participant card lock. "
+                + PostgresDiagnostics.waitsAndLocks(jdbc));
     }
 
     private int sessionsBlockedOnALock() {
@@ -187,6 +194,12 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(failure);
+        }
+    }
+
+    private static void await(CountDownLatch latch) throws InterruptedException {
+        if (!latch.await(20, TimeUnit.SECONDS)) {
+            throw new AssertionError("The move did not reach the contention point");
         }
     }
 }

@@ -1,0 +1,72 @@
+name: test stability
+
+on:
+  schedule:
+    - cron: '17 2 * * 2,5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  varied-order:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        order: [reversealphabetical, random]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - name: Run integration suite in varied order
+        env:
+          TEST_ORDER: ${{ matrix.order }}
+        run: |
+          seed="$(date -u +%Y%m%d)"
+          echo "Test order: ${TEST_ORDER}; random seed: ${seed}" | tee test-order.txt
+          ./mvnw -B test -Dsurefire.runOrder="${TEST_ORDER}" -Dsurefire.runOrder.random.seed="${seed}"
+      - name: Upload first-attempt evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: order-${{ matrix.order }}-${{ github.run_id }}
+          path: |
+            test-order.txt
+            target/surefire-reports/*.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  browser-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - name: Package application and install browser
+        run: |
+          ./mvnw -B package -DskipTests
+          cd frontend
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+      - name: Prove browser isolation with two workers
+        working-directory: frontend
+        run: npm run test:e2e -- --workers=2
+      - name: Upload first-attempt browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-isolation-${{ github.run_id }}
+          path: |
+            frontend/test-results
+            frontend/playwright-report
+          if-no-files-found: warn
+          retention-days: 14

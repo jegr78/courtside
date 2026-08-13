@@ -201,7 +201,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
               {slot}
             </th>
             {data.courts.map((court) => renderCell(
-              court, slot, selectedAllocations, data.grid.slotMinutes, data.grid.timeZone, t,
+              court, slot, selectedDate, selectedAllocations, data.grid.slotMinutes, data.grid.timeZone, t,
               () => selectedDate && setBookingSelection({ date: selectedDate, slot, courtId: court.id }),
               setCancellation,
               selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false,
@@ -258,6 +258,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
 function renderCell(
   court: PublicCourt,
   slot: string,
+  date: string | undefined,
   allocations: Allocation[],
   slotMinutes: number,
   timeZone: string,
@@ -301,6 +302,7 @@ function renderCell(
   const content = canBook ? <button
       type="button"
       data-testid="free-slot"
+      data-date={date}
       data-court-number={court.number}
       data-slot={slot}
       disabled={isPast}
@@ -310,7 +312,7 @@ function renderCell(
       onClick={book}
     >
       {isPast ? t("week.past") : t("week.available")}
-    </button> : <div data-testid="free-slot" data-court-number={court.number} data-slot={slot} data-state={isPast ? "past" : "free"} className="day-plan-slot flex h-full w-full items-center justify-center rounded-md px-2 text-sm">
+    </button> : <div data-testid="free-slot" data-date={date} data-court-number={court.number} data-slot={slot} data-state={isPast ? "past" : "free"} className="day-plan-slot flex h-full w-full items-center justify-center rounded-md px-2 text-sm">
       {isPast ? t("week.past") : t("week.available")}
     </div>;
   return <td key={court.id} className={`${cellClass} p-1`}>

@@ -3,10 +3,7 @@ package org.courtside.member.web;
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -24,10 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Ordered on purpose: the second test only proves anything once the first has left the seeded row
-// deactivated, and the restore runs at both boundaries between them.
 @WithMockUser(username = "admin", roles = "ADMIN")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class MembershipTypeSeedRestoreTest extends AbstractIntegrationTest {
 
     private static final String SEEDED_MEMBERSHIP_TYPE = "cccccccc-0000-0000-0000-000000000001";
@@ -43,9 +37,9 @@ class MembershipTypeSeedRestoreTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @Order(1)
-    void givenTheSeededMembershipType_whenDeactivatingItDirectly_thenItReportsInactive() throws Exception {
-        // when / then
+    void givenTheSeededMembershipTypeWasChangedAndTheBaselineRestored_whenListingIt_thenItIsActiveAgain()
+            throws Exception {
+        // given
         mockMvc.perform(put("/api/admin/membership-types/" + SEEDED_MEMBERSHIP_TYPE + "/active")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -54,12 +48,8 @@ class MembershipTypeSeedRestoreTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
-    }
+        restoreDatabaseBaseline();
 
-    @Test
-    @Order(2)
-    void givenTheSeededMembershipTypeWasDeactivatedByAnEarlierTest_whenListingIt_thenItIsActiveAgain()
-            throws Exception {
         // when
         String body = mockMvc.perform(get("/api/admin/membership-types"))
                 .andExpect(status().isOk())

@@ -2,6 +2,7 @@ package org.courtside.booking;
 
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.PostgresDiagnostics;
 import org.courtside.facility.Court;
 import org.courtside.facility.CourtRepository;
 import org.courtside.facility.OpeningHours;
@@ -13,6 +14,7 @@ import org.courtside.identity.Role;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -30,9 +32,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class BookingConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -97,7 +101,7 @@ class BookingConcurrencyTest extends AbstractIntegrationTest {
         };
 
         Callable<Outcome> contendForTheSlot = () -> {
-            firstIsInPlace.await();
+            await(firstIsInPlace);
             try {
                 book(bookerPersonId);
                 return Outcome.SUCCEEDED;
@@ -111,7 +115,9 @@ class BookingConcurrencyTest extends AbstractIntegrationTest {
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
             List<Future<Outcome>> futures =
                     pool.invokeAll(List.of(holdTheSlotUncommitted, contendForTheSlot));
-            outcomes = List.of(futures.get(0).get(), futures.get(1).get());
+            outcomes = List.of(
+                    futures.get(0).get(20, TimeUnit.SECONDS),
+                    futures.get(1).get(20, TimeUnit.SECONDS));
         }
 
         // then
@@ -139,7 +145,8 @@ class BookingConcurrencyTest extends AbstractIntegrationTest {
         }
         throw new AssertionError(
                 "No session ever waited on a lock within " + UNTIL_CONTENTION
-                        + ", so the second booking never contended with the uncommitted first one");
+                        + ", so the second booking never contended with the uncommitted first one. "
+                        + PostgresDiagnostics.waitsAndLocks(jdbc));
     }
 
     // PostgreSQL caches the statistics views per transaction, and this poll runs inside the one
@@ -163,6 +170,12 @@ class BookingConcurrencyTest extends AbstractIntegrationTest {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
+        }
+    }
+
+    private static void await(CountDownLatch latch) throws InterruptedException {
+        if (!latch.await(20, TimeUnit.SECONDS)) {
+            throw new AssertionError("The first booking did not reach the contention point");
         }
     }
 }

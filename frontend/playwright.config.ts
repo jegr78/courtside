@@ -8,7 +8,9 @@ export default defineConfig({
   workers: 1,
   use: {
     baseURL: "http://127.0.0.1:18080",
-    trace: "retain-on-failure"
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure"
   },
   globalSetup: "./e2e/global-setup.ts"
 });

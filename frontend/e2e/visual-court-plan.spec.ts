@@ -47,7 +47,8 @@ for (const locale of locales) {
       await expect(page.locator('[data-card-color="#34584A"]')).toHaveCount(1);
       await expect(page.locator('[data-card-color="#3A4A5C"]')).toHaveCount(1);
       await expect(page.locator('[data-card-color="#E8DDD4"]')).toHaveCount(1);
-      await expect(page.getByTestId("free-slot").first()).toBeVisible();
+      const targetSlot = page.locator('[data-testid="free-slot"][data-court-number="1"][data-slot="12:00"][data-state="free"]');
+      await expect(targetSlot).toBeVisible();
       await page.getByTestId("week-grid").evaluate((plan) => plan.scrollTo(0, 0));
       await captureFullPage(page, locale, viewport.name, "03-court-plan-dark");
 
@@ -66,7 +67,7 @@ for (const locale of locales) {
       await captureFullPage(page, locale, viewport.name, "05-court-plan-light");
 
       // when
-      await page.getByTestId("free-slot").first().click();
+      await targetSlot.click();
       await expect(page.getByTestId("booking-dialog")).toBeVisible();
 
       // then
