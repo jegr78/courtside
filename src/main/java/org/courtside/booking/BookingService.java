@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -90,7 +91,7 @@ public class BookingService {
         return allocations.findConfirmedStartingBetween(from, to);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PersonalBookingPage personalBookings(UUID bookedBy, UUID cursor, int limit) {
         List<UUID> ids = bookings.findPersonalBookingIds(bookedBy, cursor, PageRequest.of(0, limit + 1));
         CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);

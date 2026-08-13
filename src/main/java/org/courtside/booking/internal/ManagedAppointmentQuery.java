@@ -10,6 +10,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -26,6 +27,7 @@ public class ManagedAppointmentQuery {
     private final CardService cards;
     private final PersonRepository persons;
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page list(Set<Role> roles, UUID cursor, int limit) {
         Set<Role> managementRoles = accessControl.managementRoles(roles);
         if (!roles.contains(Role.ADMIN) && managementRoles.isEmpty()) {

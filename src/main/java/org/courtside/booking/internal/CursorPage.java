@@ -14,10 +14,16 @@ public final class CursorPage {
 
     public static <T> Result<T> of(
             List<UUID> idsIncludingProbe, int limit, Function<List<UUID>, List<T>> load, Function<T, UUID> idOf) {
-        UUID nextCursor = idsIncludingProbe.size() > limit ? idsIncludingProbe.get(limit - 1) : null;
-        List<UUID> visibleIds = idsIncludingProbe.stream().limit(limit).toList();
-        Map<UUID, T> found = load.apply(visibleIds).stream().collect(Collectors.toMap(idOf, item -> item));
-        return new Result<>(visibleIds.stream().map(found::get).filter(Objects::nonNull).toList(), nextCursor);
+        boolean hasProbe = idsIncludingProbe.size() > limit;
+        Map<UUID, T> found = load.apply(idsIncludingProbe).stream()
+                .collect(Collectors.toMap(idOf, item -> item));
+        List<T> items = idsIncludingProbe.stream()
+                .map(found::get)
+                .filter(Objects::nonNull)
+                .limit(limit)
+                .toList();
+        UUID nextCursor = hasProbe && !items.isEmpty() ? idOf.apply(items.getLast()) : null;
+        return new Result<>(items, nextCursor);
     }
 
     public record Result<T>(List<T> items, UUID nextCursor) {
