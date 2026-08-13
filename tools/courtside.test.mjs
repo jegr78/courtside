@@ -361,7 +361,7 @@ test("given the browser profile, when planning k6, then Chromium and the browser
     () => performanceRunPlan(options, "/tmp/performance-result", "/tmp/performance-root.crt"),
     /verified target certificate pin/
   );
-  assert.ok(plan.args.includes("grafana/k6:2.2.0-with-browser@sha256:defdc0a3e70c46bce010bfc10dedc03e335cc7febe01f6359552fe72827c2aa2"));
+  assert.ok(plan.args.some((argument) => /^grafana\/k6:\S+-with-browser@sha256:[a-f0-9]{64}$/.test(argument)));
   assert.ok(plan.args.includes("/scripts/browser.js"));
   assert.ok(plan.args.includes("K6_BROWSER_HEADLESS=true"));
   assert.ok(plan.args.includes("K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=test-pin"));
@@ -377,7 +377,7 @@ test("given a protocol profile, when planning k6, then the pinned image and isol
 
   // then
   assert.equal(plan.command, "docker");
-  assert.ok(plan.args.includes("grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6"));
+  assert.ok(plan.args.some((argument) => /^grafana\/k6:[^-\s]+@sha256:[a-f0-9]{64}$/.test(argument)));
   assert.ok(plan.args.includes("PERF_PROFILE=peak"));
   assert.ok(plan.args.includes("PERF_RUN_ID=test-run"));
   assert.ok(plan.args.includes("PERF_TARGET=https://host.docker.internal:9443"));

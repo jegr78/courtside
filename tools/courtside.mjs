@@ -624,13 +624,27 @@ export function perfResetPlan() {
   return { command: "docker", args: [...perfComposeArgs(false, true), "down", "--volumes", "--remove-orphans"] };
 }
 
+export function performanceVersion() {
+  return performanceImage("k6").split(":")[1].split("@")[0];
+}
+
+export function performanceImage(service) {
+  const compose = readFileSync(join(root, "deploy", "compose.perf-k6.yaml"), "utf8");
+  const reference = compose.match(
+    new RegExp(`^  ${service}:\\n(?:.*\\n)*?    image: (\\S+@sha256:[a-f0-9]{64})$`, "m"))?.[1];
+  if (!reference) {
+    throw new Error(`No digest-pinned image for the ${service} performance service`);
+  }
+  return reference;
+}
+
 export function performanceRunPlan(options, resultDirectory, certificateFile, runId = "test-run", certificatePin) {
   const contract = JSON.parse(readFileSync(join(root, "performance", "contract.json"), "utf8"));
   const browserRun = contract.profiles[options.profile].kind === "browser";
   if (browserRun && !certificatePin) {
     throw new Error("A verified target certificate pin is required for a browser run");
   }
-  const image = browserRun ? contract.tooling.browserImage : contract.tooling.protocolImage;
+  const image = performanceImage(browserRun ? "k6-browser" : "k6");
   return {
     command: "docker",
     args: [
@@ -653,7 +667,7 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "-v", `${perfStateFile}:/run/courtside/perf.json:ro`,
       "-v", `${certificateFile}:/certs/root.crt:ro`,
       "-v", `${resultDirectory}:/results`,
-      `${image.reference}@${image.digest}`,
+      image,
       "run", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
       "--tag", `testid=${runId}`, "--tag", `profile=${options.profile}`,
       "--summary-trend-stats", "avg,min,med,max,p(50),p(75),p(90),p(95),p(99)",
@@ -663,8 +677,7 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
 }
 
 export function funnelPerformanceRunPlan(options, resultDirectory, runId = "test-run") {
-  const contract = JSON.parse(readFileSync(join(root, "performance", "contract.json"), "utf8"));
-  const image = contract.tooling.protocolImage;
+  const image = performanceImage("k6");
   return {
     command: "docker",
     args: [
@@ -674,7 +687,7 @@ export function funnelPerformanceRunPlan(options, resultDirectory, runId = "test
       "-e", `PERF_TARGET=${options.target}`,
       "-v", `${join(root, "performance")}:/scripts:ro`,
       "-v", `${resultDirectory}:/results`,
-      `${image.reference}@${image.digest}`,
+      image,
       "run", "--log-output=none", "--tag", `testid=${runId}`, "--tag", "profile=funnel-smoke",
       "--summary-trend-stats", "avg,min,med,max,p(50),p(75),p(90),p(95),p(99)",
       "/scripts/funnel.js"
@@ -863,7 +876,7 @@ export function buildPerformanceResult({
     schemaVersion: 1,
     contract: { schemaVersion: contract.schemaVersion, digest: contractDigest },
     build: { applicationVersion: source.version, gitCommit: source.commit },
-    runtime: { k6Version: contract.tooling.k6Version, operatingSystem: platform, architecture, runner },
+    runtime: { k6Version: performanceVersion(), operatingSystem: platform, architecture, runner },
     profile: {
       name: profileName,
       workload: profile.workload,

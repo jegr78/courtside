@@ -5,11 +5,13 @@ Courtside defines its load shapes, thresholds, resource budgets, and safety boun
 scenario scripts must not carry independent copies of the same values. Machine-readable results
 conform to [`../performance/result.schema.json`](../performance/result.schema.json).
 
-The pinned k6 images are the official protocol and browser variants for the version named in the
-contract. Each readable version tag is bound to an approved multi-architecture OCI index digest;
-the runner must reject a registry result with another digest. Docker is the default execution
-boundary so macOS, Linux, Windows, and automation use the same k6 runtime. A native k6 installation
-is optional and must match the contract version before it can produce a comparable result.
+The pinned k6 images are the official protocol and browser variants, declared as services in
+`../deploy/compose.perf-k6.yaml` so that their digests are watched for updates like every other
+image this project runs. Each readable version tag is bound to an approved multi-architecture OCI
+index digest; the runner must reject a registry result with another digest. Docker is the default
+execution boundary so macOS, Linux, Windows, and automation use the same k6 runtime. A native k6
+installation is optional and must match the declared image version before it can produce a
+comparable result.
 
 ## Reference workload
 

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { performanceImage } from "./courtside.mjs";
 
 const contractPath = new URL("../performance/contract.json", import.meta.url);
 const resultSchemaPath = new URL("../performance/result.schema.json", import.meta.url);
@@ -32,21 +33,24 @@ test("given the reference workload, when reading the performance contract, then 
 
 test("given pinned performance tooling, when reading image references, then mutable tags are bound to approved digests", () => {
   // given
+  const compose = readFileSync(
+    fileURLToPath(new URL("../deploy/compose.perf-k6.yaml", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(compose, /^  k6:\n    image: grafana\/k6:\S+@sha256:[a-f0-9]{64}$/m);
+  assert.match(compose, /^  k6-browser:\n    image: grafana\/k6:\S+-with-browser@sha256:[a-f0-9]{64}$/m);
+  assert.match(performanceImage("k6"), /^grafana\/k6:\S+@sha256:[a-f0-9]{64}$/);
+  assert.match(performanceImage("k6-browser"), /^grafana\/k6:\S+-with-browser@sha256:[a-f0-9]{64}$/);
+  assert.throws(() => performanceImage("no-such-service"), /No digest-pinned image/);
+});
+
+test("given the performance contract, when reading it, then it carries no image reference of its own", () => {
+  // given
   const contract = readJson(contractPath);
 
   // when / then
-  assert.deepEqual(contract.tooling.protocolImage, {
-    reference: "grafana/k6:2.2.0",
-    digest: "sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6"
-  });
-  assert.deepEqual(contract.tooling.browserImage, {
-    reference: "grafana/k6:2.2.0-with-browser",
-    digest: "sha256:defdc0a3e70c46bce010bfc10dedc03e335cc7febe01f6359552fe72827c2aa2"
-  });
-  assert.deepEqual(contract.tooling.grafanaImage, {
-    reference: "grafana/grafana:12.1.0",
-    digest: "sha256:6ac590e7cabc2fbe8d7b8fc1ce9c9f0582177b334e0df9c927ebd9670469440f"
-  });
+  assert.equal(contract.tooling, undefined);
+  assert.equal(JSON.stringify(contract).includes("sha256:"), false);
 });
 
 test("given supported performance profiles, when reading their execution limits, then every run is bounded", () => {
