@@ -87,6 +87,30 @@ test("initial password and validation states meet automated WCAG 2.2 AA checks",
   await expectNoWcagViolations(page);
 });
 
+test("initial password change is operable using only the keyboard", async ({ page, browserName }) => {
+  // given
+  await page.goto("/login");
+  const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
+  await page.getByTestId("username").focus();
+  await page.keyboard.type("bootstrap-admin");
+  await page.keyboard.press(tabKey);
+  await page.keyboard.type("temporary-password");
+  await tabToTestId(page, "login-submit", 100, tabKey);
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("initial-password-view")).toBeVisible();
+
+  // when
+  await tabToTestId(page, "new-password", 100, tabKey);
+  await page.keyboard.type("permanent-password");
+  await page.keyboard.press(tabKey);
+  await page.keyboard.type("permanent-password");
+  await tabToTestId(page, "password-submit", 100, tabKey);
+  await page.keyboard.press("Enter");
+
+  // then
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+});
+
 test("booking dialog traps focus in both directions and restores its trigger", async ({ page, browserName }) => {
   // given
   await signIn(page, "doe.jane");
@@ -101,7 +125,6 @@ test("booking dialog traps focus in both directions and restores its trigger", a
   const last = focusable.last();
 
   // when / then
-  await first.focus();
   await expect(first).toBeFocused();
   await page.keyboard.press(browserName === "webkit" ? "Alt+Shift+Tab" : "Shift+Tab");
   await expect(last).toBeFocused();
@@ -109,6 +132,30 @@ test("booking dialog traps focus in both directions and restores its trigger", a
   await expect(first).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
+});
+
+test("a booking is operable using only the keyboard", async ({ page, browserName }) => {
+  // given
+  await signIn(page, "doe.jane");
+  const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
+  await tabToTestId(page, "week-next", 100, tabKey);
+  await page.keyboard.press("Enter");
+  await tabToTestId(page, "free-slot", 200, tabKey);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toBeVisible();
+
+  // when
+  await tabToTestId(page, "member-search", 100, tabKey);
+  await page.keyboard.type("Mary");
+  await expect(page.getByTestId("member-match")).toBeVisible();
+  await tabToTestId(page, "member-match", 100, tabKey);
+  await page.keyboard.press("Enter");
+  await tabToTestId(page, "booking-submit", 100, tabKey);
+  await page.keyboard.press("Enter");
+
+  // then
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(page.getByTestId("own-allocation")).toBeVisible();
 });
 
 test("login and cancellation are operable using only the keyboard", async ({ page, browserName }) => {
