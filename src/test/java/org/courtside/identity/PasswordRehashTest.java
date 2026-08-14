@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsPasswordService;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -17,6 +18,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.courtside.identity.AccountFixtures.enabled;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -41,6 +43,12 @@ class PasswordRehashTest extends AbstractIntegrationTest {
     @Autowired
     private UserDetailsService userDetailsService;
 
+    @Autowired
+    private UserDetailsPasswordService passwordService;
+
+    @Autowired
+    private JdbcClient jdbc;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -49,7 +57,7 @@ class PasswordRehashTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAHashBelowTheCurrentCost_whenTheAccountAuthenticates_thenItIsStoredAtTheCurrentCost() {
+    void givenAHashBelowTheCurrentCost_whenThePasswordIsUpdated_thenItIsStoredAtTheCurrentCost() {
         // given
         Argon2PasswordEncoder weaker = new Argon2PasswordEncoder(16, 32, 1, 16384, 2);
         Person person = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
@@ -58,7 +66,7 @@ class PasswordRehashTest extends AbstractIntegrationTest {
 
         // when
         UserDetails details = userDetailsService.loadUserByUsername("doe.jane");
-        ((UserDetailsPasswordService) userDetailsService).updatePassword(details, passwordEncoder.encode(PASSWORD));
+        passwordService.updatePassword(details, passwordEncoder.encode(PASSWORD));
 
         // then
         String stored = accounts.findById(account.getId()).orElseThrow().getPasswordHash();
@@ -66,6 +74,30 @@ class PasswordRehashTest extends AbstractIntegrationTest {
         assertThat(passwordEncoder.matches(PASSWORD, stored))
                 .as("the member must still be able to sign in with the same password")
                 .isTrue();
+    }
+
+    @Test
+    void givenAPasswordChangeCommittedAfterTheHashWasRead_whenTheStaleHashIsRehashed_thenTheNewerHashIsNotOverwritten() {
+        // given
+        Argon2PasswordEncoder weaker = new Argon2PasswordEncoder(16, 32, 1, 16384, 2);
+        Person person = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UserAccount account = accounts.save(new UserAccount(
+                person, "doe.jane", weaker.encode(PASSWORD), Set.of(Role.MEMBER)));
+        UserDetails details = userDetailsService.loadUserByUsername("doe.jane");
+
+        String concurrentHash = passwordEncoder.encode("a-different-password");
+        jdbc.sql("UPDATE user_account SET password_hash = :hash WHERE id = :id")
+                .param("hash", concurrentHash)
+                .param("id", account.getId())
+                .update();
+
+        // when
+        passwordService.updatePassword(details, passwordEncoder.encode(PASSWORD));
+
+        // then
+        assertThat(accounts.findById(account.getId()).orElseThrow().getPasswordHash())
+                .as("a rehash of the hash a concurrent change already replaced must not win")
+                .isEqualTo(concurrentHash);
     }
 
     @Test
@@ -89,10 +121,5 @@ class PasswordRehashTest extends AbstractIntegrationTest {
         assertThat(accounts.findById(account.getId()).orElseThrow().getPasswordHash())
                 .as("signing in must raise the stored cost without a further step")
                 .contains("m=19456");
-    }
-
-    private UserAccount enabled(UserAccount account) {
-        account.enable();
-        return account;
     }
 }

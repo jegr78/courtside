@@ -3,12 +3,14 @@ package org.courtside.identity.internal;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsPasswordService;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class CourtsideUserDetailsService implements UserDetailsService, UserDetailsPasswordService {
 
@@ -44,11 +47,18 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public UserDetails updatePassword(UserDetails user, String newPassword) {
         accounts.findByUsername(user.getUsername())
-                .ifPresent(account -> accounts.rehashPassword(
-                        account.getId(), account.getPasswordHash(), newPassword));
+                .ifPresent(account -> rehash(account, user, newPassword));
         return user;
+    }
+
+    private void rehash(UserAccount account, UserDetails user, String newPassword) {
+        try {
+            accounts.rehashPassword(account.getId(), user.getPassword(), newPassword);
+        } catch (RuntimeException e) {
+            log.warn("Password rehash failed for account {}", account.getId(), e);
+        }
     }
 }
