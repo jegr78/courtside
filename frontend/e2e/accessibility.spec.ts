@@ -112,7 +112,7 @@ test("initial password change is operable using only the keyboard", async ({ pag
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
 });
 
-test("booking dialog traps focus in both directions and restores its trigger", async ({ page, browserName }) => {
+test("booking dialog traps focus in both directions and restores its trigger", async ({ page }) => {
   // given
   await signIn(page, "doe.jane");
   await page.getByTestId("week-next").click();
@@ -121,15 +121,16 @@ test("booking dialog traps focus in both directions and restores its trigger", a
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
+  await expect(page.getByTestId("booking-submit")).toBeEnabled();
   const focusable = dialog.locator('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])');
   const first = focusable.first();
   const last = focusable.last();
 
   // when / then
   await expect(first).toBeFocused();
-  await page.keyboard.press(browserName === "webkit" ? "Alt+Shift+Tab" : "Shift+Tab");
+  await first.press("Shift+Tab");
   await expect(last).toBeFocused();
-  await page.keyboard.press(browserName === "webkit" ? "Alt+Tab" : "Tab");
+  await last.press("Tab");
   await expect(first).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();

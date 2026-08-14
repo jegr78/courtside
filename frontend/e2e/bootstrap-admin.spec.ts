@@ -169,14 +169,31 @@ test("an admin changes club configuration and a booking rule through the browser
   await expect(page.getByTestId("time-zone")).toHaveValue("Europe/Berlin");
 
   // when
-  await page.getByTestId("club-name").fill("Example Racquet Club");
+  const clubName = page.getByTestId("club-name");
+  await clubName.fill("Example Racquet Club");
+  await clubName.press("Tab");
+  await expect(clubName).toHaveValue("Example Racquet Club");
+  const configSaved = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
+  );
   await page.getByTestId("save-club-config").click();
+  const configResponse = await configSaved;
+  expect(configResponse.status()).toBe(200);
+  const changedConfig = await configResponse.json() as { clubName: string };
+  expect(changedConfig.clubName).toBe("Example Racquet Club");
+  await expect(page.getByTestId("admin-save-success")).toBeVisible();
+  await expect(page.getByTestId("club-brand-name")).toHaveText("Example Racquet Club");
   await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");
+  const ruleSaved = page.waitForResponse((response) =>
+    response.url().includes("/api/admin/rule-sets/")
+      && response.url().endsWith("/rules/ADVANCE_WINDOW")
+      && response.request().method() === "PUT"
+  );
   await page.getByTestId("save-rule-ADVANCE_WINDOW").click();
+  expect((await ruleSaved).status()).toBe(200);
 
   // then
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
-  await expect(page.getByTestId("club-brand-name")).toHaveText("Example Racquet Club");
 
   // when
   await page.goto("/");
@@ -205,7 +222,12 @@ test("an admin takes a court out of service and restores it through the browser"
   const court = "dddddddd-0000-0000-0000-000000000004";
 
   // when
+  const courtDeactivated = page.waitForResponse((response) =>
+    response.url().endsWith(`/api/admin/courts/${court}/active`)
+      && response.request().method() === "PUT"
+  );
   await page.getByTestId(`toggle-court-${court}`).click();
+  expect((await courtDeactivated).status()).toBe(200);
   await page.goto("/");
 
   // then
@@ -213,7 +235,12 @@ test("an admin takes a court out of service and restores it through the browser"
 
   // when
   await page.getByTestId("admin-facility-link").click();
+  const courtReactivated = page.waitForResponse((response) =>
+    response.url().endsWith(`/api/admin/courts/${court}/active`)
+      && response.request().method() === "PUT"
+  );
   await page.getByTestId(`toggle-court-${court}`).click();
+  expect((await courtReactivated).status()).toBe(200);
   await page.goto("/");
 
   // then

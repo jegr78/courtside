@@ -11,7 +11,7 @@ import {
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, performanceBaselinePlan,
   performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
-  resolvePublicFunnelAddresses, validatePublicAddress
+  resolvePublicFunnelAddresses, uatStartupSummary, validatePublicAddress
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
@@ -156,6 +156,16 @@ test("given platform listener output, when checking JDWP, then only loopback lis
   assert.equal(listenerOutputMatches("TCP 127.0.0.1:5005 0.0.0.0:0 LISTENING", 5005), true);
   assert.equal(listenerOutputMatches("LISTEN 0 1 127.0.0.1:5005 0.0.0.0:*", 5005), true);
   assert.equal(listenerOutputMatches("TCP 0.0.0.0:5005 0.0.0.0:0 LISTENING", 5005), false);
+});
+
+test("given a loopback-bound environment, when requesting it, then local probes cannot escape to an IPv6 listener", () => {
+  // given
+  const source = readFileSync(fileURLToPath(new URL("./courtside.mjs", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(source, /hostname: "127\.0\.0\.1", port, path, method, headers/);
+  assert.match(source, /servername: servername \?\? "localhost"/);
+  assert.match(source, /headers: \{ Host: `localhost:\$\{port\}`, \.\.\.headers \}/);
 });
 
 test("given Windows development, when planning processes, then both platform launchers are used", () => {
@@ -893,6 +903,27 @@ test("given a published UAT version, when parsing it, then only an image-safe ta
   assert.throws(() => parseArguments(["uat", "--version", "latest;whoami"]), /Invalid image version/);
 });
 
+test("given automated UAT startup, when suppressing credentials, then the password is absent from output", () => {
+  // given
+  const options = parseArguments(["uat", "--version", "1.2.3", "--no-credential-output"]);
+
+  // when
+  const summary = uatStartupSummary("not-for-logs", true, options);
+
+  // then
+  assert.equal(options.showCredentials, false);
+  assert.match(summary, /UAT: https:\/\/localhost:8443/);
+  assert.doesNotMatch(summary, /not-for-logs|one-time password/);
+});
+
+test("given the release qualification smoke, when starting UAT, then credential output is disabled", () => {
+  // given
+  const smoke = readFileSync(fileURLToPath(new URL("./courtside.uat-smoke.mjs", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(smoke, /startArguments = \["uat", "--no-credential-output"/);
+});
+
 test("given UAT status, when parsing output options, then the environment is retained", () => {
   // when
   const options = parseArguments(["status", "uat", "--json"]);
@@ -965,7 +996,7 @@ test("given the Funnel ingress, when reading its proxy contract, then only appli
   assert.match(caddy, /X-Robots-Tag "noindex, nofollow"/);
   assert.match(caddy, /Strict-Transport-Security/);
   assert.match(caddy, /@private path \/api-ui\* \/actuator\* \/api\/openapi\.yaml/);
-  assert.match(caddy, /respond @private 404/);
+  assert.match(caddy, /handle @private \{\n\t\trespond 404\n\t\}/);
   assert.match(caddy, /header_up X-Forwarded-Proto https/);
   assert.match(caddy, /header_up X-Forwarded-Port 443/);
 });

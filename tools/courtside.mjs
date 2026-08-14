@@ -80,7 +80,7 @@ export function parseArguments(argv) {
       options.dbPort = true;
     } else if (flag === "--telemetry" && command === "perf") {
       options.telemetry = true;
-    } else if (flag === "--no-credential-output" && command === "perf") {
+    } else if (flag === "--no-credential-output" && ["uat", "perf"].includes(command)) {
       options.showCredentials = false;
     } else if (flag === "--json" && command === "status") {
       options.json = true;
@@ -559,13 +559,17 @@ function startUat(options) {
   }
   mkdirSync(dirname(uatStateFile), { recursive: true });
   writeFileSync(uatStateFile, `${JSON.stringify({ image: environment.COURTSIDE_UAT_IMAGE, dbPort: options.dbPort }, null, 2)}\n`, { mode: 0o600 });
-  process.stdout.write("UAT: https://localhost:8443 | HTTP redirect: http://localhost:8081\n");
-  if (needsBootstrap) {
-    process.stdout.write(`Bootstrap admin: admin | one-time password: ${password}\n`);
-  }
-  if (options.dbPort) {
-    process.stdout.write("Database: jdbc:postgresql://127.0.0.1:5433/courtside\n");
-  }
+  process.stdout.write(uatStartupSummary(password, needsBootstrap, options));
+}
+
+export function uatStartupSummary(password, needsBootstrap, options) {
+  return [
+    "UAT: https://localhost:8443 | HTTP redirect: http://localhost:8081",
+    ...(needsBootstrap && options.showCredentials
+      ? [`Bootstrap admin: admin | one-time password: ${password}`]
+      : []),
+    ...(options.dbPort ? ["Database: jdbc:postgresql://127.0.0.1:5433/courtside"] : [])
+  ].join("\n") + "\n";
 }
 
 function uatEnvironment(version, password) {
@@ -1619,8 +1623,8 @@ function readPerformanceHealth(composeArgs) {
 export function localRequest({ secure, port, path, method = "GET", headers = {}, body, ca, servername }) {
   return new Promise((resolveResponse, rejectResponse) => {
     const request = (secure ? httpsRequest : httpRequest)({
-      hostname: "localhost", port, path, method, headers,
-      ...(secure ? { rejectUnauthorized: Boolean(ca), ...(ca ? { ca } : {}), ...(servername ? { servername } : {}) } : {})
+      hostname: "127.0.0.1", port, path, method, headers: { Host: `localhost:${port}`, ...headers },
+      ...(secure ? { rejectUnauthorized: Boolean(ca), servername: servername ?? "localhost", ...(ca ? { ca } : {}) } : {})
     }, (response) => {
       const peerCertificate = secure ? response.socket.getPeerCertificate() : undefined;
       const certificatePin = peerCertificate?.raw ? certificatePublicKeyPin(peerCertificate.raw) : undefined;
@@ -1649,7 +1653,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

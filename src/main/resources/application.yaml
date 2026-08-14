@@ -8,7 +8,6 @@ spring:
   flyway:
     enabled: true
   session:
-    store-type: jdbc
     jdbc:
       initialize-schema: always
   messages:
