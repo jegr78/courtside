@@ -119,6 +119,7 @@ default.
 | `COURTSIDE_LOGIN_GLOBAL_MAX_FAILURES` | `100` | Login attempts allowed across the instance and window. |
 | `COURTSIDE_LOGIN_GLOBAL_WINDOW` | `1m` | Instance-wide counting window. |
 | `COURTSIDE_LOGIN_GLOBAL_BLOCK` | `1m` | Instance-wide login cooldown duration. |
+| `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's own loggers. `DEBUG` also logs every error response the application answers with. |
 | `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |
 | `COURTSIDE_SOURCE_URL` | this repository | Where `GET /api/source` points. **If you modified Courtside and let others use it, the AGPL requires this to point at your source, not at ours.** |
 | `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, or `DEVELOPMENT`. UAT is visibly marked in the frontend. |
@@ -126,6 +127,21 @@ default.
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` are set by
 `compose.yaml`. Point them elsewhere if you run PostgreSQL outside Compose; the application needs
 PostgreSQL 17 and will not run on anything else.
+
+## When a member reports an error
+
+An error a member sees leaves no trace at `INFO`: the application answers the request and says
+nothing about it. Set `COURTSIDE_LOG_LEVEL=DEBUG` in `.env`, run `docker compose up -d app`, and ask
+the member to repeat what they did. The application then records every error response it sends, one
+entry per rejected request. The log is JSON, so `docker compose logs app | grep Answering` is the
+quickest way to read them: each names the status, the failure, and the field it was about — enough
+to tell a member's mistake from the instance's. Restore the level and restart once you have what you
+need.
+
+`DEBUG` is for diagnosis and not a level to run a club on. It is loud, it pushes the record of
+everything else out of the rotated log files sooner, and every line it adds is one more line to keep
+private. What it does not add is anyone's data: no rejected value, name or address reaches the log
+at any level, by design and under test.
 
 ## Upgrading
 
