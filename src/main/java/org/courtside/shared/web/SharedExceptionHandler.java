@@ -2,6 +2,7 @@ package org.courtside.shared.web;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.DuplicateItemException;
 import tools.jackson.core.JacksonException;
 import org.springframework.core.Ordered;
@@ -31,6 +32,7 @@ import java.util.regex.Pattern;
 
 // Ahead of Boot's problemdetails fallback, behind the module advices that must claim their own
 // exceptions first. AdviceOrderingTest enforces it.
+@Slf4j
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 1000)
 class SharedExceptionHandler {
@@ -46,6 +48,7 @@ class SharedExceptionHandler {
     // constraint: naming one would downgrade a module's 409 to a 400.
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleRejectedByTheDatabase(DataIntegrityViolationException exception) {
+        logAnswered(HttpStatus.BAD_REQUEST, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "The request conflicts with a database constraint");
         problem.setType(URI.create("urn:courtside:error:constraint-violation"));
@@ -55,6 +58,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleValidationFailure(MethodArgumentNotValidException exception) {
+        logAnswered(HttpStatus.BAD_REQUEST, exception);
         return validationFailed(exception.getBindingResult().getFieldErrors().stream()
                 .map(SharedExceptionHandler::toMap)
                 .toList());
@@ -62,6 +66,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail handleMethodValidationFailure(ConstraintViolationException exception) {
+        logAnswered(HttpStatus.BAD_REQUEST, exception);
         return validationFailed(exception.getConstraintViolations().stream()
                 .map(violation -> toMap(lastPathNode(violation), violation))
                 .toList());
@@ -79,6 +84,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ProblemDetail handleParameterTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        logAnswered(HttpStatus.BAD_REQUEST, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "One of the request's parameters is not valid");
         problem.setType(URI.create("urn:courtside:error:parameter-type-mismatch"));
@@ -93,6 +99,7 @@ class SharedExceptionHandler {
     // its field instead of leaving the caller with "something in the body is wrong".
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail handleUnreadableBody(HttpMessageNotReadableException exception) {
+        logAnswered(HttpStatus.BAD_REQUEST, exception);
         String field = mismatchedField(exception);
         if (field == null) {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -144,6 +151,7 @@ class SharedExceptionHandler {
     // RFC 9110 §15.5.6 makes Allow mandatory on a 405, and getHeaders() already carries it.
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     ResponseEntity<ProblemDetail> handleUnsupportedMethod(HttpRequestMethodNotSupportedException exception) {
+        logAnswered(HttpStatus.METHOD_NOT_ALLOWED, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.METHOD_NOT_ALLOWED, "This HTTP method is not supported for this resource");
         problem.setType(URI.create("urn:courtside:error:method-not-supported"));
@@ -155,6 +163,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(NoResourceFoundException.class)
     ProblemDetail handleUnknownResource(NoResourceFoundException exception) {
+        logAnswered(HttpStatus.NOT_FOUND, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND, "No resource exists at this address");
         problem.setType(URI.create("urn:courtside:error:unmapped-path"));
@@ -166,6 +175,7 @@ class SharedExceptionHandler {
     // dropping it loses the same machine-readable answer.
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     ResponseEntity<ProblemDetail> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
+        logAnswered(HttpStatus.UNSUPPORTED_MEDIA_TYPE, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.UNSUPPORTED_MEDIA_TYPE, "This endpoint does not accept the request's content type");
         problem.setType(URI.create("urn:courtside:error:unsupported-media-type"));
@@ -177,6 +187,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
     ProblemDetail handleNotAcceptable(HttpMediaTypeNotAcceptableException exception) {
+        logAnswered(HttpStatus.NOT_ACCEPTABLE, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_ACCEPTABLE, "This endpoint cannot produce a representation the request accepts");
         problem.setType(URI.create("urn:courtside:error:not-acceptable"));
@@ -186,6 +197,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     ProblemDetail handleMissingParameter(MissingServletRequestParameterException exception) {
+        logAnswered(HttpStatus.BAD_REQUEST, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "A required request parameter is missing");
         problem.setType(URI.create("urn:courtside:error:missing-parameter"));
@@ -241,5 +253,14 @@ class SharedExceptionHandler {
                 "field", field,
                 "code", "validation." + constraintName,
                 "params", params);
+    }
+
+    private static void logAnswered(HttpStatus status, Exception exception) {
+        if (status.is5xxServerError()) {
+            log.warn("Answering {} for {}", status, exception.getClass().getSimpleName(), exception);
+        } else {
+            log.debug("Answering {} for {}: {}",
+                    status, exception.getClass().getSimpleName(), exception.getMessage());
+        }
     }
 }
