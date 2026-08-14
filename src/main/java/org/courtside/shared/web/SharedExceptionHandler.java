@@ -58,18 +58,20 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleValidationFailure(MethodArgumentNotValidException exception) {
-        logAnswered(HttpStatus.BAD_REQUEST, exception);
-        return validationFailed(exception.getBindingResult().getFieldErrors().stream()
+        List<Map<String, Object>> fieldErrors = exception.getBindingResult().getFieldErrors().stream()
                 .map(SharedExceptionHandler::toMap)
-                .toList());
+                .toList();
+        logAnswered(HttpStatus.BAD_REQUEST, exception, fieldsOf(fieldErrors));
+        return validationFailed(fieldErrors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail handleMethodValidationFailure(ConstraintViolationException exception) {
-        logAnswered(HttpStatus.BAD_REQUEST, exception);
-        return validationFailed(exception.getConstraintViolations().stream()
+        List<Map<String, Object>> fieldErrors = exception.getConstraintViolations().stream()
                 .map(violation -> toMap(lastPathNode(violation), violation))
-                .toList());
+                .toList();
+        logAnswered(HttpStatus.BAD_REQUEST, exception, fieldsOf(fieldErrors));
+        return validationFailed(fieldErrors);
     }
 
     // One builder, because ProblemTypeUriTest expects each slug's literal exactly once.
@@ -84,7 +86,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ProblemDetail handleParameterTypeMismatch(MethodArgumentTypeMismatchException exception) {
-        logAnswered(HttpStatus.BAD_REQUEST, exception);
+        logAnswered(HttpStatus.BAD_REQUEST, exception, List.of(exception.getName()));
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "One of the request's parameters is not valid");
         problem.setType(URI.create("urn:courtside:error:parameter-type-mismatch"));
@@ -99,15 +101,16 @@ class SharedExceptionHandler {
     // its field instead of leaving the caller with "something in the body is wrong".
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail handleUnreadableBody(HttpMessageNotReadableException exception) {
-        logAnswered(HttpStatus.BAD_REQUEST, exception);
         String field = mismatchedField(exception);
         if (field == null) {
+            logAnswered(HttpStatus.BAD_REQUEST, exception);
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     HttpStatus.BAD_REQUEST, "The request body could not be parsed");
             problem.setType(URI.create("urn:courtside:error:malformed-request-body"));
             problem.setTitle("Malformed request body");
             return problem;
         }
+        logAnswered(HttpStatus.BAD_REQUEST, exception, List.of(field));
 
         // Twice, not one map with a computed code: ValidationMessageCoverageTest finds a code
         // by the literal following the "code" key, and one it cannot see has no bundle entry.
@@ -197,7 +200,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     ProblemDetail handleMissingParameter(MissingServletRequestParameterException exception) {
-        logAnswered(HttpStatus.BAD_REQUEST, exception);
+        logAnswered(HttpStatus.BAD_REQUEST, exception, List.of(exception.getParameterName()));
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "A required request parameter is missing");
         problem.setType(URI.create("urn:courtside:error:missing-parameter"));
@@ -256,11 +259,16 @@ class SharedExceptionHandler {
     }
 
     private static void logAnswered(HttpStatus status, Exception exception) {
-        if (status.is5xxServerError()) {
-            log.warn("Answering {} for {}", status, exception.getClass().getSimpleName(), exception);
-        } else {
-            log.debug("Answering {} for {}: {}",
-                    status, exception.getClass().getSimpleName(), exception.getMessage());
-        }
+        log.debug("Answering {} for {}", status, exception.getClass().getSimpleName());
+    }
+
+    // Only values the response carries too: a framework exception's message embeds the rejected
+    // value, which is a cleartext password on the password endpoints.
+    private static void logAnswered(HttpStatus status, Exception exception, List<String> fields) {
+        log.debug("Answering {} for {}: {}", status, exception.getClass().getSimpleName(), fields);
+    }
+
+    private static List<String> fieldsOf(List<Map<String, Object>> fieldErrors) {
+        return fieldErrors.stream().map(error -> (String) error.get("field")).toList();
     }
 }

@@ -10,8 +10,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -95,10 +100,11 @@ class AdviceLoggingTest {
     }
 
     @Test
-    void givenAFrameworkExceptionAnsweredAt4xx_whenItIsAnswered_thenItIsLoggedAtDebugWithItsMessage() {
+    void givenADatabaseMessageNamingAMember_whenItIsAnswered_thenOnlyTheStatusAndExceptionAreLogged() {
         // given
-        DataIntegrityViolationException exception =
-                new DataIntegrityViolationException("some_constraint_nothing_recognises");
+        DataIntegrityViolationException exception = new DataIntegrityViolationException(
+                "duplicate key value violates unique constraint \"account_username_key\"\n"
+                        + "  Detail: Key (username)=(doe.jane) already exists.");
 
         // when
         new SharedExceptionHandler().handleRejectedByTheDatabase(exception);
@@ -106,7 +112,28 @@ class AdviceLoggingTest {
         // then
         assertThat(sharedAppender.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
-            assertThat(event.getFormattedMessage()).contains("some_constraint_nothing_recognises");
+            assertThat(event.getFormattedMessage())
+                    .contains("400 BAD_REQUEST", "DataIntegrityViolationException")
+                    .doesNotContain("doe.jane");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
+    void givenAPasswordRejectedByValidation_whenItIsAnswered_thenTheFieldIsLoggedButNotItsValue()
+            throws NoSuchMethodException {
+        // given
+        String rejectedPassword = "hunter2";
+        MethodArgumentNotValidException exception = rejectionOf("password", rejectedPassword);
+
+        // when
+        new SharedExceptionHandler().handleValidationFailure(exception);
+
+        // then
+        assertThat(sharedAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage())
+                    .contains("password")
+                    .doesNotContain(rejectedPassword);
             assertThat(event.getThrowableProxy()).isNull();
         });
     }
@@ -163,6 +190,20 @@ class AdviceLoggingTest {
             }
         }
         throw new IllegalStateException("Unbalanced " + open + close + " from " + openIndex);
+    }
+
+    private static MethodArgumentNotValidException rejectionOf(String field, String rejectedValue)
+            throws NoSuchMethodException {
+        BindingResult binding = new BeanPropertyBindingResult(new Object(), "request");
+        binding.addError(new FieldError("request", field, rejectedValue, false,
+                new String[]{"Size"}, null, "size must be between 12 and 128"));
+        return new MethodArgumentNotValidException(
+                new MethodParameter(AdviceLoggingTest.class
+                        .getDeclaredMethod("changeInitialPassword", String.class), 0),
+                binding);
+    }
+
+    private static void changeInitialPassword(String password) {
     }
 
     private static final class NotFoundFailure extends DomainFailure {
