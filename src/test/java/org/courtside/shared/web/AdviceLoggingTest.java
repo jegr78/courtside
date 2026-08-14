@@ -4,19 +4,18 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import org.courtside.AbstractIntegrationTest;
 import org.courtside.shared.DomainFailure;
 import org.courtside.shared.ProblemType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.MethodParameter;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.util.ClassUtils;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
@@ -34,19 +33,23 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
-class AdviceLoggingTest extends AbstractIntegrationTest {
+class AdviceLoggingTest {
 
     private static final String OWNED_PACKAGE_PREFIX = "org.courtside";
+
+    private static final String EXCEPTION_HANDLER_ANNOTATION = "@ExceptionHandler";
+
+    // Spring infers the exception type from the parameter, so the annotation may carry no attribute.
+    private static final Pattern EXCEPTION_HANDLER =
+            Pattern.compile(Pattern.quote(EXCEPTION_HANDLER_ANNOTATION) + "(?![A-Za-z0-9_$])");
 
     private static final ProblemType NOT_FOUND = new ProblemType(
             "test-failure-not-found", HttpStatus.NOT_FOUND, "Test failure", "Nothing found");
 
     private static final ProblemType SERVER_ERROR = new ProblemType(
             "test-failure-server-error", HttpStatus.INTERNAL_SERVER_ERROR, "Test failure", "Something broke");
-
-    @Autowired
-    private ApplicationContext context;
 
     private final ListAppender<ILoggingEvent> domainAppender = new ListAppender<>();
     private final ListAppender<ILoggingEvent> sharedAppender = new ListAppender<>();
@@ -150,7 +153,7 @@ class AdviceLoggingTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenTheRegisteredAdvices_whenTheirSourcesAreScanned_thenNoneCallsAPersonAccessor() {
+    void givenTheAdvicesOnTheClassPath_whenTheirSourcesAreScanned_thenNoneCallsAPersonAccessor() {
         // given
         List<Path> advices = adviceSources();
 
@@ -163,7 +166,7 @@ class AdviceLoggingTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenTheRegisteredAdvices_whenTheirSourcesAreScanned_thenEveryExceptionHandlerCallsLogAnswered()
+    void givenTheAdvicesOnTheClassPath_whenTheirSourcesAreScanned_thenEveryExceptionHandlerCallsLogAnswered()
             throws IOException {
         // given
         List<Path> advices = adviceSources();
@@ -171,42 +174,83 @@ class AdviceLoggingTest extends AbstractIntegrationTest {
         // when
         List<String> handlerBodies = new ArrayList<>();
         for (Path advice : advices) {
-            String source = Files.readString(advice);
-            Matcher handlers = Pattern.compile("@ExceptionHandler\\(").matcher(source);
-            while (handlers.find()) {
-                handlerBodies.add(handlerMethodBody(source, handlers.start()));
-            }
+            handlerBodies.addAll(handlerBodies(Files.readString(advice)));
         }
 
         // then
         assertThat(handlerBodies).isNotEmpty();
         assertThat(handlerBodies).allSatisfy(body -> assertThat(body)
-                .as("every @ExceptionHandler method of a registered advice must call logAnswered so "
-                        + "a new handler cannot ship silent")
+                .as("every @ExceptionHandler method of an advice must call logAnswered so a new "
+                        + "handler cannot ship silent")
                 .contains("logAnswered("));
     }
 
-    private List<Path> adviceSources() {
-        List<Path> sources = context.getBeansWithAnnotation(ControllerAdvice.class).values().stream()
-                .map(advice -> ClassUtils.getUserClass(advice).getName())
-                .filter(name -> name.startsWith(OWNED_PACKAGE_PREFIX))
+    @Test
+    void givenAnAdviceWhoseHandlerCarriesNoAttribute_whenItIsScanned_thenItsSilentBodyIsRead() {
+        // given
+        String advice = """
+                @RestControllerAdvice
+                class BareHandlerAdvice {
+
+                    @ExceptionHandler
+                    ProblemDetail handleAnything(IllegalStateException exception) {
+                        return ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+                    }
+                }
+                """;
+
+        // when
+        List<String> handlerBodies = handlerBodies(advice);
+
+        // then
+        assertThat(handlerBodies).singleElement(STRING)
+                .as("a handler that infers its exception type from its parameter must be read like "
+                        + "any other, or the guard passes on an advice that ships silent")
+                .doesNotContain("logAnswered(");
+    }
+
+    private static List<Path> adviceSources() {
+        ClassPathScanningCandidateComponentProvider scanner =
+                new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(ControllerAdvice.class));
+        List<Path> sources = scanner.findCandidateComponents(OWNED_PACKAGE_PREFIX).stream()
+                .map(BeanDefinition::getBeanClassName)
                 .map(name -> Path.of("src/main/java", name.replace('.', '/') + ".java"))
                 .sorted()
                 .toList();
         assertThat(sources)
-                .as("every advice this application registers must resolve to a source file, or a "
-                        + "scan of those files covers less than it claims")
+                .as("every advice on this application's class path must resolve to a source file, "
+                        + "or a scan of those files covers less than it claims")
                 .isNotEmpty()
                 .allSatisfy(source -> assertThat(source).exists());
         return sources;
     }
 
+    private static List<String> handlerBodies(String source) {
+        List<String> bodies = new ArrayList<>();
+        Matcher handlers = EXCEPTION_HANDLER.matcher(source);
+        while (handlers.find()) {
+            bodies.add(handlerMethodBody(source, handlers.start()));
+        }
+        return bodies;
+    }
+
     private static String handlerMethodBody(String source, int handlerStart) {
-        int annotationOpen = source.indexOf('(', handlerStart);
-        int annotationClose = matchingClose(source, annotationOpen, '(', ')');
-        int bodyStart = source.indexOf('{', annotationClose);
+        int attributesOpen = attributeListStart(source, handlerStart);
+        int signatureStart = attributesOpen < 0
+                ? handlerStart
+                : matchingClose(source, attributesOpen, '(', ')');
+        int bodyStart = source.indexOf('{', signatureStart);
         int bodyEnd = matchingClose(source, bodyStart, '{', '}');
         return source.substring(handlerStart, bodyEnd + 1);
+    }
+
+    private static int attributeListStart(String source, int handlerStart) {
+        int index = handlerStart + EXCEPTION_HANDLER_ANNOTATION.length();
+        while (index < source.length() && Character.isWhitespace(source.charAt(index))) {
+            index++;
+        }
+        return index < source.length() && source.charAt(index) == '(' ? index : -1;
     }
 
     private static int matchingClose(String source, int openIndex, char open, char close) {
