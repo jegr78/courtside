@@ -17,7 +17,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
@@ -45,8 +44,9 @@ class CourtsideUserDetailsServiceTest {
         CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter);
 
         // when / then
-        assertThatCode(() -> service.updatePassword(user, "new-hash")).doesNotThrowAnyException();
-        assertThat(service.updatePassword(user, "new-hash")).isSameAs(user);
+        assertThat(service.updatePassword(user, "new-hash"))
+                .as("a failed rehash write must leave the authenticated user untouched")
+                .isSameAs(user);
     }
 
     @Test
@@ -64,7 +64,8 @@ class CourtsideUserDetailsServiceTest {
         CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter);
 
         // when / then
-        assertThatCode(() -> service.updatePassword(user, "new-hash")).doesNotThrowAnyException();
-        assertThat(service.updatePassword(user, "new-hash")).isSameAs(user);
+        assertThat(service.updatePassword(user, "new-hash"))
+                .as("a rehash write that cannot even begin its transaction must leave the user untouched")
+                .isSameAs(user);
     }
 }
