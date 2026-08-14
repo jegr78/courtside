@@ -5,6 +5,7 @@ import org.courtside.identity.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsPasswordService;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -16,7 +17,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class CourtsideUserDetailsService implements UserDetailsService {
+public class CourtsideUserDetailsService implements UserDetailsService, UserDetailsPasswordService {
 
     private static final String ROLE_PREFIX = "ROLE_";
     static final String PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED";
@@ -40,5 +41,14 @@ public class CourtsideUserDetailsService implements UserDetailsService {
                 .disabled(!account.isEnabled())
                 .authorities(authorities.toArray(String[]::new))
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public UserDetails updatePassword(UserDetails user, String newPassword) {
+        accounts.findByUsername(user.getUsername())
+                .ifPresent(account -> accounts.rehashPassword(
+                        account.getId(), account.getPasswordHash(), newPassword));
+        return user;
     }
 }
