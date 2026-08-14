@@ -10,6 +10,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 
 import java.io.IOException;
@@ -25,24 +26,41 @@ class AdviceLoggingTest {
     private static final ProblemType NOT_FOUND = new ProblemType(
             "test-failure-not-found", HttpStatus.NOT_FOUND, "Test failure", "Nothing found");
 
-    private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
-    private Logger logger;
+    private static final ProblemType SERVER_ERROR = new ProblemType(
+            "test-failure-server-error", HttpStatus.INTERNAL_SERVER_ERROR, "Test failure", "Something broke");
+
+    private final ListAppender<ILoggingEvent> domainAppender = new ListAppender<>();
+    private final ListAppender<ILoggingEvent> sharedAppender = new ListAppender<>();
+    private Logger domainLogger;
+    private Logger sharedLogger;
+    private Level domainLoggerOriginalLevel;
+    private Level sharedLoggerOriginalLevel;
 
     @BeforeEach
-    void attachAppender() {
-        logger = (Logger) LoggerFactory.getLogger(DomainFailureHandler.class);
-        logger.setLevel(Level.DEBUG);
-        appender.start();
-        logger.addAppender(appender);
+    void attachAppenders() {
+        domainLogger = (Logger) LoggerFactory.getLogger(DomainFailureHandler.class);
+        domainLoggerOriginalLevel = domainLogger.getLevel();
+        domainLogger.setLevel(Level.DEBUG);
+        domainAppender.start();
+        domainLogger.addAppender(domainAppender);
+
+        sharedLogger = (Logger) LoggerFactory.getLogger(SharedExceptionHandler.class);
+        sharedLoggerOriginalLevel = sharedLogger.getLevel();
+        sharedLogger.setLevel(Level.DEBUG);
+        sharedAppender.start();
+        sharedLogger.addAppender(sharedAppender);
     }
 
     @AfterEach
-    void detachAppender() {
-        logger.detachAppender(appender);
+    void detachAppenders() {
+        domainLogger.detachAppender(domainAppender);
+        domainLogger.setLevel(domainLoggerOriginalLevel);
+        sharedLogger.detachAppender(sharedAppender);
+        sharedLogger.setLevel(sharedLoggerOriginalLevel);
     }
 
     @Test
-    void givenADomainFailure_whenItIsAnswered_thenItIsLoggedAtDebugWithItsMessage() {
+    void givenA4xxDomainFailure_whenItIsAnswered_thenItIsLoggedAtDebugWithItsMessage() {
         // given
         UUID bookingId = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
         DomainFailure failure = new NotFoundFailure("No booking with id " + bookingId);
@@ -51,14 +69,47 @@ class AdviceLoggingTest {
         new DomainFailureHandler().handleDomainFailure(failure);
 
         // then
-        assertThat(appender.list).singleElement().satisfies(event -> {
+        assertThat(domainAppender.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
             assertThat(event.getFormattedMessage()).contains(bookingId.toString());
+            assertThat(event.getThrowableProxy()).isNull();
         });
     }
 
     @Test
-    void whenAnAdviceLogs_thenItNeverNamesAPersonOrTheirAddress() throws IOException {
+    void givenA5xxDomainFailure_whenItIsAnswered_thenItIsLoggedAtWarnWithItsExceptionAttached() {
+        // given
+        DomainFailure failure = new ServerErrorFailure("Something went wrong");
+
+        // when
+        new DomainFailureHandler().handleDomainFailure(failure);
+
+        // then
+        assertThat(domainAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getThrowableProxy()).isNotNull();
+        });
+    }
+
+    @Test
+    void givenAFrameworkExceptionAnsweredAt4xx_whenItIsAnswered_thenItIsLoggedAtDebugWithItsMessage() {
+        // given
+        DataIntegrityViolationException exception =
+                new DataIntegrityViolationException("some_constraint_nothing_recognises");
+
+        // when
+        new SharedExceptionHandler().handleRejectedByTheDatabase(exception);
+
+        // then
+        assertThat(sharedAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
+            assertThat(event.getFormattedMessage()).contains("some_constraint_nothing_recognises");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
+    void givenTheAdviceSources_whenReadThenNeitherNamesAPersonOrTheirAddress() throws IOException {
         // given
         List<Path> advices = List.of(
                 Path.of("src/main/java/org/courtside/shared/web/DomainFailureHandler.java"),
@@ -78,6 +129,17 @@ class AdviceLoggingTest {
         @Override
         public ProblemType problemType() {
             return NOT_FOUND;
+        }
+    }
+
+    private static final class ServerErrorFailure extends DomainFailure {
+        ServerErrorFailure(String message) {
+            super(message);
+        }
+
+        @Override
+        public ProblemType problemType() {
+            return SERVER_ERROR;
         }
     }
 }

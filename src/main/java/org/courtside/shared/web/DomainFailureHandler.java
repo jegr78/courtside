@@ -18,8 +18,12 @@ class DomainFailureHandler {
 
     @ExceptionHandler(DomainFailure.class)
     ResponseEntity<ProblemDetail> handleDomainFailure(DomainFailure failure) {
-        log.debug("Answering {} with {}: {}",
-                failure.getStatusCode(), failure.getBody().getType(), failure.getMessage());
+        if (failure.getStatusCode().is5xxServerError()) {
+            log.warn("Answering {} with {}", failure.getStatusCode(), failure.problemType().uri(), failure);
+        } else {
+            log.debug("Answering {} with {}: {}",
+                    failure.getStatusCode(), failure.problemType().uri(), failure.getMessage());
+        }
         return ResponseEntity.status(failure.getStatusCode())
                 .headers(failure.getHeaders())
                 .body(failure.getBody());
