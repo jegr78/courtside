@@ -4,7 +4,7 @@ import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataAccessException;
+import org.springframework.core.NestedRuntimeException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsPasswordService;
@@ -59,7 +59,7 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
     private void rehash(UserAccount account, UserDetails user, String newPassword) {
         try {
             rehashWriter.rehash(account.getId(), user.getPassword(), newPassword);
-        } catch (DataAccessException e) {
+        } catch (NestedRuntimeException e) {
             log.warn("Password rehash failed for account {}", account.getId(), e);
         }
     }

@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 import java.util.Optional;
 import java.util.Set;
@@ -40,6 +41,25 @@ class CourtsideUserDetailsServiceTest {
                 .build();
         when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
         doThrow(new DataAccessResourceFailureException("read-only replica"))
+                .when(rehashWriter).rehash(account.getId(), "old-hash", "new-hash");
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter);
+
+        // when / then
+        assertThatCode(() -> service.updatePassword(user, "new-hash")).doesNotThrowAnyException();
+        assertThat(service.updatePassword(user, "new-hash")).isSameAs(user);
+    }
+
+    @Test
+    void givenTheCollaboratorFailsAtTransactionBegin_whenUpdatingThePassword_thenTheUserIsStillReturned() {
+        // given
+        UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
+                "doe.jane", "old-hash", Set.of(Role.MEMBER));
+        UserDetails user = User.withUsername("doe.jane")
+                .password("old-hash")
+                .authorities("ROLE_MEMBER")
+                .build();
+        when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
+        doThrow(new CannotCreateTransactionException("connection pool exhausted"))
                 .when(rehashWriter).rehash(account.getId(), "old-hash", "new-hash");
         CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter);
 
