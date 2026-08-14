@@ -16,8 +16,11 @@ import org.springframework.http.HttpStatus;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -119,6 +122,41 @@ class AdviceLoggingTest {
         assertThat(advices).allSatisfy(advice -> assertThat(Files.readString(advice))
                 .as("%s must log the userAccountId, never a person", advice)
                 .doesNotContain("getEmail", "getDisplayName", "getFirstName", "getLastName"));
+    }
+
+    @Test
+    void givenTheSharedAdviceSource_whenReadThenEveryExceptionHandlerCallsLogAnswered() throws IOException {
+        // given
+        String source = Files.readString(
+                Path.of("src/main/java/org/courtside/shared/web/SharedExceptionHandler.java"));
+        Matcher handlers = Pattern.compile("@ExceptionHandler\\(").matcher(source);
+
+        // when
+        List<String> handlerBodies = new ArrayList<>();
+        while (handlers.find()) {
+            handlerBodies.add(handlerMethodBody(source, handlers.start()));
+        }
+
+        // then
+        assertThat(handlerBodies).isNotEmpty();
+        assertThat(handlerBodies).allSatisfy(body -> assertThat(body)
+                .as("every @ExceptionHandler method must call logAnswered so a new handler cannot "
+                        + "ship silent")
+                .contains("logAnswered("));
+    }
+
+    private static String handlerMethodBody(String source, int handlerStart) {
+        int bodyStart = source.indexOf('{', handlerStart);
+        int depth = 0;
+        int index = bodyStart;
+        for (; index < source.length(); index++) {
+            char character = source.charAt(index);
+            depth += character == '{' ? 1 : character == '}' ? -1 : 0;
+            if (depth == 0) {
+                break;
+            }
+        }
+        return source.substring(handlerStart, index + 1);
     }
 
     private static final class NotFoundFailure extends DomainFailure {
