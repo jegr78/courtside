@@ -31,7 +31,8 @@ test("given a backup archive, when qualification runs, then corruption is reject
   assert.match(runner, /corrupt archive unexpectedly restored/);
   assert.match(runner, /corrupt restore left database objects behind/);
   assert.match(runner, /interrupted restore changed the usable database/);
-  assert.match(runner, /rmSync\(join\(build, "courtside\.dump"\)/);
+  assert.match(runner, /mkdtempSync\(join\(tmpdir\(\), "courtside-restore-"\)/);
+  assert.doesNotMatch(runner, /join\(build, "courtside\.dump"\)/);
 });
 
 test("given a release candidate, when release qualification runs, then restore blocks publication", () => {
@@ -43,6 +44,8 @@ test("given a release candidate, when release qualification runs, then restore b
   assert.match(workflow, /COURTSIDE_RESTORE_IMAGE:[^\n]+needs\.image\.outputs\.digest/);
   assert.match(workflow, /node tools\/courtside\.restore-smoke\.mjs --confirm courtside-restore/);
   assert.match(workflow, /needs: \[build, image, qualify, upgrade, restore\]/);
+  assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.dump/);
+  assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.sql/);
 });
 
 test("given the recurring restore workflow, when it runs, then evidence is retained", () => {
@@ -54,6 +57,8 @@ test("given the recurring restore workflow, when it runs, then evidence is retai
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /courtside\.restore-smoke\.mjs --confirm courtside-restore/);
   assert.match(workflow, /retention-days: 14/);
+  assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.dump/);
+  assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.sql/);
 });
 
 test("given operator documentation, when backup and restore are followed, then both use the qualified archive format", () => {
@@ -62,6 +67,9 @@ test("given operator documentation, when backup and restore are followed, then b
 
   // when / then
   assert.match(documentation, /pg_dump -Fc/);
+  assert.match(documentation, /pg_restore --list/);
+  assert.match(documentation, /mktemp/);
+  assert.match(documentation, /mv "\$temporary" "\$backup"/);
   assert.match(documentation, /pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error/);
   assert.match(documentation, /matching Courtside image/);
 });

@@ -247,7 +247,12 @@ jobs:
         if: always()
         with:
           name: database-restore
-          path: build/database-restore
+          path: |
+            build/database-restore
+            !build/database-restore/**/*.dump
+            !build/database-restore/**/*.sql
+            !build/database-restore/**/*.sql.gz
+            !build/database-restore/**/*.backup
           retention-days: 14
           if-no-files-found: error
 

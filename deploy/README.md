@@ -148,7 +148,17 @@ edit an applied migration. Keep the application stopped and restore the pre-upgr
 Back up before an upgrade. The database holds everything; the containers hold nothing:
 
 ```sh
-docker compose exec -T db pg_dump -Fc --no-owner -U courtside courtside > courtside-$(date +%F).dump
+set -eu
+umask 077
+temporary=$(mktemp "./.courtside-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.partial")
+backup=${temporary#./.}
+backup=${backup%.partial}.dump
+trap 'rm -f "$temporary"' EXIT
+docker compose exec -T db pg_dump -Fc --no-owner -U courtside courtside > "$temporary"
+docker compose exec -T db pg_restore --list < "$temporary" > /dev/null
+mv "$temporary" "$backup"
+trap - EXIT
+echo "Backup written to $backup"
 ```
 
 Treat the archive, the matching Courtside image reference and the `.env` configuration as one

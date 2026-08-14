@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -165,6 +166,8 @@ async function execute() {
   const runId = `${process.pid}-${randomBytes(4).toString("hex")}`;
   const project = `courtside-restore-${runId}`;
   const build = join(root, "build", "database-restore", runId);
+  const privateDirectory = mkdtempSync(join(tmpdir(), "courtside-restore-"));
+  const dumpPath = join(privateDirectory, "courtside.dump");
   const password = newBootstrapPassword();
   const environment = { COURTSIDE_RESTORE_IMAGE: image, COURTSIDE_RESTORE_ADMIN_PASSWORD: password };
   const startedAt = Date.now();
@@ -180,7 +183,7 @@ async function execute() {
     writeFileSync(join(build, "before.json"), `${JSON.stringify(before, null, 2)}\n`);
     const dump = compose(project, environment,
       ["exec", "-T", "db", "pg_dump", "-Fc", "--no-owner", "-U", "courtside", "courtside"], { binary: true }).stdout;
-    writeFileSync(join(build, "courtside.dump"), dump, { mode: 0o600 });
+    writeFileSync(dumpPath, dump, { mode: 0o600 });
     const imageId = run("docker", ["image", "inspect", "--format", "{{.Id}}", image]).stdout.trim();
 
     compose(project, environment, ["down", "--volumes", "--remove-orphans"]);
@@ -207,7 +210,7 @@ async function execute() {
     assert.notEqual(overlap.status, 0, "restored overlap constraint accepted conflicting data");
     const result = {
       status: "passed", image, imageId, schemaVersion: after.structure.schemaVersion,
-      backupBytes: statSync(join(build, "courtside.dump")).size, durationMillis: Date.now() - startedAt
+      backupBytes: statSync(dumpPath).size, durationMillis: Date.now() - startedAt
     };
     writeFileSync(join(build, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
   } catch (error) {
@@ -218,7 +221,7 @@ async function execute() {
     throw error;
   } finally {
     compose(project, environment, ["down", "--volumes", "--remove-orphans"], { allowFailure: true });
-    rmSync(join(build, "courtside.dump"), { force: true });
+    rmSync(privateDirectory, { recursive: true, force: true });
   }
 }
 
