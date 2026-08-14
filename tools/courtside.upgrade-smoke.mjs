@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -25,6 +26,15 @@ export function selectUpgradeOrigins(candidateTag, tags) {
   const patch = versions.find((version) => version.minor === candidate.minor);
   const minor = versions.find((version) => version.minor < candidate.minor);
   return [...new Set([patch?.tag, minor?.tag].filter(Boolean))];
+}
+
+export function selectRepositoryDigest(repository, originTag, repoDigests) {
+  const prefix = `ghcr.io/${repository}@sha256:`;
+  const matches = repoDigests.filter((digest) => digest.startsWith(prefix));
+  if (matches.length !== 1) {
+    throw new Error(`Release ${originTag} did not resolve to exactly one digest in ${repository}`);
+  }
+  return matches[0];
 }
 
 function run(command, args, options = {}) {
@@ -57,6 +67,13 @@ function scalar(project, environment, sql) {
   return psql(project, environment, ["-Atc", sql]).stdout.trim();
 }
 
+function publishedPort(project, environment) {
+  const output = compose(project, environment, ["port", "app", "8080"]).stdout.trim();
+  const match = /:(\d+)$/.exec(output);
+  if (!match) throw new Error(`Could not resolve the application port from: ${output}`);
+  return Number(match[1]);
+}
+
 async function waitForDatabase(project, environment, sql, expected, label) {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (scalar(project, environment, sql) === expected) return;
@@ -65,7 +82,7 @@ async function waitForDatabase(project, environment, sql, expected, label) {
   throw new Error(`Database did not expose ${label}`);
 }
 
-async function proveInterruptedStartup(project, originEnvironment, candidateEnvironment, before, originVersion, build) {
+async function proveInterruptedStartup(project, originEnvironment, candidateEnvironment, before, originVersion, build, password) {
   compose(project, originEnvironment, ["stop", "app"]);
   const lockHolder = spawn("docker", ["compose", "-p", project, "-f", composeFile,
     "exec", "-T", "-e", "PGAPPNAME=upgrade-lock-holder", "db", "psql", "-v", "ON_ERROR_STOP=1",
@@ -80,7 +97,7 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
     await waitForDatabase(project, candidateEnvironment,
       "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND application_name <> 'upgrade-lock-holder'",
       "1", "the candidate waiting for Flyway's history lock");
-    await assert.rejects(localRequest({ secure: false, port: 8084, path: "/api/session" }));
+    await assert.rejects(localRequest({ secure: false, port: publishedPort(project, candidateEnvironment), path: "/api/session" }));
     compose(project, candidateEnvironment, ["stop", "app"]);
     psql(project, candidateEnvironment,
       ["-Atc", "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'upgrade-lock-holder'"]);
@@ -91,6 +108,24 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
     }).stdout.trim();
     assert.equal(version, originVersion, "interrupted startup changed the schema version");
     assert.equal(afterInterruption, before, "interrupted startup changed fixture data");
+    psql(project, originEnvironment, ["-c", `
+      CREATE TABLE upgrade_session_snapshot AS TABLE spring_session;
+      CREATE TABLE upgrade_session_attribute_snapshot AS TABLE spring_session_attributes;
+      CREATE TABLE upgrade_login_limit_snapshot AS TABLE login_attempt_limit`]);
+    compose(project, originEnvironment, ["up", "-d", "--wait", "--force-recreate", "app"]);
+    await verifyApplication(password, publishedPort(project, originEnvironment), false);
+    compose(project, originEnvironment, ["stop", "app"]);
+    psql(project, originEnvironment, ["-c", `
+      TRUNCATE spring_session_attributes, spring_session;
+      INSERT INTO spring_session SELECT * FROM upgrade_session_snapshot;
+      INSERT INTO spring_session_attributes SELECT * FROM upgrade_session_attribute_snapshot;
+      TRUNCATE login_attempt_limit;
+      INSERT INTO login_attempt_limit SELECT * FROM upgrade_login_limit_snapshot;
+      DROP TABLE upgrade_session_snapshot, upgrade_session_attribute_snapshot, upgrade_login_limit_snapshot`]);
+    const afterRecoveryProof = psql(project, originEnvironment, ["-At", "-f", "/dev/stdin"], {
+      input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
+    }).stdout.trim();
+    assert.equal(afterRecoveryProof, before, "origin usability proof changed fixture data");
     writeFileSync(join(build, "interrupted-startup.json"),
       `${JSON.stringify({ status: "passed", schemaVersion: version, trafficAccepted: false }, null, 2)}\n`);
   } finally {
@@ -106,35 +141,41 @@ function cookiesFrom(response, jar) {
   }
 }
 
-async function request(jar, options) {
+async function request(jar, port, options) {
   const headers = { Cookie: [...jar].map(([name, value]) => `${name}=${value}`).join("; "), ...options.headers };
-  const response = await localRequest({ secure: false, port: 8084, ...options, headers });
+  let response;
+  try {
+    response = await localRequest({ secure: false, port, ...options, headers });
+  } catch (error) {
+    throw new Error(`${options.method ?? "GET"} ${options.path} failed: ${error.message}`, { cause: error });
+  }
   cookiesFrom(response, jar);
   return response;
 }
 
-async function verifyApplication(password) {
+async function verifyApplication(password, port, isWriteRequired = true) {
   const jar = new Map();
-  const session = await request(jar, { path: "/api/session" });
+  const session = await request(jar, port, { path: "/api/session" });
   assert.equal(session.statusCode, 200, session.body);
   const token = decodeURIComponent(jar.get("XSRF-TOKEN"));
-  const login = await request(jar, {
+  const login = await request(jar, port, {
     path: "/api/session", method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", "X-XSRF-TOKEN": token },
     body: `username=upgrade-member&password=${encodeURIComponent(password)}`
   });
   assert.equal(login.statusCode, 200, login.body);
-  const courts = await request(jar, { path: "/api/public/courts" });
+  const courts = await request(jar, port, { path: "/api/public/courts" });
   assert.equal(courts.statusCode, 200, courts.body);
   assert.ok(JSON.parse(courts.body).some((court) => court.name === "Upgrade court"));
-  const bookings = await request(jar, { path: "/api/my/bookings" });
+  if (!isWriteRequired) return;
+  const bookings = await request(jar, port, { path: "/api/my/bookings" });
   assert.equal(bookings.statusCode, 200, bookings.body);
   assert.match(bookings.body, /77000000-0000-0000-0000-000000000001/);
 
   const startsAt = new Date();
   startsAt.setUTCDate(startsAt.getUTCDate() + 2);
   startsAt.setUTCHours(10, 0, 0, 0);
-  const created = await request(jar, {
+  const created = await request(jar, port, {
     path: "/api/bookings", method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -174,18 +215,21 @@ async function executeUpgrade() {
   if (!candidate || !origin) throw new Error("Candidate image and upgrade origin are required");
 
   const suffix = origin.replaceAll(/[^a-zA-Z0-9]/g, "-").toLowerCase();
-  const project = `courtside-upgrade-${suffix}`;
-  const build = join(root, "build", "database-upgrade", suffix);
+  const runId = `${process.pid}-${randomBytes(4).toString("hex")}`;
+  const project = `courtside-upgrade-${suffix}-${runId}`;
+  const build = join(root, "build", "database-upgrade", suffix, runId);
   const password = newBootstrapPassword();
   mkdirSync(build, { recursive: true });
   const fixture = fixtureFor(origin, build);
   const baseEnvironment = { COURTSIDE_UPGRADE_ADMIN_PASSWORD: password };
   let originImage = candidate;
   if (origin !== "pre-release-v17") {
-    const originTag = `ghcr.io/${process.env.GITHUB_REPOSITORY}:${origin.slice(1)}`;
+    const repository = process.env.GITHUB_REPOSITORY;
+    if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
+    const originTag = `ghcr.io/${repository}:${origin.slice(1)}`;
     run("docker", ["pull", originTag], { inherit: true });
-    originImage = run("docker", ["image", "inspect", "--format", "{{index .RepoDigests 0}}", originTag]).stdout.trim();
-    if (!originImage.includes("@sha256:")) throw new Error(`Release ${origin} did not resolve to an image digest`);
+    const digests = JSON.parse(run("docker", ["image", "inspect", "--format", "{{json .RepoDigests}}", originTag]).stdout);
+    originImage = selectRepositoryDigest(repository, origin, digests);
   }
   writeFileSync(join(build, "origin-image.txt"), `${originImage}\n`);
   const originEnvironment = {
@@ -213,7 +257,7 @@ async function executeUpgrade() {
     const originVersion = scalar(project, originEnvironment,
       "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1");
 
-    await proveInterruptedStartup(project, originEnvironment, candidateEnvironment, before, originVersion, build);
+    await proveInterruptedStartup(project, originEnvironment, candidateEnvironment, before, originVersion, build, password);
     compose(project, candidateEnvironment, ["up", "-d", "--wait", "--force-recreate", "app"]);
     const after = psql(project, candidateEnvironment, ["-At", "-f", "/dev/stdin"], {
       input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
@@ -235,7 +279,7 @@ async function executeUpgrade() {
     assert.equal(transformation, "0", "booking-card managing roles differ from the explicit migration transform");
     writeFileSync(join(build, "expected-transformations.json"),
       `${JSON.stringify({ bookingCardManagingRolesDerivedFromAllowedNonMemberRoles: true }, null, 2)}\n`);
-    await verifyApplication(password);
+    await verifyApplication(password, publishedPort(project, candidateEnvironment));
 
     const overlap = psql(project, candidateEnvironment, ["-c", `INSERT INTO court_allocation
       (id, booking_id, court_id, starts_at, ends_at, status) VALUES
