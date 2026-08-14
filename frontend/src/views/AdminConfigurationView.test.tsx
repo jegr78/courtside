@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -78,6 +78,43 @@ describe("AdminConfigurationView", () => {
     }));
     expect(configurationChanged).toHaveBeenCalled();
     expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 });
+  });
+
+  it("given an edited setting, when a locale change finishes an older reload, then the edit is retained", async () => {
+    // given
+    const reload = deferred<Awaited<ReturnType<typeof api.adminConfig>>>();
+    const adminConfig = vi.mocked(api.adminConfig);
+    adminConfig.mockReturnValueOnce(Promise.resolve({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      defaultLocale: "en",
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
+    })).mockReturnValueOnce(reload.promise);
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    const user = userEvent.setup();
+    const clubName = await screen.findByTestId("club-name");
+    await user.clear(clubName);
+    await user.type(clubName, "Example Racquet Club");
+
+    // when
+    await i18n.changeLanguage("de");
+    await waitFor(() => expect(adminConfig).toHaveBeenCalledTimes(2));
+    await act(() => {
+      reload.resolve({
+        clubName: "Example Tennis Club",
+        primaryColor: "#b85c38",
+        accentColor: "#d7e24b",
+        defaultLocale: "en",
+        slotMinutes: 30,
+        timeZone: "Europe/Berlin"
+      });
+      return reload.promise;
+    });
+
+    // then
+    await waitFor(() => expect(clubName).toHaveValue("Example Racquet Club"));
   });
 
   it("given the API rejects a club setting, when saving, then its validation code is reported", async () => {
