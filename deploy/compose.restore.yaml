@@ -1,0 +1,49 @@
+name: courtside-restore
+
+services:
+  db:
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    environment:
+      POSTGRES_DB: courtside
+      POSTGRES_USER: courtside
+      POSTGRES_PASSWORD: courtside-restore
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courtside -d courtside"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    image: ${COURTSIDE_RESTORE_IMAGE}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
+      SPRING_DATASOURCE_USERNAME: courtside
+      SPRING_DATASOURCE_PASSWORD: courtside-restore
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      COURTSIDE_COOKIE_SECURE: "false"
+      COURTSIDE_ENVIRONMENT: UAT
+      COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: admin
+      COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_RESTORE_ADMIN_PASSWORD}
+      COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
+    ports:
+      - "127.0.0.1::8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+
+volumes:
+  db:

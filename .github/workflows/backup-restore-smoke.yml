@@ -1,0 +1,55 @@
+name: backup restore smoke
+
+on:
+  schedule:
+    - cron: '23 3 * * 4'
+  workflow_dispatch:
+
+concurrency:
+  group: backup-restore-smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+
+      - name: Build and test
+        run: ./mvnw -B verify
+
+      - name: Build the candidate image
+        run: |
+          jar=$(find target -maxdepth 1 -name 'courtside-*.jar' ! -name '*.original' -print -quit)
+          java -Djarmode=tools -jar "$jar" extract --layers --launcher --destination build/restore-layers
+          docker build --build-arg LAYERS=build/restore-layers -t courtside:restore-smoke .
+
+      - name: Prove backup and restore
+        env:
+          COURTSIDE_RESTORE_IMAGE: courtside:restore-smoke
+        run: node tools/courtside.restore-smoke.mjs --confirm courtside-restore
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: database-restore-${{ github.run_id }}
+          path: |
+            build/database-restore
+            !build/database-restore/**/*.dump
+            !build/database-restore/**/*.sql
+            !build/database-restore/**/*.sql.gz
+            !build/database-restore/**/*.backup
+          retention-days: 14
+          if-no-files-found: error
