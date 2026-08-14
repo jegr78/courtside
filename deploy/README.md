@@ -141,7 +141,9 @@ of the second command would stop Caddy.
 
 Migrations run on startup and support skipping versions, so an instance that has not been updated
 for a year goes to the current release directly. Read the release notes first: every release opens
-with upgrade notes, and a change to a published surface is named there explicitly.
+with upgrade notes, names the database versions exercised by the release gate, and identifies any
+change to a published surface. If startup rejects a migration, do not attempt to reverse Flyway or
+edit an applied migration. Keep the application stopped and restore the pre-upgrade backup.
 
 Back up before an upgrade. The database holds everything; the containers hold nothing:
 

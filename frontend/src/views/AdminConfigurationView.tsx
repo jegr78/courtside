@@ -37,7 +37,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     void Promise.all([api.adminConfig(), api.ruleSets(), api.ruleTypes()])
       .then(([loadedConfig, loadedRuleSets, loadedRuleTypes]) => {
         if (!active) return;
-        setConfig(loadedConfig);
+        setConfig((current) => current ?? loadedConfig);
         setRuleSets(loadedRuleSets);
         setRuleTypes(loadedRuleTypes);
         selectRuleSet(loadedRuleSets[0]?.id ?? "");

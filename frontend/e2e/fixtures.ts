@@ -10,9 +10,9 @@ interface TestFixtures {
 }
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
-  journeyService: [async ({ browserName }, provide, workerInfo) => {
+  journeyService: [async ({ browserName }, provide) => {
     void browserName;
-    const service = await startJourneyService(workerInfo.workerIndex);
+    const service = await startJourneyService();
     await provide(service);
     await service.stop();
   }, { scope: "worker" }],

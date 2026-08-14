@@ -1,5 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { readdirSync, rmSync, statSync } from "node:fs";
+import { createServer, type AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
@@ -144,6 +146,16 @@ export interface JourneyService {
   stop(): Promise<void>;
 }
 
+async function availableLoopbackPort(): Promise<number> {
+  const server = createServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const port = (server.address() as AddressInfo).port;
+  await new Promise<void>((resolveClose, rejectClose) =>
+    server.close((error) => error ? rejectClose(error) : resolveClose()));
+  return port;
+}
+
 async function snapshotJourneyData(postgres: StartedTestContainer): Promise<string[]> {
   const tablesResult = await postgres.exec([
     "psql", "-U", "courtside", "-d", "courtside", "-At", "-c",
@@ -179,12 +191,12 @@ async function resetJourneyData(postgres: StartedTestContainer, tables: string[]
   }
 }
 
-export async function startJourneyService(workerIndex: number): Promise<JourneyService> {
+export async function startJourneyService(): Promise<JourneyService> {
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
   try {
     const visualDate = tomorrowInBerlin();
-    const port = 18080 + workerIndex;
+    const port = await availableLoopbackPort();
     const baseURL = `http://127.0.0.1:${port}`;
     postgres = await new GenericContainer(
       "postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
