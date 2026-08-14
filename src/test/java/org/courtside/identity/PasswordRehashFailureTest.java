@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -18,6 +17,8 @@ import java.util.Set;
 
 import static org.courtside.identity.AccountFixtures.enabled;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -30,9 +31,6 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
 
     @Autowired
     private WebApplicationContext context;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     @MockitoBean
     private UserAccountRepository accounts;
@@ -47,20 +45,26 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
     @Test
     void givenTheRehashWriteFails_whenTheMemberSignsIn_thenTheLoginStillSucceeds() throws Exception {
         // given
-        Argon2PasswordEncoder weaker = new Argon2PasswordEncoder(16, 32, 1, 16384, 2);
         UserAccount account = enabled(new UserAccount(
                 new Person("John", "Roe", "john.roe@example.org"),
-                "roe.john", weaker.encode(PASSWORD), Set.of(Role.MEMBER)));
+                "roe.john", weaklyHashedPassword(), Set.of(Role.MEMBER)));
         when(accounts.findByUsername("roe.john")).thenReturn(Optional.of(account));
         when(accounts.rehashPassword(any(), any(), any()))
                 .thenThrow(new DataAccessResourceFailureException("read-only replica"));
 
-        // when / then
+        // when
         mockMvc.perform(post("/api/session")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("username", "roe.john")
                         .param("password", PASSWORD)
                         .with(csrf()))
                 .andExpect(status().isOk());
+
+        // then
+        verify(accounts).rehashPassword(eq(account.getId()), eq(account.getPasswordHash()), any());
+    }
+
+    private String weaklyHashedPassword() {
+        return new Argon2PasswordEncoder(16, 32, 1, 16384, 2).encode(PASSWORD);
     }
 }
