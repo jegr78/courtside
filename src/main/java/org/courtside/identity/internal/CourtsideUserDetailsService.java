@@ -4,6 +4,7 @@ import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsPasswordService;
@@ -26,6 +27,7 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
     static final String PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED";
 
     private final UserAccountRepository accounts;
+    private final PasswordRehashWriter rehashWriter;
 
     @Override
     public UserDetails loadUserByUsername(String username) {
@@ -47,7 +49,7 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public UserDetails updatePassword(UserDetails user, String newPassword) {
         accounts.findByUsername(user.getUsername())
                 .ifPresent(account -> rehash(account, user, newPassword));
@@ -56,8 +58,8 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
 
     private void rehash(UserAccount account, UserDetails user, String newPassword) {
         try {
-            accounts.rehashPassword(account.getId(), user.getPassword(), newPassword);
-        } catch (RuntimeException e) {
+            rehashWriter.rehash(account.getId(), user.getPassword(), newPassword);
+        } catch (DataAccessException e) {
             log.warn("Password rehash failed for account {}", account.getId(), e);
         }
     }

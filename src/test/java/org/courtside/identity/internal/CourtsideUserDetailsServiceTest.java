@@ -17,6 +17,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,8 +26,11 @@ class CourtsideUserDetailsServiceTest {
     @Mock
     private UserAccountRepository accounts;
 
+    @Mock
+    private PasswordRehashWriter rehashWriter;
+
     @Test
-    void givenTheRehashWriteFails_whenUpdatingThePassword_thenTheLoginStillSucceeds() {
+    void givenTheRehashWriteFails_whenUpdatingThePassword_thenTheUserIsStillReturned() {
         // given
         UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
                 "doe.jane", "old-hash", Set.of(Role.MEMBER));
@@ -35,14 +39,12 @@ class CourtsideUserDetailsServiceTest {
                 .authorities("ROLE_MEMBER")
                 .build();
         when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
-        when(accounts.rehashPassword(account.getId(), "old-hash", "new-hash"))
-                .thenThrow(new DataAccessResourceFailureException("read-only replica"));
-        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts);
+        doThrow(new DataAccessResourceFailureException("read-only replica"))
+                .when(rehashWriter).rehash(account.getId(), "old-hash", "new-hash");
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter);
 
         // when / then
-        assertThatCode(() -> {
-            UserDetails result = service.updatePassword(user, "new-hash");
-            assertThat(result).isSameAs(user);
-        }).doesNotThrowAnyException();
+        assertThatCode(() -> service.updatePassword(user, "new-hash")).doesNotThrowAnyException();
+        assertThat(service.updatePassword(user, "new-hash")).isSameAs(user);
     }
 }
