@@ -158,7 +158,7 @@ class AdviceLoggingTest extends AbstractIntegrationTest {
         assertThat(advices).allSatisfy(advice -> assertThat(Files.readString(advice))
                 .as("%s must log the userAccountId, never a person. Source text is all this scan "
                         + "reads: a value arriving inside a framework exception's message is beyond "
-                        + "it, and the behavioural tests above cover that", advice)
+                        + "it, and only a test that reads what was logged can see one", advice)
                 .doesNotContain("getEmail", "getDisplayName", "getFirstName", "getLastName"));
     }
 
