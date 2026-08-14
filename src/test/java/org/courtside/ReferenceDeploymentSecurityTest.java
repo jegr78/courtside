@@ -32,8 +32,11 @@ class ReferenceDeploymentSecurityTest {
             "image: courtside:perf-local";
     private static final String UPGRADE_CANDIDATE_IMAGE_ALIAS =
             "image: ${COURTSIDE_UPGRADE_IMAGE}";
+    private static final String RESTORE_CANDIDATE_IMAGE_ALIAS =
+            "image: ${COURTSIDE_RESTORE_IMAGE}";
     private static final Set<String> OWN_IMAGE_REFERENCES =
-            Set.of(GHCR_RELEASE_IMAGE, UAT_LOCAL_IMAGE_ALIAS, PERF_LOCAL_IMAGE_ALIAS, UPGRADE_CANDIDATE_IMAGE_ALIAS);
+            Set.of(GHCR_RELEASE_IMAGE, UAT_LOCAL_IMAGE_ALIAS, PERF_LOCAL_IMAGE_ALIAS,
+                    UPGRADE_CANDIDATE_IMAGE_ALIAS, RESTORE_CANDIDATE_IMAGE_ALIAS);
 
     @Test
     void whenReadingImageSources_thenEveryThirdPartyImageIsPinnedByDigest() throws IOException {

@@ -148,8 +148,21 @@ edit an applied migration. Keep the application stopped and restore the pre-upgr
 Back up before an upgrade. The database holds everything; the containers hold nothing:
 
 ```sh
-docker compose exec -T db pg_dump -U courtside courtside | gzip > courtside-$(date +%F).sql.gz
+docker compose exec -T db pg_dump -Fc --no-owner -U courtside courtside > courtside-$(date +%F).dump
 ```
+
+Treat the archive, the matching Courtside image reference and the `.env` configuration as one
+versioned recovery unit. Test the archive on a separate empty PostgreSQL 17 instance. With the
+application stopped, restore it atomically:
+
+```sh
+docker compose stop app
+docker compose exec -T db pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error -U courtside -d courtside < courtside-YYYY-MM-DD.dump
+docker compose up -d app
+```
+
+If `pg_restore` fails, keep the application stopped. Do not serve traffic from a partially restored
+database and do not combine the archive with an image or configuration from a different release.
 
 ## Image updates between releases
 

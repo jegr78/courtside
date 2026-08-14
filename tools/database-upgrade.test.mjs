@@ -110,5 +110,5 @@ test("given a release candidate, when release qualification runs, then every sup
   assert.match(releaseWorkflow, /node tools\/courtside\.upgrade-smoke\.mjs --confirm courtside-upgrade/);
   assert.match(releaseWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE:[^\n]+needs\.image\.outputs\.digest/);
   assert.match(releaseWorkflow, /Supported database upgrade origins/);
-  assert.match(releaseWorkflow, /needs: \[build, image, qualify, upgrade\]/);
+  assert.match(releaseWorkflow, /needs: \[build, image, qualify, upgrade, restore\]/);
 });

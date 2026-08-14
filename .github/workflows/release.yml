@@ -220,8 +220,39 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  restore:
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    env:
+      COURTSIDE_RESTORE_IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prove backup and restore
+        run: node tools/courtside.restore-smoke.mjs --confirm courtside-restore
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: database-restore
+          path: build/database-restore
+          retention-days: 14
+          if-no-files-found: error
+
   publish:
-    needs: [build, image, qualify, upgrade]
+    needs: [build, image, qualify, upgrade, restore]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
