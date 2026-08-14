@@ -158,6 +158,16 @@ test("given platform listener output, when checking JDWP, then only loopback lis
   assert.equal(listenerOutputMatches("TCP 0.0.0.0:5005 0.0.0.0:0 LISTENING", 5005), false);
 });
 
+test("given a loopback-bound environment, when requesting it, then local probes cannot escape to an IPv6 listener", () => {
+  // given
+  const source = readFileSync(fileURLToPath(new URL("./courtside.mjs", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(source, /hostname: "127\.0\.0\.1", port, path, method, headers/);
+  assert.match(source, /servername: servername \?\? "localhost"/);
+  assert.match(source, /headers: \{ Host: `localhost:\$\{port\}`, \.\.\.headers \}/);
+});
+
 test("given Windows development, when planning processes, then both platform launchers are used", () => {
   // when
   const plans = processPlans(parseArguments(["dev"]), "win32");
@@ -965,7 +975,7 @@ test("given the Funnel ingress, when reading its proxy contract, then only appli
   assert.match(caddy, /X-Robots-Tag "noindex, nofollow"/);
   assert.match(caddy, /Strict-Transport-Security/);
   assert.match(caddy, /@private path \/api-ui\* \/actuator\* \/api\/openapi\.yaml/);
-  assert.match(caddy, /respond @private 404/);
+  assert.match(caddy, /handle @private \{\n\t\trespond 404\n\t\}/);
   assert.match(caddy, /header_up X-Forwarded-Proto https/);
   assert.match(caddy, /header_up X-Forwarded-Port 443/);
 });

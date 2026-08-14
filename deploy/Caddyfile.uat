@@ -47,7 +47,9 @@ http://:8083 {
 	}
 
 	@private path /api-ui* /actuator* /api/openapi.yaml
-	respond @private 404
+	handle @private {
+		respond 404
+	}
 
 	handle {
 		reverse_proxy app:8080 {

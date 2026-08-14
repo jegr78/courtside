@@ -1619,8 +1619,8 @@ function readPerformanceHealth(composeArgs) {
 export function localRequest({ secure, port, path, method = "GET", headers = {}, body, ca, servername }) {
   return new Promise((resolveResponse, rejectResponse) => {
     const request = (secure ? httpsRequest : httpRequest)({
-      hostname: "localhost", port, path, method, headers,
-      ...(secure ? { rejectUnauthorized: Boolean(ca), ...(ca ? { ca } : {}), ...(servername ? { servername } : {}) } : {})
+      hostname: "127.0.0.1", port, path, method, headers: { Host: `localhost:${port}`, ...headers },
+      ...(secure ? { rejectUnauthorized: Boolean(ca), servername: servername ?? "localhost", ...(ca ? { ca } : {}) } : {})
     }, (response) => {
       const peerCertificate = secure ? response.socket.getPeerCertificate() : undefined;
       const certificatePin = peerCertificate?.raw ? certificatePublicKeyPin(peerCertificate.raw) : undefined;

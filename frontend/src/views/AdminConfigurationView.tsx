@@ -33,14 +33,21 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   const [success, setSuccess] = useState<string>();
 
   useEffect(() => {
+    let active = true;
     void Promise.all([api.adminConfig(), api.ruleSets(), api.ruleTypes()])
       .then(([loadedConfig, loadedRuleSets, loadedRuleTypes]) => {
+        if (!active) return;
         setConfig(loadedConfig);
         setRuleSets(loadedRuleSets);
         setRuleTypes(loadedRuleTypes);
         selectRuleSet(loadedRuleSets[0]?.id ?? "");
       })
-      .catch((failure) => setError(problemMessage(failure, t)));
+      .catch((failure) => {
+        if (active) setError(problemMessage(failure, t));
+      });
+    return () => {
+      active = false;
+    };
   }, [t]);
 
   useEffect(() => {
@@ -68,6 +75,10 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   function selectRuleSet(ruleSetId: string) {
     selectedRuleSetIdRef.current = ruleSetId;
     setSelectedRuleSetId(ruleSetId);
+  }
+
+  function changeConfig(changed: Partial<ClubConfigRequest>) {
+    setConfig((current) => current ? { ...current, ...changed } : current);
   }
 
   async function saveConfig(event: FormEvent) {
@@ -112,26 +123,26 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     {success && <div data-testid="admin-save-success"><Alert tone="success">{success}</Alert></div>}
     <form noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5">
       <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
-      <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => setConfig({ ...config, clubName: event.target.value })} />
+      <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
       <div className="grid gap-5 sm:grid-cols-2">
-        <TextField label={t("admin.config.primaryColor")} value={config.primaryColor} onChange={(event) => setConfig({ ...config, primaryColor: event.target.value })} />
-        <TextField label={t("admin.config.accentColor")} value={config.accentColor} onChange={(event) => setConfig({ ...config, accentColor: event.target.value })} />
-        <TextField label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""} onChange={(event) => setConfig({ ...config, logoUrl: event.target.value || null })} />
-        <TextField label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => setConfig({ ...config, imprintUrl: event.target.value || null })} />
+        <TextField label={t("admin.config.primaryColor")} value={config.primaryColor} onChange={(event) => changeConfig({ primaryColor: event.target.value })} />
+        <TextField label={t("admin.config.accentColor")} value={config.accentColor} onChange={(event) => changeConfig({ accentColor: event.target.value })} />
+        <TextField label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""} onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
+        <TextField label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
       </div>
       <label className="grid gap-2 font-medium">
         {t("admin.config.defaultLocale")}
-        <select className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} onChange={(event) => setConfig({ ...config, defaultLocale: event.target.value })}>
+        <select className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} onChange={(event) => changeConfig({ defaultLocale: event.target.value })}>
           <option value="de">Deutsch</option><option value="en">English</option>
         </select>
       </label>
-      <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => setConfig({ ...config, slotMinutes: Number(event.target.value) })} />
+      <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
       <div className="grid gap-1">
         <label className="grid gap-2 font-medium">
           {t("admin.config.timeZone")}
           <select data-testid="time-zone" className="form-control rounded-lg border px-3 py-3"
                   value={config.timeZone}
-                  onChange={(event) => setConfig({ ...config, timeZone: event.target.value })}>
+                  onChange={(event) => changeConfig({ timeZone: event.target.value })}>
             {timeZones(config.timeZone).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
           </select>
         </label>
