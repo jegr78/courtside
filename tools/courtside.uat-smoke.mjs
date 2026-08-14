@@ -83,7 +83,7 @@ try {
   const password = newBootstrapPassword();
   const permanentPassword = newBootstrapPassword();
   const version = process.env.COURTSIDE_UAT_VERSION;
-  const startArguments = ["uat", ...(version ? ["--version", version] : ["--skip-verify"])];
+  const startArguments = ["uat", "--no-credential-output", ...(version ? ["--version", version] : ["--skip-verify"])];
   cli(startArguments, { ...process.env, COURTSIDE_UAT_BOOTSTRAP_PASSWORD: password });
   const appBefore = composeRun("ps", "-q", "app");
   const appStartedBefore = JSON.parse(run("docker", ["inspect", appBefore]))[0].State.StartedAt;

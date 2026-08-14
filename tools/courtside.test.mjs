@@ -11,7 +11,7 @@ import {
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, performanceBaselinePlan,
   performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
-  resolvePublicFunnelAddresses, validatePublicAddress
+  resolvePublicFunnelAddresses, uatStartupSummary, validatePublicAddress
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
@@ -901,6 +901,27 @@ test("given a published UAT version, when parsing it, then only an image-safe ta
   // when / then
   assert.equal(parseArguments(["uat", "--version", "1.2.3"]).version, "1.2.3");
   assert.throws(() => parseArguments(["uat", "--version", "latest;whoami"]), /Invalid image version/);
+});
+
+test("given automated UAT startup, when suppressing credentials, then the password is absent from output", () => {
+  // given
+  const options = parseArguments(["uat", "--version", "1.2.3", "--no-credential-output"]);
+
+  // when
+  const summary = uatStartupSummary("not-for-logs", true, options);
+
+  // then
+  assert.equal(options.showCredentials, false);
+  assert.match(summary, /UAT: https:\/\/localhost:8443/);
+  assert.doesNotMatch(summary, /not-for-logs|one-time password/);
+});
+
+test("given the release qualification smoke, when starting UAT, then credential output is disabled", () => {
+  // given
+  const smoke = readFileSync(fileURLToPath(new URL("./courtside.uat-smoke.mjs", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(smoke, /startArguments = \["uat", "--no-credential-output"/);
 });
 
 test("given UAT status, when parsing output options, then the environment is retained", () => {
