@@ -146,17 +146,23 @@ class AdviceLoggingTest {
     }
 
     private static String handlerMethodBody(String source, int handlerStart) {
-        int bodyStart = source.indexOf('{', handlerStart);
+        int annotationOpen = source.indexOf('(', handlerStart);
+        int annotationClose = matchingClose(source, annotationOpen, '(', ')');
+        int bodyStart = source.indexOf('{', annotationClose);
+        int bodyEnd = matchingClose(source, bodyStart, '{', '}');
+        return source.substring(handlerStart, bodyEnd + 1);
+    }
+
+    private static int matchingClose(String source, int openIndex, char open, char close) {
         int depth = 0;
-        int index = bodyStart;
-        for (; index < source.length(); index++) {
+        for (int index = openIndex; index < source.length(); index++) {
             char character = source.charAt(index);
-            depth += character == '{' ? 1 : character == '}' ? -1 : 0;
+            depth += character == open ? 1 : character == close ? -1 : 0;
             if (depth == 0) {
-                break;
+                return index;
             }
         }
-        return source.substring(handlerStart, index + 1);
+        throw new IllegalStateException("Unbalanced " + open + close + " from " + openIndex);
     }
 
     private static final class NotFoundFailure extends DomainFailure {
