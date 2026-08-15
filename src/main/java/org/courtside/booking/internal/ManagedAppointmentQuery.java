@@ -8,6 +8,7 @@ import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.shared.CursorPage;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
