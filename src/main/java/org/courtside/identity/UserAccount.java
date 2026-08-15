@@ -50,6 +50,9 @@ public class UserAccount {
     @Column(name = "password_change_required", nullable = false)
     private boolean passwordChangeRequired;
 
+    @Column(name = "security_epoch", nullable = false)
+    private long securityEpoch;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_account_role",
             joinColumns = @JoinColumn(name = "user_account_id"))

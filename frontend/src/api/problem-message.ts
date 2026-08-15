@@ -2,7 +2,8 @@ import type { TFunction } from "i18next";
 import { ApiError, type Problem } from "./client";
 
 const typeMessageKeys: Record<string, string> = {
-  "urn:courtside:error:unauthenticated": "auth.failed"
+  "urn:courtside:error:unauthenticated": "auth.failed",
+  "urn:courtside:error:court-unavailable": "booking.courtUnavailable"
 };
 
 export function problemMessage(failure: unknown, t: TFunction): string {

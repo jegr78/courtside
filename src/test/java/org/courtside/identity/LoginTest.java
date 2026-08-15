@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.mock.web.MockHttpSession;
@@ -13,6 +14,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Set;
 
+import static org.courtside.identity.AccountFixtures.enabled;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +36,9 @@ class LoginTest extends AbstractIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     private MockMvc mockMvc;
 
@@ -95,6 +100,27 @@ class LoginTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.locale").value("de"))
                 .andExpect(jsonPath("$.roles[0]").value("MEMBER"))
                 .andExpect(jsonPath("$.passwordChangeRequired").value(false));
+    }
+
+    @Test
+    void givenAnAuthenticatedSession_whenTheAccountSecurityEpochChanges_thenTheSessionIsRejected()
+            throws Exception {
+        // given
+        MvcResult login = mockMvc.perform(post("/api/session")
+                        .param("username", "doe.jane")
+                        .param("password", "correct-horse")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+        jdbc.sql("UPDATE user_account SET security_epoch = security_epoch + 1 WHERE username = :username")
+                .param("username", "doe.jane")
+                .update();
+
+        // when / then
+        mockMvc.perform(get("/api/session").session(session))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
     }
 
     @Test
@@ -175,10 +201,5 @@ class LoginTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .header().doesNotExist("X-Courtside-Password-Change-Required"));
-    }
-
-    private UserAccount enabled(UserAccount account) {
-        account.enable();
-        return account;
     }
 }
