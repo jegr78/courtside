@@ -67,6 +67,22 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   expect(screen.getByTestId("booking-44444444-4444-4444-4444-444444444444")).toHaveTextContent("Centre Court");
 });
 
+it("given loaded bookings, when translations rebind, then the data remains mounted without another load", async () => {
+  // given
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  const cancel = await screen.findByTestId("personal-cancel");
+  cancel.focus();
+  const loadsBeforeTranslationChange = vi.mocked(api.personalBookings).mock.calls.length;
+
+  // when
+  await i18n.changeLanguage("de");
+
+  // then
+  expect(cancel).toHaveFocus();
+  expect(screen.getByTestId("personal-cancel")).toBe(cancel);
+  expect(api.personalBookings).toHaveBeenCalledTimes(loadsBeforeTranslationChange);
+});
+
 it("given an officer, when managed appointments load, then they are separated from personal bookings", async () => {
   // given
   vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
