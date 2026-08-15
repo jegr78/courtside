@@ -21,6 +21,7 @@ test("given a pull request, when the required build runs, then dependency, sourc
   assert.match(build, /scanners: secret,misconfig/);
   assert.match(build, /--trivy build\/security\/trivy-runtime\.json[\s\S]*--trivy build\/security\/trivy-source\.json/);
   assert.match(build, /node tools\/security-findings\.mjs/);
+  assert.match(build, /--scope required-build/);
 });
 
 test("given security evidence, when workflows retain it, then only normalized reports become artifacts", () => {
@@ -30,6 +31,9 @@ test("given security evidence, when workflows retain it, then only normalized re
   assert.match(build, /rm -rf build\/security\/trivy-runtime\.json build\/security\/trivy-source\.json build\/security\/codeql/);
   assert.match(release, /build\/uat-smoke\/security-summary-/);
   assert.match(release, /rm -f build\/uat-smoke\/trivy-/);
+  assert.match(release, /npm-cli\.js --prefix frontend audit --json/);
+  assert.match(release, /release-security-record/);
+  assert.match(release, /--summary build\/security-input\/release-build\.json/);
 });
 
 test("given a scanner finding, when it is triaged, then exceptions are precise, expiring and single-maintainer compatible", () => {
@@ -40,4 +44,5 @@ test("given a scanner finding, when it is triaged, then exceptions are precise, 
   assert.match(policy, /independentReview.*false/);
   assert.match(policy, /scanner outage/i);
   assert.match(release, /node tools\/security-findings\.mjs/);
+  assert.match(policy, /scan scope/);
 });

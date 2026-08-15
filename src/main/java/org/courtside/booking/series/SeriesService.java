@@ -1,37 +1,10 @@
 package org.courtside.booking.series;
 
-import org.courtside.booking.Booking;
-import org.courtside.booking.internal.BookingNotFoundException;
-import org.courtside.booking.internal.BookingAccessControl;
-import org.courtside.booking.BookingRepository;
-import org.courtside.booking.BookingRuleCheck;
-import org.courtside.booking.internal.BookingRuleGate;
-import org.courtside.booking.internal.CardNotBookableException;
-import org.courtside.booking.BookingRulesViolatedException;
-import org.courtside.booking.BookingService;
-import org.courtside.booking.internal.CardRoleRequiredException;
-import org.courtside.booking.CourtAllocation;
-import org.courtside.booking.internal.CourtAllocationRepository;
-import org.courtside.booking.internal.CourtUnavailableException;
-import org.courtside.booking.CreateBookingCommand;
-import org.courtside.booking.internal.ParticipantCardCapacity;
-import org.courtside.booking.internal.ParticipantsInvalidException;
-import org.courtside.card.BookingCard;
-import org.courtside.card.CardService;
-import org.courtside.config.BookingGridCoordination;
-import org.courtside.facility.FacilityService;
-import org.courtside.identity.Role;
-import org.courtside.rules.RuleViolation;
-import org.courtside.shared.TimeSlot;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import jakarta.persistence.EntityManager;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
-import org.courtside.config.ClubTimeZone;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -41,6 +14,33 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.courtside.booking.Booking;
+import org.courtside.booking.BookingRepository;
+import org.courtside.booking.BookingRuleCheck;
+import org.courtside.booking.BookingRulesViolatedException;
+import org.courtside.booking.BookingService;
+import org.courtside.booking.CourtAllocation;
+import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.internal.BookingAccessControl;
+import org.courtside.booking.internal.BookingNotFoundException;
+import org.courtside.booking.internal.BookingRuleGate;
+import org.courtside.booking.internal.CardNotBookableException;
+import org.courtside.booking.internal.CardRoleRequiredException;
+import org.courtside.booking.internal.CourtAllocationRepository;
+import org.courtside.booking.internal.CourtUnavailableException;
+import org.courtside.booking.internal.ParticipantCardCapacity;
+import org.courtside.booking.internal.ParticipantsInvalidException;
+import org.courtside.card.BookingCard;
+import org.courtside.card.CardService;
+import org.courtside.config.BookingGridCoordination;
+import org.courtside.config.ClubTimeZone;
+import org.courtside.facility.FacilityService;
+import org.courtside.identity.Role;
+import org.courtside.rules.RuleViolation;
+import org.courtside.shared.TimeSlot;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SeriesService {
@@ -60,6 +60,7 @@ public class SeriesService {
     private final Clock clock;
     private final ClubTimeZone timeZone;
     private final BookingGridCoordination bookingGridCoordination;
+    private final EntityManager entityManager;
 
     public SeriesService(SeriesSchedule schedule,
                          CourtAllocationRepository allocations,
@@ -73,7 +74,8 @@ public class SeriesService {
                          ParticipantCardCapacity participantCardCapacity,
                          Clock clock,
                          BookingGridCoordination bookingGridCoordination,
-                         ClubTimeZone timeZone) {
+                         ClubTimeZone timeZone,
+                         EntityManager entityManager) {
         this.schedule = schedule;
         this.allocations = allocations;
         this.bookings = bookings;
@@ -87,6 +89,7 @@ public class SeriesService {
         this.clock = clock;
         this.bookingGridCoordination = bookingGridCoordination;
         this.timeZone = timeZone;
+        this.entityManager = entityManager;
     }
 
     @Transactional(readOnly = true)
@@ -178,6 +181,7 @@ public class SeriesService {
                       UUID cancelledBy, Set<Role> cancellerRoles) {
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
         lockSeries(seriesId);
+        discardPreLockState();
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
 
         List<Booking> affected = affectedBookings(seriesId, fromBookingId, scope);
@@ -214,6 +218,7 @@ public class SeriesService {
         requireManagementAccessTo(request.seriesId(), request.fromBookingId(), movedBy, callerRoles);
         bookingGridCoordination.lock();
         lockSeries(request.seriesId());
+        discardPreLockState();
         MovePreview preview = previewMove(request, movedBy, callerRoles);
 
         List<UUID> blocked = preview.moves().stream()
@@ -348,6 +353,10 @@ public class SeriesService {
     private void lockSeries(UUID seriesId) {
         seriesRepository.findForUpdateById(seriesId)
                 .orElseThrow(() -> new SeriesNotFoundException("No booking series with id " + seriesId));
+    }
+
+    private void discardPreLockState() {
+        entityManager.clear();
     }
 
     private void requireManagementAccessTo(UUID seriesId, UUID fromBookingId,

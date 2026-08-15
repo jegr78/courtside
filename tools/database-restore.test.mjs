@@ -43,7 +43,7 @@ test("given a release candidate, when release qualification runs, then restore b
   assert.match(workflow, /\n  restore:\n    needs: image/);
   assert.match(workflow, /COURTSIDE_RESTORE_IMAGE:[^\n]+needs\.image\.outputs\.digest/);
   assert.match(workflow, /node tools\/courtside\.restore-smoke\.mjs --confirm courtside-restore/);
-  assert.match(workflow, /needs: \[build, image, qualify, upgrade, restore\]/);
+  assert.match(workflow, /needs: \[build, image, qualify, security-record, upgrade, restore\]/);
   assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.dump/);
   assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.sql/);
 });

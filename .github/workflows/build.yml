@@ -74,6 +74,8 @@ jobs:
           --trivy build/security/trivy-source.json
           --codeql build/security/codeql
           --exceptions security/exceptions.json
+          --scope required-build
+          --subject ${{ github.sha }}
           --output build/security/summary.json
       - name: Remove raw security reports
         if: always()

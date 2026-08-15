@@ -6,13 +6,15 @@ CodeQL runs the `security-extended` query suite. Trivy scans the unpacked runtim
 
 ## Triage and exceptions
 
-High and Critical Trivy findings and CodeQL findings with a security severity of at least 7 block the gate. A maintainer validates reachability and exploitability before deciding whether to fix the dependency, remove the affected feature or record an exception.
+High and Critical npm and Trivy findings and CodeQL findings with a security severity of at least 7 block the gate. A maintainer validates reachability and exploitability before deciding whether to fix the dependency, remove the affected feature or record an exception.
 
-Exceptions live in `security/exceptions.json` and match one scanner, finding id and target exactly. Each record contains a rationale, owning area, compensating control, expiry and whether independent review occurred. Expired, duplicate, incomplete and unused exceptions fail the gate.
+Exceptions live in `security/exceptions.json` and match one scan scope, scanner, finding id and target exactly. The maintained scopes are `required-build`, `release-build`, `release-image-amd64` and `release-image-arm64`. Each record contains a rationale, owning area, compensating control, expiry and whether independent review occurred. Expired, duplicate and incomplete exceptions fail every gate; an unused exception fails its own scope without blocking unrelated scopes.
 
 The project currently has a single maintainer. That maintainer may set `independentReview` to `false` to stay operational, but the missing peer review remains visible in the record. This is intentionally not an approval requirement until another regular maintainer exists.
 
 Raw scanner output is temporary because it can contain source excerpts or secret matches. The retained `summary.json` contains only scanner identifiers, severities, targets and exception metadata; findings below the blocking threshold remain visible as informational evidence. Workflow artifacts are retained for fourteen days; CodeQL also uploads its findings to GitHub code scanning.
+
+Release qualification records npm and assembled Java-runtime findings in the release build, adds the exact image findings from both architectures and publishes their combined normalized record with the GitHub release.
 
 False positives are never suppressed by a broad scanner rule or permanent ignore file. They use the same precise, expiring exception path and disappear from the exception file when the scanner no longer reports them.
 
