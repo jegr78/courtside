@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,26 +27,44 @@ public class RosterService {
     private static final int MAX_PAGE_SIZE = 200;
     private static final int MAX_QUERY_LENGTH = 60;
 
+    private static final Comparator<UserAccount> ACCOUNT_PRECEDENCE =
+            Comparator.comparing(UserAccount::isEnabled, Comparator.reverseOrder())
+                    .thenComparing(UserAccount::getCreatedAt)
+                    .thenComparing(UserAccount::getId);
+
     private final PersonRepository persons;
     private final UserAccountRepository accounts;
     private final MemberRepository members;
 
     public CursorPage.Result<RosterEntry> list(String query, UUID cursor, int limit) {
         validateLimit(limit);
+        requireKnownCursor(cursor);
         String normalized = normalize(query);
         List<UUID> ids = persons.findRosterIds(normalized, cursor, PageRequest.of(0, limit + 1));
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
     }
 
+    private void requireKnownCursor(UUID cursor) {
+        if (cursor != null && !persons.existsById(cursor)) {
+            throw new RosterCursorUnknownException("roster.cursor.unknown", Map.of());
+        }
+    }
+
     private List<RosterEntry> load(List<UUID> personIds) {
         Map<UUID, UserAccount> accountsByPerson = accounts.findByPersonIdIn(personIds).stream()
-                .collect(Collectors.toMap(account -> account.getPerson().getId(), account -> account));
+                .collect(Collectors.toMap(account -> account.getPerson().getId(), account -> account,
+                        RosterService::preferredAccount));
         Map<UUID, UUID> membershipTypesByPerson = members.findByPersonIdIn(personIds).stream()
                 .collect(Collectors.toMap(Member::getPersonId, Member::getMembershipTypeId));
         return persons.findAllById(personIds).stream()
                 .map(person -> toEntry(person, accountsByPerson.get(person.getId()),
                         membershipTypesByPerson.get(person.getId())))
                 .toList();
+    }
+
+    // user_account carries no unique person, so one person holding two must not fail a whole page.
+    private static UserAccount preferredAccount(UserAccount first, UserAccount second) {
+        return ACCOUNT_PRECEDENCE.compare(first, second) <= 0 ? first : second;
     }
 
     private static RosterEntry toEntry(Person person, UserAccount account, UUID membershipTypeId) {

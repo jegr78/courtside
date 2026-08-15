@@ -46,6 +46,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:membership-type-name-taken",
             "urn:courtside:error:membership-type-not-found",
             "urn:courtside:error:participants-invalid",
+            "urn:courtside:error:roster-cursor-unknown",
             "urn:courtside:error:rule-parameter-invalid",
             "urn:courtside:error:rule-set-inactive",
             "urn:courtside:error:rule-set-name-taken",

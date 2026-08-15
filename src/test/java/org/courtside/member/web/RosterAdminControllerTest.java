@@ -125,6 +125,20 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenACursorNamingSomebodyWhoIsGone_whenListingTheRoster_thenTheStaleCursorIsReported()
+            throws Exception {
+        // given
+        persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when / then
+        mockMvc.perform(get("/api/admin/roster").queryParam("cursor", UUID.randomUUID().toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:roster-cursor-unknown"))
+                .andExpect(jsonPath("$.violations[0].code").value("roster.cursor.unknown"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAQueryLongerThanTheContractAllows_whenListingTheRoster_thenItIsRejectedByTheContract()
             throws Exception {
         // when / then

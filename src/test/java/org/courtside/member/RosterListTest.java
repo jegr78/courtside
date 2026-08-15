@@ -10,15 +10,22 @@ import org.courtside.shared.CursorPage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RosterListTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+
+    private static final String LOWEST_IDS = "01234";
+    private static final String MIDDLE_IDS = "56789a";
+    private static final String HIGHEST_IDS = "bcdef";
 
     @Autowired
     private PersonRepository persons;
@@ -145,24 +152,90 @@ class RosterListTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenPeopleSharingAName_whenFollowingTheCursor_thenNoNamesakeIsSkipped() {
-        // given
-        List<Person> namesakes = List.of(
-                persons.save(new Person("Jane", "Doe", "jane.doe.1@example.org")),
-                persons.save(new Person("Jane", "Doe", "jane.doe.2@example.org")),
-                persons.save(new Person("Jane", "Doe", "jane.doe.3@example.org")));
+    void givenIdsThatContradictTheNameOrder_whenFollowingTheCursor_thenTheNextPageContinuesByName() {
+        // given — the ids descend while the names ascend, the one arrangement in which an
+        // id-only cursor and a name-keyed cursor return different second pages
+        Person jane = savePersonWithLeadingIdDigitIn("Jane", "Doe", "jane.doe@example.org", HIGHEST_IDS);
+        Person mary = savePersonWithLeadingIdDigitIn("Mary", "Major", "mary.major@example.org", MIDDLE_IDS);
+        Person john = savePersonWithLeadingIdDigitIn("John", "Roe", "john.roe@example.org", LOWEST_IDS);
 
         // when
         CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
         CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
 
         // then
-        assertThat(first.items()).hasSize(2);
-        assertThat(second.items()).hasSize(1);
-        assertThat(List.of(first.items(), second.items()).stream()
-                .flatMap(List::stream)
-                .map(RosterService.RosterEntry::personId)
-                .toList())
-                .containsExactlyInAnyOrderElementsOf(namesakes.stream().map(Person::getId).toList());
+        assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(jane.getId(), mary.getId());
+        assertThat(first.nextCursor()).isEqualTo(mary.getId());
+        assertThat(second.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(john.getId());
+        assertThat(second.nextCursor()).isNull();
+    }
+
+    @Test
+    void givenPeopleSharingAName_whenFollowingTheCursor_thenTheIdTiebreakOrdersThemStably() {
+        // given
+        List<UUID> byId = Stream.of(
+                        persons.save(new Person("Jane", "Doe", "jane.doe.1@example.org")),
+                        persons.save(new Person("Jane", "Doe", "jane.doe.2@example.org")),
+                        persons.save(new Person("Jane", "Doe", "jane.doe.3@example.org")))
+                .map(Person::getId)
+                .sorted(Comparator.comparing(UUID::toString))
+                .toList();
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
+
+        // then
+        assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(byId.get(0), byId.get(1));
+        assertThat(second.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(byId.get(2));
+    }
+
+    @Test
+    void givenACursorNamingSomebodyWhoIsGone_whenListingTheRoster_thenTheStaleCursorIsReported() {
+        // given
+        persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when / then
+        assertThatThrownBy(() -> roster.list(null, UUID.randomUUID(), 50))
+                .isInstanceOf(RosterCursorUnknownException.class)
+                .satisfies(failure -> assertThat(((RosterCursorUnknownException) failure).getCode())
+                        .isEqualTo("roster.cursor.unknown"));
+    }
+
+    @Test
+    void givenAPersonHoldingTwoAccounts_whenListingTheRoster_thenTheEnabledOneRepresentsThem() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        accounts.save(new UserAccount(jane, "jane.doe.dormant", "hash", Set.of(Role.MEMBER)));
+        UserAccount current = new UserAccount(jane, "jane.doe", "hash", Set.of(Role.TRAINER));
+        current.enable();
+        accounts.save(current);
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+
+        // then
+        assertThat(page.items())
+                .singleElement()
+                .satisfies(entry -> {
+                    assertThat(entry.accountId()).isEqualTo(current.getId());
+                    assertThat(entry.username()).isEqualTo("jane.doe");
+                    assertThat(entry.enabled()).isTrue();
+                    assertThat(entry.roles()).containsExactly(Role.TRAINER);
+                });
+    }
+
+    // PostgreSQL orders a uuid bytewise, so the leading hex digit alone decides where an id sorts.
+    private Person savePersonWithLeadingIdDigitIn(
+            String firstName, String lastName, String email, String allowedDigits) {
+        Person person = new Person(firstName, lastName, email);
+        while (allowedDigits.indexOf(person.getId().toString().charAt(0)) < 0) {
+            person = new Person(firstName, lastName, email);
+        }
+        return persons.save(person);
     }
 }
