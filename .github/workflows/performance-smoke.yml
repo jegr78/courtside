@@ -27,7 +27,7 @@ jobs:
           cache: maven
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Start disposable performance environment
         run: node tools/courtside.mjs perf --skip-verify --no-credential-output
       - name: Run bounded smoke profile

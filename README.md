@@ -13,7 +13,7 @@ released image to pull. Until the first tag, run it from source as below.
 ## Requirements
 
 - JDK 25 (Eclipse Temurin)
-- Node.js 24
+- Node.js 24 or later
 - Docker — for PostgreSQL and for the Testcontainers-backed test suite
 - PostgreSQL 17. The non-overlap guarantee is a GiST exclusion constraint; no other database
   will do.
