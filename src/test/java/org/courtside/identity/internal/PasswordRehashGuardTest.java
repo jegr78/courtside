@@ -14,6 +14,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsPasswordService;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -37,7 +38,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-class PasswordRehashFailureTest extends AbstractIntegrationTest {
+class PasswordRehashGuardTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "correct-horse-battery-staple";
 
@@ -49,6 +50,9 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @MockitoBean
     private UserAccountRepository accounts;
@@ -105,9 +109,10 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnActiveCallerTransaction_whenUpdatingThePassword_thenTheGuardedWriteRunsOutsideIt() {
+    void givenAnActiveCallerTransaction_whenUpdatingThePassword_thenTheGuardHoldsNoTransaction() {
         // given
         UserAccount account = member("major.mary", new Person("Mary", "Major", "mary.major@example.org"));
+        String hashAtTheCurrentCost = passwordEncoder.encode(PASSWORD);
         AtomicBoolean transactionActiveAtTheGuard = new AtomicBoolean(true);
         when(accounts.findByUsername("major.mary")).thenAnswer(invocation -> {
             transactionActiveAtTheGuard.set(TransactionSynchronizationManager.isActualTransactionActive());
@@ -120,7 +125,7 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
 
         // when
         new TransactionTemplate(transactionManager).executeWithoutResult(status ->
-                passwordService.updatePassword(user, weaklyHashedPassword()));
+                passwordService.updatePassword(user, hashAtTheCurrentCost));
 
         // then
         assertThat(transactionActiveAtTheGuard)
