@@ -39,6 +39,21 @@ it("given an unauthenticated problem, when resolving it, then the stable type is
   expect(translate).toHaveBeenCalledWith("auth.failed");
 });
 
+it("given a concurrent booking loss, when resolving it, then the stable type is actionable", () => {
+  // given
+  const error = new ApiError(409, {
+    type: "urn:courtside:error:court-unavailable",
+    title: "Court unavailable",
+    status: 409
+  });
+
+  // when
+  problemMessage(error, translate);
+
+  // then
+  expect(translate).toHaveBeenCalledWith("booking.courtUnavailable");
+});
+
 it("given an unknown failure, when resolving it, then no technical detail is exposed", () => {
   // when
   problemMessage(new Error("Database connection failed"), translate);

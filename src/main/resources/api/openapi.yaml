@@ -1046,7 +1046,8 @@ paths:
       summary: Replace the one-time bootstrap password.
       description: |
         Available only to an authenticated account marked for an initial password change. The
-        successful change ends the current session; sign in again with the new password.
+        successful change ends every active session for the account; sign in again with the new
+        password.
       security:
         - sessionCookie: []
           csrfToken: []

@@ -9,3 +9,7 @@ server:
     session:
       cookie:
         secure: false
+
+logging:
+  level:
+    org.hibernate.orm.jdbc.error: ERROR

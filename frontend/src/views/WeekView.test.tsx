@@ -362,7 +362,7 @@ it("given a booking conflict and a failed refresh, when submission fails, then t
   await userEvent.click(screen.getByTestId("booking-submit"));
 
   // then
-  expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
+  expect(await screen.findByRole("alert")).toHaveTextContent("Someone else just booked this court. Choose another time.");
   expect(screen.getByRole("dialog")).toBeInTheDocument();
 });
 

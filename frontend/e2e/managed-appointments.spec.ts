@@ -23,7 +23,10 @@ test("sport and youth directors find the same managed league match", async ({ pa
     await leagueMatch.getByTestId("managed-details").click();
     await expect(page.getByTestId("managed-note")).toContainText("Prepare score sheets");
     await page.getByTestId("close-managed-appointment").click();
+    const logout = page.waitForResponse((response) => response.url().endsWith("/api/session/logout"));
     await page.getByTestId("logout").click();
+    expect((await logout).status()).toBe(204);
+    await expect(page.getByTestId("login-view")).toBeVisible();
   }
 });
 

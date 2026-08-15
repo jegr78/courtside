@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
-delete process.env.FORCE_COLOR;
+delete process.env.NO_COLOR;
+process.env.FORCE_COLOR = "0";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -8,8 +9,8 @@ export default defineConfig({
   workers: 1,
   timeout: 60_000,
   use: {
-    trace: "off",
-    screenshot: "off",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
     video: "off"
   },
   projects: [

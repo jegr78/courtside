@@ -867,8 +867,11 @@ whether it is built or designed. **Designed means absent today.**
 - **Sessions:** server-side via Spring Session in the database, delivered as an
   `HttpOnly` / `Secure` / `SameSite=Lax` cookie. **No JWT** — the PWA and API share an
   origin, so no token gymnastics are needed, and an admin can terminate a session
-  immediately, which JWT cannot do. *Built, except that terminating another member's session
-  has no admin surface yet.*
+  immediately, which JWT cannot do. A role, membership or account-status change must terminate
+  that account's active sessions in the same operation so cached authorities cannot outlive the
+  change. A persisted account security epoch makes sessions created before a credential change
+  fail closed even when an in-flight request saves one after bulk deletion. *Built, except that
+  terminating another member's session has no admin surface yet.*
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* Source-address counters
   absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;

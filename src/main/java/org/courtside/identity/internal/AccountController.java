@@ -13,7 +13,6 @@ class AccountController implements AccountApi {
 
     private final InitialPasswordService passwords;
     private final HttpServletRequest request;
-
     @Override
     public ResponseEntity<Void> changeInitialPassword(ApiInitialPasswordChangeRequest change) {
         passwords.change(change.getPassword());

@@ -65,11 +65,11 @@ public class Booking {
     private String requestFingerprint;
 
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
-    private final List<CourtAllocation> allocations = new ArrayList<>();
+    private List<CourtAllocation> allocations = new ArrayList<>();
 
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position")
-    private final List<BookingParticipant> participants = new ArrayList<>();
+    private List<BookingParticipant> participants = new ArrayList<>();
 
     public Booking(UUID cardId, UUID bookedBy, String note, Instant createdAt) {
         this.id = UUID.randomUUID();
