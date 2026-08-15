@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type BookingGrid, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail, type ManagedAppointmentPage, type MovePreview, type MoveRequest, type PersonalBooking, type PublicCourt } from "../api/client";
 import { problemMessage } from "../api/problem-message";
@@ -11,6 +11,7 @@ type Appointment = PersonalBooking | ManagedAppointment;
 
 export function MyBookingsView({ now, showManaged = false }: { now?: Date; showManaged?: boolean }) {
   const { t, i18n } = useTranslation();
+  const translation = useRef(t);
   const [reference] = useState(() => now ?? new Date());
   const [bookings, setBookings] = useState<PersonalBooking[]>([]);
   const [managed, setManaged] = useState<ManagedAppointment[]>([]);
@@ -22,6 +23,8 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [action, setAction] = useState<{ kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }>();
+
+  useEffect(() => { translation.current = t; }, [t]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,11 +41,11 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
       setGrid(bookingGrid);
       setError(undefined);
     } catch (failure) {
-      setError(problemMessage(failure, t));
+      setError(problemMessage(failure, translation.current));
     } finally {
       setLoading(false);
     }
-  }, [showManaged, t]);
+  }, [showManaged]);
 
   useEffect(() => { void load(); }, [load]);
 

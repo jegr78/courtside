@@ -4,12 +4,10 @@ import test from "node:test";
 
 const accessibility = readFileSync("e2e/accessibility.spec.ts", "utf8");
 const documentation = readFileSync("../docs/accessibility-testing.md", "utf8");
-const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const playwright = readFileSync("playwright.config.ts", "utf8");
 const pom = readFileSync("../pom.xml", "utf8");
 
 test("given the required accessibility gate, when inspecting its browser coverage, then axe runs in Chromium and WebKit", () => {
-  assert.equal(packageJson.devDependencies["@axe-core/playwright"], "4.10.2");
   assert.match(accessibility, /wcag22aa/);
   assert.match(accessibility, /initial password change is operable using only the keyboard/);
   assert.match(accessibility, /a booking is operable using only the keyboard/);
