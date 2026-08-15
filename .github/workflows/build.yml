@@ -12,15 +12,74 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: never
+          retry-on-snapshot-warnings: false
+      - uses: github/codeql-action/init@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef
+        with:
+          languages: java-kotlin,javascript-typescript
+          queries: security-extended
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
       - name: Build and test
         run: ./mvnw -B verify
+      - name: Prepare security evidence
+        run: |
+          mkdir -p build/security/codeql
+          java -Djarmode=tools -jar target/courtside-*.jar extract --layers --launcher --destination build/security/runtime
+      - id: trivy-runtime
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: rootfs
+          scan-ref: build/security/runtime
+          scanners: vuln
+          format: json
+          output: build/security/trivy-runtime.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+      - id: trivy-source
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          format: json
+          output: build/security/trivy-source.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+          skip-dirs: frontend/node_modules,frontend/node,target,build/layers,build/performance,build/restore-layers,build/uat-smoke,build/upgrade-review-layers
+      - id: codeql
+        uses: github/codeql-action/analyze@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef
+        with:
+          output: build/security/codeql
+          upload: always
+          upload-database: false
+      - name: Enforce security finding policy
+        run: >
+          node tools/security-findings.mjs
+          --trivy build/security/trivy-runtime.json
+          --trivy build/security/trivy-source.json
+          --codeql build/security/codeql
+          --exceptions security/exceptions.json
+          --scope required-build
+          --subject ${{ github.sha }}
+          --output build/security/summary.json
+      - name: Remove raw security reports
+        if: always()
+        run: rm -rf build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql build/security/runtime
       - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -31,5 +90,6 @@ jobs:
             frontend/test-results/visual-journeys
             frontend/test-results/**/trace.zip
             frontend/test-results/**/*.png
+            build/security/summary.json
           if-no-files-found: warn
           retention-days: 14

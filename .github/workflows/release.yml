@@ -52,6 +52,36 @@ jobs:
           java -Djarmode=tools -jar "target/courtside-$VERSION.jar"
           extract --layers --launcher --destination build/layers
 
+      - name: Capture npm audit evidence
+        run: |
+          mkdir -p build/security
+          frontend/node/node frontend/node/node_modules/npm/bin/npm-cli.js --prefix frontend audit --json \
+            > build/security/npm.json || true
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: rootfs
+          scan-ref: build/layers
+          scanners: vuln
+          format: json
+          output: build/security/trivy-runtime.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Enforce release-build security policy
+        run: >
+          node tools/security-findings.mjs
+          --npm build/security/npm.json
+          --trivy build/security/trivy-runtime.json
+          --exceptions security/exceptions.json
+          --scope release-build
+          --subject ${{ github.sha }}
+          --output build/security/release-build.json
+
+      - name: Remove raw release-build security reports
+        if: always()
+        run: rm -f build/security/npm.json build/security/trivy-runtime.json
+
       - name: Collect the upgrade notes
         run: |
           previous=$(git describe --tags --abbrev=0 --match 'v*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
@@ -72,7 +102,7 @@ jobs:
           origins=$(node tools/courtside.upgrade-smoke.mjs --origins "$GITHUB_REF_NAME")
           echo "origins=$origins" >> "$GITHUB_OUTPUT"
           printf '\n## Supported database upgrade origins\n\n' >> build/release-body.md
-          node -e 'for (const origin of JSON.parse(process.argv[1])) console.log(`- ${origin}`)' "$origins" \
+          node -e 'for (const origin of JSON.parse(process.argv[1])) console.log("- " + origin)' "$origins" \
             >> build/release-body.md
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -80,6 +110,13 @@ jobs:
           name: image-input
           path: build
           retention-days: 1
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-security-base
+          path: build/security/release-build.json
+          retention-days: 14
+          if-no-files-found: error
 
   image:
     needs: build
@@ -165,11 +202,23 @@ jobs:
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
-          format: sarif
-          output: build/uat-smoke/trivy-${{ matrix.architecture }}.sarif
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: '1'
+          format: json
+          output: build/uat-smoke/trivy-${{ matrix.architecture }}.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Enforce candidate-image security policy
+        run: >
+          node tools/security-findings.mjs
+          --trivy build/uat-smoke/trivy-${{ matrix.architecture }}.json
+          --exceptions security/exceptions.json
+          --scope release-image-${{ matrix.architecture }}
+          --subject ${{ needs.image.outputs.digest }}
+          --output build/uat-smoke/security-summary-${{ matrix.architecture }}.json
+
+      - name: Remove raw security report
+        if: always()
+        run: rm -f build/uat-smoke/trivy-${{ matrix.architecture }}.json
 
       - name: Capture deployment diagnostics
         if: failure()
@@ -180,6 +229,45 @@ jobs:
         with:
           name: image-qualification-${{ matrix.architecture }}
           path: build/uat-smoke
+          retention-days: 14
+          if-no-files-found: error
+
+  security-record:
+    needs: [build, image, qualify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-security-base
+          path: build/security-input
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: image-qualification-*
+          path: build/security-input
+          merge-multiple: true
+
+      - name: Assemble the release security record
+        run: >
+          node tools/security-findings.mjs
+          --summary build/security-input/release-build.json
+          --summary build/security-input/security-summary-amd64.json
+          --summary build/security-input/security-summary-arm64.json
+          --scope release
+          --subject ${{ needs.image.outputs.digest }}
+          --output build/security-record.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-security-record
+          path: build/security-record.json
           retention-days: 14
           if-no-files-found: error
 
@@ -257,7 +345,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [build, image, qualify, upgrade, restore]
+    needs: [build, image, qualify, security-record, upgrade, restore]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -273,6 +361,11 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: image-input
+          path: build
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-security-record
           path: build
 
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
@@ -330,4 +423,6 @@ jobs:
           body_path: build/release-body.md
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
-          files: src/main/resources/api/openapi.yaml
+          files: |
+            src/main/resources/api/openapi.yaml
+            build/security-record.json

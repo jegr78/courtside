@@ -39,6 +39,7 @@
         <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
         <node.version>v26.5.1</node.version>
         <npm.version>11.17.0</npm.version>
+        <postgresql.version>42.7.12</postgresql.version>
     </properties>
 
     <dependencyManagement>

@@ -16,15 +16,18 @@ test("given a release image, when publishing it, then the same digest is qualifi
   assert.match(workflow, /architecture: arm64[\s\S]+runs-on: ubuntu-24\.04-arm/);
   assert.match(workflow, /COURTSIDE_UAT_VERSION: release-candidate-\$\{\{ github\.sha \}\}@\$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(workflow, /node tools\/courtside\.uat-smoke\.mjs --confirm courtside-uat/);
-  assert.match(workflow, /\n  publish:\n    needs: \[build, image, qualify, upgrade, restore\]/);
+  assert.match(workflow, /\n  security-record:\n    needs: \[build, image, qualify\]/);
+  assert.match(workflow, /\n  publish:\n    needs: \[build, image, qualify, security-record, upgrade, restore\]/);
 });
 
 test("given a candidate image, when qualifying it, then deployment and vulnerability failures block publication", () => {
   // when / then
   assert.match(workflow, /docker compose[\s\S]+config --quiet/);
   assert.match(workflow, /aquasecurity\/trivy-action@[a-f0-9]{40}/);
-  assert.match(workflow, /severity: CRITICAL,HIGH/);
-  assert.match(workflow, /exit-code: '1'/);
+  assert.match(workflow, /node tools\/security-findings\.mjs/);
+  assert.match(workflow, /security\/exceptions\.json/);
+  assert.match(workflow, /security-summary-\$\{\{ matrix\.architecture \}\}\.json/);
+  assert.match(workflow, /release-security-record/);
 });
 
 test("given a qualified manifest, when publishing it, then tags and signatures address that manifest without rebuilding", () => {

@@ -160,6 +160,12 @@ try {
   });
   assert.equal(booking.statusCode, 201, booking.body);
   const bookingId = JSON.parse(booking.body).id;
+  const oversizedRequest = await requestWithCookies(cookies, {
+    path: "/api/bookings", method: "POST",
+    headers: mutationHeaders(cookies, { "Content-Type": "application/json", "Idempotency-Key": "uat-oversized-request" }),
+    body: JSON.stringify({ padding: "x".repeat(2 * 1024 * 1024) })
+  });
+  assert.equal(oversizedRequest.statusCode, 413);
   const sessionsBeforeRestart = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from spring_session");
 
   composeRun("restart", "app");
