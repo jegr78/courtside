@@ -23,8 +23,9 @@ test("given a candidate image, when qualifying it, then deployment and vulnerabi
   // when / then
   assert.match(workflow, /docker compose[\s\S]+config --quiet/);
   assert.match(workflow, /aquasecurity\/trivy-action@[a-f0-9]{40}/);
-  assert.match(workflow, /severity: CRITICAL,HIGH/);
-  assert.match(workflow, /exit-code: '1'/);
+  assert.match(workflow, /node tools\/security-findings\.mjs/);
+  assert.match(workflow, /security\/exceptions\.json/);
+  assert.match(workflow, /security-summary-\$\{\{ matrix\.architecture \}\}\.json/);
 });
 
 test("given a qualified manifest, when publishing it, then tags and signatures address that manifest without rebuilding", () => {

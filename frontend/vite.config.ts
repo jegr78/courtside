@@ -30,6 +30,7 @@ export default defineConfig({
     }
   },
   test: {
+    execArgv: ["--no-experimental-webstorage"],
     environment: "jsdom",
     environmentOptions: { jsdom: { url: "http://localhost" } },
     include: ["src/**/*.test.{ts,tsx}"],

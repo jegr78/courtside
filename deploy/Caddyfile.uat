@@ -6,6 +6,10 @@ https://localhost:443 {
 	tls internal
 	encode zstd gzip
 
+	request_body {
+		max_size 2MB
+	}
+
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
@@ -36,6 +40,10 @@ https://localhost:443 {
 
 http://:8083 {
 	encode zstd gzip
+
+	request_body {
+		max_size 2MB
+	}
 
 	header {
 		Strict-Transport-Security "max-age=31536000"

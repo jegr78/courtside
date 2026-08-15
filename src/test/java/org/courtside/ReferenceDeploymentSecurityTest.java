@@ -104,6 +104,18 @@ class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void whenReadingCaddyfile_thenRequestBodiesHaveABoundedSize() throws IOException {
+        // when
+        String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
+        String uatCaddyfile = Files.readString(Path.of("deploy/Caddyfile.uat"));
+
+        // then
+        assertThat(caddyfile).contains("request_body {\n\t\tmax_size 2MB\n\t}");
+        assertThat(uatCaddyfile.lines().filter(line -> line.strip().equals("max_size 2MB")).count())
+                .isEqualTo(2);
+    }
+
+    @Test
     void whenReadingCaddyfile_thenTheApplicationContentSecurityPolicyIsNotReplaced() throws IOException {
         // when
         String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));

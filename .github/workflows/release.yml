@@ -72,7 +72,7 @@ jobs:
           origins=$(node tools/courtside.upgrade-smoke.mjs --origins "$GITHUB_REF_NAME")
           echo "origins=$origins" >> "$GITHUB_OUTPUT"
           printf '\n## Supported database upgrade origins\n\n' >> build/release-body.md
-          node -e 'for (const origin of JSON.parse(process.argv[1])) console.log(`- ${origin}`)' "$origins" \
+          node -e 'for (const origin of JSON.parse(process.argv[1])) console.log("- " + origin)' "$origins" \
             >> build/release-body.md
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -165,11 +165,21 @@ jobs:
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
-          format: sarif
-          output: build/uat-smoke/trivy-${{ matrix.architecture }}.sarif
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: '1'
+          format: json
+          output: build/uat-smoke/trivy-${{ matrix.architecture }}.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Enforce candidate-image security policy
+        run: >
+          node tools/security-findings.mjs
+          --trivy build/uat-smoke/trivy-${{ matrix.architecture }}.json
+          --exceptions security/exceptions.json
+          --output build/uat-smoke/security-summary-${{ matrix.architecture }}.json
+
+      - name: Remove raw security report
+        if: always()
+        run: rm -f build/uat-smoke/trivy-${{ matrix.architecture }}.json
 
       - name: Capture deployment diagnostics
         if: failure()

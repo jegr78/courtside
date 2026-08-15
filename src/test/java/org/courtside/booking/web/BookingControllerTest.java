@@ -19,6 +19,8 @@ import org.courtside.identity.UserAccountRepository;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -152,12 +154,13 @@ class BookingControllerTest extends AbstractIntegrationTest {
         assertThat(bookings.count()).isZero();
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {"contains whitespace", "ä"})
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
-    void givenAnInvalidIdempotencyKey_whenCreatingABooking_thenValidationFailureIsReturned()
+    void givenAnInvalidIdempotencyKey_whenCreatingABooking_thenValidationFailureIsReturned(String key)
             throws Exception {
         // when / then
-        mockMvc.perform(bookingPost("contains whitespace")
+        mockMvc.perform(bookingPost(key)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
@@ -166,6 +169,24 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("idempotencyKey"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"))
                 .andExpect(jsonPath("$.fieldErrors[0].params").isEmpty());
+
+        assertThat(bookings.count()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenAnOversizedIdempotencyKey_whenCreatingABooking_thenSizeValidationFailureIsReturned()
+            throws Exception {
+        // when / then
+        mockMvc.perform(bookingPost("x".repeat(129))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("idempotencyKey"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"))
+                .andExpect(jsonPath("$.fieldErrors[0].params.max").value(128));
 
         assertThat(bookings.count()).isZero();
     }
