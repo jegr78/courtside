@@ -14,17 +14,18 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
-import org.springframework.core.MethodParameter;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.validation.BeanPropertyBindingResult;
-import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -40,6 +41,8 @@ import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 class AdviceLoggingTest {
 
     private static final String OWNED_PACKAGE_PREFIX = "org.courtside";
+
+    private static final String MAIN_CLASS_OUTPUT = "/target/classes/";
 
     private static final String EXCEPTION_HANDLER_ANNOTATION = "@ExceptionHandler";
 
@@ -171,7 +174,8 @@ class AdviceLoggingTest {
             throws NoSuchMethodException {
         // given
         String rejectedPassword = "hunter2";
-        MethodArgumentNotValidException exception = rejectionOf("password", rejectedPassword);
+        MethodArgumentNotValidException exception =
+                FieldRejections.rejectionOf("password", rejectedPassword, "Size");
 
         // when
         new SharedExceptionHandler().handleValidationFailure(exception);
@@ -186,6 +190,27 @@ class AdviceLoggingTest {
     }
 
     @Test
+    void givenABodyValueJacksonRejects_whenItIsAnswered_thenTheFieldIsLoggedButNotItsValue() {
+        // given
+        String rejectedValue = "half past three";
+        HttpMessageNotReadableException exception =
+                unreadableBody("{\"courtNumber\":\"" + rejectedValue + "\"}");
+
+        // when
+        new SharedExceptionHandler().handleUnreadableBody(exception);
+
+        // then
+        assertThat(sharedAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage())
+                    .as("Jackson's message quotes the value it could not read, and on a password "
+                            + "endpoint that value is the password")
+                    .contains("courtNumber")
+                    .doesNotContain(rejectedValue);
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
     void givenTheAdvicesOnTheClassPath_whenTheirSourcesAreScanned_thenNoneCallsAPersonAccessor() {
         // given
         List<Path> advices = adviceSources();
@@ -195,7 +220,8 @@ class AdviceLoggingTest {
                 .as("%s must log the userAccountId, never a person. Source text is all this scan "
                         + "reads: a value arriving inside a framework exception's message is beyond "
                         + "it, and only a test that reads what was logged can see one", advice)
-                .doesNotContain("getEmail", "getDisplayName", "getFirstName", "getLastName"));
+                .doesNotContain("getEmail", "getDisplayName", "getFirstName", "getLastName",
+                        "getUsername"));
     }
 
     @Test
@@ -247,16 +273,30 @@ class AdviceLoggingTest {
                 new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AnnotationTypeFilter(ControllerAdvice.class));
         List<Path> sources = scanner.findCandidateComponents(OWNED_PACKAGE_PREFIX).stream()
+                .filter(AdviceLoggingTest::isCompiledFromMain)
                 .map(BeanDefinition::getBeanClassName)
-                .map(name -> Path.of("src/main/java", name.replace('.', '/') + ".java"))
+                .map(AdviceLoggingTest::sourceOf)
                 .sorted()
                 .toList();
         assertThat(sources)
-                .as("every advice on this application's class path must resolve to a source file, "
-                        + "or a scan of those files covers less than it claims")
-                .isNotEmpty()
+                .as("the scan must find every advice compiled from src/main and resolve each to "
+                        + "its source, so a new advice is covered and a known one cannot vanish. "
+                        + "An empty result means %s no longer names the main output directory",
+                        MAIN_CLASS_OUTPUT)
+                .contains(sourceOf(DomainFailureHandler.class.getName()),
+                        sourceOf(SharedExceptionHandler.class.getName()))
                 .allSatisfy(source -> assertThat(source).exists());
         return sources;
+    }
+
+    // A test-only advice fixture compiles to target/test-classes and has no src/main/java source.
+    private static boolean isCompiledFromMain(BeanDefinition definition) {
+        String origin = definition.getResourceDescription();
+        return origin != null && origin.contains(MAIN_CLASS_OUTPUT);
+    }
+
+    private static Path sourceOf(String className) {
+        return Path.of("src/main/java", className.replace('.', '/') + ".java");
     }
 
     private static List<String> handlerBodies(String source) {
@@ -300,18 +340,19 @@ class AdviceLoggingTest {
                 open, close, openIndex);
     }
 
-    private static MethodArgumentNotValidException rejectionOf(String field, String rejectedValue)
-            throws NoSuchMethodException {
-        BindingResult binding = new BeanPropertyBindingResult(new Object(), "request");
-        binding.addError(new FieldError("request", field, rejectedValue, false,
-                new String[]{"Size"}, null, "size must be between 12 and 128"));
-        return new MethodArgumentNotValidException(
-                new MethodParameter(AdviceLoggingTest.class
-                        .getDeclaredMethod("changeInitialPassword", String.class), 0),
-                binding);
+    private static HttpMessageNotReadableException unreadableBody(String body) {
+        try {
+            new ObjectMapper().readValue(body, CourtRequest.class);
+        } catch (JacksonException rejected) {
+            // Spring's message converter quotes Jackson's, as this does, and Jackson's quotes the
+            // value it could not read.
+            return new HttpMessageNotReadableException("JSON parse error: " + rejected.getMessage(),
+                    rejected, new MockHttpInputMessage(body.getBytes(StandardCharsets.UTF_8)));
+        }
+        return fail("Jackson read %s, so this test no longer drives the handler it names", body);
     }
 
-    private static void changeInitialPassword(String password) {
+    private record CourtRequest(int courtNumber) {
     }
 
     private static String causeChainOf(ILoggingEvent event) {
