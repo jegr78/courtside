@@ -2,12 +2,14 @@ package org.courtside.shared.web;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.DuplicateItemException;
 import tools.jackson.core.JacksonException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -31,6 +33,7 @@ import java.util.regex.Pattern;
 
 // Ahead of Boot's problemdetails fallback, behind the module advices that must claim their own
 // exceptions first. AdviceOrderingTest enforces it.
+@Slf4j
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 1000)
 class SharedExceptionHandler {
@@ -50,21 +53,28 @@ class SharedExceptionHandler {
                 HttpStatus.BAD_REQUEST, "The request conflicts with a database constraint");
         problem.setType(URI.create("urn:courtside:error:constraint-violation"));
         problem.setTitle("Constraint violation");
+        logAnswered(problem);
         return problem;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleValidationFailure(MethodArgumentNotValidException exception) {
-        return validationFailed(exception.getBindingResult().getFieldErrors().stream()
+        List<Map<String, Object>> fieldErrors = exception.getBindingResult().getFieldErrors().stream()
                 .map(SharedExceptionHandler::toMap)
-                .toList());
+                .toList();
+        ProblemDetail problem = validationFailed(fieldErrors);
+        logAnswered(problem, fieldsOf(fieldErrors));
+        return problem;
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail handleMethodValidationFailure(ConstraintViolationException exception) {
-        return validationFailed(exception.getConstraintViolations().stream()
+        List<Map<String, Object>> fieldErrors = exception.getConstraintViolations().stream()
                 .map(violation -> toMap(lastPathNode(violation), violation))
-                .toList());
+                .toList();
+        ProblemDetail problem = validationFailed(fieldErrors);
+        logAnswered(problem, fieldsOf(fieldErrors));
+        return problem;
     }
 
     // One builder, because ProblemTypeUriTest expects each slug's literal exactly once.
@@ -86,6 +96,7 @@ class SharedExceptionHandler {
         problem.setProperty("violations", List.of(Map.of(
                 "code", "request.parameterTypeMismatch",
                 "params", Map.of("parameter", exception.getName()))));
+        logAnswered(problem, List.of(exception.getName()));
         return problem;
     }
 
@@ -99,15 +110,18 @@ class SharedExceptionHandler {
                     HttpStatus.BAD_REQUEST, "The request body could not be parsed");
             problem.setType(URI.create("urn:courtside:error:malformed-request-body"));
             problem.setTitle("Malformed request body");
+            logAnswered(problem);
             return problem;
         }
 
         // Twice, not one map with a computed code: ValidationMessageCoverageTest finds a code
         // by the literal following the "code" key, and one it cannot see has no bundle entry.
-        return validationFailed(List.of(
+        ProblemDetail problem = validationFailed(List.of(
                 exception.getCause() instanceof DuplicateItemException
                         ? Map.of("field", field, "code", "validation.NoDuplicates", "params", Map.of())
                         : Map.of("field", field, "code", "validation.TypeMismatch", "params", Map.of())));
+        logAnswered(problem, List.of(field));
+        return problem;
     }
 
     // The keys of an additionalProperties object are whatever the caller sent, so anything
@@ -148,6 +162,7 @@ class SharedExceptionHandler {
                 HttpStatus.METHOD_NOT_ALLOWED, "This HTTP method is not supported for this resource");
         problem.setType(URI.create("urn:courtside:error:method-not-supported"));
         problem.setTitle("Method not allowed");
+        logAnswered(problem);
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .headers(exception.getHeaders())
                 .body(problem);
@@ -159,6 +174,7 @@ class SharedExceptionHandler {
                 HttpStatus.NOT_FOUND, "No resource exists at this address");
         problem.setType(URI.create("urn:courtside:error:unmapped-path"));
         problem.setTitle("Unmapped path");
+        logAnswered(problem);
         return problem;
     }
 
@@ -170,6 +186,7 @@ class SharedExceptionHandler {
                 HttpStatus.UNSUPPORTED_MEDIA_TYPE, "This endpoint does not accept the request's content type");
         problem.setType(URI.create("urn:courtside:error:unsupported-media-type"));
         problem.setTitle("Unsupported media type");
+        logAnswered(problem);
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .headers(exception.getHeaders())
                 .body(problem);
@@ -181,6 +198,7 @@ class SharedExceptionHandler {
                 HttpStatus.NOT_ACCEPTABLE, "This endpoint cannot produce a representation the request accepts");
         problem.setType(URI.create("urn:courtside:error:not-acceptable"));
         problem.setTitle("Not acceptable");
+        logAnswered(problem);
         return problem;
     }
 
@@ -193,6 +211,7 @@ class SharedExceptionHandler {
         problem.setProperty("violations", List.of(Map.of(
                 "code", "request.missingParameter",
                 "params", Map.of("parameter", exception.getParameterName()))));
+        logAnswered(problem, List.of(exception.getParameterName()));
         return problem;
     }
 
@@ -241,5 +260,20 @@ class SharedExceptionHandler {
                 "field", field,
                 "code", "validation." + constraintName,
                 "params", params);
+    }
+
+    // The problem type, so a log line and the response a member reads share one token. Never the
+    // exception: its message embeds the rejected value, a cleartext password on some endpoints.
+    private static void logAnswered(ProblemDetail problem) {
+        log.debug("Answering {} for {}", HttpStatusCode.valueOf(problem.getStatus()), problem.getType());
+    }
+
+    private static void logAnswered(ProblemDetail problem, List<String> fields) {
+        log.debug("Answering {} for {}: {}",
+                HttpStatusCode.valueOf(problem.getStatus()), problem.getType(), fields);
+    }
+
+    private static List<String> fieldsOf(List<Map<String, Object>> fieldErrors) {
+        return fieldErrors.stream().map(error -> (String) error.get("field")).toList();
     }
 }

@@ -6,7 +6,6 @@ import org.courtside.identity.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.NestedRuntimeException;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsPasswordService;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -45,11 +44,8 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
             authorities.add(PASSWORD_CHANGE_REQUIRED);
         }
 
-        return User.withUsername(account.getUsername())
-                .password(account.getPasswordHash())
-                .disabled(!account.isEnabled())
-                .authorities(authorities.toArray(String[]::new))
-                .build();
+        return new CourtsideUserDetails(account.getUsername(), account.getPasswordHash(),
+                account.isEnabled(), authorities, account.getSecurityEpoch());
     }
 
     @Override

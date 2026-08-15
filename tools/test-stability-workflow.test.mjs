@@ -20,6 +20,8 @@ test("given a required build failure, when collecting evidence, then backend and
   assert.match(build, /timeout-minutes: 25/);
   assert.match(build, /target\/surefire-reports\/\*\.xml/);
   assert.match(build, /frontend\/test-results\/visual-journeys/);
+  assert.match(build, /frontend\/test-results\/\*\*\/trace\.zip/);
+  assert.match(build, /frontend\/test-results\/\*\*\/\*\.png/);
   assert.doesNotMatch(build, /frontend\/playwright-report/);
   assert.doesNotMatch(workflow, /frontend\/playwright-report/);
 });

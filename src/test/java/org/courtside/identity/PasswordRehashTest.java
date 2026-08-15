@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsPasswordService;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.courtside.identity.AccountFixtures.enabled;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -126,6 +128,33 @@ class PasswordRehashTest extends AbstractIntegrationTest {
         assertThat(accounts.findById(account.getId()).orElseThrow().getPasswordHash())
                 .as("signing in must raise the stored cost without a further step")
                 .contains("m=19456");
+    }
+
+    @Test
+    void givenAHashBelowTheCurrentCost_whenTheMemberSignsIn_thenTheirSessionSurvivesTheRehash()
+            throws Exception {
+        // given
+        Argon2PasswordEncoder weaker = new Argon2PasswordEncoder(16, 32, 1, 16384, 2);
+        Person person = persons.save(new Person("John", "Roe", "john.roe@example.org"));
+        UserAccount account = accounts.save(enabled(new UserAccount(
+                person, "roe.john", weaker.encode(PASSWORD), Set.of(Role.MEMBER))));
+        long epochBefore = account.getSecurityEpoch();
+
+        // when
+        MockHttpSession session = (MockHttpSession) mockMvc.perform(post("/api/session")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("username", "roe.john")
+                        .param("password", PASSWORD)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andReturn().getRequest().getSession(false);
+
+        // then
+        assertThat(accounts.findById(account.getId()).orElseThrow().getSecurityEpoch())
+                .as("a rehash is not a password change and must not terminate anyone's sessions")
+                .isEqualTo(epochBefore);
+        mockMvc.perform(get("/api/session").session(session))
+                .andExpect(status().isOk());
     }
 
     @Test

@@ -177,6 +177,8 @@ public class SeriesService {
     public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
                       UUID cancelledBy, Set<Role> cancellerRoles) {
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
+        lockSeries(seriesId);
+        requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
 
         List<Booking> affected = affectedBookings(seriesId, fromBookingId, scope);
         affected.forEach(booking ->
@@ -209,7 +211,9 @@ public class SeriesService {
     // Without it nothing persists at all; with it, a mid-flush constraint failure undoes every move.
     @Transactional
     public int move(MoveRequest request, UUID movedBy, Set<Role> callerRoles) {
+        requireManagementAccessTo(request.seriesId(), request.fromBookingId(), movedBy, callerRoles);
         bookingGridCoordination.lock();
+        lockSeries(request.seriesId());
         MovePreview preview = previewMove(request, movedBy, callerRoles);
 
         List<UUID> blocked = preview.moves().stream()
@@ -339,6 +343,11 @@ public class SeriesService {
             throw new SeriesRequestInvalidException("booking.series.bookingNotInSeries",
                     Map.of("field", "fromBookingId"));
         }
+    }
+
+    private void lockSeries(UUID seriesId) {
+        seriesRepository.findForUpdateById(seriesId)
+                .orElseThrow(() -> new SeriesNotFoundException("No booking series with id " + seriesId));
     }
 
     private void requireManagementAccessTo(UUID seriesId, UUID fromBookingId,

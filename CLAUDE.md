@@ -296,6 +296,33 @@ enough to need.
 * **A branch gets a whole-branch review before its pull request is merged.** Every batch of work
   so far has had its most serious findings surface there rather than in the per-task reviews.
 
+## The design specification
+
+`docs/design.md` is the design specification: what the product is, why the architecture is shaped
+the way it is, the structural vocabulary the code uses (`DomainFailure`, `ProblemType`,
+`CodedDomainFailure`), the compatibility contract, and — in section 10 — what a club board is being
+asked to trust when it hands this application its members' credentials.
+
+It is written in the present tense as a *target*, so most of it describes the design and not the
+build. Two things in it describe the build and are therefore claims the code has to keep true:
+**section 0, "What is built today"**, and the inline **built / designed** markers, which section 10
+carries per item and section 9 carries per metric.
+
+* **A change that alters a behaviour the document states updates the document, in the same pull
+  request.** Adding a metric, closing a gap, changing what a login does — if a sentence in there
+  becomes false, it is part of the change, not follow-up work. A specification that describes last
+  month's build is worse than none, because section 10 is read as a promise.
+* **A review reads it.** Whether the code contradicts the design specification is a finding, and it
+  is one that neither the diff nor this file can surface — the contradiction lives in a document
+  outside both. This has already been missed twice: a branch that made a stored password rehash on
+  sign-in left section 10 stating that nothing ever rehashes one, and two independent review passes
+  went by without noticing, because both had been given the diff and this file and nothing else.
+* **An accepted risk is recorded here, not in an issue.** Where a weakness has no proportionate fix,
+  say so in the relevant section with what is observable, what an observer needs, why it stays open
+  and what bounds it. An issue nobody can close is deferral wearing a ticket number, and section 10
+  is where someone deciding whether to trust this application will actually look.
+
 ## References
 
 * Design spec: `docs/design.md`
+* Reference deployment and its environment: `deploy/README.md`
