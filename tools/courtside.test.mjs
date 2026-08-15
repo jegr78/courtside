@@ -11,7 +11,7 @@ import {
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, performanceBaselinePlan,
   performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
-  resolvePublicFunnelAddresses, uatStartupSummary, validatePublicAddress
+  resolvePublicFunnelAddresses, uatStartupSummary, validateNode, validatePublicAddress
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
@@ -59,6 +59,18 @@ test("given macOS or Linux, when resolving executables, then the POSIX Maven wra
   // when / then
   assert.deepEqual(executableNames("darwin"), { maven: "./mvnw", npm: "npm" });
   assert.deepEqual(executableNames("linux"), { maven: "./mvnw", npm: "npm" });
+});
+
+test("given a supported or newer Node release, when validating the runtime, then no upper major blocks upgrades", () => {
+  // when / then
+  assert.doesNotThrow(() => validateNode("24.0.0"));
+  assert.doesNotThrow(() => validateNode("26.5.1"));
+  assert.doesNotThrow(() => validateNode("27.0.0"));
+});
+
+test("given a Node release below the minimum, when validating the runtime, then it is rejected", () => {
+  // when / then
+  assert.throws(() => validateNode("23.11.1"), /Node 24 or later is required, found 23\.11\.1/);
 });
 
 test("given a frontend spawn failure, when starting development, then the backend is terminated", async () => {

@@ -10,7 +10,6 @@ test("given routine performance automation, when inspecting triggers, then pull 
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /schedule:/);
   assert.doesNotMatch(workflow, /pull_request:/);
-  assert.match(workflow, /node-version: '24'/);
   assert.doesNotMatch(workflow, /uses: [^\n]+@v\d/);
   assert.match(workflow, /persist-credentials: false/);
 });

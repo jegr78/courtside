@@ -1399,10 +1399,10 @@ export function terminate(child, platform = process.platform, killProcess = proc
   }
 }
 
-function validateNode() {
-  const major = Number(process.versions.node.split(".")[0]);
-  if (major !== 24) {
-    throw new Error(`Node 24 is required, found ${process.versions.node}`);
+export function validateNode(version = process.versions.node) {
+  const major = Number(version.split(".")[0]);
+  if (major < 24) {
+    throw new Error(`Node 24 or later is required, found ${version}`);
   }
 }
 
