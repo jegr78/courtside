@@ -9,6 +9,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.Map;
+
+import static java.util.Objects.requireNonNullElse;
+
 // Ahead of SharedExceptionHandler, whose cause-chain fallback would downgrade a wrapped 409 to a
 // 400. AdviceOrderingTest enforces the relation.
 @Slf4j
@@ -18,18 +22,21 @@ class DomainFailureHandler {
 
     @ExceptionHandler(DomainFailure.class)
     ResponseEntity<ProblemDetail> handleDomainFailure(DomainFailure failure) {
-        logAnswered(failure);
+        ProblemDetail body = failure.getBody();
+        logAnswered(failure, body);
         return ResponseEntity.status(failure.getStatusCode())
                 .headers(failure.getHeaders())
-                .body(failure.getBody());
+                .body(body);
     }
 
-    private static void logAnswered(DomainFailure failure) {
+    // Never the exception's message: it is free text, and a throw site builds it from the value the
+    // request submitted where the response deliberately withholds it.
+    private static void logAnswered(DomainFailure failure, ProblemDetail body) {
         if (failure.getStatusCode().is5xxServerError()) {
-            log.warn("Answering {} for {}", failure.getStatusCode(), failure.problemType().uri(), failure);
+            log.warn("Answering {} for {}", failure.getStatusCode(), body.getType(), failure);
         } else {
-            log.debug("Answering {} for {}: {}",
-                    failure.getStatusCode(), failure.problemType().uri(), failure.getMessage());
+            log.debug("Answering {} for {}: {}", failure.getStatusCode(), body.getType(),
+                    requireNonNullElse(body.getProperties(), Map.of()));
         }
     }
 }

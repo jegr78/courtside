@@ -3,7 +3,9 @@ package org.courtside.shared.web;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.core.read.ListAppender;
+import org.courtside.shared.CodedDomainFailure;
 import org.courtside.shared.DomainFailure;
 import org.courtside.shared.ProblemType;
 import org.junit.jupiter.api.AfterEach;
@@ -27,7 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,8 +50,15 @@ class AdviceLoggingTest {
     private static final ProblemType NOT_FOUND = new ProblemType(
             "test-failure-not-found", HttpStatus.NOT_FOUND, "Test failure", "Nothing found");
 
+    private static final ProblemType CONFLICT = new ProblemType(
+            "test-failure-conflict", HttpStatus.CONFLICT, "Test failure", "Already taken");
+
     private static final ProblemType SERVER_ERROR = new ProblemType(
             "test-failure-server-error", HttpStatus.INTERNAL_SERVER_ERROR, "Test failure", "Something broke");
+
+    private static final String DUPLICATE_USERNAME =
+            "duplicate key value violates unique constraint \"account_username_key\"\n"
+                    + "  Detail: Key (username)=(doe.jane) already exists.";
 
     private final ListAppender<ILoggingEvent> domainAppender = new ListAppender<>();
     private final ListAppender<ILoggingEvent> sharedAppender = new ListAppender<>();
@@ -82,10 +91,9 @@ class AdviceLoggingTest {
     }
 
     @Test
-    void givenA4xxDomainFailure_whenItIsAnswered_thenItIsLoggedAtDebugWithItsMessage() {
+    void givenACodedDomainFailure_whenItIsAnswered_thenItsStatusTypeAndViolationAreLoggedAtDebug() {
         // given
-        UUID bookingId = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
-        DomainFailure failure = new NotFoundFailure("No booking with id " + bookingId);
+        DomainFailure failure = new ConflictFailure("card.label.taken", Map.of("field", "cardLabel"));
 
         // when
         new DomainFailureHandler().handleDomainFailure(failure);
@@ -93,15 +101,38 @@ class AdviceLoggingTest {
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
-            assertThat(event.getFormattedMessage()).contains(bookingId.toString());
+            assertThat(event.getFormattedMessage())
+                    .contains("409 CONFLICT", "urn:courtside:error:test-failure-conflict",
+                            "card.label.taken", "cardLabel");
             assertThat(event.getThrowableProxy()).isNull();
         });
     }
 
     @Test
-    void givenA5xxDomainFailure_whenItIsAnswered_thenItIsLoggedAtWarnWithItsExceptionAttached() {
+    void givenAFailureWhoseMessageNamesTheRejectedValue_whenItIsAnswered_thenTheValueIsNotLogged() {
         // given
-        DomainFailure failure = new ServerErrorFailure("Something went wrong");
+        String rejectedLabel = "Guest training";
+        DomainFailure failure = new NotFoundFailure("Card label %s is already taken".formatted(rejectedLabel));
+
+        // when
+        new DomainFailureHandler().handleDomainFailure(failure);
+
+        // then
+        assertThat(domainAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage())
+                    .as("a domain failure's message is free text a throw site may build from the "
+                            + "value the request submitted, and the response withholds it")
+                    .contains("404 NOT_FOUND", "urn:courtside:error:test-failure-not-found")
+                    .doesNotContain(rejectedLabel);
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
+    void givenA5xxFailureCausedByADatabaseError_whenItIsAnswered_thenTheWarnLineCarriesThatDetail() {
+        // given
+        DomainFailure failure = new ServerErrorFailure("Something went wrong",
+                new DataIntegrityViolationException(DUPLICATE_USERNAME));
 
         // when
         new DomainFailureHandler().handleDomainFailure(failure);
@@ -109,16 +140,18 @@ class AdviceLoggingTest {
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
-            assertThat(event.getThrowableProxy()).isNotNull();
+            assertThat(causeChainOf(event))
+                    .as("a 5xx is an incident and not an expected outcome, so its cause chain is "
+                            + "logged whole. Whoever declares the first 5xx problem type accepts "
+                            + "that a WARN line may then carry a database detail")
+                    .contains("doe.jane");
         });
     }
 
     @Test
     void givenADatabaseMessageNamingAMember_whenItIsAnswered_thenOnlyTheStatusAndExceptionAreLogged() {
         // given
-        DataIntegrityViolationException exception = new DataIntegrityViolationException(
-                "duplicate key value violates unique constraint \"account_username_key\"\n"
-                        + "  Detail: Key (username)=(doe.jane) already exists.");
+        DataIntegrityViolationException exception = new DataIntegrityViolationException(DUPLICATE_USERNAME);
 
         // when
         new SharedExceptionHandler().handleRejectedByTheDatabase(exception);
@@ -281,6 +314,14 @@ class AdviceLoggingTest {
     private static void changeInitialPassword(String password) {
     }
 
+    private static String causeChainOf(ILoggingEvent event) {
+        StringBuilder messages = new StringBuilder();
+        for (IThrowableProxy proxy = event.getThrowableProxy(); proxy != null; proxy = proxy.getCause()) {
+            messages.append(proxy.getMessage()).append('\n');
+        }
+        return messages.toString();
+    }
+
     private static final class NotFoundFailure extends DomainFailure {
         NotFoundFailure(String message) {
             super(message);
@@ -292,9 +333,20 @@ class AdviceLoggingTest {
         }
     }
 
+    private static final class ConflictFailure extends CodedDomainFailure {
+        ConflictFailure(String code, Map<String, Object> params) {
+            super(code, params);
+        }
+
+        @Override
+        public ProblemType problemType() {
+            return CONFLICT;
+        }
+    }
+
     private static final class ServerErrorFailure extends DomainFailure {
-        ServerErrorFailure(String message) {
-            super(message);
+        ServerErrorFailure(String message, Throwable cause) {
+            super(message, cause);
         }
 
         @Override
