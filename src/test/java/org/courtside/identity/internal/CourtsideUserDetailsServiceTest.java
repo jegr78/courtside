@@ -50,6 +50,23 @@ class CourtsideUserDetailsServiceTest {
     }
 
     @Test
+    void givenTheAccountLookupFails_whenUpdatingThePassword_thenTheUserIsStillReturned() {
+        // given
+        UserDetails user = User.withUsername("doe.jane")
+                .password("old-hash")
+                .authorities("ROLE_MEMBER")
+                .build();
+        when(accounts.findByUsername("doe.jane"))
+                .thenThrow(new DataAccessResourceFailureException("connection pool exhausted"));
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter);
+
+        // when / then
+        assertThat(service.updatePassword(user, "new-hash"))
+                .as("a rehash whose account lookup fails must leave the authenticated user untouched")
+                .isSameAs(user);
+    }
+
+    @Test
     void givenTheCollaboratorFailsAtTransactionBegin_whenUpdatingThePassword_thenTheUserIsStillReturned() {
         // given
         UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),

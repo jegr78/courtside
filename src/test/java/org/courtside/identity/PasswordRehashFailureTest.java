@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.courtside.identity.AccountFixtures.enabled;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -76,6 +77,28 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
 
         // then
         verify(accounts).rehashPassword(eq(account.getId()), eq(account.getPasswordHash()), any());
+    }
+
+    @Test
+    void givenTheRehashLookupFails_whenTheMemberSignsIn_thenTheLoginStillSucceeds() throws Exception {
+        // given
+        UserAccount account = enabled(new UserAccount(
+                new Person("Richard", "Miles", "richard.miles@example.org"),
+                "miles.richard", weaklyHashedPassword(), Set.of(Role.MEMBER)));
+        when(accounts.findByUsername("miles.richard"))
+                .thenReturn(Optional.of(account))
+                .thenThrow(new DataAccessResourceFailureException("connection pool exhausted"));
+
+        // when
+        mockMvc.perform(post("/api/session")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("username", "miles.richard")
+                        .param("password", PASSWORD)
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // then
+        verify(accounts, never()).rehashPassword(any(), any(), any());
     }
 
     @Test

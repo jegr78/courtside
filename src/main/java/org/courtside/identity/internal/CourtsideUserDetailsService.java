@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -51,8 +52,14 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public UserDetails updatePassword(UserDetails user, String newPassword) {
-        accounts.findByUsername(user.getUsername())
-                .ifPresent(account -> rehash(account, user, newPassword));
+        Optional<UserAccount> account;
+        try {
+            account = accounts.findByUsername(user.getUsername());
+        } catch (NestedRuntimeException e) {
+            log.warn("Password rehash failed before the account could be read", e);
+            return user;
+        }
+        account.ifPresent(found -> rehash(found, user, newPassword));
         return user;
     }
 
