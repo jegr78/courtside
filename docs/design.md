@@ -864,8 +864,19 @@ A club admin decides here whether to trust Courtside with member credentials, so
 whether it is built or designed. **Designed means absent today.**
 
 - **Passwords:** Argon2id at `m=19456`, `t=2`, `p=1`, OWASP's current guidance and above Spring
-  Security's own defaults. Login by username (section 4). *Built.* Nothing rehashes an older,
-  cheaper hash on login — it keeps verifying, and only a password change moves it up.
+  Security's own defaults. Login by username (section 4). *Built.* A stored hash below the current
+  parameters is re-encoded on its owner's next successful sign-in; storing it is best effort, so a
+  database failure there leaves the old hash in place and never turns a correct password into a
+  failed login.
+- **Password age is observable on a failed login.** *Accepted, not closed.* A wrong password against
+  an account still on an older hash costs less than one against an unknown username, because the
+  dummy verification that hides unknown usernames encodes at the current parameters. It needs no
+  credentials, and it identifies accounts that have not signed in since the parameters were raised.
+  Closing it means padding every failed login to a constant worst-case duration, which is a change
+  to how the whole login path is timed rather than to how a hash is stored. Two things bound it: an
+  observer must average many samples to see a few milliseconds through network jitter, and rate
+  limiting (below) counts every attempt before the password is checked, instance-wide as well as per
+  address. The population shrinks on its own, since each sign-in removes one account from it.
 - **Sessions:** server-side via Spring Session in the database, delivered as an
   `HttpOnly` / `Secure` / `SameSite=Lax` cookie. **No JWT** — the PWA and API share an
   origin, so no token gymnastics are needed, and an admin can terminate a session
