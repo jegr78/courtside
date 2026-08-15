@@ -8,8 +8,8 @@ export default defineConfig({
   workers: 1,
   timeout: 60_000,
   use: {
-    trace: "off",
-    screenshot: "off",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
     video: "off"
   },
   projects: [

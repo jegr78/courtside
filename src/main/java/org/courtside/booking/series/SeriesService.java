@@ -176,6 +176,7 @@ public class SeriesService {
     @Transactional
     public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
                       UUID cancelledBy, Set<Role> cancellerRoles) {
+        lockSeries(seriesId);
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
 
         List<Booking> affected = affectedBookings(seriesId, fromBookingId, scope);
@@ -210,6 +211,7 @@ public class SeriesService {
     @Transactional
     public int move(MoveRequest request, UUID movedBy, Set<Role> callerRoles) {
         bookingGridCoordination.lock();
+        lockSeries(request.seriesId());
         MovePreview preview = previewMove(request, movedBy, callerRoles);
 
         List<UUID> blocked = preview.moves().stream()
@@ -339,6 +341,11 @@ public class SeriesService {
             throw new SeriesRequestInvalidException("booking.series.bookingNotInSeries",
                     Map.of("field", "fromBookingId"));
         }
+    }
+
+    private void lockSeries(UUID seriesId) {
+        seriesRepository.findForUpdateById(seriesId)
+                .orElseThrow(() -> new SeriesNotFoundException("No booking series with id " + seriesId));
     }
 
     private void requireManagementAccessTo(UUID seriesId, UUID fromBookingId,
