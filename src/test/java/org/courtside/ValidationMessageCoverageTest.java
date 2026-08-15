@@ -44,7 +44,7 @@ class ValidationMessageCoverageTest {
     // What toMap's "validation." + AnnotationSimpleName can produce today. A new @Constraint
     // mints an unreviewed wire code until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("DurationMin", "Max", "Min", "NotNull", "Pattern", "Size");
+            List.of("DurationMin", "Email", "Max", "Min", "NotNull", "Pattern", "Size");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();

@@ -80,6 +80,8 @@ tags:
     description: Administering participant cards.
   - name: admin-membership-types
     description: Administering membership types.
+  - name: admin-roster
+    description: The club's people, and the accounts they hold.
   - name: admin-rule-sets
     description: Administering rule sets and their rules.
   - name: admin-config
@@ -484,6 +486,38 @@ components:
       properties:
         name: { type: string, maxLength: 60, pattern: ".*\\S.*" }
         ruleSetId: { type: [string, "null"], format: uuid }
+
+    RosterEntry:
+      type: object
+      required: [personId, firstName, lastName, email, enabled, roles]
+      properties:
+        personId: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        accountId: { type: [string, "null"], format: uuid }
+        username: { type: [string, "null"] }
+        enabled:
+          type: boolean
+          description: |
+            The account's state, not the person's. A person without an account is never enabled and
+            is not thereby disabled — read it together with `accountId`.
+        membershipTypeId: { type: [string, "null"], format: uuid }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/Role" }
+
+    RosterPage:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/RosterEntry" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: Pass this person id as `cursor` to continue after the current page.
 
     RuleSet:
       type: object
@@ -2109,6 +2143,46 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /api/admin/roster:
+    get:
+      tags: [admin-roster]
+      operationId: listRoster
+      summary: The club's people, with their account and membership when they have one.
+      description: |
+        A person exists without an account — children and dormant records from a membership import
+        have none — so `accountId`, `username` and `roles` are absent for them and `enabled` reports
+        the account's state only where one exists.
+
+        The page is ordered by last name, then first name, then person id, and `cursor` continues
+        after the entry it names in that same order.
+      parameters:
+        - name: query
+          in: query
+          required: false
+          description: Matches against the person's full name, case-insensitively.
+          schema: { type: string, maxLength: 60 }
+        - name: cursor
+          in: query
+          required: false
+          description: The opaque `nextCursor` returned by the preceding page.
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: The page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterPage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/admin/rule-sets:
     get:

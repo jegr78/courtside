@@ -1,0 +1,168 @@
+package org.courtside.member;
+
+import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.Person;
+import org.courtside.identity.PersonRepository;
+import org.courtside.identity.Role;
+import org.courtside.identity.UserAccount;
+import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.CursorPage;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class RosterListTest extends AbstractIntegrationTest {
+
+    private static final UUID MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+
+    @Autowired
+    private PersonRepository persons;
+
+    @Autowired
+    private UserAccountRepository accounts;
+
+    @Autowired
+    private MemberRepository members;
+
+    @Autowired
+    private RosterService roster;
+
+    @Test
+    void givenAPersonWithoutAnAccount_whenListingTheRoster_thenTheEntryCarriesNoUsername() {
+        // given
+        Person child = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+
+        // then
+        assertThat(page.items())
+                .filteredOn(entry -> entry.personId().equals(child.getId()))
+                .singleElement()
+                .satisfies(entry -> {
+                    assertThat(entry.accountId()).isNull();
+                    assertThat(entry.username()).isNull();
+                    assertThat(entry.enabled()).isFalse();
+                    assertThat(entry.roles()).isEmpty();
+                    assertThat(entry.membershipTypeId()).isNull();
+                });
+    }
+
+    @Test
+    void givenAPersonWithAnAccountAndAMembership_whenListingTheRoster_thenTheEntryCarriesBoth() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UserAccount account = new UserAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER, Role.TRAINER));
+        account.enable();
+        accounts.save(account);
+        members.save(new Member(jane.getId(), MEMBERSHIP_TYPE_ID));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+
+        // then
+        assertThat(page.items())
+                .filteredOn(entry -> entry.personId().equals(jane.getId()))
+                .singleElement()
+                .satisfies(entry -> {
+                    assertThat(entry.firstName()).isEqualTo("Jane");
+                    assertThat(entry.lastName()).isEqualTo("Doe");
+                    assertThat(entry.email()).isEqualTo("jane.doe@example.org");
+                    assertThat(entry.accountId()).isEqualTo(account.getId());
+                    assertThat(entry.username()).isEqualTo("jane.doe");
+                    assertThat(entry.enabled()).isTrue();
+                    assertThat(entry.roles()).containsExactlyInAnyOrder(Role.MEMBER, Role.TRAINER);
+                    assertThat(entry.membershipTypeId()).isEqualTo(MEMBERSHIP_TYPE_ID);
+                });
+    }
+
+    @Test
+    void givenAQuery_whenListingTheRoster_thenOnlyMatchingPeopleAreReturned() {
+        // given
+        persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        Person other = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list("mile", null, 50);
+
+        // then
+        assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(other.getId());
+    }
+
+    @Test
+    void givenAQueryOfLikeWildcards_whenListingTheRoster_thenTheyAreMatchedLiterally() {
+        // given
+        persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list("%", null, 50);
+
+        // then
+        assertThat(page.items()).isEmpty();
+    }
+
+    @Test
+    void whenListingTheRoster_thenPeopleComeOrderedByName() {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        Person john = persons.save(new Person("John", "Roe", "john.roe@example.org"));
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+
+        // then
+        assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(jane.getId(), mary.getId(), john.getId());
+        assertThat(page.nextCursor()).isNull();
+    }
+
+    @Test
+    void givenMorePeopleThanTheLimit_whenFollowingTheCursor_thenEveryPersonIsSeenExactlyOnce() {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        Person john = persons.save(new Person("John", "Roe", "john.roe@example.org"));
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        Person richard = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
+
+        // then
+        assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(jane.getId(), mary.getId());
+        assertThat(first.nextCursor()).isEqualTo(mary.getId());
+        assertThat(second.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(richard.getId(), john.getId());
+        assertThat(second.nextCursor()).isNull();
+    }
+
+    @Test
+    void givenPeopleSharingAName_whenFollowingTheCursor_thenNoNamesakeIsSkipped() {
+        // given
+        List<Person> namesakes = List.of(
+                persons.save(new Person("Jane", "Doe", "jane.doe.1@example.org")),
+                persons.save(new Person("Jane", "Doe", "jane.doe.2@example.org")),
+                persons.save(new Person("Jane", "Doe", "jane.doe.3@example.org")));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
+
+        // then
+        assertThat(first.items()).hasSize(2);
+        assertThat(second.items()).hasSize(1);
+        assertThat(List.of(first.items(), second.items()).stream()
+                .flatMap(List::stream)
+                .map(RosterService.RosterEntry::personId)
+                .toList())
+                .containsExactlyInAnyOrderElementsOf(namesakes.stream().map(Person::getId).toList());
+    }
+}
