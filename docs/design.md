@@ -797,9 +797,10 @@ Import and export:
 
 ## 9. Observability
 
-**Designed, not built.** Today only `/actuator/health` is exposed; none of the metrics, traces or
-alerts below exist yet. The section stays in the present tense because it defines the target — a
-club operating a current build should plan for a health check and nothing more.
+**Designed, not built.** Today only `/actuator/health` is exposed; of the metrics below only
+`courtside.password.rehash.failed` is registered, and no traces or alerts exist yet. The section
+stays in the present tense because it defines the target — a club operating a current build should
+plan for a health check and nothing more.
 
 The application exports **metrics, traces and logs over OTLP** using
 `spring-boot-starter-opentelemetry`. The protocol is the commitment, not the backend — the
@@ -834,6 +835,7 @@ alerting.
 | `courtside.outbox.pending` | Gauge | Are emails backing up — the key leading indicator |
 | `courtside.notifications.failed` | Counter (reason) | See delivery problems before the complaint |
 | `courtside.login.failed` | Counter | Attack detection and UX signal |
+| `courtside.password.rehash.failed` | Counter (stage) | A rehash that only logs still leaves hashes at the old cost |
 | `courtside.backup.age.seconds` | Gauge | The alert everyone forgets |
 
 `courtside.bookings.rejected` tagged by rule is close to a product feature: a club can see

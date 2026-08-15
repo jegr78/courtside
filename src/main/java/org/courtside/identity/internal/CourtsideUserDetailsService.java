@@ -1,5 +1,6 @@
 package org.courtside.identity.internal;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +26,12 @@ import java.util.Optional;
 public class CourtsideUserDetailsService implements UserDetailsService, UserDetailsPasswordService {
 
     private static final String ROLE_PREFIX = "ROLE_";
+    private static final String REHASH_FAILED = "courtside.password.rehash.failed";
     static final String PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED";
 
     private final UserAccountRepository accounts;
     private final PasswordRehashWriter rehashWriter;
+    private final MeterRegistry meters;
 
     @Override
     public UserDetails loadUserByUsername(String username) {
@@ -56,6 +59,7 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
         try {
             account = accounts.findByUsername(user.getUsername());
         } catch (NestedRuntimeException e) {
+            countFailure("lookup");
             log.warn("Password rehash failed before the account could be read", e);
             return user;
         }
@@ -67,7 +71,12 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
         try {
             rehashWriter.rehash(account.getId(), user.getPassword(), newPassword);
         } catch (NestedRuntimeException e) {
+            countFailure("write");
             log.warn("Password rehash failed for account {}", account.getId(), e);
         }
+    }
+
+    private void countFailure(String stage) {
+        meters.counter(REHASH_FAILED, "stage", stage).increment();
     }
 }

@@ -1,5 +1,7 @@
 package org.courtside.identity.internal;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.courtside.identity.Person;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
@@ -29,6 +31,8 @@ class CourtsideUserDetailsServiceTest {
     @Mock
     private PasswordRehashWriter rehashWriter;
 
+    private final MeterRegistry meters = new SimpleMeterRegistry();
+
     @Test
     void givenTheRehashWriteFails_whenUpdatingThePassword_thenTheUserIsStillReturned() {
         // given
@@ -41,7 +45,7 @@ class CourtsideUserDetailsServiceTest {
         when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
         doThrow(new DataAccessResourceFailureException("read-only replica"))
                 .when(rehashWriter).rehash(account.getId(), "old-hash", "new-hash");
-        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter);
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters);
 
         // when / then
         assertThat(service.updatePassword(user, "new-hash"))
@@ -58,12 +62,55 @@ class CourtsideUserDetailsServiceTest {
                 .build();
         when(accounts.findByUsername("doe.jane"))
                 .thenThrow(new DataAccessResourceFailureException("connection pool exhausted"));
-        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter);
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters);
 
         // when / then
         assertThat(service.updatePassword(user, "new-hash"))
                 .as("a rehash whose account lookup fails must leave the authenticated user untouched")
                 .isSameAs(user);
+    }
+
+    @Test
+    void givenTheRehashWriteFails_whenUpdatingThePassword_thenTheSwallowedFailureIsCounted() {
+        // given
+        UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
+                "doe.jane", "old-hash", Set.of(Role.MEMBER));
+        UserDetails user = User.withUsername("doe.jane")
+                .password("old-hash")
+                .authorities("ROLE_MEMBER")
+                .build();
+        when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
+        doThrow(new DataAccessResourceFailureException("read-only replica"))
+                .when(rehashWriter).rehash(account.getId(), "old-hash", "new-hash");
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters);
+
+        // when
+        service.updatePassword(user, "new-hash");
+
+        // then
+        assertThat(failures("write"))
+                .as("a rehash that only logs must still be countable in operation")
+                .isEqualTo(1);
+    }
+
+    @Test
+    void givenTheAccountLookupFails_whenUpdatingThePassword_thenTheSwallowedFailureIsCounted() {
+        // given
+        UserDetails user = User.withUsername("doe.jane")
+                .password("old-hash")
+                .authorities("ROLE_MEMBER")
+                .build();
+        when(accounts.findByUsername("doe.jane"))
+                .thenThrow(new DataAccessResourceFailureException("connection pool exhausted"));
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters);
+
+        // when
+        service.updatePassword(user, "new-hash");
+
+        // then
+        assertThat(failures("lookup"))
+                .as("a rehash lookup that only logs must still be countable in operation")
+                .isEqualTo(1);
     }
 
     @Test
@@ -78,11 +125,15 @@ class CourtsideUserDetailsServiceTest {
         when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
         doThrow(new CannotCreateTransactionException("connection pool exhausted"))
                 .when(rehashWriter).rehash(account.getId(), "old-hash", "new-hash");
-        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter);
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters);
 
         // when / then
         assertThat(service.updatePassword(user, "new-hash"))
                 .as("a rehash write that cannot even begin its transaction must leave the user untouched")
                 .isSameAs(user);
+    }
+
+    private double failures(String stage) {
+        return meters.get("courtside.password.rehash.failed").tag("stage", stage).counter().count();
     }
 }
