@@ -1,6 +1,7 @@
 package org.courtside.identity.internal;
 
 import org.courtside.identity.Role;
+import org.courtside.identity.UserAccountRepository;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -15,6 +16,7 @@ import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -54,6 +56,7 @@ public class SecurityConfiguration {
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
             LoginAttemptProtection loginAttemptProtection,
             LoginRateLimitHandler loginRateLimitHandler,
+            UserAccountRepository accounts,
             @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
@@ -109,6 +112,8 @@ public class SecurityConfiguration {
                         .failureHandler(authenticationEntryPoint::commence))
                 .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), loginAttemptProtection,
                         loginRateLimitHandler), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new SecurityEpochFilter(accounts, authenticationEntryPoint),
+                        SecurityContextHolderFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
                         .logoutSuccessHandler((request, response, authentication) ->

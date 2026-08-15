@@ -3,7 +3,6 @@ package org.courtside.identity.internal;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -35,10 +34,7 @@ public class CourtsideUserDetailsService implements UserDetailsService {
             authorities.add(PASSWORD_CHANGE_REQUIRED);
         }
 
-        return User.withUsername(account.getUsername())
-                .password(account.getPasswordHash())
-                .disabled(!account.isEnabled())
-                .authorities(authorities.toArray(String[]::new))
-                .build();
+        return new CourtsideUserDetails(account.getUsername(), account.getPasswordHash(),
+                account.isEnabled(), authorities, account.getSecurityEpoch());
     }
 }

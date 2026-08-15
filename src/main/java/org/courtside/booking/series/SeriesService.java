@@ -176,6 +176,7 @@ public class SeriesService {
     @Transactional
     public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
                       UUID cancelledBy, Set<Role> cancellerRoles) {
+        requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
         lockSeries(seriesId);
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
 
@@ -210,6 +211,7 @@ public class SeriesService {
     // Without it nothing persists at all; with it, a mid-flush constraint failure undoes every move.
     @Transactional
     public int move(MoveRequest request, UUID movedBy, Set<Role> callerRoles) {
+        requireManagementAccessTo(request.seriesId(), request.fromBookingId(), movedBy, callerRoles);
         bookingGridCoordination.lock();
         lockSeries(request.seriesId());
         MovePreview preview = previewMove(request, movedBy, callerRoles);

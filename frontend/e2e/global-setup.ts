@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { Buffer } from "node:buffer";
 import { once } from "node:events";
 import { readdirSync, rmSync, statSync } from "node:fs";
 import { createServer, type AddressInfo } from "node:net";
@@ -159,9 +160,15 @@ export interface JourneyService {
   baseURL: string;
   visualDate: string;
   executeSql(sql: string): Promise<string>;
+  holdDatabaseLock(sql: string): Promise<DatabaseLock>;
   reset(): Promise<void>;
   restart(): Promise<void>;
   stop(): Promise<void>;
+}
+
+export interface DatabaseLock {
+  waitForWaiters(count: number): Promise<string>;
+  release(): Promise<void>;
 }
 
 async function availableLoopbackPort(): Promise<number> {
@@ -232,6 +239,7 @@ export async function startJourneyService(): Promise<JourneyService> {
       SPRING_DATASOURCE_URL: `jdbc:postgresql://${postgres.getHost()}:${postgres.getMappedPort(5432)}/courtside`,
       SPRING_DATASOURCE_USERNAME: "courtside",
       SPRING_DATASOURCE_PASSWORD: "courtside",
+      LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_ERROR: "ERROR",
       COURTSIDE_COOKIE_SECURE: "false",
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: "bootstrap-admin",
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: "temporary-password",
@@ -257,6 +265,54 @@ export async function startJourneyService(): Promise<JourneyService> {
       if (result.exitCode !== 0) throw new Error(`Journey SQL failed: ${result.stderr}`);
       return result.stdout.trim();
     };
+    const heldLocks = new Set<DatabaseLock>();
+    const holdDatabaseLock = async (sql: string): Promise<DatabaseLock> => {
+      const client = spawn("docker", [
+        "exec", "-i", postgres!.getId(), "psql", "-U", "courtside", "-d", "courtside",
+        "-v", "ON_ERROR_STOP=1", "-At"
+      ], { stdio: ["pipe", "pipe", "pipe"] });
+      let output = "";
+      let errors = "";
+      client.stdout.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+      client.stderr.on("data", (chunk: Buffer) => { errors += chunk.toString(); });
+      client.stdin.write(`BEGIN;\n${sql};\nSELECT 'COURTSIDE_LOCK_READY';\n`);
+      for (let attempt = 0; attempt < 100 && !output.includes("COURTSIDE_LOCK_READY"); attempt += 1) {
+        if (client.exitCode !== null) throw new Error(`Database lock client stopped: ${errors}`);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      if (!output.includes("COURTSIDE_LOCK_READY")) {
+        client.kill();
+        throw new Error(`Database lock was not acquired: ${errors}`);
+      }
+      let released = false;
+      const lock: DatabaseLock = {
+        waitForWaiters: async (count) => {
+          let diagnostics = "";
+          for (let attempt = 0; attempt < 100; attempt += 1) {
+            diagnostics = await executeSql(`
+              SELECT pid, wait_event_type, wait_event, state, query
+              FROM pg_stat_activity
+              WHERE datname = current_database() AND pid <> pg_backend_pid()
+                AND wait_event_type = 'Lock'
+              ORDER BY pid
+            `);
+            if (diagnostics.split("\n").filter(Boolean).length >= count) return diagnostics;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          throw new Error(`Expected ${count} database lock waiters, observed:\n${diagnostics}`);
+        },
+        release: async () => {
+          if (released) return;
+          released = true;
+          client.stdin.end("COMMIT;\n\\q\n");
+          const [code] = await once(client, "exit") as [number | null];
+          heldLocks.delete(lock);
+          if (code !== 0) throw new Error(`Database lock client failed: ${errors}`);
+        }
+      };
+      heldLocks.add(lock);
+      return lock;
+    };
     await startApplication();
     await seedJourneyData(postgres, visualDate);
     const tables = await snapshotJourneyData(postgres);
@@ -264,12 +320,17 @@ export async function startJourneyService(): Promise<JourneyService> {
       baseURL,
       visualDate,
       executeSql,
-      reset: () => resetJourneyData(postgres!, tables),
+      holdDatabaseLock,
+      reset: async () => {
+        await Promise.all([...heldLocks].map((lock) => lock.release()));
+        await resetJourneyData(postgres!, tables);
+      },
       restart: async () => {
         await stopApplication();
         await startApplication();
       },
       stop: async () => {
+        await Promise.all([...heldLocks].map((lock) => lock.release()));
         await stopApplication();
         await postgres?.stop();
       }

@@ -81,6 +81,37 @@ async function attach(testInfo: TestInfo, name: string, value: unknown): Promise
   await testInfo.attach(name, { body: JSON.stringify(value, null, 2), contentType: "application/json" });
 }
 
+async function whileDatabaseLockIsContended<T>(
+  testInfo: TestInfo,
+  service: JourneyService,
+  lockSql: string,
+  actions: Array<{ name: string; start: () => Promise<T> }>
+): Promise<T[]> {
+  const lock = await service.holdDatabaseLock(lockSql);
+  const pending = actions.map((action) => action.start());
+  let waitFailure: unknown;
+  try {
+    const diagnostics = await lock.waitForWaiters(actions.length);
+    await attach(testInfo, "database-lock-waiters", {
+      actions: actions.map((action) => action.name), diagnostics
+    });
+  } catch (error) {
+    waitFailure = error;
+  } finally {
+    await lock.release();
+  }
+  const outcomes = await Promise.allSettled(pending);
+  await attach(testInfo, "client-action-outcomes", outcomes);
+  if (waitFailure) {
+    throw waitFailure instanceof Error ? waitFailure : new Error("Database waiter coordination failed");
+  }
+  const rejected = outcomes.find((outcome) => outcome.status === "rejected");
+  if (rejected?.status === "rejected") {
+    throw rejected.reason instanceof Error ? rejected.reason : new Error(String(rejected.reason));
+  }
+  return outcomes.map((outcome) => (outcome as PromiseFulfilledResult<T>).value);
+}
+
 test("two members receive one booking and one actionable conflict for the same slot", async ({ browser, journeyService }, testInfo) => {
   // given
   const first = await browser.newContext();
@@ -106,10 +137,11 @@ test("two members receive one booking and one actionable conflict for the same s
   const secondResponse = secondPage.waitForResponse((response) => response.url().endsWith("/api/bookings"));
 
   // when
-  await Promise.all([
-    firstPage.getByTestId("booking-submit").click(),
-    secondPage.getByTestId("booking-submit").click()
-  ]);
+  await whileDatabaseLockIsContended(testInfo, journeyService,
+    "SELECT id FROM club_config WHERE id = '00000000-0000-0000-0000-000000000001' FOR UPDATE", [
+      { name: "roe.jane booking", start: () => firstPage.getByTestId("booking-submit").click() },
+      { name: "keeper.roe booking", start: () => secondPage.getByTestId("booking-submit").click() }
+    ]);
   const responses = await Promise.all([firstResponse, secondResponse]);
   const evidence = await Promise.all(responses.map(async (response) => ({
     status: response.status(), body: await response.json() as Record<string, unknown>
@@ -139,10 +171,11 @@ test("duplicate browser delivery with one idempotency key creates one logical bo
   const key = crypto.randomUUID();
 
   // when
-  const deliveries = await Promise.all([
-    createBooking(page, body, key),
-    createBooking(page, body, key)
-  ]);
+  const deliveries = await whileDatabaseLockIsContended(testInfo, journeyService,
+    "SELECT id FROM club_config WHERE id = '00000000-0000-0000-0000-000000000001' FOR UPDATE", [
+      { name: "first idempotent delivery", start: () => createBooking(page, body, key) },
+      { name: "second idempotent delivery", start: () => createBooking(page, body, key) }
+    ]);
 
   // then
   expect(deliveries.map((delivery) => delivery.status)).toEqual([201, 201]);
@@ -218,10 +251,11 @@ test("concurrent participant-card claims leave exactly one capacity owner", asyn
   });
 
   // when
-  const claims = await Promise.all([
-    createBooking(firstPage, booking(courtTwo), key[0]),
-    createBooking(secondPage, booking(courtThree), key[1])
-  ]);
+  const claims = await whileDatabaseLockIsContended(testInfo, journeyService,
+    "SELECT id FROM club_config WHERE id = '00000000-0000-0000-0000-000000000001' FOR UPDATE", [
+      { name: "roe.jane participant-card claim", start: () => createBooking(firstPage, booking(courtTwo), key[0]) },
+      { name: "keeper.roe participant-card claim", start: () => createBooking(secondPage, booking(courtThree), key[1]) }
+    ]);
 
   // then
   await attach(testInfo, "participant-card-claims", claims);
@@ -258,12 +292,20 @@ test("a series move and scoped cancellation serialize without a partial occurren
   const bookingId = "70000000-0000-0000-0000-000000000001";
 
   // when
-  const [move, cancellation] = await Promise.all([
-    mutation(movePage, `/api/booking-series/${seriesId}/move`, "POST", {
-      fromBookingId: bookingId, scope: "WHOLE_SERIES", newStartTime: "13:00:00"
-    }),
-    mutation(cancelPage, `/api/booking-series/${seriesId}?fromBookingId=${bookingId}&scope=THIS`, "DELETE")
-  ]);
+  const [move, cancellation] = await whileDatabaseLockIsContended(testInfo, journeyService,
+    `SELECT id FROM booking_series WHERE id = '${seriesId}' FOR UPDATE`, [
+      {
+        name: "whole-series move",
+        start: () => mutation(movePage, `/api/booking-series/${seriesId}/move`, "POST", {
+          fromBookingId: bookingId, scope: "WHOLE_SERIES", newStartTime: "13:00:00"
+        })
+      },
+      {
+        name: "single-occurrence cancellation",
+        start: () => mutation(cancelPage,
+          `/api/booking-series/${seriesId}?fromBookingId=${bookingId}&scope=THIS`, "DELETE")
+      }
+    ]);
 
   // then
   await attach(testInfo, "series-race", { move, cancellation });
