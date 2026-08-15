@@ -119,6 +119,7 @@ default.
 | `COURTSIDE_LOGIN_GLOBAL_MAX_FAILURES` | `100` | Login attempts allowed across the instance and window. |
 | `COURTSIDE_LOGIN_GLOBAL_WINDOW` | `1m` | Instance-wide counting window. |
 | `COURTSIDE_LOGIN_GLOBAL_BLOCK` | `1m` | Instance-wide login cooldown duration. |
+| `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's own loggers. `DEBUG` adds an `Answering` line for every error one of its exception handlers answers; sign-in and authorisation failures are not among them. |
 | `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |
 | `COURTSIDE_SOURCE_URL` | this repository | Where `GET /api/source` points. **If you modified Courtside and let others use it, the AGPL requires this to point at your source, not at ours.** |
 | `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, or `DEVELOPMENT`. UAT is visibly marked in the frontend. |
@@ -126,6 +127,39 @@ default.
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` are set by
 `compose.yaml`. Point them elsewhere if you run PostgreSQL outside Compose; the application needs
 PostgreSQL 17 and will not run on anything else.
+
+## When a member reports an error
+
+An error a member causes leaves no `Answering` line at `INFO`: the handler that answers the request
+says nothing about it. A failure on the instance's own side is louder — a 5xx at `WARN`, with the
+exception attached because that is an incident and not a member's mistake, and an error no handler
+claims at `ERROR` — but a member's mistake stays invisible until you lower the level.
+Set `COURTSIDE_LOG_LEVEL=DEBUG` in `.env`, run `docker compose up -d app`, and ask the member to
+repeat what they did. Every error one of the application's exception handlers answers then adds one
+entry. The log is JSON, so `docker compose logs app | grep Answering` is the quickest way to read
+them. Each line names the status and the problem type — the same `type` URN the member's error
+carries, so the line and the response share one token to search on — and then whatever that
+response holds beyond it: the violation code and its parameters where it reports one, the names of
+the request fields where validation rejected them, and nothing where the response adds nothing to
+say. That is enough to tell a member's mistake from the instance's. Restore the level and restart
+once you have what you need.
+
+Signing in is the exception, and it is the complaint this section is most likely to be opened for.
+A rejected password, a request from a member who is not allowed to make it, and a login stopped by
+the rate limit all answer with a problem document and log nothing, at any level. For those,
+`grep Answering` comes back empty however low you set the level, and the response the member got —
+its `type`, and the `Retry-After` a rate-limited login carries — is the whole of what there is to
+go on.
+
+`DEBUG` is for diagnosis and not a level to run a club on. It is loud, it pushes the record of
+everything else out of the rotated log files sooner, and every line it adds is one more line to keep
+private. What it does not add is anyone's data. Every line it adds is built from the response the
+handler is about to return, never from the exception's message, which is free text a throw site
+may have assembled from what the request submitted. A line can therefore hold nothing the member
+on the other end has not already been shown, which leaves out a name, an address and a rejected
+password alike. Tests drive each place such a value is known to arrive — a failed validation, a
+body the JSON parser could not read, a constraint the database rejected, and a domain failure
+whose own message names what it turned down — and assert that it stays out of the line.
 
 ## Upgrading
 
