@@ -1,6 +1,5 @@
 package org.courtside.identity.internal;
 
-import org.courtside.identity.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -12,7 +11,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class PasswordRehashWriter {
 
-    private final UserAccountRepository accounts;
+    private final PasswordRehashRepository accounts;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void rehash(UUID accountId, String currentHash, String newHash) {

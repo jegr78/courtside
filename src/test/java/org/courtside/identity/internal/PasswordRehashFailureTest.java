@@ -1,6 +1,10 @@
-package org.courtside.identity;
+package org.courtside.identity.internal;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.Person;
+import org.courtside.identity.Role;
+import org.courtside.identity.UserAccount;
+import org.courtside.identity.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +27,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.courtside.identity.AccountFixtures.enabled;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -50,6 +53,9 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
     @MockitoBean
     private UserAccountRepository accounts;
 
+    @MockitoBean
+    private PasswordRehashRepository rehashRepository;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -60,11 +66,9 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
     @Test
     void givenTheRehashWriteFails_whenTheMemberSignsIn_thenTheLoginStillSucceeds() throws Exception {
         // given
-        UserAccount account = enabled(new UserAccount(
-                new Person("John", "Roe", "john.roe@example.org"),
-                "roe.john", weaklyHashedPassword(), Set.of(Role.MEMBER)));
+        UserAccount account = member("roe.john", new Person("John", "Roe", "john.roe@example.org"));
         when(accounts.findByUsername("roe.john")).thenReturn(Optional.of(account));
-        when(accounts.rehashPassword(any(), any(), any()))
+        when(rehashRepository.rehashPassword(any(), any(), any()))
                 .thenThrow(new DataAccessResourceFailureException("read-only replica"));
 
         // when
@@ -76,15 +80,14 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         // then
-        verify(accounts).rehashPassword(eq(account.getId()), eq(account.getPasswordHash()), any());
+        verify(rehashRepository).rehashPassword(eq(account.getId()), eq(account.getPasswordHash()), any());
     }
 
     @Test
     void givenTheRehashLookupFails_whenTheMemberSignsIn_thenTheLoginStillSucceeds() throws Exception {
         // given
-        UserAccount account = enabled(new UserAccount(
-                new Person("Richard", "Miles", "richard.miles@example.org"),
-                "miles.richard", weaklyHashedPassword(), Set.of(Role.MEMBER)));
+        UserAccount account = member("miles.richard",
+                new Person("Richard", "Miles", "richard.miles@example.org"));
         when(accounts.findByUsername("miles.richard"))
                 .thenReturn(Optional.of(account))
                 .thenThrow(new DataAccessResourceFailureException("connection pool exhausted"));
@@ -98,15 +101,13 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         // then
-        verify(accounts, never()).rehashPassword(any(), any(), any());
+        verify(rehashRepository, never()).rehashPassword(any(), any(), any());
     }
 
     @Test
     void givenAnActiveCallerTransaction_whenUpdatingThePassword_thenTheGuardedWriteRunsOutsideIt() {
         // given
-        UserAccount account = enabled(new UserAccount(
-                new Person("Mary", "Major", "mary.major@example.org"),
-                "major.mary", weaklyHashedPassword(), Set.of(Role.MEMBER)));
+        UserAccount account = member("major.mary", new Person("Mary", "Major", "mary.major@example.org"));
         AtomicBoolean transactionActiveAtTheGuard = new AtomicBoolean(true);
         when(accounts.findByUsername("major.mary")).thenAnswer(invocation -> {
             transactionActiveAtTheGuard.set(TransactionSynchronizationManager.isActualTransactionActive());
@@ -125,6 +126,12 @@ class PasswordRehashFailureTest extends AbstractIntegrationTest {
         assertThat(transactionActiveAtTheGuard)
                 .as("the caller's transaction must be suspended so the rehash guard holds no transaction")
                 .isFalse();
+    }
+
+    private UserAccount member(String username, Person person) {
+        UserAccount account = new UserAccount(person, username, weaklyHashedPassword(), Set.of(Role.MEMBER));
+        account.enable();
+        return account;
     }
 
     private String weaklyHashedPassword() {

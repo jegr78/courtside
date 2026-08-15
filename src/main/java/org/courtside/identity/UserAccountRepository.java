@@ -23,15 +23,5 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             """)
     int changeInitialPassword(@Param("id") UUID id, @Param("passwordHash") String passwordHash);
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            UPDATE UserAccount account
-            SET account.passwordHash = :newHash
-            WHERE account.id = :id AND account.passwordHash = :currentHash
-            """)
-    int rehashPassword(@Param("id") UUID id,
-                       @Param("currentHash") String currentHash,
-                       @Param("newHash") String newHash);
-
     List<UserAccount> findByPersonIdIn(List<UUID> personIds);
 }
