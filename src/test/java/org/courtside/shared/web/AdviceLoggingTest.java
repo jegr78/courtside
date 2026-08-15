@@ -149,7 +149,7 @@ class AdviceLoggingTest {
     }
 
     @Test
-    void givenADatabaseMessageNamingAMember_whenItIsAnswered_thenOnlyTheStatusAndExceptionAreLogged() {
+    void givenADatabaseMessageNamingAMember_whenItIsAnswered_thenOnlyTheStatusAndProblemTypeAreLogged() {
         // given
         DataIntegrityViolationException exception = new DataIntegrityViolationException(DUPLICATE_USERNAME);
 
@@ -160,7 +160,7 @@ class AdviceLoggingTest {
         assertThat(sharedAppender.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
             assertThat(event.getFormattedMessage())
-                    .contains("400 BAD_REQUEST", "DataIntegrityViolationException")
+                    .contains("400 BAD_REQUEST", "urn:courtside:error:constraint-violation")
                     .doesNotContain("doe.jane");
             assertThat(event.getThrowableProxy()).isNull();
         });

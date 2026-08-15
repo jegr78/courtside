@@ -9,6 +9,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -48,11 +49,11 @@ class SharedExceptionHandler {
     // constraint: naming one would downgrade a module's 409 to a 400.
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleRejectedByTheDatabase(DataIntegrityViolationException exception) {
-        logAnswered(HttpStatus.BAD_REQUEST, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "The request conflicts with a database constraint");
         problem.setType(URI.create("urn:courtside:error:constraint-violation"));
         problem.setTitle("Constraint violation");
+        logAnswered(problem);
         return problem;
     }
 
@@ -61,8 +62,9 @@ class SharedExceptionHandler {
         List<Map<String, Object>> fieldErrors = exception.getBindingResult().getFieldErrors().stream()
                 .map(SharedExceptionHandler::toMap)
                 .toList();
-        logAnswered(HttpStatus.BAD_REQUEST, exception, fieldsOf(fieldErrors));
-        return validationFailed(fieldErrors);
+        ProblemDetail problem = validationFailed(fieldErrors);
+        logAnswered(problem, fieldsOf(fieldErrors));
+        return problem;
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -70,8 +72,9 @@ class SharedExceptionHandler {
         List<Map<String, Object>> fieldErrors = exception.getConstraintViolations().stream()
                 .map(violation -> toMap(lastPathNode(violation), violation))
                 .toList();
-        logAnswered(HttpStatus.BAD_REQUEST, exception, fieldsOf(fieldErrors));
-        return validationFailed(fieldErrors);
+        ProblemDetail problem = validationFailed(fieldErrors);
+        logAnswered(problem, fieldsOf(fieldErrors));
+        return problem;
     }
 
     // One builder, because ProblemTypeUriTest expects each slug's literal exactly once.
@@ -86,7 +89,6 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ProblemDetail handleParameterTypeMismatch(MethodArgumentTypeMismatchException exception) {
-        logAnswered(HttpStatus.BAD_REQUEST, exception, List.of(exception.getName()));
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "One of the request's parameters is not valid");
         problem.setType(URI.create("urn:courtside:error:parameter-type-mismatch"));
@@ -94,6 +96,7 @@ class SharedExceptionHandler {
         problem.setProperty("violations", List.of(Map.of(
                 "code", "request.parameterTypeMismatch",
                 "params", Map.of("parameter", exception.getName()))));
+        logAnswered(problem, List.of(exception.getName()));
         return problem;
     }
 
@@ -103,21 +106,22 @@ class SharedExceptionHandler {
     ProblemDetail handleUnreadableBody(HttpMessageNotReadableException exception) {
         String field = mismatchedField(exception);
         if (field == null) {
-            logAnswered(HttpStatus.BAD_REQUEST, exception);
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     HttpStatus.BAD_REQUEST, "The request body could not be parsed");
             problem.setType(URI.create("urn:courtside:error:malformed-request-body"));
             problem.setTitle("Malformed request body");
+            logAnswered(problem);
             return problem;
         }
-        logAnswered(HttpStatus.BAD_REQUEST, exception, List.of(field));
 
         // Twice, not one map with a computed code: ValidationMessageCoverageTest finds a code
         // by the literal following the "code" key, and one it cannot see has no bundle entry.
-        return validationFailed(List.of(
+        ProblemDetail problem = validationFailed(List.of(
                 exception.getCause() instanceof DuplicateItemException
                         ? Map.of("field", field, "code", "validation.NoDuplicates", "params", Map.of())
                         : Map.of("field", field, "code", "validation.TypeMismatch", "params", Map.of())));
+        logAnswered(problem, List.of(field));
+        return problem;
     }
 
     // The keys of an additionalProperties object are whatever the caller sent, so anything
@@ -154,11 +158,11 @@ class SharedExceptionHandler {
     // RFC 9110 §15.5.6 makes Allow mandatory on a 405, and getHeaders() already carries it.
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     ResponseEntity<ProblemDetail> handleUnsupportedMethod(HttpRequestMethodNotSupportedException exception) {
-        logAnswered(HttpStatus.METHOD_NOT_ALLOWED, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.METHOD_NOT_ALLOWED, "This HTTP method is not supported for this resource");
         problem.setType(URI.create("urn:courtside:error:method-not-supported"));
         problem.setTitle("Method not allowed");
+        logAnswered(problem);
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .headers(exception.getHeaders())
                 .body(problem);
@@ -166,11 +170,11 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(NoResourceFoundException.class)
     ProblemDetail handleUnknownResource(NoResourceFoundException exception) {
-        logAnswered(HttpStatus.NOT_FOUND, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND, "No resource exists at this address");
         problem.setType(URI.create("urn:courtside:error:unmapped-path"));
         problem.setTitle("Unmapped path");
+        logAnswered(problem);
         return problem;
     }
 
@@ -178,11 +182,11 @@ class SharedExceptionHandler {
     // dropping it loses the same machine-readable answer.
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     ResponseEntity<ProblemDetail> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
-        logAnswered(HttpStatus.UNSUPPORTED_MEDIA_TYPE, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.UNSUPPORTED_MEDIA_TYPE, "This endpoint does not accept the request's content type");
         problem.setType(URI.create("urn:courtside:error:unsupported-media-type"));
         problem.setTitle("Unsupported media type");
+        logAnswered(problem);
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .headers(exception.getHeaders())
                 .body(problem);
@@ -190,17 +194,16 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
     ProblemDetail handleNotAcceptable(HttpMediaTypeNotAcceptableException exception) {
-        logAnswered(HttpStatus.NOT_ACCEPTABLE, exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_ACCEPTABLE, "This endpoint cannot produce a representation the request accepts");
         problem.setType(URI.create("urn:courtside:error:not-acceptable"));
         problem.setTitle("Not acceptable");
+        logAnswered(problem);
         return problem;
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     ProblemDetail handleMissingParameter(MissingServletRequestParameterException exception) {
-        logAnswered(HttpStatus.BAD_REQUEST, exception, List.of(exception.getParameterName()));
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "A required request parameter is missing");
         problem.setType(URI.create("urn:courtside:error:missing-parameter"));
@@ -208,6 +211,7 @@ class SharedExceptionHandler {
         problem.setProperty("violations", List.of(Map.of(
                 "code", "request.missingParameter",
                 "params", Map.of("parameter", exception.getParameterName()))));
+        logAnswered(problem, List.of(exception.getParameterName()));
         return problem;
     }
 
@@ -258,14 +262,15 @@ class SharedExceptionHandler {
                 "params", params);
     }
 
-    private static void logAnswered(HttpStatus status, Exception exception) {
-        log.debug("Answering {} for {}", status, exception.getClass().getSimpleName());
+    // The problem type, so a log line and the response a member reads share one token. Never the
+    // exception: its message embeds the rejected value, a cleartext password on some endpoints.
+    private static void logAnswered(ProblemDetail problem) {
+        log.debug("Answering {} for {}", HttpStatusCode.valueOf(problem.getStatus()), problem.getType());
     }
 
-    // Only values the response carries too: a framework exception's message embeds the rejected
-    // value, which is a cleartext password on the password endpoints.
-    private static void logAnswered(HttpStatus status, Exception exception, List<String> fields) {
-        log.debug("Answering {} for {}: {}", status, exception.getClass().getSimpleName(), fields);
+    private static void logAnswered(ProblemDetail problem, List<String> fields) {
+        log.debug("Answering {} for {}: {}",
+                HttpStatusCode.valueOf(problem.getStatus()), problem.getType(), fields);
     }
 
     private static List<String> fieldsOf(List<Map<String, Object>> fieldErrors) {
