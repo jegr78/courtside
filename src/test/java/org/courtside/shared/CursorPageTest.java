@@ -1,6 +1,5 @@
-package org.courtside.booking;
+package org.courtside.shared;
 
-import org.courtside.booking.internal.CursorPage;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
