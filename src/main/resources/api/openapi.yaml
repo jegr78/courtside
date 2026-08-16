@@ -487,6 +487,14 @@ components:
         name: { type: string, maxLength: 60, pattern: ".*\\S.*" }
         ruleSetId: { type: [string, "null"], format: uuid }
 
+    PersonRequest:
+      type: object
+      required: [firstName, lastName, email]
+      properties:
+        firstName: { type: string, maxLength: 60, pattern: ".*\\S.*" }
+        lastName: { type: string, maxLength: 60, pattern: ".*\\S.*" }
+        email: { type: string, format: email, maxLength: 120 }
+
     RosterEntry:
       type: object
       required: [personId, firstName, lastName, email, enabled, roles]
@@ -2193,6 +2201,72 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin-roster]
+      operationId: createPerson
+      summary: Add a person to the roster.
+      description: |
+        The person is created without an account and without a membership, which is what a child
+        or an imported dormant record looks like.
+
+        An email address is not unique across the roster: a club enrols children under a parent's
+        address, so a second person carrying an address the roster already holds is accepted.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/roster/{personId}:
+    put:
+      tags: [admin-roster]
+      operationId: changePerson
+      summary: Correct a person's name or email address.
+      description: |
+        The account and the membership the person holds are untouched; this changes the person
+        record alone.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/admin/rule-sets:
     get:

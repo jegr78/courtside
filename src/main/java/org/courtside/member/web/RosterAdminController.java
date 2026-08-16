@@ -2,6 +2,7 @@ package org.courtside.member.web;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminRosterApi;
+import org.courtside.api.ApiPersonRequest;
 import org.courtside.api.ApiRole;
 import org.courtside.api.ApiRosterEntry;
 import org.courtside.api.ApiRosterPage;
@@ -11,6 +12,7 @@ import org.courtside.shared.CursorPage;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -28,6 +30,21 @@ class RosterAdminController implements AdminRosterApi {
                 .map(RosterAdminController::toResponse)
                 .toList())
                 .nextCursor(page.nextCursor()));
+    }
+
+    @Override
+    public ResponseEntity<ApiRosterEntry> createPerson(ApiPersonRequest request) {
+        RosterService.RosterEntry entry = roster.createPerson(
+                request.getFirstName(), request.getLastName(), request.getEmail());
+        return ResponseEntity
+                .created(URI.create("/api/admin/roster/" + entry.personId()))
+                .body(toResponse(entry));
+    }
+
+    @Override
+    public ResponseEntity<ApiRosterEntry> changePerson(UUID personId, ApiPersonRequest request) {
+        return ResponseEntity.ok(toResponse(roster.changePerson(
+                personId, request.getFirstName(), request.getLastName(), request.getEmail())));
     }
 
     private static ApiRosterEntry toResponse(RosterService.RosterEntry entry) {

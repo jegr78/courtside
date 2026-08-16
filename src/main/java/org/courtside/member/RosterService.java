@@ -44,6 +44,37 @@ public class RosterService {
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
     }
 
+    @Transactional
+    public RosterEntry createPerson(String firstName, String lastName, String email) {
+        requireDetails(firstName, lastName, email);
+        return toEntry(persons.save(new Person(firstName, lastName, email)), null, null);
+    }
+
+    @Transactional
+    public RosterEntry changePerson(UUID personId, String firstName, String lastName, String email) {
+        requireDetails(firstName, lastName, email);
+        if (personId == null) {
+            throw new IllegalStateException("A person to change must be named by an id");
+        }
+        Person person = persons.findById(personId)
+                .orElseThrow(() -> new PersonNotFoundException("No person with id " + personId));
+        person.rename(firstName, lastName);
+        person.changeEmail(email);
+        return load(List.of(person.getId())).getFirst();
+    }
+
+    private static void requireDetails(String firstName, String lastName, String email) {
+        requirePresent(firstName, "first name");
+        requirePresent(lastName, "last name");
+        requirePresent(email, "email address");
+    }
+
+    private static void requirePresent(String value, String what) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("A person's " + what + " must not be blank");
+        }
+    }
+
     private void requireKnownCursor(UUID cursor) {
         if (cursor != null && !persons.existsById(cursor)) {
             throw new RosterCursorUnknownException("roster.cursor.unknown", Map.of());
