@@ -5,6 +5,7 @@ import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./ap
 import { Alert } from "./components/Alert";
 import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
 import { Preferences } from "./components/Preferences";
+import { PwaLifecycle } from "./components/PwaLifecycle";
 import { applyAccountLocale, supportedLocale } from "./i18n";
 import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
@@ -125,6 +126,17 @@ export function App() {
     return () => window.removeEventListener("courtside:unauthenticated", unauthenticated);
   }, [navigate, refreshSession]);
 
+  useEffect(() => {
+    const wentOffline = () => setOffline(true);
+    const cameOnline = () => void refreshSession().catch(() => setOffline(true));
+    window.addEventListener("offline", wentOffline);
+    window.addEventListener("online", cameOnline);
+    return () => {
+      window.removeEventListener("offline", wentOffline);
+      window.removeEventListener("online", cameOnline);
+    };
+  }, [refreshSession]);
+
   function initialPasswordChanged() {
     setPasswordChanged(true);
     setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
@@ -142,6 +154,7 @@ export function App() {
   }
 
   return <div className="flex min-h-screen flex-col bg-(--cs-page) text-(--cs-text)">
+    <PwaLifecycle />
     <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
       <div className="flex items-center gap-3">
         {config?.logoUrl ? <img src={config.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
@@ -151,7 +164,7 @@ export function App() {
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-center justify-center px-4 py-8">
-      {offline ? <Alert>{t("status.offline")}</Alert> : session
+      {offline ? <div data-testid="offline-status"><Alert>{t("status.offline")}</Alert></div> : session
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} configurationChanged={configurationChanged} />
         : <p role="status">{t("status.loading")}</p>}
     </main>

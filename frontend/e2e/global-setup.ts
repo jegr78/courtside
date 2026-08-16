@@ -1,8 +1,9 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
-import { readdirSync, rmSync, statSync } from "node:fs";
+import { appendFileSync, cpSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { createServer, type AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
@@ -161,6 +162,7 @@ export interface JourneyService {
   visualDate: string;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string): Promise<DatabaseLock>;
+  publishServiceWorkerUpdate(): void;
   reset(): Promise<void>;
   restart(): Promise<void>;
   stop(): Promise<void>;
@@ -219,6 +221,7 @@ async function resetJourneyData(postgres: StartedTestContainer, tables: string[]
 export async function startJourneyService(): Promise<JourneyService> {
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
+  let staticDirectory: string | undefined;
   try {
     const visualDate = tomorrowInBerlin();
     const port = await availableLoopbackPort();
@@ -233,6 +236,8 @@ export async function startJourneyService(): Promise<JourneyService> {
       .withExposedPorts(5432)
       .start();
     const java = process.env.JAVA_HOME ? `${process.env.JAVA_HOME}/bin/java` : "java";
+    staticDirectory = mkdtempSync(resolve(tmpdir(), "courtside-pwa-"));
+    cpSync(resolve("dist"), staticDirectory, { recursive: true });
     const applicationEnvironment = {
       ...process.env,
       SERVER_PORT: String(port),
@@ -243,7 +248,8 @@ export async function startJourneyService(): Promise<JourneyService> {
       COURTSIDE_COOKIE_SECURE: "false",
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: "bootstrap-admin",
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: "temporary-password",
-      COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "Bootstrap Administrator"
+      COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "Bootstrap Administrator",
+      SPRING_WEB_RESOURCES_STATIC_LOCATIONS: `file:${staticDirectory}/,classpath:/static/`
     };
     const startApplication = async () => {
       application = spawn(java, ["-jar", applicationJar()], {
@@ -321,6 +327,9 @@ export async function startJourneyService(): Promise<JourneyService> {
       visualDate,
       executeSql,
       holdDatabaseLock,
+      publishServiceWorkerUpdate: () => {
+        appendFileSync(resolve(staticDirectory!, "sw.js"), `\nself.addEventListener("message",event=>{if(event.data==="COURTSIDE_TEST_VERSION")event.source.postMessage({courtsideVersion:2})});\n`);
+      },
       reset: async () => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         await resetJourneyData(postgres!, tables);
@@ -333,11 +342,13 @@ export async function startJourneyService(): Promise<JourneyService> {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         await stopApplication();
         await postgres?.stop();
+        rmSync(staticDirectory!, { recursive: true, force: true });
       }
     };
   } catch (error) {
     application?.kill();
     await postgres?.stop();
+    if (staticDirectory) rmSync(staticDirectory, { recursive: true, force: true });
     throw error;
   }
 }

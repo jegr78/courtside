@@ -143,6 +143,7 @@ test("a booking is operable using only the keyboard", async ({ page, browserName
   await tabToTestId(page, "week-next", 100, tabKey);
   await page.keyboard.press("Enter");
   await tabToTestId(page, "free-slot", 200, tabKey);
+  const bookingsBefore = await page.getByTestId("own-allocation").count();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
 
@@ -157,7 +158,7 @@ test("a booking is operable using only the keyboard", async ({ page, browserName
 
   // then
   await expect(page.getByRole("dialog")).not.toBeVisible();
-  await expect(page.getByTestId("own-allocation")).toBeVisible();
+  await expect(page.getByTestId("own-allocation")).toHaveCount(bookingsBefore + 1);
 });
 
 test("login and cancellation are operable using only the keyboard", async ({ page, browserName }) => {
