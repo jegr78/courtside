@@ -2,17 +2,24 @@ package org.courtside.member.web;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminRosterApi;
+import org.courtside.api.ApiAccountRequest;
+import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiPersonRequest;
 import org.courtside.api.ApiRole;
+import org.courtside.api.ApiRolesRequest;
 import org.courtside.api.ApiRosterEntry;
 import org.courtside.api.ApiRosterPage;
 import org.courtside.identity.Role;
 import org.courtside.member.RosterService;
 import org.courtside.shared.CursorPage;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -47,6 +54,37 @@ class RosterAdminController implements AdminRosterApi {
                 personId, request.getFirstName(), request.getLastName(), request.getEmail())));
     }
 
+    @Override
+    public ResponseEntity<ApiRosterEntry> createAccount(UUID personId, ApiAccountRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(toResponse(roster.createAccount(personId, request.getUsername(),
+                        request.getOneTimePassword(), roles(request.getRoles()))));
+    }
+
+    @Override
+    public ResponseEntity<ApiRosterEntry> changeAccountRoles(UUID personId, ApiRolesRequest request) {
+        return ResponseEntity.ok(toResponse(
+                roster.changeRoles(personId, roles(request.getRoles()))));
+    }
+
+    @Override
+    public ResponseEntity<ApiRosterEntry> setAccountActive(UUID personId, ApiActiveRequest request) {
+        return ResponseEntity.ok(toResponse(
+                roster.setAccountEnabled(personId, request.getActive())));
+    }
+
+    private static Set<Role> roles(Collection<ApiRole> requested) {
+        Set<Role> result = EnumSet.noneOf(Role.class);
+        if (requested == null) {
+            return result;
+        }
+        for (ApiRole role : requested) {
+            result.add(Role.named(role.getValue()).orElseThrow(() -> new IllegalStateException(
+                    "Unvalidated role name reached the roster boundary: " + role.getValue())));
+        }
+        return result;
+    }
+
     private static ApiRosterEntry toResponse(RosterService.RosterEntry entry) {
         return new ApiRosterEntry(entry.personId(), entry.firstName(), entry.lastName(),
                 entry.email(), entry.enabled(), roleNames(entry.roles()))
@@ -57,6 +95,7 @@ class RosterAdminController implements AdminRosterApi {
 
     private static List<ApiRole> roleNames(Set<Role> roles) {
         return roles.stream()
+                .sorted(Comparator.comparingInt(Enum::ordinal))
                 .map(role -> ApiRole.fromValue(role.name()))
                 .toList();
     }

@@ -1,16 +1,24 @@
 package org.courtside.identity;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface PersonRepository extends JpaRepository<Person, UUID> {
 
     List<Person> findByEmailIgnoreCase(String email);
+
+    // user_account carries no unique person, so the person row is where two administrators
+    // creating an account at once are serialised.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Person> findWithLockById(UUID id);
 
     @Query("""
             SELECT person.id FROM Person person

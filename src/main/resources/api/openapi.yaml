@@ -546,6 +546,39 @@ components:
           format: uuid
           description: Pass this person id as `cursor` to continue after the current page.
 
+    AccountRequest:
+      type: object
+      description: |
+        The one-time password is what an administrator hands the member; the member replaces it
+        before reaching anything else and it is never stored as given. Twelve characters is the
+        floor the bootstrap administrator's password is held to, and an administrator creating
+        accounts is not held to a weaker one.
+      required: [username, oneTimePassword, roles]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 60
+          pattern: "^[a-z0-9._-]+$"
+          description: |
+            The login identifier, unique across the instance and suggested as `lastname.firstname`.
+        oneTimePassword: { type: string, format: password, minLength: 12, maxLength: 200 }
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/Role" }
+
+    RolesRequest:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/Role" }
+
     RuleSet:
       type: object
       required: [id, name, active]
@@ -2272,6 +2305,127 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/PersonRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/roster/{personId}/account:
+    post:
+      tags: [admin-roster]
+      operationId: createAccount
+      summary: Give a person a user account.
+      description: |
+        The account is enabled at once and starts out having to replace its one-time password
+        before it can reach anything else, which is the state the bootstrap administrator starts
+        in as well.
+
+        A person holds at most one account here. Every write on this surface names an account by
+        its person, so a second one would be unreachable through the surface that created it and
+        disabling the person would leave it signed in; a person who already holds one is answered
+        `409`. A username the instance already holds is answered `409` too, and the two carry
+        different problem types.
+
+        No `Location`: an account has no address of its own, and the roster entry in the response
+        body is where its state is read.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/roster/{personId}/account/roles:
+    put:
+      tags: [admin-roster]
+      operationId: changeAccountRoles
+      summary: Replace the roles of a person's account.
+      description: |
+        The roles sent replace the ones the account holds. Removing one ends that account's
+        sessions: a session carries the roles it was signed in with, so a demotion that waits for
+        the session to expire is not a demotion. Adding one ends nothing.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RolesRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/roster/{personId}/account/active:
+    put:
+      tags: [admin-roster]
+      operationId: setAccountActive
+      summary: Enable or disable a person's account.
+      description: |
+        Disabling ends the account's sessions and refuses its next request; the person, their
+        membership and their bookings are untouched. Enabling ends nothing.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActiveRequest" }
       responses:
         "200":
           description: Changed.

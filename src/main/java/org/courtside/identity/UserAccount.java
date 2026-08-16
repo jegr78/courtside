@@ -76,6 +76,25 @@ public class UserAccount {
         this.enabled = true;
     }
 
+    public void disable() {
+        this.enabled = false;
+        revokeSessions();
+    }
+
+    public void changeRoles(Set<Role> roles) {
+        Set<Role> replacement = Set.copyOf(roles);
+        if (!replacement.containsAll(this.roles)) {
+            revokeSessions();
+        }
+        this.roles = replacement;
+    }
+
+    // Only a change that takes rights away comes through here; a password rehash replaces the
+    // hash alone and must leave every session standing, which is why it never touches the entity.
+    public void revokeSessions() {
+        this.securityEpoch++;
+    }
+
     public void requirePasswordChange() {
         this.passwordChangeRequired = true;
     }

@@ -456,7 +456,10 @@ Deliberate decisions:
 
 - **`person` and `user_account` are separate.** Not every person has an account (children,
   dormant records from a membership import), and the future guardian/child relation needs
-  this separation anyway.
+  this separation anyway. The column carries no unique person, so a second account is a row the
+  schema tolerates and the roster reads past — but the admin surface refuses to create one,
+  because every write there names an account by its person and a second account would be
+  unreachable through the surface that made it.
 - **`booking_participant`** references either a `person` (member) or carries a free-text
   `guest_name`. Guest bookings are prepared in the model without Release 1 having to do
   billing.
@@ -893,8 +896,12 @@ whether it is built or designed. **Designed means absent today.**
   immediately, which JWT cannot do. A role, membership or account-status change must terminate
   that account's active sessions in the same operation so cached authorities cannot outlive the
   change. A persisted account security epoch makes sessions created before a credential change
-  fail closed even when an in-flight request saves one after bulk deletion. *Built, except that
-  terminating another member's session has no admin surface yet.*
+  fail closed even when an in-flight request saves one after bulk deletion. *Built.* The roster
+  is the admin surface for it: disabling an account, or removing one of its roles, raises that
+  account's epoch, so its next request is refused rather than served with the rights it was
+  signed in with. Enabling an account and adding a role leave sessions alone, as does a password
+  rehash, which replaces the stored hash and nothing else. Ending one single session while
+  leaving the account's rights untouched still has no surface.
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* Source-address counters
   absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;

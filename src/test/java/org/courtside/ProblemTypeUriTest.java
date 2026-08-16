@@ -28,6 +28,7 @@ class ProblemTypeUriTest {
     // Every URN src/main may produce. Two sources: a domain failure carries a ProblemType
     // constant, a framework exception only a literal in the advice answering for it.
     private static final List<String> KNOWN_FAILURE_SLUGS = List.of(
+            "urn:courtside:error:account-not-found",
             "urn:courtside:error:booking-not-found",
             "urn:courtside:error:booking-not-owned",
             "urn:courtside:error:booking-rules-violated",
@@ -46,6 +47,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:membership-type-name-taken",
             "urn:courtside:error:membership-type-not-found",
             "urn:courtside:error:participants-invalid",
+            "urn:courtside:error:person-account-exists",
             "urn:courtside:error:person-not-found",
             "urn:courtside:error:roster-cursor-unknown",
             "urn:courtside:error:rule-parameter-invalid",
@@ -57,7 +59,8 @@ class ProblemTypeUriTest {
             "urn:courtside:error:series-request-invalid",
             "urn:courtside:error:series-not-found",
             "urn:courtside:error:slot-duration-conflict",
-            "urn:courtside:error:time-zone-conflict");
+            "urn:courtside:error:time-zone-conflict",
+            "urn:courtside:error:username-taken");
 
     private static final List<String> KNOWN_ADVICE_SLUGS = List.of(
             "urn:courtside:error:access-denied",
