@@ -38,7 +38,11 @@ for (const locale of locales) {
       if (viewport.width < 1024) {
         await page.getByTestId("selected-date").fill(date);
       } else {
-        await page.getByTestId(`day-selector-${date}`).click();
+        const day = page.getByTestId(`day-selector-${date}`);
+        if (await day.count() === 0) {
+          await page.getByTestId("week-next").click();
+        }
+        await day.click();
       }
 
       // then
