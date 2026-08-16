@@ -7,6 +7,7 @@ const frontendPackage = JSON.parse(readFileSync(new URL("../frontend/package.jso
 const vite = readFileSync(new URL("../frontend/vite.config.ts", import.meta.url), "utf8");
 const build = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
 const mutation = readFileSync(new URL("../.github/workflows/mutation-testing.yml", import.meta.url), "utf8");
+const criticalCoverage = JSON.parse(readFileSync(new URL("../quality/critical-coverage.json", import.meta.url)));
 
 test("given the required coverage evidence, when running verify, then backend and frontend reports are produced", () => {
   assert.match(pom, /jacoco-maven-plugin/);
@@ -28,6 +29,10 @@ test("given a pull request, when coverage is collected, then changed critical de
   assert.match(build, /tools\/coverage-diff\.mjs/);
   assert.doesNotMatch(pom, /<minimum>/);
   assert.doesNotMatch(vite, /thresholds:/);
+});
+
+test("given booking authorization and idempotency decisions, when classifying changed coverage, then internal decisions are critical", () => {
+  assert.equal(criticalCoverage.paths.includes("src/main/java/org/courtside/booking/internal/"), true);
 });
 
 test("given critical backend decisions, when the periodic mutation workflow runs, then mutation stays narrowly scoped", () => {

@@ -40,10 +40,18 @@ export function parseJacoco(xml) {
     for (const sourceMatch of packageMatch[2].matchAll(/<sourcefile name="([^"]+)">([\s\S]*?)<\/sourcefile>/g)) {
       const file = `src/main/java/${packageName}/${sourceMatch[1]}`;
       const lines = new Map();
-      for (const lineMatch of sourceMatch[2].matchAll(/<line nr="(\d+)" mi="(\d+)" ci="(\d+)"/g)) {
+      const branches = new Map();
+      for (const lineMatch of sourceMatch[2].matchAll(
+        /<line nr="(\d+)" mi="(\d+)" ci="(\d+)" mb="(\d+)" cb="(\d+)"/g
+      )) {
         lines.set(Number(lineMatch[1]), Number(lineMatch[3]) > 0);
+        const missed = Number(lineMatch[4]);
+        const branchCovered = Number(lineMatch[5]);
+        if (missed + branchCovered > 0) {
+          branches.set(Number(lineMatch[1]), { covered: branchCovered, missed });
+        }
       }
-      covered.set(file, lines);
+      covered.set(file, { lines, branches });
     }
   }
   return covered;
@@ -56,11 +64,22 @@ export function parseLcov(lcov) {
     if (entry.startsWith("SF:")) {
       const source = entry.slice(3).replaceAll("\\", "/");
       const marker = source.lastIndexOf("/frontend/src/");
-      file = marker >= 0 ? source.slice(marker + 1) : source.replace(/^\.\//, "");
-      covered.set(file, new Map());
+      const relative = marker >= 0 ? source.slice(marker + 1) : source.replace(/^\.\//, "");
+      file = relative.startsWith("src/") ? `frontend/${relative}` : relative;
+      covered.set(file, { lines: new Map(), branches: new Map() });
     } else if (file && entry.startsWith("DA:")) {
       const [line, hits] = entry.slice(3).split(",").map(Number);
-      covered.get(file).set(line, hits > 0);
+      covered.get(file).lines.set(line, hits > 0);
+    } else if (file && entry.startsWith("BRDA:")) {
+      const [line, , , taken] = entry.slice(5).split(",");
+      const lineNumber = Number(line);
+      const current = covered.get(file).branches.get(lineNumber) ?? { covered: 0, missed: 0 };
+      if (taken === "-" || Number(taken) === 0) {
+        current.missed++;
+      } else {
+        current.covered++;
+      }
+      covered.get(file).branches.set(lineNumber, current);
     } else if (entry === "end_of_record") {
       file = undefined;
     }
@@ -73,18 +92,31 @@ export function summarize(changed, coverage, criticalPaths) {
   for (const [file, changedLines] of changed) {
     const measured = coverage.get(file);
     if (!measured) {
+      rows.push({
+        file,
+        critical: criticalPaths.some(path => file.startsWith(path)),
+        executable: 0,
+        uncovered: [],
+        partialBranches: [],
+        unmeasured: true
+      });
       continue;
     }
-    const executable = [...changedLines].filter(line => measured.has(line));
+    const executable = [...changedLines].filter(line => measured.lines.has(line));
     if (executable.length === 0) {
       continue;
     }
-    const uncovered = executable.filter(line => !measured.get(line));
+    const uncovered = executable.filter(line => !measured.lines.get(line));
+    const partialBranches = executable
+      .filter(line => (measured.branches.get(line)?.missed ?? 0) > 0)
+      .map(line => ({ line, ...measured.branches.get(line) }));
     rows.push({
       file,
       critical: criticalPaths.some(path => file.startsWith(path)),
       executable: executable.length,
-      uncovered
+      uncovered,
+      partialBranches,
+      unmeasured: false
     });
   }
   return rows;
@@ -110,9 +142,14 @@ function main() {
   if (rows.length === 0) {
     lines.push("No changed executable lines were present in the collected reports.");
   } else {
-    lines.push("| Surface | Critical | Executable changed lines | Uncovered changed lines |", "|---|---:|---:|---|");
+    lines.push(
+      "| Surface | Critical | Executable changed lines | Uncovered changed lines | Missed changed branches |",
+      "|---|---:|---:|---|---|"
+    );
     for (const row of rows) {
-      lines.push(`| \`${row.file}\` | ${row.critical ? "yes" : "no"} | ${row.executable} | ${row.uncovered.join(", ") || "none"} |`);
+      const branches = row.partialBranches
+        .map(branch => `${branch.line} (${branch.missed}/${branch.covered + branch.missed})`).join(", ");
+      lines.push(`| \`${row.file}\` | ${row.critical ? "yes" : "no"} | ${row.unmeasured ? "unmeasured" : row.executable} | ${row.uncovered.join(", ") || "none"} | ${branches || "none"} |`);
     }
   }
   const output = option("--output");

@@ -346,9 +346,10 @@ test("logout invalidates every tab and browser history reveals no personal view"
   await expect(second.getByTestId("login-view")).toBeVisible();
   await expect(second.getByTestId("my-bookings-page")).not.toBeVisible();
   expect((await context.cookies()).some((cookie) => cookie.name === "SESSION")).toBe(false);
-  await expect.poll(async () =>
-    (await context.cookies()).find((cookie) => cookie.name === "XSRF-TOKEN")?.value
-  ).not.toBe(authenticatedCsrf);
+  await expect.poll(async () => {
+    const anonymousCsrf = (await context.cookies()).find((cookie) => cookie.name === "XSRF-TOKEN")?.value;
+    return Boolean(anonymousCsrf && anonymousCsrf !== authenticatedCsrf);
+  }).toBe(true);
   await context.close();
 });
 

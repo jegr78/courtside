@@ -2,6 +2,7 @@
   "paths": [
     "src/main/java/org/courtside/booking/BookingService.java",
     "src/main/java/org/courtside/booking/BookingWriter.java",
+    "src/main/java/org/courtside/booking/internal/",
     "src/main/java/org/courtside/booking/series/",
     "src/main/java/org/courtside/identity/internal/",
     "src/main/java/org/courtside/rules/",
