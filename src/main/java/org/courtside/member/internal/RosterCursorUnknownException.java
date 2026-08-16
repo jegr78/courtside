@@ -1,4 +1,4 @@
-package org.courtside.member;
+package org.courtside.member.internal;
 
 import org.courtside.shared.CodedDomainFailure;
 import org.courtside.shared.ProblemType;
@@ -12,7 +12,7 @@ public class RosterCursorUnknownException extends CodedDomainFailure {
             "roster-cursor-unknown", HttpStatus.BAD_REQUEST,
             "Roster cursor unknown", "The cursor names a person the roster no longer holds");
 
-    RosterCursorUnknownException(String code, Map<String, Object> params) {
+    public RosterCursorUnknownException(String code, Map<String, Object> params) {
         super(code, params);
     }
 

@@ -204,8 +204,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAValueBlankByUnicodeOrEmpty_whenCreatingAPerson_thenTheContractNamesTheField(
             String field, String body) throws Exception {
-        // when / then — java.util.regex reads \S as ASCII-only, so an em space passed the
-        // document's own pattern and reached a guard that answered 500 with nothing translatable
+        // when / then
         mockMvc.perform(post("/api/admin/roster")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
@@ -213,6 +212,93 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value(field))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnEmailPaddedWithSpaces_whenCreatingAPerson_thenItIsAcceptedWithoutThatPadding()
+            throws Exception {
+        // when
+        MockHttpServletResponse response = mockMvc.perform(post("/api/admin/roster")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(personBody("Mary", "Major", "  " + VALID_EMAIL + "  "))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(VALID_EMAIL))
+                .andReturn().getResponse();
+
+        // then
+        UUID personId = UUID.fromString(JsonPath.read(response.getContentAsString(), "$.personId"));
+        assertThat(persons.findById(personId)).get()
+                .satisfies(person -> assertThat(person.getEmail()).isEqualTo(VALID_EMAIL));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenANameOfTheFullLengthAndPadding_whenCreatingAPerson_thenThePaddingIsNotCounted()
+            throws Exception {
+        // when / then — the padding is gone before the bound is checked, so a name that fits
+        // once stripped is not refused for the whitespace around it
+        mockMvc.perform(post("/api/admin/roster")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(personBody("M".repeat(60) + "  ", "Major", VALID_EMAIL))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.firstName").value("M".repeat(60)));
+    }
+
+    static Stream<Arguments> paddingTheStripperMustRemove() {
+        return Stream.of(
+                Arguments.of("noBreakSpace", Character.toString(0x00a0)),
+                Arguments.of("figureSpace", Character.toString(0x2007)),
+                Arguments.of("narrowNoBreakSpace", Character.toString(0x202f)),
+                Arguments.of("byteOrderMark", Character.toString(0xfeff)),
+                Arguments.of("emSpace", EM_SPACE),
+                Arguments.of("ideographicSpace", IDEOGRAPHIC_SPACE));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("paddingTheStripperMustRemove")
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenANamePaddedWithWhitespaceTheContractNames_whenCreatingAPerson_thenItIsRemoved(
+            String label, String padding) throws Exception {
+        // when
+        MockHttpServletResponse response = mockMvc.perform(post("/api/admin/roster")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(personBody(padding + "Mary" + padding, "Major", VALID_EMAIL))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.firstName").value("Mary"))
+                .andReturn().getResponse();
+
+        // then — a paste from a word processor arrives padded with these, and the pattern already
+        // calls every one of them whitespace
+        UUID personId = UUID.fromString(JsonPath.read(response.getContentAsString(), "$.personId"));
+        assertThat(persons.findById(personId)).get()
+                .satisfies(person -> assertThat(person.getFirstName()).isEqualTo("Mary"));
+    }
+
+    static Stream<Arguments> namesHoldingALineBreak() {
+        return Stream.of(
+                Arguments.of("lineFeed", personBody("Mary\\nMajor", "Major", VALID_EMAIL)),
+                Arguments.of("carriageReturn", personBody("Mary\\rMajor", "Major", VALID_EMAIL)));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("namesHoldingALineBreak")
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenANameHoldingALineBreak_whenCreatingAPerson_thenTheContractRefusesIt(
+            String label, String body) throws Exception {
+        // when / then — a name reaches email headers and templates, so a terminator a board can
+        // type into it is a poor default to carry there
+        mockMvc.perform(post("/api/admin/roster")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("firstName"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
     }
 
@@ -284,6 +370,24 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.personId").value(jane.getId().toString()))
+                .andExpect(jsonPath("$.lastName").value("Major"))
+                .andExpect(jsonPath("$.email").value("jane.major@example.org"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenPaddedDetails_whenChangingAPerson_thenTheyAreStoredWithoutThatPadding() throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        String noBreakSpace = Character.toString(0x00a0);
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(personBody(noBreakSpace + "Jane", "Major ", "  jane.major@example.org  "))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName").value("Jane"))
                 .andExpect(jsonPath("$.lastName").value("Major"))
                 .andExpect(jsonPath("$.email").value("jane.major@example.org"));
     }

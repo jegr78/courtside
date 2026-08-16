@@ -155,9 +155,13 @@ class RosterPersonTest extends AbstractIntegrationTest {
 
     @Test
     void givenNamesPaddedWithWhitespace_whenCreatingAPerson_thenTheyAreStoredWithoutThePadding() {
+        // given — a no-break space is what a paste from a word processor leaves behind, and
+        // String.strip does not remove it although the contract calls it whitespace
+        String noBreakSpace = Character.toString(0x00a0);
+
         // when
-        RosterService.RosterEntry created =
-                roster.createPerson("  Mary  ", "  Major  ", "  mary.major@example.org  ");
+        RosterService.RosterEntry created = roster.createPerson(
+                noBreakSpace + "Mary ", "  Major" + noBreakSpace, "  mary.major@example.org  ");
 
         // then — the roster orders by lower(last_name), so padding would sort a person ahead of
         // the whole club

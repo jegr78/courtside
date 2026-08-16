@@ -7,6 +7,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.PersonNotFoundException;
+import org.courtside.member.internal.PersonText;
+import org.courtside.member.internal.RosterCursorUnknownException;
 import org.courtside.shared.CursorPage;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -68,10 +70,8 @@ public class RosterService {
         return load(List.of(person.getId())).getFirst();
     }
 
-    // Unicode-aware, unlike the ASCII \s of the pattern the contract states, so the two agree
-    // only because that pattern spells its whitespace out by code point.
     private static String strippedNonBlank(String value, String what) {
-        String stripped = value == null ? "" : value.strip();
+        String stripped = value == null ? "" : PersonText.stripped(value);
         if (stripped.isEmpty()) {
             throw new IllegalStateException("A person's " + what + " must not be blank");
         }
