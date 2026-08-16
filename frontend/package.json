@@ -23,7 +23,7 @@
     "build": "npm run generate-api && tsc -b && vite build",
     "lint": "npm run generate-api && eslint .",
     "lint:fix": "npm run generate-api && eslint . --fix",
-    "test": "npm run generate-api && vitest run && npm run test:tools",
+    "test": "npm run generate-api && vitest run --coverage && npm run test:tools",
     "test:tools": "node --test ../tools/*.test.mjs",
     "test:uat": "node ../tools/courtside.uat-smoke.mjs",
     "test:e2e": "playwright test"
@@ -47,6 +47,7 @@
     "@testing-library/user-event": "14.6.4",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
+    "@vitest/coverage-v8": "4.1.10",
     "@vitejs/plugin-react": "6.0.5",
     "ajv": "8.20.0",
     "eslint": "10.8.1",

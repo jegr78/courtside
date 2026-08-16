@@ -64,6 +64,30 @@ class RuleEngineTest {
                 .satisfies(params -> assertThat(params).containsEntry("limit", 2));
     }
 
+    @Test
+    void givenOverridableAndNonOverridableFailures_whenEvaluatingMandatoryRules_thenOnlyMandatoryViolationsRemain() {
+        // given
+        BookingRule mandatory = new BookingRule() {
+            @Override
+            public List<RuleViolation> check(RuleContext context) {
+                return List.of(new RuleViolation("booking.rule.mandatory", Map.of()));
+            }
+
+            @Override
+            public boolean isOverridable() {
+                return false;
+            }
+        };
+        RuleEngine engine = new RuleEngine(List.of(failingRule("booking.rule.overridable"), mandatory));
+
+        // when
+        var violations = engine.evaluateNonOverridable(ANY_CONTEXT);
+
+        // then
+        assertThat(violations).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.mandatory");
+    }
+
     private BookingRule passingRule() {
         return context -> List.of();
     }

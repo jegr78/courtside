@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
         with:
@@ -36,6 +37,14 @@ jobs:
           cache: maven
       - name: Build and test
         run: ./mvnw -B verify
+      - name: Summarize changed coverage
+        if: github.event_name == 'pull_request'
+        run: >
+          node tools/coverage-diff.mjs
+          --base ${{ github.event.pull_request.base.sha }}
+          --java target/site/jacoco/jacoco.xml
+          --frontend frontend/coverage/lcov.info
+          --output build/coverage/changed.md
       - name: Prepare security evidence
         run: |
           mkdir -p build/security/codeql
@@ -87,6 +96,9 @@ jobs:
           name: test-evidence-${{ github.run_id }}
           path: |
             target/surefire-reports/*.xml
+            target/site/jacoco
+            frontend/coverage
+            build/coverage/changed.md
             frontend/test-results/visual-journeys
             frontend/test-results/**/trace.zip
             frontend/test-results/**/*.png

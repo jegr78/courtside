@@ -40,6 +40,11 @@
         <node.version>v26.5.1</node.version>
         <npm.version>11.17.0</npm.version>
         <postgresql.version>42.7.12</postgresql.version>
+        <jacoco.version>0.8.15</jacoco.version>
+        <pitest.version>1.25.8</pitest.version>
+        <pitest-junit5.version>1.2.3</pitest-junit5.version>
+        <quicktheories.version>0.26</quicktheories.version>
+        <jacocoArgLine/>
     </properties>
 
     <dependencyManagement>
@@ -141,6 +146,12 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.quicktheories</groupId>
+            <artifactId>quicktheories</artifactId>
+            <version>${quicktheories.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -321,10 +332,32 @@
                 </executions>
             </plugin>
             <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <goals><goal>prepare-agent</goal></goals>
+                        <configuration><propertyName>jacocoArgLine</propertyName></configuration>
+                    </execution>
+                    <execution>
+                        <id>coverage-report</id>
+                        <phase>verify</phase>
+                        <goals><goal>report</goal></goals>
+                        <configuration>
+                            <excludes>
+                                <exclude>org/courtside/api/**</exclude>
+                                <exclude>org/openapitools/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>-javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                    <argLine>@{jacocoArgLine} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
                     <runOrder>${surefire.runOrder}</runOrder>
                 </configuration>
             </plugin>
@@ -347,4 +380,60 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>mutation</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>${pitest.version}</version>
+                        <configuration>
+                            <targetClasses>
+                                <param>org.courtside.rules.RuleEngine</param>
+                                <param>org.courtside.rules.internal.AdvanceWindowRule</param>
+                                <param>org.courtside.rules.internal.BookingRule</param>
+                                <param>org.courtside.rules.internal.MaxOpenBookingsRule</param>
+                                <param>org.courtside.rules.internal.OpeningHoursRule</param>
+                                <param>org.courtside.rules.internal.PastBookingRule</param>
+                                <param>org.courtside.rules.internal.RuleParameters</param>
+                                <param>org.courtside.rules.internal.SlotGridRule</param>
+                                <param>org.courtside.shared.TimeSlot</param>
+                                <param>org.courtside.shared.OpeningWindow</param>
+                                <param>org.courtside.booking.series.SeriesSchedule</param>
+                            </targetClasses>
+                            <targetTests>
+                                <param>org.courtside.rules.AdvanceWindowRuleTest</param>
+                                <param>org.courtside.rules.MaxOpenBookingsRuleTest</param>
+                                <param>org.courtside.rules.OpeningHoursRuleTest</param>
+                                <param>org.courtside.rules.PastBookingRuleTest</param>
+                                <param>org.courtside.rules.RuleEngineTest</param>
+                                <param>org.courtside.rules.RuleParametersTest</param>
+                                <param>org.courtside.rules.SlotGridRuleTest</param>
+                                <param>org.courtside.rules.internal.AdvanceWindowRuleUnitTest</param>
+                                <param>org.courtside.shared.CriticalTimePropertiesTest</param>
+                                <param>org.courtside.shared.OpeningWindowTest</param>
+                                <param>org.courtside.booking.series.SeriesScheduleTest</param>
+                            </targetTests>
+                            <threads>2</threads>
+                            <timestampedReports>false</timestampedReports>
+                            <outputFormats>
+                                <param>HTML</param>
+                                <param>XML</param>
+                            </outputFormats>
+                        </configuration>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.pitest</groupId>
+                                <artifactId>pitest-junit5-plugin</artifactId>
+                                <version>${pitest-junit5.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -10,6 +10,7 @@ frontend/node/
 frontend/playwright-report/
 frontend/src/api/schema.d.ts
 frontend/test-results/
+frontend/coverage/
 frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
