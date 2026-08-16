@@ -9,7 +9,9 @@ import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.CursorPage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
+import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +34,9 @@ class RosterListTest extends AbstractIntegrationTest {
 
     @Autowired
     private UserAccountRepository accounts;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     @Autowired
     private MemberRepository members;
@@ -227,6 +232,37 @@ class RosterListTest extends AbstractIntegrationTest {
                     assertThat(entry.enabled()).isTrue();
                     assertThat(entry.roles()).containsExactly(Role.TRAINER);
                 });
+    }
+
+    @Test
+    void givenTwoEnabledAccountsWhoseAgeContradictsTheirIds_whenListingTheRoster_thenTheOlderRepresentsThem() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UserAccount one = enabled(new UserAccount(jane, "jane.doe.one", "hash", Set.of(Role.MEMBER)));
+        UserAccount other = enabled(new UserAccount(jane, "jane.doe.other", "hash", Set.of(Role.TRAINER)));
+        accounts.save(one);
+        accounts.save(other);
+        // The account made older is the one with the larger id, so an id-only tiebreak picks the other.
+        UserAccount older = one.getId().compareTo(other.getId()) > 0 ? one : other;
+        jdbc.sql("UPDATE user_account SET created_at = :createdAt WHERE id = :id")
+                .param("createdAt", OffsetDateTime.parse("2020-01-01T00:00:00Z"))
+                .param("id", older.getId())
+                .update();
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+
+        // then
+        assertThat(page.items())
+                .singleElement()
+                .satisfies(entry -> assertThat(entry.accountId())
+                        .as("two accounts in the same state are separated by age, not by id")
+                        .isEqualTo(older.getId()));
+    }
+
+    private static UserAccount enabled(UserAccount account) {
+        account.enable();
+        return account;
     }
 
     // PostgreSQL orders a uuid bytewise, so the leading hex digit alone decides where an id sorts.

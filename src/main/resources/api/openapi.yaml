@@ -1347,7 +1347,11 @@ paths:
         - name: cursor
           in: query
           required: false
-          description: The opaque `nextCursor` returned by the preceding page.
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor this account's
+            bookings do not contain yields an empty page rather than an error: a booking is
+            cancelled and never removed, so an id that came from this list keeps resolving, and
+            one that did not come from it belongs to somebody else.
           schema: { type: string, format: uuid }
         - name: limit
           in: query
@@ -2167,8 +2171,11 @@ paths:
           required: false
           description: |
             The opaque `nextCursor` returned by the preceding page. A cursor naming somebody the
-            roster no longer holds is answered `400`, because continuing from an unknown position
-            could only end the list early and call it complete.
+            roster no longer holds is normally answered `400` rather than silently ending the list,
+            because a truncated page is the one wrong answer a client cannot detect. The check and
+            the page are separate statements, so somebody removed between the two still yields an
+            empty final page; a client that must be certain a list was complete re-reads it from
+            the first page.
           schema: { type: string, format: uuid }
         - name: limit
           in: query
