@@ -1,4 +1,4 @@
-package org.courtside.member;
+package org.courtside.member.internal;
 
 import org.courtside.shared.DomainFailure;
 import org.courtside.shared.ProblemType;

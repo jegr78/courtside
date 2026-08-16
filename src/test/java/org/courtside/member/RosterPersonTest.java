@@ -6,12 +6,16 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.member.internal.PersonNotFoundException;
 import org.courtside.shared.CursorPage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -131,10 +135,65 @@ class RosterPersonTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenCreatingAPersonWithABlankFirstName_thenTheServiceRefusesItsOwnCaller() {
-        // when / then — the contract rejects this at the edge, so a blank name reaching the
+    void givenAnEmailAnotherPersonHolds_whenChangingAChildOntoIt_thenTheChangeStands() {
+        // given — the same family the create case describes, one screen later
+        RosterService.RosterEntry parent =
+                roster.createPerson("Jane", "Doe", "family.doe@example.org");
+        RosterService.RosterEntry child =
+                roster.createPerson("Mary", "Doe", "mary.doe@example.org");
+
+        // when
+        RosterService.RosterEntry changed =
+                roster.changePerson(child.personId(), "Mary", "Doe", "family.doe@example.org");
+
+        // then
+        assertThat(changed.email()).isEqualTo("family.doe@example.org");
+        assertThat(persons.findByEmailIgnoreCase("family.doe@example.org"))
+                .extracting(Person::getId)
+                .containsExactlyInAnyOrder(parent.personId(), child.personId());
+    }
+
+    @Test
+    void givenNamesPaddedWithWhitespace_whenCreatingAPerson_thenTheyAreStoredWithoutThePadding() {
+        // when
+        RosterService.RosterEntry created =
+                roster.createPerson("  Mary  ", "  Major  ", "  mary.major@example.org  ");
+
+        // then — the roster orders by lower(last_name), so padding would sort a person ahead of
+        // the whole club
+        assertThat(created.firstName()).isEqualTo("Mary");
+        assertThat(created.lastName()).isEqualTo("Major");
+        assertThat(created.email()).isEqualTo("mary.major@example.org");
+        assertThat(persons.findById(created.personId())).get()
+                .satisfies(stored -> assertThat(stored.getDisplayName()).isEqualTo("Mary Major"));
+    }
+
+    @Test
+    void givenNamesPaddedWithWhitespace_whenChangingAPerson_thenTheyAreStoredWithoutThePadding() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when
+        RosterService.RosterEntry changed =
+                roster.changePerson(jane.getId(), " Jane ", " Major ", " jane.major@example.org ");
+
+        // then
+        assertThat(changed.firstName()).isEqualTo("Jane");
+        assertThat(changed.lastName()).isEqualTo("Major");
+        assertThat(changed.email()).isEqualTo("jane.major@example.org");
+    }
+
+    static Stream<String> blankFirstNames() {
+        return Stream.of("  ", Character.toString(0x2003), Character.toString(0x3000));
+    }
+
+    @ParameterizedTest
+    @MethodSource("blankFirstNames")
+    void givenAFirstNameBlankByUnicodeOrSpaces_whenCreatingAPerson_thenTheServiceRefusesItsOwnCaller(
+            String blank) {
+        // when / then — the contract rejects all of these at the edge, so one reaching the
         // service means a caller skipped the validation that precedes it
-        assertThatThrownBy(() -> roster.createPerson("  ", "Doe", "jane.doe@example.org"))
+        assertThatThrownBy(() -> roster.createPerson(blank, "Doe", "jane.doe@example.org"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("first name");
     }

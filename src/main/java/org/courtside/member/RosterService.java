@@ -6,6 +6,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.member.internal.PersonNotFoundException;
 import org.courtside.shared.CursorPage;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -46,33 +47,35 @@ public class RosterService {
 
     @Transactional
     public RosterEntry createPerson(String firstName, String lastName, String email) {
-        requireDetails(firstName, lastName, email);
-        return toEntry(persons.save(new Person(firstName, lastName, email)), null, null);
+        Person person = new Person(strippedNonBlank(firstName, "first name"),
+                strippedNonBlank(lastName, "last name"),
+                strippedNonBlank(email, "email address"));
+        return toEntry(persons.save(person), null, null);
     }
 
     @Transactional
     public RosterEntry changePerson(UUID personId, String firstName, String lastName, String email) {
-        requireDetails(firstName, lastName, email);
         if (personId == null) {
             throw new IllegalStateException("A person to change must be named by an id");
         }
+        String first = strippedNonBlank(firstName, "first name");
+        String last = strippedNonBlank(lastName, "last name");
+        String address = strippedNonBlank(email, "email address");
         Person person = persons.findById(personId)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + personId));
-        person.rename(firstName, lastName);
-        person.changeEmail(email);
+        person.rename(first, last);
+        person.changeEmail(address);
         return load(List.of(person.getId())).getFirst();
     }
 
-    private static void requireDetails(String firstName, String lastName, String email) {
-        requirePresent(firstName, "first name");
-        requirePresent(lastName, "last name");
-        requirePresent(email, "email address");
-    }
-
-    private static void requirePresent(String value, String what) {
-        if (value == null || value.isBlank()) {
+    // Unicode-aware, unlike the ASCII \s of the pattern the contract states, so the two agree
+    // only because that pattern spells its whitespace out by code point.
+    private static String strippedNonBlank(String value, String what) {
+        String stripped = value == null ? "" : value.strip();
+        if (stripped.isEmpty()) {
             throw new IllegalStateException("A person's " + what + " must not be blank");
         }
+        return stripped;
     }
 
     private void requireKnownCursor(UUID cursor) {

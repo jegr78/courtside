@@ -489,11 +489,34 @@ components:
 
     PersonRequest:
       type: object
+      description: |
+        None of the three values may be blank, and each states that with the same pattern: at
+        least one character that is not whitespace.
+
+        The whitespace is spelled out by code point rather than written `\s`, because `\s` does
+        not mean the same thing everywhere this document is read — it is ASCII-only in Java's
+        regex engine and Unicode-aware in ECMA-262, so an em space would be refused by a
+        TypeScript client and accepted by the server. `[\s\S]` is safe in both, being every
+        character under either reading.
+
+        Surrounding whitespace is removed before the person is stored, so a name pasted with
+        padding is accepted and kept without it. An email address is accepted whatever the rest
+        of the roster holds; see `POST /api/admin/roster`.
       required: [firstName, lastName, email]
       properties:
-        firstName: { type: string, maxLength: 60, pattern: ".*\\S.*" }
-        lastName: { type: string, maxLength: 60, pattern: ".*\\S.*" }
-        email: { type: string, format: email, maxLength: 120 }
+        firstName:
+          type: string
+          maxLength: 60
+          pattern: "[\\s\\S]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][\\s\\S]*"
+        lastName:
+          type: string
+          maxLength: 60
+          pattern: "[\\s\\S]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][\\s\\S]*"
+        email:
+          type: string
+          format: email
+          maxLength: 120
+          pattern: "[\\s\\S]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][\\s\\S]*"
 
     RosterEntry:
       type: object

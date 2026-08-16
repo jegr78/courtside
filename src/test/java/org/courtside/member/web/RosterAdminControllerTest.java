@@ -11,6 +11,9 @@ import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -21,6 +24,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -34,6 +38,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+
+    private static final String EM_SPACE = Character.toString(0x2003);
+    private static final String IDEOGRAPHIC_SPACE = Character.toString(0x3000);
+
+    private static final String VALID_EMAIL = "mary.major@example.org";
+    private static final String EMAIL_OF_121_CHARACTERS =
+            "m".repeat(60) + "@" + "e".repeat(56) + ".org";
 
     @Autowired
     private WebApplicationContext context;
@@ -162,10 +173,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         // when
         MockHttpServletResponse response = mockMvc.perform(post("/api/admin/roster")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"firstName": "Mary", "lastName": "Major",
-                                 "email": "mary.major@example.org"}
-                                """)
+                        .content(personBody("Mary", "Major", VALID_EMAIL))
                         .with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.firstName").value("Mary"))
@@ -183,21 +191,52 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .satisfies(person -> assertThat(person.getDisplayName()).isEqualTo("Mary Major"));
     }
 
-    @Test
+    static Stream<Arguments> blankDetails() {
+        return Stream.of(
+                Arguments.of("firstName", personBody("   ", "Major", VALID_EMAIL)),
+                Arguments.of("firstName", personBody(EM_SPACE, "Major", VALID_EMAIL)),
+                Arguments.of("lastName", personBody("Mary", IDEOGRAPHIC_SPACE, VALID_EMAIL)),
+                Arguments.of("email", personBody("Mary", "Major", "")));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("blankDetails")
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenABlankFirstName_whenCreatingAPerson_thenTheContractNamesTheField() throws Exception {
-        // when / then
+    void givenAValueBlankByUnicodeOrEmpty_whenCreatingAPerson_thenTheContractNamesTheField(
+            String field, String body) throws Exception {
+        // when / then — java.util.regex reads \S as ASCII-only, so an em space passed the
+        // document's own pattern and reached a guard that answered 500 with nothing translatable
         mockMvc.perform(post("/api/admin/roster")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"firstName": "   ", "lastName": "Major",
-                                 "email": "mary.major@example.org"}
-                                """)
+                        .content(body)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("firstName"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value(field))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+    }
+
+    static Stream<Arguments> oversizedDetails() {
+        return Stream.of(
+                Arguments.of("firstName", personBody("M".repeat(61), "Major", VALID_EMAIL)),
+                Arguments.of("lastName", personBody("Mary", "M".repeat(61), VALID_EMAIL)),
+                Arguments.of("email", personBody("Mary", "Major", EMAIL_OF_121_CHARACTERS)));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("oversizedDetails")
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAValueLongerThanTheContractAllows_whenCreatingAPerson_thenTheContractNamesTheField(
+            String field, String body) throws Exception {
+        // when / then — all three columns are text, so nothing downstream re-imposes the bound
+        mockMvc.perform(post("/api/admin/roster")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value(field))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"));
     }
 
     @Test
@@ -207,14 +246,29 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(post("/api/admin/roster")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"firstName": "Mary", "lastName": "Major", "email": "nowhere"}
-                                """)
+                        .content(personBody("Mary", "Major", "nowhere"))
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("email"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Email"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenABlankFirstName_whenChangingAPerson_thenTheContractNamesTheField() throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(personBody(EM_SPACE, "Doe", "jane.doe@example.org"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("firstName"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
     }
 
     @Test
@@ -226,10 +280,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(put("/api/admin/roster/{personId}", jane.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"firstName": "Jane", "lastName": "Major",
-                                 "email": "jane.major@example.org"}
-                                """)
+                        .content(personBody("Jane", "Major", "jane.major@example.org"))
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.personId").value(jane.getId().toString()))
@@ -244,10 +295,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         // number, so the type is what tells them apart
         mockMvc.perform(put("/api/admin/roster/{personId}", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"firstName": "Jane", "lastName": "Doe",
-                                 "email": "jane.doe@example.org"}
-                                """)
+                        .content(personBody("Jane", "Doe", "jane.doe@example.org"))
                         .with(csrf()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:person-not-found"));
@@ -258,10 +306,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(post("/api/admin/roster")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"firstName": "Mary", "lastName": "Major",
-                                 "email": "mary.major@example.org"}
-                                """)
+                        .content(personBody("Mary", "Major", VALID_EMAIL))
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
@@ -276,12 +321,15 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(put("/api/admin/roster/{personId}", jane.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"firstName": "Jane", "lastName": "Major",
-                                 "email": "jane.major@example.org"}
-                                """)
+                        .content(personBody("Jane", "Major", "jane.major@example.org"))
                         .with(csrf()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+    }
+
+    private static String personBody(String firstName, String lastName, String email) {
+        return """
+                {"firstName": "%s", "lastName": "%s", "email": "%s"}
+                """.formatted(firstName, lastName, email);
     }
 }
