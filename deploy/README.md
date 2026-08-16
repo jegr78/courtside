@@ -128,6 +128,7 @@ default.
 | `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |
 | `COURTSIDE_SOURCE_URL` | this repository | Where `GET /api/source` points. **If you modified Courtside and let others use it, the AGPL requires this to point at your source, not at ours.** |
 | `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, or `DEVELOPMENT`. UAT is visibly marked in the frontend. |
+| `COURTSIDE_CLOCK_FIXED_INSTANT` | *unset* | Freezes the clock at an ISO-8601 instant so an automated suite reads the same date on every run. A club never sets this: the instance refuses to start while `COURTSIDE_ENVIRONMENT` is `PRODUCTION` or unset. |
 
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` are set by
 `compose.yaml`. Point them elsewhere if you run PostgreSQL outside Compose; the application needs
