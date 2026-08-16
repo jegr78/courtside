@@ -1,7 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { type Page } from "@playwright/test";
-import { expect, test } from "./fixtures";
+import { expect, selectJourneyDate, test } from "./fixtures";
+import { journeyDate } from "./global-setup";
 
 const locales = ["de", "en"] as const;
 const viewports = [
@@ -34,16 +35,10 @@ for (const locale of locales) {
       await page.getByTestId("password").fill("temporary-password");
       await page.getByTestId("login-submit").click();
       await expect(page.getByTestId("court-plan-view")).toBeVisible();
-      const date = visualJourneyDate();
       if (viewport.width < 1024) {
-        await page.getByTestId("selected-date").fill(date);
+        await page.getByTestId("selected-date").fill(journeyDate);
       } else {
-        await expect(page.getByTestId("week-grid")).toBeVisible();
-        const day = page.getByTestId(`day-selector-${date}`);
-        if (await day.count() === 0) {
-          await page.getByTestId("week-next").click();
-        }
-        await day.click();
+        await selectJourneyDate(page, journeyDate);
       }
 
       // then
@@ -108,10 +103,4 @@ async function capture(page: Page, locale: string, viewport: string, step: strin
 
 function pngDimensions(image: Buffer): { width: number; height: number } {
   return { width: image.readUInt32BE(16), height: image.readUInt32BE(20) };
-}
-
-function visualJourneyDate(): string {
-  const date = process.env.COURTSIDE_VISUAL_JOURNEY_DATE;
-  if (!date) throw new Error("The visual journey date was not provided by global setup");
-  return date;
 }

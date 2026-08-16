@@ -1,5 +1,5 @@
 import type { Browser, BrowserContext, Page, TestInfo } from "@playwright/test";
-import { expect, test } from "./fixtures";
+import { expect, journeyContext, test } from "./fixtures";
 import type { JourneyService } from "./global-setup";
 
 const memberCard = "11111111-1111-1111-1111-111111111111";
@@ -31,7 +31,7 @@ async function prepareBooking(page: Page, service: JourneyService, username: str
 }
 
 async function memberContext(browser: Browser, service: JourneyService, username: string): Promise<BrowserContext> {
-  const context = await browser.newContext();
+  const context = await journeyContext(browser);
   await login(await context.newPage(), service.baseURL, username);
   return context;
 }
@@ -113,8 +113,8 @@ async function whileDatabaseLockIsContended<T>(
 
 test("two members receive one booking and one actionable conflict for the same slot", async ({ browser, journeyService }, testInfo) => {
   // given
-  const first = await browser.newContext();
-  const second = await browser.newContext();
+  const first = await journeyContext(browser);
+  const second = await journeyContext(browser);
   const firstPage = await first.newPage();
   const secondPage = await second.newPage();
   await Promise.all([
@@ -318,7 +318,7 @@ test("a series move and scoped cancellation serialize without a partial occurren
 
 test("logout invalidates every tab and browser history reveals no personal view", async ({ browser, journeyService }) => {
   // given
-  const context = await browser.newContext();
+  const context = await journeyContext(browser);
   const first = await context.newPage();
   await context.addCookies([{
     name: "SESSION", value: "attacker-fixed-session", url: journeyService.baseURL
@@ -369,8 +369,8 @@ test("an expired session rejects a mutation from an open dialog", async ({ page,
 test("an initial password change ends every active session for the account", async ({ browser, journeyService }) => {
   // given
   await journeyService.executeSql("UPDATE user_account SET password_change_required = true WHERE username = 'roe.jane'");
-  const first = await browser.newContext();
-  const second = await browser.newContext();
+  const first = await journeyContext(browser);
+  const second = await journeyContext(browser);
   const firstPage = await first.newPage();
   const secondPage = await second.newPage();
   const restrictedLogin = async (page: Page) => {
