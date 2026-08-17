@@ -48,6 +48,16 @@ A timeout or unavailable required tool makes a gate incomplete, not successful. 
 - A changed feature updates every affected risk ID or states why no maintained risk changes.
 - A risk accepted without automation appears in the gap register with an owner and review date.
 
+### Test-effectiveness evidence
+
+Every Maven verification produces JaCoCo line and branch reports for hand-written backend code and V8 coverage reports for frontend source. Generated OpenAPI models, generated TypeScript declarations, test support and framework output are excluded because their execution does not demonstrate a Courtside decision. Coverage remains diagnostic evidence: there is no global percentage gate, and additional assertions are justified by a risk boundary rather than by a number.
+
+Pull requests receive a changed-line summary from `tools/coverage-diff.mjs`. `quality/critical-coverage.json` identifies decisions for rules, booking authorization and idempotency, series and time semantics, identity security, browser session state and booking interactions. An uncovered changed line in those paths requires review of the missing positive or negative boundary; it does not fail solely because it is uncovered. The full reports remain build artifacts for inspecting branch detail.
+
+The monthly and manually runnable mutation workflow targets only rule evaluation, time and opening-window value types, and series scheduling. Its first runs establish a reviewed baseline without a mutation-score threshold. A surviving mutant is classified as an equivalent implementation, an unprotected material decision or an accepted low-value branch before package-specific targets are introduced. Spring wiring, controllers and generated transport code are outside this mutation scope.
+
+Property tests use fixed, printed QuickTheories seeds and automatic shrinking so a failure includes a repeatable minimized counterexample. Current properties explore interval adjacency and overlap, opening-window boundaries, calendar boundaries, leap years, both DST directions and non-hour zone changes while preserving club wall time. Cursor and database idempotency retain deterministic PostgreSQL integration evidence because their invariant lives in ordering and transactions rather than a pure function. Roster parsing and full-sync properties become required with the importer tracked by #74; no parser or persistence transaction exists to exercise before that feature lands.
+
 ### Pull-request checklist
 
 The repository pull-request template requires affected risk IDs, positive and negative evidence, residual risk and any contract change. The required build result is linked from the pull request rather than copied into this document.

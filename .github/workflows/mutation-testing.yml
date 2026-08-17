@@ -1,0 +1,33 @@
+name: mutation testing
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 1 * *'
+
+permissions:
+  contents: read
+
+jobs:
+  critical-logic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - name: Mutate critical decisions
+        run: ./mvnw -B -Pmutation test-compile org.pitest:pitest-maven:mutationCoverage
+      - name: Upload mutation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mutation-evidence-${{ github.run_id }}
+          path: target/pit-reports
+          if-no-files-found: error
+          retention-days: 30

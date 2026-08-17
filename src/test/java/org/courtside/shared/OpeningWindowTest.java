@@ -65,12 +65,30 @@ class OpeningWindowTest {
     }
 
     @Test
+    void givenBothTimesPresent_whenBuildingFromNullableTimes_thenTheWindowIsReturned() {
+        // when
+        var result = OpeningWindow.ofNullable(EIGHT, TEN);
+
+        // then
+        assertThat(result).contains(new OpeningWindow(EIGHT, TEN));
+    }
+
+    @Test
     void whenRequiringAWindowThatIsNotThere_thenATypedExceptionIsThrownRatherThanANullPointer() {
         // when / then
         assertThatThrownBy(() -> OpeningWindow.required(null))
                 .isInstanceOf(InvalidOpeningWindowException.class)
                 .extracting("code")
                 .isEqualTo("openingWindow.missing");
+    }
+
+    @Test
+    void givenAWindow_whenRequiringIt_thenTheSameWindowIsReturned() {
+        // given
+        OpeningWindow window = new OpeningWindow(EIGHT, TEN);
+
+        // when / then
+        assertThat(OpeningWindow.required(window)).isSameAs(window);
     }
 
     @Test

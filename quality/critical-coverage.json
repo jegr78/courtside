@@ -1,0 +1,20 @@
+{
+  "paths": [
+    "src/main/java/org/courtside/booking/BookingService.java",
+    "src/main/java/org/courtside/booking/BookingWriter.java",
+    "src/main/java/org/courtside/booking/internal/",
+    "src/main/java/org/courtside/booking/series/",
+    "src/main/java/org/courtside/identity/internal/",
+    "src/main/java/org/courtside/rules/",
+    "src/main/java/org/courtside/shared/OpeningWindow.java",
+    "src/main/java/org/courtside/shared/TimeSlot.java",
+    "frontend/src/api/",
+    "frontend/src/components/PwaLifecycle.tsx",
+    "frontend/src/views/BookingDialog.tsx",
+    "frontend/src/views/CancellationDialog.tsx",
+    "frontend/src/views/InitialPasswordView.tsx",
+    "frontend/src/views/LoginView.tsx",
+    "frontend/src/views/MyBookingsView.tsx",
+    "frontend/src/views/WeekView.tsx"
+  ]
+}
