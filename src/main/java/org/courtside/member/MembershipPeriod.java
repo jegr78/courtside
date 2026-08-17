@@ -15,7 +15,19 @@ public record MembershipPeriod(LocalDate startedOn, LocalDate endedOn) {
         return new MembershipPeriod(null, null);
     }
 
-    public boolean isRunning() {
+    public MembershipPeriod requireNotInTheFuture(LocalDate today) {
+        if (isAfter(startedOn, today) || isAfter(endedOn, today)) {
+            throw new InvalidMembershipPeriodException("membershipPeriod.inTheFuture",
+                    "A membership is recorded once it has begun, not scheduled in advance");
+        }
+        return this;
+    }
+
+    public boolean isCurrent() {
         return endedOn == null;
+    }
+
+    private static boolean isAfter(LocalDate date, LocalDate today) {
+        return date != null && date.isAfter(today);
     }
 }

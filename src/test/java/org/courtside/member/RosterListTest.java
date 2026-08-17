@@ -63,7 +63,7 @@ class RosterListTest extends AbstractIntegrationTest {
                     assertThat(entry.username()).isNull();
                     assertThat(entry.enabled()).isFalse();
                     assertThat(entry.roles()).isEmpty();
-                    assertThat(entry.membershipTypeId()).isNull();
+                    assertThat(entry.membership()).isNull();
                 });
     }
 
@@ -91,7 +91,7 @@ class RosterListTest extends AbstractIntegrationTest {
                     assertThat(entry.username()).isEqualTo("jane.doe");
                     assertThat(entry.enabled()).isTrue();
                     assertThat(entry.roles()).containsExactlyInAnyOrder(Role.MEMBER, Role.TRAINER);
-                    assertThat(entry.membershipTypeId()).isEqualTo(MEMBERSHIP_TYPE_ID);
+                    assertThat(entry.membership().typeId()).isEqualTo(MEMBERSHIP_TYPE_ID);
                 });
     }
 

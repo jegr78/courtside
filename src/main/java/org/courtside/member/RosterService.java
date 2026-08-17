@@ -164,10 +164,10 @@ public class RosterService {
     public RosterEntry writeMembership(UUID personId, UUID membershipTypeId,
                                        MembershipPeriod period) {
         UUID id = requiredPersonId(personId);
-        MembershipPeriod requested = requiredPeriod(period);
+        MembershipPeriod requested = requiredPeriod(period).requireNotInTheFuture(today());
         requireLockedPerson(id);
         Member existing = members.findByPersonId(id).orElse(null);
-        UUID typeId = assignableTypeIdFor(existing, membershipTypeId);
+        UUID typeId = assignableTypeIdFor(existing, membershipTypeId, requested);
         if (applyMembership(id, existing, typeId, requested)) {
             revokeSessionsOf(id);
         }
@@ -194,11 +194,19 @@ public class RosterService {
         }
     }
 
-    private UUID assignableTypeIdFor(Member existing, UUID requested) {
-        if (existing != null && existing.getMembershipTypeId().equals(requested)) {
-            return memberships.requireMembershipType(requested).getId();
+    private UUID assignableTypeIdFor(Member existing, UUID requested, MembershipPeriod period) {
+        if (makesSomebodyAMemberOfANewType(existing, requested, period)) {
+            return memberships.requireAssignableMembershipType(requested).getId();
         }
-        return memberships.requireAssignableMembershipType(requested).getId();
+        return memberships.requireMembershipType(requested).getId();
+    }
+
+    private static boolean makesSomebodyAMemberOfANewType(Member existing, UUID requested,
+                                                          MembershipPeriod period) {
+        return period.isCurrent()
+                && (existing == null
+                || !existing.isCurrent()
+                || !existing.getMembershipTypeId().equals(requested));
     }
 
     private boolean applyMembership(UUID personId, Member existing, UUID typeId,
@@ -208,7 +216,7 @@ public class RosterService {
             Member created = new Member(personId, typeId, startOr(period, today()));
             created.endOn(endedOn);
             members.saveAndFlush(created);
-            return period.isRunning();
+            return period.isCurrent();
         }
         boolean wasCurrent = existing.isCurrent();
         boolean typeChanged = !existing.getMembershipTypeId().equals(typeId);
@@ -220,7 +228,7 @@ public class RosterService {
             existing.endOn(endedOn);
         }
         members.flush();
-        return typeChanged || wasCurrent != period.isRunning();
+        return typeChanged || wasCurrent != period.isCurrent();
     }
 
     private static LocalDate startOr(MembershipPeriod period, LocalDate fallback) {
@@ -336,18 +344,16 @@ public class RosterService {
         return ACCOUNT_PRECEDENCE.compare(first, second) <= 0 ? first : second;
     }
 
-    private static RosterEntry toEntry(Person person, UserAccount account, Member membership) {
-        UUID membershipTypeId = membership == null ? null : membership.getMembershipTypeId();
-        LocalDate startedOn = membership == null ? null : membership.getStartedOn();
-        LocalDate endedOn = membership == null ? null : membership.getEndedOn();
+    private static RosterEntry toEntry(Person person, UserAccount account, Member member) {
+        Membership membership = member == null ? null : new Membership(
+                member.getMembershipTypeId(), member.getStartedOn(), member.getEndedOn());
         if (account == null) {
             return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
-                    person.getEmail(), null, null, false, membershipTypeId, startedOn, endedOn,
-                    Set.of());
+                    person.getEmail(), null, null, false, membership, Set.of());
         }
         return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
                 person.getEmail(), account.getId(), account.getUsername(), account.isEnabled(),
-                membershipTypeId, startedOn, endedOn, account.getRoles());
+                membership, account.getRoles());
     }
 
     private static String normalize(String query) {
@@ -374,11 +380,13 @@ public class RosterService {
 
     public record RosterEntry(UUID personId, String firstName, String lastName, String email,
                               UUID accountId, String username, boolean enabled,
-                              UUID membershipTypeId, LocalDate membershipStartedOn,
-                              LocalDate membershipEndedOn, Set<Role> roles) {
+                              Membership membership, Set<Role> roles) {
 
         public RosterEntry {
             roles = Set.copyOf(roles);
         }
+    }
+
+    public record Membership(UUID typeId, LocalDate startedOn, LocalDate endedOn) {
     }
 }

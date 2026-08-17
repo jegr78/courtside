@@ -58,6 +58,108 @@ class MembershipEndTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAMembershipDatedToEndInDecember_whenWritingIt_thenTheFutureDateIsRefused() {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        MembershipType type = memberships.createMembershipType("Adults", null);
+
+        // when / then
+        assertThatThrownBy(() -> roster.writeMembership(mary.getId(), type.getId(),
+                new MembershipPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31))))
+                .isInstanceOf(InvalidMembershipPeriodException.class)
+                .extracting("code")
+                .isEqualTo("membershipPeriod.inTheFuture");
+        assertThat(members.findByPersonId(mary.getId())).isEmpty();
+    }
+
+    @Test
+    void givenAMembershipDatedToBeginNextYear_whenWritingIt_thenTheFutureDateIsRefused() {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        MembershipType type = memberships.createMembershipType("Adults", null);
+
+        // when / then
+        assertThatThrownBy(() -> roster.writeMembership(mary.getId(), type.getId(),
+                new MembershipPeriod(LocalDate.of(2027, 1, 1), null)))
+                .isInstanceOf(InvalidMembershipPeriodException.class)
+                .extracting("code")
+                .isEqualTo("membershipPeriod.inTheFuture");
+        assertThat(members.findByPersonId(mary.getId())).isEmpty();
+    }
+
+    @Test
+    void givenAMembershipThatBeganToday_whenTheRosterEndsIt_thenItEndsWithoutInvertingItself() {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        MembershipType type = memberships.createMembershipType("Adults", null);
+        roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
+
+        // when
+        roster.endMembership(mary.getId());
+
+        // then
+        assertThat(members.findByPersonId(mary.getId()))
+                .get()
+                .satisfies(member -> {
+                    assertThat(member.getStartedOn()).isEqualTo(TODAY);
+                    assertThat(member.getEndedOn()).isEqualTo(TODAY);
+                });
+    }
+
+    @Test
+    void givenADormantMembershipOnARetiredType_whenRevivingIt_thenTheRetiredTypeIsRefused() {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        MembershipType retired = memberships.createMembershipType("Passive", null);
+        roster.writeMembership(mary.getId(), retired.getId(),
+                new MembershipPeriod(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
+        memberships.setMembershipTypeActive(retired.getId(), false);
+
+        // when / then
+        assertThatThrownBy(() -> roster.writeMembership(
+                mary.getId(), retired.getId(), MembershipPeriod.running()))
+                .isInstanceOf(MembershipTypeInactiveException.class);
+        assertThat(memberships.membershipTypeIdOf(mary.getId()))
+                .as("a type the club no longer offers does not take a member back")
+                .isEmpty();
+    }
+
+    @Test
+    void givenARunningMembershipOnARetiredType_whenEndingIt_thenEndingStaysPossible() {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        MembershipType retired = memberships.createMembershipType("Passive", null);
+        roster.writeMembership(mary.getId(), retired.getId(), MembershipPeriod.running());
+        memberships.setMembershipTypeActive(retired.getId(), false);
+
+        // when
+        roster.endMembership(mary.getId());
+
+        // then
+        assertThat(memberships.membershipTypeIdOf(mary.getId())).isEmpty();
+    }
+
+    @Test
+    void givenARunningMembership_whenOnlyItsStartDateIsCorrected_thenTheCorrectionIsStored() {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        MembershipType type = memberships.createMembershipType("Adults", null);
+        roster.writeMembership(mary.getId(), type.getId(),
+                new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
+
+        // when
+        RosterService.RosterEntry entry = roster.writeMembership(mary.getId(), type.getId(),
+                new MembershipPeriod(LocalDate.of(2020, 9, 1), null));
+
+        // then
+        assertThat(entry.membership().startedOn()).isEqualTo(LocalDate.of(2020, 9, 1));
+        assertThat(members.findByPersonId(mary.getId()))
+                .get()
+                .satisfies(member ->
+                        assertThat(member.getStartedOn()).isEqualTo(LocalDate.of(2020, 9, 1)));
+    }
+
+    @Test
     void whenAPeriodEndsBeforeItBegan_thenItCannotBeBuiltAtAll() {
         // when / then
         assertThatThrownBy(() ->
@@ -159,7 +261,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
                 new MembershipPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 4, 30)));
 
         // then
-        assertThat(entry.membershipEndedOn()).isEqualTo(LocalDate.of(2026, 4, 30));
+        assertThat(entry.membership().endedOn()).isEqualTo(LocalDate.of(2026, 4, 30));
     }
 
     @Test
@@ -191,8 +293,8 @@ class MembershipEndTest extends AbstractIntegrationTest {
                 roster.writeMembership(mary.getId(), second.getId(), MembershipPeriod.running());
 
         // then
-        assertThat(entry.membershipTypeId()).isEqualTo(second.getId());
-        assertThat(entry.membershipStartedOn())
+        assertThat(entry.membership().typeId()).isEqualTo(second.getId());
+        assertThat(entry.membership().startedOn())
                 .as("changing the type continues the membership; it does not start a new one")
                 .isEqualTo(LocalDate.of(2020, 9, 1));
     }
@@ -239,7 +341,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
                 roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
 
         // then
-        assertThat(entry.membershipStartedOn()).isEqualTo(TODAY);
-        assertThat(entry.membershipEndedOn()).isNull();
+        assertThat(entry.membership().startedOn()).isEqualTo(TODAY);
+        assertThat(entry.membership().endedOn()).isNull();
     }
 }

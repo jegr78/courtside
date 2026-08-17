@@ -51,7 +51,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
         assertThat(created.accountId()).isNull();
         assertThat(created.username()).isNull();
         assertThat(created.enabled()).isFalse();
-        assertThat(created.membershipTypeId()).isNull();
+        assertThat(created.membership()).isNull();
         assertThat(created.roles()).isEmpty();
     }
 
@@ -122,7 +122,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
         assertThat(changed.username()).isEqualTo("jane.doe");
         assertThat(changed.enabled()).isTrue();
         assertThat(changed.roles()).containsExactly(Role.MEMBER);
-        assertThat(changed.membershipTypeId()).isEqualTo(MEMBERSHIP_TYPE_ID);
+        assertThat(changed.membership().typeId()).isEqualTo(MEMBERSHIP_TYPE_ID);
     }
 
     @Test

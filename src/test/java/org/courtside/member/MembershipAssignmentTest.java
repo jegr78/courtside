@@ -76,7 +76,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         RosterService.RosterEntry entry = roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
 
         // then
-        assertThat(entry.membershipTypeId()).isEqualTo(type.getId());
+        assertThat(entry.membership().typeId()).isEqualTo(type.getId());
         assertThat(memberships.membershipTypeIdOf(mary.getId())).contains(type.getId());
     }
 
@@ -119,7 +119,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         RosterService.RosterEntry entry = roster.writeMembership(mary.getId(), right.getId(), MembershipPeriod.running());
 
         // then
-        assertThat(entry.membershipTypeId()).isEqualTo(right.getId());
+        assertThat(entry.membership().typeId()).isEqualTo(right.getId());
         assertThat(members.findByPersonIdIn(List.of(mary.getId())))
                 .singleElement()
                 .satisfies(member ->
@@ -137,7 +137,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         RosterService.RosterEntry entry = roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
 
         // then
-        assertThat(entry.membershipTypeId()).isEqualTo(type.getId());
+        assertThat(entry.membership().typeId()).isEqualTo(type.getId());
         assertThat(members.findByPersonIdIn(List.of(mary.getId()))).hasSize(1);
     }
 
@@ -231,7 +231,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
 
         // then
         assertThat(entry.accountId()).isNull();
-        assertThat(entry.membershipTypeId()).isEqualTo(type.getId());
+        assertThat(entry.membership().typeId()).isEqualTo(type.getId());
     }
 
     @Test

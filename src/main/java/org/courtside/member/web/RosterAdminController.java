@@ -21,11 +21,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 @RestController
 @RequiredArgsConstructor
@@ -121,9 +123,18 @@ class RosterAdminController implements AdminRosterApi {
                 entry.email(), entry.enabled(), roleNames(entry.roles()))
                 .accountId(entry.accountId())
                 .username(entry.username())
-                .membershipTypeId(entry.membershipTypeId())
-                .membershipStartedOn(entry.membershipStartedOn())
-                .membershipEndedOn(entry.membershipEndedOn());
+                .membershipTypeId(membershipTypeId(entry))
+                .membershipStartedOn(membershipDate(entry, RosterService.Membership::startedOn))
+                .membershipEndedOn(membershipDate(entry, RosterService.Membership::endedOn));
+    }
+
+    private static UUID membershipTypeId(RosterService.RosterEntry entry) {
+        return entry.membership() == null ? null : entry.membership().typeId();
+    }
+
+    private static LocalDate membershipDate(RosterService.RosterEntry entry,
+                                            Function<RosterService.Membership, LocalDate> date) {
+        return entry.membership() == null ? null : date.apply(entry.membership());
     }
 
     private static List<ApiRole> roleNames(Set<Role> roles) {

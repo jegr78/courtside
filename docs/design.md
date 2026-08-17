@@ -478,6 +478,13 @@ Deliberate decisions:
   held type is gone. Bounded periods with a readable history are a different model, and widening
   `member` underneath a rule engine that assumes a single current membership is its own decision.
 
+  **The dates record, they do not schedule.** Whether somebody is a member is decided by whether an
+  end date is set, and no query compares a date with today. Neither date may therefore lie in the
+  future: a start next month would make somebody a member now, and an end in December would stop
+  their membership today — seven months of a member measured against no membership-scoped rule at
+  all. The roster refuses a future date rather than storing one nothing honours. Scheduling a
+  membership ahead needs date-aware currency in every reader, and that is the period model above.
+
 ### Identity model
 
 `username` is the login identifier, unique per instance, freely chosen by the member

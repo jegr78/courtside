@@ -511,6 +511,14 @@ components:
             person stops being a member. Omitted, the membership runs. It may not precede
             `startedOn`.
 
+            **Neither date may lie in the future.** The roster records a membership that has
+            begun, not one scheduled to begin: whether somebody is a member is decided by whether
+            an end date is set and never by comparing a date with today, so a start date next
+            month would make them a member now and an end date in December would stop their
+            membership today. A future date is answered `400` with
+            `urn:courtside:error:invalid-membership-period`. Scheduling a membership ahead is a
+            feature this surface does not have rather than one it half has.
+
     MembershipType:
       type: object
       required: [id, name, active]
@@ -2670,10 +2678,15 @@ paths:
         The type they held before is then overwritten and is no longer readable: this surface keeps
         one membership per person, not a history of them.
 
-        The type has to be one the club still offers **when it changes**. A deactivated type is
-        refused for an assignment, which is what its `active` flag is for; the memberships already
-        on it are untouched, a type deactivated afterwards leaves the people holding it exactly
-        where they are, and correcting the dates of such a membership stays possible.
+        The type has to be one the club still offers **whenever the write leaves somebody a member
+        of a type they were not already a member of** — a first assignment, a move to another type,
+        and a revival, because taking somebody back is an assignment however dormant their record
+        was. A deactivated type is refused there, which is what its `active` flag is for.
+
+        Everything that does not make somebody a member is left alone: the memberships already on a
+        type are untouched, a type deactivated afterwards leaves the people holding it exactly
+        where they are, correcting the dates of such a membership stays possible, and ending one
+        is never refused for the type it is on.
 
         A membership decides which rules the person's bookings are measured against, so a write
         that changes the type, ends the membership or revives it ends their account's sessions and
