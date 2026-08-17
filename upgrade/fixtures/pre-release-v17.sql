@@ -17,11 +17,11 @@ INSERT INTO user_account_role (user_account_id, role) VALUES
     ('72000000-0000-0000-0000-000000000001', 'MEMBER'),
     ('72000000-0000-0000-0000-000000000001', 'TRAINER');
 
-INSERT INTO member (id, person_id, membership_type_id, joined_on, left_on) VALUES
+INSERT INTO member (id, person_id, membership_type_id) VALUES
     ('73000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000001',
-     'cccccccc-0000-0000-0000-000000000001', '2024-01-01', NULL),
+     'cccccccc-0000-0000-0000-000000000001'),
     ('73000000-0000-0000-0000-000000000002', '71000000-0000-0000-0000-000000000002',
-     'cccccccc-0000-0000-0000-000000000002', '2023-01-01', '2024-12-31');
+     'cccccccc-0000-0000-0000-000000000002');
 
 INSERT INTO rule_set (id, name, active)
 VALUES ('74000000-0000-0000-0000-000000000001', 'Upgrade rules', true);

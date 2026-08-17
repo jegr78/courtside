@@ -38,6 +38,8 @@ server:
 courtside:
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}
   environment: ${COURTSIDE_ENVIRONMENT:PRODUCTION}
+  clock:
+    fixed-instant: ${COURTSIDE_CLOCK_FIXED_INSTANT:}
   bootstrap-admin:
     username: ${COURTSIDE_BOOTSTRAP_ADMIN_USERNAME:}
     password: ${COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD:}

@@ -151,13 +151,17 @@ function applicationJar(): string {
 }
 
 
-export function tomorrowInBerlin(): string {
+export const journeyInstant = "2026-05-12T10:00:00Z";
+
+function dayAfterInBerlin(instant: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit"
-  }).formatToParts(new Date());
+  }).formatToParts(new Date(instant));
   const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((entry) => entry.type === type)?.value);
   return new Date(Date.UTC(part("year"), part("month") - 1, part("day") + 1)).toISOString().slice(0, 10);
 }
+
+export const journeyDate = dayAfterInBerlin(journeyInstant);
 
 export interface JourneyService {
   baseURL: string;
@@ -225,7 +229,7 @@ export async function startJourneyService(): Promise<JourneyService> {
   let application: ChildProcess | undefined;
   let staticDirectory: string | undefined;
   try {
-    const visualDate = tomorrowInBerlin();
+    const visualDate = journeyDate;
     const port = await availableLoopbackPort();
     const baseURL = `http://127.0.0.1:${port}`;
     postgres = await new GenericContainer(
@@ -249,6 +253,8 @@ export async function startJourneyService(): Promise<JourneyService> {
       SPRING_DATASOURCE_USERNAME: "courtside",
       SPRING_DATASOURCE_PASSWORD: "courtside",
       LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_ERROR: "ERROR",
+      COURTSIDE_ENVIRONMENT: "DEVELOPMENT",
+      COURTSIDE_CLOCK_FIXED_INSTANT: journeyInstant,
       COURTSIDE_COOKIE_SECURE: "false",
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: "bootstrap-admin",
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: "temporary-password",

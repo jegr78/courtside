@@ -8,6 +8,7 @@ import tools.jackson.core.JacksonException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -53,6 +54,19 @@ class SharedExceptionHandler {
                 HttpStatus.BAD_REQUEST, "The request conflicts with a database constraint");
         problem.setType(URI.create("urn:courtside:error:constraint-violation"));
         problem.setTitle("Constraint violation");
+        logAnswered(problem);
+        return problem;
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ProblemDetail handleLostUpdate(OptimisticLockingFailureException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, "Somebody changed this record while it was being edited");
+        problem.setType(URI.create("urn:courtside:error:concurrent-modification"));
+        problem.setTitle("Concurrent modification");
+        problem.setProperty("violations", List.of(Map.of(
+                "code", "request.concurrentModification",
+                "params", Map.of())));
         logAnswered(problem);
         return problem;
     }

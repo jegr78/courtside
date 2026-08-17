@@ -80,6 +80,8 @@ tags:
     description: Administering participant cards.
   - name: admin-membership-types
     description: Administering membership types.
+  - name: admin-roster
+    description: The club's people, and the accounts they hold.
   - name: admin-rule-sets
     description: Administering rule sets and their rules.
   - name: admin-config
@@ -469,6 +471,20 @@ components:
       properties:
         active: { type: boolean }
 
+    MembershipRequest:
+      type: object
+      description: |
+        A person holds at most one membership, so the type named here replaces the one they hold
+        rather than adding a second.
+      required: [membershipTypeId]
+      properties:
+        membershipTypeId:
+          type: string
+          format: uuid
+          description: |
+            A membership type the club still offers; `GET /api/admin/membership-types` lists them
+            with their `active` flag.
+
     MembershipType:
       type: object
       required: [id, name, active]
@@ -484,6 +500,128 @@ components:
       properties:
         name: { type: string, maxLength: 60, pattern: ".*\\S.*" }
         ruleSetId: { type: [string, "null"], format: uuid }
+
+    PersonRequest:
+      type: object
+      description: |
+        None of the three values may be blank, and no name may hold a line break.
+
+        Surrounding whitespace is removed before the values are checked and stored, so a name or
+        an address pasted with padding is accepted, `maxLength` counts what is left, and the
+        person carries no padding.
+
+        An email address is accepted whatever the rest of the roster already holds; see
+        `POST /api/admin/roster`.
+      required: [firstName, lastName, email]
+      properties:
+        firstName:
+          type: string
+          maxLength: 60
+          pattern: "[^\\u000a\\u000d]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u000a\\u000d]*"
+        lastName:
+          type: string
+          maxLength: 60
+          pattern: "[^\\u000a\\u000d]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u000a\\u000d]*"
+        email:
+          type: string
+          format: email
+          maxLength: 120
+          pattern: "[^\\u000a\\u000d]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u000a\\u000d]*"
+
+    RosterEntry:
+      type: object
+      required: [personId, firstName, lastName, email, enabled, roles]
+      properties:
+        personId: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        accountId: { type: [string, "null"], format: uuid }
+        username: { type: [string, "null"] }
+        enabled:
+          type: boolean
+          description: |
+            The account's state, not the person's. A person without an account is never enabled and
+            is not thereby disabled — read it together with `accountId`.
+        membershipTypeId: { type: [string, "null"], format: uuid }
+        roles:
+          type: array
+          description: |
+            Ascending by role name, so a client may compare two entries without sorting them
+            first and the order does not move when the enumeration grows.
+          items: { $ref: "#/components/schemas/Role" }
+
+    RosterPage:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/RosterEntry" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: Pass this person id as `cursor` to continue after the current page.
+
+    AccountRequest:
+      type: object
+      description: |
+        The one-time password is what an administrator hands the member; the member replaces it
+        before reaching anything else and it is never stored as given. Twelve characters is the
+        floor the bootstrap administrator's password is held to, and an administrator creating
+        accounts is not held to a weaker one.
+      required: [username, oneTimePassword, roles]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 60
+          pattern: "^[a-z0-9._-]+$"
+          description: |
+            The login identifier, unique across the instance and suggested as `lastname.firstname`.
+        oneTimePassword: { type: string, format: password, minLength: 12, maxLength: 200 }
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/Role" }
+
+    UsernameRequest:
+      type: object
+      description: |
+        The name replaces the one the account holds. Its shape is the one `AccountRequest`
+        states, because a name a correction may produce and a name a creation may produce are
+        the same identifier.
+      required: [username]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 60
+          pattern: "^[a-z0-9._-]+$"
+          description: |
+            The login identifier, unique across the instance and suggested as `lastname.firstname`.
+
+    PasswordResetRequest:
+      type: object
+      description: |
+        The one-time password is what an administrator hands the member; the member replaces it
+        before reaching anything else and it is never stored as given. Twelve characters is the
+        floor the bootstrap administrator's password is held to, and a reset an administrator
+        performs is not held to a weaker one.
+      required: [oneTimePassword]
+      properties:
+        oneTimePassword: { type: string, format: password, minLength: 12, maxLength: 200 }
+
+    RolesRequest:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/Role" }
 
     RuleSet:
       type: object
@@ -927,7 +1065,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Conflict:
-      description: The request collides with something that already exists.
+      description: The request collides with the current state; the problem `type` names the case.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -1313,7 +1451,11 @@ paths:
         - name: cursor
           in: query
           required: false
-          description: The opaque `nextCursor` returned by the preceding page.
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor this account's
+            bookings do not contain yields an empty page rather than an error: a booking is
+            cancelled and never removed, so an id that came from this list keeps resolving, and
+            one that did not come from it belongs to somebody else.
           schema: { type: string, format: uuid }
         - name: limit
           in: query
@@ -2109,6 +2251,450 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /api/admin/roster:
+    get:
+      tags: [admin-roster]
+      operationId: listRoster
+      summary: The club's people, with their account and membership when they have one.
+      description: |
+        A person exists without an account — children and dormant records from a membership import
+        have none — so `accountId`, `username` and `roles` are absent for them and `enabled` reports
+        the account's state only where one exists.
+
+        The page is ordered by last name, then first name, then person id, and `cursor` continues
+        after the entry it names in that same order.
+      parameters:
+        - name: query
+          in: query
+          required: false
+          description: Matches against the person's full name, case-insensitively.
+          schema: { type: string, maxLength: 60 }
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor naming somebody the
+            roster no longer holds is normally answered `400` rather than silently ending the list,
+            because a truncated page is the one wrong answer a client cannot detect. The check and
+            the page are separate statements, so somebody removed between the two still yields an
+            empty final page; a client that must be certain a list was complete re-reads it from
+            the first page.
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: The page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterPage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin-roster]
+      operationId: createPerson
+      summary: Add a person to the roster.
+      description: |
+        The person is created without an account and without a membership, which is what a child
+        or an imported dormant record looks like.
+
+        An email address is not unique across the roster: a club enrols children under a parent's
+        address, so a second person carrying an address the roster already holds is accepted.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/roster/{personId}:
+    put:
+      tags: [admin-roster]
+      operationId: changePerson
+      summary: Correct a person's name or email address.
+      description: |
+        The account and the membership the person holds are untouched; this changes the person
+        record alone.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/roster/{personId}/account:
+    post:
+      tags: [admin-roster]
+      operationId: createAccount
+      summary: Give a person a user account.
+      description: |
+        The account is enabled at once and starts out having to replace its one-time password
+        before it can reach anything else, which is the state the bootstrap administrator starts
+        in as well.
+
+        A person holds at most one account here. Every write on this surface names an account by
+        its person, so a second one would be unreachable through the surface that created it and
+        disabling the person would leave it signed in; a person who already holds one is answered
+        `409`. A username the instance already holds is answered `409` too, and the two carry
+        different problem types.
+
+        No `Location`: an account has no address of its own, and the roster entry in the response
+        body is where its state is read.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/roster/{personId}/account/roles:
+    put:
+      tags: [admin-roster]
+      operationId: changeAccountRoles
+      summary: Replace the roles of a person's account.
+      description: |
+        The roles sent replace the ones the account holds. Removing one ends that account's
+        sessions: a session carries the roles it was signed in with, so a demotion that waits for
+        the session to expire is not a demotion. Adding one ends nothing.
+
+        `ADMIN` may be taken from an account once another enabled account holds it, so an officer
+        can step down and a board can demote a former one. Taking it from the last enabled account
+        that holds it is answered `409`, because the instance would then have nobody who could
+        give it back.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RolesRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The instance would be left without an enabled administrator.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/roster/{personId}/account/username:
+    put:
+      tags: [admin-roster]
+      operationId: changeAccountUsername
+      summary: Correct the username of a person's account.
+      description: |
+        A username mistyped at creation is otherwise permanent: nothing else on this surface can
+        reach it, and the person, their roles, their state and their password are untouched here.
+
+        The correction ends the account's sessions. A session is recognised by the username it was
+        signed in with, so one left standing would be signed in under a name the instance no longer
+        knows. Sending the name the account already holds changes nothing, leaves its sessions
+        alone and is answered `200` rather than a `409` against itself.
+
+        A username another account holds is answered `409` with the same problem type
+        `POST /api/admin/roster/{personId}/account` answers with.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UsernameRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/roster/{personId}/account/password:
+    put:
+      tags: [admin-roster]
+      operationId: resetAccountPassword
+      summary: Give a person's account a new one-time password.
+      description: |
+        For a member who cannot sign in at all: without this, a one-time password forgotten before
+        the first sign-in leaves an account nobody can reach, since the self-service reset is not
+        built. The account keeps its username, its roles and its state.
+
+        The account is left having to replace the new password before it can reach anything else,
+        which is the state a freshly created account starts in, and the reset ends its sessions
+        because the credential they were opened with no longer exists.
+
+        The response is the roster entry and never echoes the password.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordResetRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/roster/{personId}/account/active:
+    put:
+      tags: [admin-roster]
+      operationId: setAccountActive
+      summary: Enable or disable a person's account.
+      description: |
+        Disabling ends the account's sessions and refuses its next request; the person, their
+        membership and their bookings are untouched. Enabling ends nothing.
+
+        Disabling the last enabled account holding `ADMIN` is answered `409`, for the reason
+        `PUT .../account/roles` gives.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActiveRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The instance would be left without an enabled administrator.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/admin/roster/{personId}/membership:
+    put:
+      tags: [admin-roster]
+      operationId: assignMembership
+      summary: Give a person a membership, or move them to another type.
+      description: |
+        A person holds at most one membership, so this writes the one they already have rather
+        than adding a second: a board that picked the wrong type moves them to the right one with
+        the same request, and writing the type they already hold changes nothing.
+
+        The type has to be one the club still offers. A deactivated type is refused, which is what
+        its `active` flag is for; the memberships already on it are untouched, and a type
+        deactivated afterwards leaves the people holding it exactly where they are.
+
+        A membership decides which rules the person's bookings are measured against, so an
+        assignment that changes it ends their account's sessions and they sign in again. A person
+        without an account has none to end.
+
+        The response is the roster entry.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MembershipRequest" }
+      responses:
+        "200":
+          description: Assigned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No such person, or no such membership type.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: The membership type is no longer offered.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+    delete:
+      tags: [admin-roster]
+      operationId: removeMembership
+      summary: End a person's membership.
+      description: |
+        The person, their account and their bookings stay; the membership goes, and with it the
+        rules that were measured against its type. Ending a membership the person does not hold is
+        the state the request asks for and answers the same way.
+
+        Their account's sessions end, for the reason the assignment gives.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Ended.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   /api/admin/rule-sets:
     get:

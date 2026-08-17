@@ -28,6 +28,7 @@ class ProblemTypeUriTest {
     // Every URN src/main may produce. Two sources: a domain failure carries a ProblemType
     // constant, a framework exception only a literal in the advice answering for it.
     private static final List<String> KNOWN_FAILURE_SLUGS = List.of(
+            "urn:courtside:error:account-not-found",
             "urn:courtside:error:booking-not-found",
             "urn:courtside:error:booking-not-owned",
             "urn:courtside:error:booking-rules-violated",
@@ -40,12 +41,17 @@ class ProblemTypeUriTest {
             "urn:courtside:error:court-number-taken",
             "urn:courtside:error:court-unavailable",
             "urn:courtside:error:invalid-opening-window",
+            "urn:courtside:error:last-administrator",
             "urn:courtside:error:idempotency-key-reused",
             "urn:courtside:error:login-rate-limited",
             "urn:courtside:error:opening-hours-grid-mismatch",
+            "urn:courtside:error:membership-type-inactive",
             "urn:courtside:error:membership-type-name-taken",
             "urn:courtside:error:membership-type-not-found",
             "urn:courtside:error:participants-invalid",
+            "urn:courtside:error:person-account-exists",
+            "urn:courtside:error:person-not-found",
+            "urn:courtside:error:roster-cursor-unknown",
             "urn:courtside:error:rule-parameter-invalid",
             "urn:courtside:error:rule-set-inactive",
             "urn:courtside:error:rule-set-name-taken",
@@ -55,10 +61,12 @@ class ProblemTypeUriTest {
             "urn:courtside:error:series-request-invalid",
             "urn:courtside:error:series-not-found",
             "urn:courtside:error:slot-duration-conflict",
-            "urn:courtside:error:time-zone-conflict");
+            "urn:courtside:error:time-zone-conflict",
+            "urn:courtside:error:username-taken");
 
     private static final List<String> KNOWN_ADVICE_SLUGS = List.of(
             "urn:courtside:error:access-denied",
+            "urn:courtside:error:concurrent-modification",
             "urn:courtside:error:constraint-violation",
             "urn:courtside:error:malformed-request-body",
             "urn:courtside:error:method-not-supported",
@@ -72,8 +80,7 @@ class ProblemTypeUriTest {
 
     @Test
     void whenReadingEveryProblemTypeUri_thenNoneNamesAHostThisProductDoesNotOwn() throws Exception {
-        // given — a club runs its own instance under its own domain, so an http type URI would
-        // name a host nobody operates and could later be registered by someone else
+        // given
         List<String> types = adviceTypeLiterals();
         List<String> failureTypes = failureSlugs();
 
@@ -91,22 +98,20 @@ class ProblemTypeUriTest {
     @Test
     void whenReadingEveryDomainFailuresProblemType_thenTheSlugSetMatchesKnownSlugsExactly()
             throws Exception {
-        // when / then — a new failure must be added here deliberately before it can ship
+        // when / then
         assertThat(failureSlugs()).containsExactlyInAnyOrderElementsOf(KNOWN_FAILURE_SLUGS);
     }
 
     @Test
     void whenReadingEveryProblemTypeAnAdviceSets_thenTheSlugSetMatchesKnownSlugsExactly()
             throws IOException {
-        // when / then — an advice that describes a framework exception has no ProblemType
-        // constant to read, so its literal is pinned separately
+        // when / then
         assertThat(adviceTypeLiterals()).containsExactlyInAnyOrderElementsOf(KNOWN_ADVICE_SLUGS);
     }
 
     @Test
     void whenReadingEveryDomainFailure_thenEachDeclaresItsOwnProblemTypeConstant() throws Exception {
-        // given — the constant is what the assertions above read; a failure that built its
-        // ProblemType inline would be invisible to them and could ship an unreviewed slug
+        // given
         TreeSet<String> withoutConstant = new TreeSet<>();
 
         // when

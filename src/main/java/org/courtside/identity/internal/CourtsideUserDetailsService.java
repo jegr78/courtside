@@ -44,8 +44,9 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
             authorities.add(PASSWORD_CHANGE_REQUIRED);
         }
 
-        return new CourtsideUserDetails(account.getUsername(), account.getPasswordHash(),
-                account.isEnabled(), authorities, account.getSecurityEpoch());
+        return new CourtsideUserDetails(account.getId(), account.getUsername(),
+                account.getPasswordHash(), account.isEnabled(), authorities,
+                account.getSecurityEpoch());
     }
 
     @Override

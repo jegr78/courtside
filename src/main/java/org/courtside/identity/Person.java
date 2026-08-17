@@ -35,6 +35,11 @@ public class Person {
         this.email = email;
     }
 
+    public void rename(String firstName, String lastName) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
     public void changeEmail(String email) {
         this.email = email;
     }

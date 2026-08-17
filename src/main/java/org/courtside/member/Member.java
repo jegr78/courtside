@@ -30,4 +30,8 @@ public class Member {
         this.personId = personId;
         this.membershipTypeId = membershipTypeId;
     }
+
+    public void assignTo(UUID membershipTypeId) {
+        this.membershipTypeId = membershipTypeId;
+    }
 }

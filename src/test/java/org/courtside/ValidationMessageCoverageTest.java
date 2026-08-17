@@ -32,7 +32,8 @@ class ValidationMessageCoverageTest {
     private static final List<String> CODE_CARRYING_EXCEPTION_SIMPLE_NAMES =
             List.of("ParticipantsInvalidException", "InvalidOpeningWindowException",
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
-                    "MembershipTypeRuleSetInactiveException");
+                    "MembershipTypeRuleSetInactiveException", "MembershipTypeInactiveException",
+                    "RosterCursorUnknownException", "LastAdministratorException");
 
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
             List.of("CodedDomainFailure", "InvalidOpeningWindowException");
@@ -44,7 +45,7 @@ class ValidationMessageCoverageTest {
     // What toMap's "validation." + AnnotationSimpleName can produce today. A new @Constraint
     // mints an unreviewed wire code until it is added here and to both bundles.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("DurationMin", "Max", "Min", "NotNull", "Pattern", "Size");
+            List.of("DurationMin", "Email", "Max", "Min", "NotNull", "Pattern", "Size");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
@@ -85,8 +86,7 @@ class ValidationMessageCoverageTest {
                     .forEach(path -> collectConstraintNames(classesRoot, path, constraintNames));
         }
 
-        // when / then — an unlisted annotation would silently mint an unreviewed
-        // validation.<AnnotationSimpleName> code on the frozen wire contract
+        // when / then
         assertThat(constraintNames)
                 .as("a new constraint annotation used in src/main must be added to "
                         + "KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES, with a validation.<name> entry "
@@ -115,8 +115,7 @@ class ValidationMessageCoverageTest {
     @Test
     void everyCodeASpringValidatorRejectsWithHasAMessageKeyInBothBundles()
             throws IOException, URISyntaxException {
-        // given — a cross-field rule names its code through rejectValue, which reaches the wire
-        // like a constraint's simple name but is invisible to the annotation scan
+        // given
         TreeSet<String> codes = new TreeSet<>();
         Pattern rejectValue = Pattern.compile("rejectValue\\(\\s*\"[^\"]+\",\\s*\"([^\"]+)\"");
         try (Stream<Path> sources = Files.walk(mainSourceDirectory())) {
@@ -142,8 +141,7 @@ class ValidationMessageCoverageTest {
 
     @Test
     void bothBundlesDefineTheSameKeys() throws IOException {
-        // given — every other test here derives its keys; one written by hand into a single
-        // bundle is derivable from nothing
+        // given
         Properties english = loadBundle("/messages.properties");
         Properties german = loadBundle("/messages_de.properties");
 
@@ -166,8 +164,7 @@ class ValidationMessageCoverageTest {
                     .forEach(path -> collectGetCodeClasses(classesRoot, path, generated, getCodeClasses));
         }
 
-        // when / then — declared on CodedDomainFailure and inherited, plus on
-        // InvalidOpeningWindowException, which carries a code but no params
+        // when / then
         assertThat(getCodeClasses)
                 .as("a class declaring getCode() must be named in GET_CODE_DECLARING_SIMPLE_NAMES,"
                         + " and every concrete failure that carries a code must appear in"
@@ -179,8 +176,7 @@ class ValidationMessageCoverageTest {
 
     @Test
     void everyCodeCarryingExceptionActuallyExposesGetCode() throws IOException, URISyntaxException {
-        // given — the list above builds the "new X(\"literal\"" patterns; a name that no longer
-        // names a code-carrying failure would silently stop matching anything at all
+        // given
         Path classesRoot = classesDirectory();
         Set<String> generated = generatedTopLevelClassNames();
         TreeSet<String> resolved = new TreeSet<>();

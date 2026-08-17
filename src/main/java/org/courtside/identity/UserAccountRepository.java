@@ -17,7 +17,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
-            UPDATE UserAccount account
+            UPDATE VERSIONED UserAccount account
             SET account.passwordHash = :passwordHash,
                 account.passwordChangeRequired = false,
                 account.securityEpoch = account.securityEpoch + 1
@@ -25,8 +25,16 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             """)
     int changeInitialPassword(@Param("id") UUID id, @Param("passwordHash") String passwordHash);
 
-    @Query("SELECT account.securityEpoch FROM UserAccount account WHERE account.username = :username")
-    Optional<Long> findSecurityEpochByUsername(@Param("username") String username);
+    @Query("SELECT account.securityEpoch FROM UserAccount account WHERE account.id = :id")
+    Optional<Long> findSecurityEpochById(@Param("id") UUID id);
 
     List<UserAccount> findByPersonIdIn(List<UUID> personIds);
+
+    @Query("""
+            SELECT count(account) FROM UserAccount account
+            JOIN account.roles role
+            WHERE role = :role AND account.enabled = true AND account.id <> :excludedAccountId
+            """)
+    long countEnabledHoldingRoleExcept(@Param("role") Role role,
+                                       @Param("excludedAccountId") UUID excludedAccountId);
 }

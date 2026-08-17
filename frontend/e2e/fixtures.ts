@@ -1,5 +1,5 @@
-import { expect, test as base, type Page } from "@playwright/test";
-import { startJourneyService, type JourneyService } from "./global-setup";
+import { expect, test as base, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { journeyInstant, startJourneyService, type JourneyService } from "./global-setup";
 
 interface WorkerFixtures {
   journeyService: JourneyService;
@@ -7,6 +7,17 @@ interface WorkerFixtures {
 
 interface TestFixtures {
   resetJourney: void;
+}
+
+export async function journeyContext(browser: Browser): Promise<BrowserContext> {
+  const context = await browser.newContext();
+  await pinJourneyClock(context);
+  return context;
+}
+
+async function pinJourneyClock(context: BrowserContext): Promise<void> {
+  // Date.now stands still with it, so an elapsed time measured in the page reads zero.
+  await context.clock.setFixedTime(new Date(journeyInstant));
 }
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
@@ -19,9 +30,12 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   baseURL: async ({ journeyService }, provide) => {
     await provide(journeyService.baseURL);
   },
+  context: async ({ context }, provide) => {
+    await pinJourneyClock(context);
+    await provide(context);
+  },
   resetJourney: [async ({ journeyService }, provide) => {
     await journeyService.reset();
-    process.env.COURTSIDE_VISUAL_JOURNEY_DATE = journeyService.visualDate;
     await provide();
   }, { auto: true }]
 });

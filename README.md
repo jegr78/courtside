@@ -49,7 +49,10 @@ The database operation is serialized, so concurrent application starts cannot cr
 administrators.
 
 Once any local account exists, the variables are ignored: a restart can never create another
-administrator or reset a password. Remove them after the initial password has been changed.
+administrator or reset a password. Remove them after the initial password has been changed. Because
+a restart cannot bring one back, the roster refuses the change that would leave the instance with no
+enabled account holding `ADMIN` — an officer may step down once a successor exists, and a board may
+demote a former one.
 
 `POST /api/session` limits attempts by source address and by an instance-wide Argon2 budget before
 another password verification is allowed. The counters live in PostgreSQL, survive restarts and

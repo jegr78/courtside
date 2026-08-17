@@ -13,6 +13,8 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     Optional<Member> findByPersonId(UUID personId);
 
+    List<Member> findByPersonIdIn(List<UUID> personIds);
+
     @Query("""
             SELECT new org.courtside.member.MemberParticipant(p.id, concat(p.firstName, ' ', p.lastName))
             FROM Member m, org.courtside.identity.Person p

@@ -28,19 +28,22 @@ adapter has needed one.
 
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
-courts, accounts, roles and session login, club configuration and branding, and the admin surface
-for all of it. `/actuator/health` is exposed. The OpenAPI document is the source of truth: every
-controller implements an interface generated from it, and an instance serves the document it
-actually answers to at `GET /api/openapi.yaml`. A tagged release builds a multi-arch container
-image, publishes it to GHCR signed with cosign and carrying an SBOM attestation, and attaches the
-OpenAPI document to the release.
+courts, accounts, roles and session login, club configuration and branding, the roster — the club's
+people, the account and roles a person holds, the membership they hold, correcting a username and
+resetting a password — and the admin surface for all of it. `/actuator/health` is exposed. The
+OpenAPI document is the source of truth: every controller implements an interface generated from
+it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
+tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
+carrying an SBOM attestation, and attaches the OpenAPI document to the release.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers, and the browser admin surface for
-configuration and facilities.
+configuration and facilities. The roster is the exception: it is served by the API and has no
+browser surface yet, so a board reaches it through the API alone.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
-container image scanning, CSV import, and reports and exports.
+container image scanning, CSV import, reports and exports, and the self-service password reset of
+section 4 — an administrator hands out a new one-time password through the roster instead.
 
 ---
 
@@ -185,8 +188,8 @@ citizen.
 └──────────────────────┬───────────────────────────┘
                        │ REST/JSON  (= the public API)
 ┌──────────────────────▼───────────────────────────┐
-│ identity      User accounts, login, roles        │
-│ member        Persons, membership types          │
+│ identity      Persons, accounts, roles, login    │
+│ member        Memberships, the roster surface    │
 │ facility      Courts, opening hours, holidays    │
 │ card          Booking cards / special cards      │
 │ rules         Rule definitions and evaluation    │
@@ -456,7 +459,10 @@ Deliberate decisions:
 
 - **`person` and `user_account` are separate.** Not every person has an account (children,
   dormant records from a membership import), and the future guardian/child relation needs
-  this separation anyway.
+  this separation anyway. The column carries no unique person, so a second account is a row the
+  schema tolerates and the roster reads past — but the admin surface refuses to create one,
+  because every write there names an account by its person and a second account would be
+  unreachable through the surface that made it.
 - **`booking_participant`** references either a `person` (member) or carries a free-text
   `guest_name`. Guest bookings are prepared in the model without Release 1 having to do
   billing.
@@ -481,7 +487,9 @@ paths, both supported:
 2. Reset via **email** — the message lists *all* accounts registered to that address, each
    with its own reset link ("Accounts for this address: *doe.jane*, *roe.john*").
 
-This is a case standard frameworks do not provide and must be built explicitly.
+This is a case standard frameworks do not provide and must be built explicitly. Until it is, the
+roster is the only remedy: an administrator hands out a new one-time password (section 10), which
+is what the self-service paths above would take the board out of.
 
 A **guardian relation** (a parent seeing their children's bookings) falls out of this model
 almost for free. It is noted as a candidate for a later release, not Release 1.
@@ -510,6 +518,18 @@ public interface BookingRule {
 
 A rule set belongs to a membership type or role. On a booking attempt, all applicable rules
 run as a chain.
+
+**A person without a membership is bound by no membership-scoped rule.** *Accepted, not closed.*
+Section 10 states the same thing from the session side and calls it the most permissive state the
+booking rules know; the roster reaches it in one step, because a person can be given an account
+without being given a membership, and such an account then books as far ahead and as often as the
+grid allows. It stays open because the alternative, reading "no membership" as "no booking",
+changes what every installation already permits and is a decision of its own rather than a
+correction. Three things bound it: the roster reports the membership on every entry, so a person
+without one is visible in the list rather than hidden in it; opening hours, the slot grid and every
+rule not scoped to a membership type still bind, because they describe the facility and not the
+person; and only an administrator can create an account, so nobody reaches the state without a
+board putting them there.
 
 **Evaluation does not stop at the first violation.** All violations are collected —
 otherwise a member works through three error messages one at a time.
@@ -891,10 +911,32 @@ whether it is built or designed. **Designed means absent today.**
   `HttpOnly` / `Secure` / `SameSite=Lax` cookie. **No JWT** — the PWA and API share an
   origin, so no token gymnastics are needed, and an admin can terminate a session
   immediately, which JWT cannot do. A role, membership or account-status change must terminate
-  that account's active sessions in the same operation so cached authorities cannot outlive the
-  change. A persisted account security epoch makes sessions created before a credential change
-  fail closed even when an in-flight request saves one after bulk deletion. *Built, except that
-  terminating another member's session has no admin surface yet.*
+  that account's active sessions in the same operation — a role or an account status because
+  cached authorities must not outlive the change, a membership because what its holder may book
+  changes with it and neither direction of that change is harmless. Every path that ends an
+  account's sessions deletes the stored rows and raises a persisted account security epoch, and the
+  epoch is what carries the guarantee where the deletion cannot reach: a request already in flight
+  saves its session again afterwards, and a store that refuses the deletion must not fail the
+  operation that revoked the session. A session created before the change fails closed either way.
+  *Built.* The roster is the admin surface for it:
+  disabling an account, removing one of its roles, correcting its username, resetting its password
+  and changing the membership of the person it belongs to each raise that account's epoch, so its
+  next request is refused rather than served with the rights or the credential it was signed in
+  with. A membership is not a role, and no session carries a stale copy of one — a booking resolves
+  the membership as it evaluates the rules — so the epoch moves here for the second reason above
+  and not the first. Neither direction is harmless: the advance window and the open-booking cap
+  are looked up through a membership type and are found for nobody without one, so no membership
+  is the most permissive state the booking rules know; and a person without one drops out of
+  participant search, so ending a membership takes as much away as assigning one does. The policy
+  is about what an account is, not about what the club has configured: repointing a membership type
+  at another rule set changes what every member holding it may book and leaves every session
+  standing, as a rule set's own parameters, a court's opening hours and a card's roles do, because
+  all of them are read while a request is served and bind the next one. Enabling an account, adding
+  a role, writing the username an account already holds and writing the membership a person already
+  holds leave sessions alone, as does the rehash on a sign-in, which replaces the stored hash
+  without touching the epoch. It does raise the account's row version, so an administrator editing
+  that account at that moment is answered 409 and re-reads rather than overwriting the new hash.
+  Ending one single session while leaving the account's rights untouched still has no surface.
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* Source-address counters
   absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;

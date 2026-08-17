@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -53,6 +54,10 @@ public class UserAccount {
     @Column(name = "security_epoch", nullable = false)
     private long securityEpoch;
 
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_account_role",
             joinColumns = @JoinColumn(name = "user_account_id"))
@@ -74,6 +79,37 @@ public class UserAccount {
 
     public void enable() {
         this.enabled = true;
+    }
+
+    public void disable() {
+        this.enabled = false;
+        revokeSessions();
+    }
+
+    public void changeRoles(Set<Role> roles) {
+        Set<Role> replacement = Set.copyOf(roles);
+        if (!replacement.containsAll(this.roles)) {
+            revokeSessions();
+        }
+        this.roles = replacement;
+    }
+
+    public void changeUsername(String username) {
+        if (this.username.equals(username)) {
+            return;
+        }
+        this.username = username;
+        revokeSessions();
+    }
+
+    public void resetPassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+        requirePasswordChange();
+        revokeSessions();
+    }
+
+    void revokeSessions() {
+        this.securityEpoch++;
     }
 
     public void requirePasswordChange() {
