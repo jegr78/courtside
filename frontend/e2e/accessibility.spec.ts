@@ -61,11 +61,10 @@ for (const locale of ["de", "en"]) {
     await signIn(page, "configuration-admin");
 
     // when / then
-    await page.getByTestId("admin-configuration-link").click();
+    await page.goto("/admin/configuration");
     await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
     await expectNoWcagViolations(page);
-    await page.goto("/");
-    await page.getByTestId("admin-facility-link").click();
+    await page.goto("/admin/facility");
     await expect(page.getByTestId("admin-facility-view")).toBeVisible();
     await expectNoWcagViolations(page);
   });
