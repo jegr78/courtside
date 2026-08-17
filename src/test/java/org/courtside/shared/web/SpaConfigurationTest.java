@@ -3,6 +3,8 @@ package org.courtside.shared.web;
 import org.courtside.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -49,6 +51,16 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
     void givenAnAnonymousVisitor_whenOpeningPersonalBookings_thenTheLoginCapableAppShellIsServed() throws Exception {
         // when / then
         mockMvc.perform(get("/my-bookings"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/index.html"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/admin/configuration", "/admin/facility"})
+    void givenAnAnonymousVisitor_whenOpeningAnAdministrationRoute_thenTheLoginCapableAppShellIsServed(String route)
+            throws Exception {
+        // when / then
+        mockMvc.perform(get(route))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/index.html"));
     }
