@@ -1,6 +1,7 @@
 package org.courtside.dataexchange;
 
 import org.courtside.dataexchange.internal.CsvSnapshot;
+import org.courtside.dataexchange.internal.MemberNumber;
 import org.courtside.dataexchange.internal.SnapshotHeaderInvalidException;
 import org.courtside.dataexchange.internal.SnapshotParser;
 import org.junit.jupiter.api.Test;
@@ -154,8 +155,28 @@ class SnapshotParserTest {
         // then
         assertThat(snapshot.errors()).singleElement()
                 .satisfies(error -> assertThat(error.code())
-                        .isEqualTo("import.snapshot.row.externalIdBlank"));
+                        .isEqualTo("import.snapshot.row.externalIdUnusable"));
         assertThat(snapshot.rows()).hasSize(1);
+    }
+
+    @Test
+    void givenAMemberNumberLongerThanTheReferenceHolds_whenParsing_thenOnlyThatRowFails() {
+        // given
+        String content = """
+                Member number,First name,Last name
+                %s,Jane,Doe
+                4712,John,Roe
+                """.formatted("4".repeat(MemberNumber.MAX_LENGTH + 1));
+
+        // when
+        CsvSnapshot snapshot = parse(content);
+
+        // then
+        assertThat(snapshot.errors()).singleElement()
+                .satisfies(error -> assertThat(error.code())
+                        .isEqualTo("import.snapshot.row.externalIdUnusable"));
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.externalId()).isEqualTo("4712"));
     }
 
     @Test

@@ -66,9 +66,10 @@ public final class SnapshotParser {
             }
             Map<CanonicalField, String> values = valuesOf(record, header);
             String externalId = values.remove(CanonicalField.EXTERNAL_ID);
-            if (externalId == null || externalId.isBlank()) {
+            if (!MemberNumber.isUsable(externalId)) {
                 errors.add(new CsvSnapshot.RowError(rowNumber,
-                        "import.snapshot.row.externalIdBlank", Map.of()));
+                        "import.snapshot.row.externalIdUnusable",
+                        Map.of("maxLength", MemberNumber.MAX_LENGTH)));
             } else if (!seen.add(externalId)) {
                 errors.add(new CsvSnapshot.RowError(rowNumber,
                         "import.snapshot.row.duplicateExternalId", Map.of("externalId", externalId)));
