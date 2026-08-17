@@ -1442,6 +1442,8 @@ paths:
       responses:
         "204":
           description: Cancelled.
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -1522,6 +1524,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ManagedAppointmentDetail" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -1763,6 +1767,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Court" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -1903,6 +1909,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BookingCard" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -2043,6 +2051,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ParticipantCard" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -2183,6 +2193,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MembershipType" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -2695,6 +2707,8 @@ paths:
       responses:
         "204":
           description: Ended.
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -2785,6 +2799,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RuleSet" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -2928,6 +2944,8 @@ paths:
       responses:
         "204":
           description: Closed.
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -2993,6 +3011,8 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/RuleDefinition" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -3058,6 +3078,8 @@ paths:
       responses:
         "204":
           description: Removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -3083,6 +3105,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Impact" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -3106,6 +3130,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Impact" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":

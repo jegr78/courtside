@@ -59,6 +59,42 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
                 .isSubsetOf(served);
     }
 
+    @Test
+    void everyOperationWithAPathParameterDocumentsTheAnswerToAMalformedOne() throws IOException {
+        // when
+        TreeSet<String> silent = operationsWithAPathParameterAndNo("400");
+
+        // then
+        assertThat(silent)
+                .as("a path parameter can always arrive malformed, and the shared advice answers"
+                        + " 400 urn:courtside:error:parameter-type-mismatch for it. An operation"
+                        + " that does not document 400 promises an error surface it does not have,"
+                        + " and a client written against the document meets a status it was told"
+                        + " could not happen.")
+                .isEmpty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private TreeSet<String> operationsWithAPathParameterAndNo(String status) throws IOException {
+        TreeSet<String> missing = new TreeSet<>();
+        paths().forEach((path, methods) -> {
+            if (!path.contains("{")) {
+                return;
+            }
+            methods.forEach((method, operation) -> {
+                if (method.startsWith("x-") || method.equals("parameters")) {
+                    return;
+                }
+                Map<String, Object> responses =
+                        (Map<String, Object>) ((Map<String, Object>) operation).get("responses");
+                if (responses == null || !responses.containsKey(status)) {
+                    missing.add(method.toUpperCase() + " " + path);
+                }
+            });
+        });
+        return missing;
+    }
+
     private TreeSet<String> servedOperations() {
         TreeSet<String> operations = new TreeSet<>();
         for (Map.Entry<RequestMappingInfo, ?> entry : mappings.getHandlerMethods().entrySet()) {
@@ -77,7 +113,7 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
     }
 
     @SuppressWarnings("unchecked")
-    private TreeSet<String> documentedOperations() throws IOException {
+    private Map<String, Map<String, Object>> paths() throws IOException {
         Map<String, Object> document;
         try (InputStream in = ApiContractCoverageTest.class.getResourceAsStream(DOCUMENT)) {
             assertThat(in).as("the API document must be on the classpath at %s", DOCUMENT).isNotNull();
@@ -86,9 +122,12 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
         Map<String, Map<String, Object>> paths =
                 (Map<String, Map<String, Object>>) document.get("paths");
         assertThat(paths).as("the document must describe at least one path").isNotEmpty();
+        return paths;
+    }
 
+    private TreeSet<String> documentedOperations() throws IOException {
         TreeSet<String> operations = new TreeSet<>();
-        paths.forEach((path, methods) -> methods.keySet().stream()
+        paths().forEach((path, methods) -> methods.keySet().stream()
                 .filter(key -> !key.startsWith("x-") && !key.equals("parameters"))
                 .forEach(method -> operations.add(method.toUpperCase() + " " + path)));
         return operations;
