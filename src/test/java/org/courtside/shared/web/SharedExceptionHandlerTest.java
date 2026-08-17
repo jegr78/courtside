@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class SharedExceptionHandlerTest {
 
@@ -18,7 +19,7 @@ class SharedExceptionHandlerTest {
     @Test
     void whenHandlingAnUntranslatedConstraintViolation_thenTheProblemDetailNamesItsOwnType() {
         // given
-        SharedExceptionHandler handler = new SharedExceptionHandler();
+        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
 
         // when
         ProblemDetail problem = handler.handleRejectedByTheDatabase(
@@ -34,7 +35,7 @@ class SharedExceptionHandlerTest {
     void givenAFieldErrorThatIsNotABeanValidationViolation_whenHandlingIt_thenAProblemDetailStillNamesTheField() {
         // given — a type-mismatch binding failure on a @ModelAttribute/@RequestBody field carries
         // no ConstraintViolation to unwrap, unlike a rejected @NotBlank or @Pattern
-        SharedExceptionHandler handler = new SharedExceptionHandler();
+        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
         MethodArgumentNotValidException exception = FieldRejections.rejectionOf("page", null);
 
         // when

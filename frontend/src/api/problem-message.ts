@@ -10,11 +10,31 @@ export function problemMessage(failure: unknown, t: TFunction): string {
   if (!(failure instanceof ApiError) || !failure.problem) {
     return t("error.generic");
   }
-  const coded = firstCodedFailure(failure.problem);
+  const message = translatedProblem(failure.problem, t);
+  const reference = traceReference(failure.problem);
+  return reference
+    ? t("error.withReference", { message, reference })
+    : message;
+}
+
+export function problemReference(failure: unknown, t: TFunction): string | undefined {
+  if (!(failure instanceof ApiError) || !failure.problem?.traceId) {
+    return undefined;
+  }
+  return t("error.reference", { reference: traceReference(failure.problem) });
+}
+
+function traceReference(problem: Problem): string | undefined {
+  if (!problem.traceId) return undefined;
+  return problem.spanId ? `${problem.traceId}/${problem.spanId}` : problem.traceId;
+}
+
+function translatedProblem(problem: Problem, t: TFunction): string {
+  const coded = firstCodedFailure(problem);
   if (coded) {
     return t(coded.code, { ...coded.params, defaultValue: t("error.generic") });
   }
-  const typeMessageKey = typeMessageKeys[failure.problem.type];
+  const typeMessageKey = typeMessageKeys[problem.type];
   return t(typeMessageKey ?? "error.generic");
 }
 

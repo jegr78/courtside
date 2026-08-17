@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type BookingGrid, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
-import { problemMessage } from "../api/problem-message";
+import { problemMessage, problemReference } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
@@ -92,10 +92,15 @@ export function BookingDialog({ selection, grid, courts, closed, created, confli
         await conflicted().catch(() => undefined);
       }
       if (failure instanceof ApiError && failure.problem) {
-        setViolations(translatedViolations(failure.problem, t));
+        const translated = translatedViolations(failure.problem, t);
+        setViolations(translated);
+        setError(translated.length > 0
+          ? problemReference(failure, t)
+          : problemMessage(failure, t));
         setIdempotencyKey(crypto.randomUUID());
+      } else {
+        setError(problemMessage(failure, t));
       }
-      setError(problemMessage(failure, t));
     } finally {
       setSubmitting(false);
     }
@@ -166,7 +171,7 @@ export function BookingDialog({ selection, grid, courts, closed, created, confli
       </label>
       <FieldViolations id="booking-note-errors" violations={fieldViolations("note")} />
       <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
-      {error && violations.length === 0 && <Alert>{error}</Alert>}
+      {error && <Alert>{error}</Alert>}
       </div>
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button type="button" data-testid="booking-close" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>

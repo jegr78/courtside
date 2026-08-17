@@ -463,12 +463,14 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
   expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You");
 });
 
-it("given booking rules reject a slot, when submitting it, then every violation is translated by its field", async () => {
+it("given booking rules reject a slot, when submitting it, then violations and the trace reference are shown", async () => {
   // given
   vi.mocked(api.createBooking).mockRejectedValue(new ApiError(422, {
     type: "urn:courtside:error:booking-rules-violated",
     title: "Booking rules violated",
     status: 422,
+    traceId: "0123456789abcdef0123456789abcdef",
+    spanId: "0123456789abcdef",
     violations: [
       { code: "booking.rule.advanceWindow.exceeded", params: { maxDays: 14 } },
       { code: "booking.participants.slotCount", params: { cardLabel: "Member booking", allowed: "2 or 4", actual: 1 } }
@@ -488,6 +490,9 @@ it("given booking rules reject a slot, when submitting it, then every violation 
   expect(screen.getByTestId("guest-participants")).toHaveAttribute("aria-describedby", "booking-participants-errors");
   expect(document.querySelector('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeInTheDocument();
   expect(timeViolations).not.toHaveTextContent("booking.rule.advanceWindow.exceeded");
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
+  );
 });
 
 it("given a matching club member, when selecting them, then their person id is submitted", async () => {

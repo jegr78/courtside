@@ -61,3 +61,25 @@ it("given an unknown failure, when resolving it, then no technical detail is exp
   // then
   expect(translate).toHaveBeenCalledWith("error.generic");
 });
+
+it("given a problem with a trace reference, when resolving it, then the member can quote it", () => {
+  // given
+  const traceId = "0123456789abcdef0123456789abcdef";
+  const spanId = "0123456789abcdef";
+  const error = new ApiError(500, {
+    type: "urn:courtside:error:internal-error",
+    title: "Internal error",
+    status: 500,
+    traceId,
+    spanId
+  });
+
+  // when
+  problemMessage(error, translate);
+
+  // then
+  expect(translate).toHaveBeenCalledWith("error.withReference", {
+    message: "translated:error.generic",
+    reference: `${traceId}/${spanId}`
+  });
+});
