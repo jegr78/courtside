@@ -1,5 +1,6 @@
 package org.courtside.booking;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingAccessControl;
 import org.courtside.booking.internal.BookingRuleGate;
@@ -50,6 +51,7 @@ class BookingWriter {
     private final PersonRepository personRepository;
     private final ParticipantCardCapacity participantCardCapacity;
     private final BookingGridCoordination bookingGridCoordination;
+    private final MeterRegistry meters;
 
     UUID write(CreateBookingCommand command) {
         return write(command, null, null);
@@ -79,6 +81,7 @@ class BookingWriter {
             bookings.saveAndFlush(booking);
         } catch (DataIntegrityViolationException e) {
             if (isOverlap(e)) {
+                meters.counter("courtside.bookings.conflicts").increment();
                 throw new CourtUnavailableException(
                         "One of the requested courts is already occupied for that time", e);
             }
@@ -87,6 +90,7 @@ class BookingWriter {
             }
             throw e;
         }
+        meters.counter("courtside.bookings.created").increment();
         return booking.getId();
     }
 

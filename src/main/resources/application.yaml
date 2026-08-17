@@ -5,6 +5,12 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: ${COURTSIDE_SLOW_QUERY_THRESHOLD_MS:500}
   flyway:
     enabled: true
   session:
@@ -49,6 +55,22 @@ courtside:
     series-horizon-months: 12
 
 management:
+  tracing:
+    sampling:
+      probability: ${COURTSIDE_TRACING_SAMPLING_PROBABILITY:0.1}
+    export:
+      otlp:
+        enabled: ${COURTSIDE_OTLP_ENABLED:false}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${COURTSIDE_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+  otlp:
+    metrics:
+      export:
+        enabled: ${COURTSIDE_OTLP_ENABLED:false}
+        url: ${COURTSIDE_OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
   prometheus:
     metrics:
       export:
