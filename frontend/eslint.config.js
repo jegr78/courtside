@@ -5,7 +5,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "src/api/schema.d.ts", "vite.config.js", "vite.config.d.ts"] },
+  { ignores: ["dist", "test-results", "src/api/schema.d.ts", "vite.config.js", "vite.config.d.ts"] },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {

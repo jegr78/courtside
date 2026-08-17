@@ -180,6 +180,32 @@ The stored summary contains only contract-approved build, runtime, load, resourc
 metric fields. Credentials, hostnames, remote URLs, identities, and addresses cannot pass the
 closed result schema. Failed and stale-contract results are rejected and never replace a baseline.
 
+Compare a new result with an approved baseline only on the same controlled runner:
+
+```text
+node tools/courtside.mjs perf-compare build/performance/baseline/<run>/summary.json \
+  --baseline performance/baselines/baseline/<approved>.json \
+  --output build/performance/baseline/<run>/comparison.json
+```
+
+The comparison fails closed when the contract, profile, target, environment, k6 runtime, operating
+system, architecture, runner capacity, dataset, load shape, or container resource budgets differ.
+A baseline with failed thresholds is also rejected. The reviewed policy in
+[`../performance/regression-policy.json`](../performance/regression-policy.json) classifies a p95
+or p99 latency increase above 15 percent, a throughput decrease above 10 percent, a technical error
+rate increase above 0.5 percentage points, or any additional unexpected server error as a
+high-severity regression owned by the performance maintainer. The JSON comparison contains only
+build identities, aggregate metric values, limits, classification, and ownership; raw targets,
+credentials, identities, and machine names are excluded.
+
+Run baseline and browser profiles monthly and before a release on the same controlled host. Run a
+fresh-environment soak quarterly and before a release that changes booking persistence, sessions,
+database access, or resource configuration. Retain their summary, comparison, HTML report, and the
+matching telemetry interval. Review JVM and container memory, garbage collection, Hikari usage,
+PostgreSQL connections and locks, database growth, and changed query plans alongside the automated
+latency, throughput, error, journey, and Web Vitals decision. Shared hosted runners remain suitable
+only for bounded smoke diagnostics and cannot approve or reject a performance baseline.
+
 ## Automation and approved baselines
 
 The `performance smoke` workflow runs weekly and on explicit dispatch. It creates only the local

@@ -55,7 +55,7 @@ export function parseArguments(argv) {
   const supported = new Set([
     "build", "verify", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
     "uat-share", "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore",
-    "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset", "perf-run", "perf-promote",
+    "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset", "perf-run", "perf-promote", "perf-compare",
     "status", "help"
   ]);
   if (!command || !supported.has(command)) {
@@ -65,7 +65,7 @@ export function parseArguments(argv) {
     command, suspend: false, json: false, environment: undefined, version: undefined,
     skipVerify: false, dbPort: false, file: undefined, confirm: undefined, all: false,
     profile: undefined, fresh: false, telemetry: false, remoteWrite: false, showCredentials: true,
-    target: undefined
+    target: undefined, baseline: undefined, output: undefined
   };
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
@@ -112,6 +112,12 @@ export function parseArguments(argv) {
       options.file = flag;
     } else if (flag === "--confirm" && command === "perf-promote") {
       options.confirm = requiredOptionValue(flags, ++index, "--confirm");
+    } else if (!flag.startsWith("--") && command === "perf-compare" && !options.file) {
+      options.file = flag;
+    } else if (flag === "--baseline" && command === "perf-compare") {
+      options.baseline = requiredOptionValue(flags, ++index, "--baseline");
+    } else if (flag === "--output" && command === "perf-compare") {
+      options.output = requiredOptionValue(flags, ++index, "--output");
     } else {
       throw new Error(`Unknown option for ${command}: ${flag}`);
     }
@@ -159,6 +165,9 @@ export function parseArguments(argv) {
   }
   if (command === "perf-promote" && (!options.file || options.confirm !== perfProject)) {
     throw new Error(`perf-promote requires a summary file and --confirm ${perfProject}`);
+  }
+  if (command === "perf-compare" && (!options.file || !options.baseline || !options.output)) {
+    throw new Error("perf-compare requires a candidate, --baseline, and --output");
   }
   return options;
 }
@@ -445,7 +454,7 @@ async function main() {
     if (["build", "verify", "dev", "dev-debug", "uat", "uat-share", "perf"].includes(options.command) && !options.version) {
       validateJava();
     }
-    if (!["build", "help"].includes(options.command)) {
+    if (!["build", "help", "perf-compare"].includes(options.command)) {
       validateDocker();
     }
     await execute(options);
@@ -522,6 +531,10 @@ async function execute(options) {
   }
   if (options.command === "perf-promote") {
     promotePerformanceBaseline(options.file);
+    return;
+  }
+  if (options.command === "perf-compare") {
+    comparePerformanceFiles(options);
     return;
   }
   if (options.command === "status") {
@@ -988,6 +1001,84 @@ export function performanceBaselinePlan(result, currentContractDigest) {
   };
 }
 
+export function comparePerformanceResults(candidate, baseline) {
+  validatePerformanceResult(candidate);
+  validatePerformanceResult(baseline);
+  if (candidate.contract.digest !== baseline.contract.digest) {
+    throw new Error("Performance results use different contracts");
+  }
+  if (!Object.values(baseline.thresholds).every(Boolean)) {
+    throw new Error("A baseline with failed thresholds cannot be used for comparison");
+  }
+  const dimensions = {
+    profile: [candidate.profile.name, candidate.profile.workload, candidate.profile.target,
+      candidate.profile.environment],
+    runtime: [candidate.runtime.k6Version, candidate.runtime.operatingSystem, candidate.runtime.architecture],
+    runner: candidate.runtime.runner,
+    load: candidate.load,
+    resources: candidate.resources
+  };
+  const baselineDimensions = {
+    profile: [baseline.profile.name, baseline.profile.workload, baseline.profile.target,
+      baseline.profile.environment],
+    runtime: [baseline.runtime.k6Version, baseline.runtime.operatingSystem, baseline.runtime.architecture],
+    runner: baseline.runtime.runner,
+    load: baseline.load,
+    resources: baseline.resources
+  };
+  for (const [name, value] of Object.entries(dimensions)) {
+    if (JSON.stringify(value) !== JSON.stringify(baselineDimensions[name])) {
+      throw new Error(`Performance results use different ${name} conditions`);
+    }
+  }
+  const policy = JSON.parse(readFileSync(join(root, "performance", "regression-policy.json"), "utf8"));
+  const metricFindings = policy.metrics.flatMap((metricPolicy) => {
+    const before = metricValue(baseline.metrics, metricPolicy.name);
+    const after = metricValue(candidate.metrics, metricPolicy.name);
+    const absolute = "maximumAbsoluteChange" in metricPolicy;
+    const limit = absolute ? metricPolicy.maximumAbsoluteChange : metricPolicy.maximumRelativeChange;
+    const change = absolute
+      ? after - before
+      : metricPolicy.direction === "increase" ? (after - before) / Math.max(Math.abs(before), Number.EPSILON)
+        : (before - after) / Math.max(Math.abs(before), Number.EPSILON);
+    if (change <= limit) return [];
+    return [{
+      metric: metricPolicy.name,
+      baseline: before,
+      candidate: after,
+      change,
+      limit,
+      severity: policy.severity,
+      owner: policy.owner
+    }];
+  });
+  const thresholdFindings = Object.entries(candidate.thresholds).flatMap(([name, passed]) => passed ? [] : [{
+    metric: `thresholds.${name}`,
+    baseline: true,
+    candidate: false,
+    change: 1,
+    limit: 0,
+    severity: policy.severity,
+    owner: policy.owner
+  }]);
+  const findings = [...thresholdFindings, ...metricFindings];
+  return {
+    schemaVersion: 1,
+    baseline: baseline.build,
+    candidate: candidate.build,
+    status: findings.length === 0 ? "passed" : "regression",
+    findings
+  };
+}
+
+function metricValue(metrics, path) {
+  const value = path.split(".").reduce((current, segment) => current?.[segment], metrics);
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`Performance metric is missing: ${path}`);
+  }
+  return value;
+}
+
 function promotePerformanceBaseline(file) {
   const result = JSON.parse(readFileSync(resolve(root, file), "utf8"));
   const contractText = readFileSync(join(root, "performance", "contract.json"), "utf8");
@@ -997,6 +1088,19 @@ function promotePerformanceBaseline(file) {
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, baseline.content, { flag: "wx" });
   process.stdout.write(`Performance baseline: ${destination}\n`);
+}
+
+function comparePerformanceFiles(options) {
+  const candidate = JSON.parse(readFileSync(resolve(root, options.file), "utf8"));
+  const baseline = JSON.parse(readFileSync(resolve(root, options.baseline), "utf8"));
+  const comparison = comparePerformanceResults(candidate, baseline);
+  const destination = resolve(root, options.output);
+  mkdirSync(dirname(destination), { recursive: true });
+  writeFileSync(destination, `${JSON.stringify(comparison, null, 2)}\n`);
+  process.stdout.write(`Performance comparison: ${destination}\n`);
+  if (comparison.status === "regression") {
+    throw new Error(`Performance regression: ${comparison.findings.map(finding => finding.metric).join(", ")}`);
+  }
 }
 
 async function shareUat() {
@@ -1653,7 +1757,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

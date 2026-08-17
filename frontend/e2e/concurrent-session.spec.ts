@@ -15,9 +15,12 @@ async function login(page: Page, baseURL: string, username: string): Promise<voi
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
 }
 
-async function prepareBooking(page: Page, baseURL: string, username: string): Promise<void> {
-  await login(page, baseURL, username);
-  await page.getByTestId("week-next").click();
+async function prepareBooking(page: Page, service: JourneyService, username: string): Promise<void> {
+  await login(page, service.baseURL, username);
+  await expect(page.getByTestId("week-grid")).toBeVisible();
+  const day = page.getByTestId(`day-selector-${service.visualDate}`);
+  if (await day.count() === 0) await page.getByTestId("week-next").click();
+  await day.click();
   const slot = page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"][data-state="free"]');
   await expect(slot).toBeVisible();
   await slot.click();
@@ -35,12 +38,8 @@ async function memberContext(browser: Browser, service: JourneyService, username
 
 async function slot(service: JourneyService): Promise<{ startsAt: string; endsAt: string }> {
   const [startsAt, endsAt] = (await service.executeSql(`
-    WITH target AS (
-      SELECT DATE '${service.visualDate}' + ((8 - extract(isodow FROM DATE '${service.visualDate}'))::integer % 7) AS day
-    )
-    SELECT to_char((day + TIME '12:00') AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD"T"HH24:MI:SSOF'),
-           to_char((day + TIME '13:00') AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD"T"HH24:MI:SSOF')
-    FROM target
+    SELECT to_char((DATE '${service.visualDate}' + TIME '12:00') AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD"T"HH24:MI:SSOF'),
+           to_char((DATE '${service.visualDate}' + TIME '13:00') AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD"T"HH24:MI:SSOF')
   `)).split("|");
   return { startsAt, endsAt };
 }
@@ -119,8 +118,8 @@ test("two members receive one booking and one actionable conflict for the same s
   const firstPage = await first.newPage();
   const secondPage = await second.newPage();
   await Promise.all([
-    prepareBooking(firstPage, journeyService.baseURL, "roe.jane"),
-    prepareBooking(secondPage, journeyService.baseURL, "keeper.roe")
+    prepareBooking(firstPage, journeyService, "roe.jane"),
+    prepareBooking(secondPage, journeyService, "keeper.roe")
   ]);
   let arrivals = 0;
   let release!: () => void;
@@ -187,7 +186,7 @@ test("duplicate browser delivery with one idempotency key creates one logical bo
 
 test("a court and a member role changed behind an open dialog fail closed", async ({ page, journeyService }) => {
   // given
-  await prepareBooking(page, journeyService.baseURL, "doe.jane");
+  await prepareBooking(page, journeyService, "doe.jane");
   await journeyService.executeSql(`UPDATE court SET active = false WHERE id = '${courtTwo}'`);
 
   // when
@@ -355,7 +354,7 @@ test("logout invalidates every tab and browser history reveals no personal view"
 
 test("an expired session rejects a mutation from an open dialog", async ({ page, journeyService }) => {
   // given
-  await prepareBooking(page, journeyService.baseURL, "doe.jane");
+  await prepareBooking(page, journeyService, "doe.jane");
   await journeyService.executeSql("UPDATE spring_session SET last_access_time = 0, max_inactive_interval = 1, expiry_time = 1");
 
   // when

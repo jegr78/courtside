@@ -1,4 +1,4 @@
-import { expect, test as base } from "@playwright/test";
+import { expect, test as base, type Page } from "@playwright/test";
 import { startJourneyService, type JourneyService } from "./global-setup";
 
 interface WorkerFixtures {
@@ -25,5 +25,12 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await provide();
   }, { auto: true }]
 });
+
+export async function selectJourneyDate(page: Page, visualDate: string): Promise<void> {
+  await expect(page.getByTestId("week-grid")).toBeVisible();
+  const day = page.getByTestId(`day-selector-${visualDate}`);
+  if (await day.count() === 0) await page.getByTestId("week-next").click();
+  await day.click();
+}
 
 export { expect };

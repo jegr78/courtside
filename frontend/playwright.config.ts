@@ -11,9 +11,11 @@ const periodicProjects = process.env.COURTSIDE_PERIODIC_BROWSERS === "true" ? [
 
 export default defineConfig({
   testDir: "./e2e",
+  snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,
+  expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.005 } },
   use: {
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

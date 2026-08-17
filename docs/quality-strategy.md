@@ -113,7 +113,14 @@ Each row is deliberately about a material invariant rather than an individual te
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | UI-1 | P1 | Medium | Core public, member and administration journeys are keyboard-operable and meet automatable WCAG 2.2 AA requirements. | German and English journeys remain operable by keyboard with correct dialog and focus behaviour. | Error states, zoom and user preferences introduce no automatable WCAG 2.2 AA violation or focus loss. | React, E2E, manual | PR, release | Browser matrix | Stable accessible fixtures | Axe, journey trace and release checklist | Frontend | Full automation and manual evidence are tracked by #216. |
 | UI-2 | P0 | Low | PWA caching and browser history never serve personal API data after logout, expiry or offline transition. | Install, update, offline shell and reconnect preserve public application availability. | Logout, expiry, Back or Forward, old assets and multiple tabs cannot reveal cached personal API data. | React, E2E, deployment smoke | PR, nightly, release | Chromium, WebKit and periodic Firefox/mobile matrix | Synthetic member sessions | Browser traces, cache inspection and linked device record | Frontend and identity | Physical-device evidence remains manual because emulation cannot prove operating-system integration. |
-| UI-3 | P2 | Medium | Layout, localization and interaction remain usable at supported viewports and content extremes. | Supported mobile, tablet and desktop layouts work in both themes and locales. | Long content and empty, single or many-court states do not hide or block interaction. | React, E2E | PR, periodic | Chromium plus supported matrix | Deterministic visual dataset | Semantic assertions and reviewed visual evidence | Frontend | Pixel and performance regression gates are tracked by #224. |
+| UI-3 | P2 | Medium | Layout, localization and interaction remain usable at supported viewports and content extremes. | Supported mobile, tablet and desktop layouts work in both themes and locales. | Long content and empty, single or many-court states do not hide or block interaction. | React, E2E | PR, periodic | Chromium plus supported matrix | Deterministic visual dataset | Semantic assertions and reviewed pixel baselines | Frontend | Broad locale, theme and viewport captures remain diagnostic; seven principal surfaces have blocking stable baselines. |
+
+The blocking Chromium pixel suite fixes locale, theme, viewport, journey data, fonts, animations,
+caret rendering, and dynamic-field masks. It covers the court plan, booking and validation dialogs,
+personal bookings, series preview, and both administration surfaces. A deliberate UI change updates
+these files with `npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots`;
+the pull request must expose the changed PNG baselines for review. Unreviewed
+dimension-only screenshots remain diagnostic artifacts and never replace these assertions.
 
 ### Operations and release
 

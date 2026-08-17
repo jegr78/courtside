@@ -9,7 +9,7 @@ import {
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   processPlans, requiredPorts, restoreDatabase, startProcesses, superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
-  writePrivateFile, performanceRunPlan, buildPerformanceResult, performanceBaselinePlan,
+  writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
   resolvePublicFunnelAddresses, uatStartupSummary, validateNode, validatePublicAddress
 } from "./courtside.mjs";
@@ -597,6 +597,76 @@ test("given a failed or stale result, when planning baseline promotion, then it 
   // when / then
   assert.throws(() => performanceBaselinePlan(failed, failed.contract.digest), /thresholds/);
   assert.throws(() => performanceBaselinePlan(stale, `sha256:${"b".repeat(64)}`), /contract/);
+});
+
+test("given comparable results, when latency or throughput exceeds the policy, then owned findings are reported", () => {
+  // given
+  const baseline = passingPerformanceResult();
+  const candidate = structuredClone(baseline);
+  candidate.build = { applicationVersion: "1.2.4", gitCommit: "bcdef01" };
+  candidate.metrics.latencyMilliseconds.p95 = 36;
+  candidate.metrics.throughputPerSecond = 4.4;
+
+  // when
+  const comparison = comparePerformanceResults(candidate, baseline);
+
+  // then
+  assert.equal(comparison.status, "regression");
+  assert.deepEqual(comparison.findings.map(({ metric, severity, owner }) => ({ metric, severity, owner })), [
+    { metric: "latencyMilliseconds.p95", severity: "high", owner: "Performance maintainer" },
+    { metric: "throughputPerSecond", severity: "high", owner: "Performance maintainer" }
+  ]);
+  assert.doesNotMatch(JSON.stringify(comparison), /startedAt|target|environment/);
+});
+
+test("given results from different execution conditions, when comparing them, then comparison fails closed", () => {
+  // given
+  const baseline = passingPerformanceResult();
+  const candidate = structuredClone(baseline);
+  candidate.runtime.runner.processorCount = 8;
+
+  // when / then
+  assert.throws(() => comparePerformanceResults(candidate, baseline), /runner/);
+});
+
+test("given a stale or failed baseline, when comparing a candidate, then it cannot hide a regression", () => {
+  // given
+  const candidate = passingPerformanceResult();
+  const stale = structuredClone(candidate);
+  stale.contract.digest = `sha256:${"b".repeat(64)}`;
+  const failed = structuredClone(candidate);
+  failed.thresholds.booking = false;
+
+  // when / then
+  assert.throws(() => comparePerformanceResults(candidate, stale), /contract/);
+  assert.throws(() => comparePerformanceResults(candidate, failed), /thresholds/);
+});
+
+test("given a candidate with a failed contract threshold, when comparing it, then the result is a regression", () => {
+  // given
+  const baseline = passingPerformanceResult();
+  const candidate = structuredClone(baseline);
+  candidate.thresholds.booking = false;
+
+  // when
+  const comparison = comparePerformanceResults(candidate, baseline);
+
+  // then
+  assert.equal(comparison.status, "regression");
+  assert.equal(comparison.findings[0].metric, "thresholds.booking");
+});
+
+test("given performance evidence files, when parsing comparison, then baseline and output are explicit", () => {
+  // when
+  const options = parseArguments([
+    "perf-compare", "build/performance/candidate.json", "--baseline", "performance/baselines/baseline/reference.json",
+    "--output", "build/performance/comparison.json"
+  ]);
+
+  // then
+  assert.equal(options.file, "build/performance/candidate.json");
+  assert.equal(options.baseline, "performance/baselines/baseline/reference.json");
+  assert.equal(options.output, "build/performance/comparison.json");
 });
 
 test("given an existing credential file, when rewriting it on POSIX, then owner-only mode is restored", () => {

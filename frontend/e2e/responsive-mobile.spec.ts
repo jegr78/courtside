@@ -11,7 +11,7 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.getByTestId("login-submit").click();
 }
 
-test("member and administration surfaces remain usable on a touch viewport", async ({ page }) => {
+test("member and administration surfaces remain usable on a touch viewport", async ({ page, journeyService }) => {
   // given
   await signIn(page, "doe.jane");
 
@@ -24,7 +24,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
 
   // when
   await page.getByTestId("court-plan-link").tap();
-  await page.getByTestId("week-next").tap();
+  await page.getByTestId("selected-date").fill(journeyService.visualDate);
   await page.getByTestId("court-selector-2").tap();
   await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
 
