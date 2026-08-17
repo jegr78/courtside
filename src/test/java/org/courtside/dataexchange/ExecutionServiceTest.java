@@ -245,6 +245,67 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         assertThat(previews.read(previewId).changeSet()).isNull();
     }
 
+    @Test
+    void givenARowWhoseOwnedNameCellIsEmpty_whenPreviewing_thenItFailsThatRowRatherThanTheRun() {
+        // when
+        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
+                """
+                Member number,First name,Last name,Email
+                4711,,Doe,jane.doe@example.org
+                4712,John,Roe,john.roe@example.org
+                """.getBytes(StandardCharsets.UTF_8), actor);
+
+        // then
+        assertThat(summary.changeSet().errors()).singleElement().satisfies(error -> {
+            assertThat(error.code()).isEqualTo("import.snapshot.row.valueUnusable");
+            assertThat(error.params()).containsEntry("canonicalField", "FIRST_NAME");
+        });
+        assertThat(executions.execute(summary.previewId(), false, actor).created()).isEqualTo(1);
+    }
+
+    @Test
+    void givenARowWhoseAddressIsNotOne_whenPreviewing_thenItFailsThatRow() {
+        // when
+        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
+                """
+                Member number,First name,Last name,Email
+                4711,Jane,Doe,not-an-address
+                """.getBytes(StandardCharsets.UTF_8), actor);
+
+        // then
+        assertThat(summary.changeSet().errors()).singleElement()
+                .satisfies(error -> assertThat(error.params())
+                        .containsEntry("canonicalField", "EMAIL"));
+        assertThat(summary.changeSet().changes()).isEmpty();
+    }
+
+    @Test
+    void givenAMemberNumberLinkedAfterThePreview_whenExecuting_thenNoSecondRecordIsCreated() {
+        // given
+        UUID previewId = preview(TWO_MEMBERS, SnapshotMode.FULL_SNAPSHOT);
+        UUID somebody = persons.save(new Person("Jane", "Doe", "jane.doe@example.org")).getId();
+        references.link(source, "4711", somebody);
+        long peopleBefore = persons.count();
+
+        // when / then
+        assertThatThrownBy(() -> executions.execute(previewId, false, actor))
+                .isInstanceOf(ImportPreviewStaleException.class);
+        assertThat(persons.count()).isEqualTo(peopleBefore);
+    }
+
+    @Test
+    void givenASourceThatHasRun_whenItsReferencesAreGoneAndItIsDeleted_thenItIsStillRefused() {
+        // given
+        executions.execute(preview(TWO_MEMBERS, SnapshotMode.FULL_SNAPSHOT), false, actor);
+        references.unlink(source, "4711");
+        references.unlink(source, "4712");
+
+        // when / then
+        assertThatThrownBy(() -> sources.delete(source))
+                .isInstanceOf(ImportSourceInUseException.class);
+        assertThat(executions.runsOf(source)).hasSize(1);
+    }
+
     private UUID preview(String content, SnapshotMode mode) {
         return previews.create(source, mode, "roster.csv",
                 content.getBytes(StandardCharsets.UTF_8), actor).previewId();

@@ -71,7 +71,7 @@ public class RosterService {
     public RosterEntry createPerson(String firstName, String lastName, String email) {
         Person person = new Person(strippedNonBlank(firstName, "first name"),
                 strippedNonBlank(lastName, "last name"),
-                strippedNonBlank(email, "email address"));
+                strippedAddress(email));
         return toEntry(persons.save(person), null, null);
     }
 
@@ -80,7 +80,7 @@ public class RosterService {
         UUID id = requiredPersonId(personId);
         String first = strippedNonBlank(firstName, "first name");
         String last = strippedNonBlank(lastName, "last name");
-        String address = strippedNonBlank(email, "email address");
+        String address = strippedAddress(email);
         Person person = persons.findById(id)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
         person.rename(first, last);
@@ -316,8 +316,19 @@ public class RosterService {
 
     private static String strippedNonBlank(String value, String what) {
         String stripped = value == null ? "" : PersonText.stripped(value);
-        if (stripped.isEmpty()) {
-            throw new IllegalStateException("A person's " + what + " must not be blank");
+        if (!PersonFieldLimits.isUsableName(stripped)) {
+            throw new IllegalStateException("A person's " + what
+                    + " must not be blank, hold a line break or exceed "
+                    + PersonFieldLimits.MAX_NAME_LENGTH + " characters");
+        }
+        return stripped;
+    }
+
+    private static String strippedAddress(String value) {
+        String stripped = value == null ? "" : PersonText.stripped(value);
+        if (!PersonFieldLimits.isUsableEmail(stripped)) {
+            throw new IllegalStateException("A person's email address must be a usable address of "
+                    + "at most " + PersonFieldLimits.MAX_EMAIL_LENGTH + " characters");
         }
         return stripped;
     }

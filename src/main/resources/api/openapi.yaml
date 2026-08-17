@@ -726,7 +726,11 @@ components:
         rowNumber: { type: integer }
         code:
           type: string
-          description: An i18n key; the client renders it. The row is skipped, the file is not.
+          description: |
+            An i18n key; the client renders it. The row is skipped, the file is not. A row is also
+            reported here when it carries a value this instance cannot store — empty, holding a line
+            break, too long, or not a usable address — so a preview never promises a change that the
+            execution would then refuse.
         params:
           type: object
           additionalProperties: true
@@ -3231,6 +3235,10 @@ paths:
         those references say where people in the roster came from, and dropping them silently would
         make the next snapshot from that system create every one of them again as a new person.
         Unlink them first, and the description can go.
+
+        A source that has been executed against is refused for good. Its run log says what was
+        written to this club's roster and when, which is history rather than configuration — the way
+        to stop using such a source is to stop uploading to it.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -3472,7 +3480,9 @@ paths:
         nothing is re-read from the file, so a roster that moved between the preview and this
         request cannot be written over by a change set that no longer describes it — if anybody the
         preview would touch has changed since it was taken, the run is refused and nothing is
-        written.
+        written. That covers creations too: a member number the preview would create, and which
+        somebody has linked in the meantime, refuses the run rather than adding a second record for
+        a person the roster now holds.
 
         The whole run is one transaction. A change set whose last row fails leaves nothing behind:
         not a person, not a membership, not a reference.

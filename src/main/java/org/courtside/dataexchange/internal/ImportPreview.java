@@ -93,7 +93,6 @@ public class ImportPreview {
     public void forget() {
         this.changeSet = null;
         this.fingerprints = null;
-        this.rawContent = null;
     }
 
     public void supersedeOn(Instant supersededAt) {

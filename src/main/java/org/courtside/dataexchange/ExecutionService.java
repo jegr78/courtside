@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Function;
@@ -54,8 +55,10 @@ public class ExecutionService {
 
     @Transactional
     public RunOutcome execute(UUID previewId, boolean confirmRemovals, UUID accountId) {
+        // Under the lock before anything is read from it: the checks below must see the state the
+        // run will write against, not the one a competing run was about to change.
+        sourceLock.acquire(require(previewId).getSourceId());
         ImportPreview preview = require(previewId);
-        sourceLock.acquire(preview.getSourceId());
         Instant now = clock.instant();
         requireExecutable(preview, now);
         PreviewContent content = contentOf(preview);
@@ -97,20 +100,40 @@ public class ExecutionService {
 
     private void requireNobodyChangedSince(ImportPreview preview, PreviewContent content) {
         Map<String, String> taken = fingerprintsTakenWith(preview);
-        Map<UUID, String> now = fingerprintsOf(affectedPersonIdsOf(content));
+        List<UUID> affected = affectedPersonIdsOf(content);
+        Map<UUID, String> now = fingerprintsOf(affected);
         TreeSet<String> changed = new TreeSet<>();
-        now.forEach((personId, fingerprint) -> {
+        affected.forEach(personId -> {
             String before = taken.get(personId.toString());
-            if (before == null || !before.equals(fingerprint)) {
+            String current = now.get(personId);
+            if (current == null || before == null || !before.equals(current)) {
                 changed.add(personId.toString());
             }
         });
-        affectedPersonIdsOf(content).stream()
-                .filter(personId -> !now.containsKey(personId))
-                .forEach(personId -> changed.add(personId.toString()));
         if (!changed.isEmpty()) {
             throw new ImportPreviewStaleException("import.preview.stale",
                     Map.of("personIds", List.copyOf(changed)));
+        }
+        requireEveryCreationStillUnclaimed(preview, content);
+    }
+
+    // A creation carries no person id, so the fingerprint check above cannot see it; what changes
+    // under it is the reference somebody linked while the preview sat waiting.
+    private void requireEveryCreationStillUnclaimed(ImportPreview preview, PreviewContent content) {
+        Set<String> creations = content.changeSet().changes().stream()
+                .filter(change -> change.kind() == ResolvedChangeSet.ChangeKind.CREATE)
+                .map(ResolvedChangeSet.PersonChange::externalId)
+                .collect(Collectors.toSet());
+        if (creations.isEmpty()) {
+            return;
+        }
+        TreeSet<String> claimed = references
+                .findBySourceIdAndExternalIdIn(preview.getSourceId(), creations).stream()
+                .map(ExternalReference::getExternalId)
+                .collect(Collectors.toCollection(TreeSet::new));
+        if (!claimed.isEmpty()) {
+            throw new ImportPreviewStaleException("import.preview.externalIdClaimed",
+                    Map.of("externalIds", List.copyOf(claimed)));
         }
     }
 

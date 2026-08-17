@@ -3,6 +3,7 @@ package org.courtside.dataexchange;
 import lombok.RequiredArgsConstructor;
 import org.courtside.dataexchange.internal.ExternalReferenceRepository;
 import org.courtside.dataexchange.internal.ImportSource;
+import org.courtside.dataexchange.internal.ImportRunRepository;
 import org.courtside.dataexchange.internal.ImportSourceRepository;
 import org.courtside.member.MemberService;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -35,6 +36,7 @@ public class ImportSourceService {
 
     private final ImportSourceRepository sources;
     private final ExternalReferenceRepository references;
+    private final ImportRunRepository runs;
     private final MemberService memberships;
     private final Clock clock;
 
@@ -99,6 +101,10 @@ public class ImportSourceService {
         if (references.existsBySourceId(source.getId())) {
             throw new ImportSourceInUseException(
                     "Import source " + source.getId() + " still holds external references");
+        }
+        if (runs.existsBySourceId(source.getId())) {
+            throw new ImportSourceInUseException(
+                    "Import source " + source.getId() + " has been executed against");
         }
         sources.delete(source);
     }

@@ -160,10 +160,11 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
         padded.put("  Member number  ", EXTERNAL_ID);
         padded.put("First name", FIRST_NAME);
         padded.put("Last name", LAST_NAME);
+        padded.put("  Email  ", EMAIL);
 
         // when
         SourceConfiguration configuration = sources.create("roster-system", "  Membership system  ",
-                padded, Map.of("  A  ", ACTIVE_TYPE), Set.of(), 10);
+                padded, Map.of("  A  ", ACTIVE_TYPE), ACTIVE_TYPE, Set.of(), 10);
 
         // then
         assertThat(configuration.columns()).containsKey("Member number");
@@ -179,7 +180,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", blank,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columns.headerUnusable");
     }
@@ -188,7 +189,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
     void givenASourceKeyLongerThanTheContractAllows_whenCreatingASource_thenItIsRefused() {
         // when / then
         assertThatThrownBy(() -> sources.create("k".repeat(41), "Membership system", columns(),
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.sourceKey.tooLong");
     }
@@ -201,7 +202,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", tooLong,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columns.headerUnusable");
     }

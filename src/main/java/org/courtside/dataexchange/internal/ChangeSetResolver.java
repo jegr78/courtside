@@ -4,6 +4,7 @@ import org.courtside.dataexchange.CanonicalField;
 import org.courtside.dataexchange.ResolvedChangeSet;
 import org.courtside.dataexchange.SnapshotMode;
 import org.courtside.dataexchange.SourceConfiguration;
+import org.courtside.member.PersonFieldLimits;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -31,12 +32,13 @@ public final class ChangeSetResolver {
         for (CsvSnapshot.SnapshotRow row : snapshot.rows()) {
             present.add(row.externalId());
             UUID personId = roster.personIdsByExternalId().get(row.externalId());
+            ResolvedChangeSet.RowError unusable =
+                    unusableValueOf(row, configuration, personId == null);
+            if (unusable != null) {
+                rowErrors.add(unusable);
+                continue;
+            }
             if (personId == null) {
-                if (hasNoAddress(row)) {
-                    rowErrors.add(new ResolvedChangeSet.RowError(row.rowNumber(),
-                            "import.snapshot.row.emailMissing", Map.of()));
-                    continue;
-                }
                 changes.add(creationOf(row, configuration));
                 duplicateOf(row, roster).ifPresent(duplicates::add);
             } else {
@@ -190,9 +192,26 @@ public final class ChangeSetResolver {
                 .toList();
     }
 
-    private static boolean hasNoAddress(CsvSnapshot.SnapshotRow row) {
-        String email = row.values().get(CanonicalField.EMAIL);
-        return email == null || email.isBlank();
+    // A creation writes every field; an update writes only what the source owns, so a value this
+    // source would never write cannot stop the row.
+    private static ResolvedChangeSet.RowError unusableValueOf(CsvSnapshot.SnapshotRow row,
+                                                              SourceConfiguration configuration,
+                                                              boolean creation) {
+        for (CanonicalField field : List.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME,
+                CanonicalField.EMAIL)) {
+            if (!creation && !configuration.ownedFields().contains(field)) {
+                continue;
+            }
+            String value = row.values().get(field);
+            boolean usable = field == CanonicalField.EMAIL
+                    ? PersonFieldLimits.isUsableEmail(value)
+                    : PersonFieldLimits.isUsableName(value);
+            if (!usable) {
+                return new ResolvedChangeSet.RowError(row.rowNumber(),
+                        "import.snapshot.row.valueUnusable", Map.of("canonicalField", field.name()));
+            }
+        }
+        return null;
     }
 
     private static String nullSafe(String value) {
