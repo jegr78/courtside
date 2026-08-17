@@ -30,11 +30,11 @@ Built and covered by tests: the booking core including the exclusion constraint,
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
 courts, accounts, roles and session login, club configuration and branding, the roster — the club's
 people, the account and roles a person holds, the membership they hold, correcting a username and
-resetting a password — and the admin surface for all of it. `/actuator/health` is exposed. The OpenAPI document is the source of truth: every
-controller implements an interface generated from it, and an instance serves the document it
-actually answers to at `GET /api/openapi.yaml`. A tagged release builds a multi-arch container
-image, publishes it to GHCR signed with cosign and carrying an SBOM attestation, and attaches the
-OpenAPI document to the release.
+resetting a password — and the admin surface for all of it. `/actuator/health` is exposed. The
+OpenAPI document is the source of truth: every controller implements an interface generated from
+it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
+tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
+carrying an SBOM attestation, and attaches the OpenAPI document to the release.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers, and the browser admin surface for
