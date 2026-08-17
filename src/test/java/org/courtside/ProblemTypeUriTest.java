@@ -66,6 +66,7 @@ class ProblemTypeUriTest {
 
     private static final List<String> KNOWN_ADVICE_SLUGS = List.of(
             "urn:courtside:error:access-denied",
+            "urn:courtside:error:concurrent-modification",
             "urn:courtside:error:constraint-violation",
             "urn:courtside:error:malformed-request-body",
             "urn:courtside:error:method-not-supported",

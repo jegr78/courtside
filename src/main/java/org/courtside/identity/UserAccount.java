@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -52,6 +53,10 @@ public class UserAccount {
 
     @Column(name = "security_epoch", nullable = false)
     private long securityEpoch;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_account_role",

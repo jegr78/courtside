@@ -12,7 +12,7 @@ interface PasswordRehashRepository extends Repository<UserAccount, UUID> {
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
-            UPDATE UserAccount account
+            UPDATE VERSIONED UserAccount account
             SET account.passwordHash = :newHash
             WHERE account.id = :id AND account.passwordHash = :currentHash
             """)

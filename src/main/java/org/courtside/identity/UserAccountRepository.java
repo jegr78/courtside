@@ -17,7 +17,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
-            UPDATE UserAccount account
+            UPDATE VERSIONED UserAccount account
             SET account.passwordHash = :passwordHash,
                 account.passwordChangeRequired = false,
                 account.securityEpoch = account.securityEpoch + 1
