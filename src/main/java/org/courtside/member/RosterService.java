@@ -7,6 +7,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.AccountNotFoundException;
+import org.courtside.member.internal.AdministratorLock;
+import org.courtside.member.internal.LastAdministratorException;
 import org.courtside.member.internal.PersonAccountExistsException;
 import org.courtside.member.internal.PersonNotFoundException;
 import org.courtside.member.internal.PersonText;
@@ -46,6 +48,7 @@ public class RosterService {
     private final UserAccountRepository accounts;
     private final MemberRepository members;
     private final MemberService memberships;
+    private final AdministratorLock administrators;
     private final PasswordEncoder passwordEncoder;
 
     public CursorPage.Result<RosterEntry> list(String query, UUID cursor, int limit) {
@@ -101,7 +104,11 @@ public class RosterService {
     public RosterEntry changeRoles(UUID personId, Set<Role> roles) {
         UUID id = requiredPersonId(personId);
         Set<Role> requested = requiredRoles(roles);
-        requireAccount(id).changeRoles(requested);
+        UserAccount account = requireAccount(id);
+        if (!requested.contains(Role.ADMIN)) {
+            requireASuccessorAdministrator(account);
+        }
+        account.changeRoles(requested);
         return load(List.of(id)).getFirst();
     }
 
@@ -130,6 +137,7 @@ public class RosterService {
         if (enabled) {
             account.enable();
         } else {
+            requireASuccessorAdministrator(account);
             account.disable();
         }
         return load(List.of(id)).getFirst();
@@ -154,6 +162,18 @@ public class RosterService {
             members.delete(member);
             revokeSessionsOf(id);
         });
+    }
+
+    // An officer may step down and a board may demote a former one; what must not succeed is the
+    // write that leaves nobody able to administer the instance.
+    private void requireASuccessorAdministrator(UserAccount account) {
+        if (!account.isEnabled() || !account.getRoles().contains(Role.ADMIN)) {
+            return;
+        }
+        administrators.acquire();
+        if (accounts.countEnabledHoldingRoleExcept(Role.ADMIN, account.getId()) == 0) {
+            throw new LastAdministratorException("roster.lastAdministrator", Map.of());
+        }
     }
 
     private boolean writeMembership(UUID personId, UUID membershipTypeId) {

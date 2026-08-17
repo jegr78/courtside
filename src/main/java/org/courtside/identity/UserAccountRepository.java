@@ -29,4 +29,12 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
     Optional<Long> findSecurityEpochById(@Param("id") UUID id);
 
     List<UserAccount> findByPersonIdIn(List<UUID> personIds);
+
+    @Query("""
+            SELECT count(account) FROM UserAccount account
+            JOIN account.roles role
+            WHERE role = :role AND account.enabled = true AND account.id <> :excludedAccountId
+            """)
+    long countEnabledHoldingRoleExcept(@Param("role") Role role,
+                                       @Param("excludedAccountId") UUID excludedAccountId);
 }

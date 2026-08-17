@@ -622,6 +622,101 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenTheOnlyEnabledAdministrator_whenTheRoleIsTakenFromThem_thenTheInstanceKeepsIt()
+            throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UserAccount account = enabledAccount(jane, "doe.jane", Role.ADMIN);
+
+        // when
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roles": ["MEMBER"]}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:last-administrator"))
+                .andExpect(jsonPath("$.violations[0].code").value("roster.lastAdministrator"));
+
+        // then
+        assertThat(accounts.findById(account.getId())).get()
+                .satisfies(stored -> assertThat(stored.getRoles()).contains(Role.ADMIN));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenTheOnlyEnabledAdministrator_whenTheirAccountIsDisabled_thenTheInstanceKeepsThem()
+            throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UserAccount account = enabledAccount(jane, "doe.jane", Role.ADMIN);
+
+        // when
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/active", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active": false}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:last-administrator"))
+                .andExpect(jsonPath("$.violations[0].code").value("roster.lastAdministrator"));
+
+        // then
+        assertThat(accounts.findById(account.getId())).get()
+                .satisfies(stored -> assertThat(stored.isEnabled()).isTrue());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenASecondEnabledAdministrator_whenOneStepsDown_thenTheChangeStands() throws Exception {
+        // given — an officer may hand the role over, which is why the rule is about the last one
+        // and not about the account making the request
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UserAccount stepping = enabledAccount(jane, "doe.jane", Role.ADMIN);
+        enabledAccount(mary, "major.mary", Role.ADMIN);
+
+        // when
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roles": ["MEMBER"]}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roles[0]").value("MEMBER"))
+                .andExpect(jsonPath("$.roles.length()").value(1));
+
+        // then
+        assertThat(accounts.findById(stepping.getId())).get()
+                .satisfies(stored -> assertThat(stored.getRoles()).containsExactly(Role.MEMBER));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenADisabledSecondAdministrator_whenTheEnabledOneStepsDown_thenTheInstanceKeepsThem()
+            throws Exception {
+        // given — a disabled account cannot sign in, so it is no successor
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        enabledAccount(jane, "doe.jane", Role.ADMIN);
+        accounts.save(new UserAccount(mary, "major.mary", "hash", Set.of(Role.ADMIN)));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roles": ["MEMBER"]}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:last-administrator"));
+    }
+
+    @Test
     @WithMockUser(username = "member", roles = "MEMBER")
     void givenAMemberSession_whenCreatingAnAccount_thenItIsDenied() throws Exception {
         // given
@@ -1121,6 +1216,12 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 : """
                 {"membershipTypeId": "%s"}
                 """.formatted(membershipTypeId);
+    }
+
+    private UserAccount enabledAccount(Person person, String username, Role... roles) {
+        UserAccount account = new UserAccount(person, username, "hash", Set.of(roles));
+        account.enable();
+        return accounts.save(account);
     }
 
     private static String usernameBody(String username) {

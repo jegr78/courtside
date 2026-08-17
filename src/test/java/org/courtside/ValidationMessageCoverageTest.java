@@ -33,7 +33,7 @@ class ValidationMessageCoverageTest {
             List.of("ParticipantsInvalidException", "InvalidOpeningWindowException",
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
                     "MembershipTypeRuleSetInactiveException", "MembershipTypeInactiveException",
-                    "RosterCursorUnknownException");
+                    "RosterCursorUnknownException", "LastAdministratorException");
 
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
             List.of("CodedDomainFailure", "InvalidOpeningWindowException");

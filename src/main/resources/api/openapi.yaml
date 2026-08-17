@@ -2421,6 +2421,11 @@ paths:
         The roles sent replace the ones the account holds. Removing one ends that account's
         sessions: a session carries the roles it was signed in with, so a demotion that waits for
         the session to expire is not a demotion. Adding one ends nothing.
+
+        `ADMIN` may be taken from an account once another enabled account holds it, so an officer
+        can step down and a board can demote a former one. Taking it from the last enabled account
+        that holds it is answered `409`, because the instance would then have nobody who could
+        give it back.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2448,6 +2453,11 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: The instance would be left without an enabled administrator.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 
   /api/admin/roster/{personId}/account/username:
     put:
@@ -2546,6 +2556,9 @@ paths:
       description: |
         Disabling ends the account's sessions and refuses its next request; the person, their
         membership and their bookings are untouched. Enabling ends nothing.
+
+        Disabling the last enabled account holding `ADMIN` is answered `409`, for the reason
+        `PUT .../account/roles` gives.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2573,6 +2586,11 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: The instance would be left without an enabled administrator.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 
   /api/admin/roster/{personId}/membership:
     put:

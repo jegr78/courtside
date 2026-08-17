@@ -41,6 +41,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:court-number-taken",
             "urn:courtside:error:court-unavailable",
             "urn:courtside:error:invalid-opening-window",
+            "urn:courtside:error:last-administrator",
             "urn:courtside:error:idempotency-key-reused",
             "urn:courtside:error:login-rate-limited",
             "urn:courtside:error:opening-hours-grid-mismatch",
