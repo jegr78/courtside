@@ -975,7 +975,10 @@ components:
 
     MoveRequest:
       type: object
-      description: A move must change at least one of the time, the duration or the courts.
+      description: |
+        A move is not a date-shift operation: each occurrence keeps its original local date. The
+        supplied target defines its time of day, duration and courts, and must change at least one
+        of them.
       required: [fromBookingId, scope]
       properties:
         fromBookingId: { type: string, format: uuid }
@@ -1630,7 +1633,8 @@ paths:
       summary: Where a move would land, and what would block it.
       description: |
         Available to the creator, an administrator, or an account currently allowed by the
-        booking card. Authorization uses the card's current configuration.
+        booking card. Authorization uses the card's current configuration. Each occurrence keeps
+        its original local date; the request defines its target time of day, duration and courts.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -1646,7 +1650,7 @@ paths:
             schema: { $ref: "#/components/schemas/MoveRequest" }
       responses:
         "200":
-          description: One entry per occurrence the scope covers.
+          description: One entry per covered occurrence, retaining its original local date.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MovePreview" }
@@ -1666,7 +1670,9 @@ paths:
       summary: Move occurrences of a series.
       description: |
         All or nothing — if any occurrence cannot move, none does. The creator, an administrator,
-        or an account currently allowed by the booking card may move the occurrences.
+        or an account currently allowed by the booking card may move the occurrences. Each one
+        keeps its original local date; the request defines its target time of day, duration and
+        courts.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -1682,7 +1688,7 @@ paths:
             schema: { $ref: "#/components/schemas/MoveRequest" }
       responses:
         "200":
-          description: Moved.
+          description: Moved while retaining every occurrence's original local date.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MoveExecuted" }
