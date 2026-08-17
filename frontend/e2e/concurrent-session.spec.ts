@@ -335,7 +335,11 @@ test("logout invalidates every tab and browser history reveals no personal view"
   await expect(second.getByTestId("my-bookings-page")).toBeVisible();
 
   // when
-  await first.getByTestId("logout").click();
+  await Promise.all([
+    first.waitForResponse((response) =>
+      response.url().endsWith("/api/session/logout") && response.request().method() === "POST"),
+    first.getByTestId("logout").click()
+  ]);
   await second.goto(`${journeyService.baseURL}/courts`);
   await second.goBack();
 
