@@ -37,6 +37,28 @@ export function selectRepositoryDigest(repository, originTag, repoDigests) {
   return matches[0];
 }
 
+export function unexplainedChanges(before, after) {
+  return changesUnder(before, after, "");
+}
+
+function changesUnder(before, after, path) {
+  const here = path || "the whole proof";
+  if (Array.isArray(before)) {
+    if (!Array.isArray(after)) return [here];
+    if (after.length !== before.length) {
+      return [`${here}: ${before.length} rows before, ${after.length} after`];
+    }
+    return before.flatMap((row, index) => changesUnder(row, after[index], `${here}[${index}]`));
+  }
+  if (before !== null && typeof before === "object") {
+    if (after === null || typeof after !== "object" || Array.isArray(after)) return [here];
+    return Object.keys(before).flatMap((key) => Object.hasOwn(after, key)
+      ? changesUnder(before[key], after[key], path ? `${path}.${key}` : key)
+      : [path ? `${path}.${key}` : key]);
+  }
+  return before === after ? [] : [here];
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
@@ -263,7 +285,8 @@ async function executeUpgrade() {
       input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
     }).stdout.trim();
     writeFileSync(join(build, "after.json"), `${after}\n`);
-    assert.equal(after, before, "unexplained data or count change after migration");
+    assert.deepEqual(unexplainedChanges(JSON.parse(before), JSON.parse(after)), [],
+      "unexplained data or count change after migration");
     const version = psql(project, candidateEnvironment,
       ["-Atc", "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1"]).stdout.trim();
     writeFileSync(join(build, "migration-version.txt"), `${version}\n`);
