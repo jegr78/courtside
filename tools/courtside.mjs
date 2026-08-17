@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, X509Certificate } from "node:crypto";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { request as httpRequest } from "node:http";
@@ -8,7 +8,7 @@ import { request as httpsRequest } from "node:https";
 import { BlockList, createConnection, createServer, isIP } from "node:net";
 import { availableParallelism, totalmem } from "node:os";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
@@ -1246,12 +1246,10 @@ function extractApplicationLayers() {
   const layers = join(root, "build", "layers");
   rmSync(layers, { recursive: true, force: true });
   mkdirSync(layers, { recursive: true });
-  const java = process.env.JAVA_HOME
-    ? join(process.env.JAVA_HOME, "bin", process.platform === "win32" ? "java.exe" : "java")
-    : "java";
   runInteractive({
-    command: java,
-    args: ["-Djarmode=tools", "-jar", join("target", jar), "extract", "--layers", "--launcher", "--destination", layers]
+    command: "java",
+    args: ["-Djarmode=tools", "-jar", join("target", jar), "extract", "--layers", "--launcher", "--destination", layers],
+    environment: javaEnvironment()
   });
 }
 
@@ -1298,17 +1296,27 @@ function backupTimestamp() {
 
 function restoreUat(file) {
   const source = resolve(root, file);
-  if (!existsSync(source)) throw new Error(`Backup does not exist: ${source}`);
   const state = readUatState();
   const environment = { ...process.env, COURTSIDE_UAT_IMAGE: state.image, COURTSIDE_UAT_ADMIN_PASSWORD: "" };
   const composeArgs = uatComposeArgs(state.dbPort);
-  const input = openSync(source, "r");
+  const input = openBackupForRestore(source);
   try {
     restoreDatabase(input, composeArgs, environment);
   } finally {
     closeSync(input);
   }
   process.stdout.write(`Backup restored from ${source}\n`);
+}
+
+export function openBackupForRestore(source, open = openSync) {
+  try {
+    return open(source, "r");
+  } catch (failure) {
+    if (failure?.code === "ENOENT") {
+      throw new Error(`Backup does not exist: ${source}`, { cause: failure });
+    }
+    throw failure;
+  }
 }
 
 export function restoreDatabase(input, composeArgs, environment, execute = runInteractive) {
@@ -1426,8 +1434,9 @@ export function terminateChildren(children, terminateProcess) {
 
 function spawnReady(label, plan, environment, spawnProcess) {
   return new Promise((resolveChild, rejectChild) => {
-    const child = spawnProcess(plan.command, plan.args, {
-      cwd: root, detached: plan.detached, env: environment,
+    const trusted = trustedPlan(plan);
+    const child = spawnProcess(trusted.command, trusted.args, {
+      cwd: root, detached: plan.detached, env: environment, shell: false,
       stdio: ["inherit", "pipe", "pipe"]
     });
     const exit = new Promise((resolveExit) => {
@@ -1453,27 +1462,47 @@ function runningDevServices() {
   return new Set(result.stdout.trim().split(/\r?\n/).filter(Boolean));
 }
 
-function runInteractive(plan) {
-  const result = spawnSync(plan.command, plan.args, {
+export function runInteractive(plan, execute = executeFile) {
+  const trusted = trustedPlan(plan);
+  const result = execute(trusted.command, trusted.args, {
     cwd: root,
     env: plan.environment ?? process.env,
+    shell: false,
     stdio: [plan.stdin ?? "inherit", plan.stdout ?? "inherit", "inherit"]
   });
   if (result.error) {
     throw result.error;
   }
   if (result.status !== 0) {
-    throw new Error(`${plan.command} exited with status ${result.status}`);
+    throw new Error(`${trusted.command} exited with status ${result.status}`);
   }
 }
 
 function runCaptured(plan) {
-  const result = spawnSync(plan.command, plan.args, {
-    cwd: root, env: plan.environment ?? process.env, encoding: "utf8"
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${plan.command} exited with status ${result.status}: ${result.stderr.trim()}`);
-  return result.stdout.trim();
+  const trusted = trustedPlan(plan);
+  return execFileSync(trusted.command, trusted.args, {
+    cwd: root, env: plan.environment ?? process.env, encoding: "utf8", shell: false
+  }).trim();
+}
+
+function trustedPlan(plan) {
+  const names = executableNames();
+  if (!["docker", "java", "cmd.exe", names.maven, names.npm].includes(plan.command)) {
+    throw new Error(`Unsupported command: ${plan.command}`);
+  }
+  return { command: plan.command, args: [...plan.args] };
+}
+
+function executeFile(command, args, options) {
+  execFileSync(command, args, options);
+  return { status: 0 };
+}
+
+function javaEnvironment() {
+  if (!process.env.JAVA_HOME) return process.env;
+  const path = process.env.PATH ? `${join(process.env.JAVA_HOME, "bin")}${delimiter}${process.env.PATH}`
+    : join(process.env.JAVA_HOME, "bin");
+  return { ...process.env, PATH: path };
 }
 
 function prefix(stream, label, destination) {

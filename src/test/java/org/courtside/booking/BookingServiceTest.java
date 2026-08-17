@@ -248,6 +248,15 @@ class BookingServiceTest extends AbstractIntegrationTest {
         assertThat(bookingService.allocationsBetween(SEVEN_PM, EIGHT_PM)).isEmpty();
     }
 
+    @ParameterizedTest
+    @MethodSource("invalidPageLimits")
+    void givenAnInvalidPageLimit_whenListingPersonalBookings_thenItIsRejected(int limit) {
+        // when / then
+        assertThatThrownBy(() -> bookingService.personalBookings(someUser, null, limit))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Personal booking page size must be between 1 and 100");
+    }
+
     private CreateBookingCommand command(Instant start, Instant end) {
         return new CreateBookingCommand(
                 List.of(courtId), MEMBER_BOOKING_CARD, new TimeSlot(start, end), someUser, bookerPersonId,
@@ -256,5 +265,9 @@ class BookingServiceTest extends AbstractIntegrationTest {
 
     private static Stream<String> invalidIdempotencyKeys() {
         return Stream.of(null, "", "contains whitespace", "ä", "x".repeat(129));
+    }
+
+    private static Stream<Integer> invalidPageLimits() {
+        return Stream.of(Integer.MIN_VALUE, 0, 101, Integer.MAX_VALUE);
     }
 }

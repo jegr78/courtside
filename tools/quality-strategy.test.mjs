@@ -28,10 +28,8 @@ test("given the quality strategy, when reviewing product risks, then every maint
 
 test("given a pull request, when declaring quality evidence, then the maintained strategy is the source", () => {
   // when / then
-  assert.match(
-    pullRequestTemplate,
-    /https:\/\/github\.com\/jegr78\/courtside\/blob\/main\/docs\/quality-strategy\.md/
-  );
+  assert.equal(pullRequestTemplate.includes(
+    "https://github.com/jegr78/courtside/blob/main/docs/quality-strategy.md"), true);
   assert.match(pullRequestTemplate, /Affected risk IDs/);
   assert.match(pullRequestTemplate, /Evidence/);
   assert.match(pullRequestTemplate, /Residual risk/);

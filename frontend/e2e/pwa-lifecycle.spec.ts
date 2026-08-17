@@ -78,6 +78,7 @@ test("logout and browser history cannot reveal a cached personal view", async ({
 test("a waiting service-worker update activates once and reloads one coherent application version", async ({ journeyService, page }) => {
   // given
   await install(page);
+  await expect(page.getByTestId("build-identity")).toBeEnabled();
   const buildIdentity = await page.getByTestId("build-identity").textContent();
   journeyService.publishServiceWorkerUpdate();
 

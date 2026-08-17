@@ -23,6 +23,8 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class ManagedAppointmentQuery {
 
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final BookingRepository bookings;
     private final BookingAccessControl accessControl;
     private final CardService cards;
@@ -30,14 +32,23 @@ public class ManagedAppointmentQuery {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page list(Set<Role> roles, UUID cursor, int limit) {
+        validatePageLimit(limit);
         Set<Role> managementRoles = accessControl.managementRoles(roles);
         if (!roles.contains(Role.ADMIN) && managementRoles.isEmpty()) {
             return new Page(List.of(), null);
         }
         List<UUID> ids = bookings.findManagedBookingIds(
-                managementRoles, roles.contains(Role.ADMIN), cursor, PageRequest.of(0, limit + 1));
+                managementRoles, roles.contains(Role.ADMIN), cursor,
+                PageRequest.of(0, Math.addExact(limit, 1)));
         CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);
         return new Page(page.items(), page.nextCursor());
+    }
+
+    private static void validatePageLimit(int limit) {
+        if (limit < 1 || limit > MAX_PAGE_SIZE) {
+            throw new IllegalStateException(
+                    "Managed appointment page size must be between 1 and " + MAX_PAGE_SIZE);
+        }
     }
 
     public Detail get(UUID bookingId, UUID actor, Set<Role> roles) {

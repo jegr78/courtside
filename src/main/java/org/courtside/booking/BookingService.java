@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BookingService {
 
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final BookingWriter writer;
     private final CourtAllocationRepository allocations;
     private final BookingRepository bookings;
@@ -113,9 +115,18 @@ public class BookingService {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PersonalBookingPage personalBookings(UUID bookedBy, UUID cursor, int limit) {
-        List<UUID> ids = bookings.findPersonalBookingIds(bookedBy, cursor, PageRequest.of(0, limit + 1));
+        validatePageLimit(limit);
+        List<UUID> ids = bookings.findPersonalBookingIds(
+                bookedBy, cursor, PageRequest.of(0, Math.addExact(limit, 1)));
         CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);
         return new PersonalBookingPage(page.items(), page.nextCursor());
+    }
+
+    private static void validatePageLimit(int limit) {
+        if (limit < 1 || limit > MAX_PAGE_SIZE) {
+            throw new IllegalStateException(
+                    "Personal booking page size must be between 1 and " + MAX_PAGE_SIZE);
+        }
     }
 
     @Transactional(readOnly = true)

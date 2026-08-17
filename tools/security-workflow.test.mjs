@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const build = readFileSync(join(repository, ".github/workflows/build.yml"), "utf8");
+const codeql = readFileSync(join(repository, ".github/codeql/codeql-config.yml"), "utf8");
 const release = readFileSync(join(repository, ".github/workflows/release.yml"), "utf8");
 const policy = readFileSync(join(repository, "docs/security-scanning.md"), "utf8");
 
@@ -14,6 +15,8 @@ test("given a pull request, when the required build runs, then dependency, sourc
   assert.match(build, /actions\/dependency-review-action@[a-f0-9]{40}/);
   assert.match(build, /github\/codeql-action\/init@[a-f0-9]{40}/);
   assert.match(build, /queries: security-extended/);
+  assert.match(build, /config-file: \.\/\.github\/codeql\/codeql-config\.yml/);
+  assert.match(codeql, /frontend\/coverage\/\*\*\/\*/);
   assert.match(build, /extract --layers --launcher --destination build\/security\/runtime/);
   assert.match(build, /aquasecurity\/trivy-action@[a-f0-9]{40}/);
   assert.match(build, /scan-type: rootfs/);
