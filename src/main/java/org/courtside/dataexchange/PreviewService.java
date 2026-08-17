@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -34,6 +35,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PreviewService {
+
+    private static final int MAX_FILE_NAME_LENGTH = 200;
 
     private final ImportPreviewRepository previews;
     private final ImportSourceService sources;
@@ -48,7 +51,7 @@ public class PreviewService {
     @Transactional
     public PreviewSummary create(UUID sourceId, SnapshotMode mode, String fileName, byte[] content,
                                  UUID accountId) {
-        SourceConfiguration configuration = sources.configurationOf(sourceId);
+        SourceConfiguration configuration = sources.configurationForUpdate(sourceId);
         SnapshotMode requested = requiredMode(mode);
         CsvSnapshot snapshot = SnapshotParser.parse(requiredContent(content), configuration.columns());
         CurrentRoster roster = currentRosterFor(sourceId, snapshot);
@@ -58,15 +61,14 @@ public class PreviewService {
         ImportPreview preview = previews.save(new ImportPreview(sourceId, requested,
                 requiredFileName(fileName), PersonFingerprint.sha256(content), snapshot.rows().size(),
                 write(new StoredContent(resolved, snapshot.ignoredColumns())),
-                write(fingerprintsOf(roster)), resolved.removals().count(),
-                resolved.removals().percent(), now, requiredAccountId(accountId),
-                now.plus(properties.previewRetention())));
-        return toSummary(preview, configuration);
+                write(fingerprintsOf(resolved, roster)), resolved.removals().count(),
+                resolved.removals().percent(), configuration.removalWarningPercent(), now,
+                requiredAccountId(accountId), now.plus(properties.previewRetention())));
+        return toSummary(preview);
     }
 
     public PreviewSummary read(UUID previewId) {
-        ImportPreview preview = require(previewId);
-        return toSummary(preview, sources.configurationOf(preview.getSourceId()));
+        return toSummary(require(previewId));
     }
 
     private CurrentRoster currentRosterFor(UUID sourceId, CsvSnapshot snapshot) {
@@ -83,8 +85,8 @@ public class PreviewService {
                 memberships.activeMembershipTypeIds(), personIdsByNameKey(snapshot));
     }
 
-    // Only the names the file actually carries: a club with thousands of members would otherwise
-    // read its whole person table on every upload to answer a question about a few hundred rows.
+    // Asked of the database by name, because a club with thousands of members would otherwise
+    // read its whole person table on every upload to answer about a few hundred rows.
     private Map<String, List<UUID>> personIdsByNameKey(CsvSnapshot snapshot) {
         Set<String> wanted = snapshot.rows().stream()
                 .map(row -> ChangeSetResolver.nameKeyOf(row.values()))
@@ -92,9 +94,7 @@ public class PreviewService {
         if (wanted.isEmpty()) {
             return Map.of();
         }
-        return persons.findAll().stream()
-                .filter(person -> wanted.contains(
-                        ChangeSetResolver.nameKeyOf(person.getFirstName(), person.getLastName())))
+        return persons.findByNameKeyIn(wanted).stream()
                 .collect(Collectors.groupingBy(
                         person -> ChangeSetResolver.nameKeyOf(person.getFirstName(), person.getLastName()),
                         Collectors.mapping(Person::getId, Collectors.toList())));
@@ -107,11 +107,22 @@ public class PreviewService {
                 member != null && member.isCurrent());
     }
 
-    private static Map<String, String> fingerprintsOf(CurrentRoster roster) {
+    // Only the people the change set names: an execution compares those and nothing else, and a
+    // fingerprint of somebody this snapshot leaves alone is a stored personal detail with no reader.
+    private static Map<String, String> fingerprintsOf(ResolvedChangeSet resolved, CurrentRoster roster) {
         Map<String, String> fingerprints = new HashMap<>();
-        roster.peopleById().forEach((personId, person) -> fingerprints.put(personId.toString(),
-                PersonFingerprint.of(person.firstName(), person.lastName(), person.email(),
-                        person.membershipTypeId(), person.membershipCurrent())));
+        resolved.changes().stream()
+                .map(ResolvedChangeSet.PersonChange::personId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(personId -> {
+                    CurrentRoster.RosterPerson person = roster.peopleById().get(personId);
+                    if (person != null) {
+                        fingerprints.put(personId.toString(), PersonFingerprint.of(person.firstName(),
+                                person.lastName(), person.email(), person.membershipTypeId(),
+                                person.membershipCurrent()));
+                    }
+                });
         return fingerprints;
     }
 
@@ -120,12 +131,15 @@ public class PreviewService {
                 .forEach(preview -> preview.supersedeOn(now));
     }
 
-    private PreviewSummary toSummary(ImportPreview preview, SourceConfiguration configuration) {
-        StoredContent stored = read(preview.getChangeSet());
+    // What the document promises past the retention is the row, its hash and its counts, so an
+    // expired preview answers without the change set even before the sweep has reached its row.
+    private PreviewSummary toSummary(ImportPreview preview) {
+        StoredContent stored = preview.hasExpiredBy(clock.instant())
+                ? new StoredContent(null, List.of())
+                : read(preview.getChangeSet());
         return new PreviewSummary(preview.getId(), preview.getSourceId(), preview.getMode(),
                 preview.getFileName(), preview.getFileHash(), preview.getRowCount(),
-                stored.ignoredColumns(), stored.changeSet(),
-                preview.getRemovalPercent() > configuration.removalWarningPercent(),
+                stored.ignoredColumns(), stored.changeSet(), preview.needsConfirmation(),
                 preview.getCreatedAt(), preview.getExpiresAt(), preview.isSuperseded());
     }
 
@@ -162,10 +176,12 @@ public class PreviewService {
     }
 
     private static String requiredFileName(String fileName) {
-        if (fileName == null || fileName.isBlank()) {
-            throw new IllegalStateException("An uploaded snapshot carries the name of its file");
+        String stripped = fileName == null ? "" : fileName.strip();
+        if (stripped.isEmpty() || stripped.length() > MAX_FILE_NAME_LENGTH) {
+            throw new SnapshotFileNameInvalidException("import.snapshot.fileNameUnusable",
+                    Map.of("maxLength", MAX_FILE_NAME_LENGTH));
         }
-        return fileName.strip();
+        return stripped;
     }
 
     private static UUID requiredAccountId(UUID accountId) {

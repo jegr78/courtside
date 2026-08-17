@@ -750,7 +750,7 @@ components:
         previewId: { type: string, format: uuid }
         sourceId: { type: string, format: uuid }
         mode: { $ref: "#/components/schemas/SnapshotMode" }
-        fileName: { type: string }
+        fileName: { type: string, minLength: 1, maxLength: 200 }
         fileHash:
           type: string
           description: |
@@ -3387,8 +3387,9 @@ paths:
       operationId: readImportPreview
       summary: Read a preview back, exactly as it was taken.
       description: |
-        A preview is immutable and is kept for a bounded time; once that time has passed the row
-        survives with its hash and its counts, and the change set it carried does not.
+        A preview is immutable and answers with its change set for a bounded time. Past that time
+        the row still answers with its hash and its counts, and the change set it carried is no
+        longer part of the answer.
       parameters:
         - name: id
           in: path

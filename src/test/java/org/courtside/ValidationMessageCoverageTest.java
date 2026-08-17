@@ -34,7 +34,7 @@ class ValidationMessageCoverageTest {
                     "MembershipTypeRuleSetInactiveException", "MembershipTypeInactiveException",
                     "RosterCursorUnknownException", "LastAdministratorException",
                     "ImportSourceInvalidException", "SnapshotHeaderInvalidException",
-                    "SnapshotBlockedException");
+                    "SnapshotBlockedException", "SnapshotFileNameInvalidException");
 
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
             List.of("CodedDomainFailure", "InvalidOpeningWindowException",

@@ -46,6 +46,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:import-person-not-found",
             "urn:courtside:error:import-preview-not-found",
             "urn:courtside:error:import-snapshot-blocked",
+            "urn:courtside:error:import-snapshot-file-name-invalid",
             "urn:courtside:error:import-snapshot-unreadable",
             "urn:courtside:error:import-source-in-use",
             "urn:courtside:error:import-source-invalid",

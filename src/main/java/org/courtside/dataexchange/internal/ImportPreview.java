@@ -55,6 +55,9 @@ public class ImportPreview {
     @Column(name = "removal_percent", nullable = false)
     private int removalPercent;
 
+    @Column(name = "removal_warning_pct", nullable = false)
+    private int removalWarningPercent;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -69,8 +72,8 @@ public class ImportPreview {
 
     public ImportPreview(UUID sourceId, SnapshotMode mode, String fileName, String fileHash,
                          int rowCount, String changeSet, String fingerprints, int removalCount,
-                         int removalPercent, Instant createdAt, UUID createdByAccountId,
-                         Instant expiresAt) {
+                         int removalPercent, int removalWarningPercent, Instant createdAt,
+                         UUID createdByAccountId, Instant expiresAt) {
         this.id = UUID.randomUUID();
         this.sourceId = sourceId;
         this.mode = mode;
@@ -81,6 +84,7 @@ public class ImportPreview {
         this.fingerprints = fingerprints;
         this.removalCount = removalCount;
         this.removalPercent = removalPercent;
+        this.removalWarningPercent = removalWarningPercent;
         this.createdAt = createdAt;
         this.createdByAccountId = createdByAccountId;
         this.expiresAt = expiresAt;
@@ -88,6 +92,10 @@ public class ImportPreview {
 
     public void supersedeOn(Instant supersededAt) {
         this.supersededAt = supersededAt;
+    }
+
+    public boolean needsConfirmation() {
+        return removalPercent > removalWarningPercent;
     }
 
     public boolean isSuperseded() {

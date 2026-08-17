@@ -139,7 +139,7 @@ public final class ChangeSetResolver {
                 .filter(CurrentRoster.RosterPerson::membershipCurrent)
                 .count();
         return new ResolvedChangeSet.RemovalCounts(removed, linked,
-                linked == 0 ? 0 : Math.round(removed * 100f / linked));
+                linked == 0 ? 0 : (int) Math.ceil(removed * 100.0 / linked));
     }
 
     private static void requireUsableMembershipTypes(CsvSnapshot snapshot,

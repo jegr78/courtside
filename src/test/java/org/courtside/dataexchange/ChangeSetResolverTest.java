@@ -91,6 +91,20 @@ class ChangeSetResolverTest {
     }
 
     @Test
+    void givenAShareJustAboveTheThreshold_whenResolving_thenItIsNotRoundedBackOntoIt() {
+        // given
+        CurrentRoster roster = rosterOfThree();
+
+        // when
+        ResolvedChangeSet resolved = resolve(snapshotOf(row(1, "4712", "John", "Roe"),
+                row(2, "4713", "Mary", "Major")), SnapshotMode.FULL_SNAPSHOT, roster);
+
+        // then
+        assertThat(resolved.removals().count()).isEqualTo(1);
+        assertThat(resolved.removals().percent()).isEqualTo(34);
+    }
+
+    @Test
     void givenAKnownRecordAbsentFromAnUpdateOnlyUpload_whenResolving_thenNothingHappensToIt() {
         // given
         CsvSnapshot snapshot = snapshotOf();
@@ -217,6 +231,22 @@ class ChangeSetResolverTest {
 
     private static CurrentRoster emptyRoster() {
         return new CurrentRoster(Map.of(), Map.of(), Set.of(ACTIVE_TYPE), Map.of());
+    }
+
+    private static CurrentRoster rosterOfThree() {
+        UUID john = UUID.fromString("dddddddd-0000-0000-0000-000000000002");
+        UUID mary = UUID.fromString("dddddddd-0000-0000-0000-000000000003");
+        return new CurrentRoster(
+                Map.of("4711", JANE, "4712", john, "4713", mary),
+                Map.of(JANE, person(JANE, "Jane", "Doe"),
+                        john, person(john, "John", "Roe"),
+                        mary, person(mary, "Mary", "Major")),
+                Set.of(ACTIVE_TYPE), Map.of());
+    }
+
+    private static CurrentRoster.RosterPerson person(UUID personId, String firstName, String lastName) {
+        return new CurrentRoster.RosterPerson(personId, firstName, lastName,
+                firstName.toLowerCase(java.util.Locale.ROOT) + "@example.org", ACTIVE_TYPE, true);
     }
 
     private static CurrentRoster rosterHolding(UUID personId, String externalId, String firstName,

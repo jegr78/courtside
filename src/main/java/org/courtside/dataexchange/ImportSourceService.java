@@ -47,6 +47,17 @@ public class ImportSourceService {
         return toConfiguration(require(sourceId));
     }
 
+    // Whoever holds this row decides alone what this source's previews look like, so two uploads
+    // arriving together queue instead of both believing they superseded the other.
+    @Transactional
+    public SourceConfiguration configurationForUpdate(UUID sourceId) {
+        if (sourceId == null) {
+            throw new IllegalStateException("An import source must be named by an id");
+        }
+        return toConfiguration(sources.findWithLockById(sourceId).orElseThrow(() ->
+                new ImportSourceNotFoundException("No import source with id " + sourceId)));
+    }
+
     @Transactional
     public SourceConfiguration create(String sourceKey, String displayName,
                                       Map<String, CanonicalField> columns,

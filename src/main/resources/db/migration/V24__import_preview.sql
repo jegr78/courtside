@@ -9,6 +9,7 @@ CREATE TABLE import_preview (
     fingerprints          jsonb,
     removal_count         integer     NOT NULL,
     removal_percent       integer     NOT NULL,
+    removal_warning_pct   integer     NOT NULL,
     created_at            timestamptz NOT NULL,
     created_by_account_id uuid        NOT NULL REFERENCES user_account,
     expires_at            timestamptz NOT NULL,
@@ -18,6 +19,8 @@ CREATE TABLE import_preview (
     CONSTRAINT import_preview_file_name_not_blank CHECK (length(btrim(file_name)) > 0),
     CONSTRAINT import_preview_counts_not_negative CHECK (row_count >= 0 AND removal_count >= 0),
     CONSTRAINT import_preview_removal_percent_scale CHECK (removal_percent BETWEEN 0 AND 100),
+    CONSTRAINT import_preview_removal_warning_scale
+        CHECK (removal_warning_pct BETWEEN 0 AND 100),
     CONSTRAINT import_preview_expires_after_it_was_taken CHECK (expires_at > created_at)
 );
 

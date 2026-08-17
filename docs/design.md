@@ -1112,12 +1112,12 @@ deliver the implementation.
   months after season end (utilisation statistics survive, the personal reference does
   not); inactive accounts deleted after departure plus retention period; login logs after
   90 days.
-- **An import keeps its raw file only as long as the preview it belongs to.** A preview holds the
-  uploaded snapshot and the change set it resolved — a club's whole membership list, in other
-  words — and both are bounded by `COURTSIDE_IMPORT_PREVIEW_RETENTION`. What survives past it is
-  the row, its hash and its counts, which is what an audit of *what was executed* needs and is not
-  personal data. **Built:** the bound is recorded on every preview. **Designed:** the scheduled
-  sweep that enforces it.
+- **An import never keeps the file it was given.** What a preview holds is the SHA-256 of the
+  uploaded bytes and the change set resolved from them — a club's whole membership list, in other
+  words — and that change set is bounded by `COURTSIDE_IMPORT_PREVIEW_RETENTION`. What survives
+  past it is the row, its hash and its counts, which is what an audit of *what was executed* needs
+  and is not personal data. **Built:** the bound is recorded on every preview, and a preview past
+  it answers without its change set. **Designed:** the scheduled sweep that erases the stored one.
 - **Subject access and portability** (Art. 15/20) as self-service: every member can export
   their own data as JSON. The Release 1 export covers this.
 - **Documentation templates in the repository**: a pre-filled record of processing

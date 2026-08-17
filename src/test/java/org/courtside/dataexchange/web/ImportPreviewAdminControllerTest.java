@@ -241,6 +241,49 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnUploadThatNamesNoFile_whenPreviewing_thenTheReasonIsNamedRatherThanFailing()
+            throws Exception {
+        // when / then
+        mockMvc.perform(multipart("/api/admin/import/sources/{sourceId}/previews", source)
+                        .file(new MockMultipartFile("file", "   ", "text/csv",
+                                THREE_ROWS.getBytes(StandardCharsets.UTF_8)))
+                        .param("mode", "FULL_SNAPSHOT")
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:import-snapshot-file-name-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("import.snapshot.fileNameUnusable"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPreviewTakenUnderOneThreshold_whenTheThresholdMoves_thenThePreviewStillAnswersAsReviewed()
+            throws Exception {
+        // given
+        memberLinkedAs("4711", "Jane", "Doe");
+        memberLinkedAs("4712", "John", "Roe");
+        String body = mockMvc.perform(upload("Member number,First name,Last name\n4711,Jane,Doe\n",
+                        "FULL_SNAPSHOT"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.removals.percent").value(50))
+                .andExpect(jsonPath("$.needsConfirmation").value(true))
+                .andReturn().getResponse().getContentAsString();
+
+        // when
+        sources.change(source, "roster-system", "Membership system",
+                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                        "First name", CanonicalField.FIRST_NAME,
+                        "Last name", CanonicalField.LAST_NAME),
+                Map.of(), Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 90);
+
+        // then
+        mockMvc.perform(get("/api/admin/import/previews/{id}", (String) JsonPath.read(body, "$.previewId")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.needsConfirmation").value(true));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPreviewNobodyTook_whenReadingIt_thenItIsReportedAsNotFound() throws Exception {
         // when / then
         mockMvc.perform(get("/api/admin/import/previews/{id}", UUID.randomUUID()))
