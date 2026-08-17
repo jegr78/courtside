@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Rules",
-        allowedDependencies = {"facility", "card", "config"})
+        allowedDependencies = {"facility", "config"})
 package org.courtside.rules;
