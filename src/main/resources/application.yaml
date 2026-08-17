@@ -88,6 +88,8 @@ management:
         enabled: true
 
 logging:
+  level:
+    com.google.protobuf.UnsafeUtil: ERROR
   structured:
     format:
       console: ecs

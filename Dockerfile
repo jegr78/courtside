@@ -21,4 +21,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=90s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8080/actuator/health || exit 1
 
-ENTRYPOINT ["java", "--sun-misc-unsafe-memory-access=allow", "-XX:MaxRAMPercentage=75.0", "-XX:+ExitOnOutOfMemoryError", "org.springframework.boot.loader.launch.JarLauncher"]
+ENTRYPOINT ["java", "--sun-misc-unsafe-memory-access=deny", "-XX:MaxRAMPercentage=75.0", "-XX:+ExitOnOutOfMemoryError", "org.springframework.boot.loader.launch.JarLauncher"]
