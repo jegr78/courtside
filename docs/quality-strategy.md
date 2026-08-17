@@ -137,7 +137,6 @@ dimension-only screenshots remain diagnostic artifacts and never replace these a
 
 | Risk | Gap | Owner | Review date | Decision |
 |---|---|---|---|---|
-| Rules API | [#35](https://github.com/jegr78/courtside/issues/35) records incomplete unknown-rule-set endpoint coverage. | Rules | 2026-11-13 | Existing issue remains authoritative; do not duplicate it. |
 | Module API | [#45](https://github.com/jegr78/courtside/issues/45) records test-fixture coupling that inflates a module surface. | Architecture | 2026-11-13 | Existing issue remains authoritative; do not duplicate it. |
 
 New material gaps are added here or linked to an existing authoritative issue before the change is considered qualified. Review dates are advanced only after the risk and available evidence are reconsidered.

@@ -39,7 +39,7 @@ test("given a pull request, when declaring quality evidence, then the maintained
 
 test("given tracked residual test risks, when reading the strategy, then their existing issues remain authoritative", () => {
   // when / then
-  for (const issue of [35, 45]) {
+  for (const issue of [45]) {
     assert.match(strategy, new RegExp(`github\\.com/jegr78/courtside/issues/${issue}`));
   }
 });
