@@ -29,8 +29,6 @@ CREATE TABLE member (
     id                 uuid PRIMARY KEY,
     person_id          uuid NOT NULL REFERENCES person,
     membership_type_id uuid NOT NULL REFERENCES membership_type,
-    joined_on          date,
-    left_on            date,
     CONSTRAINT member_unique_person UNIQUE (person_id)
 );
 
