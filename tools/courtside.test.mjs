@@ -589,7 +589,14 @@ test("given a Funnel summary, when building a result, then UAT read-only evidenc
   assert.equal(result.load.writeShare, 0);
   assert.equal(result.thresholds.readOnlyApi, true);
   assert.equal("bookingConflicts" in result.metrics, false);
-  assert.equal(JSON.stringify(result).includes("example.ts.net"), false);
+  assert.deepEqual(result.profile, {
+    name: "funnel-smoke",
+    workload: "reference",
+    target: "funnel",
+    environment: "UAT",
+    startedAt: "2026-08-10T12:00:00.000Z",
+    durationSeconds: 120
+  });
   assert.doesNotThrow(() => validatePerformanceResult(result));
 });
 

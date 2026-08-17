@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, X509Certificate } from "node:crypto";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { request as httpRequest } from "node:http";
@@ -8,7 +8,7 @@ import { request as httpsRequest } from "node:https";
 import { BlockList, createConnection, createServer, isIP } from "node:net";
 import { availableParallelism, totalmem } from "node:os";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
@@ -1246,12 +1246,10 @@ function extractApplicationLayers() {
   const layers = join(root, "build", "layers");
   rmSync(layers, { recursive: true, force: true });
   mkdirSync(layers, { recursive: true });
-  const java = process.env.JAVA_HOME
-    ? join(process.env.JAVA_HOME, "bin", process.platform === "win32" ? "java.exe" : "java")
-    : "java";
   runInteractive({
-    command: java,
-    args: ["-Djarmode=tools", "-jar", join("target", jar), "extract", "--layers", "--launcher", "--destination", layers]
+    command: "java",
+    args: ["-Djarmode=tools", "-jar", join("target", jar), "extract", "--layers", "--launcher", "--destination", layers],
+    environment: javaEnvironment()
   });
 }
 
@@ -1436,7 +1434,8 @@ export function terminateChildren(children, terminateProcess) {
 
 function spawnReady(label, plan, environment, spawnProcess) {
   return new Promise((resolveChild, rejectChild) => {
-    const child = spawnProcess(trustedCommand(plan.command), plan.args, {
+    const trusted = trustedPlan(plan);
+    const child = spawnProcess(trusted.command, trusted.args, {
       cwd: root, detached: plan.detached, env: environment, shell: false,
       stdio: ["inherit", "pipe", "pipe"]
     });
@@ -1463,9 +1462,9 @@ function runningDevServices() {
   return new Set(result.stdout.trim().split(/\r?\n/).filter(Boolean));
 }
 
-export function runInteractive(plan, execute = spawnSync) {
-  const command = trustedCommand(plan.command);
-  const result = execute(command, plan.args, {
+export function runInteractive(plan, execute = executeFile) {
+  const trusted = trustedPlan(plan);
+  const result = execute(trusted.command, trusted.args, {
     cwd: root,
     env: plan.environment ?? process.env,
     shell: false,
@@ -1475,29 +1474,35 @@ export function runInteractive(plan, execute = spawnSync) {
     throw result.error;
   }
   if (result.status !== 0) {
-    throw new Error(`${command} exited with status ${result.status}`);
+    throw new Error(`${trusted.command} exited with status ${result.status}`);
   }
 }
 
 function runCaptured(plan) {
-  const command = trustedCommand(plan.command);
-  const result = spawnSync(command, plan.args, {
+  const trusted = trustedPlan(plan);
+  return execFileSync(trusted.command, trusted.args, {
     cwd: root, env: plan.environment ?? process.env, encoding: "utf8", shell: false
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}: ${result.stderr.trim()}`);
-  return result.stdout.trim();
+  }).trim();
 }
 
-function trustedCommand(command) {
+function trustedPlan(plan) {
   const names = executableNames();
-  const java = process.env.JAVA_HOME
-    ? join(process.env.JAVA_HOME, "bin", process.platform === "win32" ? "java.exe" : "java")
-    : "java";
-  if (["docker", "cmd.exe", names.maven, names.npm, java].includes(command)) {
-    return command;
+  if (!["docker", "java", "cmd.exe", names.maven, names.npm].includes(plan.command)) {
+    throw new Error(`Unsupported command: ${plan.command}`);
   }
-  throw new Error(`Unsupported command: ${command}`);
+  return { command: plan.command, args: [...plan.args] };
+}
+
+function executeFile(command, args, options) {
+  execFileSync(command, args, options);
+  return { status: 0 };
+}
+
+function javaEnvironment() {
+  if (!process.env.JAVA_HOME) return process.env;
+  const path = process.env.PATH ? `${join(process.env.JAVA_HOME, "bin")}${delimiter}${process.env.PATH}`
+    : join(process.env.JAVA_HOME, "bin");
+  return { ...process.env, PATH: path };
 }
 
 function prefix(stream, label, destination) {
