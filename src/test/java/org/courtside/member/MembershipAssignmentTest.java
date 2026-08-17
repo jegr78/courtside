@@ -254,6 +254,30 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPersonHoldingTwoAccounts_whenTheirMembershipChanges_thenBothSessionsAreRefused()
+            throws Exception {
+        // given — user_account carries no unique person, so a second account is a row this
+        // schema tolerates and the roster reads past rather than one that cannot exist
+        MembershipType type = memberships.createMembershipType("Junior", null);
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        signInReadyAccount(jane, "doe.jane.second", Set.of(Role.MEMBER));
+        MockHttpSession first = signIn("doe.jane");
+        MockHttpSession second = signIn("doe.jane.second");
+
+        // when
+        roster.assignMembership(jane.getId(), type.getId());
+
+        // then — the one the roster prefers is not the only one that books under the membership
+        mockMvc.perform(get("/api/my/bookings").session(first))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+        mockMvc.perform(get("/api/my/bookings").session(second))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+    }
+
+    @Test
     void givenASignedInMember_whenTheirMembershipIsRemoved_thenTheirNextRequestIsRefused()
             throws Exception {
         // given
