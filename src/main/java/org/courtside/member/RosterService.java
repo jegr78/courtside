@@ -1,6 +1,7 @@
 package org.courtside.member;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.identity.AccountSessions;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -49,6 +50,7 @@ public class RosterService {
     private final MemberRepository members;
     private final MemberService memberships;
     private final AdministratorLock administrators;
+    private final AccountSessions sessions;
     private final PasswordEncoder passwordEncoder;
 
     public CursorPage.Result<RosterEntry> list(String query, UUID cursor, int limit) {
@@ -108,7 +110,9 @@ public class RosterService {
         if (!requested.contains(Role.ADMIN)) {
             requireASuccessorAdministrator(account);
         }
+        long epoch = account.getSecurityEpoch();
         account.changeRoles(requested);
+        endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
         return load(List.of(id)).getFirst();
     }
 
@@ -117,8 +121,11 @@ public class RosterService {
         UUID id = requiredPersonId(personId);
         String name = requiredUsername(username);
         UserAccount account = requireAccount(id);
+        String previous = account.getUsername();
+        long epoch = account.getSecurityEpoch();
         account.changeUsername(name);
         saveOrRejectTakenUsername(account);
+        endStoredSessionsIfRevoked(account, previous, epoch);
         return load(List.of(id)).getFirst();
     }
 
@@ -126,7 +133,10 @@ public class RosterService {
     public RosterEntry resetPassword(UUID personId, String oneTimePassword) {
         UUID id = requiredPersonId(personId);
         requireUsablePassword(oneTimePassword);
-        requireAccount(id).resetPassword(passwordEncoder.encode(oneTimePassword));
+        UserAccount account = requireAccount(id);
+        long epoch = account.getSecurityEpoch();
+        account.resetPassword(passwordEncoder.encode(oneTimePassword));
+        endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
         return load(List.of(id)).getFirst();
     }
 
@@ -138,7 +148,9 @@ public class RosterService {
             account.enable();
         } else {
             requireASuccessorAdministrator(account);
+            long epoch = account.getSecurityEpoch();
             account.disable();
+            endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
         }
         return load(List.of(id)).getFirst();
     }
@@ -192,7 +204,19 @@ public class RosterService {
     // Every account the person holds, not the one the roster prefers: a second one the schema
     // tolerates would otherwise keep booking under the membership it signed in with.
     private void revokeSessionsOf(UUID personId) {
-        accounts.findByPersonIdIn(List.of(personId)).forEach(UserAccount::revokeSessions);
+        accounts.findByPersonIdIn(List.of(personId)).forEach(account -> {
+            long epoch = account.getSecurityEpoch();
+            account.revokeSessions();
+            endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
+        });
+    }
+
+    // The epoch is what refuses the next request; deleting the stored row keeps a revoked session
+    // from lingering until it expires, and the epoch is what says whether one was revoked at all.
+    private void endStoredSessionsIfRevoked(UserAccount account, String principal, long epochBefore) {
+        if (account.getSecurityEpoch() != epochBefore) {
+            sessions.endFor(principal);
+        }
     }
 
     private void saveOrRejectTakenUsername(UserAccount account) {
