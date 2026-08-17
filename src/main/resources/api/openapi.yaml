@@ -528,6 +528,83 @@ components:
         ruleSetId: { type: [string, "null"], format: uuid }
         active: { type: boolean }
 
+    CanonicalField:
+      type: string
+      description: |
+        A field of the roster a snapshot can carry. `EXTERNAL_ID` is the member number the source
+        system holds and is what a record is matched by; the other four are the person's data.
+      enum: [EXTERNAL_ID, FIRST_NAME, LAST_NAME, EMAIL, MEMBERSHIP_TYPE]
+
+    ImportSource:
+      type: object
+      required: [id, sourceKey, displayName, columns, membershipTypes, ownedFields,
+                 removalWarningPercent]
+      properties:
+        id: { type: string, format: uuid }
+        sourceKey: { type: string }
+        displayName: { type: string }
+        columns:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/CanonicalField" }
+        membershipTypes:
+          type: object
+          additionalProperties: { type: string, format: uuid }
+        ownedFields:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/CanonicalField" }
+        removalWarningPercent: { type: integer }
+
+    ImportSourceRequest:
+      type: object
+      description: |
+        Every part of a source is given here and every part may be given again — this request is
+        what a correction uses as much as a first description.
+      required: [sourceKey, displayName, columns, removalWarningPercent]
+      properties:
+        sourceKey:
+          type: string
+          minLength: 1
+          maxLength: 40
+          pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+          description: |
+            Names the system, not the file: `roster-system`, `club-registry`. It is half of the identity of every
+            record the source brings, so changing it makes the next snapshot look like a different
+            system's — which is the point when a club really does migrate, and a mistake otherwise.
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        columns:
+          type: object
+          description: |
+            The header in the club's export, mapped to the field it holds. `EXTERNAL_ID`,
+            `FIRST_NAME` and `LAST_NAME` are required; `EMAIL` and `MEMBERSHIP_TYPE` are not,
+            because a membership can exist without an address and a club may not export a category
+            at all. Two headers may not name the same field.
+          additionalProperties: { $ref: "#/components/schemas/CanonicalField" }
+        membershipTypes:
+          type: object
+          description: |
+            The value the export writes in its category column, mapped to a membership type of this
+            club. Free text never creates a type: a value with no mapping stops the snapshot rather
+            than inventing one. A type deactivated later is accepted here and refused by the run,
+            which is where a club is told about it.
+          additionalProperties: { type: string, format: uuid }
+        ownedFields:
+          type: array
+          uniqueItems: true
+          description: |
+            The fields this source owns. An owned field is overwritten by every later snapshot; a
+            field left out is the club's own and no synchronisation touches it, however different
+            the file is. `EXTERNAL_ID` cannot be owned — it identifies the record rather than
+            describing anybody.
+          items: { $ref: "#/components/schemas/CanonicalField" }
+        removalWarningPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: |
+            Above this share of the roster disappearing at once, an execution needs explicit
+            confirmation. A truncated export is the ordinary accident this guards against.
+
     MembershipTypeRequest:
       type: object
       required: [name]
@@ -2787,6 +2864,149 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources:
+    get:
+      tags: [admin-import]
+      operationId: listImportSources
+      summary: The systems this club synchronises its roster from.
+      description: |
+        Ordered by `sourceKey`. A club that has never imported anything has none.
+      responses:
+        "200":
+          description: The sources.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ImportSource" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin-import]
+      operationId: createImportSource
+      summary: Describe a system a roster snapshot comes from.
+      description: |
+        A source is what makes a second upload an update rather than a duplicate: every record it
+        brings is matched by `sourceKey` together with the member number the file carries, never by
+        a name or an email address.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImportSourceRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportSource" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources/{id}:
+    get:
+      tags: [admin-import]
+      operationId: readImportSource
+      summary: One source and its whole configuration.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The source.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportSource" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [admin-import]
+      operationId: changeImportSource
+      summary: Correct any part of a source's configuration.
+      description: |
+        The request replaces the configuration whole — the key, the display name, both mappings, the
+        owned fields and the threshold. A club that mistyped a column header, pointed a value at the
+        wrong membership type or picked the wrong threshold corrects it here; nothing about a source
+        is written once.
+
+        Changing a mapping does not touch the people a previous run created. It decides what the
+        **next** snapshot means.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImportSourceRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportSource" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [admin-import]
+      operationId: deleteImportSource
+      summary: Remove a source's configuration.
+      description: |
+        What goes is the club's description of a system it reads from — no person and no membership
+        is touched, because a source that has not been executed against says nothing about anybody
+        yet. A club that described the wrong system takes the description back here.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/admin/rule-sets:
     get:
