@@ -23,8 +23,7 @@ class PasswordHashingTest extends AbstractIntegrationTest {
     private static final List<Path> PLACES_THAT_NAME_THE_PARAMETERS =
             List.of(Path.of("README.md"), Path.of("docs/design.md"));
 
-    // Matches the hash's own "m=19456,t=2,p=1" and the prose naming the same three in backticks;
-    // backticks are stripped first, so one pattern covers both.
+    // Matches the hash's own "m=19456,t=2,p=1" and the prose naming the same three in backticks.
     private static final Pattern PARAMETERS =
             Pattern.compile("m=(\\d+),\\s*t=(\\d+),\\s*p=(\\d+)");
 

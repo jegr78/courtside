@@ -15,8 +15,6 @@ import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Walks Spring's mapping registry and the document in both directions, so neither an undocumented
-// endpoint nor an unserved contract entry can ship.
 class ApiContractCoverageTest extends AbstractIntegrationTest {
 
     // Read from the classpath, not from src: this is the copy that ships inside the jar, and the

@@ -345,8 +345,7 @@ class AdviceLoggingTest {
         try {
             new ObjectMapper().readValue(body, CourtRequest.class);
         } catch (JacksonException rejected) {
-            // Spring's message converter quotes Jackson's, as this does, and Jackson's quotes the
-            // value it could not read.
+            // Spring's message converter quotes Jackson's, and Jackson's quotes the value it could not read.
             return new HttpMessageNotReadableException("JSON parse error: " + rejected.getMessage(),
                     rejected, new MockHttpInputMessage(body.getBytes(StandardCharsets.UTF_8)));
         }

@@ -24,8 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// At UTC+10:30 in June, far enough that filtering on the server's or the database's zone instead
-// of the club's would misclassify this booking's weekday.
+// At UTC+10:30 in June.
 @WithMockUser(username = "admin", roles = "ADMIN")
 class ImpactClubZoneTest extends AbstractIntegrationTest {
 

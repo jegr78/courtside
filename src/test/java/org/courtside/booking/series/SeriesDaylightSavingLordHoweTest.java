@@ -30,8 +30,7 @@ import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Lord_Howe shifts half an hour, on other dates, in the opposite direction to Berlin: code that
-// assumed "one hour" passes every Berlin-only test and drifts here.
+// Lord_Howe shifts half an hour, on other dates, in the opposite direction to Berlin.
 class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =

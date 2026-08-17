@@ -77,7 +77,7 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
         }
     }
 
-    // booking_card holds the seed and survives the shared teardown, so this class cleans up its own.
+    // booking_card holds the seed and survives the shared teardown.
     @AfterEach
     void removeTheRetiredCard() {
         jdbc.sql("DELETE FROM booking_card WHERE id = ?").param(RETIRED_CARD).update();

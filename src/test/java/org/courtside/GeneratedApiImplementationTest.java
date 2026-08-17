@@ -17,8 +17,6 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// ApiContractCoverageTest compares paths, which a hand-written @GetMapping would still satisfy
-// while drifting in media types, parameter names and shapes. Implementing the interface cannot.
 class GeneratedApiImplementationTest extends AbstractIntegrationTest {
 
     // The filter chain answers both before any handler is consulted, so nothing can implement

@@ -13,8 +13,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// The CHECK lists a Java enum's constants by hand. @Enumerated reads the column back, so a value
-// outside the set is an exception on load rather than a quiet miss.
+// The CHECK lists a Java enum's constants by hand, and @Enumerated reads the column back.
 class EnumeratedColumnInListPatternTest {
 
     @Test

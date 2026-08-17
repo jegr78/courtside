@@ -41,8 +41,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// ProblemTypeUriTest only greps source for setType(URI.create(...)) literals, so it cannot see a
-// type Boot's own advice answers with instead of ours.
 @WithMockUser(username = "admin", roles = "ADMIN")
 class ProblemTypeWireTest extends AbstractIntegrationTest {
 
@@ -306,8 +304,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
         // then
         assertProblem(result, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "urn:courtside:error:unsupported-media-type");
         assertThat(result.andReturn().getResponse().getContentAsString()).doesNotContain("text/plain");
-        // Exactly what the document says the endpoint consumes — narrower than Spring's own
-        // default of every JSON-ish media type, because the contract is narrower.
+        // Exactly what the document says the endpoint consumes.
         assertThat(headerValues(result, "Accept"))
                 .containsExactly("application/json");
     }

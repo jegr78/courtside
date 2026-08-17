@@ -52,8 +52,7 @@ class HexColorPatternTest {
         return matcher.group(1);
     }
 
-    // Read off the generated accessor rather than the document: that is where the pattern ends up
-    // enforcing anything, and it proves the document actually reached the code.
+    // Read off the generated accessor: that is where the pattern ends up enforcing anything.
     private static String accessorPattern(String className, String accessorName)
             throws ReflectiveOperationException {
         Method accessor = Class.forName(className).getDeclaredMethod(accessorName);

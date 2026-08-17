@@ -14,8 +14,6 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// CLAUDE.md has asked for one-line comments since the first commit, and the codebase drifted to
-// eleven-line ones anyway. A rule this repository does not test is a rule it has already lost.
 class CommentBudgetTest {
 
     private static final int MOST_LINES_A_COMMENT_MAY_HAVE = 2;
@@ -31,8 +29,7 @@ class CommentBudgetTest {
     private static final List<Path> ROOTS = List.of(
             Path.of("src/main"), Path.of("src/test"), Path.of(".github"), Path.of("deploy"));
 
-    // A required marker begins its own comment, so "// given — why" followed by "// when / then"
-    // is two comments and not a three-line one.
+    // A required marker begins its own comment.
     private static final Pattern MARKER = Pattern.compile("//\\s*(given|when|then)\\b.*");
 
     private static final Pattern XML_COMMENT = Pattern.compile("<!--.*?-->", Pattern.DOTALL);

@@ -27,8 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ValidationMessageCoverageTest {
 
-    // Every class in src/main exposing a getCode() accessor for a ProblemDetail's "code" — kept
-    // in sync with the class name literals below by everyClassDeclaringGetCodeIsCoveredByAPattern.
     private static final List<String> CODE_CARRYING_EXCEPTION_SIMPLE_NAMES =
             List.of("ParticipantsInvalidException", "InvalidOpeningWindowException",
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
@@ -38,14 +36,15 @@ class ValidationMessageCoverageTest {
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
             List.of("CodedDomainFailure", "InvalidOpeningWindowException");
 
-    // Every construct in src/main that ends up as a ProblemDetail's "code": a constraint, a
-    // RuleViolation, one of the getCode() carriers above, or a literal following a "code" key.
     private static final List<Pattern> CODE_LITERAL_PATTERNS = buildCodeLiteralPatterns();
 
-    // What toMap's "validation." + AnnotationSimpleName can produce today. A new @Constraint
-    // mints an unreviewed wire code until it is added here and to both bundles.
+    // What toMap's "validation." + AnnotationSimpleName can produce today.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
             List.of("DurationMin", "Email", "Max", "Min", "NotNull", "Pattern", "Size");
+
+    // Minted by an advice rather than by a constraint, so no literal search reaches them.
+    private static final List<String> ADVICE_MINTED_CODES =
+            List.of("validation.NoDuplicates", "validation.TypeMismatch");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
@@ -110,6 +109,8 @@ class ValidationMessageCoverageTest {
         assertThat(codes).isNotEmpty();
         codes.forEach(code -> assertBothBundlesDefine(english, german,
                 code, "passed as a problem code literal in src/main"));
+        ADVICE_MINTED_CODES.forEach(code -> assertBothBundlesDefine(english, german,
+                code, "minted by an advice"));
     }
 
     @Test
@@ -192,8 +193,7 @@ class ValidationMessageCoverageTest {
                 .containsAll(CODE_CARRYING_EXCEPTION_SIMPLE_NAMES);
     }
 
-    // The generated error models answer getCode() without choosing a code. Read off disk so the
-    // exemption is exactly what the generator wrote; constraint annotations stay in scope.
+    // The generated error models answer getCode() without choosing a code.
     private static Set<String> generatedTopLevelClassNames() throws IOException, URISyntaxException {
         Path root = classesDirectory().getParent()
                 .resolve(Path.of("generated-sources", "openapi", "src", "main", "java"));
@@ -260,8 +260,7 @@ class ValidationMessageCoverageTest {
                 .isTrue();
     }
 
-    // Properties.load, not ResourceBundle: its containsKey searches the parent chain, so an
-    // English-only key would satisfy the German assertion.
+    // Properties.load, not ResourceBundle: its containsKey searches the parent chain.
     private static Properties loadBundle(String resourceName) throws IOException {
         Properties properties = new Properties();
         try (InputStream in = ValidationMessageCoverageTest.class.getResourceAsStream(resourceName)) {
@@ -287,14 +286,11 @@ class ValidationMessageCoverageTest {
         } catch (Throwable ignored) {
             return;
         }
-        // Both zones: a class-level constraint is as much a wire code as a field-level one, and
-        // scanning fields alone let four ship without a bundle entry.
         collect(type.getAnnotations(), constraintNames);
         for (Field field : type.getDeclaredFields()) {
             collect(field.getAnnotations(), constraintNames);
         }
-        // And on accessors: the generator annotates getters, so a field-and-type scan found
-        // nothing at all in the generated models.
+        // The generator annotates getters.
         for (Method method : type.getDeclaredMethods()) {
             collect(method.getAnnotations(), constraintNames);
         }

@@ -11,14 +11,11 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// An IllegalArgumentException reachable from a request becomes a 400 carrying raw English, with
-// no code a frontend can translate. Allowed only in a value type guarding against a programmer.
 class IllegalArgumentSurfaceTest {
 
     private static final String THROW = "throw new IllegalArgumentException";
 
-    // Value types only. Each validates in its compact constructor, and every path a request can
-    // take to one of them is guarded before it gets there.
+    // Value types only.
     private static final List<String> VALUE_TYPES_ALLOWED_TO_THROW = List.of(
             "org/courtside/booking/BookingRuleCheck.java",
             "org/courtside/booking/series/MoveRequest.java",
