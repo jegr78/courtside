@@ -102,7 +102,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         // when
         memberships.setMembershipTypeActive(type.getId(), false);
 
-        // then — deactivating a type must stop the next assignment, not strip the people on it
+        // then
         assertThat(memberships.membershipTypeIdOf(mary.getId())).contains(type.getId());
     }
 
@@ -114,7 +114,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         roster.assignMembership(mary.getId(), wrong.getId());
 
-        // when — one membership per person, so a correction has to move the row it already has
+        // when
         RosterService.RosterEntry entry = roster.assignMembership(mary.getId(), right.getId());
 
         // then
@@ -135,8 +135,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         // when
         RosterService.RosterEntry entry = roster.assignMembership(mary.getId(), type.getId());
 
-        // then — the unique person index would answer the member's own row, so this must not
-        // become a conflict with itself
+        // then
         assertThat(entry.membershipTypeId()).isEqualTo(type.getId());
         assertThat(members.findByPersonIdIn(List.of(mary.getId()))).hasSize(1);
     }
@@ -168,8 +167,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
 
     @Test
     void givenNoMembershipType_whenAssigningOne_thenTheServiceRefusesItsOwnCaller() {
-        // given — the contract rejects this at the edge, so one reaching the service means a
-        // caller skipped the validation that precedes it
+        // given
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
 
         // when / then
@@ -246,8 +244,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         // when
         roster.assignMembership(jane.getId(), type.getId());
 
-        // then — the membership decides which rules the account's bookings are measured
-        // against, so it may not keep booking under the ones it signed in with
+        // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
@@ -256,8 +253,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     @Test
     void givenAPersonHoldingTwoAccounts_whenTheirMembershipChanges_thenBothSessionsAreRefused()
             throws Exception {
-        // given — user_account carries no unique person, so a second account is a row this
-        // schema tolerates and the roster reads past rather than one that cannot exist
+        // given
         MembershipType type = memberships.createMembershipType("Junior", null);
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
@@ -268,7 +264,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         // when
         roster.assignMembership(jane.getId(), type.getId());
 
-        // then — the one the roster prefers is not the only one that books under the membership
+        // then
         mockMvc.perform(get("/api/my/bookings").session(first))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
@@ -309,7 +305,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         // when
         roster.assignMembership(jane.getId(), type.getId());
 
-        // then — nothing changed, so signing everybody out would be a cost without a reason
+        // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isOk());
     }

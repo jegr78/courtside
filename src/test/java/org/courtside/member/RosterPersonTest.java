@@ -68,7 +68,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
 
     @Test
     void givenAnEmailTheRosterAlreadyHolds_whenCreatingAChildOnIt_thenBothPeopleExist() {
-        // given — a club enrols children under a parent's address, so the second row must stand
+        // given
         RosterService.RosterEntry parent =
                 roster.createPerson("Jane", "Doe", "family.doe@example.org");
 
@@ -137,7 +137,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
 
     @Test
     void givenAnEmailAnotherPersonHolds_whenChangingAChildOntoIt_thenTheChangeStands() {
-        // given — the same family the create case describes, one screen later
+        // given
         RosterService.RosterEntry parent =
                 roster.createPerson("Jane", "Doe", "family.doe@example.org");
         RosterService.RosterEntry child =
@@ -156,16 +156,14 @@ class RosterPersonTest extends AbstractIntegrationTest {
 
     @Test
     void givenNamesPaddedWithWhitespace_whenCreatingAPerson_thenTheyAreStoredWithoutThePadding() {
-        // given — a no-break space is what a paste from a word processor leaves behind, and
-        // String.strip does not remove it although the contract calls it whitespace
+        // given
         String noBreakSpace = Character.toString(0x00a0);
 
         // when
         RosterService.RosterEntry created = roster.createPerson(
                 noBreakSpace + "Mary ", "  Major" + noBreakSpace, "  mary.major@example.org  ");
 
-        // then — the roster orders by lower(last_name), so padding would sort a person ahead of
-        // the whole club
+        // then
         assertThat(created.firstName()).isEqualTo("Mary");
         assertThat(created.lastName()).isEqualTo("Major");
         assertThat(created.email()).isEqualTo("mary.major@example.org");
@@ -196,8 +194,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
     @MethodSource("blankFirstNames")
     void givenAFirstNameBlankByUnicodeOrSpaces_whenCreatingAPerson_thenTheServiceRefusesItsOwnCaller(
             String blank) {
-        // when / then — the contract rejects all of these at the edge, so one reaching the
-        // service means a caller skipped the validation that precedes it
+        // when / then
         assertThatThrownBy(() -> roster.createPerson(blank, "Doe", "jane.doe@example.org"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("first name");

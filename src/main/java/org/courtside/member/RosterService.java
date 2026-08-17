@@ -199,8 +199,6 @@ public class RosterService {
         return true;
     }
 
-    // Every account the person holds, not the one the roster prefers: a second one the schema
-    // tolerates would otherwise keep booking under the membership it signed in with.
     private void revokeSessionsOf(UUID personId) {
         accounts.findByPersonIdIn(List.of(personId)).forEach(sessions::revoke);
     }
@@ -215,7 +213,7 @@ public class RosterService {
         } catch (DataIntegrityViolationException e) {
             if (isUsernameTaken(e)) {
                 throw new UsernameTakenException(
-                        "The username requested for account " + account.getId() + " is already taken", e);
+                        "The username requested for account " + account.getId() + " is already taken");
             }
             throw e;
         }
@@ -226,8 +224,6 @@ public class RosterService {
         return message != null && message.contains(UNIQUE_USERNAME_CONSTRAINT);
     }
 
-    // The account the write reaches is the one the list shows, so an administrator never changes
-    // a person's roles on a row the roster never displayed.
     private UserAccount requireAccount(UUID personId) {
         if (!persons.existsById(personId)) {
             throw new PersonNotFoundException("No person with id " + personId);
@@ -238,8 +234,6 @@ public class RosterService {
                         "No account for person " + personId));
     }
 
-    // Locked, because the one-account check and the one-membership index both assume no second
-    // write for the same person is in flight.
     private Person requireLockedPerson(UUID personId) {
         return persons.findWithLockById(personId)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + personId));
@@ -299,7 +293,6 @@ public class RosterService {
                 .toList();
     }
 
-    // user_account carries no unique person, so one person holding two must not fail a whole page.
     private static UserAccount preferredAccount(UserAccount first, UserAccount second) {
         return ACCOUNT_PRECEDENCE.compare(first, second) <= 0 ? first : second;
     }

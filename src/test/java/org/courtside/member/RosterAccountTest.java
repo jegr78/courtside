@@ -113,8 +113,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         roster.createAccount(jane.getId(), "doe.jane", "one-time-password", Set.of(Role.MEMBER));
 
-        // when / then — every write here names an account by its person, so a second account
-        // would be one this surface can neither show nor disable
+        // when / then
         assertThatThrownBy(() -> roster.createAccount(
                 jane.getId(), "doe.jane.second", "another-password", Set.of(Role.MEMBER)))
                 .isInstanceOf(PersonAccountExistsException.class)
@@ -139,8 +138,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
 
     @Test
     void givenAPasswordShorterThanTheBootstrapFloor_whenCreatingAnAccount_thenTheServiceRefusesItsOwnCaller() {
-        // given — the contract rejects this at the edge, so one reaching the service means a
-        // caller skipped the validation that precedes it
+        // given
         Person person = persons.save(new Person("John", "Roe", "john.roe@example.org"));
 
         // when / then
@@ -206,8 +204,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // when
         roster.setAccountEnabled(jane.getId(), false);
 
-        // then — the roles a session carries were read at sign-in, so a disable that waited for
-        // the session to expire would not be a disable
+        // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
@@ -216,7 +213,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
     @Test
     void givenASignedInAdministrator_whenTheAdminRoleIsRemoved_thenTheAdminSurfaceRefusesThatSession()
             throws Exception {
-        // given — a successor, because an instance never gives up its last administrator
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER, Role.ADMIN));
@@ -244,7 +241,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // when
         roster.changeRoles(jane.getId(), Set.of(Role.MEMBER, Role.TRAINER));
 
-        // then — nothing was taken away, so signing everybody out would be a cost without a reason
+        // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isOk());
     }
@@ -291,8 +288,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // when
         RosterService.RosterEntry entry = roster.changeUsername(jane.getId(), "doe.jane");
 
-        // then — the unique index would answer the account's own row, so this must not become a
-        // conflict with itself
+        // then
         assertThat(entry.username()).isEqualTo("doe.jane");
         assertThat(accounts.findByUsername("doe.jane")).isPresent();
     }
@@ -310,7 +306,8 @@ class RosterAccountTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> roster.changeUsername(mary.getId(), "doe.jane"))
                 .isInstanceOf(UsernameTakenException.class)
                 .hasMessageContaining(refused.toString())
-                .hasMessageNotContaining("doe.jane");
+                .hasMessageNotContaining("doe.jane")
+                .hasNoCause();
         assertThat(accounts.findByUsername("major.mary"))
                 .as("the refused correction must leave the account under the name it had")
                 .isPresent();
@@ -340,8 +337,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
 
     @Test
     void givenABlankUsername_whenCorrectingIt_thenTheServiceRefusesItsOwnCaller() {
-        // given — the contract rejects this at the edge, so one reaching the service means a
-        // caller skipped the validation that precedes it
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         roster.createAccount(jane.getId(), "doe.jane", "one-time-password", Set.of(Role.MEMBER));
 
@@ -365,8 +361,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // when
         roster.changeUsername(jane.getId(), "doe.jane");
 
-        // then — a session is recognised by the name it was signed in with, so one left standing
-        // would be signed in under a name the instance no longer knows
+        // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
@@ -380,8 +375,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         signInReadyAccount(jane, "doe.jaen", Set.of(Role.MEMBER));
         MockHttpSession session = signIn("doe.jaen");
 
-        // when — correcting a username is the only way a name is ever given up, and handing it
-        // to somebody else is what a board does after mixing two members up
+        // when
         roster.changeUsername(jane.getId(), "doe.jane");
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         roster.createAccount(mary.getId(), "doe.jaen", "one-time-password", Set.of(Role.MEMBER));
@@ -403,7 +397,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // when
         roster.changeUsername(jane.getId(), "doe.jane");
 
-        // then — nothing was taken away, so signing everybody out would be a cost without a reason
+        // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isOk());
     }
@@ -443,7 +437,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // when
         roster.resetPassword(jane.getId(), "second-one-time-password");
 
-        // then — the credential the session was opened with no longer exists
+        // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
@@ -459,8 +453,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // when
         roster.resetPassword(jane.getId(), "second-one-time-password");
 
-        // then — the reset is the remedy for a member who cannot sign in, so the password it
-        // hands out has to be the one that works
+        // then
         mockMvc.perform(post("/api/session")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("username", "doe.jane")
@@ -494,8 +487,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
 
     @Test
     void givenAPasswordShorterThanTheBootstrapFloor_whenResettingIt_thenTheServiceRefusesItsOwnCaller() {
-        // given — the contract rejects this at the edge, so one reaching the service means a
-        // caller skipped the validation that precedes it
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 

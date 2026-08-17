@@ -20,8 +20,7 @@ public final class PersonText {
         return value.substring(start, end);
     }
 
-    // Exactly the code points PersonRequest's pattern refuses a value made only of; PersonTextTest
-    // holds the two together over every code point.
+    // Exactly the code points PersonRequest's pattern refuses a value made only of.
     private static boolean isPadding(int codePoint) {
         return codePoint >= 0x0009 && codePoint <= 0x000d
                 || codePoint >= 0x001c && codePoint <= 0x0020

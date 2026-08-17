@@ -47,8 +47,7 @@ class RosterSessionRowTest extends AbstractIntegrationTest {
 
     @Test
     void givenAStoredSession_whenTheUsernameIsCorrected_thenTheRowUnderTheOldNameIsGone() {
-        // given — the index carries the name the session signed in with, so a deletion looking
-        // for the new one would find nothing and leave the row behind
+        // given
         UUID jane = accountHolder("doe.jaen");
         storeSessionFor("doe.jaen");
 
@@ -74,8 +73,7 @@ class RosterSessionRowTest extends AbstractIntegrationTest {
 
     @Test
     void givenAnOperationThatIsRefusedAfterRevokingSessions_whenItRollsBack_thenTheRowStands() {
-        // given — the session store commits on its own, so a deletion the operation does not
-        // survive would sign a member out over a change that never happened
+        // given
         UUID jane = accountHolder("doe.jane");
         storeSessionFor("doe.jane");
 

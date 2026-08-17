@@ -46,8 +46,7 @@ class SecurityEpochScopeTest extends AbstractIntegrationTest {
     @Test
     void givenASignedInAccount_whenAnotherAccountTakesOverItsUsername_thenTheOldSessionIsRefused()
             throws Exception {
-        // given — a username is only unique while it is held, and an account that gives one up
-        // leaves sessions behind that still name it
+        // given
         UserAccount jane = enabledAccount("Jane", "Doe", "doe.jane");
         MockHttpSession session = signIn("doe.jane");
         mockMvc.perform(get("/api/my/bookings").session(session))
@@ -57,8 +56,7 @@ class SecurityEpochScopeTest extends AbstractIntegrationTest {
         accounts.delete(jane);
         enabledAccount("Mary", "Major", "doe.jane");
 
-        // then — the session is answered for the account it was issued for, which no longer
-        // exists, and never for whoever holds its username now
+        // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));

@@ -65,8 +65,7 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
     @Test
     void givenAUsernameCorrectionInFlight_whenAPasswordResetLandsOnTheSameAccount_thenItIsRefused()
             throws Exception {
-        // given — the reset read the account before the correction committed, so without a
-        // version its write would carry the old username back into the row
+        // given
         UUID jane = accountHolder();
         CountDownLatch corrected = new CountDownLatch(1);
         CountDownLatch allowCommit = new CountDownLatch(1);

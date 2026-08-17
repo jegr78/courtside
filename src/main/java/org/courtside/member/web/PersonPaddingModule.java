@@ -12,8 +12,7 @@ import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.deser.ValueDeserializerModifier;
 import tools.jackson.databind.module.SimpleModule;
 
-// Reading is the last point before validation, and the document states the padding is gone
-// before maxLength and format are checked.
+// Reading is the last point before validation.
 @Component
 class PersonPaddingModule extends SimpleModule {
 

@@ -76,7 +76,7 @@ class ClockConfigurationTest {
 
     @Test
     void givenAPerformanceInstance_whenAFixedInstantIsConfigured_thenTheClockStandsStill() {
-        // given — the designation the perf compose file ships
+        // given
         ApplicationContextRunner runner = contextRunner.withPropertyValues(
                 "courtside.environment=PERFORMANCE", "courtside.clock.fixed-instant=" + FIXED_INSTANT);
 
@@ -87,8 +87,7 @@ class ClockConfigurationTest {
 
     @Test
     void givenAMisspelledDesignation_whenAFixedInstantIsConfigured_thenTheContextRefusesToStart() {
-        // given — COURTSIDE_ENVIRONMEN=production in a deployment leaves the property unset and
-        // the misspelling is the only designation the instance sees
+        // given
         ApplicationContextRunner runner = contextRunner.withPropertyValues(
                 "courtside.environment=PRODUCTIO", "courtside.clock.fixed-instant=" + FIXED_INSTANT);
 

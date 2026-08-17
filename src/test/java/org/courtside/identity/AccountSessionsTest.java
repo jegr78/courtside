@@ -35,8 +35,7 @@ class AccountSessionsTest {
 
     @Test
     void givenTheStoreRefusesTheDeletion_whenSessionsAreEnded_thenTheOperationThatRevokedThemStands() {
-        // given — the security epoch has already been raised by the caller, so failing the whole
-        // operation over a row that expires by itself would be the worse answer
+        // given
         when(repository.findByPrincipalName("doe.jane"))
                 .thenThrow(new IllegalStateException("the session store is unavailable"));
 

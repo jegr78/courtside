@@ -22,8 +22,7 @@ class SecurityEpochFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        // By account, not by username: a renamed account frees its old name, and a session left
-        // holding that name would otherwise be checked against whoever holds it now.
+        // A renamed account frees its old name for somebody else to take.
         if (authentication != null && authentication.getPrincipal() instanceof CourtsideUserDetails user
                 && accounts.findSecurityEpochById(user.accountId())
                 .filter(epoch -> epoch == user.securityEpoch()).isEmpty()) {

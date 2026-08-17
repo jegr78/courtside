@@ -242,8 +242,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenANameOfTheFullLengthAndPadding_whenCreatingAPerson_thenThePaddingIsNotCounted()
             throws Exception {
-        // when / then — the padding is gone before the bound is checked, so a name that fits
-        // once stripped is not refused for the whitespace around it
+        // when / then
         mockMvc.perform(post("/api/admin/roster")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(personBody("M".repeat(60) + "  ", "Major", VALID_EMAIL))
@@ -276,8 +275,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.firstName").value("Mary"))
                 .andReturn().getResponse();
 
-        // then — a paste from a word processor arrives padded with these, and the pattern already
-        // calls every one of them whitespace
+        // then
         UUID personId = UUID.fromString(JsonPath.read(response.getContentAsString(), "$.personId"));
         assertThat(persons.findById(personId)).get()
                 .satisfies(person -> assertThat(person.getFirstName()).isEqualTo("Mary"));
@@ -294,8 +292,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenANameHoldingALineBreak_whenCreatingAPerson_thenTheContractRefusesIt(
             String label, String body) throws Exception {
-        // when / then — a name reaches email headers and templates, so a terminator a board can
-        // type into it is a poor default to carry there
+        // when / then
         mockMvc.perform(post("/api/admin/roster")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
@@ -318,7 +315,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAValueLongerThanTheContractAllows_whenCreatingAPerson_thenTheContractNamesTheField(
             String field, String body) throws Exception {
-        // when / then — all three columns are text, so nothing downstream re-imposes the bound
+        // when / then
         mockMvc.perform(post("/api/admin/roster")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
@@ -399,8 +396,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnUnknownPerson_whenChangingThem_thenTheResponseCarriesItsOwnType() throws Exception {
-        // when / then — a 404 from a missing row and a 404 from an unmapped path are the same
-        // number, so the type is what tells them apart
+        // when / then
         mockMvc.perform(put("/api/admin/roster/{personId}", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(personBody("Jane", "Doe", "jane.doe@example.org"))
@@ -465,8 +461,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnAccountHoldingSeveralRoles_whenReadingIt_thenTheRolesAscendByName() throws Exception {
-        // given — MEMBER, TRAINER and ADMIN are declared in that order, so a response ordered by
-        // the enumeration's own order would answer them the other way round
+        // given
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
 
         // when / then
@@ -483,8 +478,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenATakenUsername_whenCreatingAnAccount_thenTheResponseCarriesItsOwnType() throws Exception {
-        // given — a unique index and this task's own refusal both answer 409, so the type is
-        // what tells a client which of the two it hit
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER)));
@@ -544,7 +538,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnAccountTheContractRefuses_whenCreatingIt_thenTheContractNamesTheField(
             String field, String code, String body) throws Exception {
-        // given — the twelve-character floor is the one the bootstrap administrator is held to
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
 
         // when / then
@@ -582,8 +576,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPersonWithoutAnAccount_whenChangingRoles_thenTheResponseCarriesItsOwnType()
             throws Exception {
-        // given — a person who exists and an account that does not are both 404, so only the
-        // type says which of the two an administrator is looking at
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
 
         // when / then
@@ -672,8 +665,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenASecondEnabledAdministrator_whenOneStepsDown_thenTheChangeStands() throws Exception {
-        // given — an officer may hand the role over, which is why the rule is about the last one
-        // and not about the account making the request
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         UserAccount stepping = enabledAccount(jane, "doe.jane", Role.ADMIN);
@@ -699,7 +691,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenADisabledSecondAdministrator_whenTheEnabledOneStepsDown_thenTheInstanceKeepsThem()
             throws Exception {
-        // given — a disabled account cannot sign in, so it is no successor
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         enabledAccount(jane, "doe.jane", Role.ADMIN);
@@ -758,8 +750,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenTheUsernameItAlreadyHolds_whenCorrectingIt_thenItIsAcceptedRatherThanConflicting()
             throws Exception {
-        // given — the unique index answers the account's own row, so a naive write would turn
-        // this into a 409 against itself
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER)));
 
@@ -776,8 +767,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAUsernameAnotherAccountHolds_whenCorrectingIt_thenTheResponseCarriesItsOwnType()
             throws Exception {
-        // given — a unique index and an unmapped conflict both answer 409, so the type is what
-        // tells a client which of the two it hit
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER)));
@@ -797,8 +787,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPersonWithoutAnAccount_whenCorrectingTheUsername_thenTheResponseCarriesItsOwnType()
             throws Exception {
-        // given — a person who exists and an account that does not are both 404, so only the
-        // type says which of the two an administrator is looking at
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
 
         // when / then
@@ -839,8 +828,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAUsernameTheContractRefuses_whenCorrectingIt_thenTheContractNamesTheField(
             String label, String code, String body) throws Exception {
-        // given — the service guard behind this answers with an IllegalStateException, which is
-        // a 500, so every value that could reach it has to be refused here
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         accounts.save(new UserAccount(jane, "doe.jaen", "hash", Set.of(Role.MEMBER)));
 
@@ -930,8 +918,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPasswordTheContractRefuses_whenResettingIt_thenTheContractNamesTheField(
             String label, String code, String body) throws Exception {
-        // given — the twelve-character floor is the one the bootstrap administrator is held to,
-        // and the service guard behind it is a 500 if anything gets past here
+        // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         UserAccount account = new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
         accounts.save(account);
@@ -1023,7 +1010,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.membershipTypeId").value(OTHER_MEMBERSHIP_TYPE_ID.toString()));
 
-        // then — one membership per person, so the correction moves the row rather than adding one
+        // then
         assertThat(members.findByPersonIdIn(List.of(mary.getId())))
                 .singleElement()
                 .satisfies(member -> assertThat(member.getMembershipTypeId())
@@ -1034,8 +1021,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenADeactivatedMembershipType_whenAssigningIt_thenTheResponseCarriesItsOwnType()
             throws Exception {
-        // given — the unique person index answers 409 as well, so the type and the violation are
-        // what tell a client that the refusal is the one this flag exists for
+        // given
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         mockMvc.perform(put("/api/admin/membership-types/{id}/active", MEMBERSHIP_TYPE_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -1061,8 +1047,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnUnknownMembershipType_whenAssigningIt_thenTheResponseCarriesItsOwnType()
             throws Exception {
-        // given — an unknown person and an unknown type are both 404 on this path, so only the
-        // type says which of the two an administrator got wrong
+        // given
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
 
         // when / then
@@ -1100,8 +1085,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAMembershipTypeIdTheContractRefuses_whenAssigningIt_thenTheContractNamesTheField(
             String label, String code, String body) throws Exception {
-        // given — the service guard behind this answers with an IllegalStateException, which is
-        // a 500, so every value that could reach it has to be refused here
+        // given
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
 
         // when / then
@@ -1120,8 +1104,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPersonIdThatIsNotAUuid_whenAssigningAMembership_thenTheContractRefusesIt()
             throws Exception {
-        // when / then — the service guard behind the path variable is an IllegalStateException,
-        // so nothing that is not a person id may reach it
+        // when / then
         mockMvc.perform(put("/api/admin/roster/{personId}/membership", "nobody")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(membershipBody(MEMBERSHIP_TYPE_ID.toString()))

@@ -15,8 +15,6 @@ public class AccountSessions {
 
     private final FindByIndexNameSessionRepository<? extends Session> sessions;
 
-    // After the commit, because the session store commits on its own and an operation that is
-    // still refused afterwards would otherwise have signed somebody out for nothing.
     public void endFor(String username) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             delete(username);
@@ -35,7 +33,6 @@ public class AccountSessions {
         endFor(account.getUsername());
     }
 
-    // The principal is passed in because a username correction ends the sessions the old name holds.
     public void endIfRevoked(UserAccount account, String principal, long epochBefore) {
         if (account.getSecurityEpoch() != epochBefore) {
             endFor(principal);

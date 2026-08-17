@@ -13,8 +13,7 @@ import java.util.UUID;
 
 public interface PersonRepository extends JpaRepository<Person, UUID> {
 
-    // user_account carries no unique person, so the person row is where two administrators
-    // creating an account at once are serialised.
+    // user_account carries no unique person, so the person row is the one to lock.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Person> findWithLockById(UUID id);
 

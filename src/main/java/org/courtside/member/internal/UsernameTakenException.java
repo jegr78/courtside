@@ -10,8 +10,8 @@ public class UsernameTakenException extends DomainFailure {
             "username-taken", HttpStatus.CONFLICT,
             "Username already in use", "This username is already in use");
 
-    public UsernameTakenException(String message, Throwable cause) {
-        super(message, cause);
+    public UsernameTakenException(String message) {
+        super(message);
     }
 
     @Override

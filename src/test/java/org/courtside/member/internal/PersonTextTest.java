@@ -19,8 +19,7 @@ class PersonTextTest {
     @Test
     void whenReadingEveryCodePoint_thenTheContractAndTheStripperCallTheSameThingsWhitespace()
             throws IOException {
-        // given — the two say it in different languages, a regex in the document and a range
-        // check in Java, and only their agreement keeps a blank value off the guard
+        // given
         Pattern nonBlank = Pattern.compile(patternOf("firstName"));
         List<String> disagreements = new ArrayList<>();
 
@@ -51,8 +50,7 @@ class PersonTextTest {
         // given
         String nonBlank = patternOf("firstName");
 
-        // when / then — a field left without it is answered 500 rather than 400 once a blank
-        // value reaches the service
+        // when / then
         assertThat(List.of(patternOf("lastName"), patternOf("email")))
                 .containsOnly(nonBlank);
     }

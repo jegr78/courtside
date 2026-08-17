@@ -80,8 +80,7 @@ class ProblemTypeUriTest {
 
     @Test
     void whenReadingEveryProblemTypeUri_thenNoneNamesAHostThisProductDoesNotOwn() throws Exception {
-        // given — a club runs its own instance under its own domain, so an http type URI would
-        // name a host nobody operates and could later be registered by someone else
+        // given
         List<String> types = adviceTypeLiterals();
         List<String> failureTypes = failureSlugs();
 
@@ -99,22 +98,20 @@ class ProblemTypeUriTest {
     @Test
     void whenReadingEveryDomainFailuresProblemType_thenTheSlugSetMatchesKnownSlugsExactly()
             throws Exception {
-        // when / then — a new failure must be added here deliberately before it can ship
+        // when / then
         assertThat(failureSlugs()).containsExactlyInAnyOrderElementsOf(KNOWN_FAILURE_SLUGS);
     }
 
     @Test
     void whenReadingEveryProblemTypeAnAdviceSets_thenTheSlugSetMatchesKnownSlugsExactly()
             throws IOException {
-        // when / then — an advice that describes a framework exception has no ProblemType
-        // constant to read, so its literal is pinned separately
+        // when / then
         assertThat(adviceTypeLiterals()).containsExactlyInAnyOrderElementsOf(KNOWN_ADVICE_SLUGS);
     }
 
     @Test
     void whenReadingEveryDomainFailure_thenEachDeclaresItsOwnProblemTypeConstant() throws Exception {
-        // given — the constant is what the assertions above read; a failure that built its
-        // ProblemType inline would be invisible to them and could ship an unreviewed slug
+        // given
         TreeSet<String> withoutConstant = new TreeSet<>();
 
         // when

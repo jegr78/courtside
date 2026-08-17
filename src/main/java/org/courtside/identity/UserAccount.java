@@ -108,8 +108,6 @@ public class UserAccount {
         revokeSessions();
     }
 
-    // The rehash on a sign-in replaces the hash alone, must leave every session standing, and
-    // therefore never touches the entity.
     void revokeSessions() {
         this.securityEpoch++;
     }

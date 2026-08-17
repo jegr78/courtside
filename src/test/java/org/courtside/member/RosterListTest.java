@@ -159,8 +159,7 @@ class RosterListTest extends AbstractIntegrationTest {
 
     @Test
     void givenIdsThatContradictTheNameOrder_whenFollowingTheCursor_thenTheNextPageContinuesByName() {
-        // given — the ids descend while the names ascend, the one arrangement in which an
-        // id-only cursor and a name-keyed cursor return different second pages
+        // given
         Person jane = savePersonWithLeadingIdDigitIn("Jane", "Doe", "jane.doe@example.org", HIGHEST_IDS);
         Person mary = savePersonWithLeadingIdDigitIn("Mary", "Major", "mary.major@example.org", MIDDLE_IDS);
         Person john = savePersonWithLeadingIdDigitIn("John", "Roe", "john.roe@example.org", LOWEST_IDS);

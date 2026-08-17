@@ -44,8 +44,7 @@ class LastAdministratorConcurrencyTest extends AbstractIntegrationTest {
     @Test
     void givenTwoAdministratorsSteppingDownAtOnce_whenBothAreInFlight_thenTheSecondIsRefused()
             throws Exception {
-        // given — each read two administrators before the other committed, so a check that only
-        // counted would let both through and leave the instance with none
+        // given
         UUID jane = enabledAdministrator("Jane", "Doe", "doe.jane");
         UUID mary = enabledAdministrator("Mary", "Major", "major.mary");
         CountDownLatch firstDemoted = new CountDownLatch(1);
