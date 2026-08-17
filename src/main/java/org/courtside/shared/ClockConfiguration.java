@@ -8,11 +8,14 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.Locale;
+import java.util.Set;
 
 @Configuration(proxyBeanMethods = false)
 public class ClockConfiguration {
 
-    private static final String PRODUCTION = "PRODUCTION";
+    private static final Set<String> DISPOSABLE_DESIGNATIONS =
+            Set.of("UAT", "DEVELOPMENT", "PERFORMANCE");
 
     @Bean
     public Clock clock(@Value("${courtside.clock.fixed-instant:}") String fixedInstant,
@@ -22,10 +25,10 @@ public class ClockConfiguration {
             return Clock.systemUTC();
         }
         String designation = environment == null ? "" : environment.strip();
-        if (designation.isEmpty() || PRODUCTION.equalsIgnoreCase(designation)) {
+        if (!DISPOSABLE_DESIGNATIONS.contains(designation.toUpperCase(Locale.ROOT))) {
             throw new IllegalStateException(
-                    "A fixed clock requires courtside.environment to name a non-production instance, but it is '"
-                            + designation + "'");
+                    "A fixed clock requires courtside.environment to name one of "
+                            + "UAT, DEVELOPMENT or PERFORMANCE, but it is '" + designation + "'");
         }
         return Clock.fixed(parseInstant(instant), ZoneOffset.UTC);
     }
