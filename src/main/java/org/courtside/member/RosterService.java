@@ -52,7 +52,8 @@ public class RosterService {
         validateLimit(limit);
         requireKnownCursor(cursor);
         String normalized = normalize(query);
-        List<UUID> ids = persons.findRosterIds(normalized, cursor, PageRequest.of(0, limit + 1));
+        List<UUID> ids = persons.findIdsByNameFragmentAfter(
+                normalized, cursor, PageRequest.of(0, limit + 1));
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
     }
 

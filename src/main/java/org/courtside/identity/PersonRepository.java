@@ -21,16 +21,17 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
     @Query("""
             SELECT person.id FROM Person person
             WHERE lower(concat(person.firstName, ' ', person.lastName))
-                  LIKE concat('%', :query, '%') ESCAPE '!'
-              AND (:cursor IS NULL
-                OR lower(person.lastName) > (SELECT lower(c.lastName) FROM Person c WHERE c.id = :cursor)
-                OR (lower(person.lastName) = (SELECT lower(c.lastName) FROM Person c WHERE c.id = :cursor)
+                  LIKE concat('%', :nameFragment, '%') ESCAPE '!'
+              AND (:after IS NULL
+                OR lower(person.lastName) > (SELECT lower(c.lastName) FROM Person c WHERE c.id = :after)
+                OR (lower(person.lastName) = (SELECT lower(c.lastName) FROM Person c WHERE c.id = :after)
                     AND (lower(person.firstName)
-                             > (SELECT lower(c.firstName) FROM Person c WHERE c.id = :cursor)
+                             > (SELECT lower(c.firstName) FROM Person c WHERE c.id = :after)
                          OR (lower(person.firstName)
-                                 = (SELECT lower(c.firstName) FROM Person c WHERE c.id = :cursor)
-                             AND person.id > :cursor))))
+                                 = (SELECT lower(c.firstName) FROM Person c WHERE c.id = :after)
+                             AND person.id > :after))))
             ORDER BY lower(person.lastName), lower(person.firstName), person.id
             """)
-    List<UUID> findRosterIds(@Param("query") String query, @Param("cursor") UUID cursor, Pageable pageable);
+    List<UUID> findIdsByNameFragmentAfter(@Param("nameFragment") String nameFragment,
+                                          @Param("after") UUID after, Pageable pageable);
 }
