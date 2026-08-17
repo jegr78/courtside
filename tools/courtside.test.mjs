@@ -7,7 +7,8 @@ import { test } from "node:test";
 import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
-  processPlans, requiredPorts, restoreDatabase, startProcesses, superviseFunnel, terminate,
+  openBackupForRestore, processPlans, requiredPorts, restoreDatabase, runInteractive, startProcesses,
+  superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
@@ -588,7 +589,7 @@ test("given a Funnel summary, when building a result, then UAT read-only evidenc
   assert.equal(result.load.writeShare, 0);
   assert.equal(result.thresholds.readOnlyApi, true);
   assert.equal("bookingConflicts" in result.metrics, false);
-  assert.doesNotMatch(JSON.stringify(result), /example\.ts\.net/);
+  assert.equal(JSON.stringify(result).includes("example.ts.net"), false);
   assert.doesNotThrow(() => validatePerformanceResult(result));
 });
 
@@ -1136,6 +1137,45 @@ test("given a fresh UAT database, when creating its bootstrap password, then it 
   // then
   assert.notEqual(first, second);
   assert.match(first, /^[A-Za-z0-9_-]{24}$/);
+});
+
+test("given a missing backup, when opening it for restore, then the failure names the requested path", () => {
+  // given
+  const missing = Object.assign(new Error("missing"), { code: "ENOENT" });
+
+  // when
+  let failure;
+  try {
+    openBackupForRestore("missing.dump", () => { throw missing; });
+  } catch (caught) {
+    failure = caught;
+  }
+
+  // then
+  assert.equal(failure.message, "Backup does not exist: missing.dump");
+});
+
+test("given an execution plan, when running it, then only trusted commands run without a shell", () => {
+  // given
+  const calls = [];
+  const execute = (command, args, options) => {
+    calls.push({ command, args, options });
+    return { status: 0 };
+  };
+
+  // when
+  let failure;
+  try {
+    runInteractive({ command: "untrusted", args: [] }, execute);
+  } catch (caught) {
+    failure = caught;
+  }
+  runInteractive({ command: "docker", args: ["version"] }, execute);
+
+  // then
+  assert.equal(failure.message, "Unsupported command: untrusted");
+  assert.equal(calls[0].command, "docker");
+  assert.equal(calls[0].options.shell, false);
 });
 
 test("given a restore failure, when restoring UAT, then changes are atomic and the application restarts", () => {

@@ -1298,17 +1298,27 @@ function backupTimestamp() {
 
 function restoreUat(file) {
   const source = resolve(root, file);
-  if (!existsSync(source)) throw new Error(`Backup does not exist: ${source}`);
   const state = readUatState();
   const environment = { ...process.env, COURTSIDE_UAT_IMAGE: state.image, COURTSIDE_UAT_ADMIN_PASSWORD: "" };
   const composeArgs = uatComposeArgs(state.dbPort);
-  const input = openSync(source, "r");
+  const input = openBackupForRestore(source);
   try {
     restoreDatabase(input, composeArgs, environment);
   } finally {
     closeSync(input);
   }
   process.stdout.write(`Backup restored from ${source}\n`);
+}
+
+export function openBackupForRestore(source, open = openSync) {
+  try {
+    return open(source, "r");
+  } catch (failure) {
+    if (failure?.code === "ENOENT") {
+      throw new Error(`Backup does not exist: ${source}`, { cause: failure });
+    }
+    throw failure;
+  }
 }
 
 export function restoreDatabase(input, composeArgs, environment, execute = runInteractive) {
@@ -1426,8 +1436,8 @@ export function terminateChildren(children, terminateProcess) {
 
 function spawnReady(label, plan, environment, spawnProcess) {
   return new Promise((resolveChild, rejectChild) => {
-    const child = spawnProcess(plan.command, plan.args, {
-      cwd: root, detached: plan.detached, env: environment,
+    const child = spawnProcess(trustedCommand(plan.command), plan.args, {
+      cwd: root, detached: plan.detached, env: environment, shell: false,
       stdio: ["inherit", "pipe", "pipe"]
     });
     const exit = new Promise((resolveExit) => {
@@ -1453,27 +1463,41 @@ function runningDevServices() {
   return new Set(result.stdout.trim().split(/\r?\n/).filter(Boolean));
 }
 
-function runInteractive(plan) {
-  const result = spawnSync(plan.command, plan.args, {
+export function runInteractive(plan, execute = spawnSync) {
+  const command = trustedCommand(plan.command);
+  const result = execute(command, plan.args, {
     cwd: root,
     env: plan.environment ?? process.env,
+    shell: false,
     stdio: [plan.stdin ?? "inherit", plan.stdout ?? "inherit", "inherit"]
   });
   if (result.error) {
     throw result.error;
   }
   if (result.status !== 0) {
-    throw new Error(`${plan.command} exited with status ${result.status}`);
+    throw new Error(`${command} exited with status ${result.status}`);
   }
 }
 
 function runCaptured(plan) {
-  const result = spawnSync(plan.command, plan.args, {
-    cwd: root, env: plan.environment ?? process.env, encoding: "utf8"
+  const command = trustedCommand(plan.command);
+  const result = spawnSync(command, plan.args, {
+    cwd: root, env: plan.environment ?? process.env, encoding: "utf8", shell: false
   });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${plan.command} exited with status ${result.status}: ${result.stderr.trim()}`);
+  if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}: ${result.stderr.trim()}`);
   return result.stdout.trim();
+}
+
+function trustedCommand(command) {
+  const names = executableNames();
+  const java = process.env.JAVA_HOME
+    ? join(process.env.JAVA_HOME, "bin", process.platform === "win32" ? "java.exe" : "java")
+    : "java";
+  if (["docker", "cmd.exe", names.maven, names.npm, java].includes(command)) {
+    return command;
+  }
+  throw new Error(`Unsupported command: ${command}`);
 }
 
 function prefix(stream, label, destination) {
