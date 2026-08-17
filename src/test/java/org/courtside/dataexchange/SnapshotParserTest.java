@@ -164,9 +164,9 @@ class SnapshotParserTest {
     void givenAMemberNumberLongerThanTheReferenceHolds_whenParsing_thenOnlyThatRowFails() {
         // given
         String content = """
-                Member number,First name,Last name
-                %s,Jane,Doe
-                4712,John,Roe
+                Member number,First name,Last name,Email
+                %s,Jane,Doe,jane.doe@example.org
+                4712,John,Roe,john.roe@example.org
                 """.formatted("4".repeat(MemberNumber.MAX_LENGTH + 1));
 
         // when

@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -80,7 +81,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
 
         // then
         assertThat(outcome.created()).isEqualTo(2);
-        assertThat(references.personIdsByExternalId(source, Set.of("4711", "4712"))).hasSize(2);
+        assertThat(personIdsOf(source)).hasSize(2);
         assertThat(members.findAll()).hasSize(2);
     }
 
@@ -116,7 +117,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
                 4711,Jane,Roe,jane.doe@example.org
                 4712,John,Roe,john.roe@example.org
                 """, SnapshotMode.FULL_SNAPSHOT);
-        UUID jane = references.personIdsByExternalId(source, Set.of("4711")).get("4711");
+        UUID jane = personIdsOf(source).get("4711");
         rename(jane, "Janet");
 
         // when / then
@@ -141,7 +142,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
 
         // then
         assertThat(outcome.corrected()).isEqualTo(1);
-        UUID jane = references.personIdsByExternalId(source, Set.of("4711")).get("4711");
+        UUID jane = personIdsOf(source).get("4711");
         assertThat(persons.findById(jane).orElseThrow().getLastName()).isEqualTo("Roe");
     }
 
@@ -175,7 +176,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         // then
         assertThat(outcome.membershipsEnded()).isEqualTo(1);
         assertThat(outcome.removalsConfirmed()).isTrue();
-        UUID john = references.personIdsByExternalId(source, Set.of("4712")).get("4712");
+        UUID john = personIdsOf(source).get("4712");
         assertThat(members.findCurrentByPersonId(john)).isEmpty();
     }
 
@@ -309,6 +310,11 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     private UUID preview(String content, SnapshotMode mode) {
         return previews.create(source, mode, "roster.csv",
                 content.getBytes(StandardCharsets.UTF_8), actor).previewId();
+    }
+
+    private Map<String, UUID> personIdsOf(UUID sourceId) {
+        return references.list(sourceId, null, 50).items().stream()
+                .collect(Collectors.toMap(ExternalLink::externalId, ExternalLink::personId));
     }
 
     private void rename(UUID personId, String firstName) {

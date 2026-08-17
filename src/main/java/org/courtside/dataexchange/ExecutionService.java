@@ -8,6 +8,7 @@ import org.courtside.dataexchange.internal.ImportPreview;
 import org.courtside.dataexchange.internal.ImportPreviewRepository;
 import org.courtside.dataexchange.internal.ImportRun;
 import org.courtside.dataexchange.internal.ImportRunRepository;
+import org.courtside.dataexchange.internal.MemberNumber;
 import org.courtside.dataexchange.internal.PersonFingerprint;
 import org.courtside.dataexchange.internal.PreviewContent;
 import org.courtside.dataexchange.internal.SourceLock;
@@ -198,7 +199,7 @@ public class ExecutionService {
 
     private void linkCreations(UUID sourceId, Map<String, UUID> createdByExternalId, Instant now) {
         createdByExternalId.forEach((externalId, personId) ->
-                references.save(new ExternalReference(sourceId, externalId, personId, now)));
+                references.save(new ExternalReference(sourceId, new MemberNumber(externalId), personId, now)));
         references.flush();
     }
 
