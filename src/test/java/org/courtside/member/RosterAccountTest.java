@@ -306,9 +306,11 @@ class RosterAccountTest extends AbstractIntegrationTest {
         roster.createAccount(mary.getId(), "major.mary", "another-password", Set.of(Role.MEMBER));
 
         // when / then
+        UUID refused = accounts.findByUsername("major.mary").orElseThrow().getId();
         assertThatThrownBy(() -> roster.changeUsername(mary.getId(), "doe.jane"))
                 .isInstanceOf(UsernameTakenException.class)
-                .hasMessageContaining("doe.jane");
+                .hasMessageContaining(refused.toString())
+                .hasMessageNotContaining("doe.jane");
         assertThat(accounts.findByUsername("major.mary"))
                 .as("the refused correction must leave the account under the name it had")
                 .isPresent();

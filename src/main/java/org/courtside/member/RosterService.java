@@ -215,7 +215,7 @@ public class RosterService {
         } catch (DataIntegrityViolationException e) {
             if (isUsernameTaken(e)) {
                 throw new UsernameTakenException(
-                        "Username '" + account.getUsername() + "' is already taken", e);
+                        "The username requested for account " + account.getId() + " is already taken", e);
             }
             throw e;
         }
