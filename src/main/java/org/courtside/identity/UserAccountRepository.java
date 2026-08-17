@@ -25,8 +25,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             """)
     int changeInitialPassword(@Param("id") UUID id, @Param("passwordHash") String passwordHash);
 
-    @Query("SELECT account.securityEpoch FROM UserAccount account WHERE account.username = :username")
-    Optional<Long> findSecurityEpochByUsername(@Param("username") String username);
+    @Query("SELECT account.securityEpoch FROM UserAccount account WHERE account.id = :id")
+    Optional<Long> findSecurityEpochById(@Param("id") UUID id);
 
     List<UserAccount> findByPersonIdIn(List<UUID> personIds);
 }
