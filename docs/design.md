@@ -896,27 +896,28 @@ whether it is built or designed. **Designed means absent today.**
   `HttpOnly` / `Secure` / `SameSite=Lax` cookie. **No JWT** — the PWA and API share an
   origin, so no token gymnastics are needed, and an admin can terminate a session
   immediately, which JWT cannot do. A role, membership or account-status change must terminate
-  that account's active sessions in the same operation so cached authorities cannot outlive the
-  change. A persisted account security epoch makes sessions created before a credential change
-  fail closed even when an in-flight request saves one after bulk deletion. *Built.* The roster
-  is the admin surface for it: disabling an account, removing one of its roles, correcting its
-  username, resetting its password and changing the membership of the person it belongs to each
-  raise that account's epoch, so its next request is refused rather than served with the rights or
-  the credential it was signed in with. A membership is not a role, and no session carries a stale
-  copy of one — a booking resolves the membership as it evaluates the rules — so the epoch moves
-  here because the policy above names a membership change, not because anything cached would
-  otherwise outlive it. It moves in either direction, because there is no harmless one: the advance
-  window and the open-booking cap are looked up through a membership type and are found for nobody
-  without one, so holding no membership is this build's most permissive state and ending a
-  membership grants as readily as assigning one restricts. The policy is about what an account is,
-  not about what the club has configured: repointing a membership type at another rule set changes
-  what every member holding it may book and leaves every session standing, as a rule set's own
-  parameters, a court's opening hours and a card's roles do, because all of them are read while a
-  request is served and bind the next one. Enabling an
-  account, adding a role, writing the username an account already holds and writing the membership
-  a person already holds leave sessions alone, as does the rehash on a sign-in, which replaces the
-  stored hash and nothing else. Ending one single session while leaving the account's rights
-  untouched still has no surface.
+  that account's active sessions in the same operation — a role or an account status because
+  cached authorities must not outlive the change, a membership because what its holder may book
+  changes with it and neither direction of that change is harmless. A persisted account security
+  epoch makes sessions created before a credential change fail closed even when an in-flight
+  request saves one after bulk deletion. *Built.* The roster is the admin surface for it:
+  disabling an account, removing one of its roles, correcting its username, resetting its password
+  and changing the membership of the person it belongs to each raise that account's epoch, so its
+  next request is refused rather than served with the rights or the credential it was signed in
+  with. A membership is not a role, and no session carries a stale copy of one — a booking resolves
+  the membership as it evaluates the rules — so the epoch moves here for the second reason above
+  and not the first. Neither direction is harmless: the advance window and the open-booking cap
+  are looked up through a membership type and are found for nobody without one, so no membership
+  is the most permissive state the booking rules know; and a person without one drops out of
+  participant search, so ending a membership takes as much away as assigning one does. The policy
+  is about what an account is, not about what the club has configured: repointing a membership type
+  at another rule set changes what every member holding it may book and leaves every session
+  standing, as a rule set's own parameters, a court's opening hours and a card's roles do, because
+  all of them are read while a request is served and bind the next one. Enabling an account, adding
+  a role, writing the username an account already holds and writing the membership a person already
+  holds leave sessions alone, as does the rehash on a sign-in, which replaces the stored hash and
+  nothing else. Ending one single session while leaving the account's rights untouched still has no
+  surface.
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* Source-address counters
   absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;
