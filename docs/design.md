@@ -39,7 +39,7 @@ The web client is built and covered by tests too: the court plan as the public l
 personal booking management, managed appointments for officers, and the browser admin surface for
 configuration and facilities.
 
-Designed and not built: the observability stack of section 9 beyond the health endpoint,
+Designed and not built: observability alerts and the reference collector stack of section 9,
 container image scanning, CSV import, and reports and exports.
 
 ---
@@ -797,15 +797,12 @@ Import and export:
 
 ## 9. Observability
 
-**Designed, not built.** Today only `/actuator/health` is exposed; of the metrics below only
-`courtside.password.rehash.failed` is registered, and no traces or alerts exist yet. The section
-stays in the present tense because it defines the target — a club operating a current build should
-plan for a health check and nothing more.
-
-The application exports **metrics, traces and logs over OTLP** using
-`spring-boot-starter-opentelemetry`. The protocol is the commitment, not the backend — the
-target is a configuration line, and a club that sets no `OTLP_ENDPOINT` simply exports
-nothing. Actuator and structured logs are always present.
+The application can export **metrics and traces over OTLP** using
+`spring-boot-starter-opentelemetry` and Micrometer's OTLP registry. Export is disabled unless
+`COURTSIDE_OTLP_ENABLED=true`; the trace and metrics endpoints are configured separately because
+each is a complete OTLP/HTTP URL. Actuator and structured ECS console logs are always present.
+Only `/actuator/health` is exposed over HTTP by default, so enabling OTLP does not broaden the
+management surface.
 
 **Structured logging** is built in since Spring Boot 3.4 (ECS / Logstash / GELF), with
 trace and span IDs correlated into log lines automatically:
@@ -813,14 +810,21 @@ trace and span IDs correlated into log lines automatically:
 ```properties
 logging.structured.format.console=ecs
 logging.structured.ecs.service.name=courtside
-management.otlp.metrics.export.url=${OTLP_ENDPOINT:}
-management.tracing.sampling.probability=0.1
+management.tracing.export.otlp.enabled=${COURTSIDE_OTLP_ENABLED:false}
+management.opentelemetry.tracing.export.otlp.endpoint=${COURTSIDE_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+management.otlp.metrics.export.enabled=${COURTSIDE_OTLP_ENABLED:false}
+management.otlp.metrics.export.url=${COURTSIDE_OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
+management.tracing.sampling.probability=${COURTSIDE_TRACING_SAMPLING_PROBABILITY:0.1}
 ```
+
+The OpenTelemetry SDK remains active when export is disabled. That keeps local trace context and
+log correlation available without making network calls. ECS logs remain on standard output for the
+container runtime or a collector to ingest; Courtside does not send logs through a second exporter.
 
 **JavaMelody is not used** — it does not fit the OTLP model and offers nothing Actuator plus
 Micrometer does not do better.
 
-**Spring Boot Admin is used**, for a different purpose than Grafana: fleet overview across
+**Spring Boot Admin is planned**, for a different purpose than Grafana: fleet overview across
 instances, which version runs where, health status, and raising log levels at runtime when
 a club reports a problem. That is operational *control*; Grafana is trends, history and
 alerting.
