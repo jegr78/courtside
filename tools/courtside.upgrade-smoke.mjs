@@ -37,6 +37,21 @@ export function selectRepositoryDigest(repository, originTag, repoDigests) {
   return matches[0];
 }
 
+export function unexplainedChanges(before, after, path = "") {
+  if (Array.isArray(before)) {
+    if (!Array.isArray(after) || after.length !== before.length) return [path];
+    return before.flatMap((row, index) =>
+      unexplainedChanges(row, after[index], `${path}[${index}]`));
+  }
+  if (before !== null && typeof before === "object") {
+    if (after === null || typeof after !== "object" || Array.isArray(after)) return [path];
+    return Object.keys(before).flatMap((key) => Object.hasOwn(after, key)
+      ? unexplainedChanges(before[key], after[key], path ? `${path}.${key}` : key)
+      : [path ? `${path}.${key}` : key]);
+  }
+  return before === after ? [] : [path];
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
@@ -107,7 +122,8 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
       input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
     }).stdout.trim();
     assert.equal(version, originVersion, "interrupted startup changed the schema version");
-    assert.equal(afterInterruption, before, "interrupted startup changed fixture data");
+    assert.deepEqual(unexplainedChanges(JSON.parse(before), JSON.parse(afterInterruption)), [],
+      "interrupted startup changed fixture data");
     psql(project, originEnvironment, ["-c", `
       CREATE TABLE upgrade_session_snapshot AS TABLE spring_session;
       CREATE TABLE upgrade_session_attribute_snapshot AS TABLE spring_session_attributes;
@@ -125,7 +141,8 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
     const afterRecoveryProof = psql(project, originEnvironment, ["-At", "-f", "/dev/stdin"], {
       input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
     }).stdout.trim();
-    assert.equal(afterRecoveryProof, before, "origin usability proof changed fixture data");
+    assert.deepEqual(unexplainedChanges(JSON.parse(before), JSON.parse(afterRecoveryProof)), [],
+      "origin usability proof changed fixture data");
     writeFileSync(join(build, "interrupted-startup.json"),
       `${JSON.stringify({ status: "passed", schemaVersion: version, trafficAccepted: false }, null, 2)}\n`);
   } finally {
@@ -263,7 +280,8 @@ async function executeUpgrade() {
       input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
     }).stdout.trim();
     writeFileSync(join(build, "after.json"), `${after}\n`);
-    assert.equal(after, before, "unexplained data or count change after migration");
+    assert.deepEqual(unexplainedChanges(JSON.parse(before), JSON.parse(after)), [],
+      "unexplained data or count change after migration");
     const version = psql(project, candidateEnvironment,
       ["-Atc", "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1"]).stdout.trim();
     writeFileSync(join(build, "migration-version.txt"), `${version}\n`);

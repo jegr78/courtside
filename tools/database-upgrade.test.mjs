@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { selectRepositoryDigest, selectUpgradeOrigins } from "./courtside.upgrade-smoke.mjs";
+import {
+  selectRepositoryDigest,
+  selectUpgradeOrigins,
+  unexplainedChanges
+} from "./courtside.upgrade-smoke.mjs";
 
 const releaseWorkflow = readFileSync(
   fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
@@ -75,7 +79,7 @@ test("given the pre-release fixture, when it is inspected, then all representati
   assert.match(fixture, /upgrade-fixture@example\.org/);
 });
 
-test("given the upgrade verifier, when it is inspected, then representative row contents are hashed", () => {
+test("given the upgrade verifier, when it is inspected, then representative row contents are captured", () => {
   // given
   const verification = readFileSync(fileURLToPath(new URL("../upgrade/verify.sql", import.meta.url)), "utf8");
 
@@ -88,6 +92,18 @@ test("given the upgrade verifier, when it is inspected, then representative row 
     assert.match(verification, new RegExp(`'${checksum}'`), checksum);
   }
   assert.doesNotMatch(verification, /SELECT id::text AS value/);
+  assert.doesNotMatch(verification, /md5\(string_agg/);
+  assert.match(verification, /md5\(a\.password_hash\)/);
+});
+
+test("given the proof it writes as evidence, when a run compares it, then only losses fail the run", () => {
+  // when / then
+  assert.match(upgradeRunner, /unexplainedChanges\(JSON\.parse\(before\), JSON\.parse\(after\)\)/);
+  assert.match(upgradeRunner,
+    /unexplainedChanges\(JSON\.parse\(before\), JSON\.parse\(afterInterruption\)\)/);
+  assert.match(upgradeRunner,
+    /unexplainedChanges\(JSON\.parse\(before\), JSON\.parse\(afterRecoveryProof\)\)/);
+  assert.doesNotMatch(upgradeRunner, /assert\.equal\(after, before/);
 });
 
 test("given concurrent upgrade runs, when resources are named, then projects and ports are isolated", () => {
@@ -111,4 +127,67 @@ test("given a release candidate, when release qualification runs, then every sup
   assert.match(releaseWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE:[^\n]+needs\.image\.outputs\.digest/);
   assert.match(releaseWorkflow, /Supported database upgrade origins/);
   assert.match(releaseWorkflow, /needs: \[build, image, qualify, security-record, upgrade, restore\]/);
+});
+
+test("given a migration that adds a column, when comparing the proof, then the new column is not a change", () => {
+  // given
+  const before = { members: 2, memberRows: [{ id: "a", person_id: "p" }] };
+  const after = { members: 2, memberRows: [{ id: "a", person_id: "p", started_on: "2026-01-01" }] };
+
+  // when / then
+  assert.deepEqual(unexplainedChanges(before, after), []);
+});
+
+test("given a migration that rewrites a value, when comparing the proof, then the change is reported", () => {
+  // given
+  const before = { memberRows: [{ id: "a", membership_type_id: "old" }] };
+  const after = { memberRows: [{ id: "a", membership_type_id: "new" }] };
+
+  // when / then
+  assert.deepEqual(unexplainedChanges(before, after), ["memberRows[0].membership_type_id"]);
+});
+
+test("given a migration that drops a column, when comparing the proof, then the loss is reported", () => {
+  // given
+  const before = { memberRows: [{ id: "a", membership_type_id: "t" }] };
+  const after = { memberRows: [{ id: "a" }] };
+
+  // when / then
+  assert.deepEqual(unexplainedChanges(before, after), ["memberRows[0].membership_type_id"]);
+});
+
+test("given a migration that loses a row, when comparing the proof, then the row count is reported", () => {
+  // given
+  const before = { memberRows: [{ id: "a" }, { id: "b" }] };
+  const after = { memberRows: [{ id: "a" }] };
+
+  // when / then
+  assert.deepEqual(unexplainedChanges(before, after), ["memberRows"]);
+});
+
+test("given a migration that changes a count, when comparing the proof, then the count is reported", () => {
+  // given
+  const before = { members: 2, people: 3 };
+  const after = { members: 1, people: 3 };
+
+  // when / then
+  assert.deepEqual(unexplainedChanges(before, after), ["members"]);
+});
+
+test("given a table the fixture leaves empty, when comparing the proof, then null stays null", () => {
+  // given
+  const before = { seriesRows: null };
+  const after = { seriesRows: null };
+
+  // when / then
+  assert.deepEqual(unexplainedChanges(before, after), []);
+});
+
+test("given a proof that gains a whole entry, when comparing it, then the addition is not a change", () => {
+  // given
+  const before = { members: 1 };
+  const after = { members: 1, membershipPeriods: 1 };
+
+  // when / then
+  assert.deepEqual(unexplainedChanges(before, after), []);
 });
