@@ -567,3 +567,19 @@ it("given today scrolled to the current time, when another day is chosen, then t
   // then
   expect(scrollTo).toHaveBeenCalledWith(0, 0);
 });
+
+it("given another day is shown, when today is chosen again, then the current time keeps the position", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const plan = await screen.findByTestId("week-grid");
+  const scrollTo = vi.fn();
+  plan.scrollTo = scrollTo;
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-11"));
+  expect(scrollTo).toHaveBeenCalledTimes(1);
+
+  // when
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-10"));
+
+  // then
+  expect(scrollTo).toHaveBeenCalledTimes(1);
+});

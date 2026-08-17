@@ -39,6 +39,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
   const [cancellation, setCancellation] = useState<Allocation>();
   const planRef = useRef<HTMLDivElement>(null);
+  const shownDate = useRef<string>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -113,12 +114,14 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
     return () => window.cancelAnimationFrame(frame);
   }, [currentSlot, isToday]);
 
-  // Another day has no current time to scroll to, so it would otherwise open where today left it.
+  // Another day has no current time to scroll to, and only a change of day resets it so that
+  // midnight turning today into yesterday leaves a reader where they were.
   useEffect(() => {
-    if (isToday) return;
-    planRef.current?.scrollTo?.(0, 0);
+    const changed = shownDate.current !== selectedDate;
+    shownDate.current = selectedDate;
+    if (!changed || isToday) return;
+    scrollToStart(planRef.current);
   }, [selectedDate, isToday]);
-
 
   return <section aria-labelledby="occupancy-heading" className="mt-8">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -350,6 +353,12 @@ function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
   const target = slot ? plan?.querySelector(`[data-slot="${slot}"]`) : undefined;
   if (target instanceof HTMLElement && typeof target.scrollIntoView === "function") {
     target.scrollIntoView({ block: "center" });
+  }
+}
+
+function scrollToStart(plan: HTMLDivElement | null) {
+  if (plan && typeof plan.scrollTo === "function") {
+    plan.scrollTo(0, 0);
   }
 }
 
