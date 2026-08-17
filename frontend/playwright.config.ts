@@ -11,6 +11,7 @@ const periodicProjects = process.env.COURTSIDE_PERIODIC_BROWSERS === "true" ? [
 
 export default defineConfig({
   testDir: "./e2e",
+  testMatch: "**/*.spec.ts",
   snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}-{platform}{ext}",
   fullyParallel: false,
   workers: 1,
