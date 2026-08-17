@@ -7,7 +7,6 @@ CREATE TABLE import_preview (
     row_count             integer     NOT NULL,
     change_set            jsonb,
     fingerprints          jsonb,
-    raw_content           bytea,
     removal_count         integer     NOT NULL,
     removal_percent       integer     NOT NULL,
     created_at            timestamptz NOT NULL,

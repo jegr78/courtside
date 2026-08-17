@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -50,14 +51,14 @@ public class PreviewService {
         SourceConfiguration configuration = sources.configurationOf(sourceId);
         SnapshotMode requested = requiredMode(mode);
         CsvSnapshot snapshot = SnapshotParser.parse(requiredContent(content), configuration.columns());
-        CurrentRoster roster = currentRosterFor(sourceId);
+        CurrentRoster roster = currentRosterFor(sourceId, snapshot);
         ResolvedChangeSet resolved = ChangeSetResolver.resolve(snapshot, configuration, requested, roster);
         Instant now = clock.instant();
         supersedeEarlierPreviewsOf(sourceId, now);
         ImportPreview preview = previews.save(new ImportPreview(sourceId, requested,
                 requiredFileName(fileName), PersonFingerprint.sha256(content), snapshot.rows().size(),
                 write(new StoredContent(resolved, snapshot.ignoredColumns())),
-                write(fingerprintsOf(roster)), content, resolved.removals().count(),
+                write(fingerprintsOf(roster)), resolved.removals().count(),
                 resolved.removals().percent(), now, requiredAccountId(accountId),
                 now.plus(properties.previewRetention())));
         return toSummary(preview, configuration);
@@ -68,7 +69,7 @@ public class PreviewService {
         return toSummary(preview, sources.configurationOf(preview.getSourceId()));
     }
 
-    private CurrentRoster currentRosterFor(UUID sourceId) {
+    private CurrentRoster currentRosterFor(UUID sourceId, CsvSnapshot snapshot) {
         Map<String, UUID> personIdsByExternalId = references.findBySourceId(sourceId).stream()
                 .collect(Collectors.toMap(ExternalReference::getExternalId,
                         ExternalReference::getPersonId));
@@ -79,13 +80,24 @@ public class PreviewService {
                 .collect(Collectors.toMap(Person::getId,
                         person -> toRosterPerson(person, membershipsByPerson.get(person.getId()))));
         return new CurrentRoster(personIdsByExternalId, peopleById,
-                memberships.activeMembershipTypeIds(), personIdsByNameKey());
+                memberships.activeMembershipTypeIds(), personIdsByNameKey(snapshot));
     }
 
-    private Map<String, List<UUID>> personIdsByNameKey() {
-        return persons.findAll().stream().collect(Collectors.groupingBy(
-                person -> ChangeSetResolver.nameKeyOf(person.getFirstName(), person.getLastName()),
-                Collectors.mapping(Person::getId, Collectors.toList())));
+    // Only the names the file actually carries: a club with thousands of members would otherwise
+    // read its whole person table on every upload to answer a question about a few hundred rows.
+    private Map<String, List<UUID>> personIdsByNameKey(CsvSnapshot snapshot) {
+        Set<String> wanted = snapshot.rows().stream()
+                .map(row -> ChangeSetResolver.nameKeyOf(row.values()))
+                .collect(Collectors.toSet());
+        if (wanted.isEmpty()) {
+            return Map.of();
+        }
+        return persons.findAll().stream()
+                .filter(person -> wanted.contains(
+                        ChangeSetResolver.nameKeyOf(person.getFirstName(), person.getLastName())))
+                .collect(Collectors.groupingBy(
+                        person -> ChangeSetResolver.nameKeyOf(person.getFirstName(), person.getLastName()),
+                        Collectors.mapping(Person::getId, Collectors.toList())));
     }
 
     private static CurrentRoster.RosterPerson toRosterPerson(Person person, Member member) {

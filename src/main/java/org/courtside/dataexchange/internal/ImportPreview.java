@@ -49,9 +49,6 @@ public class ImportPreview {
     @Column(name = "fingerprints")
     private String fingerprints;
 
-    @Column(name = "raw_content")
-    private byte[] rawContent;
-
     @Column(name = "removal_count", nullable = false)
     private int removalCount;
 
@@ -71,9 +68,9 @@ public class ImportPreview {
     private Instant supersededAt;
 
     public ImportPreview(UUID sourceId, SnapshotMode mode, String fileName, String fileHash,
-                         int rowCount, String changeSet, String fingerprints, byte[] rawContent,
-                         int removalCount, int removalPercent, Instant createdAt,
-                         UUID createdByAccountId, Instant expiresAt) {
+                         int rowCount, String changeSet, String fingerprints, int removalCount,
+                         int removalPercent, Instant createdAt, UUID createdByAccountId,
+                         Instant expiresAt) {
         this.id = UUID.randomUUID();
         this.sourceId = sourceId;
         this.mode = mode;
@@ -82,7 +79,6 @@ public class ImportPreview {
         this.rowCount = rowCount;
         this.changeSet = changeSet;
         this.fingerprints = fingerprints;
-        this.rawContent = rawContent;
         this.removalCount = removalCount;
         this.removalPercent = removalPercent;
         this.createdAt = createdAt;
