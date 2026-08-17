@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -62,7 +63,7 @@ class RosterListTest extends AbstractIntegrationTest {
                     assertThat(entry.username()).isNull();
                     assertThat(entry.enabled()).isFalse();
                     assertThat(entry.roles()).isEmpty();
-                    assertThat(entry.membershipTypeId()).isNull();
+                    assertThat(entry.membership()).isNull();
                 });
     }
 
@@ -73,7 +74,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UserAccount account = new UserAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER, Role.TRAINER));
         account.enable();
         accounts.save(account);
-        members.save(new Member(jane.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
 
         // when
         CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
@@ -90,7 +91,7 @@ class RosterListTest extends AbstractIntegrationTest {
                     assertThat(entry.username()).isEqualTo("jane.doe");
                     assertThat(entry.enabled()).isTrue();
                     assertThat(entry.roles()).containsExactlyInAnyOrder(Role.MEMBER, Role.TRAINER);
-                    assertThat(entry.membershipTypeId()).isEqualTo(MEMBERSHIP_TYPE_ID);
+                    assertThat(entry.membership().typeId()).isEqualTo(MEMBERSHIP_TYPE_ID);
                 });
     }
 

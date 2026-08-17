@@ -1,6 +1,7 @@
 package org.courtside.member;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.config.ClubTimeZone;
 import org.courtside.identity.AccountSessions;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -22,6 +23,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -52,6 +55,8 @@ public class RosterService {
     private final AdministratorLock administrators;
     private final AccountSessions sessions;
     private final PasswordEncoder passwordEncoder;
+    private final Clock clock;
+    private final ClubTimeZone clubTimeZone;
 
     public CursorPage.Result<RosterEntry> list(String query, UUID cursor, int limit) {
         validateLimit(limit);
@@ -156,22 +161,25 @@ public class RosterService {
     }
 
     @Transactional
-    public RosterEntry assignMembership(UUID personId, UUID membershipTypeId) {
+    public RosterEntry writeMembership(UUID personId, UUID membershipTypeId,
+                                       MembershipPeriod period) {
         UUID id = requiredPersonId(personId);
+        MembershipPeriod requested = requiredPeriod(period).requireNotInTheFuture(today());
         requireLockedPerson(id);
-        UUID typeId = memberships.requireAssignableMembershipType(membershipTypeId).getId();
-        if (writeMembership(id, typeId)) {
+        Member existing = members.findByPersonId(id).orElse(null);
+        UUID typeId = assignableTypeIdFor(existing, membershipTypeId, requested);
+        if (applyMembership(id, existing, typeId, requested)) {
             revokeSessionsOf(id);
         }
         return load(List.of(id)).getFirst();
     }
 
     @Transactional
-    public void removeMembership(UUID personId) {
+    public void endMembership(UUID personId) {
         UUID id = requiredPersonId(personId);
         requireLockedPerson(id);
-        members.findByPersonId(id).ifPresent(member -> {
-            members.delete(member);
+        members.findCurrentByPersonId(id).ifPresent(member -> {
+            member.endOn(today());
             revokeSessionsOf(id);
         });
     }
@@ -186,17 +194,56 @@ public class RosterService {
         }
     }
 
-    private boolean writeMembership(UUID personId, UUID membershipTypeId) {
-        Member member = members.findByPersonId(personId).orElse(null);
-        if (member == null) {
-            members.save(new Member(personId, membershipTypeId));
-            return true;
+    private UUID assignableTypeIdFor(Member existing, UUID requested, MembershipPeriod period) {
+        if (makesSomebodyAMemberOfANewType(existing, requested, period)) {
+            return memberships.requireAssignableMembershipType(requested).getId();
         }
-        if (member.getMembershipTypeId().equals(membershipTypeId)) {
-            return false;
+        return memberships.requireMembershipType(requested).getId();
+    }
+
+    private static boolean makesSomebodyAMemberOfANewType(Member existing, UUID requested,
+                                                          MembershipPeriod period) {
+        return period.isCurrent()
+                && (existing == null
+                || !existing.isCurrent()
+                || !existing.getMembershipTypeId().equals(requested));
+    }
+
+    private boolean applyMembership(UUID personId, Member existing, UUID typeId,
+                                   MembershipPeriod period) {
+        LocalDate endedOn = period.endedOn();
+        if (existing == null) {
+            Member created = new Member(personId, typeId, startOr(period, today()));
+            created.endOn(endedOn);
+            members.saveAndFlush(created);
+            return period.isCurrent();
         }
-        member.assignTo(membershipTypeId);
-        return true;
+        boolean wasCurrent = existing.isCurrent();
+        boolean typeChanged = !existing.getMembershipTypeId().equals(typeId);
+        if (wasCurrent) {
+            existing.assignTo(typeId);
+            existing.correctPeriod(startOr(period, existing.getStartedOn()), endedOn);
+        } else {
+            existing.reviveOn(typeId, startOr(period, today()));
+            existing.endOn(endedOn);
+        }
+        members.flush();
+        return typeChanged || wasCurrent != period.isCurrent();
+    }
+
+    private static LocalDate startOr(MembershipPeriod period, LocalDate fallback) {
+        return period.startedOn() == null ? fallback : period.startedOn();
+    }
+
+    private static MembershipPeriod requiredPeriod(MembershipPeriod period) {
+        if (period == null) {
+            throw new IllegalStateException("A membership must be written with a period");
+        }
+        return period;
+    }
+
+    private LocalDate today() {
+        return LocalDate.now(clock.withZone(clubTimeZone.zoneId()));
     }
 
     private void revokeSessionsOf(UUID personId) {
@@ -285,11 +332,11 @@ public class RosterService {
         Map<UUID, UserAccount> accountsByPerson = accounts.findByPersonIdIn(personIds).stream()
                 .collect(Collectors.toMap(account -> account.getPerson().getId(), account -> account,
                         RosterService::preferredAccount));
-        Map<UUID, UUID> membershipTypesByPerson = members.findByPersonIdIn(personIds).stream()
-                .collect(Collectors.toMap(Member::getPersonId, Member::getMembershipTypeId));
+        Map<UUID, Member> membershipsByPerson = members.findByPersonIdIn(personIds).stream()
+                .collect(Collectors.toMap(Member::getPersonId, member -> member));
         return persons.findAllById(personIds).stream()
                 .map(person -> toEntry(person, accountsByPerson.get(person.getId()),
-                        membershipTypesByPerson.get(person.getId())))
+                        membershipsByPerson.get(person.getId())))
                 .toList();
     }
 
@@ -297,14 +344,16 @@ public class RosterService {
         return ACCOUNT_PRECEDENCE.compare(first, second) <= 0 ? first : second;
     }
 
-    private static RosterEntry toEntry(Person person, UserAccount account, UUID membershipTypeId) {
+    private static RosterEntry toEntry(Person person, UserAccount account, Member member) {
+        Membership membership = member == null ? null : new Membership(
+                member.getMembershipTypeId(), member.getStartedOn(), member.getEndedOn());
         if (account == null) {
             return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
-                    person.getEmail(), null, null, false, membershipTypeId, Set.of());
+                    person.getEmail(), null, null, false, membership, Set.of());
         }
         return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
                 person.getEmail(), account.getId(), account.getUsername(), account.isEnabled(),
-                membershipTypeId, account.getRoles());
+                membership, account.getRoles());
     }
 
     private static String normalize(String query) {
@@ -331,10 +380,13 @@ public class RosterService {
 
     public record RosterEntry(UUID personId, String firstName, String lastName, String email,
                               UUID accountId, String username, boolean enabled,
-                              UUID membershipTypeId, Set<Role> roles) {
+                              Membership membership, Set<Role> roles) {
 
         public RosterEntry {
             roles = Set.copyOf(roles);
         }
+    }
+
+    public record Membership(UUID typeId, LocalDate startedOn, LocalDate endedOn) {
     }
 }

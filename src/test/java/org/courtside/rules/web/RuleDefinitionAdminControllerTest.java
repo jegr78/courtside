@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -243,7 +244,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
             openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
         }
         UUID personId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
-        members.save(new Member(personId, STANDARD_MEMBERSHIP));
+        members.save(memberSince(personId, STANDARD_MEMBERSHIP));
         Instant eightDaysOut = NOW.plus(8, ChronoUnit.DAYS);
 
         // when / then

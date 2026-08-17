@@ -483,7 +483,8 @@ components:
       type: object
       description: |
         A person holds at most one membership, so the type named here replaces the one they hold
-        rather than adding a second.
+        rather than adding a second. The request writes that one membership whole: its type and
+        both its dates.
       required: [membershipTypeId]
       properties:
         membershipTypeId:
@@ -491,7 +492,32 @@ components:
           format: uuid
           description: |
             A membership type the club still offers; `GET /api/admin/membership-types` lists them
-            with their `active` flag.
+            with their `active` flag. The club has to still offer it only when it differs from the
+            type the person already holds — correcting the dates of a membership on a type retired
+            since is not an assignment and is not refused, because a departure recorded on the
+            wrong day would otherwise be permanent.
+        startedOn:
+          type: [string, "null"]
+          format: date
+          description: |
+            The date the membership began. Omitted, it is today for a membership that is being
+            created or revived, and leaves a running one where it is — changing somebody's type
+            continues their membership rather than starting a new one.
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: |
+            Present, it writes a membership that has ended: the record and the type stay, the
+            person stops being a member. Omitted, the membership runs. It may not precede
+            `startedOn`.
+
+            **Neither date may lie in the future.** The roster records a membership that has
+            begun, not one scheduled to begin: whether somebody is a member is decided by whether
+            an end date is set and never by comparing a date with today, so a start date next
+            month would make them a member now and an end date in December would stop their
+            membership today. A future date is answered `400` with
+            `urn:courtside:error:invalid-membership-period`. Scheduling a membership ahead is a
+            feature this surface does not have rather than one it half has.
 
     MembershipType:
       type: object
@@ -551,7 +577,24 @@ components:
           description: |
             The account's state, not the person's. A person without an account is never enabled and
             is not thereby disabled — read it together with `accountId`.
-        membershipTypeId: { type: [string, "null"], format: uuid }
+        membershipTypeId:
+          type: [string, "null"]
+          format: uuid
+          description: |
+            The type of the membership the person holds, or — when `membershipEndedOn` is present —
+            the type they last held. Read it together with `membershipEndedOn` and never on its
+            own: a person whose membership has ended still has a type here and is not a member.
+        membershipStartedOn:
+          type: [string, "null"]
+          format: date
+          description: The date the membership began, absent when the person holds none.
+        membershipEndedOn:
+          type: [string, "null"]
+          format: date
+          description: |
+            Present only for a membership that has ended, naming the date it did. A person whose
+            entry carries it is **not** currently a member: no membership-scoped booking rule is
+            measured against them and they are not offered as a co-player.
         roles:
           type: array
           description: |
@@ -2624,19 +2667,32 @@ paths:
     put:
       tags: [admin-roster]
       operationId: assignMembership
-      summary: Give a person a membership, or move them to another type.
+      summary: Give a person a membership, move them to another type, or correct its dates.
       description: |
         A person holds at most one membership, so this writes the one they already have rather
         than adding a second: a board that picked the wrong type moves them to the right one with
         the same request, and writing the type they already hold changes nothing.
 
-        The type has to be one the club still offers. A deactivated type is refused, which is what
-        its `active` flag is for; the memberships already on it are untouched, and a type
-        deactivated afterwards leaves the people holding it exactly where they are.
+        A membership that has ended is revived by this request rather than duplicated — somebody
+        rejoining is the same person on the same record, beginning again on the `startedOn` given.
+        The type they held before is then overwritten and is no longer readable: this surface keeps
+        one membership per person, not a history of them.
 
-        A membership decides which rules the person's bookings are measured against, so an
-        assignment that changes it ends their account's sessions and they sign in again. A person
-        without an account has none to end.
+        The type has to be one the club still offers **whenever the write leaves somebody a member
+        of a type they were not already a member of** — a first assignment, a move to another type,
+        and a revival, because taking somebody back is an assignment however dormant their record
+        was. A deactivated type is refused there, which is what its `active` flag is for.
+
+        Everything that does not make somebody a member is left alone: the memberships already on a
+        type are untouched, a type deactivated afterwards leaves the people holding it exactly
+        where they are, correcting the dates of such a membership stays possible, and ending one
+        is never refused for the type it is on.
+
+        A membership decides which rules the person's bookings are measured against, so a write
+        that changes the type, ends the membership or revives it ends their account's sessions and
+        they sign in again. A write that only moves `startedOn` while the membership keeps running
+        changes nothing a session carries and leaves it standing. A person without an account has
+        none to end.
 
         The response is the roster entry.
 
@@ -2680,11 +2736,19 @@ paths:
     delete:
       tags: [admin-roster]
       operationId: removeMembership
-      summary: End a person's membership.
+      summary: End a person's membership today.
       description: |
-        The person, their account and their bookings stay; the membership goes, and with it the
-        rules that were measured against its type. Ending a membership the person does not hold is
-        the state the request asks for and answers the same way.
+        The person, their account, their bookings **and the membership record** stay; what goes is
+        the membership itself, and with it the rules that were measured against its type. The
+        record keeps the type they held and gains today's date in the club's time zone as the date
+        it ended, so a club can still see who was a member of what and until when. Nothing is
+        deleted here.
+
+        Use `PUT` instead to end a membership on a different date, or to correct a date recorded
+        wrongly.
+
+        Ending a membership the person does not currently hold is the state the request asks for
+        and answers the same way, and it leaves an already recorded end date where it is.
 
         Their account's sessions end, for the reason the assignment gives.
 

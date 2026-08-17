@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -149,7 +150,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     void givenAMemberBeyondTheAdvanceWindow_whenCreatingEveryOccurrence_thenTheLaterOnesAreSkippedAsRuleViolations() {
         // given
         UUID personId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
-        members.save(new Member(personId, STANDARD_MEMBERSHIP));
+        members.save(memberSince(personId, STANDARD_MEMBERSHIP));
         SeriesRule rule = fridaysFromApril3(4);
 
         // when
@@ -166,7 +167,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     void givenABookerBeyondTheAdvanceWindow_whenPreviewingAndCreating_thenThePreviewPromisesWhatCreateDelivers() {
         // given
         UUID personId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
-        members.save(new Member(personId, STANDARD_MEMBERSHIP));
+        members.save(memberSince(personId, STANDARD_MEMBERSHIP));
         UUID bookedBy = UUID.randomUUID();
         SeriesRule rule = fridaysFromApril3(6);
 
@@ -186,7 +187,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     void givenAnAdminBookerBeyondTheAdvanceWindow_whenPreviewingAndCreating_thenEveryOccurrenceIsOfferedAndCreated() {
         // given
         UUID personId = persons.save(new Person("John", "Roe", "john@example.org")).getId();
-        members.save(new Member(personId, STANDARD_MEMBERSHIP));
+        members.save(memberSince(personId, STANDARD_MEMBERSHIP));
         UUID bookedBy = UUID.randomUUID();
         SeriesRule rule = fridaysFromApril3(6);
 

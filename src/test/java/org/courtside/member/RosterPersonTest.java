@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -50,7 +51,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
         assertThat(created.accountId()).isNull();
         assertThat(created.username()).isNull();
         assertThat(created.enabled()).isFalse();
-        assertThat(created.membershipTypeId()).isNull();
+        assertThat(created.membership()).isNull();
         assertThat(created.roles()).isEmpty();
     }
 
@@ -110,7 +111,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
         UserAccount account = new UserAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER));
         account.enable();
         accounts.save(account);
-        members.save(new Member(jane.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
 
         // when
         RosterService.RosterEntry changed =
@@ -121,7 +122,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
         assertThat(changed.username()).isEqualTo("jane.doe");
         assertThat(changed.enabled()).isTrue();
         assertThat(changed.roles()).containsExactly(Role.MEMBER);
-        assertThat(changed.membershipTypeId()).isEqualTo(MEMBERSHIP_TYPE_ID);
+        assertThat(changed.membership().typeId()).isEqualTo(MEMBERSHIP_TYPE_ID);
     }
 
     @Test

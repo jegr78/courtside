@@ -30,7 +30,7 @@ public class MemberService {
     private final RuleSetActivationRepository ruleSetActivation;
 
     public Optional<UUID> membershipTypeIdOf(UUID personId) {
-        return members.findByPersonId(personId).map(Member::getMembershipTypeId);
+        return members.findCurrentByPersonId(personId).map(Member::getMembershipTypeId);
     }
 
     public List<MemberParticipant> findParticipants(String query) {

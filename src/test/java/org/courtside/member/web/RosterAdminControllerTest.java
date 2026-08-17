@@ -28,6 +28,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.courtside.member.MemberFixtures.MEMBER_SINCE;
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -78,7 +80,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         UserAccount account = new UserAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER));
         account.enable();
         accounts.save(account);
-        members.save(new Member(jane.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
 
         // when / then
@@ -1000,7 +1002,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        members.save(new Member(mary.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(mary.getId(), MEMBERSHIP_TYPE_ID));
 
         // when
         mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
@@ -1116,10 +1118,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAMembership_whenItIsEnded_thenTheEntryNoLongerCarriesIt() throws Exception {
+    void givenAMembership_whenItIsEnded_thenTheEntryReportsTheDateItEnded() throws Exception {
         // given
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        members.save(new Member(mary.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(mary.getId(), MEMBERSHIP_TYPE_ID));
 
         // when
         mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary.getId())
@@ -1127,11 +1129,68 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isNoContent());
 
         // then
-        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
+        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isNotEmpty();
         mockMvc.perform(get("/api/admin/roster"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries[0].personId").value(mary.getId().toString()))
-                .andExpect(jsonPath("$.entries[0].membershipTypeId").doesNotExist());
+                .andExpect(jsonPath("$.entries[0].membershipTypeId")
+                        .value(MEMBERSHIP_TYPE_ID.toString()))
+                .andExpect(jsonPath("$.entries[0].membershipStartedOn")
+                        .value(MEMBER_SINCE.toString()))
+                .andExpect(jsonPath("$.entries[0].membershipEndedOn").value("2026-05-12"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAMembership_whenItIsEndedOnAGivenDate_thenThatDateIsWhatTheEntryReports()
+            throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        members.save(memberSince(mary.getId(), MEMBERSHIP_TYPE_ID));
+
+        // when
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"membershipTypeId":"%s","startedOn":"2026-01-01","endedOn":"2026-03-31"}
+                                """.formatted(MEMBERSHIP_TYPE_ID))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.membershipStartedOn").value("2026-01-01"))
+                .andExpect(jsonPath("$.membershipEndedOn").value("2026-03-31"));
+
+        // then
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"membershipTypeId":"%s","startedOn":"2026-01-01","endedOn":"2026-04-30"}
+                                """.formatted(MEMBERSHIP_TYPE_ID))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.membershipEndedOn")
+                        .value("2026-04-30"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAMembershipEndedBeforeItBegan_whenWritingIt_thenTheOrderingIsRefused()
+            throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"membershipTypeId":"%s","startedOn":"2026-05-01","endedOn":"2026-04-30"}
+                                """.formatted(MEMBERSHIP_TYPE_ID))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:invalid-membership-period"))
+                .andExpect(jsonPath("$.violations[0].code")
+                        .value("membershipPeriod.endsBeforeItBegan"));
+        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
     }
 
     @Test
@@ -1181,7 +1240,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenNoSession_whenEndingAMembership_thenItIsUnauthenticated() throws Exception {
         // given
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        members.save(new Member(mary.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(mary.getId(), MEMBERSHIP_TYPE_ID));
 
         // when / then
         mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary.getId())
