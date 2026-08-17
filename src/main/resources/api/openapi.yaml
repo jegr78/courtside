@@ -546,6 +546,9 @@ components:
         membershipTypeId: { type: [string, "null"], format: uuid }
         roles:
           type: array
+          description: |
+            Ascending by role name, so a client may compare two entries without sorting them
+            first and the order does not move when the enumeration grows.
           items: { $ref: "#/components/schemas/Role" }
 
     RosterPage:

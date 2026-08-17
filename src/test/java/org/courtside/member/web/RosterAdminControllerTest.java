@@ -464,6 +464,24 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAccountHoldingSeveralRoles_whenReadingIt_thenTheRolesAscendByName() throws Exception {
+        // given — MEMBER, TRAINER and ADMIN are declared in that order, so a response ordered by
+        // the enumeration's own order would answer them the other way round
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+
+        // when / then
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountBody("major.mary", "one-time-password", "TRAINER", "ADMIN", "MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.roles[0]").value("ADMIN"))
+                .andExpect(jsonPath("$.roles[1]").value("MEMBER"))
+                .andExpect(jsonPath("$.roles[2]").value("TRAINER"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenATakenUsername_whenCreatingAnAccount_thenTheResponseCarriesItsOwnType() throws Exception {
         // given — a unique index and this task's own refusal both answer 409, so the type is
         // what tells a client which of the two it hit

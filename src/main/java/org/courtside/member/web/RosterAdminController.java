@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -125,8 +124,9 @@ class RosterAdminController implements AdminRosterApi {
 
     private static List<ApiRole> roleNames(Set<Role> roles) {
         return roles.stream()
-                .sorted(Comparator.comparingInt(Enum::ordinal))
-                .map(role -> ApiRole.fromValue(role.name()))
+                .map(Role::name)
+                .sorted()
+                .map(ApiRole::fromValue)
                 .toList();
     }
 }
