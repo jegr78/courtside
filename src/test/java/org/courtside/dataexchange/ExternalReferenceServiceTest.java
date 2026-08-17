@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,8 +35,20 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
         references.link(source, "4711", jane);
 
         // then
-        assertThat(references.personIdsByExternalId(source, Set.of("4711", "4712")))
-                .isEqualTo(Map.of("4711", jane));
+        assertThat(personIdsOf(source)).isEqualTo(Map.of("4711", jane));
+    }
+
+    @Test
+    void givenAMemberNumberWithPadding_whenLinking_thenItIsStoredWithoutIt() {
+        // given
+        UUID source = source("roster-system");
+        UUID jane = person("Jane", "Doe");
+
+        // when
+        references.link(source, "  4711  ", jane);
+
+        // then
+        assertThat(personIdsOf(source)).isEqualTo(Map.of("4711", jane));
     }
 
     @Test
@@ -63,8 +76,8 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
         references.link(second, "A-90", jane);
 
         // then
-        assertThat(references.personIdsByExternalId(first, Set.of("4711"))).isEqualTo(Map.of("4711", jane));
-        assertThat(references.personIdsByExternalId(second, Set.of("A-90"))).isEqualTo(Map.of("A-90", jane));
+        assertThat(personIdsOf(first)).isEqualTo(Map.of("4711", jane));
+        assertThat(personIdsOf(second)).isEqualTo(Map.of("A-90", jane));
     }
 
     @Test
@@ -91,7 +104,7 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
 
         // then
         assertThat(again.linkedAt()).isEqualTo(first.linkedAt());
-        assertThat(references.personIdsByExternalId(source, Set.of("4711"))).isEqualTo(Map.of("4711", jane));
+        assertThat(personIdsOf(source)).isEqualTo(Map.of("4711", jane));
     }
 
     @Test
@@ -105,7 +118,7 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
         references.unlink(source, "4711");
 
         // then
-        assertThat(references.personIdsByExternalId(source, Set.of("4711"))).isEmpty();
+        assertThat(personIdsOf(source)).isEmpty();
         assertThat(persons.findById(jane)).isPresent();
     }
 
@@ -150,16 +163,12 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> sources.delete(source))
                 .isInstanceOf(ImportSourceInUseException.class);
-        assertThat(references.personIdsByExternalId(source, Set.of("4711"))).isEqualTo(Map.of("4711", jane));
+        assertThat(personIdsOf(source)).isEqualTo(Map.of("4711", jane));
     }
 
-    @Test
-    void whenLookingUpNoExternalIdAtAll_thenTheDatabaseIsNotAsked() {
-        // given
-        UUID source = source("roster-system");
-
-        // when / then
-        assertThat(references.personIdsByExternalId(source, Set.of())).isEmpty();
+    private Map<String, UUID> personIdsOf(UUID sourceId) {
+        return references.list(sourceId, null, 50).items().stream()
+                .collect(Collectors.toMap(ExternalLink::externalId, ExternalLink::personId));
     }
 
     private UUID source(String sourceKey) {

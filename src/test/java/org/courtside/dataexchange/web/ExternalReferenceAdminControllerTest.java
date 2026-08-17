@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.net.URI;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -184,6 +185,32 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.references.length()").value(0));
         assertThat(persons.findById(jane)).isPresent();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAMemberNumberCarryingASpace_whenItIsLinked_thenTheLocationAddressesIt()
+            throws Exception {
+        // given
+        String location = mockMvc.perform(link("A 1234", person("Jane", "Doe")))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getHeader("Location");
+
+        // when / then
+        mockMvc.perform(delete(URI.create(location)).with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAMemberNumberNoReferenceCanHold_whenUnlinking_thenItIsReportedAsNotFound()
+            throws Exception {
+        // when / then
+        mockMvc.perform(delete(URI.create("/api/admin/import/sources/" + source
+                        + "/references/%20")).with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:import-external-reference-not-found"));
     }
 
     @Test

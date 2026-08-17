@@ -11,9 +11,9 @@ import org.courtside.shared.CursorPage;
 import org.courtside.shared.WireTypes;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriUtils;
 
 import java.net.URI;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
@@ -47,7 +47,7 @@ class ExternalReferenceAdminController implements AdminImportReferencesApi {
 
     private static URI locationOf(ExternalLink link) {
         return URI.create("/api/admin/import/sources/" + link.sourceId() + "/references/"
-                + URLEncoder.encode(link.externalId(), StandardCharsets.UTF_8));
+                + UriUtils.encodePathSegment(link.externalId(), StandardCharsets.UTF_8));
     }
 
     private static ApiExternalReference toResponse(ExternalLink link) {

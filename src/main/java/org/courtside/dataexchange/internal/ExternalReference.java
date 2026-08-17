@@ -32,10 +32,10 @@ public class ExternalReference {
     @Column(name = "linked_at", nullable = false)
     private Instant linkedAt;
 
-    public ExternalReference(UUID sourceId, String externalId, UUID personId, Instant linkedAt) {
+    public ExternalReference(UUID sourceId, MemberNumber externalId, UUID personId, Instant linkedAt) {
         this.id = UUID.randomUUID();
         this.sourceId = sourceId;
-        this.externalId = externalId;
+        this.externalId = externalId.value();
         this.personId = personId;
         this.linkedAt = linkedAt;
     }

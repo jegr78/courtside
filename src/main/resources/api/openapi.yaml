@@ -633,7 +633,7 @@ components:
       properties:
         referenceId: { type: string, format: uuid }
         sourceId: { type: string, format: uuid }
-        externalId: { type: string }
+        externalId: { type: string, minLength: 1, maxLength: 120 }
         personId: { type: string, format: uuid }
         linkedAt: { type: string, format: date-time }
 
@@ -3168,6 +3168,10 @@ paths:
         The person stays exactly as they are; what goes is the statement that this source's member
         number names them. The next snapshot carrying that member number therefore reads as a person
         this instance has not seen before.
+
+        A member number outside the shape a reference can hold — blank, or longer than the stored
+        value allows — is answered `404` like any other one nothing points at, because no reference
+        can be holding it.
       security:
         - sessionCookie: []
           csrfToken: []

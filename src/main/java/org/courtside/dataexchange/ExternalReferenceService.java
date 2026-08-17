@@ -3,6 +3,7 @@ package org.courtside.dataexchange;
 import lombok.RequiredArgsConstructor;
 import org.courtside.dataexchange.internal.ExternalReference;
 import org.courtside.dataexchange.internal.ExternalReferenceRepository;
+import org.courtside.dataexchange.internal.MemberNumber;
 import org.courtside.identity.PersonRepository;
 import org.courtside.shared.CursorPage;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -12,10 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,34 +41,34 @@ public class ExternalReferenceService {
         return CursorPage.of(ids, limit, this::load, ExternalReferenceService::idOf);
     }
 
-    public Map<String, UUID> personIdsByExternalId(UUID sourceId, Set<String> externalIds) {
-        if (externalIds == null || externalIds.isEmpty()) {
-            return Map.of();
-        }
-        return references.findBySourceIdAndExternalIdIn(requireKnownSource(sourceId), externalIds).stream()
-                .collect(Collectors.toMap(ExternalReference::getExternalId, ExternalReference::getPersonId));
-    }
-
     @Transactional
     public ExternalLink link(UUID sourceId, String externalId, UUID personId) {
         UUID source = requireKnownSource(sourceId);
-        String reference = requiredExternalId(externalId);
+        MemberNumber reference = new MemberNumber(externalId);
         UUID person = requiredPersonId(personId);
-        ExternalReference existing = references.findBySourceIdAndExternalId(source, reference).orElse(null);
+        ExternalReference existing = references.findBySourceIdAndExternalId(source, reference.value())
+                .orElse(null);
         if (existing != null && existing.getPersonId().equals(person)) {
             return toLink(existing);
         }
         return toLink(saveOrTranslateCollision(
-                new ExternalReference(source, reference, person, clock.instant()), reference));
+                new ExternalReference(source, reference, person, clock.instant()), reference.value()));
     }
 
     @Transactional
     public void unlink(UUID sourceId, String externalId) {
         UUID source = requireKnownSource(sourceId);
-        String reference = requiredExternalId(externalId);
-        references.delete(references.findBySourceIdAndExternalId(source, reference)
+        references.delete(heldReference(source, externalId)
                 .orElseThrow(() -> new ExternalReferenceNotFoundException(
-                        "No reference '" + reference + "' from import source " + source)));
+                        "No such reference from import source " + source)));
+    }
+
+    // A member number no reference can hold reaches this from a path segment, where no validation
+    // precedes it, so it is answered as the absence it describes rather than as a broken request.
+    private Optional<ExternalReference> heldReference(UUID sourceId, String externalId) {
+        return MemberNumber.isUsable(externalId)
+                ? references.findBySourceIdAndExternalId(sourceId, new MemberNumber(externalId).value())
+                : Optional.empty();
     }
 
     private ExternalReference saveOrTranslateCollision(ExternalReference reference, String externalId) {
@@ -113,13 +112,6 @@ public class ExternalReferenceService {
             throw new LinkedPersonNotFoundException("No person with id " + personId);
         }
         return personId;
-    }
-
-    private static String requiredExternalId(String externalId) {
-        if (externalId == null || externalId.isBlank()) {
-            throw new IllegalStateException("A reference names the member number it stands for");
-        }
-        return externalId.strip();
     }
 
     private List<ExternalLink> load(List<UUID> ids) {
