@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, selectJourneyDate, test } from "./fixtures";
 
 function freeSlot(page: import("@playwright/test").Page, court: number, slot: string) {
   return page.locator(`[data-testid="free-slot"][data-court-number="${court}"][data-slot="${slot}"][data-state="free"]`);
@@ -88,14 +88,14 @@ test("a seeded member stays signed in across a reload and can sign out", async (
   await expect(page.getByTestId("login-view")).toBeVisible();
 });
 
-test("a seeded member can book a free slot and cancel it again", async ({ page }) => {
+test("a seeded member can book a free slot and cancel it again", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");
   await page.getByTestId("username").fill("doe.jane");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
-  await page.getByTestId("week-next").click();
+  await selectJourneyDate(page, journeyService.visualDate);
   const targetSlot = freeSlot(page, 2, "12:00");
   await expect(targetSlot).toBeVisible();
 
@@ -124,7 +124,7 @@ test("a seeded member can book a free slot and cancel it again", async ({ page }
   await expect(personalBooking).not.toBeVisible();
 });
 
-test("a guest-restricted booking card rejects a guest through the browser", async ({ page }) => {
+test("a guest-restricted booking card rejects a guest through the browser", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");
   await page.getByTestId("username").fill("configuration-admin");
@@ -145,7 +145,7 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   await page.getByTestId("username").fill("doe.jane");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
-  await page.getByTestId("week-next").click();
+  await selectJourneyDate(page, journeyService.visualDate);
   await freeSlot(page, 3, "13:00").click();
   await page.getByTestId("booking-card").selectOption({ label: "Restricted event" });
   await page.getByTestId("guest-name").fill("John Roe");

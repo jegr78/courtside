@@ -168,17 +168,45 @@ than a general instruction to accept invalid certificates.
 
 ## Reference baselines
 
-Only a successful authoritative `baseline` result using the current performance contract can be
-promoted. The explicit command validates the result schema and every threshold before creating a
-new, non-overwriting versioned file below `performance/baselines/baseline`:
+Only a successful authoritative `baseline`, `browser`, or `soak` result using the current
+performance contract can be promoted. The explicit command validates the result schema and every
+threshold before creating a new, non-overwriting versioned file below the profile's directory in
+`performance/baselines`:
 
 ```text
-node tools/courtside.mjs perf-promote build/performance/baseline/<run>/summary.json --confirm courtside-perf
+node tools/courtside.mjs perf-promote build/performance/<profile>/<run>/summary.json --confirm courtside-perf
 ```
 
 The stored summary contains only contract-approved build, runtime, load, resource, threshold, and
 metric fields. Credentials, hostnames, remote URLs, identities, and addresses cannot pass the
 closed result schema. Failed and stale-contract results are rejected and never replace a baseline.
+
+Compare a new result with an approved baseline only on the same controlled runner:
+
+```text
+node tools/courtside.mjs perf-compare build/performance/baseline/<run>/summary.json \
+  --baseline performance/baselines/baseline/<approved>.json \
+  --output build/performance/baseline/<run>/comparison.json
+```
+
+The comparison fails closed when either result does not use the current contract, or when profile,
+observed duration, target, environment, k6 runtime, operating system, architecture, runner capacity,
+dataset, load shape, or container resource budgets differ. A reference with failed thresholds or a
+non-reference profile is also rejected. The reviewed policy in
+[`../performance/regression-policy.json`](../performance/regression-policy.json) classifies a p95
+or p99 latency increase above 15 percent, a throughput decrease above 10 percent, a technical error
+rate increase above 0.5 percentage points, or any additional unexpected server error as a
+high-severity regression owned by the performance maintainer. The JSON comparison contains only
+build identities, aggregate metric values, limits, classification, and ownership; raw targets,
+credentials, identities, and machine names are excluded.
+
+Run baseline and browser profiles monthly and before a release on the same controlled host. Run a
+fresh-environment soak quarterly and before a release that changes booking persistence, sessions,
+database access, or resource configuration. Retain their summary, comparison, HTML report, and the
+matching telemetry interval. Review JVM and container memory, garbage collection, Hikari usage,
+PostgreSQL connections and locks, database growth, and changed query plans alongside the automated
+latency, throughput, error, journey, and Web Vitals decision. Shared hosted runners remain suitable
+only for bounded smoke diagnostics and cannot approve or reject a performance baseline.
 
 ## Automation and approved baselines
 
@@ -188,10 +216,10 @@ JSON reports for fourteen days even when the run fails. It has no pull-request t
 target input, and never promotes a baseline. Pull requests continue to use the deterministic build
 workflow as their required gate.
 
-An approved reference baseline comes from the `baseline` profile on a documented local or dedicated
-runner whose processor count, memory, operating system, and architecture remain comparable. Review
-the successful report and its resource metadata before using `perf-promote`; shared hosted runners
-are diagnostic smoke environments and do not produce reference baselines.
+An approved reference comes from the `baseline`, `browser`, or `soak` profile on a documented local
+or dedicated runner whose processor count, memory, operating system, and architecture remain
+comparable. Review the successful report and its resource metadata before using `perf-promote`;
+shared hosted runners are diagnostic smoke environments and do not produce references.
 
 Remote targets require a separate opt-in and cannot use ordinary load profiles. Production targets,
 persistent UAT writes, tracked credentials, tracked remote targets, and ordinary overrides of VU or

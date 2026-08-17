@@ -9,7 +9,7 @@ import {
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   processPlans, requiredPorts, restoreDatabase, startProcesses, superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
-  writePrivateFile, performanceRunPlan, buildPerformanceResult, performanceBaselinePlan,
+  writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
   resolvePublicFunnelAddresses, uatStartupSummary, validateNode, validatePublicAddress
 } from "./courtside.mjs";
@@ -48,6 +48,22 @@ function passingPerformanceResult() {
       latencyMilliseconds: { p50: 10, p90: 20, p95: 30, p99: 40 }
     }
   };
+}
+
+function passingBrowserPerformanceResult() {
+  const result = passingPerformanceResult();
+  result.profile.name = "browser";
+  result.thresholds = {
+    technicalErrorRate: true, unexpectedServerErrors: true, webVitals: true, browserErrors: true,
+    browserJourney: true
+  };
+  result.metrics = {
+    iterations: 100, requests: 300, throughputPerSecond: 5, technicalErrorRate: 0,
+    unexpectedServerErrors: 0, browserErrors: 0, browserJourneyMilliseconds: 1800,
+    webVitals: { percentile: 75, lcpMilliseconds: 1200, inpMilliseconds: 80, cls: 0.03 },
+    latencyMilliseconds: { p50: 10, p90: 20, p95: 30, p99: 40 }
+  };
+  return result;
 }
 
 test("given Windows, when resolving executables, then wrapper commands use cmd launchers", () => {
@@ -588,15 +604,114 @@ test("given an approved result, when planning baseline promotion, then its versi
   assert.equal(JSON.parse(baseline.content).build.gitCommit, "abcdef0");
 });
 
+test("given approved browser and soak results, when promoting references, then each profile has an immutable path", () => {
+  // given
+  const browser = passingBrowserPerformanceResult();
+  const soak = passingPerformanceResult();
+  soak.profile.name = "soak";
+
+  // when
+  const browserBaseline = performanceBaselinePlan(browser, browser.contract.digest);
+  const soakBaseline = performanceBaselinePlan(soak, soak.contract.digest);
+
+  // then
+  assert.equal(browserBaseline.relativePath, "performance/baselines/browser/1.2.3-abcdef0.json");
+  assert.equal(soakBaseline.relativePath, "performance/baselines/soak/1.2.3-abcdef0.json");
+});
+
 test("given a failed or stale result, when planning baseline promotion, then it is rejected", () => {
   // given
   const failed = passingPerformanceResult();
   failed.thresholds.booking = false;
   const stale = passingPerformanceResult();
+  const smoke = passingPerformanceResult();
+  smoke.profile.name = "smoke";
 
   // when / then
   assert.throws(() => performanceBaselinePlan(failed, failed.contract.digest), /thresholds/);
   assert.throws(() => performanceBaselinePlan(stale, `sha256:${"b".repeat(64)}`), /contract/);
+  assert.throws(() => performanceBaselinePlan(smoke, smoke.contract.digest), /reference/);
+});
+
+test("given comparable results, when latency or throughput exceeds the policy, then owned findings are reported", () => {
+  // given
+  const baseline = passingPerformanceResult();
+  const candidate = structuredClone(baseline);
+  candidate.build = { applicationVersion: "1.2.4", gitCommit: "bcdef01" };
+  candidate.metrics.latencyMilliseconds.p95 = 36;
+  candidate.metrics.throughputPerSecond = 4.4;
+
+  // when
+  const comparison = comparePerformanceResults(candidate, baseline, baseline.contract.digest);
+
+  // then
+  assert.equal(comparison.status, "regression");
+  assert.deepEqual(comparison.findings.map(({ metric, severity, owner }) => ({ metric, severity, owner })), [
+    { metric: "latencyMilliseconds.p95", severity: "high", owner: "Performance maintainer" },
+    { metric: "throughputPerSecond", severity: "high", owner: "Performance maintainer" }
+  ]);
+  assert.doesNotMatch(JSON.stringify(comparison), /startedAt|target|environment/);
+});
+
+test("given results from different execution conditions, when comparing them, then comparison fails closed", () => {
+  // given
+  const baseline = passingPerformanceResult();
+  const candidate = structuredClone(baseline);
+  candidate.runtime.runner.processorCount = 8;
+
+  // when / then
+  assert.throws(() => comparePerformanceResults(candidate, baseline, baseline.contract.digest), /runner/);
+});
+
+test("given results with different observed durations, when comparing them, then comparison fails closed", () => {
+  // given
+  const baseline = passingPerformanceResult();
+  const candidate = structuredClone(baseline);
+  candidate.profile.durationSeconds += 1;
+
+  // when / then
+  assert.throws(() => comparePerformanceResults(candidate, baseline, baseline.contract.digest), /profile/);
+});
+
+test("given a stale or failed baseline, when comparing a candidate, then it cannot hide a regression", () => {
+  // given
+  const candidate = passingPerformanceResult();
+  const stale = structuredClone(candidate);
+  stale.contract.digest = `sha256:${"b".repeat(64)}`;
+  const failed = structuredClone(candidate);
+  failed.thresholds.booking = false;
+
+  // when / then
+  assert.throws(() => comparePerformanceResults(candidate, stale, candidate.contract.digest), /contract/);
+  assert.throws(() => comparePerformanceResults(candidate, failed, candidate.contract.digest), /thresholds/);
+  assert.throws(() => comparePerformanceResults(candidate, candidate, `sha256:${"c".repeat(64)}`), /contract/);
+});
+
+test("given a candidate with a failed contract threshold, when comparing it, then the result is a regression", () => {
+  // given
+  const baseline = passingPerformanceResult();
+  const candidate = structuredClone(baseline);
+  candidate.thresholds.booking = false;
+
+  // when
+  const comparison = comparePerformanceResults(candidate, baseline, baseline.contract.digest);
+
+  // then
+  assert.equal(comparison.status, "regression");
+  assert.equal(comparison.findings[0].metric, "thresholds.booking");
+});
+
+test("given performance evidence files, when parsing comparison, then baseline and output are explicit", () => {
+  // when
+  const options = parseArguments([
+    "perf-compare", "build/performance/candidate.json", "--baseline", "performance/baselines/baseline/reference.json",
+    "--output", "build/performance/comparison.json"
+  ]);
+
+  // then
+  assert.equal(options.file, "build/performance/candidate.json");
+  assert.equal(options.baseline, "performance/baselines/baseline/reference.json");
+  assert.equal(options.output, "build/performance/comparison.json");
 });
 
 test("given an existing credential file, when rewriting it on POSIX, then owner-only mode is restored", () => {

@@ -38,6 +38,7 @@ for (const locale of locales) {
       if (viewport.width < 1024) {
         await page.getByTestId("selected-date").fill(date);
       } else {
+        await expect(page.getByTestId("week-grid")).toBeVisible();
         const day = page.getByTestId(`day-selector-${date}`);
         if (await day.count() === 0) {
           await page.getByTestId("week-next").click();

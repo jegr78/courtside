@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "owner": "Performance maintainer",
+  "severity": "high",
+  "metrics": [
+    { "name": "latencyMilliseconds.p95", "direction": "increase", "maximumRelativeChange": 0.15 },
+    { "name": "latencyMilliseconds.p99", "direction": "increase", "maximumRelativeChange": 0.15 },
+    { "name": "throughputPerSecond", "direction": "decrease", "maximumRelativeChange": 0.1 },
+    { "name": "technicalErrorRate", "direction": "increase", "maximumAbsoluteChange": 0.005 },
+    { "name": "unexpectedServerErrors", "direction": "increase", "maximumAbsoluteChange": 0 }
+  ]
+}

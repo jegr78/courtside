@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "./fixtures";
+import { expect, selectJourneyDate, test } from "./fixtures";
 
 async function expectNoWcagViolations(page: import("@playwright/test").Page) {
   const results = await new AxeBuilder({ page })
@@ -36,7 +36,7 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
-  test(`${locale} member views and booking dialog meet automated WCAG 2.2 AA checks`, async ({ page }) => {
+  test(`${locale} member views and booking dialog meet automated WCAG 2.2 AA checks`, async ({ page, journeyService }) => {
     // given
     await page.goto("/");
     await page.locator("#locale-preference").selectOption(locale);
@@ -44,7 +44,7 @@ for (const locale of ["de", "en"]) {
 
     // when / then
     await expectNoWcagViolations(page);
-    await page.getByTestId("week-next").click();
+    await selectJourneyDate(page, journeyService.visualDate);
     await page.locator('[data-testid="free-slot"][data-state="free"]').first().click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expectNoWcagViolations(page);
@@ -112,10 +112,10 @@ test("initial password change is operable using only the keyboard", async ({ pag
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
 });
 
-test("booking dialog traps focus in both directions and restores its trigger", async ({ page }) => {
+test("booking dialog traps focus in both directions and restores its trigger", async ({ page, journeyService }) => {
   // given
   await signIn(page, "doe.jane");
-  await page.getByTestId("week-next").click();
+  await selectJourneyDate(page, journeyService.visualDate);
   const trigger = page.locator('[data-testid="free-slot"][data-state="free"]').first();
   await trigger.focus();
   await page.keyboard.press("Enter");
@@ -136,12 +136,12 @@ test("booking dialog traps focus in both directions and restores its trigger", a
   await expect(trigger).toBeFocused();
 });
 
-test("a booking is operable using only the keyboard", async ({ page, browserName }) => {
+test("a booking is operable using only the keyboard", async ({ page, browserName, journeyService }) => {
   // given
   await signIn(page, "doe.jane");
   const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
-  await tabToTestId(page, "week-next", 100, tabKey);
-  await page.keyboard.press("Enter");
+  await selectJourneyDate(page, journeyService.visualDate);
+  await page.getByTestId("court-plan-link").focus();
   await tabToTestId(page, "free-slot", 200, tabKey);
   const bookingsBefore = await page.getByTestId("own-allocation").count();
   await page.keyboard.press("Enter");
