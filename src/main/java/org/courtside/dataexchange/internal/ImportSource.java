@@ -63,10 +63,8 @@ public class ImportSource {
     @Column(name = "canonical_field", nullable = false)
     private Set<CanonicalField> ownedFields = new HashSet<>();
 
-    public ImportSource(String sourceKey, String displayName, Instant createdAt) {
+    public ImportSource(Instant createdAt) {
         this.id = UUID.randomUUID();
-        this.sourceKey = sourceKey;
-        this.displayName = displayName;
         this.createdAt = createdAt;
     }
 

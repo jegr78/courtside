@@ -153,6 +153,59 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
                 .hasMessageContaining(absent.toString());
     }
 
+    @Test
+    void givenAColumnHeaderWithPadding_whenCreatingASource_thenItIsStoredAsTheFileWillDeliverIt() {
+        // given
+        Map<String, CanonicalField> padded = new LinkedHashMap<>();
+        padded.put("  Member number  ", EXTERNAL_ID);
+        padded.put("First name", FIRST_NAME);
+        padded.put("Last name", LAST_NAME);
+
+        // when
+        SourceConfiguration configuration = sources.create("roster-system", "  Membership system  ",
+                padded, Map.of("  A  ", ACTIVE_TYPE), Set.of(), 10);
+
+        // then
+        assertThat(configuration.columns()).containsKey("Member number");
+        assertThat(configuration.membershipTypes()).containsKey("A");
+        assertThat(configuration.displayName()).isEqualTo("Membership system");
+    }
+
+    @Test
+    void givenAColumnHeaderOfOnlyWhitespace_whenCreatingASource_thenTheReasonIsNamed() {
+        // given
+        Map<String, CanonicalField> blank = new LinkedHashMap<>(columns());
+        blank.put("   ", MEMBERSHIP_TYPE);
+
+        // when / then
+        assertThatThrownBy(() -> sources.create("roster-system", "Membership system", blank,
+                Map.of(), Set.of(), 10))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .extracting("code").isEqualTo("import.source.columns.headerUnusable");
+    }
+
+    @Test
+    void givenASourceKeyLongerThanTheContractAllows_whenCreatingASource_thenItIsRefused() {
+        // when / then
+        assertThatThrownBy(() -> sources.create("k".repeat(41), "Membership system", columns(),
+                Map.of(), Set.of(), 10))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .extracting("code").isEqualTo("import.source.sourceKey.tooLong");
+    }
+
+    @Test
+    void givenAColumnHeaderLongerThanTheContractAllows_whenCreatingASource_thenItIsRefused() {
+        // given
+        Map<String, CanonicalField> tooLong = new LinkedHashMap<>(columns());
+        tooLong.put("h".repeat(121), MEMBERSHIP_TYPE);
+
+        // when / then
+        assertThatThrownBy(() -> sources.create("roster-system", "Membership system", tooLong,
+                Map.of(), Set.of(), 10))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .extracting("code").isEqualTo("import.source.columns.headerUnusable");
+    }
+
     private static Map<String, CanonicalField> columns() {
         Map<String, CanonicalField> columns = new LinkedHashMap<>();
         columns.put("Member number", EXTERNAL_ID);

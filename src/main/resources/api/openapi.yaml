@@ -579,6 +579,10 @@ components:
             `FIRST_NAME` and `LAST_NAME` are required; `EMAIL` and `MEMBERSHIP_TYPE` are not,
             because a membership can exist without an address and a club may not export a category
             at all. Two headers may not name the same field.
+
+            A header is stored without its surrounding whitespace, because that is how it arrives
+            from the file: a mapping kept with padding would name a column that never matches.
+          propertyNames: { minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
           additionalProperties: { $ref: "#/components/schemas/CanonicalField" }
         membershipTypes:
           type: object
@@ -587,6 +591,9 @@ components:
             club. Free text never creates a type: a value with no mapping stops the snapshot rather
             than inventing one. A type deactivated later is accepted here and refused by the run,
             which is where a club is told about it.
+
+            A value is stored without its surrounding whitespace, for the same reason a header is.
+          propertyNames: { minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
           additionalProperties: { type: string, format: uuid }
         ownedFields:
           type: array

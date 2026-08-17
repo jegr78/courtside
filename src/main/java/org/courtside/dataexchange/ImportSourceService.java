@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,6 +25,9 @@ public class ImportSourceService {
     private static final Set<CanonicalField> REQUIRED_COLUMNS =
             EnumSet.of(CanonicalField.EXTERNAL_ID, CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME);
     private static final String UNIQUE_KEY_CONSTRAINT = "import_source_unique_key";
+    private static final int MAX_KEY_LENGTH = 40;
+    private static final int MAX_DISPLAY_NAME_LENGTH = 80;
+    private static final int MAX_ENTRY_LENGTH = 120;
 
     private final ImportSourceRepository sources;
     private final MemberService memberships;
@@ -45,12 +49,10 @@ public class ImportSourceService {
                                       Map<String, UUID> membershipTypes,
                                       Set<CanonicalField> ownedFields, int removalWarningPercent) {
         requireUsable(columns, membershipTypes, ownedFields, removalWarningPercent);
-        ImportSource source = new ImportSource(
-                requiredText(sourceKey, "import.source.sourceKey.blank", "sourceKey"),
-                requiredText(displayName, "import.source.displayName.blank", "displayName"),
-                clock.instant());
-        source.changeTo(source.getSourceKey(), source.getDisplayName(), columns, membershipTypes,
-                ownedFields, removalWarningPercent);
+        ImportSource source = new ImportSource(clock.instant());
+        source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
+                strippedColumns(columns), strippedMembershipTypes(membershipTypes), ownedFields,
+                removalWarningPercent);
         return toConfiguration(saveOrRejectTakenKey(source));
     }
 
@@ -61,9 +63,9 @@ public class ImportSourceService {
                                       Set<CanonicalField> ownedFields, int removalWarningPercent) {
         requireUsable(columns, membershipTypes, ownedFields, removalWarningPercent);
         ImportSource source = require(sourceId);
-        source.changeTo(requiredText(sourceKey, "import.source.sourceKey.blank", "sourceKey"),
-                requiredText(displayName, "import.source.displayName.blank", "displayName"),
-                columns, membershipTypes, ownedFields, removalWarningPercent);
+        source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
+                strippedColumns(columns), strippedMembershipTypes(membershipTypes), ownedFields,
+                removalWarningPercent);
         return toConfiguration(saveOrRejectTakenKey(source));
     }
 
@@ -162,11 +164,54 @@ public class ImportSourceService {
         return ownedFields == null ? Set.of() : ownedFields;
     }
 
-    private static String requiredText(String value, String code, String field) {
+    private static String requiredKey(String sourceKey) {
+        return requiredText(sourceKey, MAX_KEY_LENGTH, "import.source.sourceKey.blank",
+                "import.source.sourceKey.tooLong", "sourceKey");
+    }
+
+    private static String requiredDisplayName(String displayName) {
+        return requiredText(displayName, MAX_DISPLAY_NAME_LENGTH, "import.source.displayName.blank",
+                "import.source.displayName.tooLong", "displayName");
+    }
+
+    private static String requiredText(String value, int maxLength, String blankCode,
+                                       String tooLongCode, String field) {
         if (value == null || value.isBlank()) {
-            throw new ImportSourceInvalidException(code, Map.of("field", field));
+            throw new ImportSourceInvalidException(blankCode, Map.of("field", field));
         }
-        return value.strip();
+        String stripped = value.strip();
+        if (stripped.length() > maxLength) {
+            throw new ImportSourceInvalidException(tooLongCode,
+                    Map.of("field", field, "maxLength", maxLength));
+        }
+        return stripped;
+    }
+
+    // The file's headers arrive stripped, so a mapping stored with padding would silently never
+    // match the column it names.
+    private static Map<String, CanonicalField> strippedColumns(Map<String, CanonicalField> columns) {
+        Map<String, CanonicalField> stripped = new LinkedHashMap<>();
+        requiredColumns(columns).forEach((header, field) -> stripped.put(
+                usableEntry(header, "import.source.columns.headerUnusable", "columns"), field));
+        return stripped;
+    }
+
+    private static Map<String, UUID> strippedMembershipTypes(Map<String, UUID> membershipTypes) {
+        Map<String, UUID> stripped = new LinkedHashMap<>();
+        requiredMembershipTypes(membershipTypes).forEach((value, typeId) -> stripped.put(
+                usableEntry(value, "import.source.membershipTypes.valueUnusable", "membershipTypes"),
+                typeId));
+        return stripped;
+    }
+
+    private static String usableEntry(String value, String code, String field) {
+        String stripped = value == null ? "" : value.strip();
+        if (stripped.isEmpty() || stripped.length() > MAX_ENTRY_LENGTH) {
+            throw new ImportSourceInvalidException(code,
+                    Map.of("field", field, "value", value == null ? "" : value,
+                            "maxLength", MAX_ENTRY_LENGTH));
+        }
+        return stripped;
     }
 
     private static SourceConfiguration toConfiguration(ImportSource source) {
