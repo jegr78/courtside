@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -57,6 +58,8 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
             UUID.fromString("cccccccc-0000-0000-0000-000000000001");
     private static final UUID MEMBER_BOOKING_CARD =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID UNKNOWN_RULE_SET =
+            UUID.fromString("aaaaaaaa-0000-0000-0000-000000000099");
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
 
     @Autowired
@@ -199,14 +202,37 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
     @Test
     void givenAnUnknownRuleSet_whenSettingARule_thenItIsNotFound() throws Exception {
         // when / then
-        mockMvc.perform(put("/api/admin/rule-sets/" + UUID.randomUUID() + "/rules/ADVANCE_WINDOW")
+        mockMvc.perform(put("/api/admin/rule-sets/" + UNKNOWN_RULE_SET + "/rules/ADVANCE_WINDOW")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"params": {"maxDays": 14}}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("Rule set not found"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:rule-set-not-found"))
+                .andExpect(jsonPath("$.title").value("Rule set not found"))
+                .andExpect(jsonPath("$.detail").value("No such rule set"));
+    }
+
+    @Test
+    void givenAnUnknownRuleSet_whenListingRules_thenItIsNotFound() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/rule-sets/" + UNKNOWN_RULE_SET + "/rules"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:rule-set-not-found"))
+                .andExpect(jsonPath("$.title").value("Rule set not found"))
+                .andExpect(jsonPath("$.detail").value("No such rule set"));
+    }
+
+    @Test
+    void givenAnUnknownRuleSet_whenDeletingARule_thenItIsNotFound() throws Exception {
+        // when / then
+        mockMvc.perform(delete("/api/admin/rule-sets/" + UNKNOWN_RULE_SET + "/rules/ADVANCE_WINDOW")
+                        .with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:rule-set-not-found"))
+                .andExpect(jsonPath("$.title").value("Rule set not found"))
+                .andExpect(jsonPath("$.detail").value("No such rule set"));
     }
 
     @Test
@@ -218,7 +244,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
             openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
         }
         UUID personId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
-        members.save(new Member(personId, STANDARD_MEMBERSHIP));
+        members.save(memberSince(personId, STANDARD_MEMBERSHIP));
         Instant eightDaysOut = NOW.plus(8, ChronoUnit.DAYS);
 
         // when / then

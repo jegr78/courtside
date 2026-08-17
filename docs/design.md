@@ -29,8 +29,8 @@ adapter has needed one.
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
 courts, accounts, roles and session login, club configuration and branding, the roster — the club's
-people, the account and roles a person holds, the membership they hold, correcting a username and
-resetting a password — and the admin surface for all of it. `/actuator/health` is exposed. The
+people, the account and roles a person holds, the membership they hold with the dates it runs
+between, correcting a username and resetting a password — and the admin surface for all of it. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -470,6 +470,20 @@ Deliberate decisions:
   kind is a validator class plus a row, not a schema migration.
 - **`membership_type` → `rule_set`** is what makes "juniors only until 18:00" possible
   without a special case in code.
+- **`member` is one dated row per person, and a membership that ends is kept rather than removed.**
+  `UNIQUE (person_id)` holds, so "at most one membership" stays the database's answer and every
+  reader finds one row. Ending a membership records the date it ended; the row keeps the type its
+  holder last had, so a club can still see who was a member of what and until when, and a rejoin
+  revives the same row from a new start date. The price is deliberate: after a rejoin the previously
+  held type is gone. Bounded periods with a readable history are a different model, and widening
+  `member` underneath a rule engine that assumes a single current membership is its own decision.
+
+  **The dates record, they do not schedule.** Whether somebody is a member is decided by whether an
+  end date is set, and no query compares a date with today. Neither date may therefore lie in the
+  future: a start next month would make somebody a member now, and an end in December would stop
+  their membership today — seven months of a member measured against no membership-scoped rule at
+  all. The roster refuses a future date rather than storing one nothing honours. Scheduling a
+  membership ahead needs date-aware currency in every reader, and that is the period model above.
 
 ### Identity model
 
@@ -520,6 +534,12 @@ A rule set belongs to a membership type or role. On a booking attempt, all appli
 run as a chain.
 
 **A person without a membership is bound by no membership-scoped rule.** *Accepted, not closed.*
+This covers a membership that has **ended** exactly as it covers one never given: a person whose
+membership carries an end date is no longer measured against its type, so ending a membership
+loosens what its holder may book rather than tightening it. Anything that ends memberships in bulk
+therefore has to take the account's permission away in the same step, or it hands departed members a
+less restricted account than they had as members.
+
 Section 10 states the same thing from the session side and calls it the most permissive state the
 booking rules know; the roster reaches it in one step, because a person can be given an account
 without being given a membership, and such an account then books as far ahead and as often as the

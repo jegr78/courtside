@@ -105,7 +105,8 @@ class PerformanceDataSeeder implements ApplicationRunner {
             UserAccount account = new UserAccount(person, "member" + number, passwordHash, Set.of(Role.MEMBER));
             account.enable();
             accounts.save(account);
-            members.save(new Member(person.getId(), ACTIVE_MEMBERSHIP_TYPE));
+            members.save(new Member(person.getId(), ACTIVE_MEMBERSHIP_TYPE,
+                    LocalDate.now(clock.withZone(timeZone.zoneId()))));
             result.add(new PerformanceMember(person, account));
         }
         return result;
