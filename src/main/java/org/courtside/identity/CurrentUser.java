@@ -18,8 +18,7 @@ public class CurrentUser {
 
     public Optional<UserAccount> account() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        // The anonymous token reports isAuthenticated() == true, so without this an anonymous
-        // caller would be looked up as "anonymousUser".
+        // The anonymous token reports isAuthenticated() == true.
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken) {
             return Optional.empty();

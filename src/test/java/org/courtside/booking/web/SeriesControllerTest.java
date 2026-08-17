@@ -106,8 +106,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenACountLargerThanTheHorizonAllows_whenPreviewing_thenTheResponseSaysSo() throws Exception {
-        // when / then — the horizon defaults to 12 months, so a weekly series starting
-        // 2026-04-07 offers 53 Tuesdays, not the 100 requested
+        // when / then
         mockMvc.perform(post("/api/booking-series/preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewJson(100))
@@ -192,7 +191,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenTheTrainerIsAlsoAMember_whenPreviewing_thenTheAdvanceWindowNarrowsTheCreatableCount()
             throws Exception {
-        // given — the "Active" membership caps advance booking at 7 days
+        // given
         members.save(new Member(trainerPersonId, ACTIVE_MEMBERSHIP));
 
         // when / then
@@ -221,7 +220,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAMemberAndATrainerCard_whenPreviewing_thenItIsStillAllowed() throws Exception {
-        // when / then — a preview reads the calendar and creates nothing
+        // when / then
         mockMvc.perform(post("/api/booking-series/preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewJson(4))
@@ -329,7 +328,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenEveryConfirmedOccurrenceIsImpossible_whenCreating_thenOkWithoutALocation() throws Exception {
-        // when / then — 21:00 plus two hours runs past the 22:00 closing time
+        // when / then
         mockMvc.perform(post("/api/booking-series")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

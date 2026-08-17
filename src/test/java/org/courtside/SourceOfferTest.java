@@ -58,8 +58,7 @@ class SourceOfferTest extends AbstractIntegrationTest {
 
     @Test
     void whenAskingWhereTheSourceIs_thenTheCommitIsTheOneTheBuildRecorded() throws Exception {
-        // given — the build tolerates having no repository to read, so the endpoint must report
-        // whatever git.properties ended up holding, including nothing
+        // given
         String recorded = whatTheBuildRecorded();
 
         // when / then
@@ -78,7 +77,7 @@ class SourceOfferTest extends AbstractIntegrationTest {
 
     @Test
     void whenNobodyOverrodeIt_thenTheSourceUrlIsTheOneTheProjectDeclares() throws Exception {
-        // given — a build that stopped filtering @project.url@ would ship the placeholder
+        // given
         Matcher declared = POM_URL.matcher(Files.readString(Path.of("pom.xml")));
         assertThat(declared.find()).as("pom.xml must declare the project url").isTrue();
 

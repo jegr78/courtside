@@ -38,8 +38,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Every mapped path falls into exactly one of three buckets, and each bucket is proven in both
-// directions against the running filter chain.
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
     private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 48;
@@ -263,8 +261,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         try {
             MockHttpServletRequest servletRequest =
                     new MockHttpServletRequest(endpoint.method().name(), endpoint.concretePath());
-            // The mappings state what they consume, so a probe with no content type matches
-            // nothing. Accept stays open, since one endpoint serves YAML.
+            // The mappings state what they consume, so a probe with no content type matches nothing.
             servletRequest.setContentType(MediaType.APPLICATION_JSON_VALUE);
             servletRequest.addHeader(HttpHeaders.ACCEPT, MediaType.ALL_VALUE);
             ServletRequestPathUtils.parseAndCache(servletRequest);
@@ -313,8 +310,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         }
     }
 
-    // Taken from what the mapping declares rather than assumed to be JSON, because one endpoint
-    // serves the API document as YAML.
+    // One endpoint serves the API document as YAML.
     private String successfulAsAnonymousFailure(MappedEndpoint endpoint) {
         try {
             MockHttpServletRequestBuilder request = request(endpoint.method(), endpoint.concretePath())
@@ -334,8 +330,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         }
     }
 
-    // No single expected status: these endpoints differ in what they need to succeed, and only
-    // this app's two gates produce 401 and 403, so their absence proves both were passed.
+    // Only this app's two gates produce 401 and 403.
     private String reachableAsAuthenticatedMemberFailure(MappedEndpoint endpoint) {
         try {
             int status = mockMvc.perform(request(endpoint.method(), endpoint.concretePath())

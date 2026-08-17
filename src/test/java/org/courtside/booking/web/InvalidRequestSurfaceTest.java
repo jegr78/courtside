@@ -32,8 +32,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Pins the answer at every throw site a request can reach. Each once returned a 400 carrying the
-// exception's message verbatim, with no code and no field.
 @WithMockUser(username = "doe.jane", roles = "MEMBER")
 class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
@@ -94,16 +92,13 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:court-not-bookable"))
                 .andExpect(jsonPath("$.violations[0].code").value("court.unknown"))
                 .andExpect(jsonPath("$.violations[0].params.field").value("courtIds"))
-                // The old shape is gone, not merely joined: a client that finds a code here would
-                // keep the second render path alive.
                 .andExpect(jsonPath("$.code").doesNotExist())
                 .andExpect(jsonPath("$.params").doesNotExist());
     }
 
     @Test
     void whenBookingACourtThatIsNotActive_thenTheCodeSaysSoRatherThanUnknown() throws Exception {
-        // given — a member must be able to tell "there is no such court" from "that court is
-        // closed", and only the code carries that
+        // given
         // when / then
         postBooking(booking(inactiveCourtId.toString(), MEMBER_BOOKING_CARD.toString(),
                 "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
@@ -127,8 +122,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenTheBookingEndsBeforeItStarts_thenItIsAFieldErrorOnEndsAt() throws Exception {
-        // when / then — the ordering is a field constraint, so TimeSlot's guard goes back to
-        // being what it is meant to be: unreachable from a request
+        // when / then
         postBooking(booking(courtId.toString(), MEMBER_BOOKING_CARD.toString(),
                 "2026-05-12T19:00:00+02:00", "2026-05-12T18:00:00+02:00"))
                 .andExpect(status().isBadRequest())
@@ -139,8 +133,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenTheBookingEndsExactlyWhenItStarts_thenItIsAFieldErrorOnEndsAt() throws Exception {
-        // given — a zero-length booking occupies nothing; the exclusion constraint would not
-        // even see it as an overlap
+        // given
         // when / then
         postBooking(booking(courtId.toString(), MEMBER_BOOKING_CARD.toString(),
                 "2026-05-12T18:00:00+02:00", "2026-05-12T18:00:00+02:00"))
@@ -200,8 +193,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SeriesEndsOnce"));
     }
 
-    // The rule is stated twice in SeriesRequestValidator, once per generated type. Testing only
-    // the preview leaves the other free to be deleted, and its absence is a 500.
+    // The rule is stated twice in SeriesRequestValidator, once per generated type.
     @Test
     void whenASeriesToCreateEndsBeforeItStarts_thenItIsAFieldErrorOnEndsOn() throws Exception {
         // when / then
@@ -234,8 +226,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.SeriesEndsOnce"));
     }
 
-    // The one array the document bounds below but not above, and so the only case reaching the
-    // code written for a maximum no message can name.
+    // The one array the document bounds below but not above.
     @Test
     void whenASeriesNamesNoWeekdays_thenTheViolationDoesNotQuoteAnUnboundedMaximum()
             throws Exception {
@@ -255,8 +246,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenAMoveNamesNoCourtsAtAll_thenItIsAFieldErrorOnNewCourtIds() throws Exception {
-        // given — leaving newCourtIds out means "keep the courts", so null stays legal; an empty
-        // list asks for a booking on no court at all
+        // given
         // when / then
         postMovePreview("""
                 {"fromBookingId": "%s", "scope": "WHOLE_SERIES", "newCourtIds": []}
@@ -281,8 +271,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenAMoveChangesNothing_thenItIsAFieldErrorRatherThanASilentNoOp() throws Exception {
-        // given — all three of time, duration and courts left out; the request asks the series to
-        // move to exactly where it already is
+        // given
         // when / then
         postMovePreview("""
                 {"fromBookingId": "%s", "scope": "WHOLE_SERIES"}
@@ -310,8 +299,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .with(csrf()));
     }
 
-    // The series id is arbitrary: @Valid on the request body is resolved before the controller
-    // method runs, so a body that fails validation never reaches the lookup.
+    // @Valid on the request body is resolved before the controller method runs.
     private org.springframework.test.web.servlet.ResultActions postMovePreview(String body)
             throws Exception {
         return mockMvc.perform(post("/api/booking-series/{id}/move/preview", UUID.randomUUID())
@@ -334,8 +322,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .with(csrf()));
     }
 
-    // Creating additionally requires the occurrences the caller confirmed; one valid entry keeps
-    // the recurrence itself the only thing under test.
+    // Creating additionally requires the occurrences the caller confirmed.
     private String seriesToCreate(String ending) {
         return """
                 {"courtIds": ["%s"], "cardId": "%s", "startsOn": "2026-05-12",

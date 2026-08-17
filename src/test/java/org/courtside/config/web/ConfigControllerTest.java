@@ -426,8 +426,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenALogoUrlThatIsBackslashRelative_whenChangingTheConfig_thenItIsRejected()
             throws Exception {
-        // when / then — a WHATWG-compliant browser resolves "/\evil.example" the same as
-        // "//evil.example": a cross-origin URL, not a root-relative path
+        // when / then
         mockMvc.perform(put("/api/admin/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

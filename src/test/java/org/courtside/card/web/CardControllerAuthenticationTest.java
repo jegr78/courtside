@@ -16,8 +16,7 @@ class CardControllerAuthenticationTest {
 
     @Test
     void givenNoAuthenticatedAccount_whenListingBookingCardsPublicly_thenItReturnsNoCardsRatherThanThrowing() {
-        // given — reached directly, with no security filter chain in front to guarantee
-        // authentication is present, unlike every MockMvc-driven test in this package
+        // given
         CardService cards = mock(CardService.class);
         CurrentUser currentUser = mock(CurrentUser.class);
         when(currentUser.account()).thenReturn(Optional.empty());

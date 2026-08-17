@@ -8,6 +8,7 @@ import org.courtside.identity.UserAccountRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -80,6 +82,22 @@ class BootstrapAdminInitializerTest {
         verify(persons, never()).save(any());
         verify(accounts, never()).save(any());
         verify(encoder, never()).encode(any());
+    }
+
+    @Test
+    void givenAnEmptyAccountTable_whenInitializing_thenTheDecisionIsTakenUnderTheLock() {
+        // given
+        when(accounts.count()).thenReturn(1L);
+        BootstrapAdminInitializer initializer = initializer(
+                new BootstrapAdminProperties("", "", ""));
+
+        // when
+        initializer.run(null);
+
+        // then
+        InOrder serialised = inOrder(lock, accounts);
+        serialised.verify(lock).acquire();
+        serialised.verify(accounts).count();
     }
 
     private BootstrapAdminInitializer initializer(BootstrapAdminProperties properties) {

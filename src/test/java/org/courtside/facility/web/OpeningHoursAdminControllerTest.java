@@ -68,7 +68,7 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void whenListingTheOpeningHours_thenEveryWeekdayIsPresentEvenWhenClosed() throws Exception {
-        // given — the teardown clears opening_hours, so the club starts closed all week
+        // given
         mockMvc.perform(put("/api/admin/opening-hours/MONDAY")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -145,7 +145,7 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
         // when
         setHours("THURSDAY", "09:00", "21:00");
 
-        // then — opening_hours_unique_day would have rejected a second row
+        // then
         mockMvc.perform(get("/api/admin/opening-hours"))
                 .andExpect(jsonPath("$.length()").value(7))
                 .andExpect(jsonPath("$[3].opensAt").value("09:00:00"))

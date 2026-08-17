@@ -147,7 +147,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     void givenOpeningHours_whenSettingItPerRuleSet_thenItIsRejected() throws Exception {
-        // given — opening hours describe the grid itself, not a per-membership setting
+        // given
         String ruleSetId = createRuleSet("Trial");
 
         // when / then
@@ -221,7 +221,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
         members.save(new Member(personId, STANDARD_MEMBERSHIP));
         Instant eightDaysOut = NOW.plus(8, ChronoUnit.DAYS);
 
-        // when / then — a one-day window refuses a booking eight days out
+        // when / then
         setRule(STANDARD_RULE_SET.toString(), "ADVANCE_WINDOW", "maxDays", 1);
         assertThatThrownBy(() -> book(courtId, personId, eightDaysOut))
                 .isInstanceOf(BookingRulesViolatedException.class)
@@ -230,7 +230,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
                         .extracting("code")
                         .contains("booking.rule.advanceWindow.exceeded"));
 
-        // when / then — widening the window to a year accepts the very same booking
+        // when / then
         setRule(STANDARD_RULE_SET.toString(), "ADVANCE_WINDOW", "maxDays", 365);
         UUID bookingId = book(courtId, personId, eightDaysOut);
         assertThat(bookings.findWithAllocationsById(bookingId).orElseThrow().getStatus())

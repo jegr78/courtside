@@ -151,7 +151,6 @@ class PerformanceDataSeeder implements ApplicationRunner {
             historicalBookings.importBooking(command);
             return memberIndex + 2;
         }
-        // A slot already under way is neither importable as history nor acceptable to the rules.
         if (command.slot().start().isBefore(now)) {
             return memberIndex + 2;
         }

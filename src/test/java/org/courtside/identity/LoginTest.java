@@ -15,6 +15,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.util.Set;
 
 import static org.courtside.identity.AccountFixtures.enabled;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -136,21 +137,28 @@ class LoginTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnAccountAwaitingApproval_whenLoggingIn_thenUnauthorized() throws Exception {
+    void givenAnAccountAwaitingApproval_whenLoggingIn_thenTheAnswerIsTheWrongPasswordAnswer()
+            throws Exception {
         // given
         Person pending = persons.save(new Person("Mary", "Major", "new@example.org"));
         accounts.save(new UserAccount(
                 pending, "major.mary", passwordEncoder.encode("secret"), Set.of(Role.MEMBER)));
+        String wrongPassword = signInFailure("doe.jane", "wrong");
 
-        // when / then — the body must be indistinguishable from a wrong password, so it never
-        // confirms whether an account exists
-        mockMvc.perform(post("/api/session")
-                        .param("username", "major.mary")
-                        .param("password", "secret")
+        // when
+        String awaitingApproval = signInFailure("major.mary", "secret");
+
+        // then
+        assertThat(awaitingApproval).isEqualTo(wrongPassword);
+    }
+
+    private String signInFailure(String username, String password) throws Exception {
+        return mockMvc.perform(post("/api/session")
+                        .param("username", username)
+                        .param("password", password)
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"))
-                .andExpect(jsonPath("$.instance").value("/api/session"));
+                .andReturn().getResponse().getContentAsString();
     }
 
     @Test

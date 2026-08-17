@@ -16,8 +16,7 @@ class HexColorPatternTest {
     @Test
     void whenReadingEveryHexColorPatternCopy_thenTheyAllAgreeWithBookingCardsColorCheck()
             throws IOException, ReflectiveOperationException {
-        // given — booking_card.color is the oldest copy of this pattern; the three web-side
-        // copies now live in the API document and reach the code through the generator
+        // given
         String canonical = sqlCheckRegex("V2__booking_card.sql", "color");
 
         // when / then
@@ -53,8 +52,7 @@ class HexColorPatternTest {
         return matcher.group(1);
     }
 
-    // Read off the generated accessor rather than the document: that is where the pattern ends up
-    // enforcing anything, and it proves the document actually reached the code.
+    // Read off the generated accessor: that is where the pattern ends up enforcing anything.
     private static String accessorPattern(String className, String accessorName)
             throws ReflectiveOperationException {
         Method accessor = Class.forName(className).getDeclaredMethod(accessorName);

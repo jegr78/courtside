@@ -33,8 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-// Ahead of Boot's problemdetails fallback, behind the module advices that must claim their own
-// exceptions first. AdviceOrderingTest enforces it.
+// Ahead of Boot's problemdetails fallback, behind the module advices.
 @Slf4j
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 1000)
@@ -43,15 +42,13 @@ class SharedExceptionHandler {
 
     private final ProblemTraceReference traceReference;
 
-    // Every bundle entry interpolates at most these; anything else a constraint carries (a
-    // @Pattern's regexp, for one) must not reach a client, so this is an allowlist, not a denylist.
+    // An allowlist: anything else a constraint carries must not reach a client.
     private static final Map<String, Set<String>> ALLOWED_PARAMS_BY_CONSTRAINT = Map.of(
             "Size", Set.of("min", "max"),
             "Min", Set.of("value"),
             "Max", Set.of("value"));
 
-    // Only for a violation nothing upstream recognised, and it must not guess at which
-    // constraint: naming one would downgrade a module's 409 to a 400.
+    // Only for a violation nothing upstream recognised.
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleRejectedByTheDatabase(DataIntegrityViolationException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -95,7 +92,6 @@ class SharedExceptionHandler {
         return problem;
     }
 
-    // One builder, because ProblemTypeUriTest expects each slug's literal exactly once.
     private static ProblemDetail validationFailed(List<Map<String, Object>> fieldErrors) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "The request does not pass validation");
@@ -118,8 +114,7 @@ class SharedExceptionHandler {
         return problem;
     }
 
-    // Jackson records the property path as a mismatch unwinds, so a value it cannot read names
-    // its field instead of leaving the caller with "something in the body is wrong".
+    // Jackson records the property path as a mismatch unwinds.
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail handleUnreadableBody(HttpMessageNotReadableException exception) {
         String field = mismatchedField(exception);
@@ -132,8 +127,6 @@ class SharedExceptionHandler {
             return problem;
         }
 
-        // Twice, not one map with a computed code: ValidationMessageCoverageTest finds a code
-        // by the literal following the "code" key, and one it cannot see has no bundle entry.
         ProblemDetail problem = validationFailed(List.of(
                 exception.getCause() instanceof DuplicateItemException
                         ? Map.of("field", field, "code", "validation.NoDuplicates", "params", Map.of())
@@ -142,8 +135,7 @@ class SharedExceptionHandler {
         return problem;
     }
 
-    // The keys of an additionalProperties object are whatever the caller sent, so anything
-    // outside this set is not echoed back.
+    // The keys of an additionalProperties object are whatever the caller sent.
     private static final Pattern A_NAME_THIS_API_DEFINES = Pattern.compile("[A-Za-z0-9_-]{1,40}");
 
     private static String mismatchedField(HttpMessageNotReadableException exception) {
@@ -152,8 +144,7 @@ class SharedExceptionHandler {
         }
         StringBuilder field = new StringBuilder();
         for (JacksonException.Reference reference : mismatch.getPath()) {
-            // Bean Validation names the same field "participants[0].personId"; without the
-            // index a caller cannot tell which entry to correct.
+            // Bean Validation names the same field "participants[0].personId".
             if (reference.getIndex() >= 0) {
                 field.append('[').append(reference.getIndex()).append(']');
                 continue;
@@ -196,8 +187,7 @@ class SharedExceptionHandler {
         return problem;
     }
 
-    // getHeaders() carries Accept, as it carries Allow above. Not mandatory on a 415, but
-    // dropping it loses the same machine-readable answer.
+    // getHeaders() carries Accept, as it carries Allow above.
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     ResponseEntity<ProblemDetail> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -235,8 +225,7 @@ class SharedExceptionHandler {
 
     private static Map<String, Object> toMap(FieldError error) {
         if (!error.contains(ConstraintViolation.class)) {
-            // A Validator's rejection carries its own code; falling back to "rejected" would
-            // leave a client unable to tell one cross-field rule from another.
+            // A Validator's rejection carries its own code.
             String code = error.getCode();
             return Map.of("field", error.getField(),
                     "code", code == null ? "validation.rejected" : "validation." + code,
@@ -264,8 +253,7 @@ class SharedExceptionHandler {
         Map<String, Object> params = new LinkedHashMap<>();
         allowedParams.forEach(name -> params.put(name, attributes.get(name)));
 
-        // An unbounded minItems generates @Size(min = 1) with max = Integer.MAX_VALUE, and no
-        // message can name two billion usefully.
+        // An unbounded minItems generates @Size(min = 1) with max = Integer.MAX_VALUE.
         if ("Size".equals(constraintName) && Integer.valueOf(Integer.MAX_VALUE).equals(params.get("max"))) {
             params.remove("max");
             return Map.of(
@@ -280,8 +268,7 @@ class SharedExceptionHandler {
                 "params", params);
     }
 
-    // The problem type, so a log line and the response a member reads share one token. Never the
-    // exception: its message embeds the rejected value, a cleartext password on some endpoints.
+    // Never the exception: its message embeds the rejected value, a password on some endpoints.
     private void logAnswered(ProblemDetail problem) {
         traceReference.addTo(problem);
         log.debug("Answering {} for {}", HttpStatusCode.valueOf(problem.getStatus()), problem.getType());

@@ -16,7 +16,7 @@ import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 
 const roles: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER"];
-// The server strips MEMBER before matching a managing role, so offering it here would grant nobody.
+// The server strips MEMBER before matching a managing role.
 const managingRoleOptions: Role[] = roles.filter((role) => role !== "MEMBER");
 
 export function AdminFacilityView() {

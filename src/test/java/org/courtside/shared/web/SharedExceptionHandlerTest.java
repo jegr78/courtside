@@ -14,8 +14,7 @@ import static org.mockito.Mockito.mock;
 
 class SharedExceptionHandlerTest {
 
-    // No known write path reaches this handler unclaimed, so it is pinned directly rather than
-    // through a fabricated HTTP request that would misrepresent what the API can currently produce.
+    // No known write path reaches this handler unclaimed.
     @Test
     void whenHandlingAnUntranslatedConstraintViolation_thenTheProblemDetailNamesItsOwnType() {
         // given
@@ -33,8 +32,7 @@ class SharedExceptionHandlerTest {
     @Test
     @SuppressWarnings("unchecked")
     void givenAFieldErrorThatIsNotABeanValidationViolation_whenHandlingIt_thenAProblemDetailStillNamesTheField() {
-        // given — a type-mismatch binding failure on a @ModelAttribute/@RequestBody field carries
-        // no ConstraintViolation to unwrap, unlike a rejected @NotBlank or @Pattern
+        // given
         SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
         MethodArgumentNotValidException exception = FieldRejections.rejectionOf("page", null);
 

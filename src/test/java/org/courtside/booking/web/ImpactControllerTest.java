@@ -192,7 +192,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     @Test
     void givenBookingsInsideAndOutsideTheProposedHours_whenNarrowingTuesday_thenOnlyTheOutOfHoursBookingIsListed()
             throws Exception {
-        // given — 2026-05-12 is a Tuesday; Europe/Berlin runs CEST (+2) then
+        // given
         UUID court = courts.save(new Court(1, null)).getId();
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
@@ -364,8 +364,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     @Test
     void givenABookingStartingAtExactlyTheCurrentInstant_whenAskingWhatDeactivatingTheCourtWouldAffect_thenItIsCounted()
             throws Exception {
-        // given — the fixed clock reads 2026-05-12T10:00:00Z; a booking beginning this instant
-        // has not started yet and must still be reported
+        // given
         UUID court = courts.save(new Court(1, null)).getId();
         UUID bookingId = insertBooking(
                 court, "2026-05-12T10:00:00Z", "2026-05-12T11:00:00Z", "CONFIRMED");
@@ -395,7 +394,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     @Test
     void givenABookingStartingAtExactlyTheCurrentInstant_whenAskingWhatClosingItsWeekdayWouldAffect_thenItIsCounted()
             throws Exception {
-        // given — 10:00Z is 12:00 on a Tuesday in the club zone, so closing Tuesday strands it
+        // given
         UUID court = courts.save(new Court(1, null)).getId();
         UUID bookingId = insertBooking(
                 court, "2026-05-12T10:00:00Z", "2026-05-12T11:00:00Z", "CONFIRMED");
@@ -410,8 +409,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     @Test
     void givenOpensAtWithoutClosesAt_whenAskingWhatNarrowingOpeningHoursWouldAffect_thenTheRequestIsRejected()
             throws Exception {
-        // given — a future Tuesday booking exists so the request would otherwise have to be
-        // evaluated against the incomplete pair, not merely accepted because there is nothing to check
+        // given
         UUID court = courts.save(new Court(1, null)).getId();
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
@@ -428,8 +426,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     @Test
     void givenClosesAtWithoutOpensAt_whenAskingWhatNarrowingOpeningHoursWouldAffect_thenTheRequestIsRejected()
             throws Exception {
-        // given — a future Tuesday booking exists so the request would otherwise have to be
-        // evaluated against the incomplete pair, not merely accepted because there is nothing to check
+        // given
         UUID court = courts.save(new Court(1, null)).getId();
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();

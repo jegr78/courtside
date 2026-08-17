@@ -11,12 +11,9 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// One shape for a translatable failure: a violations array, even for a single entry. No type
-// system can hold that, since any failure may override properties(); this test is the boundary.
 class ViolationShapeTest {
 
-    // The only two files allowed to write a "code" map key: DomainFailure builds the violations
-    // entry, SharedExceptionHandler builds both violations and fieldErrors.
+    // The only two files allowed to write a "code" map key.
     private static final List<String> ALLOWED_TO_WRITE_A_CODE = List.of(
             "org/courtside/shared/DomainFailure.java",
             "org/courtside/shared/web/SharedExceptionHandler.java");
@@ -44,8 +41,7 @@ class ViolationShapeTest {
 
     @Test
     void whenReadingEveryAdvice_thenNoneSetsACodeOnTheProblemItself() throws IOException {
-        // given — the array is set as one property; a code set directly on the ProblemDetail is
-        // the top-level shape by definition
+        // given
         TreeSet<String> offenders = new TreeSet<>();
 
         // when

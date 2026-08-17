@@ -212,7 +212,6 @@ public class SeriesService {
         return new MovePreview(moves);
     }
 
-    // Without it nothing persists at all; with it, a mid-flush constraint failure undoes every move.
     @Transactional
     public int move(MoveRequest request, UUID movedBy, Set<Role> callerRoles) {
         requireManagementAccessTo(request.seriesId(), request.fromBookingId(), movedBy, callerRoles);

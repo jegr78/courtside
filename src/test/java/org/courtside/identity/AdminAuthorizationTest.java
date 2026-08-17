@@ -101,8 +101,7 @@ class AdminAuthorizationTest extends AbstractIntegrationTest {
     @Test
     void givenNoAuthenticationAndNoCsrfToken_whenMutatingAnAdminEndpoint_thenCsrfIsCheckedBeforeAuthentication()
             throws Exception {
-        // when / then — CsrfFilter runs before AuthorizationFilter, so an unauthenticated
-        // mutation without a token is refused for the missing token, not the missing session
+        // when / then
         mockMvc.perform(put("/api/admin/config").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.detail").value("You are not allowed to perform this request"));

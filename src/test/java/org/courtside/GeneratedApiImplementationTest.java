@@ -17,8 +17,6 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// ApiContractCoverageTest compares paths, which a hand-written @GetMapping would still satisfy
-// while drifting in media types, parameter names and shapes. Implementing the interface cannot.
 class GeneratedApiImplementationTest extends AbstractIntegrationTest {
 
     // The filter chain answers both before any handler is consulted, so nothing can implement
@@ -57,8 +55,7 @@ class GeneratedApiImplementationTest extends AbstractIntegrationTest {
 
     @Test
     void whenReadingEveryController_thenNoneDeclaresItsOwnRequestMapping() throws IOException {
-        // given — a mapping annotation on a controller is a route the document did not describe,
-        // or one that describes it differently. Either way the two have stopped agreeing.
+        // given
         TreeSet<String> offenders = new TreeSet<>();
 
         // when

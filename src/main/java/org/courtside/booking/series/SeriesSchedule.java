@@ -57,8 +57,6 @@ public class SeriesSchedule {
         }
     }
 
-    // The local wall-clock time is what a club agrees on, so each occurrence is resolved in the
-    // club's zone rather than by adding seven days to the previous instant across a DST change.
     private TimeSlot slotOn(LocalDate day, SeriesRule rule) {
         var start = day.atTime(rule.startTime()).atZone(timeZone.zoneId());
         return new TimeSlot(start.toInstant(),

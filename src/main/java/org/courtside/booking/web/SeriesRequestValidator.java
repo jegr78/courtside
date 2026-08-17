@@ -9,7 +9,6 @@ import org.springframework.validation.Validator;
 
 import java.time.LocalDate;
 
-// See BookingRequestValidator for why these rules are not annotations on the request models.
 @Component
 class SeriesRequestValidator implements Validator {
 
@@ -22,8 +21,7 @@ class SeriesRequestValidator implements Validator {
 
     @Override
     public void validate(Object target, Errors errors) {
-        // Previewing and creating carry the same recurrence in two generated types, so the same
-        // two rules have to be stated against both.
+        // Previewing and creating carry the same recurrence in two generated types.
         if (target instanceof ApiSeriesRuleRequest rule) {
             validateRule(rule.getStartsOn(), rule.getEndsOn(), rule.getOccurrenceCount(), errors);
         } else if (target instanceof ApiCreateSeriesRequest rule) {

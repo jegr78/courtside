@@ -194,8 +194,7 @@ class CourtAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     void givenANamedCourt_whenChangingItWithoutAName_thenTheCourtIsStillListedWithNoName() throws Exception {
-        // given — whole-entity PUT semantics: a field absent from the body is set to its absent
-        // value, not left alone
+        // given
         String id = createCourt(5, "Centre Court");
 
         // when
@@ -293,8 +292,7 @@ class CourtAdminControllerTest extends AbstractIntegrationTest {
     @Test
     void givenTwoCourts_whenSwappingTheirNumbersViaAFreeIntermediateNumber_thenBothEndUpSwapped()
             throws Exception {
-        // given — issue #1: a direct swap always collides with the other court's current number,
-        // so the workaround renumbers one court onto a free number first
+        // given
         String courtOne = createCourt(1, "Court One");
         String courtTwo = createCourt(2, "Court Two");
 

@@ -18,8 +18,7 @@ import static java.util.stream.Collectors.toSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Five enums exist twice, in the domain and hand-written in the document, with nothing making
-// them agree. A value only the document knows is a 500 for a request the document called valid.
+// Five enums exist twice, in the domain and hand-written in the document.
 class WireEnumParityTest {
 
     @Test

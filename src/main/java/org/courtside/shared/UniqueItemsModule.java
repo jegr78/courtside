@@ -14,8 +14,7 @@ import tools.jackson.databind.type.CollectionType;
 import java.util.HashSet;
 import java.util.Set;
 
-// A Set makes a duplicate disappear, so ["A", "A"] would succeed as one court and the response
-// carries no court list to tell the caller otherwise. JSON Schema calls such a document invalid.
+// A Set makes a duplicate disappear; JSON Schema calls such a document invalid.
 @Component
 class UniqueItemsModule extends SimpleModule {
 
@@ -43,8 +42,7 @@ class UniqueItemsModule extends SimpleModule {
             this.delegate = delegate;
         }
 
-        // A collection deserializer learns its element type through these two; answering them
-        // here instead of delegating leaves every Set in the API unreadable.
+        // A collection deserializer learns its element type through these two.
         @Override
         public void resolve(DeserializationContext context) {
             delegate.resolve(context);
@@ -62,14 +60,12 @@ class UniqueItemsModule extends SimpleModule {
                 Set<JsonNode> seen = new HashSet<>();
                 for (JsonNode element : array) {
                     if (!seen.add(element)) {
-                        // Thrown through Jackson so the property path travels with it; the advice
-                        // turns that path into the field a client has to correct.
+                        // Thrown through Jackson so the property path travels with it.
                         throw new DuplicateItemException(context, parser, element.toString());
                     }
                 }
             }
-            // A parser replaying a tree starts before its first token; handing it over unadvanced
-            // gives the delegate nothing to read.
+            // A parser replaying a tree starts before its first token.
             JsonParser replay = array.traverse(context);
             replay.nextToken();
             return delegate.deserialize(replay, context);

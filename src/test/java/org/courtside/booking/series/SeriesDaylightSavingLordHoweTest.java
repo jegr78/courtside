@@ -30,8 +30,7 @@ import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Lord_Howe shifts half an hour, on other dates, in the opposite direction to Berlin: code that
-// assumed "one hour" passes every Berlin-only test and drifts here.
+// Lord_Howe shifts half an hour, on other dates, in the opposite direction to Berlin.
 class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -72,7 +71,7 @@ class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     @Test
     void givenASeriesCrossingTheLordHoweGap_whenCreating_thenEveryAllocationRowKeepsItsLocalTime() {
-        // given — Lord Howe skips 30 minutes on 2026-10-04, +10:30 to +11:00
+        // given
         SeriesRule rule = sundaysAt(BEFORE_THE_GAP, LocalTime.of(18, 0), 2);
 
         // when
@@ -93,7 +92,7 @@ class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     @Test
     void givenASeriesCrossingTheLordHoweOverlap_whenCreating_thenEveryAllocationRowKeepsItsLocalTime() {
-        // given — Lord Howe repeats 30 minutes on 2027-04-04, +11:00 to +10:30
+        // given
         SeriesRule rule = sundaysAt(BEFORE_THE_OVERLAP, LocalTime.of(18, 0), 2);
 
         // when
@@ -114,7 +113,7 @@ class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     @Test
     void givenASeriesCrossingTheLordHoweGap_whenMovingTheWholeSeries_thenEveryOccurrenceHoldsTheRequestedLocalTime() {
-        // given — Lord Howe skips 30 minutes on 2026-10-04, +10:30 to +11:00
+        // given
         SeriesCreationResult series = create(sundaysAt(BEFORE_THE_GAP, LocalTime.of(18, 0), 2));
 
         // when
@@ -137,7 +136,7 @@ class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     @Test
     void givenASeriesCrossingTheLordHoweOverlap_whenMovingTheWholeSeries_thenEveryOccurrenceHoldsTheRequestedLocalTime() {
-        // given — Lord Howe repeats 30 minutes on 2027-04-04, +11:00 to +10:30
+        // given
         SeriesCreationResult series = create(sundaysAt(BEFORE_THE_OVERLAP, LocalTime.of(18, 0), 2));
 
         // when

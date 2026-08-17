@@ -26,8 +26,7 @@ class SourceOfferController implements SourceApi {
     private final EnvironmentEnum environment;
 
     SourceOfferController(BuildProperties build,
-                          // Absent when the build had no repository to read, a source archive
-                          // for one; the version is then all there is to go on.
+                          // Absent when the build had no repository to read.
                           @Nullable GitProperties git,
                           @Value("${courtside.source-url}") URI sourceUrl,
                           @Value("${courtside.environment}") String environment) {

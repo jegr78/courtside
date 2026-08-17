@@ -37,8 +37,7 @@ public class BookingService {
             try {
                 return writer.write(command);
             } catch (ConcurrencyFailureException e) {
-                // A deadlock leaves the transaction unusable; the retry runs in a fresh one, where the
-                // competing row is committed and the exclusion constraint fires cleanly.
+                // A deadlock leaves the transaction unusable.
                 return writer.write(command);
             }
         } catch (BookingRulesViolatedException failure) {

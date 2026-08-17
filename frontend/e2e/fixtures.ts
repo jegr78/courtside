@@ -16,7 +16,7 @@ export async function journeyContext(browser: Browser): Promise<BrowserContext> 
 }
 
 async function pinJourneyClock(context: BrowserContext): Promise<void> {
-  // Date.now stands still with it, so an elapsed time measured in the page reads zero.
+  // Date.now stands still with it.
   await context.clock.setFixedTime(new Date(journeyInstant));
 }
 
