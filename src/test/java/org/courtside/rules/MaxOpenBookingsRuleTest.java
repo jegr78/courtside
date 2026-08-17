@@ -124,7 +124,7 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
 
     @Test
     void givenABookingEndingExactlyAtTheClockInstant_whenChecking_thenItDoesNotCountAsOpen() {
-        // given — the fixed clock reads 2026-05-12T10:00:00Z
+        // given
         insertHistoricalBooking("2026-05-12T09:00:00Z");
         book("2026-05-13T16:00:00Z");
 

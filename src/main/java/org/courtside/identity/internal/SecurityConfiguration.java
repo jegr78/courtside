@@ -75,8 +75,6 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/bookings").permitAll()
                         .requestMatchers("/actuator/prometheus").access((authentication, context) ->
                                 new AuthorizationDecision(performanceTelemetryEnabled))
-                        // The contract is not a secret and is needed before anyone can
-                        // authenticate against it.
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
                                 "/index.html",

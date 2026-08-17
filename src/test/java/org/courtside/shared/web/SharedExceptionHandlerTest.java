@@ -33,8 +33,7 @@ class SharedExceptionHandlerTest {
     @Test
     @SuppressWarnings("unchecked")
     void givenAFieldErrorThatIsNotABeanValidationViolation_whenHandlingIt_thenAProblemDetailStillNamesTheField() {
-        // given — a type-mismatch binding failure on a @ModelAttribute/@RequestBody field carries
-        // no ConstraintViolation to unwrap, unlike a rejected @NotBlank or @Pattern
+        // given
         SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
         MethodArgumentNotValidException exception = FieldRejections.rejectionOf("page", null);
 

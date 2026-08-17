@@ -93,8 +93,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
 
     @Test
     void givenABodyFieldThatIsNotAUuid_whenPosting_thenTheResponseNamesTheField() throws Exception {
-        // given — a value Jackson cannot read is a failure about one field, not an unreadable
-        // body
+        // given
         String body = """
                 {"courtIds":["%s"],"cardId":"not-a-uuid",
                  "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z"}
@@ -115,8 +114,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @Test
     void givenAnUnreadableValueInsideAnObjectInAnArray_whenPosting_thenTheFieldCarriesTheIndex()
             throws Exception {
-        // given — with several participants, a field name without the index leaves the caller
-        // guessing which one to correct
+        // given
         String body = """
                 {"courtIds":["%s"],"cardId":"%s",
                  "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z",
@@ -152,8 +150,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @Test
     void givenAnUnreadableValueUnderAKeyTheCallerInvented_whenPutting_thenOnlyTheObjectIsNamed()
             throws Exception {
-        // given — the keys of an additionalProperties object are whatever was sent, so echoing one
-        // back puts the caller's own text in the response
+        // given
         ResultActions result = mockMvc.perform(put(
                 "/api/admin/rule-sets/{id}/rules/{type}", UUID.randomUUID(), "ADVANCE_WINDOW")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -169,8 +166,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @Test
     void givenADuplicateInAnArrayThatMustBeUnique_whenPosting_thenTheResponseNamesTheField()
             throws Exception {
-        // given — weekdays is a Set, so a duplicate would simply vanish on the way in and the
-        // caller would be told the request succeeded exactly as sent. It did not.
+        // given
         String body = """
                 {"courtIds":["%s"],"cardId":"%s","startsOn":"2026-04-07","startTime":"18:00:00",
                  "durationMinutes":120,"intervalWeeks":1,"weekdays":["TUESDAY","TUESDAY"],
@@ -192,8 +188,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @Test
     void givenAnUnreadableValueInsideAnArray_whenPosting_thenTheResponseNamesTheEntry()
             throws Exception {
-        // given — the entry, not just the array: an array of ten court ids with one bad entry
-        // should not send the caller looking through all ten
+        // given
         String body = """
                 {"courtIds":["not-a-uuid"],"cardId":"%s",
                  "startsAt":"2026-01-05T09:00:00Z","endsAt":"2026-01-05T10:00:00Z"}
@@ -466,8 +461,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @WithMockUser(username = "roe.john", roles = "TRAINER")
     void givenAMoveBlockedByAnotherBooking_whenMovingTheSeries_thenTheResponseCarriesItsOwnType()
             throws Exception {
-        // given — a directly-booked training session already occupies the court at the slot the
-        // move would shift the 2026-06-09 occurrence into
+        // given
         createAccount("roe.john", Role.TRAINER);
         String created = mockMvc.perform(post("/api/booking-series")
                         .contentType(MediaType.APPLICATION_JSON)

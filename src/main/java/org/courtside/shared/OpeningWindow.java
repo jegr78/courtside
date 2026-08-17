@@ -16,7 +16,7 @@ public record OpeningWindow(LocalTime opensAt, LocalTime closesAt) {
         }
     }
 
-    // Both absent means closed all day, which is a window nobody has rather than an invalid one.
+    // Both absent means closed all day.
     public static Optional<OpeningWindow> ofNullable(LocalTime opensAt, LocalTime closesAt) {
         if (opensAt == null && closesAt == null) {
             return Optional.empty();

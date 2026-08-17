@@ -142,8 +142,7 @@ class LoginTest extends AbstractIntegrationTest {
         accounts.save(new UserAccount(
                 pending, "major.mary", passwordEncoder.encode("secret"), Set.of(Role.MEMBER)));
 
-        // when / then — the body must be indistinguishable from a wrong password, so it never
-        // confirms whether an account exists
+        // when / then
         mockMvc.perform(post("/api/session")
                         .param("username", "major.mary")
                         .param("password", "secret")

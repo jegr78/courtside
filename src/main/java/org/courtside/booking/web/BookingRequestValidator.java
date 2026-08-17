@@ -5,8 +5,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 
-// Cross-field rules live here and not on the request model, which is generated and would lose
-// an annotation on the next build.
+// The request model is generated and loses an annotation on the next build.
 @Component
 class BookingRequestValidator implements Validator {
 

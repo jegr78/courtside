@@ -21,8 +21,7 @@ class RuleParametersTest {
 
     @Test
     void givenAMisspelledParameter_whenValidating_thenItIsRejectedWithACodeNotTheRawKey() {
-        // when / then — the whole point: a typo must not quietly disable the rule, and the typo
-        // itself, being unvalidated caller input, must not be reflected back
+        // when / then
         assertThatThrownBy(() ->
                 RuleParameters.validated(RuleType.ADVANCE_WINDOW, Map.of("maxdays", 7)))
                 .isInstanceOf(RuleParameterInvalidException.class)
@@ -51,8 +50,7 @@ class RuleParametersTest {
 
     @Test
     void givenARuleTypeThatIsNotConfiguredPerRuleSet_whenValidating_thenItIsRejected() {
-        // when / then — opening hours and the slot grid describe the grid itself; they are not
-        // per-membership settings and have no row in rule_definition
+        // when / then
         assertThatThrownBy(() -> RuleParameters.validated(RuleType.OPENING_HOURS, Map.of()))
                 .isInstanceOf(RuleParameterInvalidException.class)
                 .extracting(exception -> ((RuleParameterInvalidException) exception).getCode())

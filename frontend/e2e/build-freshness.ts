@@ -14,8 +14,6 @@ function newestModification(path: string): { path: string; modified: number } {
     }, { path, modified: 0 });
 }
 
-// A build older than its sources serves code nobody wrote, and every conclusion drawn from the run
-// is then about something else entirely.
 export function requireBuiltAfterItsSources(artifact: string, sources: string, remedy: string): void {
   const built = newestModification(artifact).modified;
   const source = newestModification(sources);

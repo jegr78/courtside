@@ -98,7 +98,7 @@ class SeriesScheduleTest {
 
     @Test
     void givenAFortnightlySeriesStartingOnAThursday_whenExpanding_thenWholeCalendarWeeksAreSkipped() {
-        // given — 2026-04-09 is a Thursday; the Tuesday of that same week precedes it
+        // given
         SeriesRule rule = rule(LocalDate.of(2026, 4, 9), 2,
                 Set.of(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY), null, 4);
 
@@ -115,7 +115,7 @@ class SeriesScheduleTest {
 
     @Test
     void givenAStartDateThatIsNotAMatchingWeekday_whenExpanding_thenTheFirstMatchIsAfterIt() {
-        // given — 2026-04-06 is a Monday
+        // given
         SeriesRule rule = rule(LocalDate.of(2026, 4, 6), 1, Set.of(DayOfWeek.TUESDAY), null, 1);
 
         // when
@@ -127,7 +127,7 @@ class SeriesScheduleTest {
 
     @Test
     void givenASeriesCrossingTheDstChange_whenExpanding_thenEveryOccurrenceKeepsItsLocalTime() {
-        // given — Europe/Berlin leaves DST on 2026-10-25
+        // given
         SeriesRule rule = rule(LocalDate.of(2026, 10, 20), 1, Set.of(DayOfWeek.TUESDAY), null, 2);
 
         // when
@@ -143,7 +143,7 @@ class SeriesScheduleTest {
 
     @Test
     void givenASeriesCrossingTheSpringForwardChange_whenExpanding_thenEveryOccurrenceKeepsItsLocalTime() {
-        // given — Europe/Berlin enters DST on 2026-03-29
+        // given
         SeriesRule rule = rule(LocalDate.of(2026, 3, 24), 1, Set.of(DayOfWeek.TUESDAY), null, 2);
 
         // when
@@ -161,7 +161,7 @@ class SeriesScheduleTest {
     @MethodSource("southernHemisphereTransitions")
     void givenASeriesCrossingASouthernHemisphereChange_whenExpanding_thenEveryOccurrenceKeepsItsLocalTime(
             String zoneId, LocalDate transitionDate) {
-        // given — the transition dates come from the JDK's tzdb, never from this test
+        // given
         ZoneId zone = ZoneId.of(zoneId);
         LocalDate weekBefore = transitionDate.minusWeeks(1);
         SeriesRule rule = new SeriesRule(List.of(COURT), CARD, weekBefore, LocalTime.of(18, 0), 120,
@@ -182,7 +182,7 @@ class SeriesScheduleTest {
 
     @Test
     void givenAZoneWithoutDaylightSaving_whenExpanding_thenEveryOccurrenceKeepsItsLocalTimeAndItsOffset() {
-        // given — Asia/Kathmandu is +05:45 all year, over the dates Europe/Berlin changes on
+        // given
         ZoneId zone = ZoneId.of("Asia/Kathmandu");
         assertThat(zone.getRules().nextTransition(Instant.parse("2026-01-01T00:00:00Z"))).isNull();
         SeriesRule rule = rule(LocalDate.of(2026, 10, 20), 1, Set.of(DayOfWeek.TUESDAY), null, 2);
@@ -215,7 +215,7 @@ class SeriesScheduleTest {
 
     @Test
     void givenAStartTimeInsideTheAmbiguousFallBackHour_whenExpanding_thenTheEarlierOffsetIsChosen() {
-        // given — Europe/Berlin has 02:30 twice on 2026-10-25, at +02:00 and again at +01:00
+        // given
         SeriesRule rule = rule(LocalDate.of(2026, 10, 18), LocalTime.of(2, 30), 1,
                 Set.of(DayOfWeek.SUNDAY), null, 2);
 
@@ -231,7 +231,7 @@ class SeriesScheduleTest {
 
     @Test
     void givenAStartTimeInsideTheSpringForwardGap_whenExpanding_thenThatOccurrenceShiftsForward() {
-        // given — Europe/Berlin has no local 02:30 on 2026-03-29
+        // given
         SeriesRule rule = rule(LocalDate.of(2026, 3, 22), LocalTime.of(2, 30), 1,
                 Set.of(DayOfWeek.SUNDAY), null, 2);
 

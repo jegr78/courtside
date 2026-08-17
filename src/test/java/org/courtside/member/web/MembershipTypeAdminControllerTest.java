@@ -117,7 +117,7 @@ class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     void givenAnUnknownRuleSet_whenCreatingAMembershipType_thenItIsRejected() throws Exception {
-        // given — no pre-check: the foreign key on rule_set_id is what actually rejects this
+        // given
         UUID ruleSetId = UUID.randomUUID();
 
         // when / then

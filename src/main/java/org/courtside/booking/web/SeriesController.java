@@ -110,8 +110,7 @@ class SeriesController implements BookingSeriesApi {
                 series.move(moveRequestOf(id, body), account.getId(), account.getRoles())));
     }
 
-    // allOf gives the recurrence two unrelated generated types. One overload each, because nine
-    // positional parameters would put durationMinutes and intervalWeeks side by side.
+    // allOf gives the recurrence two unrelated generated types.
     private static SeriesRule ruleOf(ApiSeriesRuleRequest request) {
         return new SeriesRule(List.copyOf(request.getCourtIds()), request.getCardId(),
                 request.getStartsOn(), request.getStartTime(), request.getDurationMinutes(),

@@ -13,8 +13,7 @@ class BootstrapLock {
     private final JdbcClient jdbc;
 
     void acquire() {
-        // An empty table has no row to lock. This transaction-scoped PostgreSQL advisory lock
-        // makes two application replicas serialize their first-start decision.
+        // An empty table has no row to lock.
         jdbc.sql("SELECT pg_advisory_xact_lock(:id)")
                 .param("id", LOCK_ID)
                 .query((result, row) -> result.getObject(1))

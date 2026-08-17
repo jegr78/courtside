@@ -14,8 +14,7 @@ class SourceOfferUrlTest {
 
     @Test
     void givenAnAddressNoMemberCouldOpen_whenStarting_thenTheInstanceRefusesToStart() {
-        // given — the value comes from an environment variable, and java.net.URI checks syntax
-        // rather than scheme: every one of these parses, and none of them is an offer of source
+        // given
         for (String notAnOffer : new String[] {
                 "javascript:alert(1)", "data:text/html,x", "file:///etc/passwd",
                 "//evil.example/x", "", "ftp://example.org/courtside"}) {

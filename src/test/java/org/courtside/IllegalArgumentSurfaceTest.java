@@ -52,8 +52,7 @@ class IllegalArgumentSurfaceTest {
 
     @Test
     void whenReadingEveryValueTypeOnTheList_thenItStillThrowsAndTheListHasNoFossils() throws IOException {
-        // given — a name that stopped throwing would sit here forever, quietly widening what the
-        // test above accepts
+        // given
         TreeSet<String> notThrowing = new TreeSet<>();
 
         // when

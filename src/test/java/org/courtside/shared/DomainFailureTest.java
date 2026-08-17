@@ -67,8 +67,7 @@ class DomainFailureTest {
 
     @Test
     void givenAFailureWhoseMessageNamesAnIdentifier_whenAskedForItsBody_thenTheMessageIsNotInIt() {
-        // given — a message may carry an id or the caller's own input, and neither belongs in a
-        // response body; the detail is the ProblemType's, always
+        // given
         DomainFailure failure = new PlainFailure("No court with id 7f3a-secret");
 
         // when / then
@@ -94,15 +93,14 @@ class DomainFailureTest {
 
     @Test
     void givenAFailure_whenAskedForItsHeaders_thenThereAreNone() {
-        // given — no domain failure needs a header today; the hook exists because a 405 does
+        // given
         // when / then
         assertThat(new PlainFailure("No court with id 7").getHeaders().isEmpty()).isTrue();
     }
 
     @Test
     void givenAFailure_whenItIsAskedTwiceForItsBody_thenTheSecondAnswerIsNotPollutedByTheFirst() {
-        // given — getBody must build a fresh ProblemDetail; a cached, mutable one would let a
-        // caller that sets a property on it change what a later caller sees
+        // given
         DomainFailure failure = new CodeCarryingFailure();
 
         // when

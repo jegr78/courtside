@@ -14,8 +14,7 @@ import java.util.Map;
 
 import static java.util.Objects.requireNonNullElse;
 
-// Ahead of SharedExceptionHandler, whose cause-chain fallback would downgrade a wrapped 409 to a
-// 400. AdviceOrderingTest enforces the relation.
+// Ahead of SharedExceptionHandler and its cause-chain fallback.
 @Slf4j
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 500)
@@ -34,8 +33,7 @@ class DomainFailureHandler {
                 .body(body);
     }
 
-    // Never the exception's message: it is free text, and a throw site builds it from the value the
-    // request submitted where the response deliberately withholds it.
+    // Never the exception's message: a throw site builds it from the submitted value.
     private static void logAnswered(DomainFailure failure, ProblemDetail body) {
         if (failure.getStatusCode().is5xxServerError()) {
             log.warn("Answering {} for {}", failure.getStatusCode(), body.getType(), failure);

@@ -53,8 +53,7 @@ class PasswordHashingTest extends AbstractIntegrationTest {
 
     @Test
     void whenAPasswordWasHashedWithTheOlderParameters_thenItStillVerifies() {
-        // given — raising the cost must not lock out an account created before the change. Argon2
-        // encodes its parameters, so matches() reads them from the stored hash.
+        // given
         Argon2PasswordEncoder asItUsedToBe = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
         String storedBeforeTheChange = asItUsedToBe.encode("correct horse battery staple");
 

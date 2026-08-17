@@ -9,13 +9,11 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
-// Clubs update on their own schedule, so the document in the repository and the one an instance
-// answers to are not the same document. This is the second.
+// The document an instance answers to, not the one in the repository.
 @RestController
 class ApiDocumentController implements DocumentationApi {
 
-    // Read once at startup: it cannot change while the instance runs, and a failure to read it
-    // should stop the start rather than the first request for it.
+    // Read once at startup: it cannot change while the instance runs.
     private final String document = read();
 
     @Override

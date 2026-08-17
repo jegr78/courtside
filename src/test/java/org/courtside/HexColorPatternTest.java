@@ -16,8 +16,7 @@ class HexColorPatternTest {
     @Test
     void whenReadingEveryHexColorPatternCopy_thenTheyAllAgreeWithBookingCardsColorCheck()
             throws IOException, ReflectiveOperationException {
-        // given — booking_card.color is the oldest copy of this pattern; the three web-side
-        // copies now live in the API document and reach the code through the generator
+        // given
         String canonical = sqlCheckRegex("V2__booking_card.sql", "color");
 
         // when / then

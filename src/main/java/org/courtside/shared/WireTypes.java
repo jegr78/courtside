@@ -7,8 +7,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
-// UTC and not the club's zone: the offset says nothing the instant does not, and a club crossing
-// a daylight-saving boundary would otherwise change how its past bookings read.
+// UTC and not the club's zone.
 public final class WireTypes {
 
     private WireTypes() {

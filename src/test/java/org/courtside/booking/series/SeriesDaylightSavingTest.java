@@ -64,7 +64,7 @@ class SeriesDaylightSavingTest extends AbstractIntegrationTest {
 
     @Test
     void givenASeriesCrossingTheAutumnChange_whenCreating_thenEveryAllocationRowKeepsItsLocalTime() {
-        // given — Europe/Berlin leaves DST on 2026-10-25
+        // given
         SeriesRule rule = tuesdaysAt(BEFORE_THE_AUTUMN_CHANGE, LocalTime.of(18, 0), 2);
 
         // when
@@ -83,7 +83,7 @@ class SeriesDaylightSavingTest extends AbstractIntegrationTest {
 
     @Test
     void givenASeriesCrossingTheSpringChange_whenCreating_thenEveryAllocationRowKeepsItsLocalTime() {
-        // given — Europe/Berlin enters DST on 2027-03-28
+        // given
         SeriesRule rule = tuesdaysAt(BEFORE_THE_SPRING_CHANGE, LocalTime.of(18, 0), 2);
 
         // when
@@ -102,7 +102,7 @@ class SeriesDaylightSavingTest extends AbstractIntegrationTest {
 
     @Test
     void givenASeriesCrossingTheAutumnChange_whenMovingTheWholeSeries_thenEveryOccurrenceHoldsTheRequestedLocalTime() {
-        // given — Europe/Berlin leaves DST on 2026-10-25
+        // given
         SeriesCreationResult series = create(tuesdaysAt(BEFORE_THE_AUTUMN_CHANGE, LocalTime.of(18, 0), 2));
 
         // when
@@ -123,7 +123,7 @@ class SeriesDaylightSavingTest extends AbstractIntegrationTest {
 
     @Test
     void givenASeriesCrossingTheSpringChange_whenMovingTheWholeSeries_thenEveryOccurrenceHoldsTheRequestedLocalTime() {
-        // given — Europe/Berlin enters DST on 2027-03-28
+        // given
         SeriesCreationResult series = create(tuesdaysAt(BEFORE_THE_SPRING_CHANGE, LocalTime.of(18, 0), 2));
 
         // when

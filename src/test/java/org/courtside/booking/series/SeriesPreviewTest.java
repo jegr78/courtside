@@ -95,7 +95,7 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
 
     @Test
     void givenOneCourtTakenOnTheSecondDate_whenPreviewing_thenOnlyThatOccurrenceIsBlocked() {
-        // given — 2026-04-14 is the second Tuesday of the series
+        // given
         bookingService.create(new CreateBookingCommand(
                 List.of(courtTwo), TRAINING_CARD,
                 new TimeSlot(Instant.parse("2026-04-14T16:00:00Z"),
@@ -166,7 +166,7 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
 
     @Test
     void givenARuleExpandingPastTheOccurrenceLimit_whenPreviewing_thenItIsRejectedBeforeAnyCalendarQuery() {
-        // given — every day from 2026-04-07 up to and including 2026-10-24 is 201 occurrences
+        // given
         SeriesRule rule = everyDayUntil(LocalDate.of(2026, 10, 24));
 
         // when / then

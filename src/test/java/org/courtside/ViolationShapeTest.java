@@ -44,8 +44,7 @@ class ViolationShapeTest {
 
     @Test
     void whenReadingEveryAdvice_thenNoneSetsACodeOnTheProblemItself() throws IOException {
-        // given — the array is set as one property; a code set directly on the ProblemDetail is
-        // the top-level shape by definition
+        // given
         TreeSet<String> offenders = new TreeSet<>();
 
         // when

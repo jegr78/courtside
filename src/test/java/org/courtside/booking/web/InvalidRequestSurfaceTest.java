@@ -102,8 +102,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenBookingACourtThatIsNotActive_thenTheCodeSaysSoRatherThanUnknown() throws Exception {
-        // given — a member must be able to tell "there is no such court" from "that court is
-        // closed", and only the code carries that
+        // given
         // when / then
         postBooking(booking(inactiveCourtId.toString(), MEMBER_BOOKING_CARD.toString(),
                 "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
@@ -127,8 +126,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenTheBookingEndsBeforeItStarts_thenItIsAFieldErrorOnEndsAt() throws Exception {
-        // when / then — the ordering is a field constraint, so TimeSlot's guard goes back to
-        // being what it is meant to be: unreachable from a request
+        // when / then
         postBooking(booking(courtId.toString(), MEMBER_BOOKING_CARD.toString(),
                 "2026-05-12T19:00:00+02:00", "2026-05-12T18:00:00+02:00"))
                 .andExpect(status().isBadRequest())
@@ -139,8 +137,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenTheBookingEndsExactlyWhenItStarts_thenItIsAFieldErrorOnEndsAt() throws Exception {
-        // given — a zero-length booking occupies nothing; the exclusion constraint would not
-        // even see it as an overlap
+        // given
         // when / then
         postBooking(booking(courtId.toString(), MEMBER_BOOKING_CARD.toString(),
                 "2026-05-12T18:00:00+02:00", "2026-05-12T18:00:00+02:00"))
@@ -255,8 +252,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenAMoveNamesNoCourtsAtAll_thenItIsAFieldErrorOnNewCourtIds() throws Exception {
-        // given — leaving newCourtIds out means "keep the courts", so null stays legal; an empty
-        // list asks for a booking on no court at all
+        // given
         // when / then
         postMovePreview("""
                 {"fromBookingId": "%s", "scope": "WHOLE_SERIES", "newCourtIds": []}
@@ -281,8 +277,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     @Test
     void whenAMoveChangesNothing_thenItIsAFieldErrorRatherThanASilentNoOp() throws Exception {
-        // given — all three of time, duration and courts left out; the request asks the series to
-        // move to exactly where it already is
+        // given
         // when / then
         postMovePreview("""
                 {"fromBookingId": "%s", "scope": "WHOLE_SERIES"}

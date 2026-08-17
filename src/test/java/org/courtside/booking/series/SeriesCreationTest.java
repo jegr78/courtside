@@ -147,7 +147,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
 
     @Test
     void givenAMemberBeyondTheAdvanceWindow_whenCreatingEveryOccurrence_thenTheLaterOnesAreSkippedAsRuleViolations() {
-        // given — the "Standard" rule set caps advance booking at 7 days
+        // given
         UUID personId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
         members.save(new Member(personId, STANDARD_MEMBERSHIP));
         SeriesRule rule = fridaysFromApril3(4);
@@ -164,7 +164,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
 
     @Test
     void givenABookerBeyondTheAdvanceWindow_whenPreviewingAndCreating_thenThePreviewPromisesWhatCreateDelivers() {
-        // given — the "Standard" rule set caps advance booking at 7 days
+        // given
         UUID personId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
         members.save(new Member(personId, STANDARD_MEMBERSHIP));
         UUID bookedBy = UUID.randomUUID();

@@ -114,8 +114,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
     return () => window.cancelAnimationFrame(frame);
   }, [currentSlot, isToday]);
 
-  // Another day has no current time to scroll to, and only a change of day resets it so that
-  // midnight turning today into yesterday leaves a reader where they were.
+  // Another day has no current time to scroll to.
   useEffect(() => {
     const changed = shownDate.current !== selectedDate;
     shownDate.current = selectedDate;

@@ -43,8 +43,7 @@ public class BookingRuleGate {
         requireEmpty(nonOverridableViolationsFor(courtIds, cardId, slot, bookedBy));
     }
 
-    // A check without a person carries no membership, so it may only ever reach the rules that
-    // bind everyone. Keeping it inside this class is what stops it reaching the others.
+    // A check without a person carries no membership.
     private static BookingRuleCheck ownerCheck(List<UUID> courtIds, UUID cardId,
                                                TimeSlot slot, UUID bookedBy) {
         return new BookingRuleCheck(courtIds, cardId, slot, bookedBy, null, Set.of());

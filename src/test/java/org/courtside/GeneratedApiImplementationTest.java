@@ -57,8 +57,7 @@ class GeneratedApiImplementationTest extends AbstractIntegrationTest {
 
     @Test
     void whenReadingEveryController_thenNoneDeclaresItsOwnRequestMapping() throws IOException {
-        // given — a mapping annotation on a controller is a route the document did not describe,
-        // or one that describes it differently. Either way the two have stopped agreeing.
+        // given
         TreeSet<String> offenders = new TreeSet<>();
 
         // when

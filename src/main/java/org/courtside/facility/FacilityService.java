@@ -117,8 +117,7 @@ public class FacilityService {
     }
 
     public void requireBookableCourts(List<UUID> courtIds) {
-        // Unreachable through the API, where minItems and uniqueItems answer for both. Reaching
-        // here is this service's caller skipping validation, not bad input.
+        // Unreachable through the API, where minItems and uniqueItems answer for both.
         if (courtIds.isEmpty()) {
             throw new IllegalStateException("A booking needs at least one court");
         }

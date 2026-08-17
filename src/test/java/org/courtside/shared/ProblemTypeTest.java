@@ -23,8 +23,7 @@ class ProblemTypeTest {
 
     @Test
     void whenTheSlugIsNotKebabCase_thenItIsRejected() {
-        // given — the URN scheme is a published contract; ProblemTypeUriTest reads these
-        // constants, so a slug that does not fit the scheme must not compile into one
+        // given
         // when / then
         assertThatThrownBy(() -> withSlug("Court_Not_Found"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -33,7 +32,7 @@ class ProblemTypeTest {
 
     @Test
     void whenTheSlugAlreadyCarriesTheUrnPrefix_thenItIsRejected() {
-        // given — the prefix is added by uri(); carrying it here would double it
+        // given
         // when / then
         assertThatThrownBy(() -> withSlug("urn:courtside:error:court-not-found"))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -60,8 +59,7 @@ class ProblemTypeTest {
 
     @Test
     void whenTheStatusIsNotAnError_thenItIsRejected() {
-        // given — a problem detail describes a failure; a 2xx here would ship a success status
-        // on a response body that says something went wrong
+        // given
         // when / then
         assertThatThrownBy(() -> new ProblemType("court-not-found", HttpStatus.OK, "Title", "Detail"))
                 .isInstanceOf(IllegalArgumentException.class);

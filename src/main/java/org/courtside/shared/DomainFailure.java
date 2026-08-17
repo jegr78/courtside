@@ -38,8 +38,7 @@ public abstract class DomainFailure extends RuntimeException implements ErrorRes
         return Map.of();
     }
 
-    // Always an array, even for a single entry, so a client has one shape to render against the
-    // message bundle. ViolationShapeTest holds the boundary.
+    // Always an array, even for a single entry.
     protected static List<Map<String, Object>> oneViolation(String code, Map<String, Object> params) {
         return List.of(Map.of("code", code, "params", params == null ? Map.of() : params));
     }

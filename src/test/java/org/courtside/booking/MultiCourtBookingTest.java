@@ -85,8 +85,7 @@ class MultiCourtBookingTest extends AbstractIntegrationTest {
 
     @Test
     void whenBookingWithAnEmptyCourtList_thenTheServiceStillRefusesItsOwnCaller() {
-        // given — minItems in the API document answers for this; reaching the service means a
-        // caller skipped validation, which is a bug here rather than bad input
+        // given
         // when / then
         assertThatThrownBy(() -> book(List.of()))
                 .isInstanceOf(IllegalStateException.class);
@@ -94,7 +93,7 @@ class MultiCourtBookingTest extends AbstractIntegrationTest {
 
     @Test
     void whenBookingTheSameCourtTwiceInOneRequest_thenTheServiceStillRefusesItsOwnCaller() {
-        // given — as above: uniqueItems is the API's answer, this is the backstop
+        // given
         // when / then
         assertThatThrownBy(() -> book(List.of(courtOne, courtOne)))
                 .isInstanceOf(IllegalStateException.class);
