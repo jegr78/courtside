@@ -6,6 +6,7 @@ import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
+import { requireBuiltAfterItsSources } from "./build-freshness";
 
 async function waitForApplication(application: ChildProcess, baseURL: string): Promise<void> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -149,6 +150,7 @@ function applicationJar(): string {
   return candidates[0].path;
 }
 
+
 export function tomorrowInBerlin(): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit"
@@ -236,6 +238,8 @@ export async function startJourneyService(): Promise<JourneyService> {
       .withExposedPorts(5432)
       .start();
     const java = process.env.JAVA_HOME ? `${process.env.JAVA_HOME}/bin/java` : "java";
+    requireBuiltAfterItsSources(resolve("dist"), resolve("src"), "npm run build");
+    requireBuiltAfterItsSources(applicationJar(), resolve("../src/main"), "./mvnw package -DskipTests");
     staticDirectory = mkdtempSync(resolve(tmpdir(), "courtside-pwa-"));
     cpSync(resolve("dist"), staticDirectory, { recursive: true });
     const applicationEnvironment = {
