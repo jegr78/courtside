@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
+import static org.mockito.Mockito.mock;
 
 class AdviceLoggingTest {
 
@@ -99,7 +100,7 @@ class AdviceLoggingTest {
         DomainFailure failure = new ConflictFailure("card.label.taken", Map.of("field", "cardLabel"));
 
         // when
-        new DomainFailureHandler().handleDomainFailure(failure);
+        new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -118,7 +119,7 @@ class AdviceLoggingTest {
         DomainFailure failure = new NotFoundFailure("Card label %s is already taken".formatted(rejectedLabel));
 
         // when
-        new DomainFailureHandler().handleDomainFailure(failure);
+        new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -138,7 +139,7 @@ class AdviceLoggingTest {
                 new DataIntegrityViolationException(DUPLICATE_USERNAME));
 
         // when
-        new DomainFailureHandler().handleDomainFailure(failure);
+        new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -157,7 +158,7 @@ class AdviceLoggingTest {
         DataIntegrityViolationException exception = new DataIntegrityViolationException(DUPLICATE_USERNAME);
 
         // when
-        new SharedExceptionHandler().handleRejectedByTheDatabase(exception);
+        new SharedExceptionHandler(mock(ProblemTraceReference.class)).handleRejectedByTheDatabase(exception);
 
         // then
         assertThat(sharedAppender.list).singleElement().satisfies(event -> {
@@ -178,7 +179,7 @@ class AdviceLoggingTest {
                 FieldRejections.rejectionOf("password", rejectedPassword, "Size");
 
         // when
-        new SharedExceptionHandler().handleValidationFailure(exception);
+        new SharedExceptionHandler(mock(ProblemTraceReference.class)).handleValidationFailure(exception);
 
         // then
         assertThat(sharedAppender.list).singleElement().satisfies(event -> {
@@ -197,7 +198,7 @@ class AdviceLoggingTest {
                 unreadableBody("{\"courtNumber\":\"" + rejectedValue + "\"}");
 
         // when
-        new SharedExceptionHandler().handleUnreadableBody(exception);
+        new SharedExceptionHandler(mock(ProblemTraceReference.class)).handleUnreadableBody(exception);
 
         // then
         assertThat(sharedAppender.list).singleElement().satisfies(event -> {

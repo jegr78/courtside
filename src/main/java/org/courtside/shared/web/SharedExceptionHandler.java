@@ -2,6 +2,7 @@ package org.courtside.shared.web;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.DuplicateItemException;
 import tools.jackson.core.JacksonException;
@@ -37,7 +38,10 @@ import java.util.regex.Pattern;
 @Slf4j
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 1000)
+@RequiredArgsConstructor
 class SharedExceptionHandler {
+
+    private final ProblemTraceReference traceReference;
 
     // Every bundle entry interpolates at most these; anything else a constraint carries (a
     // @Pattern's regexp, for one) must not reach a client, so this is an allowlist, not a denylist.
@@ -278,11 +282,13 @@ class SharedExceptionHandler {
 
     // The problem type, so a log line and the response a member reads share one token. Never the
     // exception: its message embeds the rejected value, a cleartext password on some endpoints.
-    private static void logAnswered(ProblemDetail problem) {
+    private void logAnswered(ProblemDetail problem) {
+        traceReference.addTo(problem);
         log.debug("Answering {} for {}", HttpStatusCode.valueOf(problem.getStatus()), problem.getType());
     }
 
-    private static void logAnswered(ProblemDetail problem, List<String> fields) {
+    private void logAnswered(ProblemDetail problem, List<String> fields) {
+        traceReference.addTo(problem);
         log.debug("Answering {} for {}: {}",
                 HttpStatusCode.valueOf(problem.getStatus()), problem.getType(), fields);
     }

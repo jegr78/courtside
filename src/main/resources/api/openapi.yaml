@@ -232,6 +232,14 @@ components:
         instance:
           type: string
           format: uri
+        traceId:
+          type: string
+          pattern: "^[0-9a-f]{32}$"
+          description: Trace identifier shared with structured logs and tracing backends.
+        spanId:
+          type: string
+          pattern: "^[0-9a-f]{16}$"
+          description: Server span identifier that selects the same request within the trace.
         violations:
           type: array
           items: { $ref: "#/components/schemas/Violation" }

@@ -1,5 +1,6 @@
 package org.courtside.shared.web;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.DomainFailure;
 import org.springframework.core.Ordered;
@@ -18,11 +19,15 @@ import static java.util.Objects.requireNonNullElse;
 @Slf4j
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 500)
+@RequiredArgsConstructor
 class DomainFailureHandler {
+
+    private final ProblemTraceReference traceReference;
 
     @ExceptionHandler(DomainFailure.class)
     ResponseEntity<ProblemDetail> handleDomainFailure(DomainFailure failure) {
         ProblemDetail body = failure.getBody();
+        traceReference.addTo(body);
         logAnswered(failure, body);
         return ResponseEntity.status(failure.getStatusCode())
                 .headers(failure.getHeaders())
