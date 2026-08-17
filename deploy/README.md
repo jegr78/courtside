@@ -123,6 +123,7 @@ default.
 | `COURTSIDE_OTLP_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | Complete OTLP/HTTP trace endpoint. Set a container-network hostname when the collector runs in another container. |
 | `COURTSIDE_OTLP_METRICS_ENDPOINT` | `http://localhost:4318/v1/metrics` | Complete OTLP/HTTP metrics endpoint. |
 | `COURTSIDE_TRACING_SAMPLING_PROBABILITY` | `0.1` | Share of new traces sampled, from `0.0` to `1.0`. Parent sampling decisions are retained. |
+| `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` | `500` | Logs Hibernate queries slower than this threshold in milliseconds. Bind values are not logged. |
 | `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's own loggers. `DEBUG` adds an `Answering` line for every error one of its exception handlers answers; sign-in and authorisation failures are not among them. |
 | `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |
 | `COURTSIDE_SOURCE_URL` | this repository | Where `GET /api/source` points. **If you modified Courtside and let others use it, the AGPL requires this to point at your source, not at ours.** |
@@ -131,6 +132,26 @@ default.
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` are set by
 `compose.yaml`. Point them elsewhere if you run PostgreSQL outside Compose; the application needs
 PostgreSQL 17 and will not run on anything else.
+
+## Diagnose slow requests and queries
+
+Enable OTLP export only after a collector is reachable. Standard Spring HTTP, JVM and HikariCP
+metrics then identify the affected endpoint and resource pressure. Courtside additionally exports
+the counters `courtside.bookings.created`, `courtside.bookings.rejected` and
+`courtside.bookings.conflicts`; rejected bookings carry only the stable rule code as a tag.
+
+Hibernate writes queries above `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` to the structured application
+log. The statement retains placeholders instead of bind values, and a sampled request adds its
+`traceId` and `spanId` to the same entry. Find the slow HTTP span in the tracing backend, then search
+the application log for that trace ID to identify the parameterised statement. Lower the threshold
+temporarily when investigating and restore it afterwards because a low value increases log volume.
+
+The example `http://` OTLP endpoints are safe only on a trusted local container network. A remote
+collector must use HTTPS and authentication. Supply credentials through the deployment's secret
+management using Spring's
+`MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION` and
+`MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION` environment variables; never commit tokens
+to `.env`. The collector and its retention policy remain the operator's responsibility.
 
 ## When a member reports an error
 

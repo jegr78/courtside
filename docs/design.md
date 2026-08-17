@@ -829,21 +829,27 @@ instances, which version runs where, health status, and raising log levels at ru
 a club reports a problem. That is operational *control*; Grafana is trends, history and
 alerting.
 
-### Domain metrics, defined from the start
+### Domain metrics
 
-| Metric | Type | Why |
-|---|---|---|
-| `courtside.bookings.created` | Counter (card, court) | Utilisation, usage per card type |
-| `courtside.bookings.rejected` | Counter (**rule**) | Which rule actually bites in daily use |
-| `courtside.bookings.conflicts` | Counter | How often the exclusion constraint fires |
-| `courtside.outbox.pending` | Gauge | Are emails backing up — the key leading indicator |
-| `courtside.notifications.failed` | Counter (reason) | See delivery problems before the complaint |
-| `courtside.login.failed` | Counter | Attack detection and UX signal |
-| `courtside.password.rehash.failed` | Counter (stage) | A rehash that only logs still leaves hashes at the old cost |
-| `courtside.backup.age.seconds` | Gauge | The alert everyone forgets |
+| Metric | State | Type | Why |
+|---|---|---|---|
+| `courtside.bookings.created` | Built | Counter | Successful booking volume |
+| `courtside.bookings.rejected` | Built | Counter (**rule**) | Which rule actually bites in daily use |
+| `courtside.bookings.conflicts` | Built | Counter | How often concurrent occupancy prevents a booking |
+| `courtside.password.rehash.failed` | Built | Counter (stage) | A rehash that only logs still leaves hashes at the old cost |
+| `courtside.outbox.pending` | Planned with outbox | Gauge | Are emails backing up — the key leading indicator |
+| `courtside.notifications.failed` | Planned with notifications | Counter (reason) | See delivery problems before the complaint |
+| `courtside.login.failed` | Planned | Counter | Attack detection and UX signal |
+| `courtside.backup.age.seconds` | Planned with backup automation | Gauge | The alert everyone forgets |
 
 `courtside.bookings.rejected` tagged by rule is close to a product feature: a club can see
 whether its own booking rules are obstructing members.
+
+Standard Spring HTTP, JVM and HikariCP metrics provide endpoint latency and resource context.
+Hibernate logs statements exceeding `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` with placeholders rather
+than bind values. Sampled requests add the trace and span IDs to the structured slow-query entry,
+allowing an operator to correlate endpoint latency with the responsible query without exporting
+personal data or high-cardinality identifiers.
 
 ### Alerts that may wake someone
 

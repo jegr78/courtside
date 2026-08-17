@@ -1,5 +1,6 @@
 package org.courtside.booking;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.CursorPage;
 import org.courtside.booking.internal.IdempotencyKeyRaceException;
@@ -29,14 +30,20 @@ public class BookingService {
     private final CourtAllocationRepository allocations;
     private final BookingRepository bookings;
     private final BookingRequestFingerprint fingerprints;
+    private final MeterRegistry meters;
 
     public UUID create(CreateBookingCommand command) {
         try {
-            return writer.write(command);
-        } catch (ConcurrencyFailureException e) {
-            // A deadlock leaves the transaction unusable; the retry runs in a fresh one, where the
-            // competing row is committed and the exclusion constraint fires cleanly.
-            return writer.write(command);
+            try {
+                return writer.write(command);
+            } catch (ConcurrencyFailureException e) {
+                // A deadlock leaves the transaction unusable; the retry runs in a fresh one, where the
+                // competing row is committed and the exclusion constraint fires cleanly.
+                return writer.write(command);
+            }
+        } catch (BookingRulesViolatedException failure) {
+            recordRejections(failure);
+            throw failure;
         }
     }
 
@@ -44,12 +51,26 @@ public class BookingService {
         validateIdempotencyKey(idempotencyKey);
         String fingerprint = fingerprints.of(command);
         try {
-            return existingBooking(command.bookedBy(), idempotencyKey, fingerprint)
-                    .orElseGet(() -> createNew(command, idempotencyKey, fingerprint));
-        } catch (ConcurrencyFailureException failure) {
-            return existingBooking(command.bookedBy(), idempotencyKey, fingerprint)
-                    .orElseGet(() -> createNew(command, idempotencyKey, fingerprint));
+            try {
+                return createIdempotently(command, idempotencyKey, fingerprint);
+            } catch (ConcurrencyFailureException failure) {
+                return createIdempotently(command, idempotencyKey, fingerprint);
+            }
+        } catch (BookingRulesViolatedException failure) {
+            recordRejections(failure);
+            throw failure;
         }
+    }
+
+    private UUID createIdempotently(CreateBookingCommand command, String idempotencyKey, String fingerprint) {
+        return existingBooking(command.bookedBy(), idempotencyKey, fingerprint)
+                .orElseGet(() -> createNew(command, idempotencyKey, fingerprint));
+    }
+
+    private void recordRejections(BookingRulesViolatedException failure) {
+        failure.getViolations().forEach(violation -> meters
+                .counter("courtside.bookings.rejected", "rule", violation.code())
+                .increment());
     }
 
     private static void validateIdempotencyKey(String idempotencyKey) {

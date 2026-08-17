@@ -33,7 +33,8 @@ class ObservabilityContractTest {
                 .contains("enabled: ${COURTSIDE_OTLP_ENABLED:false}")
                 .contains("endpoint: ${COURTSIDE_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}")
                 .contains("url: ${COURTSIDE_OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}")
-                .contains("probability: ${COURTSIDE_TRACING_SAMPLING_PROBABILITY:0.1}");
+                .contains("probability: ${COURTSIDE_TRACING_SAMPLING_PROBABILITY:0.1}")
+                .contains("LOG_QUERIES_SLOWER_THAN_MS: ${COURTSIDE_SLOW_QUERY_THRESHOLD_MS:500}");
     }
 
     @Test
@@ -57,6 +58,7 @@ class ObservabilityContractTest {
                 .contains("COURTSIDE_OTLP_TRACES_ENDPOINT: ${COURTSIDE_OTLP_TRACES_ENDPOINT:-")
                 .contains("COURTSIDE_OTLP_METRICS_ENDPOINT: ${COURTSIDE_OTLP_METRICS_ENDPOINT:-")
                 .contains("COURTSIDE_TRACING_SAMPLING_PROBABILITY: "
-                        + "${COURTSIDE_TRACING_SAMPLING_PROBABILITY:-0.1}");
+                        + "${COURTSIDE_TRACING_SAMPLING_PROBABILITY:-0.1}")
+                .contains("COURTSIDE_SLOW_QUERY_THRESHOLD_MS: ${COURTSIDE_SLOW_QUERY_THRESHOLD_MS:-500}");
     }
 }

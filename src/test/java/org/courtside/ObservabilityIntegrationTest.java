@@ -5,11 +5,14 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
+import org.hibernate.engine.jdbc.spi.SqlStatementLogger;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -56,6 +59,33 @@ class ObservabilityIntegrationTest extends AbstractIntegrationTest {
 
         // then
         assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getMDCPropertyMap().get("traceId")).isEqualTo(span.context().traceId());
+            assertThat(event.getMDCPropertyMap().get("spanId")).isEqualTo(span.context().spanId());
+        });
+    }
+
+    @Test
+    void givenASlowParameterizedQuery_whenHibernateReportsIt_thenTheQueryAndTraceAreCorrelated() {
+        // given
+        Logger logger = (Logger) LoggerFactory.getLogger("org.hibernate.SQL_SLOW");
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        Span span = tracer.nextSpan().name("slow-query-test").start();
+        String query = "select * from booking where booked_by = ?";
+
+        // when
+        try (Tracer.SpanInScope ignored = tracer.withSpan(span)) {
+            new SqlStatementLogger(false, false, false, 1)
+                    .logSlowQuery(query, System.nanoTime() - Duration.ofMillis(10).toNanos(), null);
+        } finally {
+            span.end();
+            logger.detachAppender(appender);
+        }
+
+        // then
+        assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage()).contains(query);
             assertThat(event.getMDCPropertyMap().get("traceId")).isEqualTo(span.context().traceId());
             assertThat(event.getMDCPropertyMap().get("spanId")).isEqualTo(span.context().spanId());
         });

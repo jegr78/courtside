@@ -5,6 +5,12 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: ${COURTSIDE_SLOW_QUERY_THRESHOLD_MS:500}
   flyway:
     enabled: true
   session:

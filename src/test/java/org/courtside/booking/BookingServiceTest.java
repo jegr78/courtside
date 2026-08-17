@@ -1,5 +1,6 @@
 package org.courtside.booking;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.Court;
@@ -62,6 +63,9 @@ class BookingServiceTest extends AbstractIntegrationTest {
     @Autowired
     private PersonRepository persons;
 
+    @Autowired
+    private MeterRegistry meters;
+
     private UUID courtId;
     private final UUID someUser = UUID.randomUUID();
     private UUID bookerPersonId;
@@ -78,6 +82,9 @@ class BookingServiceTest extends AbstractIntegrationTest {
 
     @Test
     void whenCreatingABooking_thenItHasOneConfirmedCourtAllocation() {
+        // given
+        double createdBefore = counter("courtside.bookings.created");
+
         // when
         UUID bookingId = bookingService.create(command(SIX_PM, SEVEN_PM));
 
@@ -88,22 +95,26 @@ class BookingServiceTest extends AbstractIntegrationTest {
             assertThat(allocation.getCourtId()).isEqualTo(courtId);
             assertThat(allocation.getStartsAt()).isEqualTo(SIX_PM);
         });
+        assertThat(counter("courtside.bookings.created")).isEqualTo(createdBefore + 1);
     }
 
     @Test
     void givenAnExistingBooking_whenCreatingAnOverlappingOne_thenCourtUnavailableIsThrown() {
         // given
         bookingService.create(command(SIX_PM, EIGHT_PM));
+        double conflictsBefore = counter("courtside.bookings.conflicts");
 
         // when / then
         assertThatThrownBy(() -> bookingService.create(command(SEVEN_PM, EIGHT_PM)))
                 .isInstanceOf(CourtUnavailableException.class);
+        assertThat(counter("courtside.bookings.conflicts")).isEqualTo(conflictsBefore + 1);
     }
 
     @Test
     void givenABookingStartingInThePast_whenCreating_thenItIsRejectedWithoutBeingStored() {
         // given
         Instant start = Instant.parse("2026-05-12T09:00:00Z");
+        double rejectedBefore = counter("courtside.bookings.rejected", "rule", "booking.rule.startsInPast");
 
         // when / then
         assertThatThrownBy(() -> bookingService.create(command(
@@ -112,6 +123,29 @@ class BookingServiceTest extends AbstractIntegrationTest {
                         assertThat(failure.getViolations()).extracting(RuleViolation::code)
                                 .contains("booking.rule.startsInPast"));
         assertThat(bookings.count()).isZero();
+        assertThat(counter("courtside.bookings.rejected", "rule", "booking.rule.startsInPast"))
+                .isEqualTo(rejectedBefore + 1);
+    }
+
+    private double counter(String name, String... tags) {
+        var counter = meters.find(name).tags(tags).counter();
+        return counter == null ? 0 : counter.count();
+    }
+
+    @Test
+    void givenAnIdempotentReplay_whenCreating_thenOnlyThePersistedBookingIsCounted() {
+        // given
+        String idempotencyKey = UUID.randomUUID().toString();
+        CreateBookingCommand command = command(SIX_PM, SEVEN_PM);
+        double createdBefore = counter("courtside.bookings.created");
+
+        // when
+        UUID first = bookingService.create(command, idempotencyKey);
+        UUID replay = bookingService.create(command, idempotencyKey);
+
+        // then
+        assertThat(replay).isEqualTo(first);
+        assertThat(counter("courtside.bookings.created")).isEqualTo(createdBefore + 1);
     }
 
     @ParameterizedTest
