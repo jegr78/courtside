@@ -88,6 +88,8 @@ tags:
     description: Administering the club's own name and branding.
   - name: admin-impact
     description: What a configuration change would affect, before it is made.
+  - name: admin-import-references
+    description: Which member number of a source stands for which person.
 
 security:
   - sessionCookie: []
@@ -624,6 +626,45 @@ components:
           description: |
             Above this share of the roster disappearing at once, an execution needs explicit
             confirmation. A truncated export is the ordinary accident this guards against.
+
+    ExternalReference:
+      type: object
+      required: [referenceId, sourceId, externalId, personId, linkedAt]
+      properties:
+        referenceId: { type: string, format: uuid }
+        sourceId: { type: string, format: uuid }
+        externalId: { type: string }
+        personId: { type: string, format: uuid }
+        linkedAt: { type: string, format: date-time }
+
+    ExternalReferencePage:
+      type: object
+      required: [references]
+      properties:
+        references:
+          type: array
+          items: { $ref: "#/components/schemas/ExternalReference" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: Pass this reference id as `cursor` to continue after the current page.
+
+    ExternalReferenceRequest:
+      type: object
+      required: [externalId, personId]
+      properties:
+        externalId:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: ".*\\S.*"
+          description: |
+            The member number the source system holds for this person. Surrounding whitespace is
+            removed before it is stored, so a value pasted with padding is accepted.
+        personId:
+          type: string
+          format: uuid
+          description: The person in this club's roster that the record stands for.
 
     MembershipTypeRequest:
       type: object
@@ -3003,11 +3044,13 @@ paths:
     delete:
       tags: [admin-import]
       operationId: deleteImportSource
-      summary: Remove a source's configuration.
+      summary: Remove a source nothing in the roster points at.
       description: |
         What goes is the club's description of a system it reads from — no person and no membership
-        is touched, because a source that has not been executed against says nothing about anybody
-        yet. A club that described the wrong system takes the description back here.
+        is touched. A source that still holds external references is refused with `409` instead:
+        those references say where people in the roster came from, and dropping them silently would
+        make the next snapshot from that system create every one of them again as a new person.
+        Unlink them first, and the description can go.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -3019,6 +3062,127 @@ paths:
       responses:
         "204":
           description: Removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources/{sourceId}/references:
+    get:
+      tags: [admin-import-references]
+      operationId: listExternalReferences
+      summary: Which member number of this source stands for which person.
+      description: |
+        Ordered by the member number, and `cursor` continues after the reference it names in that
+        same order.
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor naming a reference this
+            source no longer holds is answered `404` rather than silently ending the list, because a
+            truncated page is the one wrong answer a client cannot detect.
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: The page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExternalReferencePage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [admin-import-references]
+      operationId: linkExternalReference
+      summary: Say which person a member number of this source stands for.
+      description: |
+        A snapshot matches a record by this reference and by nothing else — never by a name and
+        never by an email address, because two members really are called John Roe and a club enrols
+        children under a parent's address. A record whose member number this source does not know
+        becomes a new person, and a board that recognises the resemblance links the two here
+        instead.
+
+        Naming the same person under the same member number again changes nothing and is answered
+        `201` with the reference as it already stands. The two ways of contradicting an existing
+        reference are refused: a member number this source already gives to somebody else, and a
+        person this source already knows under a different member number. Both are corrected by
+        unlinking first — an existing reference is never silently moved, because moving it would
+        hand one person's record to another at the next snapshot.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExternalReferenceRequest" }
+      responses:
+        "201":
+          description: Linked.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExternalReference" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources/{sourceId}/references/{externalId}:
+    delete:
+      tags: [admin-import-references]
+      operationId: unlinkExternalReference
+      summary: Take back what a member number of this source stands for.
+      description: |
+        The person stays exactly as they are; what goes is the statement that this source's member
+        number names them. The next snapshot carrying that member number therefore reads as a person
+        this instance has not seen before.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: externalId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        "204":
+          description: Unlinked.
         "400":
           $ref: "#/components/responses/Invalid"
         "401":
