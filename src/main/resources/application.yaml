@@ -61,6 +61,7 @@ courtside:
     series-horizon-months: 12
   import:
     preview-retention: ${COURTSIDE_IMPORT_PREVIEW_RETENTION:7d}
+    sweep-interval: ${COURTSIDE_IMPORT_SWEEP_INTERVAL:1h}
 
 management:
   tracing:

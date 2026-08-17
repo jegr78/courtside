@@ -1129,8 +1129,9 @@ deliver the implementation.
   uploaded bytes and the change set resolved from them — a club's whole membership list, in other
   words — and that change set is bounded by `COURTSIDE_IMPORT_PREVIEW_RETENTION`. What survives
   past it is the row, its hash and its counts, which is what an audit of *what was executed* needs
-  and is not personal data. **Built:** the bound is recorded on every preview, and a preview past
-  it answers without its change set. **Designed:** the scheduled sweep that erases the stored one.
+  and is not personal data. A scheduled sweep enforces the bound, a preview past it answers
+  without its change set, and a swept preview is refused rather than executed against one that is
+  no longer there.
 - **Subject access and portability** (Art. 15/20) as self-service: every member can export
   their own data as JSON. The Release 1 export covers this.
 - **Documentation templates in the repository**: a pre-filled record of processing
