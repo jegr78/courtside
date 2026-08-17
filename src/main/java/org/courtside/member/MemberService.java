@@ -1,6 +1,7 @@
 package org.courtside.member;
 
 import org.courtside.member.internal.MembershipType;
+import org.courtside.member.internal.MembershipTypeInactiveException;
 import org.courtside.member.internal.MembershipTypeNameTakenException;
 import org.courtside.member.internal.MembershipTypeNotFoundException;
 import org.courtside.member.internal.MembershipTypeRepository;
@@ -74,9 +75,21 @@ public class MemberService {
     }
 
     public MembershipType requireMembershipType(UUID membershipTypeId) {
+        if (membershipTypeId == null) {
+            throw new IllegalStateException("A membership type must be named by an id");
+        }
         return membershipTypes.findById(membershipTypeId)
                 .orElseThrow(() -> new MembershipTypeNotFoundException(
                         "No membership type with id " + membershipTypeId));
+    }
+
+    public MembershipType requireAssignableMembershipType(UUID membershipTypeId) {
+        MembershipType type = requireMembershipType(membershipTypeId);
+        if (!type.isActive()) {
+            throw new MembershipTypeInactiveException(
+                    "membershipType.inactive", Map.of("field", "membershipTypeId"));
+        }
+        return type;
     }
 
     private void requireActiveRuleSet(UUID ruleSetId) {

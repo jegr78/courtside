@@ -45,6 +45,7 @@ public class RosterService {
     private final PersonRepository persons;
     private final UserAccountRepository accounts;
     private final MemberRepository members;
+    private final MemberService memberships;
     private final PasswordEncoder passwordEncoder;
 
     public CursorPage.Result<RosterEntry> list(String query, UUID cursor, int limit) {
@@ -83,8 +84,7 @@ public class RosterService {
         String name = requiredUsername(username);
         Set<Role> requested = requiredRoles(roles);
         requireUsablePassword(oneTimePassword);
-        Person person = persons.findWithLockById(id)
-                .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        Person person = requireLockedPerson(id);
         if (!accounts.findByPersonIdIn(List.of(id)).isEmpty()) {
             throw new PersonAccountExistsException("Person " + id + " already holds an account");
         }
@@ -134,6 +134,46 @@ public class RosterService {
         return load(List.of(id)).getFirst();
     }
 
+    @Transactional
+    public RosterEntry assignMembership(UUID personId, UUID membershipTypeId) {
+        UUID id = requiredPersonId(personId);
+        requireLockedPerson(id);
+        UUID typeId = memberships.requireAssignableMembershipType(membershipTypeId).getId();
+        if (writeMembership(id, typeId)) {
+            revokeSessionsOf(id);
+        }
+        return load(List.of(id)).getFirst();
+    }
+
+    @Transactional
+    public void removeMembership(UUID personId) {
+        UUID id = requiredPersonId(personId);
+        requireLockedPerson(id);
+        members.findByPersonId(id).ifPresent(member -> {
+            members.delete(member);
+            revokeSessionsOf(id);
+        });
+    }
+
+    private boolean writeMembership(UUID personId, UUID membershipTypeId) {
+        Member member = members.findByPersonId(personId).orElse(null);
+        if (member == null) {
+            members.save(new Member(personId, membershipTypeId));
+            return true;
+        }
+        if (member.getMembershipTypeId().equals(membershipTypeId)) {
+            return false;
+        }
+        member.assignTo(membershipTypeId);
+        return true;
+    }
+
+    // Every account the person holds, not the one the roster prefers: a second one the schema
+    // tolerates would otherwise keep booking under the membership it signed in with.
+    private void revokeSessionsOf(UUID personId) {
+        accounts.findByPersonIdIn(List.of(personId)).forEach(UserAccount::revokeSessions);
+    }
+
     private void saveOrRejectTakenUsername(UserAccount account) {
         try {
             accounts.saveAndFlush(account);
@@ -161,6 +201,13 @@ public class RosterService {
                 .reduce(RosterService::preferredAccount)
                 .orElseThrow(() -> new AccountNotFoundException(
                         "No account for person " + personId));
+    }
+
+    // Locked, because the one-account check and the one-membership index both assume no second
+    // write for the same person is in flight.
+    private Person requireLockedPerson(UUID personId) {
+        return persons.findWithLockById(personId)
+                .orElseThrow(() -> new PersonNotFoundException("No person with id " + personId));
     }
 
     private static UUID requiredPersonId(UUID personId) {

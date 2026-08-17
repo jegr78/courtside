@@ -900,11 +900,15 @@ whether it is built or designed. **Designed means absent today.**
   change. A persisted account security epoch makes sessions created before a credential change
   fail closed even when an in-flight request saves one after bulk deletion. *Built.* The roster
   is the admin surface for it: disabling an account, removing one of its roles, correcting its
-  username and resetting its password each raise that account's epoch, so its next request is
-  refused rather than served with the rights or the credential it was signed in with. Enabling an
-  account, adding a role and writing the username an account already holds leave sessions alone,
-  as does the rehash on a sign-in, which replaces the stored hash and nothing else. Ending one
-  single session while leaving the account's rights untouched still has no surface.
+  username, resetting its password and changing the membership of the person it belongs to each
+  raise that account's epoch, so its next request is refused rather than served with the rights or
+  the credential it was signed in with. A membership is not a role, but it decides which rule set
+  a booking is measured against, and whether it grants or restricts is a property of club data
+  rather than of the operation — so any change of it counts, in either direction. Enabling an
+  account, adding a role, writing the username an account already holds and writing the membership
+  a person already holds leave sessions alone, as does the rehash on a sign-in, which replaces the
+  stored hash and nothing else. Ending one single session while leaving the account's rights
+  untouched still has no surface.
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* Source-address counters
   absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;

@@ -471,6 +471,20 @@ components:
       properties:
         active: { type: boolean }
 
+    MembershipRequest:
+      type: object
+      description: |
+        A person holds at most one membership, so the type named here replaces the one they hold
+        rather than adding a second.
+      required: [membershipTypeId]
+      properties:
+        membershipTypeId:
+          type: string
+          format: uuid
+          description: |
+            A membership type the club still offers; `GET /api/admin/membership-types` lists them
+            with their `active` flag.
+
     MembershipType:
       type: object
       required: [id, name, active]
@@ -2550,6 +2564,88 @@ paths:
               schema: { $ref: "#/components/schemas/RosterEntry" }
         "400":
           $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/roster/{personId}/membership:
+    put:
+      tags: [admin-roster]
+      operationId: assignMembership
+      summary: Give a person a membership, or move them to another type.
+      description: |
+        A person holds at most one membership, so this writes the one they already have rather
+        than adding a second: a board that picked the wrong type moves them to the right one with
+        the same request, and writing the type they already hold changes nothing.
+
+        The type has to be one the club still offers. A deactivated type is refused, which is what
+        its `active` flag is for; the memberships already on it are untouched, and a type
+        deactivated afterwards leaves the people holding it exactly where they are.
+
+        A membership decides which rules the person's bookings are measured against, so an
+        assignment that changes it ends their account's sessions and they sign in again. A person
+        without an account has none to end.
+
+        The response is the roster entry.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MembershipRequest" }
+      responses:
+        "200":
+          description: Assigned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No such person, or no such membership type.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: The membership type is no longer offered.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+    delete:
+      tags: [admin-roster]
+      operationId: removeMembership
+      summary: End a person's membership.
+      description: |
+        The person, their account and their bookings stay; the membership goes, and with it the
+        rules that were measured against its type. Ending a membership the person does not hold is
+        the state the request asks for and answers the same way.
+
+        Their account's sessions end, for the reason the assignment gives.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Ended.
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":

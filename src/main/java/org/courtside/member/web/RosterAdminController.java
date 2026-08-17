@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminRosterApi;
 import org.courtside.api.ApiAccountRequest;
 import org.courtside.api.ApiActiveRequest;
+import org.courtside.api.ApiMembershipRequest;
 import org.courtside.api.ApiPasswordResetRequest;
 import org.courtside.api.ApiPersonRequest;
 import org.courtside.api.ApiRole;
@@ -87,6 +88,19 @@ class RosterAdminController implements AdminRosterApi {
     public ResponseEntity<ApiRosterEntry> setAccountActive(UUID personId, ApiActiveRequest request) {
         return ResponseEntity.ok(toResponse(
                 roster.setAccountEnabled(personId, request.getActive())));
+    }
+
+    @Override
+    public ResponseEntity<ApiRosterEntry> assignMembership(UUID personId,
+                                                           ApiMembershipRequest request) {
+        return ResponseEntity.ok(toResponse(
+                roster.assignMembership(personId, request.getMembershipTypeId())));
+    }
+
+    @Override
+    public ResponseEntity<Void> removeMembership(UUID personId) {
+        roster.removeMembership(personId);
+        return ResponseEntity.noContent().build();
     }
 
     private static Set<Role> roles(Collection<ApiRole> requested) {

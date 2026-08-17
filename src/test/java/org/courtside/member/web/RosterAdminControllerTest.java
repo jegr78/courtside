@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -30,6 +31,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -39,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+    private static final UUID OTHER_MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000002");
 
     private static final String EM_SPACE = Character.toString(0x2003);
     private static final String IDEOGRAPHIC_SPACE = Character.toString(0x3000);
@@ -866,6 +869,240 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
         assertThat(accounts.findById(account.getId())).get()
                 .satisfies(stored -> assertThat(stored.getPasswordHash()).isEqualTo("hash"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWithoutAMembership_whenOneIsAssigned_thenTheEntryAndTheRosterCarryIt()
+            throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+
+        // when
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(membershipBody(MEMBERSHIP_TYPE_ID.toString()))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.personId").value(mary.getId().toString()))
+                .andExpect(jsonPath("$.membershipTypeId").value(MEMBERSHIP_TYPE_ID.toString()));
+
+        // then
+        mockMvc.perform(get("/api/admin/roster"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].membershipTypeId")
+                        .value(MEMBERSHIP_TYPE_ID.toString()));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonOnTheWrongType_whenAnotherIsAssigned_thenTheyHoldOnlyTheNewOne()
+            throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        members.save(new Member(mary.getId(), MEMBERSHIP_TYPE_ID));
+
+        // when
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(membershipBody(OTHER_MEMBERSHIP_TYPE_ID.toString()))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.membershipTypeId").value(OTHER_MEMBERSHIP_TYPE_ID.toString()));
+
+        // then — one membership per person, so the correction moves the row rather than adding one
+        assertThat(members.findByPersonIdIn(List.of(mary.getId())))
+                .singleElement()
+                .satisfies(member -> assertThat(member.getMembershipTypeId())
+                        .isEqualTo(OTHER_MEMBERSHIP_TYPE_ID));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenADeactivatedMembershipType_whenAssigningIt_thenTheResponseCarriesItsOwnType()
+            throws Exception {
+        // given — the unique person index answers 409 as well, so the type and the violation are
+        // what tell a client that the refusal is the one this flag exists for
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        mockMvc.perform(put("/api/admin/membership-types/{id}/active", MEMBERSHIP_TYPE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"active": false}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(membershipBody(MEMBERSHIP_TYPE_ID.toString()))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:membership-type-inactive"))
+                .andExpect(jsonPath("$.violations[0].code").value("membershipType.inactive"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("membershipTypeId"));
+        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnUnknownMembershipType_whenAssigningIt_thenTheResponseCarriesItsOwnType()
+            throws Exception {
+        // given — an unknown person and an unknown type are both 404 on this path, so only the
+        // type says which of the two an administrator got wrong
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(membershipBody(UUID.randomUUID().toString()))
+                        .with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:membership-type-not-found"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnUnknownPerson_whenAssigningAMembership_thenTheResponseCarriesItsOwnType()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(membershipBody(MEMBERSHIP_TYPE_ID.toString()))
+                        .with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:person-not-found"));
+    }
+
+    static Stream<Arguments> membershipsTheContractRefuses() {
+        return Stream.of(
+                Arguments.of("absent", "validation.NotNull", "{}"),
+                Arguments.of("null", "validation.NotNull", membershipBody(null)),
+                Arguments.of("notAUuid", "validation.TypeMismatch", membershipBody("nothing")),
+                Arguments.of("blank", "validation.NotNull", membershipBody("   ")));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("membershipsTheContractRefuses")
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAMembershipTypeIdTheContractRefuses_whenAssigningIt_thenTheContractNamesTheField(
+            String label, String code, String body) throws Exception {
+        // given — the service guard behind this answers with an IllegalStateException, which is
+        // a 500, so every value that could reach it has to be refused here
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("membershipTypeId"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value(code));
+        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonIdThatIsNotAUuid_whenAssigningAMembership_thenTheContractRefusesIt()
+            throws Exception {
+        // when / then — the service guard behind the path variable is an IllegalStateException,
+        // so nothing that is not a person id may reach it
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", "nobody")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(membershipBody(MEMBERSHIP_TYPE_ID.toString()))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:parameter-type-mismatch"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("personId"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAMembership_whenItIsEnded_thenTheEntryNoLongerCarriesIt() throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        members.save(new Member(mary.getId(), MEMBERSHIP_TYPE_ID));
+
+        // when
+        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary.getId())
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
+        mockMvc.perform(get("/api/admin/roster"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].personId").value(mary.getId().toString()))
+                .andExpect(jsonPath("$.entries[0].membershipTypeId").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWithoutAMembership_whenEndingIt_thenItIsTheStateTheRequestAsksFor()
+            throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+
+        // when / then
+        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary.getId())
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+        assertThat(persons.findById(mary.getId()))
+                .as("only the membership goes; the person stays")
+                .isPresent();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnUnknownPerson_whenEndingAMembership_thenTheResponseCarriesItsOwnType()
+            throws Exception {
+        // when / then
+        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", UUID.randomUUID())
+                        .with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:person-not-found"));
+    }
+
+    @Test
+    @WithMockUser(username = "member", roles = "MEMBER")
+    void givenAMemberSession_whenAssigningAMembership_thenItIsDenied() throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(membershipBody(MEMBERSHIP_TYPE_ID.toString()))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
+    }
+
+    @Test
+    void givenNoSession_whenEndingAMembership_thenItIsUnauthenticated() throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        members.save(new Member(mary.getId(), MEMBERSHIP_TYPE_ID));
+
+        // when / then
+        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary.getId())
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isNotEmpty();
+    }
+
+    private static String membershipBody(String membershipTypeId) {
+        return membershipTypeId == null
+                ? """
+                {"membershipTypeId": null}
+                """
+                : """
+                {"membershipTypeId": "%s"}
+                """.formatted(membershipTypeId);
     }
 
     private static String usernameBody(String username) {

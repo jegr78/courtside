@@ -44,6 +44,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:idempotency-key-reused",
             "urn:courtside:error:login-rate-limited",
             "urn:courtside:error:opening-hours-grid-mismatch",
+            "urn:courtside:error:membership-type-inactive",
             "urn:courtside:error:membership-type-name-taken",
             "urn:courtside:error:membership-type-not-found",
             "urn:courtside:error:participants-invalid",
