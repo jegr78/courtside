@@ -216,9 +216,11 @@ class RosterAccountTest extends AbstractIntegrationTest {
     @Test
     void givenASignedInAdministrator_whenTheAdminRoleIsRemoved_thenTheAdminSurfaceRefusesThatSession()
             throws Exception {
-        // given
+        // given — a successor, because an instance never gives up its last administrator
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER, Role.ADMIN));
+        signInReadyAccount(mary, "major.mary", Set.of(Role.ADMIN));
         MockHttpSession session = signIn("doe.jane");
         mockMvc.perform(get("/api/admin/roster").session(session))
                 .andExpect(status().isOk());
