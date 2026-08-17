@@ -1065,7 +1065,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Conflict:
-      description: The request collides with something that already exists.
+      description: The request collides with the current state; the problem `type` names the case.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -2426,6 +2426,9 @@ paths:
         can step down and a board can demote a former one. Taking it from the last enabled account
         that holds it is answered `409`, because the instance would then have nobody who could
         give it back.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2475,6 +2478,9 @@ paths:
 
         A username another account holds is answered `409` with the same problem type
         `POST /api/admin/roster/{personId}/account` answers with.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2520,6 +2526,9 @@ paths:
         because the credential they were opened with no longer exists.
 
         The response is the roster entry and never echoes the password.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2547,6 +2556,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   /api/admin/roster/{personId}/account/active:
     put:
@@ -2559,6 +2570,9 @@ paths:
 
         Disabling the last enabled account holding `ADMIN` is answered `409`, for the reason
         `PUT .../account/roles` gives.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2611,6 +2625,9 @@ paths:
         without an account has none to end.
 
         The response is the roster entry.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2656,6 +2673,9 @@ paths:
         the state the request asks for and answers the same way.
 
         Their account's sessions end, for the reason the assignment gives.
+
+        A write that would overwrite a change to the account made since this entry was read is
+        answered `409` with `urn:courtside:error:concurrent-modification`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2673,6 +2693,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   /api/admin/rule-sets:
     get:

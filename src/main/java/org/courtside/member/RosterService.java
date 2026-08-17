@@ -176,8 +176,6 @@ public class RosterService {
         });
     }
 
-    // An officer may step down and a board may demote a former one; what must not succeed is the
-    // write that leaves nobody able to administer the instance.
     private void requireASuccessorAdministrator(UserAccount account) {
         if (!account.isEnabled() || !account.getRoles().contains(Role.ADMIN)) {
             return;
@@ -204,19 +202,11 @@ public class RosterService {
     // Every account the person holds, not the one the roster prefers: a second one the schema
     // tolerates would otherwise keep booking under the membership it signed in with.
     private void revokeSessionsOf(UUID personId) {
-        accounts.findByPersonIdIn(List.of(personId)).forEach(account -> {
-            long epoch = account.getSecurityEpoch();
-            account.revokeSessions();
-            endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
-        });
+        accounts.findByPersonIdIn(List.of(personId)).forEach(sessions::revoke);
     }
 
-    // The epoch is what refuses the next request; deleting the stored row keeps a revoked session
-    // from lingering until it expires, and the epoch is what says whether one was revoked at all.
     private void endStoredSessionsIfRevoked(UserAccount account, String principal, long epochBefore) {
-        if (account.getSecurityEpoch() != epochBefore) {
-            sessions.endFor(principal);
-        }
+        sessions.endIfRevoked(account, principal, epochBefore);
     }
 
     private void saveOrRejectTakenUsername(UserAccount account) {

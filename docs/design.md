@@ -933,9 +933,10 @@ whether it is built or designed. **Designed means absent today.**
   standing, as a rule set's own parameters, a court's opening hours and a card's roles do, because
   all of them are read while a request is served and bind the next one. Enabling an account, adding
   a role, writing the username an account already holds and writing the membership a person already
-  holds leave sessions alone, as does the rehash on a sign-in, which replaces the stored hash and
-  nothing else. Ending one single session while leaving the account's rights untouched still has no
-  surface.
+  holds leave sessions alone, as does the rehash on a sign-in, which replaces the stored hash
+  without touching the epoch. It does raise the account's row version, so an administrator editing
+  that account at that moment is answered 409 and re-reads rather than overwriting the new hash.
+  Ending one single session while leaving the account's rights untouched still has no surface.
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* Source-address counters
   absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;

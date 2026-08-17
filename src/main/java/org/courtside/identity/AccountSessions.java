@@ -30,8 +30,18 @@ public class AccountSessions {
         });
     }
 
-    // Best effort: the account's security epoch is what refuses the next request, so a stored row
-    // that outlives its deletion is untidy rather than dangerous.
+    public void revoke(UserAccount account) {
+        account.revokeSessions();
+        endFor(account.getUsername());
+    }
+
+    // The principal is passed in because a username correction ends the sessions the old name holds.
+    public void endIfRevoked(UserAccount account, String principal, long epochBefore) {
+        if (account.getSecurityEpoch() != epochBefore) {
+            endFor(principal);
+        }
+    }
+
     private void delete(String username) {
         try {
             sessions.findByPrincipalName(username).keySet().forEach(sessions::deleteById);
