@@ -113,6 +113,13 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
     return () => window.cancelAnimationFrame(frame);
   }, [currentSlot, isToday]);
 
+  // Another day has no current time to scroll to, so it would otherwise open where today left it.
+  useEffect(() => {
+    if (isToday) return;
+    planRef.current?.scrollTo?.(0, 0);
+  }, [selectedDate, isToday]);
+
+
   return <section aria-labelledby="occupancy-heading" className="mt-8">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>

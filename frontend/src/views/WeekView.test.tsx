@@ -553,3 +553,17 @@ it("given an occupied slot, when cancelling it, then the API decides and the day
   await waitFor(() => expect(api.cancelBooking).toHaveBeenCalledWith("33333333-3333-3333-3333-333333333333"));
   await waitFor(() => expect(screen.queryByTestId("own-allocation")).not.toBeInTheDocument());
 });
+
+it("given today scrolled to the current time, when another day is chosen, then the plan opens at its start", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const plan = await screen.findByTestId("week-grid");
+  const scrollTo = vi.fn();
+  plan.scrollTo = scrollTo;
+
+  // when
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-11"));
+
+  // then
+  expect(scrollTo).toHaveBeenCalledWith(0, 0);
+});
