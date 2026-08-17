@@ -13,8 +13,6 @@ import java.util.UUID;
 
 public interface PersonRepository extends JpaRepository<Person, UUID> {
 
-    List<Person> findByEmailIgnoreCase(String email);
-
     // user_account carries no unique person, so the person row is where two administrators
     // creating an account at once are serialised.
     @Lock(LockModeType.PESSIMISTIC_WRITE)

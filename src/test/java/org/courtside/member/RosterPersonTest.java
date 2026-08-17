@@ -13,6 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -77,9 +78,9 @@ class RosterPersonTest extends AbstractIntegrationTest {
 
         // then
         assertThat(child.personId()).isNotEqualTo(parent.personId());
-        assertThat(persons.findByEmailIgnoreCase("family.doe@example.org"))
-                .extracting(Person::getId)
-                .containsExactlyInAnyOrder(parent.personId(), child.personId());
+        assertThat(persons.findAllById(List.of(parent.personId(), child.personId())))
+                .extracting(Person::getEmail)
+                .containsExactly("family.doe@example.org", "family.doe@example.org");
     }
 
     @Test
@@ -148,9 +149,9 @@ class RosterPersonTest extends AbstractIntegrationTest {
 
         // then
         assertThat(changed.email()).isEqualTo("family.doe@example.org");
-        assertThat(persons.findByEmailIgnoreCase("family.doe@example.org"))
-                .extracting(Person::getId)
-                .containsExactlyInAnyOrder(parent.personId(), child.personId());
+        assertThat(persons.findAllById(List.of(parent.personId(), child.personId())))
+                .extracting(Person::getEmail)
+                .containsExactly("family.doe@example.org", "family.doe@example.org");
     }
 
     @Test
