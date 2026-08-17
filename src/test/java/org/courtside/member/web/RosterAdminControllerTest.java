@@ -616,6 +616,270 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         assertThat(accounts.findByUsername("doe.jane")).isEmpty();
     }
 
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAMistypedUsername_whenItIsCorrected_thenTheEntryCarriesTheNewOne() throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        accounts.save(new UserAccount(jane, "doe.jaen", "hash", Set.of(Role.MEMBER)));
+
+        // when
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(usernameBody("doe.jane"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.personId").value(jane.getId().toString()))
+                .andExpect(jsonPath("$.username").value("doe.jane"))
+                .andExpect(jsonPath("$.roles[0]").value("MEMBER"));
+
+        // then
+        assertThat(accounts.findByUsername("doe.jaen")).isEmpty();
+        assertThat(accounts.findByUsername("doe.jane")).isPresent();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenTheUsernameItAlreadyHolds_whenCorrectingIt_thenItIsAcceptedRatherThanConflicting()
+            throws Exception {
+        // given — the unique index answers the account's own row, so a naive write would turn
+        // this into a 409 against itself
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER)));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(usernameBody("doe.jane"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("doe.jane"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAUsernameAnotherAccountHolds_whenCorrectingIt_thenTheResponseCarriesItsOwnType()
+            throws Exception {
+        // given — a unique index and an unmapped conflict both answer 409, so the type is what
+        // tells a client which of the two it hit
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER)));
+        accounts.save(new UserAccount(mary, "major.mary", "hash", Set.of(Role.MEMBER)));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", mary.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(usernameBody("doe.jane"))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:username-taken"));
+        assertThat(accounts.findByUsername("major.mary")).isPresent();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWithoutAnAccount_whenCorrectingTheUsername_thenTheResponseCarriesItsOwnType()
+            throws Exception {
+        // given — a person who exists and an account that does not are both 404, so only the
+        // type says which of the two an administrator is looking at
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(usernameBody("doe.jane"))
+                        .with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:account-not-found"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnUnknownPerson_whenCorrectingTheUsername_thenTheResponseCarriesItsOwnType()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(usernameBody("doe.jane"))
+                        .with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:person-not-found"));
+    }
+
+    static Stream<Arguments> usernamesTheContractRefuses() {
+        return Stream.of(
+                Arguments.of("blank", "validation.Pattern", usernameBody("   ")),
+                Arguments.of("unicodeBlank", "validation.Pattern", usernameBody(EM_SPACE.repeat(3))),
+                Arguments.of("uppercase", "validation.Pattern", usernameBody("Doe.Jane")),
+                Arguments.of("lineBreak", "validation.Pattern", usernameBody("doe.jane\\n")),
+                Arguments.of("tooShort", "validation.Size", usernameBody("dj")),
+                Arguments.of("tooLong", "validation.Size", usernameBody("d".repeat(61))),
+                Arguments.of("absent", "validation.NotNull", "{}"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("usernamesTheContractRefuses")
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAUsernameTheContractRefuses_whenCorrectingIt_thenTheContractNamesTheField(
+            String label, String code, String body) throws Exception {
+        // given — the service guard behind this answers with an IllegalStateException, which is
+        // a 500, so every value that could reach it has to be refused here
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        accounts.save(new UserAccount(jane, "doe.jaen", "hash", Set.of(Role.MEMBER)));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("username"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value(code));
+        assertThat(accounts.findByUsername("doe.jaen")).isPresent();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAccount_whenItsPasswordIsReset_thenTheEntryCarriesItWithoutEchoingThePassword()
+            throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UserAccount account = new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
+        account.enable();
+        accounts.save(account);
+
+        // when
+        String body = mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordBody("second-one-time-password"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("doe.jane"))
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(body)
+                .as("the response is the roster entry and never carries the password back")
+                .doesNotContain("second-one-time-password");
+        assertThat(accounts.findById(account.getId())).get()
+                .satisfies(stored -> {
+                    assertThat(stored.isPasswordChangeRequired()).isTrue();
+                    assertThat(stored.getPasswordHash()).isNotEqualTo("hash");
+                    assertThat(stored.getPasswordHash()).isNotEqualTo("second-one-time-password");
+                });
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWithoutAnAccount_whenResettingThePassword_thenTheResponseCarriesItsOwnType()
+            throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordBody("second-one-time-password"))
+                        .with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:account-not-found"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnUnknownPerson_whenResettingThePassword_thenTheResponseCarriesItsOwnType()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordBody("second-one-time-password"))
+                        .with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:person-not-found"));
+    }
+
+    static Stream<Arguments> passwordsTheContractRefuses() {
+        return Stream.of(
+                Arguments.of("empty", "validation.Size", passwordBody("")),
+                Arguments.of("elevenCharacters", "validation.Size", passwordBody("eleven.char")),
+                Arguments.of("longerThanTheBound", "validation.Size", passwordBody("p".repeat(201))),
+                Arguments.of("absent", "validation.NotNull", "{}"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("passwordsTheContractRefuses")
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPasswordTheContractRefuses_whenResettingIt_thenTheContractNamesTheField(
+            String label, String code, String body) throws Exception {
+        // given — the twelve-character floor is the one the bootstrap administrator is held to,
+        // and the service guard behind it is a 500 if anything gets past here
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UserAccount account = new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
+        accounts.save(account);
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("oneTimePassword"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value(code));
+        assertThat(accounts.findById(account.getId())).get()
+                .satisfies(stored -> assertThat(stored.getPasswordHash()).isEqualTo("hash"));
+    }
+
+    @Test
+    @WithMockUser(username = "member", roles = "MEMBER")
+    void givenAMemberSession_whenCorrectingAUsername_thenItIsDenied() throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        accounts.save(new UserAccount(jane, "doe.jaen", "hash", Set.of(Role.MEMBER)));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(usernameBody("doe.jane"))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+        assertThat(accounts.findByUsername("doe.jaen")).isPresent();
+    }
+
+    @Test
+    void givenNoSession_whenResettingAPassword_thenItIsUnauthenticated() throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UserAccount account = new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
+        accounts.save(account);
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordBody("second-one-time-password"))
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+        assertThat(accounts.findById(account.getId())).get()
+                .satisfies(stored -> assertThat(stored.getPasswordHash()).isEqualTo("hash"));
+    }
+
+    private static String usernameBody(String username) {
+        return """
+                {"username": "%s"}
+                """.formatted(username);
+    }
+
+    private static String passwordBody(String oneTimePassword) {
+        return """
+                {"oneTimePassword": "%s"}
+                """.formatted(oneTimePassword);
+    }
+
     private static String accountBody(String username, String oneTimePassword, String... roles) {
         String named = Stream.of(roles).map("\"%s\""::formatted).collect(Collectors.joining(", "));
         return """

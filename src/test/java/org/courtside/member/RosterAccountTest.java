@@ -30,6 +30,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -260,6 +261,246 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void givenAMistypedUsername_whenItIsCorrected_thenTheEntryAndTheAccountCarryTheNewOne() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        roster.createAccount(jane.getId(), "doe.jaen", "one-time-password", Set.of(Role.MEMBER));
+
+        // when
+        RosterService.RosterEntry entry = roster.changeUsername(jane.getId(), "doe.jane");
+
+        // then
+        assertThat(entry.username()).isEqualTo("doe.jane");
+        assertThat(entry.roles()).containsExactly(Role.MEMBER);
+        assertThat(entry.enabled()).isTrue();
+        assertThat(accounts.findByUsername("doe.jaen")).isEmpty();
+        assertThat(accounts.findByUsername("doe.jane")).isPresent();
+    }
+
+    @Test
+    void givenTheUsernameAnAccountAlreadyHolds_whenCorrectingIt_thenNothingChanges() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        roster.createAccount(jane.getId(), "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+
+        // when
+        RosterService.RosterEntry entry = roster.changeUsername(jane.getId(), "doe.jane");
+
+        // then — the unique index would answer the account's own row, so this must not become a
+        // conflict with itself
+        assertThat(entry.username()).isEqualTo("doe.jane");
+        assertThat(accounts.findByUsername("doe.jane")).isPresent();
+    }
+
+    @Test
+    void givenAUsernameAnotherAccountHolds_whenCorrectingIt_thenItIsRefusedByName() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        roster.createAccount(jane.getId(), "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(mary.getId(), "major.mary", "another-password", Set.of(Role.MEMBER));
+
+        // when / then
+        assertThatThrownBy(() -> roster.changeUsername(mary.getId(), "doe.jane"))
+                .isInstanceOf(UsernameTakenException.class)
+                .hasMessageContaining("doe.jane");
+        assertThat(accounts.findByUsername("major.mary"))
+                .as("the refused correction must leave the account under the name it had")
+                .isPresent();
+    }
+
+    @Test
+    void givenAPersonWithoutAnAccount_whenCorrectingTheUsername_thenItIsRefusedByType() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when / then
+        assertThatThrownBy(() -> roster.changeUsername(jane.getId(), "doe.jane"))
+                .isInstanceOf(AccountNotFoundException.class)
+                .hasMessageContaining(jane.getId().toString());
+    }
+
+    @Test
+    void givenAnUnknownPerson_whenCorrectingTheUsername_thenTheFailureNamesWhatWasNotFound() {
+        // given
+        UUID absent = UUID.fromString("00000000-0000-0000-0000-0000000000fe");
+
+        // when / then
+        assertThatThrownBy(() -> roster.changeUsername(absent, "doe.jane"))
+                .isInstanceOf(PersonNotFoundException.class)
+                .hasMessageContaining(absent.toString());
+    }
+
+    @Test
+    void givenABlankUsername_whenCorrectingIt_thenTheServiceRefusesItsOwnCaller() {
+        // given — the contract rejects this at the edge, so one reaching the service means a
+        // caller skipped the validation that precedes it
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        roster.createAccount(jane.getId(), "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+
+        // when / then
+        assertThatThrownBy(() -> roster.changeUsername(jane.getId(), "   "))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("blank");
+        assertThat(accounts.findByUsername("doe.jane")).isPresent();
+    }
+
+    @Test
+    void givenASignedInMember_whenTheirUsernameIsCorrected_thenTheirNextRequestIsRefused()
+            throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jaen", Set.of(Role.MEMBER));
+        MockHttpSession session = signIn("doe.jaen");
+        mockMvc.perform(get("/api/my/bookings").session(session))
+                .andExpect(status().isOk());
+
+        // when
+        roster.changeUsername(jane.getId(), "doe.jane");
+
+        // then — a session is recognised by the name it was signed in with, so one left standing
+        // would be signed in under a name the instance no longer knows
+        mockMvc.perform(get("/api/my/bookings").session(session))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+    }
+
+    @Test
+    void givenARenamedAccount_whenANewOneTakesTheNameItGaveUp_thenTheOldSessionIsStillRefused()
+            throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jaen", Set.of(Role.MEMBER));
+        MockHttpSession session = signIn("doe.jaen");
+
+        // when — correcting a username is the only way a name is ever given up, and handing it
+        // to somebody else is what a board does after mixing two members up
+        roster.changeUsername(jane.getId(), "doe.jane");
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        roster.createAccount(mary.getId(), "doe.jaen", "one-time-password", Set.of(Role.MEMBER));
+
+        // then
+        mockMvc.perform(get("/api/my/bookings").session(session))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+    }
+
+    @Test
+    void givenASignedInMember_whenTheUsernameIsSetToTheOneTheyAlreadyHold_thenTheirSessionStands()
+            throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        MockHttpSession session = signIn("doe.jane");
+
+        // when
+        roster.changeUsername(jane.getId(), "doe.jane");
+
+        // then — nothing was taken away, so signing everybody out would be a cost without a reason
+        mockMvc.perform(get("/api/my/bookings").session(session))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void givenAMemberWhoAlreadyReplacedTheirPassword_whenItIsReset_thenOnlyTheNewOneIsLeft() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+
+        // when
+        RosterService.RosterEntry entry = roster.resetPassword(jane.getId(), "second-one-time-password");
+
+        // then
+        assertThat(entry.username()).isEqualTo("doe.jane");
+        UserAccount stored = accounts.findByUsername("doe.jane").orElseThrow();
+        assertThat(stored.isPasswordChangeRequired()).isTrue();
+        assertThat(stored.getPasswordHash())
+                .as("the new one-time password must never be stored as given")
+                .isNotEqualTo("second-one-time-password");
+        assertThat(passwordEncoder.matches("second-one-time-password", stored.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches(SIGN_IN_PASSWORD, stored.getPasswordHash()))
+                .as("the credential the member could sign in with must be gone")
+                .isFalse();
+    }
+
+    @Test
+    void givenASignedInMember_whenTheirPasswordIsReset_thenTheirNextRequestIsRefused()
+            throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        MockHttpSession session = signIn("doe.jane");
+        mockMvc.perform(get("/api/my/bookings").session(session))
+                .andExpect(status().isOk());
+
+        // when
+        roster.resetPassword(jane.getId(), "second-one-time-password");
+
+        // then — the credential the session was opened with no longer exists
+        mockMvc.perform(get("/api/my/bookings").session(session))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+    }
+
+    @Test
+    void givenAnAccountWhosePasswordWasReset_whenSigningInWithTheNewOne_thenItIsAccepted()
+            throws Exception {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+
+        // when
+        roster.resetPassword(jane.getId(), "second-one-time-password");
+
+        // then — the reset is the remedy for a member who cannot sign in, so the password it
+        // hands out has to be the one that works
+        mockMvc.perform(post("/api/session")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("username", "doe.jane")
+                        .param("password", "second-one-time-password")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Courtside-Password-Change-Required", "true"));
+    }
+
+    @Test
+    void givenAPersonWithoutAnAccount_whenResettingThePassword_thenItIsRefusedByType() {
+        // given
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+
+        // when / then
+        assertThatThrownBy(() -> roster.resetPassword(jane.getId(), "second-one-time-password"))
+                .isInstanceOf(AccountNotFoundException.class)
+                .hasMessageContaining(jane.getId().toString());
+    }
+
+    @Test
+    void givenAnUnknownPerson_whenResettingThePassword_thenTheFailureNamesWhatWasNotFound() {
+        // given
+        UUID absent = UUID.fromString("00000000-0000-0000-0000-0000000000fd");
+
+        // when / then
+        assertThatThrownBy(() -> roster.resetPassword(absent, "second-one-time-password"))
+                .isInstanceOf(PersonNotFoundException.class)
+                .hasMessageContaining(absent.toString());
+    }
+
+    @Test
+    void givenAPasswordShorterThanTheBootstrapFloor_whenResettingIt_thenTheServiceRefusesItsOwnCaller() {
+        // given — the contract rejects this at the edge, so one reaching the service means a
+        // caller skipped the validation that precedes it
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+
+        // when / then
+        assertThatThrownBy(() -> roster.resetPassword(jane.getId(), "eleven.char"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("12");
+        assertThat(passwordEncoder.matches(SIGN_IN_PASSWORD,
+                accounts.findByUsername("doe.jane").orElseThrow().getPasswordHash())).isTrue();
     }
 
     private void signInReadyAccount(Person person, String username, Set<Role> roles) {

@@ -484,7 +484,9 @@ paths, both supported:
 2. Reset via **email** — the message lists *all* accounts registered to that address, each
    with its own reset link ("Accounts for this address: *doe.jane*, *roe.john*").
 
-This is a case standard frameworks do not provide and must be built explicitly.
+This is a case standard frameworks do not provide and must be built explicitly. Until it is, the
+roster is the only remedy: an administrator hands out a new one-time password (section 10), which
+is what the self-service paths above would take the board out of.
 
 A **guardian relation** (a parent seeing their children's bookings) falls out of this model
 almost for free. It is noted as a candidate for a later release, not Release 1.
@@ -897,11 +899,12 @@ whether it is built or designed. **Designed means absent today.**
   that account's active sessions in the same operation so cached authorities cannot outlive the
   change. A persisted account security epoch makes sessions created before a credential change
   fail closed even when an in-flight request saves one after bulk deletion. *Built.* The roster
-  is the admin surface for it: disabling an account, or removing one of its roles, raises that
-  account's epoch, so its next request is refused rather than served with the rights it was
-  signed in with. Enabling an account and adding a role leave sessions alone, as does a password
-  rehash, which replaces the stored hash and nothing else. Ending one single session while
-  leaving the account's rights untouched still has no surface.
+  is the admin surface for it: disabling an account, removing one of its roles, correcting its
+  username and resetting its password each raise that account's epoch, so its next request is
+  refused rather than served with the rights or the credential it was signed in with. Enabling an
+  account, adding a role and writing the username an account already holds leave sessions alone,
+  as does the rehash on a sign-in, which replaces the stored hash and nothing else. Ending one
+  single session while leaving the account's rights untouched still has no surface.
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* Source-address counters
   absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;

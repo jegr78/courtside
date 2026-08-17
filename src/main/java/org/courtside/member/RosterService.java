@@ -105,6 +105,24 @@ public class RosterService {
     }
 
     @Transactional
+    public RosterEntry changeUsername(UUID personId, String username) {
+        UUID id = requiredPersonId(personId);
+        String name = requiredUsername(username);
+        UserAccount account = requireAccount(id);
+        account.changeUsername(name);
+        saveOrRejectTakenUsername(account);
+        return load(List.of(id)).getFirst();
+    }
+
+    @Transactional
+    public RosterEntry resetPassword(UUID personId, String oneTimePassword) {
+        UUID id = requiredPersonId(personId);
+        requireUsablePassword(oneTimePassword);
+        requireAccount(id).resetPassword(passwordEncoder.encode(oneTimePassword));
+        return load(List.of(id)).getFirst();
+    }
+
+    @Transactional
     public RosterEntry setAccountEnabled(UUID personId, boolean enabled) {
         UUID id = requiredPersonId(personId);
         UserAccount account = requireAccount(id);

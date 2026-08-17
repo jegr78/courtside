@@ -569,6 +569,33 @@ components:
           uniqueItems: true
           items: { $ref: "#/components/schemas/Role" }
 
+    UsernameRequest:
+      type: object
+      description: |
+        The name replaces the one the account holds. Its shape is the one `AccountRequest`
+        states, because a name a correction may produce and a name a creation may produce are
+        the same identifier.
+      required: [username]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 60
+          pattern: "^[a-z0-9._-]+$"
+          description: |
+            The login identifier, unique across the instance and suggested as `lastname.firstname`.
+
+    PasswordResetRequest:
+      type: object
+      description: |
+        The one-time password is what an administrator hands the member; the member replaces it
+        before reaching anything else and it is never stored as given. Twelve characters is the
+        floor the bootstrap administrator's password is held to, and a reset an administrator
+        performs is not held to a weaker one.
+      required: [oneTimePassword]
+      properties:
+        oneTimePassword: { type: string, format: password, minLength: 12, maxLength: 200 }
+
     RolesRequest:
       type: object
       required: [roles]
@@ -2390,6 +2417,95 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/RolesRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/roster/{personId}/account/username:
+    put:
+      tags: [admin-roster]
+      operationId: changeAccountUsername
+      summary: Correct the username of a person's account.
+      description: |
+        A username mistyped at creation is otherwise permanent: nothing else on this surface can
+        reach it, and the person, their roles, their state and their password are untouched here.
+
+        The correction ends the account's sessions. A session is recognised by the username it was
+        signed in with, so one left standing would be signed in under a name the instance no longer
+        knows. Sending the name the account already holds changes nothing, leaves its sessions
+        alone and is answered `200` rather than a `409` against itself.
+
+        A username another account holds is answered `409` with the same problem type
+        `POST /api/admin/roster/{personId}/account` answers with.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UsernameRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/roster/{personId}/account/password:
+    put:
+      tags: [admin-roster]
+      operationId: resetAccountPassword
+      summary: Give a person's account a new one-time password.
+      description: |
+        For a member who cannot sign in at all: without this, a one-time password forgotten before
+        the first sign-in leaves an account nobody can reach, since the self-service reset is not
+        built. The account keeps its username, its roles and its state.
+
+        The account is left having to replace the new password before it can reach anything else,
+        which is the state a freshly created account starts in, and the reset ends its sessions
+        because the credential they were opened with no longer exists.
+
+        The response is the roster entry and never echoes the password.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordResetRequest" }
       responses:
         "200":
           description: Changed.

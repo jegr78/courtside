@@ -89,8 +89,22 @@ public class UserAccount {
         this.roles = replacement;
     }
 
-    // Only a change that takes rights away comes through here; a password rehash replaces the
-    // hash alone and must leave every session standing, which is why it never touches the entity.
+    public void changeUsername(String username) {
+        if (this.username.equals(username)) {
+            return;
+        }
+        this.username = username;
+        revokeSessions();
+    }
+
+    public void resetPassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+        requirePasswordChange();
+        revokeSessions();
+    }
+
+    // Only a change that takes something away comes through here; the rehash on a sign-in replaces
+    // the hash alone, must leave every session standing, and never touches the entity.
     public void revokeSessions() {
         this.securityEpoch++;
     }
