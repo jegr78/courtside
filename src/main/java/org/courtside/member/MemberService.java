@@ -15,7 +15,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +45,13 @@ public class MemberService {
 
     private String escapeLikePattern(String value) {
         return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    }
+
+    public Set<UUID> activeMembershipTypeIds() {
+        return membershipTypes.findAllByOrderByNameAsc().stream()
+                .filter(MembershipType::isActive)
+                .map(MembershipType::getId)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     public boolean knowsMembershipType(UUID membershipTypeId) {

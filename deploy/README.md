@@ -123,6 +123,8 @@ default.
 | `COURTSIDE_OTLP_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | Complete OTLP/HTTP trace endpoint. Set a container-network hostname when the collector runs in another container. |
 | `COURTSIDE_OTLP_METRICS_ENDPOINT` | `http://localhost:4318/v1/metrics` | Complete OTLP/HTTP metrics endpoint. |
 | `COURTSIDE_TRACING_SAMPLING_PROBABILITY` | `0.1` | Share of new traces sampled, from `0.0` to `1.0`. Parent sampling decisions are retained. |
+| `COURTSIDE_IMPORT_MAX_FILE_SIZE` | `8MB` | Largest roster snapshot an upload may carry. An upload above it is answered `413` with a problem document rather than a container error page. |
+| `COURTSIDE_IMPORT_PREVIEW_RETENTION` | `7d` | How long a roster-import preview keeps the uploaded file and the change set it resolved. The preview row and its counts survive; the personal data in it does not. |
 | `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` | `500` | Logs Hibernate queries slower than this threshold in milliseconds. Bind values are not logged. |
 | `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's own loggers. `DEBUG` adds an `Answering` line for every error one of its exception handlers answers; sign-in and authorisation failures are not among them. |
 | `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |

@@ -90,6 +90,8 @@ tags:
     description: What a configuration change would affect, before it is made.
   - name: admin-import-references
     description: Which member number of a source stands for which person.
+  - name: admin-import-previews
+    description: What an uploaded roster snapshot would change, before anything is written.
 
 security:
   - sessionCookie: []
@@ -665,6 +667,127 @@ components:
           type: string
           format: uuid
           description: The person in this club's roster that the record stands for.
+
+    SnapshotMode:
+      type: string
+      description: |
+        `FULL_SNAPSHOT` means the file is the whole truth about this source: a member it does not
+        carry has left, and their membership ends. `UPDATE_ONLY` means the file is a partial
+        delivery — absence says nothing, and no membership ends because of it. The difference is
+        the difference between a club's yearly export and a correction of forty rows.
+      enum: [FULL_SNAPSHOT, UPDATE_ONLY]
+
+    ImportChangeKind:
+      type: string
+      description: |
+        `CREATE` adds a person this source has not seen before, `UPDATE` writes the owned fields
+        that differ, and `END_MEMBERSHIP` records that somebody the file no longer carries has left.
+      enum: [CREATE, UPDATE, END_MEMBERSHIP]
+
+    ImportPersonChange:
+      type: object
+      required: [kind, rowNumber, externalId, values]
+      properties:
+        kind: { $ref: "#/components/schemas/ImportChangeKind" }
+        rowNumber:
+          type: integer
+          description: |
+            The nth data row of the file, counting the header as row zero. An `END_MEMBERSHIP` has
+            no row of its own — it follows from an absence — and reports `0`.
+        externalId: { type: string }
+        personId: { type: [string, "null"], format: uuid }
+        values:
+          type: object
+          description: |
+            Only the fields that would actually change, keyed by canonical field. A field this
+            source does not own never appears here, however different the file is.
+          additionalProperties: { type: string }
+        membershipTypeId: { type: [string, "null"], format: uuid }
+
+    ImportRowError:
+      type: object
+      required: [rowNumber, code, params]
+      properties:
+        rowNumber: { type: integer }
+        code:
+          type: string
+          description: An i18n key; the client renders it. The row is skipped, the file is not.
+        params:
+          type: object
+          additionalProperties: true
+
+    ImportPossibleDuplicate:
+      type: object
+      required: [rowNumber, externalId, personId]
+      description: |
+        A row that would create somebody the roster appears to hold already. It is reported and not
+        acted on: two members really are called John Roe, so only a board can tell a duplicate from
+        a namesake. The answer to a real one is to link the record to the person it names.
+      properties:
+        rowNumber: { type: integer }
+        externalId: { type: string }
+        personId: { type: string, format: uuid }
+
+    ImportRemovalCounts:
+      type: object
+      required: [count, currentlyLinked, percent]
+      properties:
+        count: { type: integer }
+        currentlyLinked:
+          type: integer
+          description: |
+            How many current memberships this source accounts for right now. It is the denominator
+            of `percent`, so a source covering part of a club is measured against its own part
+            rather than against the whole roster.
+        percent: { type: integer }
+
+    ImportPreview:
+      type: object
+      required: [previewId, sourceId, mode, fileName, fileHash, rowCount, ignoredColumns, changes,
+                 rowErrors, possibleDuplicates, removals, needsConfirmation, superseded, createdAt,
+                 expiresAt]
+      properties:
+        previewId: { type: string, format: uuid }
+        sourceId: { type: string, format: uuid }
+        mode: { $ref: "#/components/schemas/SnapshotMode" }
+        fileName: { type: string }
+        fileHash:
+          type: string
+          description: |
+            The SHA-256 of the uploaded bytes, in lower-case hex. Uploading the same file twice
+            yields two previews carrying the same hash, which is how a board can tell it reviewed
+            the file it meant to.
+        rowCount: { type: integer }
+        ignoredColumns:
+          type: array
+          items: { type: string }
+          description: |
+            Headers the file carries and this source's mapping does not name. They are skipped and
+            listed rather than silently dropped: a column left out by a typo in the mapping looks
+            exactly like a column the club never wanted.
+        changes:
+          type: array
+          items: { $ref: "#/components/schemas/ImportPersonChange" }
+        rowErrors:
+          type: array
+          items: { $ref: "#/components/schemas/ImportRowError" }
+        possibleDuplicates:
+          type: array
+          items: { $ref: "#/components/schemas/ImportPossibleDuplicate" }
+        removals: { $ref: "#/components/schemas/ImportRemovalCounts" }
+        needsConfirmation:
+          type: boolean
+          description: |
+            True when the share of this source's memberships that would end exceeds the source's
+            own threshold. It does not block anything here — a preview writes nothing — it tells a
+            board that executing this one needs a deliberate confirmation.
+        superseded:
+          type: boolean
+          description: |
+            A newer preview for this source exists. The older one is kept so that what was reviewed
+            stays readable, and it is not what a later execution should use.
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
 
     MembershipTypeRequest:
       type: object
@@ -1258,6 +1381,11 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
     Conflict:
       description: The request collides with the current state; the problem `type` names the case.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PayloadTooLarge:
+      description: The upload is larger than this instance accepts.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -3187,6 +3315,91 @@ paths:
       responses:
         "204":
           description: Unlinked.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/import/sources/{sourceId}/previews:
+    post:
+      tags: [admin-import-previews]
+      operationId: createImportPreview
+      summary: Upload a roster snapshot and see exactly what it would change.
+      description: |
+        Nothing is written. The file is read against this source's column mapping, every row is
+        resolved against the people this source already knows, and the answer is the whole change
+        set: what would be created, what would be updated and in which fields, whose membership
+        would end, which rows could not be read, and which creations resemble somebody the roster
+        already holds.
+
+        A header problem fails the whole file, because nothing in it can then be trusted. A cell
+        problem fails one row and is reported beside the rest — a club with one truncated line
+        should not have to fix the export before it can see the other nine hundred.
+
+        Uploading again supersedes the previous preview of this source rather than replacing it.
+        A preview is never edited: correcting a mistake means uploading the corrected file, which
+        is the honest move, because an editable preview would no longer be what anybody reviewed.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, mode]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The club's export, as UTF-8 CSV. A byte order mark is tolerated.
+                mode: { $ref: "#/components/schemas/SnapshotMode" }
+      responses:
+        "201":
+          description: The preview.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportPreview" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
+  /api/admin/import/previews/{id}:
+    get:
+      tags: [admin-import-previews]
+      operationId: readImportPreview
+      summary: Read a preview back, exactly as it was taken.
+      description: |
+        A preview is immutable and is kept for a bounded time; once that time has passed the row
+        survives with its hash and its counts, and the change set it carried does not.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The preview.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportPreview" }
         "400":
           $ref: "#/components/responses/Invalid"
         "401":
