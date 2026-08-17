@@ -83,7 +83,7 @@ public class MemberService {
                         "No membership type with id " + membershipTypeId));
     }
 
-    public MembershipType requireAssignableMembershipType(UUID membershipTypeId) {
+    MembershipType requireAssignableMembershipType(UUID membershipTypeId) {
         MembershipType type = requireMembershipType(membershipTypeId);
         if (!type.isActive()) {
             throw new MembershipTypeInactiveException(
