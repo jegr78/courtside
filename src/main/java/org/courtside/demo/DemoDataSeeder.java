@@ -131,7 +131,8 @@ class DemoDataSeeder implements ApplicationRunner {
                 Set.of(Role.MEMBER));
         account.enable();
         accounts.save(account);
-        members.save(new Member(person.getId(), ACTIVE_MEMBERSHIP_TYPE));
+        members.save(new Member(person.getId(), ACTIVE_MEMBERSHIP_TYPE,
+                LocalDate.now(clock.withZone(timeZone.zoneId()))));
         return new DemoMember(person, account);
     }
 

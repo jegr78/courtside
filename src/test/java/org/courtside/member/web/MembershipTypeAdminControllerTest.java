@@ -20,6 +20,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.UUID;
 
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -207,7 +208,7 @@ class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
         // given
         String typeId = createMembershipType("Veterans", null);
         Person person = persons.save(new Person("Jane", "Doe", "jane@example.org"));
-        members.save(new Member(person.getId(), UUID.fromString(typeId)));
+        members.save(memberSince(person.getId(), UUID.fromString(typeId)));
 
         // when
         mockMvc.perform(put("/api/admin/membership-types/" + typeId + "/active")

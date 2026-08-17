@@ -13,6 +13,7 @@ import org.courtside.api.ApiRosterEntry;
 import org.courtside.api.ApiRosterPage;
 import org.courtside.api.ApiUsernameRequest;
 import org.courtside.identity.Role;
+import org.courtside.member.MembershipPeriod;
 import org.courtside.member.RosterService;
 import org.courtside.shared.CursorPage;
 import org.springframework.http.HttpStatus;
@@ -92,13 +93,14 @@ class RosterAdminController implements AdminRosterApi {
     @Override
     public ResponseEntity<ApiRosterEntry> assignMembership(UUID personId,
                                                            ApiMembershipRequest request) {
-        return ResponseEntity.ok(toResponse(
-                roster.assignMembership(personId, request.getMembershipTypeId())));
+        return ResponseEntity.ok(toResponse(roster.writeMembership(personId,
+                request.getMembershipTypeId(),
+                new MembershipPeriod(request.getStartedOn(), request.getEndedOn()))));
     }
 
     @Override
     public ResponseEntity<Void> removeMembership(UUID personId) {
-        roster.removeMembership(personId);
+        roster.endMembership(personId);
         return ResponseEntity.noContent().build();
     }
 
@@ -119,7 +121,9 @@ class RosterAdminController implements AdminRosterApi {
                 entry.email(), entry.enabled(), roleNames(entry.roles()))
                 .accountId(entry.accountId())
                 .username(entry.username())
-                .membershipTypeId(entry.membershipTypeId());
+                .membershipTypeId(entry.membershipTypeId())
+                .membershipStartedOn(entry.membershipStartedOn())
+                .membershipEndedOn(entry.membershipEndedOn());
     }
 
     private static List<ApiRole> roleNames(Set<Role> roles) {

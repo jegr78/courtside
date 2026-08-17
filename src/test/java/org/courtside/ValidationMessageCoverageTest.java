@@ -29,12 +29,14 @@ class ValidationMessageCoverageTest {
 
     private static final List<String> CODE_CARRYING_EXCEPTION_SIMPLE_NAMES =
             List.of("ParticipantsInvalidException", "InvalidOpeningWindowException",
+                    "InvalidMembershipPeriodException",
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
                     "MembershipTypeRuleSetInactiveException", "MembershipTypeInactiveException",
                     "RosterCursorUnknownException", "LastAdministratorException");
 
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
-            List.of("CodedDomainFailure", "InvalidOpeningWindowException");
+            List.of("CodedDomainFailure", "InvalidOpeningWindowException",
+                    "InvalidMembershipPeriodException");
 
     private static final List<Pattern> CODE_LITERAL_PATTERNS = buildCodeLiteralPatterns();
 

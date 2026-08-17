@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -72,7 +73,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
 
         // when
-        RosterService.RosterEntry entry = roster.assignMembership(mary.getId(), type.getId());
+        RosterService.RosterEntry entry = roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
 
         // then
         assertThat(entry.membershipTypeId()).isEqualTo(type.getId());
@@ -87,7 +88,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         Person richard = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
 
         // when / then
-        assertThatThrownBy(() -> roster.assignMembership(richard.getId(), type.getId()))
+        assertThatThrownBy(() -> roster.writeMembership(richard.getId(), type.getId(), MembershipPeriod.running()))
                 .isInstanceOf(MembershipTypeInactiveException.class);
         assertThat(members.findByPersonId(richard.getId())).isEmpty();
     }
@@ -97,7 +98,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         // given
         MembershipType type = memberships.createMembershipType("Junior", null);
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        roster.assignMembership(mary.getId(), type.getId());
+        roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
 
         // when
         memberships.setMembershipTypeActive(type.getId(), false);
@@ -112,10 +113,10 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         MembershipType wrong = memberships.createMembershipType("Junior", null);
         MembershipType right = memberships.createMembershipType("Senior", null);
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        roster.assignMembership(mary.getId(), wrong.getId());
+        roster.writeMembership(mary.getId(), wrong.getId(), MembershipPeriod.running());
 
         // when
-        RosterService.RosterEntry entry = roster.assignMembership(mary.getId(), right.getId());
+        RosterService.RosterEntry entry = roster.writeMembership(mary.getId(), right.getId(), MembershipPeriod.running());
 
         // then
         assertThat(entry.membershipTypeId()).isEqualTo(right.getId());
@@ -130,10 +131,10 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         // given
         MembershipType type = memberships.createMembershipType("Junior", null);
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        roster.assignMembership(mary.getId(), type.getId());
+        roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
 
         // when
-        RosterService.RosterEntry entry = roster.assignMembership(mary.getId(), type.getId());
+        RosterService.RosterEntry entry = roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
 
         // then
         assertThat(entry.membershipTypeId()).isEqualTo(type.getId());
@@ -147,7 +148,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         UUID absent = UUID.fromString("00000000-0000-0000-0000-0000000000fc");
 
         // when / then
-        assertThatThrownBy(() -> roster.assignMembership(absent, type.getId()))
+        assertThatThrownBy(() -> roster.writeMembership(absent, type.getId(), MembershipPeriod.running()))
                 .isInstanceOf(PersonNotFoundException.class)
                 .hasMessageContaining(absent.toString());
     }
@@ -159,7 +160,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         UUID absent = UUID.fromString("00000000-0000-0000-0000-0000000000fb");
 
         // when / then
-        assertThatThrownBy(() -> roster.assignMembership(mary.getId(), absent))
+        assertThatThrownBy(() -> roster.writeMembership(mary.getId(), absent, MembershipPeriod.running()))
                 .isInstanceOf(MembershipTypeNotFoundException.class)
                 .hasMessageContaining(absent.toString());
         assertThat(members.findByPersonId(mary.getId())).isEmpty();
@@ -171,47 +172,50 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
 
         // when / then
-        assertThatThrownBy(() -> roster.assignMembership(mary.getId(), null))
+        assertThatThrownBy(() -> roster.writeMembership(mary.getId(), null, MembershipPeriod.running()))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(members.findByPersonId(mary.getId())).isEmpty();
     }
 
     @Test
-    void givenAMembership_whenItIsRemoved_thenThePersonHoldsNone() {
+    void givenAMembership_whenItIsEnded_thenThePersonHoldsNoneAndTheRecordStays() {
         // given
         MembershipType type = memberships.createMembershipType("Junior", null);
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        roster.assignMembership(mary.getId(), type.getId());
+        roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
 
         // when
-        roster.removeMembership(mary.getId());
+        roster.endMembership(mary.getId());
 
         // then
         assertThat(memberships.membershipTypeIdOf(mary.getId())).isEmpty();
         assertThat(persons.findById(mary.getId()))
                 .as("only the membership goes; the person stays")
                 .isPresent();
+        assertThat(members.findByPersonId(mary.getId()))
+                .as("and so does the record of what they held")
+                .isPresent();
     }
 
     @Test
-    void givenAPersonWithoutAMembership_whenRemovingIt_thenItIsTheStateTheRequestAsksFor() {
+    void givenAPersonWithoutAMembership_whenEndingIt_thenItIsTheStateTheRequestAsksFor() {
         // given
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
 
         // when
-        roster.removeMembership(mary.getId());
+        roster.endMembership(mary.getId());
 
         // then
         assertThat(memberships.membershipTypeIdOf(mary.getId())).isEmpty();
     }
 
     @Test
-    void givenAnUnknownPerson_whenRemovingAMembership_thenTheFailureNamesWhatWasNotFound() {
+    void givenAnUnknownPerson_whenEndingAMembership_thenTheFailureNamesWhatWasNotFound() {
         // given
         UUID absent = UUID.fromString("00000000-0000-0000-0000-0000000000fa");
 
         // when / then
-        assertThatThrownBy(() -> roster.removeMembership(absent))
+        assertThatThrownBy(() -> roster.endMembership(absent))
                 .isInstanceOf(PersonNotFoundException.class)
                 .hasMessageContaining(absent.toString());
     }
@@ -223,7 +227,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
 
         // when
-        RosterService.RosterEntry entry = roster.assignMembership(mary.getId(), type.getId());
+        RosterService.RosterEntry entry = roster.writeMembership(mary.getId(), type.getId(), MembershipPeriod.running());
 
         // then
         assertThat(entry.accountId()).isNull();
@@ -242,7 +246,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         // when
-        roster.assignMembership(jane.getId(), type.getId());
+        roster.writeMembership(jane.getId(), type.getId(), MembershipPeriod.running());
 
         // then
         mockMvc.perform(get("/api/my/bookings").session(session))
@@ -262,7 +266,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         MockHttpSession second = signIn("doe.jane.second");
 
         // when
-        roster.assignMembership(jane.getId(), type.getId());
+        roster.writeMembership(jane.getId(), type.getId(), MembershipPeriod.running());
 
         // then
         mockMvc.perform(get("/api/my/bookings").session(first))
@@ -280,11 +284,11 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         MembershipType type = memberships.createMembershipType("Junior", null);
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
-        roster.assignMembership(jane.getId(), type.getId());
+        roster.writeMembership(jane.getId(), type.getId(), MembershipPeriod.running());
         MockHttpSession session = signIn("doe.jane");
 
         // when
-        roster.removeMembership(jane.getId());
+        roster.endMembership(jane.getId());
 
         // then
         mockMvc.perform(get("/api/my/bookings").session(session))
@@ -299,15 +303,53 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         MembershipType type = memberships.createMembershipType("Junior", null);
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
-        roster.assignMembership(jane.getId(), type.getId());
+        roster.writeMembership(jane.getId(), type.getId(), MembershipPeriod.running());
         MockHttpSession session = signIn("doe.jane");
 
         // when
-        roster.assignMembership(jane.getId(), type.getId());
+        roster.writeMembership(jane.getId(), type.getId(), MembershipPeriod.running());
 
         // then
         mockMvc.perform(get("/api/my/bookings").session(session))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void givenASignedInMember_whenOnlyTheDateTheirMembershipBeganIsCorrected_thenTheirSessionStands()
+            throws Exception {
+        // given
+        MembershipType type = memberships.createMembershipType("Junior", null);
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        roster.writeMembership(jane.getId(), type.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
+        MockHttpSession session = signIn("doe.jane");
+
+        // when
+        roster.writeMembership(jane.getId(), type.getId(), new MembershipPeriod(LocalDate.of(2020, 9, 1), null));
+
+        // then
+        mockMvc.perform(get("/api/my/bookings").session(session))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void givenASignedInMemberWhoseMembershipEnded_whenItIsRevived_thenTheirNextRequestIsRefused()
+            throws Exception {
+        // given
+        MembershipType type = memberships.createMembershipType("Junior", null);
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        roster.writeMembership(jane.getId(), type.getId(),
+                new MembershipPeriod(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
+        MockHttpSession session = signIn("doe.jane");
+
+        // when
+        roster.writeMembership(jane.getId(), type.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
+
+        // then
+        mockMvc.perform(get("/api/my/bookings").session(session))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
     }
 
     @Test
@@ -319,7 +361,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         MockHttpSession session = signIn("doe.jane");
 
         // when
-        roster.removeMembership(jane.getId());
+        roster.endMembership(jane.getId());
 
         // then
         mockMvc.perform(get("/api/my/bookings").session(session))

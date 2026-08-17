@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -192,7 +193,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     void givenTheTrainerIsAlsoAMember_whenPreviewing_thenTheAdvanceWindowNarrowsTheCreatableCount()
             throws Exception {
         // given
-        members.save(new Member(trainerPersonId, ACTIVE_MEMBERSHIP));
+        members.save(memberSince(trainerPersonId, ACTIVE_MEMBERSHIP));
 
         // when / then
         mockMvc.perform(post("/api/booking-series/preview")

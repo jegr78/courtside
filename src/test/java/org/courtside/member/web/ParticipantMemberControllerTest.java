@@ -15,6 +15,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.UUID;
 
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -47,8 +48,8 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         Person john = persons.save(new Person("John", "Roe", "john.roe@example.org"));
         persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        members.save(new Member(jane.getId(), MEMBERSHIP_TYPE_ID));
-        members.save(new Member(john.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(john.getId(), MEMBERSHIP_TYPE_ID));
 
         // when / then
         mockMvc.perform(get("/api/public/participant-members").queryParam("query", "do"))
@@ -81,7 +82,7 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
     void givenWildcardCharacters_whenSearchingMembers_thenTheyAreMatchedLiterally() throws Exception {
         // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        members.save(new Member(jane.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
 
         // when / then
         mockMvc.perform(get("/api/public/participant-members").queryParam("query", "%%"))

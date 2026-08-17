@@ -70,17 +70,17 @@ async function seedJourneyData(postgres: StartedTestContainer, visualDate: strin
       ('00000000-0000-0000-0000-000000000111', 'YOUTH_DIRECTOR'),
       ('00000000-0000-0000-0000-000000000113', 'GROUNDSKEEPER'),
       ('00000000-0000-0000-0000-000000000113', 'MEMBER');
-    INSERT INTO member (id, person_id, membership_type_id)
+    INSERT INTO member (id, person_id, membership_type_id, started_on)
     VALUES ('00000000-0000-0000-0000-000000000105',
-      '00000000-0000-0000-0000-000000000101', 'cccccccc-0000-0000-0000-000000000001');
+      '00000000-0000-0000-0000-000000000101', 'cccccccc-0000-0000-0000-000000000001', DATE '2026-01-01');
     INSERT INTO person (id, first_name, last_name, email)
     VALUES ('00000000-0000-0000-0000-000000000103', 'Mary', 'Major', 'mary.major@example.org');
-    INSERT INTO member (id, person_id, membership_type_id)
+    INSERT INTO member (id, person_id, membership_type_id, started_on)
     VALUES ('00000000-0000-0000-0000-000000000104',
-      '00000000-0000-0000-0000-000000000103', 'cccccccc-0000-0000-0000-000000000001');
-    INSERT INTO member (id, person_id, membership_type_id)
+      '00000000-0000-0000-0000-000000000103', 'cccccccc-0000-0000-0000-000000000001', DATE '2026-01-01');
+    INSERT INTO member (id, person_id, membership_type_id, started_on)
     VALUES ('00000000-0000-0000-0000-000000000114',
-      '00000000-0000-0000-0000-000000000112', 'cccccccc-0000-0000-0000-000000000001');
+      '00000000-0000-0000-0000-000000000112', 'cccccccc-0000-0000-0000-000000000001', DATE '2026-01-01');
     INSERT INTO person (id, first_name, last_name, email)
     VALUES ('00000000-0000-0000-0000-000000000115', 'Jane', 'Roe', 'jane.roe@example.org');
     INSERT INTO user_account
@@ -90,9 +90,9 @@ async function seedJourneyData(postgres: StartedTestContainer, visualDate: strin
     FROM user_account WHERE username = 'bootstrap-admin';
     INSERT INTO user_account_role (user_account_id, role)
     VALUES ('00000000-0000-0000-0000-000000000116', 'MEMBER');
-    INSERT INTO member (id, person_id, membership_type_id)
+    INSERT INTO member (id, person_id, membership_type_id, started_on)
     VALUES ('00000000-0000-0000-0000-000000000117',
-      '00000000-0000-0000-0000-000000000115', 'cccccccc-0000-0000-0000-000000000001');
+      '00000000-0000-0000-0000-000000000115', 'cccccccc-0000-0000-0000-000000000001', DATE '2026-01-01');
 
     INSERT INTO court (id, number, name) VALUES
       ('dddddddd-0000-0000-0000-000000000002', 2, NULL),

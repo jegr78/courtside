@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -73,7 +74,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UserAccount account = new UserAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER, Role.TRAINER));
         account.enable();
         accounts.save(account);
-        members.save(new Member(jane.getId(), MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
 
         // when
         CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
