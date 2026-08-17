@@ -1,4 +1,4 @@
-package org.courtside.booking.internal;
+package org.courtside.shared;
 
 import java.util.List;
 import java.util.Map;

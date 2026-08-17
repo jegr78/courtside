@@ -2,10 +2,10 @@ package org.courtside.booking;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.booking.internal.CourtAllocationRepository;
-import org.courtside.booking.internal.CursorPage;
 import org.courtside.booking.internal.IdempotencyKeyRaceException;
 import org.courtside.booking.internal.IdempotencyKeyReusedException;
 import org.courtside.identity.Role;
+import org.courtside.shared.CursorPage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.domain.PageRequest;
