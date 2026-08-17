@@ -902,9 +902,17 @@ whether it is built or designed. **Designed means absent today.**
   is the admin surface for it: disabling an account, removing one of its roles, correcting its
   username, resetting its password and changing the membership of the person it belongs to each
   raise that account's epoch, so its next request is refused rather than served with the rights or
-  the credential it was signed in with. A membership is not a role, but it decides which rule set
-  a booking is measured against, and whether it grants or restricts is a property of club data
-  rather than of the operation — so any change of it counts, in either direction. Enabling an
+  the credential it was signed in with. A membership is not a role, and no session carries a stale
+  copy of one — a booking resolves the membership as it evaluates the rules — so the epoch moves
+  here because the policy above names a membership change, not because anything cached would
+  otherwise outlive it. It moves in either direction, because there is no harmless one: the advance
+  window and the open-booking cap are looked up through a membership type and are found for nobody
+  without one, so holding no membership is this build's most permissive state and ending a
+  membership grants as readily as assigning one restricts. The policy is about what an account is,
+  not about what the club has configured: repointing a membership type at another rule set changes
+  what every member holding it may book and leaves every session standing, as a rule set's own
+  parameters, a court's opening hours and a card's roles do, because all of them are read while a
+  request is served and bind the next one. Enabling an
   account, adding a role, writing the username an account already holds and writing the membership
   a person already holds leave sessions alone, as does the rehash on a sign-in, which replaces the
   stored hash and nothing else. Ending one single session while leaving the account's rights
