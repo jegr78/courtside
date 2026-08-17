@@ -60,6 +60,20 @@ fails on the missing `BuildProperties` bean.
   sub-package such as `shared.web` is still internal even though `shared` itself is shared. Add a
   class to a module's base package only when another module genuinely needs it; everything else
   belongs in `<module>.internal`.
+* **Everything a club enters, a club can correct.** Every field an administrative surface writes has
+  an operation that changes it afterwards. There is no write-once data: not a username, not a
+  password, not a name. A board that mistypes something must be able to fix it in the product,
+  without a database console and without support from us.
+
+  This is not a nicety. A single-tenant instance is operated by a volunteer, and the alternative to
+  an edit operation is an account nobody can rescue — a member who forgets a one-time password
+  before their first sign-in, or a username with a typo in it that the member has to live with. An
+  admin surface that can only create is a trap that gets set once per mistake.
+
+  Identifiers are the exception, because they are not data a club entered: a `personId` names a row,
+  it does not describe anybody. Deletion is separate and stays governed by section 11 of the design
+  spec — the answer to bad data is correcting it, and the answer to a departed member is
+  deactivation, not erasure.
 * **Keep controllers thin.** HTTP handling only. Business logic lives in services, never in
   controllers or repositories.
 * **Rules are data.** Booking rules are declarative rows evaluated by `RuleEngine`, not nested
