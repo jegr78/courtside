@@ -33,6 +33,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
 
+    private static final UUID ACTIVE_TYPE =
+            UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+
     @Autowired
     private WebApplicationContext context;
 
@@ -52,8 +55,9 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
         source = sources.create("roster-system", "Membership system",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
-                        "Last name", CanonicalField.LAST_NAME),
-                Map.of(), Set.of(), 10).sourceId();
+                        "Last name", CanonicalField.LAST_NAME,
+                        "Email", CanonicalField.EMAIL),
+                Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
     }
 
     @Test

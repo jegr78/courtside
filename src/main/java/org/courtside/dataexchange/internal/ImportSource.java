@@ -38,6 +38,9 @@ public class ImportSource {
     @Column(name = "display_name", nullable = false)
     private String displayName;
 
+    @Column(name = "default_membership_type_id", nullable = false)
+    private UUID defaultMembershipTypeId;
+
     @Column(name = "removal_warning_percent", nullable = false)
     private int removalWarningPercent;
 
@@ -69,10 +72,11 @@ public class ImportSource {
     }
 
     public void changeTo(String sourceKey, String displayName, Map<String, CanonicalField> columns,
-                         Map<String, UUID> membershipTypes, Set<CanonicalField> ownedFields,
-                         int removalWarningPercent) {
+                         Map<String, UUID> membershipTypes, UUID defaultMembershipTypeId,
+                         Set<CanonicalField> ownedFields, int removalWarningPercent) {
         this.sourceKey = sourceKey;
         this.displayName = displayName;
+        this.defaultMembershipTypeId = defaultMembershipTypeId;
         this.removalWarningPercent = removalWarningPercent;
         this.columns.clear();
         this.columns.putAll(columns);

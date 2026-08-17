@@ -92,6 +92,8 @@ tags:
     description: Which member number of a source stands for which person.
   - name: admin-import-previews
     description: What an uploaded roster snapshot would change, before anything is written.
+  - name: admin-import-runs
+    description: Executing a reviewed snapshot, and the log of what was executed.
 
 security:
   - sessionCookie: []
@@ -541,8 +543,8 @@ components:
 
     ImportSource:
       type: object
-      required: [id, sourceKey, displayName, columns, membershipTypes, ownedFields,
-                 removalWarningPercent]
+      required: [id, sourceKey, displayName, columns, membershipTypes, defaultMembershipTypeId,
+                 ownedFields, removalWarningPercent]
       properties:
         id: { type: string, format: uuid }
         sourceKey: { type: string }
@@ -553,6 +555,7 @@ components:
         membershipTypes:
           type: object
           additionalProperties: { type: string, format: uuid }
+        defaultMembershipTypeId: { type: string, format: uuid }
         ownedFields:
           type: array
           uniqueItems: true
@@ -564,7 +567,7 @@ components:
       description: |
         Every part of a source is given here and every part may be given again — this request is
         what a correction uses as much as a first description.
-      required: [sourceKey, displayName, columns, removalWarningPercent]
+      required: [sourceKey, displayName, columns, defaultMembershipTypeId, removalWarningPercent]
       properties:
         sourceKey:
           type: string
@@ -588,9 +591,13 @@ components:
           type: object
           description: |
             The header in the club's export, mapped to the field it holds. `EXTERNAL_ID`,
-            `FIRST_NAME` and `LAST_NAME` are required; `EMAIL` and `MEMBERSHIP_TYPE` are not,
-            because a membership can exist without an address and a club may not export a category
+            `FIRST_NAME`, `LAST_NAME` and `EMAIL` are required — a snapshot creates people, and this
+            product has no person without an address, so a source that cannot supply one could never
+            create anybody. `MEMBERSHIP_TYPE` is optional, because a club may not export a category
             at all. Two headers may not name the same field.
+
+            Requiring the column is not the same as requiring every cell: a row whose address is
+            empty fails on its own and the rest of the file resolves.
 
             A header is stored without its surrounding whitespace, because that is how it arrives
             from the file: a mapping kept with padding would name a column that never matches. Two
@@ -612,6 +619,14 @@ components:
           propertyNames: { minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
           maxProperties: 200
           additionalProperties: { type: string, format: uuid }
+        defaultMembershipTypeId:
+          type: string
+          format: uuid
+          description: |
+            What somebody created from this source becomes when the file does not say. A snapshot
+            creates people, and a person in this club holds exactly one kind of membership, so a
+            source with nothing to fall back on could create nobody. Where the export does carry a
+            category, its mapping wins and this fills the blanks.
         ownedFields:
           type: array
           uniqueItems: true
@@ -788,6 +803,43 @@ components:
             stays readable, and it is not what a later execution should use.
         createdAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time }
+
+    ImportRun:
+      type: object
+      required: [runId, sourceId, previewId, mode, fileHash, created, corrected, membershipsEnded,
+                 accountsDisabled, rolesRemoved, rowErrors, removalsConfirmed, executedAt]
+      properties:
+        runId: { type: string, format: uuid }
+        sourceId: { type: string, format: uuid }
+        previewId: { type: string, format: uuid }
+        mode: { $ref: "#/components/schemas/SnapshotMode" }
+        fileHash: { type: string }
+        created: { type: integer }
+        corrected: { type: integer }
+        membershipsEnded: { type: integer }
+        accountsDisabled:
+          type: integer
+          description: |
+            Accounts whose only role was `MEMBER` and which are therefore no longer able to sign in.
+            An account holding another role is never disabled by a snapshot, and no snapshot ever
+            enables one.
+        rolesRemoved:
+          type: integer
+          description: Accounts that kept another role and lost `MEMBER` only.
+        rowErrors: { type: integer }
+        removalsConfirmed: { type: boolean }
+        executedAt: { type: string, format: date-time }
+
+    ExecutionRequest:
+      type: object
+      properties:
+        confirmRemovals:
+          type: boolean
+          default: false
+          description: |
+            Required only when the preview reported `needsConfirmation`. It is a deliberate second
+            statement about one reviewed preview, not a setting: a truncated export is the accident
+            this exists to catch, and catching it is worth one extra click.
 
     MembershipTypeRequest:
       type: object
@@ -3401,6 +3453,89 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImportPreview" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/import/previews/{id}/execution:
+    post:
+      tags: [admin-import-runs]
+      operationId: executeImportPreview
+      summary: Apply exactly the change set that was reviewed.
+      description: |
+        The preview is the contract: what a board approved is what runs. Nothing is re-resolved and
+        nothing is re-read from the file, so a roster that moved between the preview and this
+        request cannot be written over by a change set that no longer describes it — if anybody the
+        preview would touch has changed since it was taken, the run is refused and nothing is
+        written.
+
+        The whole run is one transaction. A change set whose last row fails leaves nothing behind:
+        not a person, not a membership, not a reference.
+
+        Executions of one source serialise, so two boards pressing this at the same moment cannot
+        interleave. A successful run supersedes every preview of that source, including this one,
+        which is what makes re-executing a reviewed snapshot impossible rather than merely unwise.
+
+        Executing the same file twice changes nothing the second time. That is the property this
+        whole design exists for: a record is matched by its member number, so a second run finds
+        everybody it created the first time.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExecutionRequest" }
+      responses:
+        "200":
+          description: What the run did.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportRun" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources/{sourceId}/runs:
+    get:
+      tags: [admin-import-runs]
+      operationId: listImportRuns
+      summary: What this source has actually written, newest first.
+      description: |
+        The log outlives the previews it came from: it keeps the file's hash and the counts, and
+        never a copy of the roster. That is what an audit of *what was executed* needs, and it is
+        not personal data.
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ImportRun" }
         "400":
           $ref: "#/components/responses/Invalid"
         "401":

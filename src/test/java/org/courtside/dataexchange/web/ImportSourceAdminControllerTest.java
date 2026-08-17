@@ -30,11 +30,12 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
     private static final String COMPLETE = """
             {"sourceKey":"roster-system","displayName":"Membership system",
              "columns":{"Member number":"EXTERNAL_ID","First name":"FIRST_NAME",
-                        "Last name":"LAST_NAME"},
+                        "Last name":"LAST_NAME","Email":"EMAIL"},
              "membershipTypes":{"A":"%s"},
+             "defaultMembershipTypeId":"%s",
              "ownedFields":["FIRST_NAME","LAST_NAME"],
              "removalWarningPercent":10}
-            """.formatted(ACTIVE_TYPE);
+            """.formatted(ACTIVE_TYPE, ACTIVE_TYPE);
 
     @Autowired
     private WebApplicationContext context;
@@ -86,6 +87,7 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
                                  "columns":{"No.":"EXTERNAL_ID","Given":"FIRST_NAME",
                                             "Family":"LAST_NAME","Mail":"EMAIL"},
                                  "membershipTypes":{},
+                                 "defaultMembershipTypeId":"cccccccc-0000-0000-0000-000000000001",
                                  "ownedFields":["EMAIL"],
                                  "removalWarningPercent":25}
                                 """)
@@ -106,6 +108,7 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(create("""
                         {"sourceKey":"roster-system","displayName":"Membership system",
                          "columns":{"First name":"FIRST_NAME","Last name":"LAST_NAME"},
+                         "defaultMembershipTypeId":"cccccccc-0000-0000-0000-000000000001",
                          "removalWarningPercent":10}
                         """))
                 .andExpect(status().isBadRequest())

@@ -10,6 +10,7 @@ import org.courtside.dataexchange.internal.ImportPreview;
 import org.courtside.dataexchange.internal.ImportPreviewRepository;
 import org.courtside.dataexchange.internal.ImportProperties;
 import org.courtside.dataexchange.internal.PersonFingerprint;
+import org.courtside.dataexchange.internal.PreviewContent;
 import org.courtside.dataexchange.internal.SnapshotParser;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -60,7 +61,7 @@ public class PreviewService {
         supersedeEarlierPreviewsOf(sourceId, now);
         ImportPreview preview = previews.save(new ImportPreview(sourceId, requested,
                 requiredFileName(fileName), PersonFingerprint.sha256(content), snapshot.rows().size(),
-                write(new StoredContent(resolved, snapshot.ignoredColumns())),
+                write(new PreviewContent(resolved, snapshot.ignoredColumns())),
                 write(fingerprintsOf(resolved, roster)), resolved.removals().count(),
                 resolved.removals().percent(), configuration.removalWarningPercent(), now,
                 requiredAccountId(accountId), now.plus(properties.previewRetention())));
@@ -134,8 +135,8 @@ public class PreviewService {
     // What the document promises past the retention is the row, its hash and its counts, so an
     // expired preview answers without the change set even before the sweep has reached its row.
     private PreviewSummary toSummary(ImportPreview preview) {
-        StoredContent stored = preview.hasExpiredBy(clock.instant())
-                ? new StoredContent(null, List.of())
+        PreviewContent stored = preview.hasExpiredBy(clock.instant())
+                ? new PreviewContent(null, List.of())
                 : read(preview.getChangeSet());
         return new PreviewSummary(preview.getId(), preview.getSourceId(), preview.getMode(),
                 preview.getFileName(), preview.getFileHash(), preview.getRowCount(),
@@ -155,10 +156,10 @@ public class PreviewService {
         return json.writeValueAsString(value);
     }
 
-    private StoredContent read(String changeSet) {
+    private PreviewContent read(String changeSet) {
         return changeSet == null
-                ? new StoredContent(null, List.of())
-                : json.readValue(changeSet, StoredContent.class);
+                ? new PreviewContent(null, List.of())
+                : json.readValue(changeSet, PreviewContent.class);
     }
 
     private static SnapshotMode requiredMode(SnapshotMode mode) {
@@ -189,8 +190,5 @@ public class PreviewService {
             throw new IllegalStateException("A preview records the account that took it");
         }
         return accountId;
-    }
-
-    private record StoredContent(ResolvedChangeSet changeSet, List<String> ignoredColumns) {
     }
 }

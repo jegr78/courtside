@@ -26,11 +26,17 @@ public final class ChangeSetResolver {
         requireUsableMembershipTypes(snapshot, configuration, roster);
         List<ResolvedChangeSet.PersonChange> changes = new ArrayList<>();
         List<ResolvedChangeSet.PossibleDuplicate> duplicates = new ArrayList<>();
+        List<ResolvedChangeSet.RowError> rowErrors = new ArrayList<>(errorsOf(snapshot));
         Set<String> present = new HashSet<>();
         for (CsvSnapshot.SnapshotRow row : snapshot.rows()) {
             present.add(row.externalId());
             UUID personId = roster.personIdsByExternalId().get(row.externalId());
             if (personId == null) {
+                if (hasNoAddress(row)) {
+                    rowErrors.add(new ResolvedChangeSet.RowError(row.rowNumber(),
+                            "import.snapshot.row.emailMissing", Map.of()));
+                    continue;
+                }
                 changes.add(creationOf(row, configuration));
                 duplicateOf(row, roster).ifPresent(duplicates::add);
             } else {
@@ -39,7 +45,7 @@ public final class ChangeSetResolver {
         }
         List<ResolvedChangeSet.PersonChange> endings = endingsFor(mode, present, roster);
         changes.addAll(endings);
-        return new ResolvedChangeSet(changes, errorsOf(snapshot), duplicates,
+        return new ResolvedChangeSet(changes, rowErrors, duplicates,
                 removalsOf(endings.size(), roster));
     }
 
@@ -172,7 +178,9 @@ public final class ChangeSetResolver {
     private static UUID membershipTypeOf(CsvSnapshot.SnapshotRow row,
                                          SourceConfiguration configuration) {
         String value = row.values().get(CanonicalField.MEMBERSHIP_TYPE);
-        return value == null || value.isBlank() ? null : configuration.membershipTypes().get(value);
+        return value == null || value.isBlank()
+                ? configuration.defaultMembershipTypeId()
+                : configuration.membershipTypes().get(value);
     }
 
     private static List<ResolvedChangeSet.RowError> errorsOf(CsvSnapshot snapshot) {
@@ -180,6 +188,11 @@ public final class ChangeSetResolver {
                 .map(error -> new ResolvedChangeSet.RowError(error.rowNumber(), error.code(),
                         error.params()))
                 .toList();
+    }
+
+    private static boolean hasNoAddress(CsvSnapshot.SnapshotRow row) {
+        String email = row.values().get(CanonicalField.EMAIL);
+        return email == null || email.isBlank();
     }
 
     private static String nullSafe(String value) {

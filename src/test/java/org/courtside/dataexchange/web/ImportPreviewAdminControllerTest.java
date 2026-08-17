@@ -39,14 +39,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
 
+    private static final UUID ACTIVE_TYPE =
+            UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+
     private static final UUID MEMBERSHIP_TYPE_ID =
             UUID.fromString("cccccccc-0000-0000-0000-000000000001");
 
     private static final String THREE_ROWS = """
-            Member number,First name,Last name
-            4711,Jane,Doe
-            4712,John,Roe
-            4713,Mary,Major
+            Member number,First name,Last name,Email
+            4711,Jane,Doe,jane.doe@example.org
+            4712,John,Roe,john.roe@example.org
+            4713,Mary,Major,mary.major@example.org
             """;
 
     @Autowired
@@ -77,8 +80,9 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
         source = sources.create("roster-system", "Membership system",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
-                        "Last name", CanonicalField.LAST_NAME),
-                Map.of(), Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
+                        "Last name", CanonicalField.LAST_NAME,
+                        "Email", CanonicalField.EMAIL),
+                Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
         Person admin = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
         accounts.save(new UserAccount(admin, "admin", "hash", Set.of(Role.ADMIN)));
     }
@@ -145,7 +149,8 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                         .value("urn:courtside:error:import-snapshot-unreadable"))
                 .andExpect(jsonPath("$.violations[0].code")
                         .value("import.snapshot.header.missingField"))
-                .andExpect(jsonPath("$.violations[0].params.missing[0]").value("EXTERNAL_ID"));
+                .andExpect(jsonPath("$.violations[0].params.missing")
+                        .value(org.hamcrest.Matchers.containsInAnyOrder("EMAIL", "EXTERNAL_ID")));
     }
 
     @Test
@@ -153,9 +158,9 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
     void givenARowThatCannotBeRead_whenPreviewing_thenTheOtherRowsStillResolve() throws Exception {
         // when / then
         mockMvc.perform(upload("""
-                        Member number,First name,Last name
+                        Member number,First name,Last name,Email
                         4711,Jane
-                        4712,John,Roe
+                        4712,John,Roe,john.roe@example.org
                         """, "FULL_SNAPSHOT"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.rowCount").value(1))
@@ -173,7 +178,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
         UUID jane = memberLinkedAs("4711", "Jane", "Doe");
 
         // when / then
-        mockMvc.perform(upload("Member number,First name,Last name\n4712,John,Roe\n", "FULL_SNAPSHOT"))
+        mockMvc.perform(upload("Member number,First name,Last name,Email\n4712,John,Roe,john.roe@example.org\n", "FULL_SNAPSHOT"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.removals.count").value(1))
                 .andExpect(jsonPath("$.removals.currentlyLinked").value(1))
@@ -191,7 +196,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
         memberLinkedAs("4711", "Jane", "Doe");
 
         // when / then
-        mockMvc.perform(upload("Member number,First name,Last name\n4712,John,Roe\n", "UPDATE_ONLY"))
+        mockMvc.perform(upload("Member number,First name,Last name,Email\n4712,John,Roe,john.roe@example.org\n", "UPDATE_ONLY"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.removals.count").value(0))
                 .andExpect(jsonPath("$.needsConfirmation").value(false));
@@ -205,7 +210,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
         UUID jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org")).getId();
 
         // when / then
-        mockMvc.perform(upload("Member number,First name,Last name\n4711,Jane,Doe\n", "FULL_SNAPSHOT"))
+        mockMvc.perform(upload("Member number,First name,Last name,Email\n4711,Jane,Doe,jane.doe@example.org\n", "FULL_SNAPSHOT"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.changes[0].kind").value("CREATE"))
                 .andExpect(jsonPath("$.possibleDuplicates.length()").value(1))
@@ -218,8 +223,8 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // when / then
         mockMvc.perform(upload("""
-                        Member number,First name,Last name,IBAN
-                        4711,Jane,Doe,XX00
+                        Member number,First name,Last name,Email,IBAN
+                        4711,Jane,Doe,jane.doe@example.org,XX00
                         """, "FULL_SNAPSHOT"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.ignoredColumns.length()").value(1))

@@ -2,6 +2,7 @@ CREATE TABLE import_source (
     id                      uuid PRIMARY KEY,
     source_key              text        NOT NULL,
     display_name            text        NOT NULL,
+    default_membership_type_id uuid   NOT NULL REFERENCES membership_type,
     removal_warning_percent integer     NOT NULL,
     created_at              timestamptz NOT NULL,
     CONSTRAINT import_source_unique_key UNIQUE (source_key),

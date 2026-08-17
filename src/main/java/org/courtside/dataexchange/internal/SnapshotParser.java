@@ -26,7 +26,8 @@ import java.util.Set;
 public final class SnapshotParser {
 
     private static final Set<CanonicalField> REQUIRED_FIELDS = EnumSet.of(
-            CanonicalField.EXTERNAL_ID, CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME);
+            CanonicalField.EXTERNAL_ID, CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME,
+            CanonicalField.EMAIL);
     private static final byte[] BYTE_ORDER_MARK = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
     private SnapshotParser() {

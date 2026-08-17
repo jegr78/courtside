@@ -205,8 +205,9 @@ class ChangeSetResolverTest {
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
+                        "Email", CanonicalField.EMAIL,
                         "Category", CanonicalField.MEMBERSHIP_TYPE),
-                Map.of("A", ACTIVE_TYPE, "B", RETIRED_TYPE),
+                Map.of("A", ACTIVE_TYPE, "B", RETIRED_TYPE), ACTIVE_TYPE,
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10);
     }
 
@@ -225,6 +226,7 @@ class ChangeSetResolverTest {
         Map<CanonicalField, String> values = new java.util.EnumMap<>(CanonicalField.class);
         values.put(CanonicalField.FIRST_NAME, firstName);
         values.put(CanonicalField.LAST_NAME, lastName);
+        values.put(CanonicalField.EMAIL, "jane.doe@example.org");
         values.putAll(extra);
         return new CsvSnapshot.SnapshotRow(rowNumber, externalId, values);
     }
