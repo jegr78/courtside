@@ -981,9 +981,9 @@ export function validatePerformanceResult(result) {
 
 export function performanceBaselinePlan(result, currentContractDigest) {
   validatePerformanceResult(result);
-  if (result.profile.name !== "baseline" || result.profile.target !== "system"
+  if (!["baseline", "browser", "soak"].includes(result.profile.name) || result.profile.target !== "system"
       || result.profile.environment !== "PERFORMANCE") {
-    throw new Error("Only an authoritative PERFORMANCE baseline result can be promoted");
+    throw new Error("Only an authoritative PERFORMANCE reference result can be promoted");
   }
   if (result.contract.digest !== currentContractDigest) {
     throw new Error("The result uses a different performance contract");
@@ -1001,18 +1001,15 @@ export function performanceBaselinePlan(result, currentContractDigest) {
   };
 }
 
-export function comparePerformanceResults(candidate, baseline) {
+export function comparePerformanceResults(candidate, baseline, currentContractDigest) {
   validatePerformanceResult(candidate);
-  validatePerformanceResult(baseline);
-  if (candidate.contract.digest !== baseline.contract.digest) {
+  performanceBaselinePlan(baseline, currentContractDigest);
+  if (candidate.contract.digest !== currentContractDigest) {
     throw new Error("Performance results use different contracts");
-  }
-  if (!Object.values(baseline.thresholds).every(Boolean)) {
-    throw new Error("A baseline with failed thresholds cannot be used for comparison");
   }
   const dimensions = {
     profile: [candidate.profile.name, candidate.profile.workload, candidate.profile.target,
-      candidate.profile.environment],
+      candidate.profile.environment, candidate.profile.durationSeconds],
     runtime: [candidate.runtime.k6Version, candidate.runtime.operatingSystem, candidate.runtime.architecture],
     runner: candidate.runtime.runner,
     load: candidate.load,
@@ -1020,7 +1017,7 @@ export function comparePerformanceResults(candidate, baseline) {
   };
   const baselineDimensions = {
     profile: [baseline.profile.name, baseline.profile.workload, baseline.profile.target,
-      baseline.profile.environment],
+      baseline.profile.environment, baseline.profile.durationSeconds],
     runtime: [baseline.runtime.k6Version, baseline.runtime.operatingSystem, baseline.runtime.architecture],
     runner: baseline.runtime.runner,
     load: baseline.load,
@@ -1093,7 +1090,9 @@ function promotePerformanceBaseline(file) {
 function comparePerformanceFiles(options) {
   const candidate = JSON.parse(readFileSync(resolve(root, options.file), "utf8"));
   const baseline = JSON.parse(readFileSync(resolve(root, options.baseline), "utf8"));
-  const comparison = comparePerformanceResults(candidate, baseline);
+  const contractText = readFileSync(join(root, "performance", "contract.json"), "utf8");
+  const digest = `sha256:${createHash("sha256").update(contractText).digest("hex")}`;
+  const comparison = comparePerformanceResults(candidate, baseline, digest);
   const destination = resolve(root, options.output);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, `${JSON.stringify(comparison, null, 2)}\n`);

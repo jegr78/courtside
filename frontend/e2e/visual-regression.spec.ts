@@ -95,5 +95,6 @@ function dynamicDates(page: Page): Locator {
 
 async function stableScreenshot(page: Page, name: string, mask?: Locator): Promise<void> {
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot(name, { ...screenshotOptions, ...(mask ? { mask: [mask] } : {}) });
+  const masks = [page.locator("footer"), ...(mask ? [mask] : [])];
+  await expect(page).toHaveScreenshot(name, { ...screenshotOptions, mask: masks });
 }

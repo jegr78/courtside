@@ -116,10 +116,12 @@ Each row is deliberately about a material invariant rather than an individual te
 | UI-3 | P2 | Medium | Layout, localization and interaction remain usable at supported viewports and content extremes. | Supported mobile, tablet and desktop layouts work in both themes and locales. | Long content and empty, single or many-court states do not hide or block interaction. | React, E2E | PR, periodic | Chromium plus supported matrix | Deterministic visual dataset | Semantic assertions and reviewed pixel baselines | Frontend | Broad locale, theme and viewport captures remain diagnostic; seven principal surfaces have blocking stable baselines. |
 
 The blocking Chromium pixel suite fixes locale, theme, viewport, journey data, fonts, animations,
-caret rendering, and dynamic-field masks. It covers the court plan, booking and validation dialogs,
-personal bookings, series preview, and both administration surfaces. A deliberate UI change updates
-these files with `npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots`;
-the pull request must expose the changed PNG baselines for review. Unreviewed
+caret rendering, and dynamic-field masks. Build identity is masked, while separate Darwin and Linux
+baselines retain platform rendering differences. It covers the court plan, booking and validation
+dialogs, personal bookings, series preview, and both administration surfaces. A deliberate UI change
+updates these files on both supported baseline hosts with
+`npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots`; the pull
+request must expose the changed PNG baselines for review. Unreviewed
 dimension-only screenshots remain diagnostic artifacts and never replace these assertions.
 
 ### Operations and release

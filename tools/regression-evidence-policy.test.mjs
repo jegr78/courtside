@@ -15,15 +15,18 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
     assert.match(visual, new RegExp(`\\"${surface}\\.png\\"`));
   }
   assert.equal(existsSync(snapshots), true);
-  assert.equal(readdirSync(snapshots).filter((file) => file.endsWith(".png")).length, 7);
+  const reviewed = readdirSync(snapshots).filter((file) => file.endsWith(".png"));
+  assert.equal(reviewed.filter((file) => file.endsWith("-darwin.png")).length, 7);
+  assert.equal(reviewed.filter((file) => file.endsWith("-linux.png")).length, 7);
 });
 
 test("given visual baselines, when running them on different hosts, then their path and rendering controls stay deterministic", () => {
-  assert.match(playwright, /snapshotPathTemplate/);
+  assert.match(playwright, /snapshotPathTemplate:.*\{platform\}/);
   assert.match(visual, /animations: "disabled"/);
   assert.match(visual, /caret: "hide"/);
   assert.match(visual, /document\.fonts\.ready/);
   assert.match(visual, /mask:/);
+  assert.match(visual, /page\.locator\("footer"\)/);
 });
 
 test("given retained browser diagnostics, when linting after a failed run, then generated trace sources are excluded", () => {
