@@ -93,17 +93,49 @@ test("given the upgrade verifier, when it is inspected, then representative row 
   }
   assert.doesNotMatch(verification, /SELECT id::text AS value/);
   assert.doesNotMatch(verification, /md5\(string_agg/);
-  assert.match(verification, /md5\(a\.password_hash\)/);
 });
 
-test("given the proof it writes as evidence, when a run compares it, then only losses fail the run", () => {
+test("given the proof captures whole rows, when a column is secret-sounding, then one rule redacts it", () => {
+  // given
+  const verification = readFileSync(fileURLToPath(new URL("../upgrade/verify.sql", import.meta.url)), "utf8");
+
+  // when
+  const rules = verification.match(/key ~\* '\([^']+\)'/g) ?? [];
+
+  // then
+  assert.equal(rules.length, 1, "the redaction must exist once, not once per captured table");
+  for (const name of ["password", "secret", "token", "credential", "hash", "key"]) {
+    assert.match(rules[0], new RegExp(`\\b${name}\\b`), name);
+  }
+  const captured = [...verification.matchAll(/SELECT '(\w+)',/g)].map((match) => match[1]);
+  const served = [...verification.matchAll(/FROM redacted WHERE name = '(\w+)'/g)]
+    .map((match) => match[1]);
+  assert.deepEqual([...new Set(captured)].sort(), [...new Set(served)].sort(),
+    "every captured table is served through the redaction, and none bypasses it");
+});
+
+test("given the restore proof, when it is produced, then it reads the same file and stays strict", () => {
+  // given
+  const restoreRunner = readFileSync(
+    fileURLToPath(new URL("./courtside.restore-smoke.mjs", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(restoreRunner, /join\(root, "upgrade", "verify\.sql"\)/);
+  assert.match(restoreRunner, /assert\.deepEqual\(after, before/);
+  assert.doesNotMatch(restoreRunner, /unexplainedChanges/);
+});
+
+test("given a comparison that spans a migration, when a run makes it, then only losses fail the run", () => {
   // when / then
   assert.match(upgradeRunner, /unexplainedChanges\(JSON\.parse\(before\), JSON\.parse\(after\)\)/);
-  assert.match(upgradeRunner,
-    /unexplainedChanges\(JSON\.parse\(before\), JSON\.parse\(afterInterruption\)\)/);
-  assert.match(upgradeRunner,
-    /unexplainedChanges\(JSON\.parse\(before\), JSON\.parse\(afterRecoveryProof\)\)/);
-  assert.doesNotMatch(upgradeRunner, /assert\.equal\(after, before/);
+});
+
+test("given a comparison within one schema version, when a run makes it, then nothing may be added either", () => {
+  // when / then
+  assert.match(upgradeRunner, /assert\.equal\(afterInterruption, before/);
+  assert.match(upgradeRunner, /assert\.equal\(afterRecoveryProof, before/);
+  assert.doesNotMatch(upgradeRunner, /unexplainedChanges\([^)]*afterInterruption/);
+  assert.doesNotMatch(upgradeRunner, /unexplainedChanges\([^)]*afterRecoveryProof/);
 });
 
 test("given concurrent upgrade runs, when resources are named, then projects and ports are isolated", () => {
@@ -162,7 +194,7 @@ test("given a migration that loses a row, when comparing the proof, then the row
   const after = { memberRows: [{ id: "a" }] };
 
   // when / then
-  assert.deepEqual(unexplainedChanges(before, after), ["memberRows"]);
+  assert.deepEqual(unexplainedChanges(before, after), ["memberRows: 2 rows before, 1 after"]);
 });
 
 test("given a migration that changes a count, when comparing the proof, then the count is reported", () => {
