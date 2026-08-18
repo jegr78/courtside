@@ -138,13 +138,14 @@ public class ExecutionService {
         }
     }
 
+    // The threshold the preview was judged against, not today's: what a board reviewed is what it
+    // is asked to confirm.
     private void requireConfirmedRemovals(ImportPreview preview, boolean confirmRemovals) {
-        int threshold = sources.configurationOf(preview.getSourceId()).removalWarningPercent();
-        if (preview.getRemovalPercent() > threshold && !confirmRemovals) {
+        if (preview.needsConfirmation() && !confirmRemovals) {
             throw new RemovalsNeedConfirmationException("import.removals.needConfirmation",
                     Map.of("count", preview.getRemovalCount(),
                             "percent", preview.getRemovalPercent(),
-                            "threshold", threshold));
+                            "threshold", preview.getRemovalWarningPercent()));
         }
     }
 

@@ -267,8 +267,10 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
         // given
         memberLinkedAs("4711", "Jane", "Doe");
         memberLinkedAs("4712", "John", "Roe");
-        String body = mockMvc.perform(upload("Member number,First name,Last name\n4711,Jane,Doe\n",
-                        "FULL_SNAPSHOT"))
+        String body = mockMvc.perform(upload("""
+                        Member number,First name,Last name,Email
+                        4711,Jane,Doe,jane.doe@example.org
+                        """, "FULL_SNAPSHOT"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.removals.percent").value(50))
                 .andExpect(jsonPath("$.needsConfirmation").value(true))
@@ -278,8 +280,10 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
         sources.change(source, "roster-system", "Membership system",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
-                        "Last name", CanonicalField.LAST_NAME),
-                Map.of(), Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 90);
+                        "Last name", CanonicalField.LAST_NAME,
+                        "Email", CanonicalField.EMAIL),
+                Map.of(), ACTIVE_TYPE,
+                Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 90);
 
         // then
         mockMvc.perform(get("/api/admin/import/previews/{id}", (String) JsonPath.read(body, "$.previewId")))

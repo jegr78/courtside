@@ -30,9 +30,9 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
             UUID.fromString("cccccccc-0000-0000-0000-000000000001");
 
     private static final String TWO_ROWS = """
-            Member number,First name,Last name
-            4711,Janet,Doe
-            4712,John,Roe
+            Member number,First name,Last name,Email
+            4711,Janet,Doe,jane.doe@example.org
+            4712,John,Roe,john.roe@example.org
             """;
 
     @Autowired
@@ -68,8 +68,10 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
         source = sources.create("roster-system", "Membership system",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
-                        "Last name", CanonicalField.LAST_NAME),
-                Map.of(), Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
+                        "Last name", CanonicalField.LAST_NAME,
+                        "Email", CanonicalField.EMAIL),
+                Map.of(), MEMBERSHIP_TYPE_ID,
+                Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
         Person admin = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
         account = accounts.save(new UserAccount(admin, "admin", "hash", Set.of(Role.ADMIN))).getId();
     }
