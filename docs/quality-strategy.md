@@ -131,6 +131,15 @@ therefore holds on every machine with Docker, `mvn verify` compares pixels where
 red run means a regression rather than a different operating system. There is exactly one PNG per
 surface and no platform suffix.
 
+The WebKit projects draw in the same image, so no runner installs WebKit or its system libraries and
+`mvn verify` installs Chromium alone, without distribution packages. A project declares where it
+renders with `metadata.pinnedBrowser`. The container reaches the application under a hostname rather
+than `127.0.0.1`, and that origin is not a secure context: `crypto.subtle`, `navigator.serviceWorker`
+and `crypto.randomUUID` are withheld from it. The PWA and service-worker journeys therefore stay on
+the host browser, while the WebKit gate covers the club that serves Courtside without TLS, down to a
+booking whose idempotency key comes from the fallback generator. The browser server carries no
+authentication, so its endpoint path is an unguessable per-run value and it accepts one client.
+
 A deliberate UI change updates the baselines the same way anywhere:
 `npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots`, then
 commit what changed. The suite pins `updateSnapshots: "missing"`; the values nobody may reach are

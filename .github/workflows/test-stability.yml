@@ -56,7 +56,7 @@ jobs:
           ./mvnw -B package -DskipTests
           cd frontend
           npm ci --ignore-scripts
-          npx playwright install --with-deps chromium webkit
+          npx playwright install chromium
       - name: Prove browser isolation with two workers
         working-directory: frontend
         run: |

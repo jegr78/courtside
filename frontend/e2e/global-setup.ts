@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
 import { appendFileSync, cpSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -169,18 +170,14 @@ export const journeyDate = dayAfterInBerlin(journeyInstant);
 export interface JourneyService {
   baseURL: string;
   visualDate: string;
-  pinnedBrowser(): Promise<PinnedBrowser>;
+  pinnedBrowser(): Promise<string>;
+  containerBaseURL(): Promise<string>;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): void;
   reset(): Promise<void>;
   restart(): Promise<void>;
   stop(): Promise<void>;
-}
-
-export interface PinnedBrowser {
-  wsEndpoint: string;
-  baseURL: string;
 }
 
 export interface DatabaseLock {
@@ -238,6 +235,7 @@ export async function startJourneyService(): Promise<JourneyService> {
   let application: ChildProcess | undefined;
   let staticDirectory: string | undefined;
   let browserServer: StartedTestContainer | undefined;
+  let browserPath = "/";
   try {
     const visualDate = journeyDate;
     const port = await availableLoopbackPort();
@@ -342,25 +340,31 @@ export async function startJourneyService(): Promise<JourneyService> {
     await startApplication();
     await seedJourneyData(postgres, visualDate);
     const tables = await snapshotJourneyData(postgres);
-    // Pixel baselines are only comparable across machines when the renderer is the same one, so
-    // the visual suite draws in this image rather than in whatever browser the host happens to run.
-    const startPinnedBrowser = async (): Promise<PinnedBrowser> => {
+    // The host tunnel must exist before the browser container is created: Testcontainers gives
+    // host.testcontainers.internal only to containers it starts afterwards.
+    const startPinnedBrowser = async (): Promise<string> => {
       if (!browserServer) {
         await TestContainers.exposeHostPorts(port);
+        // Docker publishes the mapped port on every interface and run-server has no authentication,
+        // so the unguessable endpoint path is what keeps a reachable port from being a browser.
+        browserPath = `/${randomUUID()}`;
         browserServer = await new GenericContainer(PINNED_BROWSER_IMAGE)
-          .withCommand(["npx", "playwright", "run-server", "--port", "3000", "--host", "0.0.0.0"])
+          .withCommand(["npx", "playwright", "run-server", "--port", "3000", "--host", "0.0.0.0",
+            "--path", browserPath, "--max-clients", "1"])
           .withExposedPorts(3000)
           .start();
       }
-      return {
-        wsEndpoint: `ws://${browserServer.getHost()}:${browserServer.getMappedPort(3000)}/`,
-        baseURL: `http://host.testcontainers.internal:${port}`
-      };
+      return `ws://${browserServer.getHost()}:${browserServer.getMappedPort(3000)}${browserPath}`;
+    };
+    const containerBaseURL = async (): Promise<string> => {
+      await TestContainers.exposeHostPorts(port);
+      return `http://host.testcontainers.internal:${port}`;
     };
     return {
       baseURL,
       visualDate,
       pinnedBrowser: startPinnedBrowser,
+      containerBaseURL,
       executeSql,
       holdDatabaseLock,
       publishServiceWorkerUpdate: () => {

@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
+const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync(join(repository, "frontend/playwright.config.ts"), "utf8");
 const pom = readFileSync(join(repository, "pom.xml"), "utf8");
 const stability = readFileSync(join(repository, ".github/workflows/test-stability.yml"), "utf8");
@@ -13,9 +14,10 @@ const documentation = readFileSync(join(repository, "docs/browser-pwa-testing.md
 
 test("given supported desktop browsers, when qualifying a pull request, then Chromium and WebKit run core smoke journeys", () => {
   assert.match(playwright, /name: "chromium"/);
-  assert.match(playwright, /name: "webkit-core"/);
   assert.match(playwright, /supported-browser\\\.spec\\\.ts/);
-  assert.match(pom, /playwright install --with-deps chromium webkit/);
+  assert.match(pom, /playwright install chromium/);
+  assert.match(playwright, /name: "webkit-core".*metadata: \{ pinnedBrowser: true \}/);
+  assert.match(fixtures, /project\.metadata\.pinnedBrowser === true/);
 });
 
 test("given periodic browser qualification, when the stability workflow runs, then Firefox and mobile devices produce evidence", () => {

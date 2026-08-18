@@ -4,6 +4,7 @@ import test from "node:test";
 
 const accessibility = readFileSync("e2e/accessibility.spec.ts", "utf8");
 const documentation = readFileSync("../docs/accessibility-testing.md", "utf8");
+const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync("playwright.config.ts", "utf8");
 const pom = readFileSync("../pom.xml", "utf8");
 
@@ -11,9 +12,11 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.match(accessibility, /wcag22aa/);
   assert.match(accessibility, /initial password change is operable using only the keyboard/);
   assert.match(accessibility, /a booking is operable using only the keyboard/);
-  assert.match(playwright, /name: "webkit-accessibility"/);
+  assert.match(playwright, /name: "webkit-accessibility".*metadata: \{ pinnedBrowser: true \}/);
   assert.match(playwright, /testMatch: \/accessibility\\\.spec/);
-  assert.match(pom, /exec -- playwright install --with-deps chromium webkit/);
+  // WebKit draws in the pinned image, so the runner installs Chromium only.
+  assert.match(pom, /exec -- playwright install chromium/);
+  assert.match(fixtures, /project\.metadata\.pinnedBrowser === true/);
 });
 
 test("given automation cannot decide assistive-technology usability, when qualifying a release, then the manual evidence stays explicit", () => {

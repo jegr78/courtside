@@ -204,7 +204,7 @@ function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking:
     try { await api.moveSeries(booking.seriesId!, request); await completed(); }
     catch (failure) { setError(problemMessage(failure, t)); }
   }
-  return <Modal labelledBy="move-personal-title" closed={closed}><div className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
+  return <Modal labelledBy="move-personal-title" closed={closed}><div data-testid="move-dialog" className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
     <h2 id="move-personal-title" className="text-xl font-bold">{t("myBookings.moveTitle")}</h2>
     <ScopeFields scope={scope} changed={(value) => { setScope(value); setPreview(undefined); }} t={t} />
     <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<input data-testid="move-start-time" type="time" value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
