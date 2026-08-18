@@ -67,6 +67,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/public/participant-cards",
             "/api/public/participant-members",
             "/api/my/bookings",
+            "/api/my/participations",
+            "/api/my/participations/{bookingId}",
             "/api/managed/bookings",
             "/api/managed/bookings/{id}",
             "/api/bookings",

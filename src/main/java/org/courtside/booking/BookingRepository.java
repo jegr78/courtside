@@ -125,6 +125,25 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                                      @Param("cursor") UUID cursor,
                                      Pageable pageable);
 
+    @Query("""
+            SELECT b.id FROM Booking b
+            WHERE EXISTS (SELECT p.id FROM BookingParticipant p
+                          WHERE p.booking = b AND p.personId = :personId)
+              AND (b.bookedBy IS NULL OR b.bookedBy <> :accountId)
+              AND (:cursor IS NULL
+                OR (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
+                    < (SELECT min(ca.startsAt) FROM CourtAllocation ca WHERE ca.booking.id = :cursor)
+                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
+                    = (SELECT min(ca.startsAt) FROM CourtAllocation ca WHERE ca.booking.id = :cursor)
+                    AND b.id < :cursor))
+            ORDER BY (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b) DESC,
+                     b.id DESC
+            """)
+    List<UUID> findParticipationIds(@Param("personId") UUID personId,
+                                    @Param("accountId") UUID accountId,
+                                    @Param("cursor") UUID cursor,
+                                    Pageable pageable);
+
     @EntityGraph(attributePaths = "allocations")
     List<Booking> findAllByIdIn(Collection<UUID> ids);
 

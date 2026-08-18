@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type BookingGrid, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail, type ManagedAppointmentPage, type MovePreview, type MoveRequest, type PersonalBooking, type PublicCourt } from "../api/client";
+import { api, type BookingGrid, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail, type ManagedAppointmentPage, type MovePreview, type MoveRequest, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -15,6 +15,7 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
   const [reference] = useState(() => now ?? new Date());
   const [bookings, setBookings] = useState<PersonalBooking[]>([]);
   const [managed, setManaged] = useState<ManagedAppointment[]>([]);
+  const [participations, setParticipations] = useState<Participation[]>([]);
   const [courts, setCourts] = useState<PublicCourt[]>([]);
   const [grid, setGrid] = useState<BookingGrid>();
   const [nextCursor, setNextCursor] = useState<string>();
@@ -29,12 +30,13 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [page, managedPage, availableCourts, bookingGrid] = await Promise.all([
+      const [page, managedPage, participationPage, availableCourts, bookingGrid] = await Promise.all([
         api.personalBookings(), showManaged ? api.managedAppointments() : Promise.resolve<ManagedAppointmentPage>({ items: [] }),
-        api.courts(), api.bookingGrid()
+        api.participations(), api.courts(), api.bookingGrid()
       ]);
       setBookings(page.items);
       setManaged(managedPage.items);
+      setParticipations(participationPage.items);
       setNextCursor(page.nextCursor ?? undefined);
       setManagedNextCursor(managedPage.nextCursor ?? undefined);
       setCourts(availableCourts);
@@ -103,9 +105,50 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
       <div className="mt-4"><BookingSection testId="managed-bookings" title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={setAction} t={t} /></div>
       {managedNextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
     </section>}
+    {!loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={load} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={(action.managed ? managed : bookings).filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={(action.managed ? managedNextCursor : nextCursor) !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
     {action?.kind === "detail" && <ManagedAppointmentDialog bookingId={action.booking.id} closed={() => setAction(undefined)} />}
+  </section>;
+}
+
+function ParticipationSection({ participations, courtNames, locale, timeZone, withdrawn, t }: {
+  participations: Participation[]; courtNames: Map<string, string>; locale: string; timeZone: string;
+  withdrawn: () => Promise<void>; t: Translate;
+}) {
+  const [leaving, setLeaving] = useState<string>();
+  const [error, setError] = useState<string>();
+
+  async function withdraw(bookingId: string) {
+    setLeaving(bookingId);
+    try {
+      await api.withdrawParticipation(bookingId);
+      setError(undefined);
+      await withdrawn();
+    } catch (failure) {
+      setError(problemMessage(failure, t));
+    } finally {
+      setLeaving(undefined);
+    }
+  }
+
+  return <section className="border-structural mt-10 border-t pt-8" aria-labelledby="participations-title">
+    <h2 id="participations-title" data-testid="participations-title" className="text-2xl font-bold">{t("participations.title")}</h2>
+    <p className="text-muted mt-2">{t("participations.description")}</p>
+    {error && <Alert>{error}</Alert>}
+    <div data-testid="participations" className="mt-4">
+      {participations.length === 0 ? <p className="text-muted">{t("participations.empty")}</p>
+        : <ul className="grid gap-3">{participations.map((participation) =>
+          <li key={participation.id} data-testid={`participation-${participation.id}`} data-status={participation.status} className="border-structural grid gap-1 rounded-xl border p-4">
+            <span className="font-semibold">{participation.cardLabel}</span>
+            <time dateTime={participation.startsAt}>{formatDateTime(participation.startsAt, locale, timeZone)}</time>
+            <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
+            {participation.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
+            <div className="pt-1">
+              <Button data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
+            </div>
+          </li>)}</ul>}
+    </div>
   </section>;
 }
 

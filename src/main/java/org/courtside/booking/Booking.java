@@ -104,6 +104,10 @@ public class Booking {
         return List.copyOf(allocations);
     }
 
+    public boolean withdrawParticipant(UUID personId) {
+        return participants.removeIf(participant -> personId.equals(participant.getPersonId()));
+    }
+
     public void addParticipant(ParticipantSpec spec) {
         participants.add(new BookingParticipant(this, spec, participants.size() + 1));
     }
