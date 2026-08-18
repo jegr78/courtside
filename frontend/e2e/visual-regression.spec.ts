@@ -54,7 +54,7 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await expect(page.getByTestId("move-preview")).toBeVisible();
 
   // then
-  await stableScreenshot(page.getByRole("dialog"), "series-preview.png",
+  await stableScreenshot(page.getByTestId("move-dialog"), "series-preview.png",
     page.getByTestId("move-preview").locator("li p"));
 });
 
