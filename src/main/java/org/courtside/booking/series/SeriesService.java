@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingRuleCheck;
@@ -97,10 +98,15 @@ public class SeriesService {
         requireCardDoesNotTrackPlayers(card);
         facility.requireBookableCourts(rule.courtIds());
         SeriesSchedule.Expansion expansion = expandWithinLimit(rule);
-        List<SeriesPreview.Occurrence> occurrences = expansion.slots().stream()
-                .map(slot -> new SeriesPreview.Occurrence(slot, blockedCourts(rule, slot),
-                        ruleGate.violationsFor(new BookingRuleCheck(rule.courtIds(), rule.cardId(),
-                                slot, bookedBy, bookedByPersonId, callerRoles))))
+        List<BookingRuleCheck> checks = expansion.slots().stream()
+                .map(slot -> new BookingRuleCheck(rule.courtIds(), rule.cardId(), slot,
+                        bookedBy, bookedByPersonId, callerRoles))
+                .toList();
+        List<List<RuleViolation>> violations = ruleGate.violationsFor(checks);
+        List<SeriesPreview.Occurrence> occurrences = IntStream.range(0, expansion.slots().size())
+                .mapToObj(index -> new SeriesPreview.Occurrence(
+                        expansion.slots().get(index), blockedCourts(rule, expansion.slots().get(index)),
+                        violations.get(index)))
                 .toList();
         return new SeriesPreview(occurrences, expansion.truncatedByHorizon(), expansion.horizonLimit());
     }
@@ -183,8 +189,12 @@ public class SeriesService {
                 .toList();
         List<ParticipantCardCapacity.Target> targets = participantTargets(planned);
 
-        List<MovePreview.Move> moves = planned.stream()
-                .map(move -> toPreviewMove(move, planned, movingIds, targets))
+        List<List<RuleViolation>> ruleViolations = ruleGate.nonOverridableViolationsFor(
+                planned.stream().map(move -> ownerCheck(
+                        move.courts(), move.cardId(), move.to(), move.bookedBy())).toList());
+        List<MovePreview.Move> moves = IntStream.range(0, planned.size())
+                .mapToObj(index -> toPreviewMove(
+                        planned.get(index), planned, movingIds, targets, ruleViolations.get(index)))
                 .toList();
 
         return new MovePreview(moves);
@@ -214,10 +224,15 @@ public class SeriesService {
                         execution.booking().getId(), execution.booking().getParticipants(), execution.slot()))
                 .toList();
         List<UUID> movingIds = movingBookingIds(executions);
+        executions.forEach(execution -> facility.requireBookableCourts(execution.courtIds()));
 
-        executions.forEach(execution -> {
-            facility.requireBookableCourts(execution.courtIds());
-            requireNoNonOverridableViolations(execution);
+        List<List<RuleViolation>> ruleViolations = ruleGate.nonOverridableViolationsFor(
+                executions.stream().map(execution -> ownerCheck(
+                        execution.courtIds(), execution.booking().getCardId(),
+                        execution.slot(), execution.booking().getBookedBy())).toList());
+        IntStream.range(0, executions.size()).forEach(index -> {
+            MoveExecution execution = executions.get(index);
+            requireNoViolations(ruleViolations.get(index));
             participantCardCapacity.requireAvailableForParticipants(
                     execution.booking().getParticipants(), execution.slot(), execution.booking().getId(),
                     movingIds, targets);
@@ -258,12 +273,6 @@ public class SeriesService {
         return new MoveExecution(booking, courtIds, move.to());
     }
 
-    private void requireNoNonOverridableViolations(MoveExecution execution) {
-        ruleGate.requireNoNonOverridableViolations(
-                execution.courtIds(), execution.booking().getCardId(), execution.slot(),
-                execution.booking().getBookedBy());
-    }
-
     private boolean isOverlap(DataIntegrityViolationException e) {
         String message = e.getMostSpecificCause().getMessage();
         return message != null && message.contains(OVERLAP_CONSTRAINT);
@@ -285,19 +294,29 @@ public class SeriesService {
 
     private MovePreview.Move toPreviewMove(PlannedMove move, List<PlannedMove> planned,
                                            List<UUID> movingIds,
-                                           List<ParticipantCardCapacity.Target> targets) {
+                                           List<ParticipantCardCapacity.Target> targets,
+                                           List<RuleViolation> ruleViolations) {
         Set<UUID> blocked = new LinkedHashSet<>(allocations.findOccupiedCourtsExcluding(
                 move.courts(), move.to().start(), move.to().end(), movingIds));
         blocked.addAll(conflictingCourts(move, planned));
         Booking booking = bookingRepository.findWithParticipantsById(move.bookingId()).orElseThrow();
-        List<RuleViolation> violations = new ArrayList<>(
-                ruleGate.nonOverridableViolationsFor(
-                        move.courts(), move.cardId(), move.to(), move.bookedBy()));
+        List<RuleViolation> violations = new ArrayList<>(ruleViolations);
         violations.addAll(participantCardCapacity.violationsFor(
                 booking.getParticipants(), move.to(), move.bookingId(), movingIds, targets));
         return new MovePreview.Move(move.bookingId(), move.from(), move.to(), List.copyOf(blocked),
                 facility.findUnbookableCourts(move.courts()),
                 violations);
+    }
+
+    private BookingRuleCheck ownerCheck(List<UUID> courtIds, UUID cardId,
+                                       TimeSlot slot, UUID bookedBy) {
+        return new BookingRuleCheck(courtIds, cardId, slot, bookedBy, null, Set.of());
+    }
+
+    private void requireNoViolations(List<RuleViolation> violations) {
+        if (!violations.isEmpty()) {
+            throw new BookingRulesViolatedException(violations);
+        }
     }
 
     private List<ParticipantCardCapacity.Target> participantTargets(List<PlannedMove> planned) {

@@ -7,12 +7,13 @@ import org.courtside.member.MemberService;
 import org.courtside.rules.RuleContext;
 import org.courtside.rules.RuleEngine;
 import org.courtside.rules.RuleViolation;
-import org.courtside.shared.TimeSlot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -29,24 +30,31 @@ public class BookingRuleGate {
                 : ruleEngine.evaluateNonOverridable(context);
     }
 
-    public List<RuleViolation> nonOverridableViolationsFor(List<UUID> courtIds, UUID cardId,
-                                                           TimeSlot slot, UUID bookedBy) {
-        return ruleEngine.evaluateNonOverridable(contextOf(ownerCheck(courtIds, cardId, slot, bookedBy)));
+    public List<List<RuleViolation>> violationsFor(List<BookingRuleCheck> checks) {
+        if (checks.isEmpty()) {
+            return List.of();
+        }
+        boolean restrictionsApply = restrictionsApplyTo(checks.getFirst());
+        if (checks.stream().anyMatch(check -> restrictionsApplyTo(check) != restrictionsApply)) {
+            throw new IllegalStateException("A rule evaluation batch must use one restriction mode");
+        }
+        Map<UUID, Optional<UUID>> membershipTypes = new HashMap<>();
+        List<RuleContext> contexts = checks.stream()
+                .map(check -> contextOf(check, membershipTypes))
+                .toList();
+        return restrictionsApply
+                ? ruleEngine.evaluate(contexts)
+                : ruleEngine.evaluateNonOverridable(contexts);
+    }
+
+    public List<List<RuleViolation>> nonOverridableViolationsFor(List<BookingRuleCheck> checks) {
+        return ruleEngine.evaluateNonOverridable(checks.stream()
+                .map(this::contextOf)
+                .toList());
     }
 
     public void requireNoViolations(BookingRuleCheck check) {
         requireEmpty(violationsFor(check));
-    }
-
-    public void requireNoNonOverridableViolations(List<UUID> courtIds, UUID cardId,
-                                                  TimeSlot slot, UUID bookedBy) {
-        requireEmpty(nonOverridableViolationsFor(courtIds, cardId, slot, bookedBy));
-    }
-
-    // A check without a person carries no membership.
-    private static BookingRuleCheck ownerCheck(List<UUID> courtIds, UUID cardId,
-                                               TimeSlot slot, UUID bookedBy) {
-        return new BookingRuleCheck(courtIds, cardId, slot, bookedBy, null, Set.of());
     }
 
     // An ADMIN overrides every restriction; only opening hours and the slot grid bind them too.
@@ -59,6 +67,15 @@ public class BookingRuleGate {
                 ? null
                 : members.membershipTypeIdOf(check.bookedByPersonId()).orElse(null);
 
+        return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
+                check.bookedBy(), membershipTypeId);
+    }
+
+    private RuleContext contextOf(BookingRuleCheck check, Map<UUID, Optional<UUID>> membershipTypes) {
+        UUID membershipTypeId = check.bookedByPersonId() == null
+                ? null
+                : membershipTypes.computeIfAbsent(
+                        check.bookedByPersonId(), members::membershipTypeIdOf).orElse(null);
         return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
                 check.bookedBy(), membershipTypeId);
     }

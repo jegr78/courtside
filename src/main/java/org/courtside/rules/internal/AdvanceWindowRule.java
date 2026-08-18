@@ -8,9 +8,11 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 public class AdvanceWindowRule implements BookingRule {
@@ -29,6 +31,18 @@ public class AdvanceWindowRule implements BookingRule {
     public List<RuleViolation> check(RuleContext context) {
         Optional<Integer> maxDays = ruleParameters.findIntParameter(
                 context.membershipTypeId(), RuleType.ADVANCE_WINDOW, "maxDays");
+        return check(context, maxDays);
+    }
+
+    @Override
+    public Prepared prepare() {
+        Map<UUID, Optional<Integer>> maxDaysByMembership = new HashMap<>();
+        return context -> check(context, maxDaysByMembership.computeIfAbsent(
+                context.membershipTypeId(), membershipTypeId -> ruleParameters.findIntParameter(
+                        membershipTypeId, RuleType.ADVANCE_WINDOW, "maxDays")));
+    }
+
+    private List<RuleViolation> check(RuleContext context, Optional<Integer> maxDays) {
         if (maxDays.isEmpty()) {
             return List.of();
         }
