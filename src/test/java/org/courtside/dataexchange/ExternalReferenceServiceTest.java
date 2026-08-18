@@ -1,10 +1,10 @@
 package org.courtside.dataexchange;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.util.Map;
 import java.util.Set;
@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(IdentityTestFixture.class)
 class ExternalReferenceServiceTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
@@ -25,7 +26,7 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
     private ImportSourceService sources;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identities;
 
     @Test
     void whenARecordIsLinkedToAPerson_thenThatPersonAnswersForItsExternalId() {
@@ -121,7 +122,7 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
 
         // then
         assertThat(personIdsOf(source)).isEmpty();
-        assertThat(persons.findById(jane)).isPresent();
+        assertThat(identities.personExists(jane)).isTrue();
     }
 
     @Test
@@ -183,7 +184,6 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
     }
 
     private UUID person(String firstName, String lastName) {
-        return persons.save(new Person(firstName, lastName,
-                firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org")).getId();
+        return identities.createPerson(firstName, lastName);
     }
 }
