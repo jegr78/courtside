@@ -36,7 +36,8 @@ class ImportSourceAdminController implements AdminImportApi {
     public ResponseEntity<ApiImportSource> createImportSource(ApiImportSourceRequest request) {
         SourceConfiguration created = sources.create(request.getSourceKey(),
                 request.getDisplayName(), columns(request), request.getMembershipTypes(),
-                ownedFields(request), request.getRemovalWarningPercent());
+                request.getDefaultMembershipTypeId(), ownedFields(request),
+                request.getRemovalWarningPercent());
         return ResponseEntity
                 .created(URI.create("/api/admin/import/sources/" + created.sourceId()))
                 .body(toResponse(created));
@@ -52,7 +53,8 @@ class ImportSourceAdminController implements AdminImportApi {
                                                               ApiImportSourceRequest request) {
         return ResponseEntity.ok(toResponse(sources.change(id, request.getSourceKey(),
                 request.getDisplayName(), columns(request), request.getMembershipTypes(),
-                ownedFields(request), request.getRemovalWarningPercent())));
+                request.getDefaultMembershipTypeId(), ownedFields(request),
+                request.getRemovalWarningPercent())));
     }
 
     @Override
@@ -85,7 +87,8 @@ class ImportSourceAdminController implements AdminImportApi {
         configuration.ownedFields().stream().sorted()
                 .forEach(field -> owned.add(ApiCanonicalField.fromValue(field.name())));
         return new ApiImportSource(configuration.sourceId(), configuration.sourceKey(),
-                configuration.displayName(), columns, configuration.membershipTypes(), owned,
+                configuration.displayName(), columns, configuration.membershipTypes(),
+                configuration.defaultMembershipTypeId(), owned,
                 configuration.removalWarningPercent());
     }
 }

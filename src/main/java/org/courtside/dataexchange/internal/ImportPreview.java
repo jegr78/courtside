@@ -90,6 +90,11 @@ public class ImportPreview {
         this.expiresAt = expiresAt;
     }
 
+    public void forget() {
+        this.changeSet = null;
+        this.fingerprints = null;
+    }
+
     public void supersedeOn(Instant supersededAt) {
         this.supersededAt = supersededAt;
     }

@@ -13,6 +13,8 @@ public interface ExternalReferenceRepository extends JpaRepository<ExternalRefer
 
     Optional<ExternalReference> findBySourceIdAndExternalId(UUID sourceId, String externalId);
 
+    List<ExternalReference> findBySourceIdAndExternalIdIn(UUID sourceId, Iterable<String> externalIds);
+
     List<ExternalReference> findBySourceId(UUID sourceId);
 
     boolean existsBySourceId(UUID sourceId);

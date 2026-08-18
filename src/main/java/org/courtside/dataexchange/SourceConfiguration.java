@@ -7,6 +7,7 @@ import java.util.UUID;
 public record SourceConfiguration(UUID sourceId, String sourceKey, String displayName,
                                   Map<String, CanonicalField> columns,
                                   Map<String, UUID> membershipTypes,
+                                  UUID defaultMembershipTypeId,
                                   Set<CanonicalField> ownedFields,
                                   int removalWarningPercent) {
 

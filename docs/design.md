@@ -37,8 +37,10 @@ roster whose disappearance needs confirming — and it can say which member numb
 for which person, which is what makes a second snapshot an update rather than a second set of
 people. A club can upload a snapshot and see exactly what it would change — every creation, every
 field of every update, every membership that would end, every row that could not be read and every
-creation that resembles somebody the roster already holds. Nothing is written by that: executing a
-reviewed preview is the part that is not built yet. `/actuator/health` is exposed. The
+creation that resembles somebody the roster already holds — and it can then execute exactly that
+reviewed change set, atomically, once per source at a time, refusing the run if anybody it would
+touch has changed in the meantime. What is still missing is the browser journey for it, accounts
+created from a snapshot, and export. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -50,8 +52,7 @@ configuration and facilities. The roster and the import sources are the exceptio
 the API and have no browser surface yet, so a board reaches them through the API alone.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
-container image scanning, the execution of a reviewed roster snapshot, reports and exports, and the
-self-service password reset of section 4 — an administrator hands out a new one-time password
+container image scanning, reports and exports, and the self-service password reset of section 4 — an administrator hands out a new one-time password
 through the roster instead.
 
 ---
@@ -836,8 +837,9 @@ available as CSV:
 
 Import and export:
 
-- **CSV member import** with column mapping, dry-run preview and a per-row error report.
-  This is what replaces today's manual re-keying from the external membership system.
+- **Repeatable snapshot synchronisation** replaces today's manual re-keying from the external
+  membership system. A club uploads its export, reviews what it would change, and executes exactly
+  that. Running the same file twice changes nothing the second time.
 - **A source** describes one system a club synchronises from and is configured once rather than
   chosen per file: which header holds which field, which category value means which membership
   type, which fields that source owns — a field it does not own is the club's own and no snapshot
@@ -857,6 +859,17 @@ Import and export:
   preview would no longer be what anybody reviewed. Above the source's own threshold, the share of
   its memberships that would end is flagged as needing a deliberate confirmation, which is what
   stands between a truncated export and a club that has lost half its roster.
+- **An execution applies the reviewed change set and nothing else.** It is one transaction — a
+  change set whose last row fails leaves no person, no membership and no reference behind — and if
+  anybody it would touch changed between the preview and the run, it is refused rather than writing
+  over a roster it no longer describes. Executions of one source serialise, and a successful one
+  supersedes every preview of that source, so a stale change set cannot be applied afterwards.
+- **A synchronisation can take a membership away; it can never hand one out.** When a membership
+  ends, an account that held `MEMBER` and nothing else is disabled and its sessions end; an account
+  holding another role keeps it and loses `MEMBER` only, so a card requiring `MEMBER` refuses it.
+  No snapshot ever enables an account, because a board disabled it for a reason no membership
+  system knows, and none can disable the club's own administration: an account holding `ADMIN`
+  keeps that role and stays enabled. An import cannot lock a club out of its instance.
 - **CSV export** for every list view in the admin backend, matching what existing booking
   systems offer today.
 - **Per-member JSON export** for subject access requests (section 11).

@@ -34,7 +34,9 @@ class ValidationMessageCoverageTest {
                     "MembershipTypeRuleSetInactiveException", "MembershipTypeInactiveException",
                     "RosterCursorUnknownException", "LastAdministratorException",
                     "ImportSourceInvalidException", "SnapshotHeaderInvalidException",
-                    "SnapshotBlockedException", "SnapshotFileNameInvalidException");
+                    "SnapshotBlockedException", "SnapshotFileNameInvalidException",
+                    "ImportPreviewStaleException", "ImportPreviewSupersededException",
+                    "ImportPreviewExpiredException", "RemovalsNeedConfirmationException");
 
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
             List.of("CodedDomainFailure", "InvalidOpeningWindowException",
@@ -54,7 +56,8 @@ class ValidationMessageCoverageTest {
         List<Pattern> patterns = new ArrayList<>();
         patterns.add(Pattern.compile("new\\s+RuleViolation\\(\\s*\"([^\"]+)\""));
         patterns.add(Pattern.compile(
-                "new\\s+CsvSnapshot\\.RowError\\(\\s*\\w+\\s*,\\s*\"([^\"]+)\""));
+                "new\\s+(?:CsvSnapshot|ResolvedChangeSet)\\.RowError\\(\\s*[\\w.()]+\\s*,"
+                        + "\\s*\n?\\s*\"([^\"]+)\""));
         CODE_CARRYING_EXCEPTION_SIMPLE_NAMES.forEach(name -> patterns.add(
                 Pattern.compile("new\\s+" + name + "\\(\\s*\"([^\"]+)\"")));
         patterns.add(Pattern.compile("\"code\"\\s*,\\s*\"([^\"]+)\"(?!\\s*\\+)"));

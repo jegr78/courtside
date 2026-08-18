@@ -340,7 +340,23 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("email"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Email"));
+                .andExpect(jsonPath("$.fieldErrors[0].code")
+                        .value(org.hamcrest.Matchers.oneOf("validation.Email", "validation.Pattern")));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAddressWithoutADottedDomain_whenAddingAPerson_thenTheContractAnswersFirst()
+            throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/roster")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(personBody("Mary", "Major", "mary.major@localhost"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("email"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
     }
 
     @Test

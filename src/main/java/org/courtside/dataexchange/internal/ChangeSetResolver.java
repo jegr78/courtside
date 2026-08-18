@@ -4,6 +4,7 @@ import org.courtside.dataexchange.CanonicalField;
 import org.courtside.dataexchange.ResolvedChangeSet;
 import org.courtside.dataexchange.SnapshotMode;
 import org.courtside.dataexchange.SourceConfiguration;
+import org.courtside.member.PersonFieldLimits;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -26,10 +27,17 @@ public final class ChangeSetResolver {
         requireUsableMembershipTypes(snapshot, configuration, roster);
         List<ResolvedChangeSet.PersonChange> changes = new ArrayList<>();
         List<ResolvedChangeSet.PossibleDuplicate> duplicates = new ArrayList<>();
+        List<ResolvedChangeSet.RowError> rowErrors = new ArrayList<>(errorsOf(snapshot));
         Set<String> present = new HashSet<>();
         for (CsvSnapshot.SnapshotRow row : snapshot.rows()) {
             present.add(row.externalId());
             UUID personId = roster.personIdsByExternalId().get(row.externalId());
+            ResolvedChangeSet.RowError unusable =
+                    unusableValueOf(row, configuration, personId == null);
+            if (unusable != null) {
+                rowErrors.add(unusable);
+                continue;
+            }
             if (personId == null) {
                 changes.add(creationOf(row, configuration));
                 duplicateOf(row, roster).ifPresent(duplicates::add);
@@ -39,7 +47,7 @@ public final class ChangeSetResolver {
         }
         List<ResolvedChangeSet.PersonChange> endings = endingsFor(mode, present, roster);
         changes.addAll(endings);
-        return new ResolvedChangeSet(changes, errorsOf(snapshot), duplicates,
+        return new ResolvedChangeSet(changes, rowErrors, duplicates,
                 removalsOf(endings.size(), roster));
     }
 
@@ -78,7 +86,7 @@ public final class ChangeSetResolver {
         if (!configuration.ownedFields().contains(CanonicalField.MEMBERSHIP_TYPE)) {
             return null;
         }
-        UUID requested = membershipTypeOf(row, configuration);
+        UUID requested = mappedMembershipTypeOf(row, configuration);
         if (requested == null || current == null) {
             return requested;
         }
@@ -169,8 +177,16 @@ public final class ChangeSetResolver {
         }
     }
 
+    // A creation must hold a type, so a file that names none falls back to the source's. An update
+    // must not: a blank cell says the file has nothing to say, not that this member changed category.
     private static UUID membershipTypeOf(CsvSnapshot.SnapshotRow row,
                                          SourceConfiguration configuration) {
+        UUID mapped = mappedMembershipTypeOf(row, configuration);
+        return mapped == null ? configuration.defaultMembershipTypeId() : mapped;
+    }
+
+    private static UUID mappedMembershipTypeOf(CsvSnapshot.SnapshotRow row,
+                                               SourceConfiguration configuration) {
         String value = row.values().get(CanonicalField.MEMBERSHIP_TYPE);
         return value == null || value.isBlank() ? null : configuration.membershipTypes().get(value);
     }
@@ -180,6 +196,28 @@ public final class ChangeSetResolver {
                 .map(error -> new ResolvedChangeSet.RowError(error.rowNumber(), error.code(),
                         error.params()))
                 .toList();
+    }
+
+    // A creation writes every field; an update writes only what the source owns, so a value this
+    // source would never write cannot stop the row.
+    private static ResolvedChangeSet.RowError unusableValueOf(CsvSnapshot.SnapshotRow row,
+                                                              SourceConfiguration configuration,
+                                                              boolean creation) {
+        for (CanonicalField field : List.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME,
+                CanonicalField.EMAIL)) {
+            if (!creation && !configuration.ownedFields().contains(field)) {
+                continue;
+            }
+            String value = row.values().get(field);
+            boolean usable = field == CanonicalField.EMAIL
+                    ? PersonFieldLimits.isUsableEmail(value)
+                    : PersonFieldLimits.isUsableName(value);
+            if (!usable) {
+                return new ResolvedChangeSet.RowError(row.rowNumber(),
+                        "import.snapshot.row.valueUnusable", Map.of("canonicalField", field.name()));
+            }
+        }
+        return null;
     }
 
     private static String nullSafe(String value) {

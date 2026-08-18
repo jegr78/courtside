@@ -32,7 +32,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when
         UUID id = sources.create("roster-system", "Membership system", columns,
-                Map.of("A", ACTIVE_TYPE), Set.of(FIRST_NAME, LAST_NAME), 10).sourceId();
+                Map.of("A", ACTIVE_TYPE), ACTIVE_TYPE, Set.of(FIRST_NAME, LAST_NAME), 10).sourceId();
 
         // then
         SourceConfiguration configuration = sources.configurationOf(id);
@@ -51,7 +51,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", withoutTheKey,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code")
                 .isEqualTo("import.source.columns.incomplete");
@@ -65,7 +65,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", ambiguous,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code")
                 .isEqualTo("import.source.columns.ambiguous");
@@ -75,7 +75,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
     void givenASourceThatWouldOwnTheKeyItIsMatchedBy_whenCreatingIt_thenItIsRefused() {
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", columns(),
-                Map.of(), Set.of(EXTERNAL_ID), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(EXTERNAL_ID), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code")
                 .isEqualTo("import.source.ownedFields.externalId");
@@ -88,7 +88,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", columns(),
-                Map.of("A", absent), Set.of(), 10))
+                Map.of("A", absent), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code")
                 .isEqualTo("import.source.membershipType.unknown");
@@ -97,11 +97,11 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
     @Test
     void givenAKeyAnotherSourceHolds_whenCreatingASecond_thenItIsAnsweredAsTaken() {
         // given
-        sources.create("roster-system", "Membership system", columns(), Map.of(), Set.of(), 10);
+        sources.create("roster-system", "Membership system", columns(), Map.of(), ACTIVE_TYPE, Set.of(), 10);
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Another system", columns(),
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceKeyTakenException.class);
     }
 
@@ -109,7 +109,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
     void givenAThresholdOutsideTheScale_whenCreatingTheSource_thenItIsRefused() {
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", columns(),
-                Map.of(), Set.of(), 101))
+                Map.of(), ACTIVE_TYPE, Set.of(), 101))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code")
                 .isEqualTo("import.source.removalWarningPercent.outOfRange");
@@ -119,7 +119,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
     void givenASourceConfiguredWrongly_whenEveryPartIsChanged_thenEveryPartHolds() {
         // given
         UUID id = sources.create("roster-system", "Membership system", columns(),
-                Map.of("A", ACTIVE_TYPE), Set.of(FIRST_NAME), 10).sourceId();
+                Map.of("A", ACTIVE_TYPE), ACTIVE_TYPE, Set.of(FIRST_NAME), 10).sourceId();
         Map<String, CanonicalField> corrected = new LinkedHashMap<>();
         corrected.put("Member no.", EXTERNAL_ID);
         corrected.put("Given name", FIRST_NAME);
@@ -129,7 +129,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when
         sources.change(id, "club-registry", "The other system", corrected,
-                Map.of("Senior", OTHER_TYPE), Set.of(LAST_NAME, EMAIL, MEMBERSHIP_TYPE), 25);
+                Map.of("Senior", OTHER_TYPE), ACTIVE_TYPE, Set.of(LAST_NAME, EMAIL, MEMBERSHIP_TYPE), 25);
 
         // then
         SourceConfiguration configuration = sources.configurationOf(id);
@@ -160,10 +160,11 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
         padded.put("  Member number  ", EXTERNAL_ID);
         padded.put("First name", FIRST_NAME);
         padded.put("Last name", LAST_NAME);
+        padded.put("  Email  ", EMAIL);
 
         // when
         SourceConfiguration configuration = sources.create("roster-system", "  Membership system  ",
-                padded, Map.of("  A  ", ACTIVE_TYPE), Set.of(), 10);
+                padded, Map.of("  A  ", ACTIVE_TYPE), ACTIVE_TYPE, Set.of(), 10);
 
         // then
         assertThat(configuration.columns()).containsKey("Member number");
@@ -179,7 +180,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", blank,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columns.headerUnusable");
     }
@@ -188,7 +189,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
     void givenASourceKeyLongerThanTheContractAllows_whenCreatingASource_thenItIsRefused() {
         // when / then
         assertThatThrownBy(() -> sources.create("k".repeat(41), "Membership system", columns(),
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.sourceKey.tooLong");
     }
@@ -201,7 +202,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", tooLong,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columns.headerUnusable");
     }
@@ -213,10 +214,11 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
         repeated.put("Member number", EXTERNAL_ID);
         repeated.put("  Member number  ", FIRST_NAME);
         repeated.put("Last name", LAST_NAME);
+        repeated.put("Email", EMAIL);
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", repeated,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columns.headerRepeated");
     }
@@ -230,7 +232,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", columns(),
-                repeated, Set.of(), 10))
+                repeated, ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.membershipTypes.valueRepeated");
     }
@@ -243,7 +245,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", withControl,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columns.headerUnusable");
     }
@@ -258,7 +260,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", columns(),
-                tooMany, Set.of(), 10))
+                tooMany, ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.membershipTypes.tooMany");
     }
@@ -268,6 +270,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
         columns.put("Member number", EXTERNAL_ID);
         columns.put("First name", FIRST_NAME);
         columns.put("Last name", LAST_NAME);
+        columns.put("Email", EMAIL);
         return columns;
     }
 }

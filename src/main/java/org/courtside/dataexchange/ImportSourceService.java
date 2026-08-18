@@ -3,6 +3,7 @@ package org.courtside.dataexchange;
 import lombok.RequiredArgsConstructor;
 import org.courtside.dataexchange.internal.ExternalReferenceRepository;
 import org.courtside.dataexchange.internal.ImportSource;
+import org.courtside.dataexchange.internal.ImportRunRepository;
 import org.courtside.dataexchange.internal.ImportSourceRepository;
 import org.courtside.member.MemberService;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -24,7 +25,8 @@ import java.util.UUID;
 public class ImportSourceService {
 
     private static final Set<CanonicalField> REQUIRED_COLUMNS =
-            EnumSet.of(CanonicalField.EXTERNAL_ID, CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME);
+            EnumSet.of(CanonicalField.EXTERNAL_ID, CanonicalField.FIRST_NAME,
+                    CanonicalField.LAST_NAME, CanonicalField.EMAIL);
     private static final String UNIQUE_KEY_CONSTRAINT = "import_source_unique_key";
     private static final int MAX_KEY_LENGTH = 40;
     private static final int MAX_DISPLAY_NAME_LENGTH = 80;
@@ -34,6 +36,7 @@ public class ImportSourceService {
 
     private final ImportSourceRepository sources;
     private final ExternalReferenceRepository references;
+    private final ImportRunRepository runs;
     private final MemberService memberships;
     private final Clock clock;
 
@@ -62,13 +65,16 @@ public class ImportSourceService {
     public SourceConfiguration create(String sourceKey, String displayName,
                                       Map<String, CanonicalField> columns,
                                       Map<String, UUID> membershipTypes,
+                                      UUID defaultMembershipTypeId,
                                       Set<CanonicalField> ownedFields, int removalWarningPercent) {
         Map<String, CanonicalField> storedColumns = strippedColumns(columns);
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
-        requireUsable(storedColumns, storedTypes, ownedFields, removalWarningPercent);
+        requireUsable(storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
+                removalWarningPercent);
         ImportSource source = new ImportSource(clock.instant());
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
-                storedColumns, storedTypes, ownedFields, removalWarningPercent);
+                storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
+                removalWarningPercent);
         return toConfiguration(saveOrRejectTakenKey(source));
     }
 
@@ -76,13 +82,16 @@ public class ImportSourceService {
     public SourceConfiguration change(UUID sourceId, String sourceKey, String displayName,
                                       Map<String, CanonicalField> columns,
                                       Map<String, UUID> membershipTypes,
+                                      UUID defaultMembershipTypeId,
                                       Set<CanonicalField> ownedFields, int removalWarningPercent) {
         Map<String, CanonicalField> storedColumns = strippedColumns(columns);
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
-        requireUsable(storedColumns, storedTypes, ownedFields, removalWarningPercent);
+        requireUsable(storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
+                removalWarningPercent);
         ImportSource source = require(sourceId);
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
-                storedColumns, storedTypes, ownedFields, removalWarningPercent);
+                storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
+                removalWarningPercent);
         return toConfiguration(saveOrRejectTakenKey(source));
     }
 
@@ -93,17 +102,29 @@ public class ImportSourceService {
             throw new ImportSourceInUseException(
                     "Import source " + source.getId() + " still holds external references");
         }
+        if (runs.existsBySourceId(source.getId())) {
+            throw new ImportSourceInUseException(
+                    "Import source " + source.getId() + " has been executed against");
+        }
         sources.delete(source);
     }
 
     private void requireUsable(Map<String, CanonicalField> columns,
-                               Map<String, UUID> membershipTypes,
+                               Map<String, UUID> membershipTypes, UUID defaultMembershipTypeId,
                                Set<CanonicalField> ownedFields, int removalWarningPercent) {
         requireCompleteColumns(columns);
         requireUnambiguousColumns(columns);
         requireOwnableFields(ownedFields);
         requireKnownMembershipTypes(membershipTypes);
+        requireKnownDefaultMembershipType(defaultMembershipTypeId);
         requirePercentage(removalWarningPercent);
+    }
+
+    private void requireKnownDefaultMembershipType(UUID defaultMembershipTypeId) {
+        if (defaultMembershipTypeId == null || !memberships.knowsMembershipType(defaultMembershipTypeId)) {
+            throw new ImportSourceInvalidException("import.source.defaultMembershipType.unknown",
+                    Map.of("field", "defaultMembershipTypeId"));
+        }
     }
 
     private static void requireCompleteColumns(Map<String, CanonicalField> columns) {
@@ -268,7 +289,7 @@ public class ImportSourceService {
     private static SourceConfiguration toConfiguration(ImportSource source) {
         return new SourceConfiguration(source.getId(), source.getSourceKey(),
                 source.getDisplayName(), Map.copyOf(source.getColumns()),
-                Map.copyOf(source.getMembershipTypes()), new HashSet<>(source.getOwnedFields()),
-                source.getRemovalWarningPercent());
+                Map.copyOf(source.getMembershipTypes()), source.getDefaultMembershipTypeId(),
+                new HashSet<>(source.getOwnedFields()), source.getRemovalWarningPercent());
     }
 }

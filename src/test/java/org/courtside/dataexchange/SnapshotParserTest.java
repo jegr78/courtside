@@ -20,7 +20,7 @@ class SnapshotParserTest {
     @Test
     void givenAFileWrittenWithAByteOrderMark_whenParsing_thenTheFirstHeaderIsStillRecognised() {
         // given
-        String content = "﻿Member number,First name,Last name\n4711,Jane,Doe\n";
+        String content = "﻿Member number,First name,Last name,Email\n4711,Jane,Doe,jane.doe@example.org\n";
 
         // when
         CsvSnapshot snapshot = parse(content);
@@ -35,9 +35,9 @@ class SnapshotParserTest {
     void givenQuotedCellsHoldingACommaAndANewline_whenParsing_thenBothArriveWhole() {
         // given
         String content = """
-                Member number,First name,Last name
+                Member number,First name,Last name,Email
                 4711,"Jane, the elder","Doe
-                Roe"
+                Roe",jane.doe@example.org
                 """;
 
         // when
@@ -54,7 +54,7 @@ class SnapshotParserTest {
     @Test
     void givenAColumnTheMappingDoesNotName_whenParsing_thenItIsReportedRatherThanSilentlyDropped() {
         // given
-        String content = "Member number,First name,Last name,IBAN\n4711,Jane,Doe,XX00\n";
+        String content = "Member number,First name,Last name,Email,IBAN\n4711,Jane,Doe,jane.doe@example.org,XX00\n";
 
         // when
         CsvSnapshot snapshot = parse(content);
@@ -63,7 +63,8 @@ class SnapshotParserTest {
         assertThat(snapshot.ignoredColumns()).containsExactly("IBAN");
         assertThat(snapshot.rows()).singleElement()
                 .satisfies(row -> assertThat(row.values())
-                        .containsOnlyKeys(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME));
+                        .containsOnlyKeys(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME,
+                                CanonicalField.EMAIL));
     }
 
     @Test
@@ -80,7 +81,7 @@ class SnapshotParserTest {
     @Test
     void givenAHeaderNamingTheSameColumnTwice_whenParsing_thenTheWholeFileIsRefused() {
         // given
-        String content = "Member number,First name,Last name,First name\n4711,Jane,Doe,Jane\n";
+        String content = "Member number,First name,Last name,Email,First name\n4711,Jane,Doe,jane.doe@example.org,Jane\n";
 
         // when / then
         assertThatThrownBy(() -> parse(content))
@@ -100,9 +101,9 @@ class SnapshotParserTest {
     void givenARowWithFewerCellsThanTheHeader_whenParsing_thenOnlyThatRowFails() {
         // given
         String content = """
-                Member number,First name,Last name
+                Member number,First name,Last name,Email
                 4711,Jane
-                4712,John,Roe
+                4712,John,Roe,john.roe@example.org
                 """;
 
         // when
@@ -121,9 +122,9 @@ class SnapshotParserTest {
     void givenTheSameMemberNumberTwiceInOneFile_whenParsing_thenTheSecondRowFails() {
         // given
         String content = """
-                Member number,First name,Last name
-                4711,Jane,Doe
-                4711,John,Roe
+                Member number,First name,Last name,Email
+                4711,Jane,Doe,jane.doe@example.org
+                4711,John,Roe,john.roe@example.org
                 """;
 
         // when
@@ -144,9 +145,9 @@ class SnapshotParserTest {
     void givenARowWithoutAMemberNumber_whenParsing_thenOnlyThatRowFails() {
         // given
         String content = """
-                Member number,First name,Last name
-                   ,Jane,Doe
-                4712,John,Roe
+                Member number,First name,Last name,Email
+                   ,Jane,Doe,jane.doe@example.org
+                4712,John,Roe,john.roe@example.org
                 """;
 
         // when
@@ -163,9 +164,9 @@ class SnapshotParserTest {
     void givenAMemberNumberLongerThanTheReferenceHolds_whenParsing_thenOnlyThatRowFails() {
         // given
         String content = """
-                Member number,First name,Last name
-                %s,Jane,Doe
-                4712,John,Roe
+                Member number,First name,Last name,Email
+                %s,Jane,Doe,jane.doe@example.org
+                4712,John,Roe,john.roe@example.org
                 """.formatted("4".repeat(MemberNumber.MAX_LENGTH + 1));
 
         // when
@@ -182,7 +183,7 @@ class SnapshotParserTest {
     @Test
     void whenParsing_thenEveryValueArrivesWithoutItsSurroundingWhitespace() {
         // given
-        String content = "Member number,First name,Last name\n  4711 , Jane , Doe \n";
+        String content = "Member number,First name,Last name,Email\n  4711 , Jane , Doe , jane.doe@example.org \n";
 
         // when
         CsvSnapshot snapshot = parse(content);
@@ -198,7 +199,7 @@ class SnapshotParserTest {
     @Test
     void givenAFileThatIsNotUtf8_whenParsing_thenTheWholeFileIsRefused() {
         // given
-        byte[] latin1 = "Member number,First name,Last name\n4711,Jané,Doe\n"
+        byte[] latin1 = "Member number,First name,Last name,Email\n4711,Jané,Doe,jane.doe@example.org\n"
                 .getBytes(StandardCharsets.ISO_8859_1);
 
         // when / then
