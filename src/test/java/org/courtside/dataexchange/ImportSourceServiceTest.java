@@ -214,10 +214,11 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
         repeated.put("Member number", EXTERNAL_ID);
         repeated.put("  Member number  ", FIRST_NAME);
         repeated.put("Last name", LAST_NAME);
+        repeated.put("Email", EMAIL);
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", repeated,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columns.headerRepeated");
     }
@@ -231,7 +232,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", columns(),
-                repeated, Set.of(), 10))
+                repeated, ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.membershipTypes.valueRepeated");
     }
@@ -244,7 +245,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", withControl,
-                Map.of(), Set.of(), 10))
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columns.headerUnusable");
     }
@@ -259,7 +260,7 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", columns(),
-                tooMany, Set.of(), 10))
+                tooMany, ACTIVE_TYPE, Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.membershipTypes.tooMany");
     }
