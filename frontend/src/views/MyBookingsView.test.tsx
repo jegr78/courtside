@@ -297,18 +297,20 @@ it("given a move is blocked, when previewed, then every reason is translated and
 
 const participationId = "55555555-5555-5555-5555-555555555555";
 
+function participation(id: string) {
+  return {
+    id,
+    courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-19T16:00:00Z",
+    endsAt: "2026-08-19T17:00:00Z",
+    cardLabel: "Member booking",
+    cardColor: "#176b55",
+    status: "CONFIRMED" as const
+  };
+}
+
 function recordedAsCoPlayer() {
-  vi.spyOn(api, "participations").mockResolvedValue({ items: [
-    {
-      id: participationId,
-      courtIds: ["33333333-3333-3333-3333-333333333333"],
-      startsAt: "2026-08-19T16:00:00Z",
-      endsAt: "2026-08-19T17:00:00Z",
-      cardLabel: "Member booking",
-      cardColor: "#176b55",
-      status: "CONFIRMED"
-    }
-  ] });
+  vi.spyOn(api, "participations").mockResolvedValue({ items: [participation(participationId)] });
 }
 
 it("given somebody named this member, when the page loads, then the participation is listed", async () => {
@@ -339,4 +341,18 @@ it("given the withdrawal fails, when the member tries, then the reason is shown 
   await userEvent.click(await screen.findByTestId("withdraw-participation"));
 
   expect(await screen.findByRole("alert")).toBeInTheDocument();
+});
+
+it("given more participations than one page, when the member asks for more, then the next page is appended", async () => {
+  const second = "66666666-6666-6666-6666-666666666666";
+  vi.spyOn(api, "participations")
+    .mockResolvedValueOnce({ items: [participation(participationId)], nextCursor: participationId })
+    .mockResolvedValueOnce({ items: [participation(second)] });
+
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("load-more-participations"));
+
+  expect(await screen.findByTestId(`participation-${second}`)).toBeInTheDocument();
+  expect(screen.getByTestId(`participation-${participationId}`)).toBeInTheDocument();
+  expect(screen.queryByTestId("load-more-participations")).not.toBeInTheDocument();
 });

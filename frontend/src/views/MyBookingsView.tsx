@@ -20,6 +20,7 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
   const [grid, setGrid] = useState<BookingGrid>();
   const [nextCursor, setNextCursor] = useState<string>();
   const [managedNextCursor, setManagedNextCursor] = useState<string>();
+  const [participationsNextCursor, setParticipationsNextCursor] = useState<string>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
@@ -37,6 +38,7 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
       setBookings(page.items);
       setManaged(managedPage.items);
       setParticipations(participationPage.items);
+      setParticipationsNextCursor(participationPage.nextCursor ?? undefined);
       setNextCursor(page.nextCursor ?? undefined);
       setManagedNextCursor(managedPage.nextCursor ?? undefined);
       setCourts(availableCourts);
@@ -58,6 +60,21 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
       const page = await api.personalBookings(nextCursor);
       setBookings((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor ?? undefined);
+      setError(undefined);
+    } catch (failure) {
+      setError(problemMessage(failure, t));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  async function loadMoreParticipations() {
+    if (!participationsNextCursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.participations(participationsNextCursor);
+      setParticipations((current) => [...current, ...page.items]);
+      setParticipationsNextCursor(page.nextCursor ?? undefined);
       setError(undefined);
     } catch (failure) {
       setError(problemMessage(failure, t));
@@ -105,16 +122,17 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
       <div className="mt-4"><BookingSection testId="managed-bookings" title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={setAction} t={t} /></div>
       {managedNextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
     </section>}
-    {!loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={load} t={t} />}
+    {!loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={load} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={(action.managed ? managed : bookings).filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={(action.managed ? managedNextCursor : nextCursor) !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
     {action?.kind === "detail" && <ManagedAppointmentDialog bookingId={action.booking.id} closed={() => setAction(undefined)} />}
   </section>;
 }
 
-function ParticipationSection({ participations, courtNames, locale, timeZone, withdrawn, t }: {
+function ParticipationSection({ participations, courtNames, locale, timeZone, withdrawn, nextCursor, loadingMore, loadMore, t }: {
   participations: Participation[]; courtNames: Map<string, string>; locale: string; timeZone: string;
-  withdrawn: () => Promise<void>; t: Translate;
+  withdrawn: () => Promise<void>; nextCursor?: string; loadingMore: boolean;
+  loadMore: () => Promise<void>; t: Translate;
 }) {
   const [leaving, setLeaving] = useState<string>();
   const [error, setError] = useState<string>();
@@ -149,6 +167,7 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
             </div>
           </li>)}</ul>}
     </div>
+    {nextCursor && <Button data-testid="load-more-participations" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("participations.loadMore")}</Button>}
   </section>;
 }
 
