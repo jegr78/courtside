@@ -45,6 +45,12 @@ public class IdentityTestFixture {
         return accounts.save(account).getId();
     }
 
+    public void requirePasswordChange(String username) {
+        UserAccount account = accounts.findByUsername(username).orElseThrow();
+        account.requirePasswordChange();
+        accounts.save(account);
+    }
+
     public boolean personExists(UUID personId) {
         return persons.existsById(personId);
     }
@@ -63,6 +69,10 @@ public class IdentityTestFixture {
 
     public Set<Role> accountRoles(UUID accountId) {
         return accounts.findById(accountId).orElseThrow().getRoles();
+    }
+
+    public boolean isPasswordChangeRequired(String username) {
+        return accounts.findByUsername(username).orElseThrow().isPasswordChangeRequired();
     }
 
     public UUID personIdForUsername(String username) {
