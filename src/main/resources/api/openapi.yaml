@@ -88,6 +88,12 @@ tags:
     description: Administering the club's own name and branding.
   - name: admin-impact
     description: What a configuration change would affect, before it is made.
+  - name: admin-import-references
+    description: Which member number of a source stands for which person.
+  - name: admin-import-previews
+    description: What an uploaded roster snapshot would change, before anything is written.
+  - name: admin-import-runs
+    description: Executing a reviewed snapshot, and the log of what was executed.
 
 security:
   - sessionCookie: []
@@ -528,6 +534,317 @@ components:
         ruleSetId: { type: [string, "null"], format: uuid }
         active: { type: boolean }
 
+    CanonicalField:
+      type: string
+      description: |
+        A field of the roster a snapshot can carry. `EXTERNAL_ID` is the member number the source
+        system holds and is what a record is matched by; the other four are the person's data.
+      enum: [EXTERNAL_ID, FIRST_NAME, LAST_NAME, EMAIL, MEMBERSHIP_TYPE]
+
+    ImportSource:
+      type: object
+      required: [id, sourceKey, displayName, columns, membershipTypes, defaultMembershipTypeId,
+                 ownedFields, removalWarningPercent]
+      properties:
+        id: { type: string, format: uuid }
+        sourceKey: { type: string }
+        displayName: { type: string }
+        columns:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/CanonicalField" }
+        membershipTypes:
+          type: object
+          additionalProperties: { type: string, format: uuid }
+        defaultMembershipTypeId: { type: string, format: uuid }
+        ownedFields:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/CanonicalField" }
+        removalWarningPercent: { type: integer }
+
+    ImportSourceRequest:
+      type: object
+      description: |
+        Every part of a source is given here and every part may be given again — this request is
+        what a correction uses as much as a first description.
+      required: [sourceKey, displayName, columns, defaultMembershipTypeId, removalWarningPercent]
+      properties:
+        sourceKey:
+          type: string
+          minLength: 1
+          maxLength: 40
+          pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+          description: |
+            Names the system, not the file: `roster-system`, `club-registry`. It is half of the identity of every
+            record the source brings, so changing it makes the next snapshot look like a different
+            system's — which is the point when a club really does migrate, and a mistake otherwise.
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          pattern: ".*\\S.*"
+          description: |
+            Surrounding whitespace is removed before the name is stored, so a name pasted with
+            padding is accepted; `maxLength` is measured on what was sent, and the stored name is
+            never longer than it.
+        columns:
+          type: object
+          description: |
+            The header in the club's export, mapped to the field it holds. `EXTERNAL_ID`,
+            `FIRST_NAME`, `LAST_NAME` and `EMAIL` are required — a snapshot creates people, and this
+            product has no person without an address, so a source that cannot supply one could never
+            create anybody. `MEMBERSHIP_TYPE` is optional, because a club may not export a category
+            at all. Two headers may not name the same field.
+
+            Requiring the column is not the same as requiring every cell: a row whose address is
+            empty fails on its own and the rest of the file resolves.
+
+            A header is stored without its surrounding whitespace, because that is how it arrives
+            from the file: a mapping kept with padding would name a column that never matches. Two
+            headers that differ only in that whitespace name the same column and are refused. A
+            header holding a control character is refused too — it could never match a real file.
+          propertyNames: { minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
+          additionalProperties: { $ref: "#/components/schemas/CanonicalField" }
+        membershipTypes:
+          type: object
+          description: |
+            The value the export writes in its category column, mapped to a membership type of this
+            club. Free text never creates a type: a value with no mapping stops the snapshot rather
+            than inventing one. A type deactivated later is accepted here and refused by the run,
+            which is where a club is told about it.
+
+            A value is stored without its surrounding whitespace, for the same reason a header is.
+            Two values that differ only in that whitespace name the same category and are refused,
+            because keeping one of them would drop a mapping that was sent. At most 200 entries.
+          propertyNames: { minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
+          maxProperties: 200
+          additionalProperties: { type: string, format: uuid }
+        defaultMembershipTypeId:
+          type: string
+          format: uuid
+          description: |
+            What somebody created from this source becomes when the file does not say. A snapshot
+            creates people, and a person in this club holds exactly one kind of membership, so a
+            source with nothing to fall back on could create nobody. Where the export does carry a
+            category, its mapping wins and this fills the blanks.
+        ownedFields:
+          type: array
+          uniqueItems: true
+          description: |
+            The fields this source owns. An owned field is overwritten by every later snapshot; a
+            field left out is the club's own and no synchronisation touches it, however different
+            the file is. `EXTERNAL_ID` cannot be owned — it identifies the record rather than
+            describing anybody.
+          items: { $ref: "#/components/schemas/CanonicalField" }
+        removalWarningPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: |
+            Above this share of the roster disappearing at once, an execution needs explicit
+            confirmation. A truncated export is the ordinary accident this guards against.
+
+    ExternalReference:
+      type: object
+      required: [referenceId, sourceId, externalId, personId, linkedAt]
+      properties:
+        referenceId: { type: string, format: uuid }
+        sourceId: { type: string, format: uuid }
+        externalId: { type: string, minLength: 1, maxLength: 120 }
+        personId: { type: string, format: uuid }
+        linkedAt: { type: string, format: date-time }
+
+    ExternalReferencePage:
+      type: object
+      required: [references]
+      properties:
+        references:
+          type: array
+          items: { $ref: "#/components/schemas/ExternalReference" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: Pass this reference id as `cursor` to continue after the current page.
+
+    ExternalReferenceRequest:
+      type: object
+      required: [externalId, personId]
+      properties:
+        externalId:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: ".*\\S.*"
+          description: |
+            The member number the source system holds for this person. Surrounding whitespace is
+            removed before it is stored, so a value pasted with padding is accepted.
+        personId:
+          type: string
+          format: uuid
+          description: The person in this club's roster that the record stands for.
+
+    SnapshotMode:
+      type: string
+      description: |
+        `FULL_SNAPSHOT` means the file is the whole truth about this source: a member it does not
+        carry has left, and their membership ends. `UPDATE_ONLY` means the file is a partial
+        delivery — absence says nothing, and no membership ends because of it. The difference is
+        the difference between a club's yearly export and a correction of forty rows.
+      enum: [FULL_SNAPSHOT, UPDATE_ONLY]
+
+    ImportChangeKind:
+      type: string
+      description: |
+        `CREATE` adds a person this source has not seen before, `UPDATE` writes the owned fields
+        that differ, and `END_MEMBERSHIP` records that somebody the file no longer carries has left.
+      enum: [CREATE, UPDATE, END_MEMBERSHIP]
+
+    ImportPersonChange:
+      type: object
+      required: [kind, rowNumber, externalId, values]
+      properties:
+        kind: { $ref: "#/components/schemas/ImportChangeKind" }
+        rowNumber:
+          type: integer
+          description: |
+            The nth data row of the file, counting the header as row zero. An `END_MEMBERSHIP` has
+            no row of its own — it follows from an absence — and reports `0`.
+        externalId: { type: string }
+        personId: { type: [string, "null"], format: uuid }
+        values:
+          type: object
+          description: |
+            Only the fields that would actually change, keyed by canonical field. A field this
+            source does not own never appears here, however different the file is.
+          additionalProperties: { type: string }
+        membershipTypeId: { type: [string, "null"], format: uuid }
+
+    ImportRowError:
+      type: object
+      required: [rowNumber, code, params]
+      properties:
+        rowNumber: { type: integer }
+        code:
+          type: string
+          description: |
+            An i18n key; the client renders it. The row is skipped, the file is not. A row is also
+            reported here when it carries a value this instance cannot store — empty, holding a line
+            break, too long, or not a usable address — so a preview never promises a change that the
+            execution would then refuse.
+        params:
+          type: object
+          additionalProperties: true
+
+    ImportPossibleDuplicate:
+      type: object
+      required: [rowNumber, externalId, personId]
+      description: |
+        A row that would create somebody the roster appears to hold already. It is reported and not
+        acted on: two members really are called John Roe, so only a board can tell a duplicate from
+        a namesake. The answer to a real one is to link the record to the person it names.
+      properties:
+        rowNumber: { type: integer }
+        externalId: { type: string }
+        personId: { type: string, format: uuid }
+
+    ImportRemovalCounts:
+      type: object
+      required: [count, currentlyLinked, percent]
+      properties:
+        count: { type: integer }
+        currentlyLinked:
+          type: integer
+          description: |
+            How many current memberships this source accounts for right now. It is the denominator
+            of `percent`, so a source covering part of a club is measured against its own part
+            rather than against the whole roster.
+        percent: { type: integer }
+
+    ImportPreview:
+      type: object
+      required: [previewId, sourceId, mode, fileName, fileHash, rowCount, ignoredColumns, changes,
+                 rowErrors, possibleDuplicates, removals, needsConfirmation, superseded, createdAt,
+                 expiresAt]
+      properties:
+        previewId: { type: string, format: uuid }
+        sourceId: { type: string, format: uuid }
+        mode: { $ref: "#/components/schemas/SnapshotMode" }
+        fileName: { type: string, minLength: 1, maxLength: 200 }
+        fileHash:
+          type: string
+          description: |
+            The SHA-256 of the uploaded bytes, in lower-case hex. Uploading the same file twice
+            yields two previews carrying the same hash, which is how a board can tell it reviewed
+            the file it meant to.
+        rowCount: { type: integer }
+        ignoredColumns:
+          type: array
+          items: { type: string }
+          description: |
+            Headers the file carries and this source's mapping does not name. They are skipped and
+            listed rather than silently dropped: a column left out by a typo in the mapping looks
+            exactly like a column the club never wanted.
+        changes:
+          type: array
+          items: { $ref: "#/components/schemas/ImportPersonChange" }
+        rowErrors:
+          type: array
+          items: { $ref: "#/components/schemas/ImportRowError" }
+        possibleDuplicates:
+          type: array
+          items: { $ref: "#/components/schemas/ImportPossibleDuplicate" }
+        removals: { $ref: "#/components/schemas/ImportRemovalCounts" }
+        needsConfirmation:
+          type: boolean
+          description: |
+            True when the share of this source's memberships that would end exceeds the source's
+            own threshold. It does not block anything here — a preview writes nothing — it tells a
+            board that executing this one needs a deliberate confirmation.
+        superseded:
+          type: boolean
+          description: |
+            A newer preview for this source exists. The older one is kept so that what was reviewed
+            stays readable, and it is not what a later execution should use.
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+
+    ImportRun:
+      type: object
+      required: [runId, sourceId, previewId, mode, fileHash, created, corrected, membershipsEnded,
+                 accountsDisabled, rolesRemoved, rowErrors, removalsConfirmed, executedAt]
+      properties:
+        runId: { type: string, format: uuid }
+        sourceId: { type: string, format: uuid }
+        previewId: { type: string, format: uuid }
+        mode: { $ref: "#/components/schemas/SnapshotMode" }
+        fileHash: { type: string }
+        created: { type: integer }
+        corrected: { type: integer }
+        membershipsEnded: { type: integer }
+        accountsDisabled:
+          type: integer
+          description: |
+            Accounts whose only role was `MEMBER` and which are therefore no longer able to sign in.
+            An account holding another role is never disabled by a snapshot, and no snapshot ever
+            enables one.
+        rolesRemoved:
+          type: integer
+          description: Accounts that kept another role and lost `MEMBER` only.
+        rowErrors: { type: integer }
+        removalsConfirmed: { type: boolean }
+        executedAt: { type: string, format: date-time }
+
+    ExecutionRequest:
+      type: object
+      properties:
+        confirmRemovals:
+          type: boolean
+          default: false
+          description: |
+            Required only when the preview reported `needsConfirmation`. It is a deliberate second
+            statement about one reviewed preview, not a setting: a truncated export is the accident
+            this exists to catch, and catching it is worth one extra click.
+
     MembershipTypeRequest:
       type: object
       required: [name]
@@ -538,7 +855,8 @@ components:
     PersonRequest:
       type: object
       description: |
-        None of the three values may be blank, and no name may hold a line break.
+        None of the three values may be blank, and none may hold a control character — not a line
+        break, and not a NUL, which PostgreSQL refuses to store at all.
 
         Surrounding whitespace is removed before the values are checked and stored, so a name or
         an address pasted with padding is accepted, `maxLength` counts what is left, and the
@@ -551,16 +869,20 @@ components:
         firstName:
           type: string
           maxLength: 60
-          pattern: "[^\\u000a\\u000d]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u000a\\u000d]*"
+          pattern: "[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u009f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u0000-\\u001f\\u007f-\\u009f]*"
         lastName:
           type: string
           maxLength: 60
-          pattern: "[^\\u000a\\u000d]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u000a\\u000d]*"
+          pattern: "[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u009f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u0000-\\u001f\\u007f-\\u009f]*"
         email:
           type: string
           format: email
           maxLength: 120
-          pattern: "[^\\u000a\\u000d]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u000a\\u000d]*"
+          description: |
+            One `@` with something before it, and a dotted domain after it. The rule is spelled out
+            here because the service enforces exactly it: a shape this pattern accepts and the
+            service then refuses would reach a club board as a `500`.
+          pattern: "[^\\u0000-\\u0020\\u007f-\\u009f@]+@[^\\u0000-\\u0020\\u007f-\\u009f@.]+(\\.[^\\u0000-\\u0020\\u007f-\\u009f@.]+)+"
 
     RosterEntry:
       type: object
@@ -1120,6 +1442,11 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
     Conflict:
       description: The request collides with the current state; the problem `type` names the case.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PayloadTooLarge:
+      description: The upload is larger than this instance accepts.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -2787,6 +3114,451 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources:
+    get:
+      tags: [admin-import]
+      operationId: listImportSources
+      summary: The systems this club synchronises its roster from.
+      description: |
+        Ordered by `sourceKey`. A club that has never imported anything has none.
+      responses:
+        "200":
+          description: The sources.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ImportSource" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [admin-import]
+      operationId: createImportSource
+      summary: Describe a system a roster snapshot comes from.
+      description: |
+        A source is what makes a second upload an update rather than a duplicate: every record it
+        brings is matched by `sourceKey` together with the member number the file carries, never by
+        a name or an email address.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImportSourceRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportSource" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources/{id}:
+    get:
+      tags: [admin-import]
+      operationId: readImportSource
+      summary: One source and its whole configuration.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The source.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportSource" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [admin-import]
+      operationId: changeImportSource
+      summary: Correct any part of a source's configuration.
+      description: |
+        The request replaces the configuration whole — the key, the display name, both mappings, the
+        owned fields and the threshold. A club that mistyped a column header, pointed a value at the
+        wrong membership type or picked the wrong threshold corrects it here; nothing about a source
+        is written once.
+
+        Changing a mapping does not touch the people a previous run created. It decides what the
+        **next** snapshot means.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImportSourceRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportSource" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [admin-import]
+      operationId: deleteImportSource
+      summary: Remove a source nothing in the roster points at.
+      description: |
+        What goes is the club's description of a system it reads from — no person and no membership
+        is touched. A source that still holds external references is refused with `409` instead:
+        those references say where people in the roster came from, and dropping them silently would
+        make the next snapshot from that system create every one of them again as a new person.
+        Unlink them first, and the description can go.
+
+        A source that has been executed against is refused for good. Its run log says what was
+        written to this club's roster and when, which is history rather than configuration — the way
+        to stop using such a source is to stop uploading to it.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources/{sourceId}/references:
+    get:
+      tags: [admin-import-references]
+      operationId: listExternalReferences
+      summary: Which member number of this source stands for which person.
+      description: |
+        Ordered by the member number, and `cursor` continues after the reference it names in that
+        same order.
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor naming a reference this
+            source no longer holds is answered `404` rather than silently ending the list, because a
+            truncated page is the one wrong answer a client cannot detect.
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: The page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExternalReferencePage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [admin-import-references]
+      operationId: linkExternalReference
+      summary: Say which person a member number of this source stands for.
+      description: |
+        A snapshot matches a record by this reference and by nothing else — never by a name and
+        never by an email address, because two members really are called John Roe and a club enrols
+        children under a parent's address. A record whose member number this source does not know
+        becomes a new person, and a board that recognises the resemblance links the two here
+        instead.
+
+        Naming the same person under the same member number again changes nothing and is answered
+        `201` with the reference as it already stands. The two ways of contradicting an existing
+        reference are refused: a member number this source already gives to somebody else, and a
+        person this source already knows under a different member number. Both are corrected by
+        unlinking first — an existing reference is never silently moved, because moving it would
+        hand one person's record to another at the next snapshot.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExternalReferenceRequest" }
+      responses:
+        "201":
+          description: Linked.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExternalReference" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources/{sourceId}/references/{externalId}:
+    delete:
+      tags: [admin-import-references]
+      operationId: unlinkExternalReference
+      summary: Take back what a member number of this source stands for.
+      description: |
+        The person stays exactly as they are; what goes is the statement that this source's member
+        number names them. The next snapshot carrying that member number therefore reads as a person
+        this instance has not seen before.
+
+        A member number outside the shape a reference can hold — blank, or longer than the stored
+        value allows — is answered `404` like any other one nothing points at, because no reference
+        can be holding it.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: externalId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        "204":
+          description: Unlinked.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/import/sources/{sourceId}/previews:
+    post:
+      tags: [admin-import-previews]
+      operationId: createImportPreview
+      summary: Upload a roster snapshot and see exactly what it would change.
+      description: |
+        Nothing is written. The file is read against this source's column mapping, every row is
+        resolved against the people this source already knows, and the answer is the whole change
+        set: what would be created, what would be updated and in which fields, whose membership
+        would end, which rows could not be read, and which creations resemble somebody the roster
+        already holds.
+
+        A header problem fails the whole file, because nothing in it can then be trusted. A cell
+        problem fails one row and is reported beside the rest — a club with one truncated line
+        should not have to fix the export before it can see the other nine hundred.
+
+        Uploading again supersedes the previous preview of this source rather than replacing it.
+        A preview is never edited: correcting a mistake means uploading the corrected file, which
+        is the honest move, because an editable preview would no longer be what anybody reviewed.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, mode]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The club's export, as UTF-8 CSV. A byte order mark is tolerated.
+                mode: { $ref: "#/components/schemas/SnapshotMode" }
+      responses:
+        "201":
+          description: The preview.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportPreview" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
+  /api/admin/import/previews/{id}:
+    get:
+      tags: [admin-import-previews]
+      operationId: readImportPreview
+      summary: Read a preview back, exactly as it was taken.
+      description: |
+        A preview is immutable and answers with its change set for a bounded time. Past that time
+        the row still answers with its hash and its counts, and the change set it carried is no
+        longer part of the answer.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The preview.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportPreview" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/import/previews/{id}/execution:
+    post:
+      tags: [admin-import-runs]
+      operationId: executeImportPreview
+      summary: Apply exactly the change set that was reviewed.
+      description: |
+        The preview is the contract: what a board approved is what runs. Nothing is re-resolved and
+        nothing is re-read from the file, so a roster that moved between the preview and this
+        request cannot be written over by a change set that no longer describes it — if anybody the
+        preview would touch has changed since it was taken, the run is refused and nothing is
+        written. That covers creations too: a member number the preview would create, and which
+        somebody has linked in the meantime, refuses the run rather than adding a second record for
+        a person the roster now holds.
+
+        The whole run is one transaction. A change set whose last row fails leaves nothing behind:
+        not a person, not a membership, not a reference.
+
+        Executions of one source serialise, so two boards pressing this at the same moment cannot
+        interleave. A successful run supersedes every preview of that source, including this one,
+        which is what makes re-executing a reviewed snapshot impossible rather than merely unwise.
+
+        Executing the same file twice changes nothing the second time. That is the property this
+        whole design exists for: a record is matched by its member number, so a second run finds
+        everybody it created the first time.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExecutionRequest" }
+      responses:
+        "200":
+          description: What the run did.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportRun" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/sources/{sourceId}/runs:
+    get:
+      tags: [admin-import-runs]
+      operationId: listImportRuns
+      summary: What this source has actually written, newest first.
+      description: |
+        The log outlives the previews it came from: it keeps the file's hash and the counts, and
+        never a copy of the roster. That is what an audit of *what was executed* needs, and it is
+        not personal data.
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ImportRun" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/admin/rule-sets:
     get:

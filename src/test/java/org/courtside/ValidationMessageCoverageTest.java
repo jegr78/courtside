@@ -32,7 +32,11 @@ class ValidationMessageCoverageTest {
                     "InvalidMembershipPeriodException",
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
                     "MembershipTypeRuleSetInactiveException", "MembershipTypeInactiveException",
-                    "RosterCursorUnknownException", "LastAdministratorException");
+                    "RosterCursorUnknownException", "LastAdministratorException",
+                    "ImportSourceInvalidException", "SnapshotHeaderInvalidException",
+                    "SnapshotBlockedException", "SnapshotFileNameInvalidException",
+                    "ImportPreviewStaleException", "ImportPreviewSupersededException",
+                    "ImportPreviewExpiredException", "RemovalsNeedConfirmationException");
 
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
             List.of("CodedDomainFailure", "InvalidOpeningWindowException",
@@ -42,7 +46,7 @@ class ValidationMessageCoverageTest {
 
     // What toMap's "validation." + AnnotationSimpleName can produce today.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("DurationMin", "Email", "Max", "Min", "NotNull", "Pattern", "Size");
+            List.of("DurationMax", "DurationMin", "Email", "Max", "Min", "NotNull", "Pattern", "Size");
 
     // Minted by an advice rather than by a constraint, so no literal search reaches them.
     private static final List<String> ADVICE_MINTED_CODES =
@@ -51,6 +55,9 @@ class ValidationMessageCoverageTest {
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
         patterns.add(Pattern.compile("new\\s+RuleViolation\\(\\s*\"([^\"]+)\""));
+        patterns.add(Pattern.compile(
+                "new\\s+(?:CsvSnapshot|ResolvedChangeSet)\\.RowError\\(\\s*[\\w.()]+\\s*,"
+                        + "\\s*\n?\\s*\"([^\"]+)\""));
         CODE_CARRYING_EXCEPTION_SIMPLE_NAMES.forEach(name -> patterns.add(
                 Pattern.compile("new\\s+" + name + "\\(\\s*\"([^\"]+)\"")));
         patterns.add(Pattern.compile("\"code\"\\s*,\\s*\"([^\"]+)\"(?!\\s*\\+)"));

@@ -14,8 +14,8 @@
 
 ## 0. What is built today
 
-Eleven modules exist: `api`, `booking`, `card`, `config`, `demo`, `facility`, `identity`, `member`,
-`performance`, `rules`, `shared`. `api` holds the OpenAPI-generated request, response and
+Twelve modules exist: `api`, `booking`, `card`, `config`, `dataexchange`, `demo`, `facility`,
+`identity`, `member`, `performance`, `rules`, `shared`. `api` holds the OpenAPI-generated request, response and
 controller-interface types and carries no logic of its own, which is why it is declared shared
 alongside `shared` rather than given `allowedDependencies` of its own. `demo` and `performance`
 seed disposable environments — a walkthrough dataset and a synthetic load-test dataset — and each
@@ -30,7 +30,17 @@ Built and covered by tests: the booking core including the exclusion constraint,
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
 courts, accounts, roles and session login, club configuration and branding, the roster — the club's
 people, the account and roles a person holds, the membership they hold with the dates it runs
-between, correcting a username and resetting a password — and the admin surface for all of it. `/actuator/health` is exposed. The
+between, correcting a username and resetting a password — and the admin surface for all of it. A
+club can also describe the systems it means to synchronise its roster from: the column mapping, the
+membership types a source's categories stand for, the fields that source owns and the share of the
+roster whose disappearance needs confirming — and it can say which member number of a source stands
+for which person, which is what makes a second snapshot an update rather than a second set of
+people. A club can upload a snapshot and see exactly what it would change — every creation, every
+field of every update, every membership that would end, every row that could not be read and every
+creation that resembles somebody the roster already holds — and it can then execute exactly that
+reviewed change set, atomically, once per source at a time, refusing the run if anybody it would
+touch has changed in the meantime. What is still missing is the browser journey for it, accounts
+created from a snapshot, and export. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -38,12 +48,12 @@ carrying an SBOM attestation, and attaches the OpenAPI document to the release.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers, and the browser admin surface for
-configuration and facilities. The roster is the exception: it is served by the API and has no
-browser surface yet, so a board reaches it through the API alone.
+configuration and facilities. The roster and the import sources are the exceptions: they are served by
+the API and have no browser surface yet, so a board reaches them through the API alone.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
-container image scanning, CSV import, reports and exports, and the self-service password reset of
-section 4 — an administrator hands out a new one-time password through the roster instead.
+container image scanning, reports and exports, and the self-service password reset of section 4 — an administrator hands out a new one-time password
+through the roster instead.
 
 ---
 
@@ -827,8 +837,39 @@ available as CSV:
 
 Import and export:
 
-- **CSV member import** with column mapping, dry-run preview and a per-row error report.
-  This is what replaces today's manual re-keying from the external membership system.
+- **Repeatable snapshot synchronisation** replaces today's manual re-keying from the external
+  membership system. A club uploads its export, reviews what it would change, and executes exactly
+  that. Running the same file twice changes nothing the second time.
+- **A source** describes one system a club synchronises from and is configured once rather than
+  chosen per file: which header holds which field, which category value means which membership
+  type, which fields that source owns — a field it does not own is the club's own and no snapshot
+  overwrites it — and above what share of the roster disappearing an execution needs confirming.
+  Every part of it is correctable, and a change decides what the *next* snapshot means rather than
+  touching the people an earlier one created.
+- **A record is matched by the source and the member number it carries**, never by a name and never
+  by an email address: two members really are called John Roe, and a club enrols children under a
+  parent's address. A member number a source does not yet know becomes a new person, and where a
+  board recognises the resemblance it links the two by hand instead. One person may hold a
+  reference from each of several sources, which is what lets a club migrate between membership
+  systems without the second one duplicating everybody.
+- **A preview writes nothing and is never edited.** It resolves the whole file and answers with the
+  change set a later execution would apply, so what a board approves is what runs. A header problem
+  fails the file, because nothing in it can then be trusted; a cell problem fails one row and is
+  reported beside the rest. Correcting a mistake means uploading the corrected file — an editable
+  preview would no longer be what anybody reviewed. Above the source's own threshold, the share of
+  its memberships that would end is flagged as needing a deliberate confirmation, which is what
+  stands between a truncated export and a club that has lost half its roster.
+- **An execution applies the reviewed change set and nothing else.** It is one transaction — a
+  change set whose last row fails leaves no person, no membership and no reference behind — and if
+  anybody it would touch changed between the preview and the run, it is refused rather than writing
+  over a roster it no longer describes. Executions of one source serialise, and a successful one
+  supersedes every preview of that source, so a stale change set cannot be applied afterwards.
+- **A synchronisation can take a membership away; it can never hand one out.** When a membership
+  ends, an account that held `MEMBER` and nothing else is disabled and its sessions end; an account
+  holding another role keeps it and loses `MEMBER` only, so a card requiring `MEMBER` refuses it.
+  No snapshot ever enables an account, because a board disabled it for a reason no membership
+  system knows, and none can disable the club's own administration: an account holding `ADMIN`
+  keeps that role and stays enabled. An import cannot lock a club out of its instance.
 - **CSV export** for every list view in the admin backend, matching what existing booking
   systems offer today.
 - **Per-member JSON export** for subject access requests (section 11).
@@ -1084,6 +1125,13 @@ deliver the implementation.
   months after season end (utilisation statistics survive, the personal reference does
   not); inactive accounts deleted after departure plus retention period; login logs after
   90 days.
+- **An import never keeps the file it was given.** What a preview holds is the SHA-256 of the
+  uploaded bytes and the change set resolved from them — a club's whole membership list, in other
+  words — and that change set is bounded by `COURTSIDE_IMPORT_PREVIEW_RETENTION`. What survives
+  past it is the row, the name of the uploaded file, its SHA-256 and the counts — what an audit of
+  *what was executed* needs, and no member's name, address or number. A scheduled sweep enforces the
+  bound, a preview past it answers without its change set, and a swept preview is refused rather
+  than executed against one that is no longer there.
 - **Subject access and portability** (Art. 15/20) as self-service: every member can export
   their own data as JSON. The Release 1 export covers this.
 - **Documentation templates in the repository**: a pre-filled record of processing

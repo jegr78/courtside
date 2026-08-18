@@ -71,7 +71,7 @@ public class RosterService {
     public RosterEntry createPerson(String firstName, String lastName, String email) {
         Person person = new Person(strippedNonBlank(firstName, "first name"),
                 strippedNonBlank(lastName, "last name"),
-                strippedNonBlank(email, "email address"));
+                strippedAddress(email));
         return toEntry(persons.save(person), null, null);
     }
 
@@ -80,12 +80,29 @@ public class RosterService {
         UUID id = requiredPersonId(personId);
         String first = strippedNonBlank(firstName, "first name");
         String last = strippedNonBlank(lastName, "last name");
-        String address = strippedNonBlank(email, "email address");
+        String address = strippedAddress(email);
         Person person = persons.findById(id)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
         person.rename(first, last);
         person.changeEmail(address);
         return load(List.of(person.getId())).getFirst();
+    }
+
+    // Only what the caller carries is checked: a synchronisation must not fail on a stored value
+    // it is not touching, or one bad address would stop every later run of that source.
+    @Transactional
+    public void correctPerson(UUID personId, String firstName, String lastName, String email) {
+        UUID id = requiredPersonId(personId);
+        Person person = persons.findById(id)
+                .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        if (firstName != null || lastName != null) {
+            person.rename(
+                    firstName == null ? person.getFirstName() : strippedNonBlank(firstName, "first name"),
+                    lastName == null ? person.getLastName() : strippedNonBlank(lastName, "last name"));
+        }
+        if (email != null) {
+            person.changeEmail(strippedAddress(email));
+        }
     }
 
     @Transactional
@@ -316,8 +333,19 @@ public class RosterService {
 
     private static String strippedNonBlank(String value, String what) {
         String stripped = value == null ? "" : PersonText.stripped(value);
-        if (stripped.isEmpty()) {
-            throw new IllegalStateException("A person's " + what + " must not be blank");
+        if (!PersonFieldLimits.isUsableName(stripped)) {
+            throw new IllegalStateException("A person's " + what
+                    + " must not be blank, hold a line break or exceed "
+                    + PersonFieldLimits.MAX_NAME_LENGTH + " characters");
+        }
+        return stripped;
+    }
+
+    private static String strippedAddress(String value) {
+        String stripped = value == null ? "" : PersonText.stripped(value);
+        if (!PersonFieldLimits.isUsableEmail(stripped)) {
+            throw new IllegalStateException("A person's email address must be a usable address of "
+                    + "at most " + PersonFieldLimits.MAX_EMAIL_LENGTH + " characters");
         }
         return stripped;
     }

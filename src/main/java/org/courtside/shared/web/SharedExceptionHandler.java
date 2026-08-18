@@ -22,6 +22,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -183,6 +184,19 @@ class SharedExceptionHandler {
                 HttpStatus.NOT_FOUND, "No resource exists at this address");
         problem.setType(URI.create("urn:courtside:error:unmapped-path"));
         problem.setTitle("Unmapped path");
+        logAnswered(problem);
+        return problem;
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ProblemDetail handleOversizedUpload(MaxUploadSizeExceededException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.PAYLOAD_TOO_LARGE, "The upload is larger than this instance accepts");
+        problem.setType(URI.create("urn:courtside:error:payload-too-large"));
+        problem.setTitle("Payload too large");
+        problem.setProperty("violations", List.of(Map.of(
+                "code", "request.uploadTooLarge",
+                "params", Map.of("maxBytes", exception.getMaxUploadSize()))));
         logAnswered(problem);
         return problem;
     }

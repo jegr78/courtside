@@ -40,6 +40,7 @@
         <node.version>v26.5.1</node.version>
         <npm.version>11.17.0</npm.version>
         <postgresql.version>42.7.12</postgresql.version>
+        <commons-csv.version>1.14.1</commons-csv.version>
         <jacoco.version>0.8.15</jacoco.version>
         <pitest.version>1.25.8</pitest.version>
         <pitest-junit5.version>1.2.3</pitest-junit5.version>
@@ -156,6 +157,11 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>${commons-csv.version}</version>
         </dependency>
         <dependency>
             <groupId>org.quicktheories</groupId>
