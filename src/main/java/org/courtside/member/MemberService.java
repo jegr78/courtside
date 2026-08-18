@@ -45,6 +45,10 @@ public class MemberService {
         return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
+    public boolean knowsMembershipType(UUID membershipTypeId) {
+        return membershipTypeId != null && membershipTypes.existsById(membershipTypeId);
+    }
+
     public List<MembershipType> allMembershipTypes() {
         return membershipTypes.findAllByOrderByNameAsc();
     }

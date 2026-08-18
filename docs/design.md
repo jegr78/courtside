@@ -14,8 +14,8 @@
 
 ## 0. What is built today
 
-Eleven modules exist: `api`, `booking`, `card`, `config`, `demo`, `facility`, `identity`, `member`,
-`performance`, `rules`, `shared`. `api` holds the OpenAPI-generated request, response and
+Twelve modules exist: `api`, `booking`, `card`, `config`, `dataexchange`, `demo`, `facility`,
+`identity`, `member`, `performance`, `rules`, `shared`. `api` holds the OpenAPI-generated request, response and
 controller-interface types and carries no logic of its own, which is why it is declared shared
 alongside `shared` rather than given `allowedDependencies` of its own. `demo` and `performance`
 seed disposable environments — a walkthrough dataset and a synthetic load-test dataset — and each
@@ -30,7 +30,11 @@ Built and covered by tests: the booking core including the exclusion constraint,
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
 courts, accounts, roles and session login, club configuration and branding, the roster — the club's
 people, the account and roles a person holds, the membership they hold with the dates it runs
-between, correcting a username and resetting a password — and the admin surface for all of it. `/actuator/health` is exposed. The
+between, correcting a username and resetting a password — and the admin surface for all of it. A
+club can also describe the systems it means to synchronise its roster from: the column mapping, the
+membership types a source's categories stand for, the fields that source owns and the share of the
+roster whose disappearance needs confirming. Nothing reads a file yet; what exists is the
+configuration a run will need. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -38,11 +42,12 @@ carrying an SBOM attestation, and attaches the OpenAPI document to the release.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers, and the browser admin surface for
-configuration and facilities. The roster is the exception: it is served by the API and has no
-browser surface yet, so a board reaches it through the API alone.
+configuration and facilities. The roster and the import sources are the exceptions: they are served by
+the API and have no browser surface yet, so a board reaches them through the API alone.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
-container image scanning, CSV import, reports and exports, and the self-service password reset of
+container image scanning, the upload, preview and execution of a roster snapshot against a
+configured source, reports and exports, and the self-service password reset of
 section 4 — an administrator hands out a new one-time password through the roster instead.
 
 ---
@@ -829,6 +834,12 @@ Import and export:
 
 - **CSV member import** with column mapping, dry-run preview and a per-row error report.
   This is what replaces today's manual re-keying from the external membership system.
+- **A source** describes one system a club synchronises from and is configured once rather than
+  chosen per file: which header holds which field, which category value means which membership
+  type, which fields that source owns — a field it does not own is the club's own and no snapshot
+  overwrites it — and above what share of the roster disappearing an execution needs confirming.
+  Every part of it is correctable, and a change decides what the *next* snapshot means rather than
+  touching the people an earlier one created.
 - **CSV export** for every list view in the admin backend, matching what existing booking
   systems offer today.
 - **Per-member JSON export** for subject access requests (section 11).
