@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Import;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -26,7 +27,10 @@ class ParticipationServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final Instant TWO_PM = Instant.parse("2026-05-13T14:00:00Z");
+    private static final Instant THREE_PM = Instant.parse("2026-05-13T15:00:00Z");
     private static final Instant SIX_PM = Instant.parse("2026-05-13T16:00:00Z");
+    private static final Instant LAST_WEEK = Instant.parse("2026-05-05T16:00:00Z");
     private static final Instant SEVEN_PM = Instant.parse("2026-05-13T17:00:00Z");
     private static final int PAGE_LIMIT = 50;
 
@@ -150,9 +154,60 @@ class ParticipationServiceTest extends AbstractIntegrationTest {
                 .isInstanceOf(ParticipationNotFoundException.class);
     }
 
+    @Test
+    void givenSeveralParticipations_whenTheyArePagedOneAtATime_thenEachIsWalkedExactlyOnce() {
+        // given
+        UUID secondCourt = facilityFixture.createCourt(2, "Court 2");
+        UUID earlier = bookingNaming(namedPersonId, courtId, new TimeSlot(TWO_PM, THREE_PM));
+        UUID onOneCourt = bookingNaming(namedPersonId, courtId, new TimeSlot(SIX_PM, SEVEN_PM));
+        UUID onTheOther = bookingNaming(namedPersonId, secondCourt, new TimeSlot(SIX_PM, SEVEN_PM));
+
+        // when
+        List<UUID> walked = new ArrayList<>();
+        UUID cursor = null;
+        for (int page = 0; page < 3; page += 1) {
+            ParticipationPage current =
+                    participations.participations(namedPersonId, namedAccountId, cursor, 1);
+            walked.addAll(current.bookings().stream().map(Booking::getId).toList());
+            cursor = current.nextCursor();
+        }
+
+        // then
+        assertThat(walked)
+                .as("two of them start at the same moment, so a page boundary falls inside the"
+                        + " tie the cursor breaks by id")
+                .containsExactlyInAnyOrder(earlier, onOneCourt, onTheOther);
+        assertThat(walked.getLast()).isEqualTo(earlier);
+        assertThat(cursor).isNull();
+    }
+
+    @Test
+    void givenABookingThatHasAlreadyHappened_whenTheNamedMemberObjects_thenTheRecordGoesAnyway() {
+        // given
+        Booking past = new Booking(MEMBER_BOOKING_CARD, UUID.randomUUID(), null, THREE_PM);
+        past.allocate(courtId, new TimeSlot(LAST_WEEK, LAST_WEEK.plusSeconds(3600)));
+        past.addParticipant(ParticipantSpec.member(bookerPersonId));
+        past.addParticipant(ParticipantSpec.member(namedPersonId));
+        bookings.saveAndFlush(past);
+
+        // when
+        participations.withdraw(past.getId(), namedPersonId, namedAccountId);
+
+        // then
+        assertThat(bookings.findWithParticipantsById(past.getId()).orElseThrow().getParticipants())
+                .as("a member usually learns of the record after the fact, so a booking that has"
+                        + " already happened is the case the objection exists for")
+                .extracting(BookingParticipant::getPersonId)
+                .containsExactly(bookerPersonId);
+    }
+
     private UUID bookingByJaneNaming(UUID participantPersonId) {
+        return bookingNaming(participantPersonId, courtId, new TimeSlot(SIX_PM, SEVEN_PM));
+    }
+
+    private UUID bookingNaming(UUID participantPersonId, UUID court, TimeSlot slot) {
         return bookingService.create(new CreateBookingCommand(
-                List.of(courtId), MEMBER_BOOKING_CARD, new TimeSlot(SIX_PM, SEVEN_PM),
+                List.of(court), MEMBER_BOOKING_CARD, slot,
                 bookerAccountId, bookerPersonId, Set.of(Role.MEMBER), "Doubles",
                 List.of(ParticipantSpec.member(participantPersonId)), null));
     }

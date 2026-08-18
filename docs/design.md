@@ -1105,6 +1105,13 @@ Consequences for the model and the API:
   because an objection is not a rebooking. The list resolves no name at all, not the booker's and
   not the other participants', so exercising the objection reveals nothing the grid would not.
   **Built.**
+- **The objection has no time limit and no card exception.** It reaches a booking that has already
+  happened as readily as one still ahead — a member usually learns of the record after the fact, so
+  the past is the case it exists for. It reaches whatever card recorded them, though as shipped only
+  the member booking card records anybody: `allowed_player_counts` is empty for training, league
+  match and court closure, so those carry no roster to leave. A club that gives a managed card
+  player counts gets the objection there too, and the managing role learns of it by reading the
+  appointment detail — there is no notification. **Built.**
 - Guest names are personal data too and follow the same rule.
 - The managed-appointment detail is not the grid. It resolves every participant of the booking,
   guests included, for a card's managing roles and for an admin. Widening a card's managing roles
