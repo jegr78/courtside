@@ -105,11 +105,18 @@ public class Booking {
     }
 
     public boolean withdrawParticipant(UUID personId) {
-        return participants.removeIf(participant -> personId.equals(participant.getPersonId()));
+        // A null would match every guest, whose person_id is null by design.
+        return personId != null
+                && participants.removeIf(participant -> personId.equals(participant.getPersonId()));
     }
 
     public void addParticipant(ParticipantSpec spec) {
-        participants.add(new BookingParticipant(this, spec, participants.size() + 1));
+        participants.add(new BookingParticipant(this, spec, nextPosition()));
+    }
+
+    private int nextPosition() {
+        // A withdrawal leaves a hole, and (booking_id, position) is unique.
+        return participants.stream().mapToInt(BookingParticipant::getPosition).max().orElse(0) + 1;
     }
 
     public List<BookingParticipant> getParticipants() {
