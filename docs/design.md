@@ -42,8 +42,8 @@ carrying an SBOM attestation, and attaches the OpenAPI document to the release.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers, and the browser admin surface for
-configuration and facilities. The roster is the exception: it is served by the API and has no
-browser surface yet, so a board reaches it through the API alone.
+configuration and facilities. The roster and the import sources are the exceptions: they are served by
+the API and have no browser surface yet, so a board reaches them through the API alone.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
 container image scanning, the upload, preview and execution of a roster snapshot against a

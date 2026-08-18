@@ -206,6 +206,63 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
                 .extracting("code").isEqualTo("import.source.columns.headerUnusable");
     }
 
+    @Test
+    void givenTwoHeadersThatDifferOnlyInPadding_whenCreatingASource_thenTheRepetitionIsNamed() {
+        // given
+        Map<String, CanonicalField> repeated = new LinkedHashMap<>();
+        repeated.put("Member number", EXTERNAL_ID);
+        repeated.put("  Member number  ", FIRST_NAME);
+        repeated.put("Last name", LAST_NAME);
+
+        // when / then
+        assertThatThrownBy(() -> sources.create("roster-system", "Membership system", repeated,
+                Map.of(), Set.of(), 10))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .extracting("code").isEqualTo("import.source.columns.headerRepeated");
+    }
+
+    @Test
+    void givenTwoCategoryValuesThatDifferOnlyInPadding_whenCreatingASource_thenTheRepetitionIsNamed() {
+        // given
+        Map<String, UUID> repeated = new LinkedHashMap<>();
+        repeated.put("A", ACTIVE_TYPE);
+        repeated.put(" A ", OTHER_TYPE);
+
+        // when / then
+        assertThatThrownBy(() -> sources.create("roster-system", "Membership system", columns(),
+                repeated, Set.of(), 10))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .extracting("code").isEqualTo("import.source.membershipTypes.valueRepeated");
+    }
+
+    @Test
+    void givenAHeaderHoldingAControlCharacter_whenCreatingASource_thenItIsRefusedRatherThanStored() {
+        // given
+        Map<String, CanonicalField> withControl = new LinkedHashMap<>(columns());
+        withControl.put("Category\u0000", MEMBERSHIP_TYPE);
+
+        // when / then
+        assertThatThrownBy(() -> sources.create("roster-system", "Membership system", withControl,
+                Map.of(), Set.of(), 10))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .extracting("code").isEqualTo("import.source.columns.headerUnusable");
+    }
+
+    @Test
+    void givenMoreCategoryValuesThanASourceMaps_whenCreatingASource_thenItIsRefused() {
+        // given
+        Map<String, UUID> tooMany = new LinkedHashMap<>();
+        for (int entry = 0; entry <= 200; entry++) {
+            tooMany.put("value-" + entry, ACTIVE_TYPE);
+        }
+
+        // when / then
+        assertThatThrownBy(() -> sources.create("roster-system", "Membership system", columns(),
+                tooMany, Set.of(), 10))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .extracting("code").isEqualTo("import.source.membershipTypes.tooMany");
+    }
+
     private static Map<String, CanonicalField> columns() {
         Map<String, CanonicalField> columns = new LinkedHashMap<>();
         columns.put("Member number", EXTERNAL_ID);

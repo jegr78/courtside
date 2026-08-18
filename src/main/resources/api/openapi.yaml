@@ -571,7 +571,15 @@ components:
             Names the system, not the file: `roster-system`, `club-registry`. It is half of the identity of every
             record the source brings, so changing it makes the next snapshot look like a different
             system's — which is the point when a club really does migrate, and a mistake otherwise.
-        displayName: { type: string, minLength: 1, maxLength: 80 }
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          pattern: ".*\\S.*"
+          description: |
+            Surrounding whitespace is removed before the name is stored, so a name pasted with
+            padding is accepted; `maxLength` is measured on what was sent, and the stored name is
+            never longer than it.
         columns:
           type: object
           description: |
@@ -581,7 +589,9 @@ components:
             at all. Two headers may not name the same field.
 
             A header is stored without its surrounding whitespace, because that is how it arrives
-            from the file: a mapping kept with padding would name a column that never matches.
+            from the file: a mapping kept with padding would name a column that never matches. Two
+            headers that differ only in that whitespace name the same column and are refused. A
+            header holding a control character is refused too — it could never match a real file.
           propertyNames: { minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
           additionalProperties: { $ref: "#/components/schemas/CanonicalField" }
         membershipTypes:
@@ -593,7 +603,10 @@ components:
             which is where a club is told about it.
 
             A value is stored without its surrounding whitespace, for the same reason a header is.
+            Two values that differ only in that whitespace name the same category and are refused,
+            because keeping one of them would drop a mapping that was sent. At most 200 entries.
           propertyNames: { minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
+          maxProperties: 200
           additionalProperties: { type: string, format: uuid }
         ownedFields:
           type: array
