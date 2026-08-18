@@ -42,4 +42,17 @@ class IdentityTestFixtureTest extends AbstractIntegrationTest {
         assertThat(identity.accountRoles(accountId)).containsExactlyInAnyOrder(Role.MEMBER, Role.ADMIN);
         assertThat(identity.personIdForUsername("major.mary")).isEqualTo(personId);
     }
+
+    @Test
+    void givenAnAccount_whenRequiringAPasswordChange_thenTheStateIsObservable() {
+        // given
+        UUID personId = identity.createPerson("John", "Roe");
+        identity.createEnabledAccount(personId, "roe.john", Set.of(Role.MEMBER));
+
+        // when
+        identity.requirePasswordChange("roe.john");
+
+        // then
+        assertThat(identity.isPasswordChangeRequired("roe.john")).isTrue();
+    }
 }

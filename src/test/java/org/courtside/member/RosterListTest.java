@@ -3,8 +3,6 @@ package org.courtside.member;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.RosterCursorUnknownException;
@@ -19,7 +17,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,9 +30,6 @@ class RosterListTest extends AbstractIntegrationTest {
     private static final String LOWEST_IDS = "01234";
     private static final String MIDDLE_IDS = "56789a";
     private static final String HIGHEST_IDS = "bcdef";
-
-    @Autowired
-    private PersonRepository persons;
 
     @Autowired
     private IdentityTestFixture identity;
@@ -166,9 +160,12 @@ class RosterListTest extends AbstractIntegrationTest {
     @Test
     void givenIdsThatContradictTheNameOrder_whenFollowingTheCursor_thenTheNextPageContinuesByName() {
         // given
-        Person jane = savePersonWithLeadingIdDigitIn("Jane", "Doe", "jane.doe@example.org", HIGHEST_IDS);
-        Person mary = savePersonWithLeadingIdDigitIn("Mary", "Major", "mary.major@example.org", MIDDLE_IDS);
-        Person john = savePersonWithLeadingIdDigitIn("John", "Roe", "john.roe@example.org", LOWEST_IDS);
+        UUID jane = identity.createPersonWithLeadingIdDigitIn(
+                "Jane", "Doe", "jane.doe@example.org", HIGHEST_IDS);
+        UUID mary = identity.createPersonWithLeadingIdDigitIn(
+                "Mary", "Major", "mary.major@example.org", MIDDLE_IDS);
+        UUID john = identity.createPersonWithLeadingIdDigitIn(
+                "John", "Roe", "john.roe@example.org", LOWEST_IDS);
 
         // when
         CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
@@ -176,21 +173,20 @@ class RosterListTest extends AbstractIntegrationTest {
 
         // then
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
-                .containsExactly(jane.getId(), mary.getId());
-        assertThat(first.nextCursor()).isEqualTo(mary.getId());
+                .containsExactly(jane, mary);
+        assertThat(first.nextCursor()).isEqualTo(mary);
         assertThat(second.items()).extracting(RosterService.RosterEntry::personId)
-                .containsExactly(john.getId());
+                .containsExactly(john);
         assertThat(second.nextCursor()).isNull();
     }
 
     @Test
     void givenPeopleSharingAName_whenFollowingTheCursor_thenTheIdTiebreakOrdersThemStably() {
         // given
-        List<UUID> byId = Stream.of(
-                        persons.save(new Person("Jane", "Doe", "jane.doe.1@example.org")),
-                        persons.save(new Person("Jane", "Doe", "jane.doe.2@example.org")),
-                        persons.save(new Person("Jane", "Doe", "jane.doe.3@example.org")))
-                .map(Person::getId)
+        List<UUID> byId = java.util.stream.Stream.of(
+                        identity.createPerson("Jane", "Doe", "jane.doe.1@example.org"),
+                        identity.createPerson("Jane", "Doe", "jane.doe.2@example.org"),
+                        identity.createPerson("Jane", "Doe", "jane.doe.3@example.org"))
                 .sorted(Comparator.comparing(UUID::toString))
                 .toList();
 
@@ -264,13 +260,4 @@ class RosterListTest extends AbstractIntegrationTest {
                         .isEqualTo(older.getId()));
     }
 
-    // PostgreSQL orders a uuid bytewise, so the leading hex digit alone decides where an id sorts.
-    private Person savePersonWithLeadingIdDigitIn(
-            String firstName, String lastName, String email, String allowedDigits) {
-        Person person = new Person(firstName, lastName, email);
-        while (allowedDigits.indexOf(person.getId().toString().charAt(0)) < 0) {
-            person = new Person(firstName, lastName, email);
-        }
-        return persons.save(person);
-    }
 }

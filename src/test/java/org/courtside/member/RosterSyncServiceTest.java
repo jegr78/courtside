@@ -4,15 +4,14 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
-import org.courtside.booking.internal.CardRoleRequiredException;
-import org.courtside.card.BookingCard;
-import org.courtside.card.internal.BookingCardRepository;
+import org.courtside.card.CardService;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.DomainFailure;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +54,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
     private MemberRepository members;
 
     @Autowired
-    private BookingCardRepository cards;
+    private CardService cards;
 
     @Autowired
     private FacilityTestFixture facilityFixture;
@@ -72,8 +71,8 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
-        memberOnlyCardId = cards.save(new BookingCard("Members only", "#B85C38",
-                Set.of(Role.MEMBER), Set.of(), new short[]{}, false, false, false)).getId();
+        memberOnlyCardId = cards.createCard("Members only", "#B85C38",
+                Set.of(Role.MEMBER), Set.of(), new short[]{}, false, false, false).getId();
     }
 
     @Test
@@ -106,7 +105,9 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
         assertThat(account.isEnabled()).isTrue();
         assertThat(account.getRoles()).containsExactly(Role.TREASURER);
         assertThatThrownBy(() -> bookings.create(bookingFor(richard, account.getRoles())))
-                .isInstanceOf(CardRoleRequiredException.class);
+                .isInstanceOfSatisfying(DomainFailure.class,
+                        failure -> assertThat(failure.problemType().slug())
+                                .isEqualTo("card-role-required"));
     }
 
     @Test
@@ -140,8 +141,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
         // given
         UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
         UserAccount account = account(john, "roe.john", Set.of(Role.MEMBER));
-        account.disable();
-        accounts.saveAndFlush(account);
+        identity.disableAccount(account.getId());
 
         // when
         sync.apply(new RosterChangeSet(List.of(), List.of(new RosterChangeSet.PersonCorrection(

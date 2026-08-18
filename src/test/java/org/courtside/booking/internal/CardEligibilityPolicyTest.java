@@ -14,6 +14,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.courtside.card.testfixture.CardTestFixture.bookingCardAllowing;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,7 +38,7 @@ class CardEligibilityPolicyTest {
     @Test
     void givenAnInactiveCard_whenRequiringEligibility_thenTheTypedInactiveFailureIsRaised() {
         // given
-        BookingCard card = cardAllowing(Role.MEMBER);
+        BookingCard card = bookingCardAllowing(Role.MEMBER);
         card.deactivate();
         when(cards.findCard(card.getId())).thenReturn(Optional.of(card));
 
@@ -50,7 +51,7 @@ class CardEligibilityPolicyTest {
     @Test
     void givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned() {
         // given
-        BookingCard card = cardAllowing(Role.TRAINER);
+        BookingCard card = bookingCardAllowing(Role.TRAINER);
         when(cards.findCard(card.getId())).thenReturn(Optional.of(card));
 
         // when
@@ -63,7 +64,7 @@ class CardEligibilityPolicyTest {
     @Test
     void givenOnlyAnotherRole_whenRequiringEligibility_thenTheRoleFailureIsRaised() {
         // given
-        BookingCard card = cardAllowing(Role.TRAINER);
+        BookingCard card = bookingCardAllowing(Role.TRAINER);
         when(cards.findCard(card.getId())).thenReturn(Optional.of(card));
 
         // when / then
@@ -74,7 +75,7 @@ class CardEligibilityPolicyTest {
     @Test
     void givenAnAdministrator_whenRequiringEligibility_thenTheRequiredRoleIsBypassed() {
         // given
-        BookingCard card = cardAllowing(Role.TRAINER);
+        BookingCard card = bookingCardAllowing(Role.TRAINER);
         when(cards.findCard(card.getId())).thenReturn(Optional.of(card));
 
         // when
@@ -86,10 +87,5 @@ class CardEligibilityPolicyTest {
 
     private CardEligibilityPolicy policy() {
         return new CardEligibilityPolicy(cards);
-    }
-
-    private BookingCard cardAllowing(Role... roles) {
-        return new BookingCard("Training", "#34584A", Set.of(roles), Set.of(),
-                new short[]{}, false, false, false);
     }
 }

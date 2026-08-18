@@ -913,9 +913,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
                         .with(user("doe.jane").roles("MEMBER"))
                         .with(csrf()))
                 .andExpect(status().isCreated());
-        UserAccount account = accounts.findByUsername("doe.jane").orElseThrow();
-        account.requirePasswordChange();
-        accounts.save(account);
+        identity.requirePasswordChange("doe.jane");
 
         // when / then
         mockMvc.perform(get("/api/bookings").param("date", "2026-05-12")

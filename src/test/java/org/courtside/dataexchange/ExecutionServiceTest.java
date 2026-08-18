@@ -3,7 +3,6 @@ package org.courtside.dataexchange;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberRepository;
@@ -323,8 +322,6 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     }
 
     private void rename(UUID personId, String firstName) {
-        Person person = persons.findById(personId).orElseThrow();
-        person.rename(firstName, person.getLastName());
-        persons.saveAndFlush(person);
+        identity.renamePerson(personId, firstName, persons.findById(personId).orElseThrow().getLastName());
     }
 }
