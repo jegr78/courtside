@@ -130,11 +130,14 @@ not have. The suite therefore skips itself off that platform: a local `mvn verif
 not compare pixels, and does not exercise these journeys either. Semantic assertions in the other
 specs remain the local evidence for them.
 
-A deliberate UI change updates the baselines by taking what the gate rendered. The build publishes
-`frontend/e2e/visual-regression.spec.ts-snapshots` with the test evidence, so a run that fails on a
-changed or missing baseline carries the replacement PNG as an artifact, whatever the author's
-operating system. The pull request must expose the changed PNG baselines for review. Unreviewed
-dimension-only screenshots remain diagnostic artifacts and never replace these assertions.
+A deliberate UI change updates the baselines by taking what the gate rendered. The suite pins
+`updateSnapshots: "none"`, so a run never writes a baseline into the source tree and a missing one
+fails as loudly as a changed one; Playwright's own default would write it and let the run report a
+soft error instead. What the run rendered leaves as `-actual.png` under `frontend/test-results`,
+which the build already publishes with the test evidence, so the replacement PNG is obtainable
+whatever the author's operating system. The pull request must expose the changed PNG baselines for
+review. Unreviewed dimension-only screenshots remain diagnostic artifacts and never replace these
+assertions.
 
 ### Operations and release
 

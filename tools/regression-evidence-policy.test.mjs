@@ -16,15 +16,18 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
   }
   // A missing baseline is Playwright's to report, and it does so by failing the run that would
   // have compared it; what cannot report itself is a file kept for a host that gates nothing.
-  assert.equal(existsSync(snapshots), true);
-  const reviewed = readdirSync(snapshots).filter((file) => file.endsWith(".png"));
+  const reviewed = existsSync(snapshots)
+    ? readdirSync(snapshots).filter((file) => file.endsWith(".png"))
+    : [];
   assert.deepEqual(reviewed.filter((file) => /-(darwin|linux)\.png$/.test(file)), []);
 });
 
 test("given visual baselines, when running them on different hosts, then their path and rendering controls stay deterministic", () => {
   assert.doesNotMatch(playwright, /snapshotPathTemplate:.*\{platform\}/);
   assert.match(visual, /test\.skip\(process\.platform !== "linux"/);
-  assert.doesNotMatch(visual, /toHaveScreenshot\(page,/);
+  assert.doesNotMatch(visual, /expect\(page\)\.toHaveScreenshot/);
+  assert.doesNotMatch(visual, /stableScreenshot\(page,/);
+  assert.match(playwright, /updateSnapshots: "none"/);
   assert.doesNotMatch(visual, /fullPage/);
   assert.match(visual, /animations: "disabled"/);
   assert.match(visual, /caret: "hide"/);

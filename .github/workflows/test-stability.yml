@@ -71,6 +71,7 @@ jobs:
           name: browser-isolation-${{ github.run_id }}
           path: |
             frontend/test-results/visual-journeys
+            frontend/test-results/**/*.png
           if-no-files-found: warn
           retention-days: 14
 

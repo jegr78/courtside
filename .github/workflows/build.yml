@@ -101,7 +101,6 @@ jobs:
             frontend/coverage
             build/coverage/changed.md
             frontend/test-results/visual-journeys
-            frontend/e2e/visual-regression.spec.ts-snapshots
             frontend/test-results/**/trace.zip
             frontend/test-results/**/*.png
             build/security/summary.json

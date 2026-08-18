@@ -53,7 +53,8 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await expect(page.getByTestId("move-preview")).toBeVisible();
 
   // then
-  await stableScreenshot(page.getByTestId("move-preview"), "series-preview.png", page.getByTestId("move-preview").locator("p"));
+  await stableScreenshot(page.getByRole("dialog"), "series-preview.png",
+    page.getByTestId("move-preview").locator("li p"));
 });
 
 test("stable administration surfaces match their reviewed baselines", async ({ page }) => {
