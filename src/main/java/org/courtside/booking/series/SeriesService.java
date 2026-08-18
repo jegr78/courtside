@@ -24,14 +24,12 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.BookingAccessControl;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingRuleGate;
-import org.courtside.booking.internal.CardNotBookableException;
-import org.courtside.booking.internal.CardRoleRequiredException;
+import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.card.BookingCard;
-import org.courtside.card.CardService;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
@@ -53,7 +51,7 @@ public class SeriesService {
     private final BookingSeriesRepository seriesRepository;
     private final BookingRepository bookingRepository;
     private final FacilityService facility;
-    private final CardService cards;
+    private final CardEligibilityPolicy cardEligibility;
     private final BookingRuleGate ruleGate;
     private final BookingAccessControl accessControl;
     private final ParticipantCardCapacity participantCardCapacity;
@@ -68,7 +66,7 @@ public class SeriesService {
                          BookingSeriesRepository seriesRepository,
                          BookingRepository bookingRepository,
                          FacilityService facility,
-                         CardService cards,
+                         CardEligibilityPolicy cardEligibility,
                          BookingRuleGate ruleGate,
                          BookingAccessControl accessControl,
                          ParticipantCardCapacity participantCardCapacity,
@@ -82,7 +80,7 @@ public class SeriesService {
         this.seriesRepository = seriesRepository;
         this.bookingRepository = bookingRepository;
         this.facility = facility;
-        this.cards = cards;
+        this.cardEligibility = cardEligibility;
         this.ruleGate = ruleGate;
         this.accessControl = accessControl;
         this.participantCardCapacity = participantCardCapacity;
@@ -95,7 +93,8 @@ public class SeriesService {
     @Transactional(readOnly = true)
     public SeriesPreview preview(SeriesRule rule, UUID bookedBy, UUID bookedByPersonId,
                                  Set<Role> callerRoles) {
-        requireBookableCard(rule.cardId());
+        BookingCard card = cardEligibility.requireActive(rule.cardId());
+        requireCardDoesNotTrackPlayers(card);
         facility.requireBookableCourts(rule.courtIds());
         SeriesSchedule.Expansion expansion = expandWithinLimit(rule);
         List<SeriesPreview.Occurrence> occurrences = expansion.slots().stream()
@@ -114,7 +113,8 @@ public class SeriesService {
         }
         requireOfferedBySchedule(rule, confirmedStarts);
         facility.requireBookableCourts(rule.courtIds());
-        requireBookableCard(rule.cardId(), callerRoles);
+        BookingCard card = cardEligibility.requireEligible(rule.cardId(), callerRoles);
+        requireCardDoesNotTrackPlayers(card);
 
         BookingSeries series = seriesRepository.saveAndFlush(
                 new BookingSeries(rule, bookedBy, note, clock.instant()));
@@ -145,28 +145,6 @@ public class SeriesService {
             return new SeriesCreationResult(null, created, skipped);
         }
         return new SeriesCreationResult(series.getId(), created, skipped);
-    }
-
-    private BookingCard requireBookableCard(UUID cardId) {
-        BookingCard card = cards.findCard(cardId)
-                .orElseThrow(() -> new CardNotBookableException(
-                        "card.unknown", Map.of("field", "cardId")));
-        if (!card.isActive()) {
-            throw new CardNotBookableException("card.inactive", Map.of("field", "cardId"));
-        }
-        requireCardDoesNotTrackPlayers(card);
-        return card;
-    }
-
-    private void requireBookableCard(UUID cardId, Set<Role> callerRoles) {
-        BookingCard card = requireBookableCard(cardId);
-        if (callerRoles.contains(Role.ADMIN)) {
-            return;
-        }
-        if (!card.permits(callerRoles)) {
-            throw new CardRoleRequiredException(
-                    "Card %s requires one of roles %s".formatted(card.getId(), card.getAllowedRoles()));
-        }
     }
 
     private void requireCardDoesNotTrackPlayers(BookingCard card) {

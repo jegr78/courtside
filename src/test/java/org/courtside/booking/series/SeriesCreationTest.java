@@ -4,9 +4,11 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
-import org.courtside.booking.internal.CardRoleRequiredException;
 import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.internal.CardNotBookableException;
+import org.courtside.booking.internal.CardRoleRequiredException;
 import org.courtside.booking.internal.ParticipantsInvalidException;
+import org.courtside.card.CardService;
 import org.courtside.facility.Court;
 import org.courtside.facility.CourtRepository;
 import org.courtside.facility.OpeningHours;
@@ -55,6 +57,9 @@ class SeriesCreationTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingRepository bookings;
+
+    @Autowired
+    private CardService cards;
 
     @Autowired
     private BookingSeriesRepository seriesRepository;
@@ -215,6 +220,67 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACallerLacksTheRequiredCardRole_whenWritingIndividualAndSeriesBookings_thenBothRejectIt() {
+        // given
+        SeriesRule rule = rule(1);
+        List<Instant> confirmed = starts(seriesService.preview(
+                rule, UUID.randomUUID(), null, Set.of(Role.MEMBER)));
+        CreateBookingCommand individual = commandAt(
+                Instant.parse("2026-04-08T16:00:00Z"), Set.of(Role.MEMBER));
+
+        // when / then
+        assertThatThrownBy(() -> bookingService.create(individual))
+                .isInstanceOf(CardRoleRequiredException.class);
+        assertThatThrownBy(() -> seriesService.create(rule, confirmed, UUID.randomUUID(), null,
+                Set.of(Role.MEMBER), "Team training"))
+                .isInstanceOf(CardRoleRequiredException.class);
+        assertThat(bookings.count()).isZero();
+        assertThat(seriesRepository.count()).isZero();
+    }
+
+    @Test
+    void givenAnInactiveCard_whenWritingIndividualAndSeriesBookings_thenBothRejectItWithTheSameCode() {
+        // given
+        SeriesRule rule = rule(1);
+        List<Instant> confirmed = starts(previewAsTrainer(rule));
+        cards.setCardActive(TRAINING_CARD, false);
+        CreateBookingCommand individual = commandAt(
+                Instant.parse("2026-04-08T16:00:00Z"), Set.of(Role.TRAINER));
+
+        // when / then
+        assertThatThrownBy(() -> bookingService.create(individual))
+                .isInstanceOfSatisfying(CardNotBookableException.class,
+                        failure -> assertThat(failure.getCode()).isEqualTo("card.inactive"));
+        assertThatThrownBy(() -> seriesService.create(rule, confirmed, UUID.randomUUID(), null,
+                Set.of(Role.TRAINER), "Team training"))
+                .isInstanceOfSatisfying(CardNotBookableException.class,
+                        failure -> assertThat(failure.getCode()).isEqualTo("card.inactive"));
+        assertThat(bookings.count()).isZero();
+        assertThat(seriesRepository.count()).isZero();
+    }
+
+    @Test
+    void givenAnAdministrator_whenWritingIndividualAndSeriesBookings_thenBothBypassTheRequiredRole() {
+        // given
+        SeriesRule rule = rule(1);
+        List<Instant> confirmed = starts(seriesService.preview(
+                rule, UUID.randomUUID(), null, Set.of(Role.ADMIN)));
+        CreateBookingCommand individual = commandAt(
+                Instant.parse("2026-04-08T16:00:00Z"), Set.of(Role.ADMIN));
+
+        // when
+        UUID bookingId = bookingService.create(individual);
+        SeriesCreationResult result = seriesService.create(rule, confirmed, UUID.randomUUID(), null,
+                Set.of(Role.ADMIN), "Team training");
+
+        // then
+        assertThat(bookingId).isNotNull();
+        assertThat(result.bookingIds()).hasSize(1);
+        assertThat(bookings.count()).isEqualTo(2);
+        assertThat(seriesRepository.count()).isOne();
+    }
+
+    @Test
     void givenACardThatTracksPlayers_whenCreating_thenItIsRejectedAndNoSeriesRowIsWritten() {
         // given
         List<Instant> confirmed = starts(previewAsTrainer(rule(4)));
@@ -345,6 +411,12 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     private SeriesCreationResult create(List<Instant> confirmed) {
         return seriesService.create(rule(4), confirmed, UUID.randomUUID(), null,
                 Set.of(Role.TRAINER), "Team training");
+    }
+
+    private CreateBookingCommand commandAt(Instant start, Set<Role> roles) {
+        return new CreateBookingCommand(
+                List.of(courtOne), TRAINING_CARD, new TimeSlot(start, start.plus(2, ChronoUnit.HOURS)),
+                UUID.randomUUID(), null, roles, "Team training", List.of(), null);
     }
 
     private SeriesRule rule(int count) {

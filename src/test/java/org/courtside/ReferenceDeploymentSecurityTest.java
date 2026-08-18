@@ -74,6 +74,17 @@ class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void whenReadingTheContainerEntrypoint_thenUnsupportedUnsafeAccessIsDenied() throws IOException {
+        // when
+        String dockerfile = Files.readString(Path.of("Dockerfile"));
+
+        // then
+        assertThat(dockerfile)
+                .contains("--sun-misc-unsafe-memory-access=deny")
+                .doesNotContain("--sun-misc-unsafe-memory-access=allow");
+    }
+
+    @Test
     void whenReadingComposeFile_thenApplicationPortIsBoundToLoopback() throws IOException {
         // when
         String compose = Files.readString(Path.of("deploy/compose.yaml"));

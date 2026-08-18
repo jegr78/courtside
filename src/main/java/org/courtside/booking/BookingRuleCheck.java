@@ -23,8 +23,4 @@ public record BookingRuleCheck(
         }
     }
 
-    static BookingRuleCheck of(CreateBookingCommand command) {
-        return new BookingRuleCheck(command.courtIds(), command.cardId(), command.slot(),
-                command.bookedBy(), command.bookedByPersonId(), command.callerRoles());
-    }
 }

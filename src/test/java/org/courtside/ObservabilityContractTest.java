@@ -24,6 +24,19 @@ class ObservabilityContractTest {
     }
 
     @Test
+    void whenRunningTelemetry_thenUnsupportedUnsafeAccessIsDeniedAndTheKnownFallbackNoticeIsQuiet()
+            throws IOException {
+        // given
+        String pom = Files.readString(PROJECT.resolve("pom.xml"));
+        String configuration = Files.readString(PROJECT.resolve("src/main/resources/application.yaml"));
+
+        // when / then
+        assertThat(pom).contains("<argLine>@{jacocoArgLine} -Xshare:off "
+                + "--sun-misc-unsafe-memory-access=deny -javaagent:");
+        assertThat(configuration).contains("com.google.protobuf.UnsafeUtil: ERROR");
+    }
+
+    @Test
     void whenInspectingDefaultConfiguration_thenTelemetryExportRequiresExplicitOptIn() throws IOException {
         // given
         String configuration = Files.readString(PROJECT.resolve("src/main/resources/application.yaml"));

@@ -4,8 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingAccessControl;
 import org.courtside.booking.internal.BookingRuleGate;
-import org.courtside.booking.internal.CardNotBookableException;
-import org.courtside.booking.internal.CardRoleRequiredException;
+import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantKind;
 import org.courtside.booking.internal.ParticipantCardCapacity;
@@ -47,6 +46,7 @@ class BookingWriter {
     private final BookingRuleGate ruleGate;
     private final BookingAccessControl accessControl;
     private final CardService cards;
+    private final CardEligibilityPolicy cardEligibility;
     private final FacilityService facility;
     private final PersonRepository personRepository;
     private final ParticipantCardCapacity participantCardCapacity;
@@ -60,15 +60,10 @@ class BookingWriter {
     UUID write(CreateBookingCommand command, String idempotencyKey, String requestFingerprint) {
         bookingGridCoordination.lock();
         facility.requireBookableCourts(command.courtIds());
-        BookingCard card = requireBookableCard(command.cardId());
-
-        boolean overridesRestrictions = command.callerRoles().contains(Role.ADMIN);
-
-        if (!overridesRestrictions) {
-            checkRequiredRole(card, command.callerRoles());
-        }
+        BookingCard card = cardEligibility.requireEligible(command.cardId(), command.callerRoles());
         List<ParticipantSpec> slots = resolveSlots(card, command);
-        ruleGate.requireNoViolations(BookingRuleCheck.of(command));
+        ruleGate.requireNoViolations(new BookingRuleCheck(command.courtIds(), command.cardId(), command.slot(),
+                command.bookedBy(), command.bookedByPersonId(), command.callerRoles()));
 
         Booking booking = new Booking(
                 command.cardId(), command.bookedBy(), command.note(), clock.instant());
@@ -103,16 +98,6 @@ class BookingWriter {
         bookings.saveAndFlush(booking);
     }
 
-    private BookingCard requireBookableCard(UUID cardId) {
-        BookingCard card = cards.findCard(cardId)
-                .orElseThrow(() -> new CardNotBookableException(
-                        "card.unknown", Map.of("field", "cardId")));
-        if (!card.isActive()) {
-            throw new CardNotBookableException("card.inactive", Map.of("field", "cardId"));
-        }
-        return card;
-    }
-
     private boolean isOverlap(DataIntegrityViolationException e) {
         return isConstraint(e, OVERLAP_CONSTRAINT);
     }
@@ -120,13 +105,6 @@ class BookingWriter {
     private boolean isConstraint(DataIntegrityViolationException e, String constraint) {
         String message = e.getMostSpecificCause().getMessage();
         return message != null && message.contains(constraint);
-    }
-
-    private void checkRequiredRole(BookingCard card, Set<Role> callerRoles) {
-        if (!card.permits(callerRoles)) {
-            throw new CardRoleRequiredException(
-                    "Card %s requires one of roles %s".formatted(card.getId(), card.getAllowedRoles()));
-        }
     }
 
     private List<ParticipantSpec> resolveSlots(BookingCard card, CreateBookingCommand command) {
