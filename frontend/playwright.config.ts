@@ -17,9 +17,9 @@ export default defineConfig({
   workers: 1,
   timeout: 60_000,
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.005 } },
-  // A run never writes a baseline into the tree: missing and changed are both hard failures, and
-  // what it rendered leaves as an artifact instead. Playwright's own default would write and pass.
-  updateSnapshots: "none",
+  // Pinned so nobody reaches "changed" or "all", under which a missing baseline passes silently.
+  // "missing" writes the new baseline for collection and still fails the run that needed it.
+  updateSnapshots: "missing",
   use: {
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

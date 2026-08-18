@@ -113,30 +113,30 @@ Each row is deliberately about a material invariant rather than an individual te
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | UI-1 | P1 | Medium | Core public, member and administration journeys are keyboard-operable and meet automatable WCAG 2.2 AA requirements. | German and English journeys remain operable by keyboard with correct dialog and focus behaviour. | Error states, zoom and user preferences introduce no automatable WCAG 2.2 AA violation or focus loss. | React, E2E, manual | PR, release | Browser matrix | Stable accessible fixtures | Axe, journey trace and release checklist | Frontend | Full automation and manual evidence are tracked by #216. |
 | UI-2 | P0 | Low | PWA caching and browser history never serve personal API data after logout, expiry or offline transition. | Install, update, offline shell and reconnect preserve public application availability. | Logout, expiry, Back or Forward, old assets and multiple tabs cannot reveal cached personal API data. | React, E2E, deployment smoke | PR, nightly, release | Chromium, WebKit and periodic Firefox/mobile matrix | Synthetic member sessions | Browser traces, cache inspection and linked device record | Frontend and identity | Physical-device evidence remains manual because emulation cannot prove operating-system integration. |
-| UI-3 | P2 | Medium | Layout, localization and interaction remain usable at supported viewports and content extremes. | Supported mobile, tablet and desktop layouts work in both themes and locales. | Long content and empty, single or many-court states do not hide or block interaction. | React, E2E | PR, periodic | Chromium plus supported matrix | Deterministic visual dataset | Semantic assertions and reviewed pixel baselines | Frontend | Broad locale, theme and viewport captures remain diagnostic; seven principal surfaces have blocking stable baselines, rendered on the gating platform only. |
+| UI-3 | P2 | Medium | Layout, localization and interaction remain usable at supported viewports and content extremes. | Supported mobile, tablet and desktop layouts work in both themes and locales. | Long content and empty, single or many-court states do not hide or block interaction. | React, E2E | PR, periodic | Chromium plus supported matrix | Deterministic visual dataset | Semantic assertions and reviewed pixel baselines | Frontend | Broad locale, theme and viewport captures remain diagnostic; seven principal surfaces have blocking stable baselines, rendered in a pinned browser image. |
 
-The blocking Chromium pixel suite fixes locale, theme, viewport, journey data, fonts, animations,
-caret rendering, and dynamic-field masks. Each assertion captures the surface under test rather
-than the whole page, so a change to one surface cannot move a neighbour's baseline: the
+The blocking Chromium pixel suite fixes locale, theme, viewport, timezone, journey data, fonts,
+animations, caret rendering, and dynamic-field masks. Each assertion captures the surface under test
+rather than the whole page, so a change to one surface cannot move a neighbour's baseline: the
 series-preview and booking dialogs are captured as dialogs, not as dialogs over the page behind
-them. Build identity needs no mask any more — the footer carrying it sits outside every captured
-surface. It covers the court plan, booking and validation dialogs, personal bookings,
-series preview, and both administration surfaces.
+them. Build identity needs no mask — the footer carrying it sits outside every captured surface. It
+covers the court plan, booking and validation dialogs, personal bookings, series preview, and both
+administration surfaces.
 
-There is one reviewed rendering per surface and it is produced on the platform the gate runs on,
-which is Linux. A second platform's baseline gated nothing and could not be written by whoever was
-not sitting on that platform, so every deliberate UI change was blocked on a host its author might
-not have. The suite therefore skips itself off that platform: a local `mvn verify` elsewhere does
-not compare pixels, and does not exercise these journeys either. Semantic assertions in the other
-specs remain the local evidence for them.
+**The renderer is pinned, not the host.** The suite draws in the Playwright image matching the
+installed Playwright version, addressed by digest, started as a browser server by the journey
+service and reached over `chromium.connect`; the application under test stays on the host and the
+container reaches it through the Testcontainers host tunnel. One reviewed baseline per surface
+therefore holds on every machine with Docker, `mvn verify` compares pixels wherever it runs, and a
+red run means a regression rather than a different operating system. There is exactly one PNG per
+surface and no platform suffix.
 
-A deliberate UI change updates the baselines by taking what the gate rendered. The suite pins
-`updateSnapshots: "none"`, so a run never writes a baseline into the source tree and a missing one
-fails as loudly as a changed one; Playwright's own default would write it and let the run report a
-soft error instead. What the run rendered leaves as `-actual.png` under `frontend/test-results`,
-which the build already publishes with the test evidence, so the replacement PNG is obtainable
-whatever the author's operating system. The pull request must expose the changed PNG baselines for
-review. Unreviewed dimension-only screenshots remain diagnostic artifacts and never replace these
+A deliberate UI change updates the baselines the same way anywhere:
+`npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots`, then
+commit what changed. The suite pins `updateSnapshots: "missing"`; the values nobody may reach are
+`changed` and `all`, under which a missing baseline is created and the run **passes**, so a deleted
+baseline would go unnoticed. The pull request must expose the changed PNG baselines for review.
+Unreviewed dimension-only screenshots remain diagnostic artifacts and never replace these
 assertions.
 
 ### Operations and release
