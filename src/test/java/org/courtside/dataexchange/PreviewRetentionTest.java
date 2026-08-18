@@ -7,8 +7,7 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
-import org.courtside.member.Member;
-import org.courtside.member.MemberRepository;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,14 +16,13 @@ import org.springframework.context.annotation.Import;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(IdentityTestFixture.class)
+@Import({IdentityTestFixture.class, MemberTestFixture.class})
 class PreviewRetentionTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID =
@@ -55,7 +53,7 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
-    private MemberRepository members;
+    private MemberTestFixture members;
 
     @Autowired
     private UserAccountRepository accounts;
@@ -126,7 +124,7 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
     private UUID memberLinkedAs(String externalId, String firstName, String lastName) {
         UUID personId = identity.createPerson(firstName, lastName,
                 firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org");
-        members.save(new Member(personId, MEMBERSHIP_TYPE_ID, LocalDate.of(2026, 1, 1)));
+        members.assignMembership(personId, MEMBERSHIP_TYPE_ID);
         references.link(source, externalId, personId);
         return personId;
     }

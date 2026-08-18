@@ -8,8 +8,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
-import org.courtside.member.Member;
-import org.courtside.member.MemberRepository;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.TimeSlot;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +29,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -43,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import({BookingTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({BookingTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD_RULE_SET =
@@ -69,7 +67,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
-    private MemberRepository members;
+    private MemberTestFixture members;
 
     private MockMvc mockMvc;
 
@@ -232,7 +230,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
         UUID personId = identity.createPerson("Jane", "Doe", "jane@example.org");
-        members.save(memberSince(personId, STANDARD_MEMBERSHIP));
+        members.assignMembership(personId, STANDARD_MEMBERSHIP);
         Instant eightDaysOut = NOW.plus(8, ChronoUnit.DAYS);
 
         // when / then

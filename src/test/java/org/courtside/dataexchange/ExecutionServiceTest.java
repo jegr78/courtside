@@ -7,7 +7,7 @@ import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberRepository;
-import org.courtside.member.MemberService;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(IdentityTestFixture.class)
+@Import({IdentityTestFixture.class, MemberTestFixture.class})
 class ExecutionServiceTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
@@ -58,7 +58,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     private UserAccountRepository accounts;
 
     @Autowired
-    private MemberService memberships;
+    private MemberTestFixture memberFixture;
 
     private UUID source;
     private UUID actor;
@@ -226,7 +226,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
                 4712,John,Roe,john.roe@example.org,A
                 """.getBytes(StandardCharsets.UTF_8), actor).previewId();
         long peopleBefore = persons.count();
-        memberships.setMembershipTypeActive(ACTIVE_TYPE, false);
+        memberFixture.deactivateMembershipType(ACTIVE_TYPE);
 
         // when / then
         assertThatThrownBy(() -> executions.execute(previewId, false, actor))
