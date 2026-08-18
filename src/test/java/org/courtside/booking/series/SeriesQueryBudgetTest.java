@@ -13,7 +13,6 @@ import org.courtside.member.MemberRepository;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.TestReporter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,8 +77,7 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(ints = {1, 20, 200})
-    void givenASeriesSize_whenMeasuringCreatePreview_thenStableRuleQueriesStayBounded(
-            int count, TestReporter reporter) {
+    void givenASeriesSize_whenMeasuringCreatePreview_thenStableRuleQueriesStayBounded(int count) {
         // given
         SeriesRule rule = dailyRule(count);
         queries.reset();
@@ -88,7 +86,6 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         SeriesPreview preview = seriesService.preview(
                 rule, trainer, trainerPersonId, Set.of(Role.TRAINER));
         SqlStatementCounter.Snapshot snapshot = queries.snapshot();
-        reporter.publishEntry("create-preview-" + count, snapshot.toString());
 
         // then
         assertThat(preview.occurrences()).hasSize(count);
@@ -98,8 +95,7 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(ints = {1, 20, 200})
-    void givenASeriesSize_whenMeasuringMovePreviewAndMove_thenStableRuleQueriesStayBounded(
-            int count, TestReporter reporter) {
+    void givenASeriesSize_whenMeasuringMovePreviewAndMove_thenStableRuleQueriesStayBounded(int count) {
         // given
         SeriesCreationResult series = createSeries(count);
         MoveRequest request = new MoveRequest(
@@ -110,11 +106,9 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         // when
         MovePreview preview = seriesService.previewMove(request, trainer, Set.of(Role.ADMIN));
         SqlStatementCounter.Snapshot previewSnapshot = queries.snapshot();
-        reporter.publishEntry("move-preview-" + count, previewSnapshot.toString());
         queries.reset();
         int moved = seriesService.move(request, trainer, Set.of(Role.ADMIN));
         SqlStatementCounter.Snapshot moveSnapshot = queries.snapshot();
-        reporter.publishEntry("move-" + count, moveSnapshot.toString());
 
         // then
         assertThat(preview.moves()).hasSize(count);
