@@ -39,6 +39,7 @@ beforeEach(async () => {
       status: "CONFIRMED"
     }
   ] });
+  vi.spyOn(api, "participations").mockResolvedValue({ items: [] });
   vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
   vi.spyOn(api, "previewSeriesMove").mockResolvedValue({
     executable: true,
@@ -292,4 +293,66 @@ it("given a move is blocked, when previewed, then every reason is translated and
   expect(screen.getByTestId("occupied-courts")).toHaveTextContent("Occupied courts: Centre Court");
   expect(screen.getByTestId("unavailable-courts")).toHaveTextContent("Unavailable courts: Centre Court");
   expect(screen.getByTestId("confirm-move")).toBeDisabled();
+});
+
+const participationId = "55555555-5555-5555-5555-555555555555";
+
+function participation(id: string) {
+  return {
+    id,
+    courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-19T16:00:00Z",
+    endsAt: "2026-08-19T17:00:00Z",
+    cardLabel: "Member booking",
+    cardColor: "#176b55",
+    status: "CONFIRMED" as const
+  };
+}
+
+function recordedAsCoPlayer() {
+  vi.spyOn(api, "participations").mockResolvedValue({ items: [participation(participationId)] });
+}
+
+it("given somebody named this member, when the page loads, then the participation is listed", async () => {
+  recordedAsCoPlayer();
+
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+
+  expect(await screen.findByTestId(`participation-${participationId}`)).toBeInTheDocument();
+});
+
+it("given a listed participation, when the member withdraws, then it is sent and the page reloads", async () => {
+  recordedAsCoPlayer();
+  const withdraw = vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
+
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("withdraw-participation"));
+
+  await waitFor(() => expect(withdraw).toHaveBeenCalledWith(participationId));
+  await waitFor(() => expect(api.participations).toHaveBeenCalledTimes(2));
+});
+
+it("given the withdrawal fails, when the member tries, then the reason is shown rather than swallowed", async () => {
+  recordedAsCoPlayer();
+  vi.spyOn(api, "withdrawParticipation").mockRejectedValue(
+    { status: 404, problem: { type: "urn:courtside:error:participation-not-found" } });
+
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("withdraw-participation"));
+
+  expect(await screen.findByRole("alert")).toBeInTheDocument();
+});
+
+it("given more participations than one page, when the member asks for more, then the next page is appended", async () => {
+  const second = "66666666-6666-6666-6666-666666666666";
+  vi.spyOn(api, "participations")
+    .mockResolvedValueOnce({ items: [participation(participationId)], nextCursor: participationId })
+    .mockResolvedValueOnce({ items: [participation(second)] });
+
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("load-more-participations"));
+
+  expect(await screen.findByTestId(`participation-${second}`)).toBeInTheDocument();
+  expect(screen.getByTestId(`participation-${participationId}`)).toBeInTheDocument();
+  expect(screen.queryByTestId("load-more-participations")).not.toBeInTheDocument();
 });

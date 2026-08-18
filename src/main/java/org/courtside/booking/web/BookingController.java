@@ -5,6 +5,8 @@ import org.courtside.api.ApiBookingCreated;
 import org.courtside.api.ApiCreateBookingRequest;
 import org.courtside.api.ApiBookingStatus;
 import org.courtside.api.ApiPersonalBooking;
+import org.courtside.api.ApiParticipation;
+import org.courtside.api.ApiParticipationPage;
 import org.courtside.api.ApiPersonalBookingPage;
 import org.courtside.api.ApiManagedAppointment;
 import org.courtside.api.ApiManagedAppointmentDetail;
@@ -16,6 +18,8 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.ParticipationPage;
+import org.courtside.booking.ParticipationService;
 import org.courtside.booking.PersonalBookingPage;
 import org.courtside.booking.Booking;
 import org.courtside.booking.internal.AllocationVisibilityService;
@@ -50,6 +54,7 @@ class BookingController implements BookingsApi {
     private final BookingRequestValidator crossFieldRules;
     private final ManagedAppointmentQuery managedAppointments;
     private final ClubTimeZone timeZone;
+    private final ParticipationService participations;
 
     BookingController(BookingService bookings,
                       CardService cards,
@@ -57,7 +62,8 @@ class BookingController implements BookingsApi {
                       AllocationVisibilityService allocationVisibility,
                       BookingRequestValidator crossFieldRules,
                       ManagedAppointmentQuery managedAppointments,
-                      ClubTimeZone timeZone) {
+                      ClubTimeZone timeZone,
+                      ParticipationService participations) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
@@ -65,6 +71,7 @@ class BookingController implements BookingsApi {
         this.crossFieldRules = crossFieldRules;
         this.managedAppointments = managedAppointments;
         this.timeZone = timeZone;
+        this.participations = participations;
     }
 
     @InitBinder
@@ -130,6 +137,43 @@ class BookingController implements BookingsApi {
                 })
                 .toList();
         return ResponseEntity.ok(new ApiPersonalBookingPage(items).nextCursor(page.nextCursor()));
+    }
+
+    @Override
+    public ResponseEntity<ApiParticipationPage> listOwnParticipations(UUID cursor, Integer limit) {
+        UserAccount account = currentUser.requireAccount();
+        Map<UUID, BookingCard> cardsById = cards.allCards().stream()
+                .collect(Collectors.toMap(BookingCard::getId, card -> card));
+        ParticipationPage page = participations.participations(
+                personIdOf(account), account.getId(), cursor, limit);
+        List<ApiParticipation> items = page.bookings().stream()
+                .map(booking -> toParticipation(booking, cardsById.get(booking.getCardId())))
+                .toList();
+        return ResponseEntity.ok(new ApiParticipationPage(items).nextCursor(page.nextCursor()));
+    }
+
+    @Override
+    public ResponseEntity<Void> removeOwnParticipation(UUID bookingId) {
+        UserAccount account = currentUser.requireAccount();
+        participations.withdraw(bookingId, personIdOf(account), account.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    private static ApiParticipation toParticipation(Booking booking, BookingCard card) {
+        List<CourtAllocation> allocations = booking.getAllocations();
+        CourtAllocation first = allocations.getFirst();
+        return new ApiParticipation(
+                booking.getId(),
+                allocations.stream().map(CourtAllocation::getCourtId).toList(),
+                WireTypes.toOffsetDateTime(first.getStartsAt()),
+                WireTypes.toOffsetDateTime(first.getEndsAt()),
+                card == null ? "?" : card.getLabel(),
+                card == null ? "#999999" : card.getColor(),
+                ApiBookingStatus.fromValue(booking.getStatus().name()));
+    }
+
+    private static UUID personIdOf(UserAccount account) {
+        return account.getPerson() == null ? null : account.getPerson().getId();
     }
 
     @Override

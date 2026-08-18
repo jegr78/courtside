@@ -66,6 +66,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:membership-type-name-taken",
             "urn:courtside:error:membership-type-not-found",
             "urn:courtside:error:participants-invalid",
+            "urn:courtside:error:participation-not-found",
             "urn:courtside:error:person-account-exists",
             "urn:courtside:error:person-not-found",
             "urn:courtside:error:roster-cursor-unknown",

@@ -1096,6 +1096,22 @@ Consequences for the model and the API:
 - An own member booking carries only the last names of other member participants. The client adds
   its localised viewer marker; guest names never enter the grid response.
 - A booking's participant count is public; the participants are not.
+- **A member is recorded as a co-player without being asked, and can undo it.** Any authenticated
+  account may search the member directory and name anybody, so the record exists before the named
+  member knows of it. `GET /api/my/participations` is how they find out and
+  `DELETE /api/my/participations/{bookingId}` is how they object; neither needs the booker's
+  agreement. Withdrawing takes the member's place out and leaves the booking, its court and its
+  other participants standing — a booking left below its card's player count is not corrected,
+  because an objection is not a rebooking. The list resolves no name at all, not the booker's and
+  not the other participants', so exercising the objection reveals nothing the grid would not.
+  **Built.**
+- **The objection has no time limit and no card exception.** It reaches a booking that has already
+  happened as readily as one still ahead — a member usually learns of the record after the fact, so
+  the past is the case it exists for. It reaches whatever card recorded them, though as shipped only
+  the member booking card records anybody: `allowed_player_counts` is empty for training, league
+  match and court closure, so those carry no roster to leave. A club that gives a managed card
+  player counts gets the objection there too, and the managing role learns of it by reading the
+  appointment detail — there is no notification. **Built.**
 - Guest names are personal data too and follow the same rule.
 - The managed-appointment detail is not the grid. It resolves every participant of the booking,
   guests included, for a card's managing roles and for an admin. Widening a card's managing roles
