@@ -1,14 +1,14 @@
 package org.courtside.rules;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.rules.internal.OpeningHoursRule;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -17,17 +17,18 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Import(FacilityTestFixture.class)
 class OpeningHoursRuleTest extends AbstractIntegrationTest {
 
     @Autowired
     private OpeningHoursRule rule;
 
     @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @BeforeEach
     void setUp() {
-        openingHours.save(new OpeningHours(DayOfWeek.TUESDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+        facilityFixture.setOpeningHours(DayOfWeek.TUESDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
     }
 
     @Test

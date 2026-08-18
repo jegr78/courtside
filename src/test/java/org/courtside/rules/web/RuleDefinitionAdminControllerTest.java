@@ -2,12 +2,9 @@ package org.courtside.rules.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.booking.testfixture.BookingTestFixture;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -47,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import(BookingTestFixture.class)
+@Import({BookingTestFixture.class, FacilityTestFixture.class})
 class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD_RULE_SET =
@@ -67,10 +64,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
     private BookingTestFixture bookingFixture;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -234,9 +228,9 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
     void givenAnAdvanceWindowChangedThroughTheAdminApi_whenBooking_thenTheNewWindowTakesEffect()
             throws Exception {
         // given
-        UUID courtId = courts.save(new Court(1, "Court 1")).getId();
+        UUID courtId = facilityFixture.createCourt(1, "Court 1");
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
         UUID personId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
         members.save(memberSince(personId, STANDARD_MEMBERSHIP));

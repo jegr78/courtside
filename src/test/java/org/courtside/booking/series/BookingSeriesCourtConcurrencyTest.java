@@ -1,12 +1,12 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.postgresql.util.PSQLException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
+@Import(FacilityTestFixture.class)
 class BookingSeriesCourtConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -37,7 +38,7 @@ class BookingSeriesCourtConcurrencyTest extends AbstractIntegrationTest {
     private BookingSeriesRepository series;
 
     @Autowired
-    private CourtRepository courts;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private JdbcClient jdbc;
@@ -49,8 +50,8 @@ class BookingSeriesCourtConcurrencyTest extends AbstractIntegrationTest {
     void givenTwoCourts_whenConcurrentTransactionsRemoveOneEach_thenOneRemovalIsRejected()
             throws Exception {
         // given
-        UUID firstCourt = courts.save(new Court(1, "Court 1")).getId();
-        UUID secondCourt = courts.save(new Court(2, "Court 2")).getId();
+        UUID firstCourt = facilityFixture.createCourt(1, "Court 1");
+        UUID secondCourt = facilityFixture.createCourt(2, "Court 2");
         SeriesRule rule = new SeriesRule(
                 List.of(firstCourt, secondCourt), TRAINING_CARD,
                 LocalDate.of(2026, 4, 7), LocalTime.of(18, 0), 120,

@@ -1,14 +1,13 @@
 package org.courtside.config;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.config.internal.ConfigService;
 import org.courtside.facility.FacilityService;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -19,6 +18,7 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
+@Import(FacilityTestFixture.class)
 class BookingGridCoordinationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -56,7 +57,7 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
     private BookingService bookings;
 
     @Autowired
-    private CourtRepository courts;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -119,7 +120,7 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
     void givenAnUncommittedTimeZoneChange_whenABookingIsCreated_thenTheWriterWaitsForTheChange()
             throws Exception {
         // given
-        UUID courtId = courts.save(new Court(1, "Court 1")).getId();
+        UUID courtId = facilityFixture.createCourt(1, "Court 1");
         UUID personId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
         UUID accountId = UUID.randomUUID();
         facility.setOpeningHours(DayOfWeek.TUESDAY,

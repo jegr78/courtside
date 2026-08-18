@@ -3,7 +3,7 @@ package org.courtside.facility.web;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
+import org.courtside.facility.internal.CourtRepository;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;

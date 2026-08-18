@@ -1,5 +1,6 @@
-package org.courtside.facility;
+package org.courtside.facility.internal;
 
+import org.courtside.facility.OpeningHours;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

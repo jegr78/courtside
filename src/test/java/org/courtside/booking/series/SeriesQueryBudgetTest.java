@@ -1,11 +1,8 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.SqlStatementCounter;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -16,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.DayOfWeek;
@@ -30,6 +28,7 @@ import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@Import(FacilityTestFixture.class)
 class SeriesQueryBudgetTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -44,10 +43,7 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
     private SqlStatementCounter queries;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -61,13 +57,13 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        courtId = courts.save(new Court(1, "Court 1")).getId();
+        courtId = facilityFixture.createCourt(1, "Court 1");
         trainerPersonId = persons.save(new Person("John", "Roe", "john@example.org")).getId();
         members.save(memberSince(trainerPersonId, STANDARD_MEMBERSHIP));
         trainer = UUID.randomUUID();
         Arrays.stream(DayOfWeek.values())
-                .forEach(day -> openingHours.save(new OpeningHours(
-                        day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)))));
+                .forEach(day -> facilityFixture.setOpeningHours(
+                        day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
     }
 
     @AfterEach

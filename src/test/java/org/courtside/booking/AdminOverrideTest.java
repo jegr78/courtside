@@ -2,10 +2,7 @@ package org.courtside.booking;
 
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -16,6 +13,7 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -29,6 +27,7 @@ import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(FacilityTestFixture.class)
 class AdminOverrideTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -50,10 +49,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     private BookingRepository bookings;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -66,11 +62,11 @@ class AdminOverrideTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        courtId = courts.save(new Court(1, "Court 1")).getId();
+        courtId = facilityFixture.createCourt(1, "Court 1");
         bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
 
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 

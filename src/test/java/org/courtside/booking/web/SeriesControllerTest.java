@@ -2,11 +2,8 @@ package org.courtside.booking.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.series.BookingSeriesRepository;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -18,6 +15,7 @@ import org.courtside.member.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -43,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@Import(FacilityTestFixture.class)
 class SeriesControllerTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_MEMBERSHIP =
@@ -54,10 +53,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -78,9 +74,9 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-        courtId = courts.save(new Court(1, "Court 1")).getId();
+        courtId = facilityFixture.createCourt(1, "Court 1");
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
         Person trainer = persons.save(new Person("John", "Roe", "john@example.org"));
         trainerPersonId = trainer.getId();

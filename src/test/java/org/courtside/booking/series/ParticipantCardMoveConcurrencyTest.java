@@ -1,6 +1,7 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.PostgresDiagnostics;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
@@ -8,10 +9,6 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.internal.ParticipantsInvalidException;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -21,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -45,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
+@Import(FacilityTestFixture.class)
 class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -70,10 +69,7 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
     private BookingRepository bookings;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -91,13 +87,12 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        seriesCourt = courts.save(new Court(1, "Court 1")).getId();
-        competingCourt = courts.save(new Court(2, "Court 2")).getId();
+        seriesCourt = facilityFixture.createCourt(1, "Court 1");
+        competingCourt = facilityFixture.createCourt(2, "Court 2");
         trainer = UUID.randomUUID();
         memberPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day,
-                    new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 

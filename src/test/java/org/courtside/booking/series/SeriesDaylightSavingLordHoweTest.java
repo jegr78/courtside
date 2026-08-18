@@ -1,16 +1,14 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.DayOfWeek;
@@ -31,6 +29,7 @@ import java.util.function.Function;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // Lord_Howe shifts half an hour, on other dates, in the opposite direction to Berlin.
+@Import(FacilityTestFixture.class)
 class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -48,10 +47,7 @@ class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
     private SeriesService seriesService;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private JdbcClient jdbc;
@@ -62,10 +58,10 @@ class SeriesDaylightSavingLordHoweTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbc.sql("UPDATE club_config SET time_zone = ?").param(ZONE.getId()).update();
-        court = courts.save(new Court(1, "Court 1")).getId();
+        court = facilityFixture.createCourt(1, "Court 1");
 
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 

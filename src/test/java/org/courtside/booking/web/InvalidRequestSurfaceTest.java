@@ -1,10 +1,7 @@
 package org.courtside.booking.web;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -14,6 +11,7 @@ import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -33,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "doe.jane", roles = "MEMBER")
+@Import(FacilityTestFixture.class)
 class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -43,10 +42,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
     private WebApplicationContext context;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -66,15 +62,12 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day,
-                    new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
-        courtId = courts.save(new Court(1, "Court 1")).getId();
-        secondCourtId = courts.save(new Court(2, "Court 2")).getId();
+        courtId = facilityFixture.createCourt(1, "Court 1");
+        secondCourtId = facilityFixture.createCourt(2, "Court 2");
 
-        Court inactive = courts.save(new Court(3, "Court 3"));
-        inactive.deactivate();
-        inactiveCourtId = courts.save(inactive).getId();
+        inactiveCourtId = facilityFixture.createInactiveCourt(3, "Court 3");
 
         Person person = persons.save(new Person("Jane", "Doe", "doe.jane@example.org"));
         UserAccount account = new UserAccount(

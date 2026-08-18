@@ -1,10 +1,7 @@
 package org.courtside;
 
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import com.jayway.jsonpath.JsonPath;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -14,6 +11,7 @@ import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -42,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
+@Import(FacilityTestFixture.class)
 class ProblemTypeWireTest extends AbstractIntegrationTest {
 
     private static final Pattern ALLOWED_TYPE = Pattern.compile("^urn:courtside:error:[a-z0-9-]+$");
@@ -54,10 +53,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     private WebApplicationContext context;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -71,9 +67,9 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-        courtId = courts.save(new Court(1, "Court 1")).getId();
+        courtId = facilityFixture.createCourt(1, "Court 1");
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 

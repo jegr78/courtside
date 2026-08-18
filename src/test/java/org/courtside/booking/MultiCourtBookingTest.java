@@ -2,16 +2,14 @@ package org.courtside.booking;
 
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -23,6 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(FacilityTestFixture.class)
 class MultiCourtBookingTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -38,10 +37,7 @@ class MultiCourtBookingTest extends AbstractIntegrationTest {
     private BookingRepository bookings;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     private UUID courtOne;
     private UUID courtTwo;
@@ -49,12 +45,12 @@ class MultiCourtBookingTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        courtOne = courts.save(new Court(1, "Court 1")).getId();
-        courtTwo = courts.save(new Court(2, "Court 2")).getId();
-        courtThree = courts.save(new Court(3, "Court 3")).getId();
+        courtOne = facilityFixture.createCourt(1, "Court 1");
+        courtTwo = facilityFixture.createCourt(2, "Court 2");
+        courtThree = facilityFixture.createCourt(3, "Court 3");
 
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 

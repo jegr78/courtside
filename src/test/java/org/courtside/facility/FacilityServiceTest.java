@@ -1,5 +1,7 @@
 package org.courtside.facility;
 
+import org.courtside.facility.internal.CourtRepository;
+import org.courtside.facility.internal.OpeningHoursRepository;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.Test;
