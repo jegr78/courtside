@@ -18,8 +18,11 @@ final class TestModuleBoundaryPolicy {
     private static final Pattern PACKAGE = Pattern.compile("package\\s+org\\.courtside\\.([a-z]+)(?:[.;])");
     private static final Pattern IMPORT = Pattern.compile(
             "import\\s+(?:static\\s+)?org\\.courtside\\.([a-z]+)\\.([A-Za-z0-9_.*]+);");
+    private static final Pattern QUALIFIED_TYPE = Pattern.compile(
+            "\\borg\\.courtside\\.([a-z]+)\\.((?:[a-z][A-Za-z0-9_]*\\.)*([A-Z][A-Za-z0-9_]*))\\b");
     private static final Set<String> REPOSITORY_MUTATIONS = Set.of(
-            "delete", "deleteAll", "deleteAllById", "deleteAllInBatch", "deleteById",
+            "delete", "deleteAll", "deleteAllById", "deleteAllByIdInBatch", "deleteAllInBatch",
+            "deleteById", "deleteInBatch",
             "flush", "save", "saveAll", "saveAllAndFlush", "saveAndFlush");
 
     private TestModuleBoundaryPolicy() {
@@ -46,31 +49,35 @@ final class TestModuleBoundaryPolicy {
         List<ImportedType> foreignImports = importsOf(code).stream()
                 .filter(imported -> !imported.module().equals(sourceModule.orElseThrow()))
                 .toList();
+        Set<ImportedType> foreignTypes = typesOf(code).stream()
+                .filter(type -> !type.module().equals(sourceModule.orElseThrow()))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
         List<String> violations = new ArrayList<>();
         foreignImports.stream()
                 .filter(imported -> imported.simpleName().equals("*"))
                 .forEach(imported -> violations.add("%s uses a cross-module wildcard import %s"
                         .formatted(sourcePath, imported.qualifiedName())));
-        foreignImports.stream()
-                .filter(imported -> imported.qualifiedName().contains(".internal."))
-                .forEach(imported -> violations.add("%s imports another module's internal type %s"
-                        .formatted(sourcePath, imported.qualifiedName())));
+        foreignTypes.stream()
+                .filter(type -> type.qualifiedName().contains(".internal."))
+                .sorted(java.util.Comparator.comparing(ImportedType::qualifiedName))
+                .forEach(type -> violations.add("%s references another module's internal type %s"
+                        .formatted(sourcePath, type.qualifiedName())));
 
         Set<String> entities = productionEntities();
-        foreignImports.stream()
-                .filter(imported -> entities.contains(imported.qualifiedName()))
-                .filter(imported -> !isProductionDependency(sourceModule.orElseThrow(), imported))
-                .filter(imported -> constructs(code, imported.simpleName()))
-                .forEach(imported -> violations.add("%s constructs another module's entity %s"
-                        .formatted(sourcePath, imported.qualifiedName())));
+        foreignTypes.stream()
+                .filter(type -> entities.contains(type.qualifiedName()))
+                .filter(type -> constructs(code, type))
+                .sorted(java.util.Comparator.comparing(ImportedType::qualifiedName))
+                .forEach(type -> violations.add("%s constructs another module's entity %s"
+                        .formatted(sourcePath, type.qualifiedName())));
 
-        foreignImports.stream()
-                .filter(imported -> imported.simpleName().endsWith("Repository"))
-                .filter(imported -> !isProductionDependency(sourceModule.orElseThrow(), imported))
-                .forEach(imported -> repositoryMutations(code, imported.simpleName()).stream()
+        foreignTypes.stream()
+                .filter(type -> type.simpleName().endsWith("Repository"))
+                .sorted(java.util.Comparator.comparing(ImportedType::qualifiedName))
+                .forEach(type -> repositoryMutations(code, type).stream()
                         .forEach(mutation -> violations.add(
                                 "%s mutates another module through %s.%s"
-                                        .formatted(sourcePath, imported.simpleName(), mutation))));
+                                        .formatted(sourcePath, type.simpleName(), mutation))));
         return violations;
     }
 
@@ -91,12 +98,33 @@ final class TestModuleBoundaryPolicy {
         return imports;
     }
 
-    private static boolean constructs(String source, String simpleName) {
-        return Pattern.compile("\\bnew\\s+" + Pattern.quote(simpleName) + "\\s*\\(")
+    private static Set<ImportedType> typesOf(String source) {
+        Set<ImportedType> types = new HashSet<>(importsOf(source));
+        Matcher matcher = QUALIFIED_TYPE.matcher(source);
+        while (matcher.find()) {
+            types.add(new ImportedType(matcher.group(1), "org.courtside." + matcher.group(1) + "." + matcher.group(2),
+                    matcher.group(3)));
+        }
+        return types;
+    }
+
+    private static boolean constructs(String source, ImportedType type) {
+        return constructs(source, type.simpleName()) || constructs(source, type.qualifiedName());
+    }
+
+    private static boolean constructs(String source, String typeName) {
+        return Pattern.compile("\\bnew\\s+" + Pattern.quote(typeName) + "\\s*\\(")
                 .matcher(source).find();
     }
 
-    private static List<String> repositoryMutations(String source, String repositoryType) {
+    private static List<String> repositoryMutations(String source, ImportedType repositoryType) {
+        Set<String> mutations = new HashSet<>();
+        mutations.addAll(repositoryMutations(source, repositoryType.simpleName()));
+        mutations.addAll(repositoryMutations(source, repositoryType.qualifiedName()));
+        return mutations.stream().sorted().toList();
+    }
+
+    private static Set<String> repositoryMutations(String source, String repositoryType) {
         Pattern declaration = Pattern.compile("\\b" + Pattern.quote(repositoryType)
                 + "\\s+([A-Za-z][A-Za-z0-9_]*)\\b");
         Matcher variables = declaration.matcher(source);
@@ -107,26 +135,18 @@ final class TestModuleBoundaryPolicy {
                     + "\\s*\\.\\s*([A-Za-z][A-Za-z0-9_]*)\\s*\\(");
             Matcher methods = invocation.matcher(source);
             while (methods.find()) {
-                if (REPOSITORY_MUTATIONS.contains(methods.group(1))) {
+                if (REPOSITORY_MUTATIONS.contains(methods.group(1))
+                        && !isMockitoStubbing(source, methods.start())) {
                     mutations.add(methods.group(1));
                 }
             }
         }
-        return mutations.stream().sorted().toList();
+        return mutations;
     }
 
-    private static boolean isProductionDependency(String sourceModule, ImportedType imported) {
-        Path moduleSources = PRODUCTION_SOURCES.resolve("org/courtside").resolve(sourceModule);
-        if (!Files.isDirectory(moduleSources)) {
-            return false;
-        }
-        String declaration = "import " + imported.qualifiedName() + ";";
-        try (Stream<Path> sources = Files.walk(moduleSources)) {
-            return sources.filter(path -> path.toString().endsWith(".java"))
-                    .anyMatch(path -> read(path).contains(declaration));
-        } catch (IOException e) {
-            throw new IllegalStateException("Cannot inspect production module " + sourceModule, e);
-        }
+    private static boolean isMockitoStubbing(String source, int invocationStart) {
+        String prefix = source.substring(Math.max(0, invocationStart - 40), invocationStart);
+        return Pattern.compile("\\bwhen\\s*\\(\\s*$").matcher(prefix).find();
     }
 
     private static String withoutLiteralsAndComments(String source) {

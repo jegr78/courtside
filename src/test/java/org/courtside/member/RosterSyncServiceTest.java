@@ -141,8 +141,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
         // given
         UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
         UserAccount account = account(john, "roe.john", Set.of(Role.MEMBER));
-        account.disable();
-        accounts.saveAndFlush(account);
+        identity.disableAccount(account.getId());
 
         // when
         sync.apply(new RosterChangeSet(List.of(), List.of(new RosterChangeSet.PersonCorrection(

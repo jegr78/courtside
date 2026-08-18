@@ -71,7 +71,7 @@ class PerformanceDataSeederTest {
         HistoricalBookingImporter historicalBookings = mock(HistoricalBookingImporter.class);
         BookingRepository bookings = mock(BookingRepository.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        Court baseline = new Court(1, null);
+        Court baseline = court(1);
         when(accounts.existsByUsername(PerformanceDataSeeder.MARKER_USERNAME)).thenReturn(false);
         when(accounts.count()).thenReturn(1L);
         when(members.count()).thenReturn(0L);
@@ -79,9 +79,10 @@ class PerformanceDataSeederTest {
         when(persons.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(passwordEncoder.encode("performance-password")).thenReturn("password-hash");
         when(facility.allCourts()).thenReturn(List.of(baseline));
-        when(facility.changeCourt(baseline.getId(), 1, "Court 1")).thenReturn(new Court(1, "Court 1"));
+        when(facility.changeCourt(baseline.getId(), 1, "Court 1")).thenAnswer(invocation -> court(1));
         for (int number = 2; number <= PerformanceDataSeeder.COURT_COUNT; number++) {
-            when(facility.createCourt(number, "Court " + number)).thenReturn(new Court(number, "Court " + number));
+            int courtNumber = number;
+            when(facility.createCourt(number, "Court " + number)).thenAnswer(invocation -> court(courtNumber));
         }
         PerformanceDataSeeder seeder = new PerformanceDataSeeder(
                 persons, accounts, members, facility, bookingService, historicalBookings, bookings, passwordEncoder,
@@ -115,7 +116,7 @@ class PerformanceDataSeederTest {
         HistoricalBookingImporter historicalBookings = mock(HistoricalBookingImporter.class);
         BookingRepository bookings = mock(BookingRepository.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        Court baseline = new Court(1, null);
+        Court baseline = court(1);
         when(accounts.existsByUsername(PerformanceDataSeeder.MARKER_USERNAME)).thenReturn(false);
         when(accounts.count()).thenReturn(1L);
         when(members.count()).thenReturn(0L);
@@ -123,9 +124,10 @@ class PerformanceDataSeederTest {
         when(persons.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(passwordEncoder.encode("performance-password")).thenReturn("password-hash");
         when(facility.allCourts()).thenReturn(List.of(baseline));
-        when(facility.changeCourt(baseline.getId(), 1, "Court 1")).thenReturn(new Court(1, "Court 1"));
+        when(facility.changeCourt(baseline.getId(), 1, "Court 1")).thenAnswer(invocation -> court(1));
         for (int number = 2; number <= PerformanceDataSeeder.COURT_COUNT; number++) {
-            when(facility.createCourt(number, "Court " + number)).thenReturn(new Court(number, "Court " + number));
+            int courtNumber = number;
+            when(facility.createCourt(number, "Court " + number)).thenAnswer(invocation -> court(courtNumber));
         }
         Instant halfwayThroughTheEveningSlot = Instant.parse("2026-08-10T16:30:00Z");
         PerformanceDataSeeder seeder = new PerformanceDataSeeder(
@@ -150,5 +152,12 @@ class PerformanceDataSeederTest {
                 .as("a historical booking must have ended")
                 .allSatisfy(command -> assertThat(command.slot().end())
                         .isBefore(halfwayThroughTheEveningSlot));
+    }
+
+    private Court court(int number) {
+        Court court = mock(Court.class);
+        when(court.getId()).thenReturn(java.util.UUID.randomUUID());
+        when(court.getNumber()).thenReturn(number);
+        return court;
     }
 }

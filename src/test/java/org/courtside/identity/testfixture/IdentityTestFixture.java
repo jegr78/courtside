@@ -51,6 +51,27 @@ public class IdentityTestFixture {
         accounts.save(account);
     }
 
+    public void renamePerson(UUID personId, String firstName, String lastName) {
+        Person person = persons.findById(personId).orElseThrow();
+        person.rename(firstName, lastName);
+        persons.saveAndFlush(person);
+    }
+
+    public void disableAccount(UUID accountId) {
+        UserAccount account = accounts.findById(accountId).orElseThrow();
+        account.disable();
+        accounts.saveAndFlush(account);
+    }
+
+    public UUID createPersonWithLeadingIdDigitIn(
+            String firstName, String lastName, String email, String allowedDigits) {
+        Person person = new Person(firstName, lastName, email);
+        while (allowedDigits.indexOf(person.getId().toString().charAt(0)) < 0) {
+            person = new Person(firstName, lastName, email);
+        }
+        return persons.save(person).getId();
+    }
+
     public boolean personExists(UUID personId) {
         return persons.existsById(personId);
     }

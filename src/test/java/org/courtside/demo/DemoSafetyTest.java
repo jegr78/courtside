@@ -3,7 +3,6 @@ package org.courtside.demo;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
 import org.courtside.facility.FacilityService;
-import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
@@ -19,7 +18,6 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.time.Clock;
 import java.util.List;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -77,8 +75,10 @@ class DemoSafetyTest {
     void givenAnUnexpectedSoleAdmin_whenSeedingAnUnmarkedDatabase_thenStartupIsRejected() {
         // given
         UserAccountRepository accounts = mock(UserAccountRepository.class);
-        UserAccount unexpected = account("Mary", "Major", "mary.major", Role.ADMIN);
-        unexpected.requirePasswordChange();
+        UserAccount unexpected = mock(UserAccount.class);
+        when(unexpected.getUsername()).thenReturn("mary.major");
+        when(unexpected.getRoles()).thenReturn(java.util.Set.of(Role.ADMIN));
+        when(unexpected.isPasswordChangeRequired()).thenReturn(true);
         when(accounts.existsByUsername("jane.doe")).thenReturn(false);
         when(accounts.findAll()).thenReturn(List.of(unexpected));
         DemoDataSeeder seeder = new DemoDataSeeder(
@@ -92,10 +92,5 @@ class DemoSafetyTest {
         assertThatThrownBy(() -> seeder.run(new DefaultApplicationArguments(new String[0])))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("only the bootstrap administrator");
-    }
-
-    private static UserAccount account(String firstName, String lastName, String username, Role role) {
-        return new UserAccount(new Person(firstName, lastName, username + "@example.org"),
-                username, "password-hash", Set.of(role));
     }
 }

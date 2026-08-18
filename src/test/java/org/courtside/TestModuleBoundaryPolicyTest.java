@@ -25,7 +25,7 @@ class TestModuleBoundaryPolicyTest {
 
         // then
         assertThat(violations).containsExactly(
-                "src/test/java/org/courtside/booking/ExampleTest.java imports another module's internal type org.courtside.facility.internal.CourtRepository");
+                "src/test/java/org/courtside/booking/ExampleTest.java references another module's internal type org.courtside.facility.internal.CourtRepository");
     }
 
     @Test
@@ -70,6 +70,52 @@ class TestModuleBoundaryPolicyTest {
     }
 
     @Test
+    void givenJpaBatchMutations_whenCheckingTheTestSource_thenEveryMutationIsRejected() {
+        // given
+        String source = """
+                package org.courtside.booking;
+                import org.courtside.member.MemberRepository;
+                class ExampleTest {
+                    private MemberRepository members;
+                    void arrange() {
+                        members.deleteInBatch(java.util.List.of());
+                        members.deleteAllByIdInBatch(java.util.List.of());
+                    }
+                }
+                """;
+
+        // when
+        var violations = TestModuleBoundaryPolicy.violations(BOOKING_TEST, source);
+
+        // then
+        assertThat(violations).containsExactly(
+                "src/test/java/org/courtside/booking/ExampleTest.java mutates another module through MemberRepository.deleteAllByIdInBatch",
+                "src/test/java/org/courtside/booking/ExampleTest.java mutates another module through MemberRepository.deleteInBatch");
+    }
+
+    @Test
+    void givenFullyQualifiedForeignTypes_whenCheckingTheTestSource_thenSetupIsRejected() {
+        // given
+        String source = """
+                package org.courtside.booking;
+                class ExampleTest {
+                    private org.courtside.member.MemberRepository members;
+                    void arrange() {
+                        members.save(new org.courtside.member.Member(null, null, null));
+                    }
+                }
+                """;
+
+        // when
+        var violations = TestModuleBoundaryPolicy.violations(BOOKING_TEST, source);
+
+        // then
+        assertThat(violations).containsExactly(
+                "src/test/java/org/courtside/booking/ExampleTest.java constructs another module's entity org.courtside.member.Member",
+                "src/test/java/org/courtside/booking/ExampleTest.java mutates another module through MemberRepository.save");
+    }
+
+    @Test
     void givenFixtureAndReadOnlyProductionApiImports_whenCheckingTheTestSource_thenTheyAreAllowed() {
         // given
         String source = """
@@ -95,7 +141,28 @@ class TestModuleBoundaryPolicyTest {
     }
 
     @Test
-    void givenARepositoryUsedByTheProductionModule_whenMutatingThroughIt_thenTheImportIsAllowed() {
+    void givenAMockedRepositoryMutation_whenCheckingTheTestSource_thenTheStubIsAllowed() {
+        // given
+        String source = """
+                package org.courtside.booking;
+                import org.courtside.member.MemberRepository;
+                class ExampleTest {
+                    private MemberRepository members;
+                    void arrangeMock() {
+                        when(members.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+                    }
+                }
+                """;
+
+        // when
+        var violations = TestModuleBoundaryPolicy.violations(BOOKING_TEST, source);
+
+        // then
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void givenARepositoryUsedByTheProductionModule_whenMutatingThroughIt_thenSetupIsRejected() {
         // given
         Path dataExchangeTest =
                 Path.of("src/test/java/org/courtside/dataexchange/ExampleTest.java");
@@ -114,7 +181,8 @@ class TestModuleBoundaryPolicyTest {
         var violations = TestModuleBoundaryPolicy.violations(dataExchangeTest, source);
 
         // then
-        assertThat(violations).isEmpty();
+        assertThat(violations).containsExactly(
+                "src/test/java/org/courtside/dataexchange/ExampleTest.java mutates another module through MemberRepository.flush");
     }
 
     @Test
