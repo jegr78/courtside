@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
 import { appendFileSync, cpSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -234,6 +235,7 @@ export async function startJourneyService(): Promise<JourneyService> {
   let application: ChildProcess | undefined;
   let staticDirectory: string | undefined;
   let browserServer: StartedTestContainer | undefined;
+  let browserPath = "/";
   try {
     const visualDate = journeyDate;
     const port = await availableLoopbackPort();
@@ -343,12 +345,16 @@ export async function startJourneyService(): Promise<JourneyService> {
     const startPinnedBrowser = async (): Promise<string> => {
       if (!browserServer) {
         await TestContainers.exposeHostPorts(port);
+        // Docker publishes the mapped port on every interface and run-server has no authentication,
+        // so the unguessable endpoint path is what keeps a reachable port from being a browser.
+        browserPath = `/${randomUUID()}`;
         browserServer = await new GenericContainer(PINNED_BROWSER_IMAGE)
-          .withCommand(["npx", "playwright", "run-server", "--port", "3000", "--host", "0.0.0.0"])
+          .withCommand(["npx", "playwright", "run-server", "--port", "3000", "--host", "0.0.0.0",
+            "--path", browserPath, "--max-clients", "1"])
           .withExposedPorts(3000)
           .start();
       }
-      return `ws://${browserServer.getHost()}:${browserServer.getMappedPort(3000)}/`;
+      return `ws://${browserServer.getHost()}:${browserServer.getMappedPort(3000)}${browserPath}`;
     };
     const containerBaseURL = async (): Promise<string> => {
       await TestContainers.exposeHostPorts(port);
