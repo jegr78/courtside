@@ -33,8 +33,10 @@ people, the account and roles a person holds, the membership they hold with the 
 between, correcting a username and resetting a password — and the admin surface for all of it. A
 club can also describe the systems it means to synchronise its roster from: the column mapping, the
 membership types a source's categories stand for, the fields that source owns and the share of the
-roster whose disappearance needs confirming. Nothing reads a file yet; what exists is the
-configuration a run will need. `/actuator/health` is exposed. The
+roster whose disappearance needs confirming — and it can say which member number of a source stands
+for which person, which is what makes a second snapshot an update rather than a second set of
+people. Nothing reads a file yet; what exists is the configuration and the references a run will
+need. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -840,6 +842,12 @@ Import and export:
   overwrites it — and above what share of the roster disappearing an execution needs confirming.
   Every part of it is correctable, and a change decides what the *next* snapshot means rather than
   touching the people an earlier one created.
+- **A record is matched by the source and the member number it carries**, never by a name and never
+  by an email address: two members really are called John Roe, and a club enrols children under a
+  parent's address. A member number a source does not yet know becomes a new person, and where a
+  board recognises the resemblance it links the two by hand instead. One person may hold a
+  reference from each of several sources, which is what lets a club migrate between membership
+  systems without the second one duplicating everybody.
 - **CSV export** for every list view in the admin backend, matching what existing booking
   systems offer today.
 - **Per-member JSON export** for subject access requests (section 11).

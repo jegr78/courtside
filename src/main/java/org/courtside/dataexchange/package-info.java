@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Data exchange",
-        allowedDependencies = {"member"})
+        allowedDependencies = {"identity", "member"})
 package org.courtside.dataexchange;

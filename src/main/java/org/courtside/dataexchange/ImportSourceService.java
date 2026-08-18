@@ -1,6 +1,7 @@
 package org.courtside.dataexchange;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.dataexchange.internal.ExternalReferenceRepository;
 import org.courtside.dataexchange.internal.ImportSource;
 import org.courtside.dataexchange.internal.ImportSourceRepository;
 import org.courtside.member.MemberService;
@@ -32,6 +33,7 @@ public class ImportSourceService {
     private static final int MAX_REPORTED_LENGTH = 60;
 
     private final ImportSourceRepository sources;
+    private final ExternalReferenceRepository references;
     private final MemberService memberships;
     private final Clock clock;
 
@@ -75,7 +77,12 @@ public class ImportSourceService {
 
     @Transactional
     public void delete(UUID sourceId) {
-        sources.delete(require(sourceId));
+        ImportSource source = require(sourceId);
+        if (references.existsBySourceId(source.getId())) {
+            throw new ImportSourceInUseException(
+                    "Import source " + source.getId() + " still holds external references");
+        }
+        sources.delete(source);
     }
 
     private void requireUsable(Map<String, CanonicalField> columns,
