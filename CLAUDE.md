@@ -114,6 +114,10 @@ fails on the missing `BuildProperties` bean.
 * **Sequence:** unit tests → implementation → integration tests → E2E.
 * **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. One full `./mvnw clean verify`
   before any commit that closes a task.
+* **Cross-module test setup uses test fixtures.** A module exposes intent-revealing fixture
+  operations from `src/test/java/org/courtside/<module>/testfixture`, and consuming integration
+  tests register the required fixture explicitly with `@Import`. Fixtures return identifiers or
+  observations, not entities or repositories. Production code never depends on a test fixture.
 * **UI test selectors are semantic and language-neutral.** Locate elements by accessible role or a
   stable ID/test ID. Never use rendered labels, translated text, placeholders, displayed values,
   titles or alt text as selectors. Text assertions remain valid only after the element has already
