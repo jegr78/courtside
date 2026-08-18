@@ -14,19 +14,22 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
   ]) {
     assert.match(visual, new RegExp(`\\"${surface}\\.png\\"`));
   }
+  // A missing baseline is Playwright's to report, and it does so by failing the run that would
+  // have compared it; what cannot report itself is a file kept for a host that gates nothing.
   assert.equal(existsSync(snapshots), true);
   const reviewed = readdirSync(snapshots).filter((file) => file.endsWith(".png"));
-  assert.equal(reviewed.filter((file) => file.endsWith("-darwin.png")).length, 7);
-  assert.equal(reviewed.filter((file) => file.endsWith("-linux.png")).length, 7);
+  assert.deepEqual(reviewed.filter((file) => /-(darwin|linux)\.png$/.test(file)), []);
 });
 
 test("given visual baselines, when running them on different hosts, then their path and rendering controls stay deterministic", () => {
-  assert.match(playwright, /snapshotPathTemplate:.*\{platform\}/);
+  assert.doesNotMatch(playwright, /snapshotPathTemplate:.*\{platform\}/);
+  assert.match(visual, /test\.skip\(process\.platform !== "linux"/);
+  assert.doesNotMatch(visual, /toHaveScreenshot\(page,/);
+  assert.doesNotMatch(visual, /fullPage/);
   assert.match(visual, /animations: "disabled"/);
   assert.match(visual, /caret: "hide"/);
   assert.match(visual, /document\.fonts\.ready/);
   assert.match(visual, /mask:/);
-  assert.match(visual, /page\.locator\("footer"\)/);
 });
 
 test("given retained browser diagnostics, when linting after a failed run, then generated trace sources are excluded", () => {

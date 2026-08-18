@@ -5,9 +5,12 @@ test.use({ viewport: { width: 1440, height: 1000 }, colorScheme: "dark", locale:
 
 const screenshotOptions = {
   animations: "disabled" as const,
-  caret: "hide" as const,
-  fullPage: true
+  caret: "hide" as const
 };
+
+// One reviewed rendering per surface, produced where the gate runs. A second platform's baseline
+// gates nothing and cannot be written by whoever is not on that platform.
+test.skip(process.platform !== "linux", "Reviewed baselines are rendered on the gating platform");
 
 test("stable member surfaces match their reviewed baselines", async ({ page, journeyService }) => {
   // given
@@ -15,7 +18,7 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await selectVisualDate(page, journeyService.visualDate);
 
   // then
-  await stableScreenshot(page, "court-plan.png", dynamicDates(page));
+  await stableScreenshot(page.getByTestId("court-plan-view"), "court-plan.png", dynamicDates(page));
 
   // when
   await signIn(page, "doe.jane");
@@ -26,14 +29,14 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await page.evaluate(() => window.scrollTo(0, 0));
 
   // then
-  await stableScreenshot(page, "booking-dialog.png", dynamicDates(page));
+  await stableScreenshot(page.getByTestId("booking-dialog"), "booking-dialog.png", dynamicDates(page));
 
   // when
   await page.getByTestId("booking-submit").click();
   await expect(page.getByTestId("booking-dialog").locator("[data-code]")).toBeVisible();
 
   // then
-  await stableScreenshot(page, "booking-validation.png", dynamicDates(page));
+  await stableScreenshot(page.getByTestId("booking-dialog"), "booking-validation.png", dynamicDates(page));
 
   // when
   await page.getByTestId("booking-close").click();
@@ -41,7 +44,7 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
 
   // then
-  await stableScreenshot(page, "personal-bookings.png", page.locator("time"));
+  await stableScreenshot(page.getByTestId("my-bookings-page"), "personal-bookings.png", page.locator("time"));
 
   // when
   await page.getByTestId("move-booking").click();
@@ -50,7 +53,7 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await expect(page.getByTestId("move-preview")).toBeVisible();
 
   // then
-  await stableScreenshot(page, "series-preview.png", page.getByTestId("move-preview").locator("p"));
+  await stableScreenshot(page.getByTestId("move-preview"), "series-preview.png", page.getByTestId("move-preview").locator("p"));
 });
 
 test("stable administration surfaces match their reviewed baselines", async ({ page }) => {
@@ -62,14 +65,14 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
 
   // then
-  await stableScreenshot(page, "admin-configuration.png");
+  await stableScreenshot(page.getByTestId("admin-configuration-view"), "admin-configuration.png");
 
   // when
   await page.goto("/admin/facility");
   await expect(page.getByTestId("admin-facility-view")).toBeVisible();
 
   // then
-  await stableScreenshot(page, "admin-facility.png");
+  await stableScreenshot(page.getByTestId("admin-facility-view"), "admin-facility.png");
 });
 
 async function signIn(page: Page, username: string): Promise<void> {
@@ -93,8 +96,9 @@ function dynamicDates(page: Page): Locator {
   return page.locator('[data-testid^="day-selector-"], time');
 }
 
-async function stableScreenshot(page: Page, name: string, mask?: Locator): Promise<void> {
-  await page.evaluate(() => document.fonts.ready);
-  const masks = [page.locator("footer"), ...(mask ? [mask] : [])];
-  await expect(page).toHaveScreenshot(name, { ...screenshotOptions, mask: masks });
+async function stableScreenshot(surface: Locator, name: string, mask?: Locator): Promise<void> {
+  await surface.page().evaluate(() => document.fonts.ready);
+  await expect(surface).toHaveScreenshot(name, {
+    ...screenshotOptions, mask: mask ? [mask] : []
+  });
 }

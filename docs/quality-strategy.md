@@ -113,15 +113,27 @@ Each row is deliberately about a material invariant rather than an individual te
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | UI-1 | P1 | Medium | Core public, member and administration journeys are keyboard-operable and meet automatable WCAG 2.2 AA requirements. | German and English journeys remain operable by keyboard with correct dialog and focus behaviour. | Error states, zoom and user preferences introduce no automatable WCAG 2.2 AA violation or focus loss. | React, E2E, manual | PR, release | Browser matrix | Stable accessible fixtures | Axe, journey trace and release checklist | Frontend | Full automation and manual evidence are tracked by #216. |
 | UI-2 | P0 | Low | PWA caching and browser history never serve personal API data after logout, expiry or offline transition. | Install, update, offline shell and reconnect preserve public application availability. | Logout, expiry, Back or Forward, old assets and multiple tabs cannot reveal cached personal API data. | React, E2E, deployment smoke | PR, nightly, release | Chromium, WebKit and periodic Firefox/mobile matrix | Synthetic member sessions | Browser traces, cache inspection and linked device record | Frontend and identity | Physical-device evidence remains manual because emulation cannot prove operating-system integration. |
-| UI-3 | P2 | Medium | Layout, localization and interaction remain usable at supported viewports and content extremes. | Supported mobile, tablet and desktop layouts work in both themes and locales. | Long content and empty, single or many-court states do not hide or block interaction. | React, E2E | PR, periodic | Chromium plus supported matrix | Deterministic visual dataset | Semantic assertions and reviewed pixel baselines | Frontend | Broad locale, theme and viewport captures remain diagnostic; seven principal surfaces have blocking stable baselines. |
+| UI-3 | P2 | Medium | Layout, localization and interaction remain usable at supported viewports and content extremes. | Supported mobile, tablet and desktop layouts work in both themes and locales. | Long content and empty, single or many-court states do not hide or block interaction. | React, E2E | PR, periodic | Chromium plus supported matrix | Deterministic visual dataset | Semantic assertions and reviewed pixel baselines | Frontend | Broad locale, theme and viewport captures remain diagnostic; seven principal surfaces have blocking stable baselines, rendered on the gating platform only. |
 
 The blocking Chromium pixel suite fixes locale, theme, viewport, journey data, fonts, animations,
-caret rendering, and dynamic-field masks. Build identity is masked, while separate Darwin and Linux
-baselines retain platform rendering differences. It covers the court plan, booking and validation
-dialogs, personal bookings, series preview, and both administration surfaces. A deliberate UI change
-updates these files on both supported baseline hosts with
-`npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots`; the pull
-request must expose the changed PNG baselines for review. Unreviewed
+caret rendering, and dynamic-field masks. Each assertion captures the surface under test rather
+than the whole page, so a change to one surface cannot move a neighbour's baseline: the
+series-preview and booking dialogs are captured as dialogs, not as dialogs over the page behind
+them. Build identity needs no mask any more — the footer carrying it sits outside every captured
+surface. It covers the court plan, booking and validation dialogs, personal bookings,
+series preview, and both administration surfaces.
+
+There is one reviewed rendering per surface and it is produced on the platform the gate runs on,
+which is Linux. A second platform's baseline gated nothing and could not be written by whoever was
+not sitting on that platform, so every deliberate UI change was blocked on a host its author might
+not have. The suite therefore skips itself off that platform: a local `mvn verify` elsewhere does
+not compare pixels, and does not exercise these journeys either. Semantic assertions in the other
+specs remain the local evidence for them.
+
+A deliberate UI change updates the baselines by taking what the gate rendered. The build publishes
+`frontend/e2e/visual-regression.spec.ts-snapshots` with the test evidence, so a run that fails on a
+changed or missing baseline carries the replacement PNG as an artifact, whatever the author's
+operating system. The pull request must expose the changed PNG baselines for review. Unreviewed
 dimension-only screenshots remain diagnostic artifacts and never replace these assertions.
 
 ### Operations and release
