@@ -1128,10 +1128,10 @@ deliver the implementation.
 - **An import never keeps the file it was given.** What a preview holds is the SHA-256 of the
   uploaded bytes and the change set resolved from them — a club's whole membership list, in other
   words — and that change set is bounded by `COURTSIDE_IMPORT_PREVIEW_RETENTION`. What survives
-  past it is the row, its hash and its counts, which is what an audit of *what was executed* needs
-  and is not personal data. A scheduled sweep enforces the bound, a preview past it answers
-  without its change set, and a swept preview is refused rather than executed against one that is
-  no longer there.
+  past it is the row, the name of the uploaded file, its SHA-256 and the counts — what an audit of
+  *what was executed* needs, and no member's name, address or number. A scheduled sweep enforces the
+  bound, a preview past it answers without its change set, and a swept preview is refused rather
+  than executed against one that is no longer there.
 - **Subject access and portability** (Art. 15/20) as self-service: every member can export
   their own data as JSON. The Release 1 export covers this.
 - **Documentation templates in the repository**: a pre-filled record of processing

@@ -115,6 +115,22 @@ class PreviewExpiryTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenASweptPreview_whenAnotherUploadSupersedesIt_thenWhatWasDroppedStaysDropped() {
+        // given
+        UUID previewId = preview();
+        expiry.sweep(clock.instant().plus(Duration.ofDays(9)));
+
+        // when
+        previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
+                ONE_MEMBER.getBytes(StandardCharsets.UTF_8), actor);
+
+        // then
+        assertThat(stored.findById(previewId).orElseThrow().getChangeSet()).isNull();
+        assertThat(stored.findById(previewId).orElseThrow().getFingerprints()).isNull();
+        assertThat(stored.findById(previewId).orElseThrow().isSuperseded()).isTrue();
+    }
+
+    @Test
     void givenASweptPreview_whenTheSweepRunsAgain_thenThereIsNothingLeftToDrop() {
         // given
         preview();

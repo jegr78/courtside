@@ -8,7 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 
 @Slf4j
 @Component
@@ -18,7 +17,9 @@ public class PreviewExpiry {
     private final ImportPreviewRepository previews;
     private final Clock clock;
 
-    @Scheduled(initialDelayString = "${courtside.import.sweep-interval:PT1H}",
+    // The first sweep is soon after start and not one interval away: an instance that restarts more
+    // often than its interval would otherwise never reach the only thing that erases.
+    @Scheduled(initialDelay = 1, timeUnit = java.util.concurrent.TimeUnit.MINUTES,
             fixedDelayString = "${courtside.import.sweep-interval:PT1H}")
     @Transactional
     public void sweepNow() {
@@ -27,12 +28,9 @@ public class PreviewExpiry {
 
     @Transactional
     public int sweep(Instant cutoff) {
-        List<ImportPreview> expired = previews.findByExpiresAtLessThanEqualAndChangeSetIsNotNull(cutoff);
-        expired.forEach(ImportPreview::forget);
-        if (!expired.isEmpty()) {
-            log.info("Dropped the uploaded file and the resolved change set of {} expired previews",
-                    expired.size());
-        }
-        return expired.size();
+        int forgotten = previews.forgetExpired(cutoff);
+        log.info("Swept previews past their retention: {} lost their change set and fingerprints",
+                forgotten);
+        return forgotten;
     }
 }
