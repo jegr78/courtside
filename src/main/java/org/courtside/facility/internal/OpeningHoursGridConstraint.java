@@ -3,7 +3,6 @@ package org.courtside.facility.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
-import org.courtside.facility.OpeningHoursRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;

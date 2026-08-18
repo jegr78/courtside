@@ -1,14 +1,11 @@
 package org.courtside.booking.web;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.internal.ImpactService;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -17,6 +14,7 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,6 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
+@Import(FacilityTestFixture.class)
 class ImpactControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -50,10 +49,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     private WebApplicationContext context;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -78,10 +74,10 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenFutureBookingsOnACourt_whenAskingWhatDeactivatingItWouldAffect_thenOnlyItsOwnAreListed()
             throws Exception {
         // given
-        UUID courtOne = courts.save(new Court(1, null)).getId();
-        UUID courtTwo = courts.save(new Court(2, null)).getId();
+        UUID courtOne = facilityFixture.createCourt(1, null);
+        UUID courtTwo = facilityFixture.createCourt(2, null);
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
 
@@ -101,7 +97,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenACourtWithNoFutureBookings_whenAskingWhatDeactivatingItWouldAffect_thenAffectedCountIsZeroAndTheListIsEmpty()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
 
         // when / then
         mockMvc.perform(get("/api/admin/impact/courts/" + court))
@@ -115,7 +111,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenACancelledBooking_whenAskingWhatDeactivatingTheCourtWouldAffect_thenItIsNotCounted()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
 
@@ -133,7 +129,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenABookingThatHasAlreadyStarted_whenAskingWhatDeactivatingTheCourtWouldAffect_thenItIsNotCounted()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
 
@@ -151,7 +147,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenBookingsOnTwoCards_whenAskingWhatRetiringOneCardWouldAffect_thenOnlyItsOwnAreListed()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
 
@@ -170,8 +166,8 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenABookingOnTwoCourts_whenAskingWhatRetiringItsCardWouldAffect_thenItIsCountedOnce()
             throws Exception {
         // given
-        UUID courtOne = courts.save(new Court(1, null)).getId();
-        UUID courtTwo = courts.save(new Court(2, null)).getId();
+        UUID courtOne = facilityFixture.createCourt(1, null);
+        UUID courtTwo = facilityFixture.createCourt(2, null);
         setStandardOpeningHours();
         UUID bookingId = bookings.create(new CreateBookingCommand(
                 List.of(courtOne, courtTwo), TRAINING_CARD,
@@ -193,7 +189,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenBookingsInsideAndOutsideTheProposedHours_whenNarrowingTuesday_thenOnlyTheOutOfHoursBookingIsListed()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
 
@@ -212,7 +208,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     @Test
     void givenTuesdayBookings_whenClosingTuesdayEntirely_thenEveryTuesdayBookingIsListed() throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
 
@@ -238,7 +234,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void given51FutureBookingsOnACourt_whenRequestingBothPages_thenEveryBookingCanBeRead()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         Instant start = Instant.parse("2026-05-13T08:00:00Z");
         UUID firstPageCursor = null;
         UUID lastBookingId = null;
@@ -272,7 +268,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenExactly50FutureBookingsOnACourt_whenAskingWhatDeactivatingItWouldAffect_thenTheFullListIsReturnedUntruncated()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         Instant start = Instant.parse("2026-05-13T08:00:00Z");
         for (int i = 0; i < 50; i++) {
             Instant slotStart = start.plusSeconds(i * 1800L);
@@ -308,7 +304,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenTwoBookingsOnACard_whenRequestingTheSecondPage_thenTheRemainingBookingIsReturned()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         UUID firstBookingId = insertBookingWithCard(TRAINING_CARD, court,
                 "2026-05-12T12:00:00Z", "2026-05-12T13:00:00Z", "CONFIRMED");
         UUID secondBookingId = insertBookingWithCard(TRAINING_CARD, court,
@@ -327,7 +323,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenTwoTuesdayBookings_whenRequestingTheSecondClosingImpactPage_thenTheRemainingBookingIsReturned()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         UUID firstBookingId = insertBooking(
                 court, "2026-05-12T12:00:00Z", "2026-05-12T13:00:00Z", "CONFIRMED");
         UUID secondBookingId = insertBooking(
@@ -346,8 +342,8 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenACursorFromAnotherCourt_whenRequestingImpact_thenNoPositionedBookingsAreDisclosed()
             throws Exception {
         // given
-        UUID requestedCourt = courts.save(new Court(1, null)).getId();
-        UUID otherCourt = courts.save(new Court(2, null)).getId();
+        UUID requestedCourt = facilityFixture.createCourt(1, null);
+        UUID otherCourt = facilityFixture.createCourt(2, null);
         insertBooking(requestedCourt, "2026-05-12T12:00:00Z", "2026-05-12T13:00:00Z", "CONFIRMED");
         UUID foreignCursor = insertBooking(
                 otherCourt, "2026-05-12T14:00:00Z", "2026-05-12T15:00:00Z", "CONFIRMED");
@@ -365,7 +361,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenABookingStartingAtExactlyTheCurrentInstant_whenAskingWhatDeactivatingTheCourtWouldAffect_thenItIsCounted()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         UUID bookingId = insertBooking(
                 court, "2026-05-12T10:00:00Z", "2026-05-12T11:00:00Z", "CONFIRMED");
 
@@ -380,7 +376,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenABookingStartingAtExactlyTheCurrentInstant_whenAskingWhatRetiringItsCardWouldAffect_thenItIsCounted()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         UUID bookingId = insertBooking(
                 court, "2026-05-12T10:00:00Z", "2026-05-12T11:00:00Z", "CONFIRMED");
 
@@ -395,7 +391,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenABookingStartingAtExactlyTheCurrentInstant_whenAskingWhatClosingItsWeekdayWouldAffect_thenItIsCounted()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         UUID bookingId = insertBooking(
                 court, "2026-05-12T10:00:00Z", "2026-05-12T11:00:00Z", "CONFIRMED");
 
@@ -410,7 +406,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenOpensAtWithoutClosesAt_whenAskingWhatNarrowingOpeningHoursWouldAffect_thenTheRequestIsRejected()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
         book(court, bookerPersonId, "2026-05-12T13:00:00Z", "2026-05-12T14:00:00Z");
@@ -427,7 +423,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenClosesAtWithoutOpensAt_whenAskingWhatNarrowingOpeningHoursWouldAffect_thenTheRequestIsRejected()
             throws Exception {
         // given
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
         book(court, bookerPersonId, "2026-05-12T13:00:00Z", "2026-05-12T14:00:00Z");
@@ -442,7 +438,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
 
     private void setStandardOpeningHours() {
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 

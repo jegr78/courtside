@@ -1,7 +1,7 @@
 package org.courtside;
 
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.testfixture.BookingTestFixture;
-import org.courtside.facility.CourtRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberRepository;
@@ -25,7 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "courtside.test.clock=2026-05-12T20:00:00Z"
         })
 @ActiveProfiles({"test", "demo"})
-@Import({TestcontainersConfiguration.class, FixedClockConfiguration.class, BookingTestFixture.class})
+@Import({TestcontainersConfiguration.class, FixedClockConfiguration.class, BookingTestFixture.class,
+        FacilityTestFixture.class})
 class DemoDataSeederTest {
 
     @Autowired
@@ -39,7 +40,7 @@ class DemoDataSeederTest {
     private MemberRepository members;
 
     @Autowired
-    private CourtRepository courts;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private BookingTestFixture bookingFixture;
@@ -52,7 +53,7 @@ class DemoDataSeederTest {
         // given
         long accountCount = accounts.count();
         long memberCount = members.count();
-        long courtCount = courts.count();
+        long courtCount = facilityFixture.countCourts();
         long bookingCount = bookingFixture.countBookings();
         long migrationCount = jdbc.sql("SELECT count(*) FROM flyway_schema_history")
                 .query(Long.class).single();
@@ -63,7 +64,7 @@ class DemoDataSeederTest {
         // then
         assertThat(accounts.count()).isEqualTo(accountCount).isEqualTo(3);
         assertThat(members.count()).isEqualTo(memberCount).isEqualTo(2);
-        assertThat(courts.count()).isEqualTo(courtCount).isEqualTo(2);
+        assertThat(facilityFixture.countCourts()).isEqualTo(courtCount).isEqualTo(2);
         assertThat(bookingFixture.countBookings()).isEqualTo(bookingCount).isEqualTo(2);
         assertThat(jdbc.sql("SELECT count(*) FROM flyway_schema_history").query(Long.class).single())
                 .isEqualTo(migrationCount);

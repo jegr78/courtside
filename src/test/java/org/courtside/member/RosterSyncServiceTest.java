@@ -1,15 +1,12 @@
 package org.courtside.member;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.CardRoleRequiredException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.internal.BookingCardRepository;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -20,6 +17,7 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -32,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.courtside.member.MemberFixtures.memberSince;
 
+@Import(FacilityTestFixture.class)
 class RosterSyncServiceTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD_MEMBERSHIP =
@@ -55,10 +54,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
     private BookingCardRepository cards;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private BookingService bookings;
@@ -68,10 +64,9 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        courtId = courts.save(new Court(1, "Court 1")).getId();
+        courtId = facilityFixture.createCourt(1, "Court 1");
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day,
-                    new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
         memberOnlyCardId = cards.save(new BookingCard("Members only", "#B85C38",
                 Set.of(Role.MEMBER), Set.of(), new short[]{}, false, false, false)).getId();

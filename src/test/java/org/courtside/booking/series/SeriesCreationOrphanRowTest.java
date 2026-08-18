@@ -1,16 +1,14 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.BookingService;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -28,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@Import(FacilityTestFixture.class)
 class SeriesCreationOrphanRowTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -40,10 +39,7 @@ class SeriesCreationOrphanRowTest extends AbstractIntegrationTest {
     private BookingSeriesRepository seriesRepository;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @MockitoBean
     private BookingService bookings;
@@ -52,9 +48,9 @@ class SeriesCreationOrphanRowTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        courtOne = courts.save(new Court(1, "Court 1")).getId();
+        courtOne = facilityFixture.createCourt(1, "Court 1");
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 

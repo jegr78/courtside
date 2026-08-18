@@ -1,16 +1,13 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.internal.CardNotBookableException;
 import org.courtside.facility.CourtNotBookableException;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.ParticipantsInvalidException;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.rules.RuleViolation;
@@ -19,6 +16,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -36,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@Import(FacilityTestFixture.class)
 class SeriesPreviewTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -52,10 +51,7 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
     private BookingService bookingService;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @MockitoSpyBean
     private CourtAllocationRepository allocations;
@@ -69,11 +65,11 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        courtOne = courts.save(new Court(1, "Court 1")).getId();
-        courtTwo = courts.save(new Court(2, "Court 2")).getId();
+        courtOne = facilityFixture.createCourt(1, "Court 1");
+        courtTwo = facilityFixture.createCourt(2, "Court 2");
 
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 
@@ -210,9 +206,7 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
     @Test
     void givenOneOfTheCourtsIsInactive_whenPreviewing_thenItIsRejectedAsCreateWould() {
         // given
-        Court inactive = courts.findById(courtTwo).orElseThrow();
-        inactive.deactivate();
-        courts.save(inactive);
+        facilityFixture.deactivateCourt(courtTwo);
 
         // when / then
         assertThatThrownBy(() -> previewAsTrainer(rule(4)))

@@ -1,6 +1,8 @@
 package org.courtside.facility;
 
 import org.courtside.facility.internal.CourtNumberTakenException;
+import org.courtside.facility.internal.CourtRepository;
+import org.courtside.facility.internal.OpeningHoursRepository;
 import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.config.BookingGridSettings;

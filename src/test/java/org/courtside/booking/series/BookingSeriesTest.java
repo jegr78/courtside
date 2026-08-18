@@ -1,11 +1,11 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.postgresql.util.PSQLException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -20,6 +20,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(FacilityTestFixture.class)
 class BookingSeriesTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -30,7 +31,7 @@ class BookingSeriesTest extends AbstractIntegrationTest {
     private BookingSeriesRepository series;
 
     @Autowired
-    private CourtRepository courts;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private JdbcClient jdbc;
@@ -38,8 +39,8 @@ class BookingSeriesTest extends AbstractIntegrationTest {
     @Test
     void givenASeriesEndingOnADate_whenStored_thenTheRuleSurvivesTheRoundTrip() {
         // given
-        UUID firstCourt = courts.save(new Court(1, "Court 1")).getId();
-        UUID secondCourt = courts.save(new Court(2, "Court 2")).getId();
+        UUID firstCourt = facilityFixture.createCourt(1, "Court 1");
+        UUID secondCourt = facilityFixture.createCourt(2, "Court 2");
         SeriesRule rule = new SeriesRule(
                 List.of(firstCourt, secondCourt), TRAINING_CARD,
                 LocalDate.of(2026, 4, 7), LocalTime.of(18, 0), 120,
@@ -77,7 +78,7 @@ class BookingSeriesTest extends AbstractIntegrationTest {
     @Test
     void givenACourtReferencedByASeries_whenDeletingIt_thenTheDatabaseRefusesIt() {
         // given
-        UUID courtId = courts.save(new Court(1, "Court 1")).getId();
+        UUID courtId = facilityFixture.createCourt(1, "Court 1");
         SeriesRule rule = new SeriesRule(
                 List.of(courtId), TRAINING_CARD,
                 LocalDate.of(2026, 4, 7), LocalTime.of(18, 0), 120,

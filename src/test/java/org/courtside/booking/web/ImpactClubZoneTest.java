@@ -1,11 +1,11 @@
 package org.courtside.booking.web;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 // At UTC+10:30 in June.
 @WithMockUser(username = "admin", roles = "ADMIN")
+@Import(FacilityTestFixture.class)
 class ImpactClubZoneTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -37,7 +38,7 @@ class ImpactClubZoneTest extends AbstractIntegrationTest {
     private WebApplicationContext context;
 
     @Autowired
-    private CourtRepository courts;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private JdbcClient jdbc;
@@ -56,7 +57,7 @@ class ImpactClubZoneTest extends AbstractIntegrationTest {
         // given
         DayOfWeek clubWeekday = STARTS_AT.atZone(ZONE).getDayOfWeek();
         assertThat(clubWeekday).isNotEqualTo(STARTS_AT.atZone(ZoneOffset.UTC).getDayOfWeek());
-        UUID court = courts.save(new Court(1, null)).getId();
+        UUID court = facilityFixture.createCourt(1, null);
         UUID bookingId = insertBooking(court);
 
         // when / then

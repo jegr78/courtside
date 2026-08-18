@@ -2,14 +2,11 @@ package org.courtside.booking.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingStatus;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -22,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -48,6 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(FacilityTestFixture.class)
 class BookingControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -66,10 +65,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     private CardService cards;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -89,10 +85,10 @@ class BookingControllerTest extends AbstractIntegrationTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
-        courtId = courts.save(new Court(1, "Court 1")).getId();
-        secondCourtId = courts.save(new Court(2, "Court 2")).getId();
+        courtId = facilityFixture.createCourt(1, "Court 1");
+        secondCourtId = facilityFixture.createCourt(2, "Court 2");
 
         createAccount("Jane", "Doe", "doe.jane", Role.MEMBER);
         createAccount("Mary", "Major", "major.mary", Role.MEMBER);
@@ -682,9 +678,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenADeactivatedCourt_whenCreatingABooking_thenBadRequest() throws Exception {
         // given
-        Court retired = new Court(9, "Court 9");
-        retired.deactivate();
-        UUID retiredId = courts.save(retired).getId();
+        UUID retiredId = facilityFixture.createInactiveCourt(9, "Court 9");
 
         // when / then
         expectBadRequest(bookingJson(retiredId, MEMBER_BOOKING_CARD, GUEST_PARTICIPANT));

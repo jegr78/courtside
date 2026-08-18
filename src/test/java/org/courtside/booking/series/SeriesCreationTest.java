@@ -1,6 +1,7 @@
 package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
@@ -9,10 +10,6 @@ import org.courtside.booking.internal.CardNotBookableException;
 import org.courtside.booking.internal.CardRoleRequiredException;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.card.CardService;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -23,6 +20,7 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.DayOfWeek;
@@ -40,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
+@Import(FacilityTestFixture.class)
 class SeriesCreationTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -65,10 +64,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     private BookingSeriesRepository seriesRepository;
 
     @Autowired
-    private CourtRepository courts;
-
-    @Autowired
-    private OpeningHoursRepository openingHours;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
     private PersonRepository persons;
@@ -82,11 +78,11 @@ class SeriesCreationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        courtOne = courts.save(new Court(1, "Court 1")).getId();
-        courtTwo = courts.save(new Court(2, "Court 2")).getId();
+        courtOne = facilityFixture.createCourt(1, "Court 1");
+        courtTwo = facilityFixture.createCourt(2, "Court 2");
 
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 
