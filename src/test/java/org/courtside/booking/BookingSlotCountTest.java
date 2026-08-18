@@ -4,9 +4,8 @@ import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +22,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class BookingSlotCountTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -44,7 +43,7 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     private UUID courtId;
     private UUID bookerPersonId;
@@ -52,7 +51,7 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         courtId = facilityFixture.createCourt(1, "Court 1");
-        bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
 
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
@@ -75,8 +74,8 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     @Test
     void givenThreeFurtherPlayers_whenBooking_thenFourPlayersAreComplete() {
         // given
-        UUID second = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
-        UUID third = persons.save(new Person("Richard", "Miles", "richard@example.org")).getId();
+        UUID second = identity.createPerson("Mary", "Major", "mary@example.org");
+        UUID third = identity.createPerson("Richard", "Miles", "richard@example.org");
 
         // when
         UUID bookingId = book(MEMBER_BOOKING_CARD, List.of(
@@ -105,7 +104,7 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     @Test
     void givenTwoFurtherPlayers_whenBooking_thenThreeSlotsAreRejected() {
         // given
-        UUID second = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
+        UUID second = identity.createPerson("Mary", "Major", "mary@example.org");
 
         // when / then
         assertThatThrownBy(() -> book(MEMBER_BOOKING_CARD, List.of(
@@ -160,7 +159,7 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     @Test
     void givenTheBookerAlsoListedAsAParticipant_whenBooking_thenTheDuplicateIsRejected() {
         // given
-        UUID third = persons.save(new Person("Richard", "Miles", "richard@example.org")).getId();
+        UUID third = identity.createPerson("Richard", "Miles", "richard@example.org");
 
         // when / then
         assertThatThrownBy(() -> book(MEMBER_BOOKING_CARD, List.of(
@@ -175,7 +174,7 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     @Test
     void givenAFourPlayerBookingNamingAnUnknownPersonId_whenBooking_thenItIsRejected() {
         // given
-        UUID second = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
+        UUID second = identity.createPerson("Mary", "Major", "mary@example.org");
 
         // when / then
         assertThatThrownBy(() -> book(MEMBER_BOOKING_CARD, List.of(

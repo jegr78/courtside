@@ -1,16 +1,15 @@
 package org.courtside.member.web;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.RosterService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -38,6 +37,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
+@Import(IdentityTestFixture.class)
 class RosterLostUpdateTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -46,8 +46,9 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
     @Autowired
     private RosterService roster;
 
+
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private UserAccountRepository accounts;
@@ -141,11 +142,9 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
     }
 
     private UUID accountHolder() {
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
-        account.enable();
-        accounts.save(account);
-        return jane.getId();
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        return jane;
     }
 
     private static void await(CountDownLatch latch) {

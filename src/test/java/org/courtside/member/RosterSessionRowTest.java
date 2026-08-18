@@ -1,11 +1,11 @@
 package org.courtside.member;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
@@ -18,13 +18,14 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(IdentityTestFixture.class)
 class RosterSessionRowTest extends AbstractIntegrationTest {
 
     @Autowired
     private RosterService roster;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private FindByIndexNameSessionRepository<? extends Session> sessions;
@@ -86,9 +87,9 @@ class RosterSessionRowTest extends AbstractIntegrationTest {
     }
 
     private UUID accountHolder(String username) {
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        roster.createAccount(jane.getId(), username, "one-time-password", Set.of(Role.MEMBER));
-        return jane.getId();
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.createAccount(jane, username, "one-time-password", Set.of(Role.MEMBER));
+        return jane;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

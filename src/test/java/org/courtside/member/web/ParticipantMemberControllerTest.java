@@ -1,13 +1,13 @@
 package org.courtside.member.web;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -21,6 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(IdentityTestFixture.class)
 class ParticipantMemberControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
@@ -28,8 +29,9 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
     @Autowired
     private WebApplicationContext context;
 
+
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private MemberRepository members;
@@ -45,17 +47,17 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "member", roles = "MEMBER")
     void givenMembersAndANonMember_whenSearchingByName_thenOnlyMatchingMembersAreReturned() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        Person john = persons.save(new Person("John", "Roe", "john.roe@example.org"));
-        persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
-        members.save(memberSince(john.getId(), MEMBERSHIP_TYPE_ID));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        identity.createPerson("Mary", "Major", "mary.major@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(john, MEMBERSHIP_TYPE_ID));
 
         // when / then
         mockMvc.perform(get("/api/public/participant-members").queryParam("query", "do"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].personId").value(jane.getId().toString()))
+                .andExpect(jsonPath("$[0].personId").value(jane.toString()))
                 .andExpect(jsonPath("$[0].displayName").value("Jane Doe"));
     }
 
@@ -81,8 +83,8 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "member", roles = "MEMBER")
     void givenWildcardCharacters_whenSearchingMembers_thenTheyAreMatchedLiterally() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
 
         // when / then
         mockMvc.perform(get("/api/public/participant-members").queryParam("query", "%%"))

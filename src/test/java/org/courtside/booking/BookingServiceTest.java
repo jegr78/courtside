@@ -8,9 +8,8 @@ import org.courtside.shared.OpeningWindow;
 import org.courtside.card.CardService;
 import org.courtside.card.BookingCard;
 import org.courtside.booking.internal.BookingNotOwnedException;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.rules.RuleViolation;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +31,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class BookingServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -57,7 +56,7 @@ class BookingServiceTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private MeterRegistry meters;
@@ -69,7 +68,7 @@ class BookingServiceTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         courtId = facilityFixture.createCourt(1, "Court 1");
-        bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
 
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(

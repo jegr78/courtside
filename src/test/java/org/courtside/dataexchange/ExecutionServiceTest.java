@@ -1,16 +1,17 @@
 package org.courtside.dataexchange;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.identity.Role;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
-import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberRepository;
 import org.courtside.member.MemberService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(IdentityTestFixture.class)
 class ExecutionServiceTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
@@ -47,6 +49,9 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     private PersonRepository persons;
 
     @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
     private MemberRepository members;
 
     @Autowired
@@ -67,8 +72,8 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
                         "Email", CanonicalField.EMAIL),
                 Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME,
                         CanonicalField.EMAIL), 10).sourceId();
-        Person admin = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
-        actor = accounts.save(new UserAccount(admin, "admin", "hash", Set.of(Role.ADMIN))).getId();
+        UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        actor = identity.createAccount(admin, "admin", Set.of(Role.ADMIN));
     }
 
     @Test
@@ -135,7 +140,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
                 4711,Jane,Roe,jane.doe@example.org
                 4712,John,Roe,john.roe@example.org
                 """, SnapshotMode.FULL_SNAPSHOT);
-        rename(persons.save(new Person("Mary", "Major", "mary.major@example.org")).getId(), "Maria");
+        rename(identity.createPerson("Mary", "Major", "mary.major@example.org"), "Maria");
 
         // when
         RunOutcome outcome = executions.execute(previewId, false, actor);
@@ -284,7 +289,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     void givenAMemberNumberLinkedAfterThePreview_whenExecuting_thenNoSecondRecordIsCreated() {
         // given
         UUID previewId = preview(TWO_MEMBERS, SnapshotMode.FULL_SNAPSHOT);
-        UUID somebody = persons.save(new Person("Jane", "Doe", "jane.doe@example.org")).getId();
+        UUID somebody = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         references.link(source, "4711", somebody);
         long peopleBefore = persons.count();
 

@@ -1,15 +1,14 @@
 package org.courtside.member;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.LastAdministratorException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -27,13 +26,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
+@Import(IdentityTestFixture.class)
 class LastAdministratorConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
     private RosterService roster;
 
+
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private UserAccountRepository accounts;
@@ -78,12 +79,10 @@ class LastAdministratorConcurrencyTest extends AbstractIntegrationTest {
     }
 
     private UUID enabledAdministrator(String firstName, String lastName, String username) {
-        Person person = persons.save(new Person(firstName, lastName,
-                username + "@example.org"));
-        UserAccount account = new UserAccount(person, username, "hash", Set.of(Role.ADMIN));
-        account.enable();
-        accounts.save(account);
-        return person.getId();
+        UUID person = identity.createPerson(firstName, lastName,
+                username + "@example.org");
+        identity.createEnabledAccount(person, username, Set.of(Role.ADMIN));
+        return person;
     }
 
     private static void await(CountDownLatch latch) {

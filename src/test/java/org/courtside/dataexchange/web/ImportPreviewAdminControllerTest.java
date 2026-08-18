@@ -5,16 +5,16 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.dataexchange.CanonicalField;
 import org.courtside.dataexchange.ExternalReferenceService;
 import org.courtside.dataexchange.ImportSourceService;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
+import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,6 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(IdentityTestFixture.class)
 class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE =
@@ -65,6 +66,9 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
     private PersonRepository persons;
 
     @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
     private UserAccountRepository accounts;
 
     @Autowired
@@ -83,8 +87,8 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL),
                 Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
-        Person admin = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
-        accounts.save(new UserAccount(admin, "admin", "hash", Set.of(Role.ADMIN)));
+        UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        identity.createAccount(admin, "admin", Set.of(Role.ADMIN));
     }
 
     @Test
@@ -207,7 +211,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
     void givenARowNamingSomebodyTheRosterHolds_whenPreviewing_thenItIsReportedAsAPossibleDuplicate()
             throws Exception {
         // given
-        UUID jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org")).getId();
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
         mockMvc.perform(upload("Member number,First name,Last name,Email\n4711,Jane,Doe,jane.doe@example.org\n", "FULL_SNAPSHOT"))
@@ -326,8 +330,8 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
     }
 
     private UUID memberLinkedAs(String externalId, String firstName, String lastName) {
-        UUID personId = persons.save(new Person(firstName, lastName,
-                firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org")).getId();
+        UUID personId = identity.createPerson(firstName, lastName,
+                firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org");
         members.save(new Member(personId, MEMBERSHIP_TYPE_ID, LocalDate.of(2026, 1, 1)));
         references.link(source, externalId, personId);
         return personId;

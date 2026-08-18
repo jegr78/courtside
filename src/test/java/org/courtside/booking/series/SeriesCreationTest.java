@@ -11,9 +11,8 @@ import org.courtside.booking.internal.CardRoleRequiredException;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.card.CardService;
 import org.courtside.shared.OpeningWindow;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.courtside.shared.TimeSlot;
@@ -38,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class SeriesCreationTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -67,7 +66,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private MemberRepository members;
@@ -150,7 +149,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     @Test
     void givenAMemberBeyondTheAdvanceWindow_whenCreatingEveryOccurrence_thenTheLaterOnesAreSkippedAsRuleViolations() {
         // given
-        UUID personId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
+        UUID personId = identity.createPerson("Mary", "Major", "mary@example.org");
         members.save(memberSince(personId, STANDARD_MEMBERSHIP));
         SeriesRule rule = fridaysFromApril3(4);
 
@@ -167,7 +166,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     @Test
     void givenABookerBeyondTheAdvanceWindow_whenPreviewingAndCreating_thenThePreviewPromisesWhatCreateDelivers() {
         // given
-        UUID personId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
+        UUID personId = identity.createPerson("Mary", "Major", "mary@example.org");
         members.save(memberSince(personId, STANDARD_MEMBERSHIP));
         UUID bookedBy = UUID.randomUUID();
         SeriesRule rule = fridaysFromApril3(6);
@@ -187,7 +186,7 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     @Test
     void givenAnAdminBookerBeyondTheAdvanceWindow_whenPreviewingAndCreating_thenEveryOccurrenceIsOfferedAndCreated() {
         // given
-        UUID personId = persons.save(new Person("John", "Roe", "john@example.org")).getId();
+        UUID personId = identity.createPerson("John", "Roe", "john@example.org");
         members.save(memberSince(personId, STANDARD_MEMBERSHIP));
         UUID bookedBy = UUID.randomUUID();
         SeriesRule rule = fridaysFromApril3(6);

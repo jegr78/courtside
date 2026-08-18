@@ -4,9 +4,8 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.Court;
 import org.courtside.facility.internal.CourtRepository;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import(BookingTestFixture.class)
+@Import({BookingTestFixture.class, IdentityTestFixture.class})
 class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -46,7 +45,7 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
     private CourtRepository courts;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private BookingTestFixture bookingFixture;
@@ -152,7 +151,7 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
         // given
         setHours("TUESDAY", "08:00", "22:00");
         UUID courtId = courts.save(new Court(1, null)).getId();
-        UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
         UUID bookingId = bookingFixture.createBookingWithGuest(
                 courtId, MEMBER_BOOKING_CARD,
                 new TimeSlot(Instant.parse("2026-05-12T19:00:00Z"),

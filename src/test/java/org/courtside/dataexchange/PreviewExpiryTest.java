@@ -3,14 +3,14 @@ package org.courtside.dataexchange;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.dataexchange.internal.ImportPreviewRepository;
 import org.courtside.dataexchange.internal.PreviewExpiry;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
+import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -22,6 +22,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(IdentityTestFixture.class)
 class PreviewExpiryTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
@@ -50,6 +51,9 @@ class PreviewExpiryTest extends AbstractIntegrationTest {
     private PersonRepository persons;
 
     @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
     private UserAccountRepository accounts;
 
     @Autowired
@@ -66,8 +70,8 @@ class PreviewExpiryTest extends AbstractIntegrationTest {
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL),
                 Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME), 10).sourceId();
-        Person admin = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
-        actor = accounts.save(new UserAccount(admin, "admin", "hash", Set.of(Role.ADMIN))).getId();
+        UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        actor = identity.createAccount(admin, "admin", Set.of(Role.ADMIN));
     }
 
     @Test
