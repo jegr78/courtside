@@ -8,9 +8,8 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.facility.OpeningHoursGridMismatchException;
 import org.courtside.rules.RuleViolation;
 import org.courtside.shared.OpeningWindow;
@@ -41,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class BookingGridCoordinationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -60,7 +59,7 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private PlatformTransactionManager transactions;
@@ -121,7 +120,7 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         UUID courtId = facilityFixture.createCourt(1, "Court 1");
-        UUID personId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        UUID personId = identity.createPerson("Jane", "Doe", "jane@example.org");
         UUID accountId = UUID.randomUUID();
         facility.setOpeningHours(DayOfWeek.TUESDAY,
                 new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));

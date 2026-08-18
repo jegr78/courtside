@@ -3,9 +3,8 @@ package org.courtside.booking;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.PostgresDiagnostics;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -53,7 +52,7 @@ class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private PlatformTransactionManager transactions;
@@ -66,7 +65,7 @@ class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         UUID courtId = facilityFixture.createCourt(1, "Court 1");
-        UUID personId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        UUID personId = identity.createPerson("Jane", "Doe", "jane@example.org");
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }

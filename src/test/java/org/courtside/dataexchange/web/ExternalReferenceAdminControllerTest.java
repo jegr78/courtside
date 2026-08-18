@@ -2,13 +2,14 @@ package org.courtside.dataexchange.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.dataexchange.CanonicalField;
 import org.courtside.dataexchange.ImportSourceService;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(IdentityTestFixture.class)
 class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE =
@@ -44,6 +46,9 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private PersonRepository persons;
+
+    @Autowired
+    private IdentityTestFixture identity;
 
     private MockMvc mockMvc;
 
@@ -271,7 +276,7 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
     }
 
     private UUID person(String firstName, String lastName) {
-        return persons.save(new Person(firstName, lastName,
-                firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org")).getId();
+        return identity.createPerson(firstName, lastName,
+                firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org");
     }
 }

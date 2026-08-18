@@ -9,9 +9,8 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.internal.ParticipantsInvalidException;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -72,7 +71,7 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private PlatformTransactionManager transactions;
@@ -90,7 +89,7 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
         seriesCourt = facilityFixture.createCourt(1, "Court 1");
         competingCourt = facilityFixture.createCourt(2, "Court 2");
         trainer = UUID.randomUUID();
-        memberPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        memberPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }

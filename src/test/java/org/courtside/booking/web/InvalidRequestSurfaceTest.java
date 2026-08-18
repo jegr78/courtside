@@ -2,10 +2,8 @@ package org.courtside.booking.web;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "doe.jane", roles = "MEMBER")
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -44,8 +42,9 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
     @Autowired
     private FacilityTestFixture facilityFixture;
 
+
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private UserAccountRepository accounts;
@@ -69,11 +68,9 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
         inactiveCourtId = facilityFixture.createInactiveCourt(3, "Court 3");
 
-        Person person = persons.save(new Person("Jane", "Doe", "doe.jane@example.org"));
-        UserAccount account = new UserAccount(
+        UUID person = identity.createPerson("Jane", "Doe", "doe.jane@example.org");
+        identity.createEnabledAccount(
                 person, "doe.jane", passwordEncoder.encode("secret"), Set.of(Role.MEMBER));
-        account.enable();
-        accounts.save(account);
     }
 
     @Test

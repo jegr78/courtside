@@ -7,9 +7,10 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.CardRoleRequiredException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.internal.BookingCardRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.identity.Role;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
-import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.OpeningWindow;
@@ -30,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.courtside.member.MemberFixtures.memberSince;
 
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class RosterSyncServiceTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD_MEMBERSHIP =
@@ -43,6 +44,9 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
 
     @Autowired
     private PersonRepository persons;
+
+    @Autowired
+    private IdentityTestFixture identity;
 
     @Autowired
     private UserAccountRepository accounts;
@@ -134,7 +138,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
     @Test
     void givenAnAccountABoardDisabled_whenTheSnapshotListsThemAsACurrentMember_thenItStaysDisabled() {
         // given
-        UUID john = persons.save(new Person("John", "Roe", "john.roe@example.org")).getId();
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
         UserAccount account = account(john, "roe.john", Set.of(Role.MEMBER));
         account.disable();
         accounts.saveAndFlush(account);
@@ -208,16 +212,14 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
     }
 
     private UUID member(String firstName, String lastName) {
-        UUID personId = persons.save(new Person(firstName, lastName,
-                firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org")).getId();
+        UUID personId = identity.createPerson(firstName, lastName,
+                firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org");
         members.save(memberSince(personId, STANDARD_MEMBERSHIP));
         return personId;
     }
 
     private UserAccount account(UUID personId, String username, Set<Role> roles) {
-        UserAccount account = new UserAccount(persons.findById(personId).orElseThrow(),
-                username, "hash", roles);
-        account.enable();
-        return accounts.saveAndFlush(account);
+        UUID accountId = identity.createEnabledAccount(personId, username, roles);
+        return accounts.findById(accountId).orElseThrow();
     }
 }

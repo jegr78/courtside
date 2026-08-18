@@ -1,10 +1,10 @@
 package org.courtside.member;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.identity.Role;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
-import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.PersonNotFoundException;
 import org.courtside.shared.CursorPage;
@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.Set;
@@ -22,12 +23,16 @@ import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(IdentityTestFixture.class)
 class RosterPersonTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
 
     @Autowired
     private PersonRepository persons;
+
+    @Autowired
+    private IdentityTestFixture identity;
 
     @Autowired
     private UserAccountRepository accounts;
@@ -87,17 +92,17 @@ class RosterPersonTest extends AbstractIntegrationTest {
     @Test
     void givenAPerson_whenChangingThem_thenTheNameAndTheEmailAreCorrected() {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when
         RosterService.RosterEntry changed =
-                roster.changePerson(jane.getId(), "Jane", "Major", "jane.major@example.org");
+                roster.changePerson(jane, "Jane", "Major", "jane.major@example.org");
 
         // then
-        assertThat(changed.personId()).isEqualTo(jane.getId());
+        assertThat(changed.personId()).isEqualTo(jane);
         assertThat(changed.lastName()).isEqualTo("Major");
         assertThat(changed.email()).isEqualTo("jane.major@example.org");
-        assertThat(persons.findById(jane.getId())).get()
+        assertThat(persons.findById(jane)).get()
                 .satisfies(stored -> {
                     assertThat(stored.getLastName()).isEqualTo("Major");
                     assertThat(stored.getEmail()).isEqualTo("jane.major@example.org");
@@ -107,18 +112,16 @@ class RosterPersonTest extends AbstractIntegrationTest {
     @Test
     void givenAPersonHoldingAnAccountAndAMembership_whenChangingThem_thenBothSurvive() {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = new UserAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER));
-        account.enable();
-        accounts.save(account);
-        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = identity.createEnabledAccount(jane, "jane.doe", Set.of(Role.MEMBER));
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
 
         // when
         RosterService.RosterEntry changed =
-                roster.changePerson(jane.getId(), "Jane", "Major", "jane.major@example.org");
+                roster.changePerson(jane, "Jane", "Major", "jane.major@example.org");
 
         // then
-        assertThat(changed.accountId()).isEqualTo(account.getId());
+        assertThat(changed.accountId()).isEqualTo(account);
         assertThat(changed.username()).isEqualTo("jane.doe");
         assertThat(changed.enabled()).isTrue();
         assertThat(changed.roles()).containsExactly(Role.MEMBER);
@@ -175,11 +178,11 @@ class RosterPersonTest extends AbstractIntegrationTest {
     @Test
     void givenNamesPaddedWithWhitespace_whenChangingAPerson_thenTheyAreStoredWithoutThePadding() {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when
         RosterService.RosterEntry changed =
-                roster.changePerson(jane.getId(), " Jane ", " Major ", " jane.major@example.org ");
+                roster.changePerson(jane, " Jane ", " Major ", " jane.major@example.org ");
 
         // then
         assertThat(changed.firstName()).isEqualTo("Jane");

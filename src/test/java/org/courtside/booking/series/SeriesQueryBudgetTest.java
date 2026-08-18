@@ -3,9 +3,8 @@ package org.courtside.booking.series;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.SqlStatementCounter;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.MemberRepository;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.AfterEach;
@@ -28,7 +27,7 @@ import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class SeriesQueryBudgetTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -46,7 +45,7 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private MemberRepository members;
@@ -58,7 +57,7 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         courtId = facilityFixture.createCourt(1, "Court 1");
-        trainerPersonId = persons.save(new Person("John", "Roe", "john@example.org")).getId();
+        trainerPersonId = identity.createPerson("John", "Roe", "john@example.org");
         members.save(memberSince(trainerPersonId, STANDARD_MEMBERSHIP));
         trainer = UUID.randomUUID();
         Arrays.stream(DayOfWeek.values())

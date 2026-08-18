@@ -6,9 +6,8 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.CardService;
 import org.courtside.shared.OpeningWindow;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import({BookingTestFixture.class, FacilityTestFixture.class})
+@Import({BookingTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class})
 class BookingCardAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -53,7 +52,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     private MockMvc mockMvc;
 
@@ -302,7 +301,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
         // given
         String id = createCard("Match play", "#3a4a5c");
         UUID courtId = facilityFixture.createCourt(1, "Court 1");
-        UUID personId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        UUID personId = identity.createPerson("Jane", "Doe", "jane@example.org");
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }

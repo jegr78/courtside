@@ -8,11 +8,11 @@ import org.courtside.booking.BookingStatus;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.shared.OpeningWindow;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class BookingControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -74,6 +74,9 @@ class BookingControllerTest extends AbstractIntegrationTest {
     private UserAccountRepository accounts;
 
     @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private MockMvc mockMvc;
@@ -99,12 +102,9 @@ class BookingControllerTest extends AbstractIntegrationTest {
     }
 
     private void createAccount(String firstName, String lastName, String username, Role role) {
-        Person person = persons.save(
-                new Person(firstName, lastName, username + "@example.org"));
-        UserAccount account = new UserAccount(
-                person, username, passwordEncoder.encode("secret"), Set.of(role));
-        account.enable();
-        accounts.save(account);
+        UUID personId = identity.createPerson(firstName, lastName, username + "@example.org");
+        identity.createEnabledAccount(
+                personId, username, passwordEncoder.encode("secret"), Set.of(role));
     }
 
     @Test

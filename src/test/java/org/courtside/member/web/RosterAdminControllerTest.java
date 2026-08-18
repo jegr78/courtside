@@ -2,10 +2,9 @@ package org.courtside.member.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
+import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
@@ -15,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(IdentityTestFixture.class)
 class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
@@ -59,6 +60,9 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     private PersonRepository persons;
 
     @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
     private UserAccountRepository accounts;
 
     @Autowired
@@ -76,25 +80,23 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAMemberAndAChild_whenListingTheRoster_thenBothAppearAndOnlyTheMemberHasAnAccount()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = new UserAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER));
-        account.enable();
-        accounts.save(account);
-        members.save(memberSince(jane.getId(), MEMBERSHIP_TYPE_ID));
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = identity.createEnabledAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER));
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
         mockMvc.perform(get("/api/admin/roster"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries.length()").value(2))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist())
-                .andExpect(jsonPath("$.entries[0].personId").value(jane.getId().toString()))
+                .andExpect(jsonPath("$.entries[0].personId").value(jane.toString()))
                 .andExpect(jsonPath("$.entries[0].username").value("jane.doe"))
-                .andExpect(jsonPath("$.entries[0].accountId").value(account.getId().toString()))
+                .andExpect(jsonPath("$.entries[0].accountId").value(account.toString()))
                 .andExpect(jsonPath("$.entries[0].enabled").value(true))
                 .andExpect(jsonPath("$.entries[0].membershipTypeId").value(MEMBERSHIP_TYPE_ID.toString()))
                 .andExpect(jsonPath("$.entries[0].roles[0]").value("MEMBER"))
-                .andExpect(jsonPath("$.entries[1].personId").value(mary.getId().toString()))
+                .andExpect(jsonPath("$.entries[1].personId").value(mary.toString()))
                 .andExpect(jsonPath("$.entries[1].email").value("mary.major@example.org"))
                 .andExpect(jsonPath("$.entries[1].username").doesNotExist())
                 .andExpect(jsonPath("$.entries[1].accountId").doesNotExist())
@@ -107,15 +109,15 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenMorePeopleThanTheLimit_whenListingTheRoster_thenTheCursorNamesTheLastEntry()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
         mockMvc.perform(get("/api/admin/roster").queryParam("limit", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries.length()").value(1))
-                .andExpect(jsonPath("$.entries[0].personId").value(jane.getId().toString()))
-                .andExpect(jsonPath("$.nextCursor").value(jane.getId().toString()));
+                .andExpect(jsonPath("$.entries[0].personId").value(jane.toString()))
+                .andExpect(jsonPath("$.nextCursor").value(jane.toString()));
     }
 
     @Test
@@ -152,7 +154,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenACursorNamingSomebodyWhoIsGone_whenListingTheRoster_thenTheStaleCursorIsReported()
             throws Exception {
         // given
-        persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
         mockMvc.perform(get("/api/admin/roster").queryParam("cursor", UUID.randomUUID().toString()))
@@ -363,10 +365,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenABlankFirstName_whenChangingAPerson_thenTheContractNamesTheField() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(personBody(EM_SPACE, "Doe", "jane.doe@example.org"))
                         .with(csrf()))
@@ -380,15 +382,15 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPerson_whenChangingThem_thenTheResponseCarriesTheCorrection() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(personBody("Jane", "Major", "jane.major@example.org"))
                         .with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.personId").value(jane.getId().toString()))
+                .andExpect(jsonPath("$.personId").value(jane.toString()))
                 .andExpect(jsonPath("$.lastName").value("Major"))
                 .andExpect(jsonPath("$.email").value("jane.major@example.org"));
     }
@@ -397,11 +399,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenPaddedDetails_whenChangingAPerson_thenTheyAreStoredWithoutThatPadding() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         String noBreakSpace = Character.toString(0x00a0);
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(personBody(noBreakSpace + "Jane", "Major ", "  jane.major@example.org  "))
                         .with(csrf()))
@@ -438,10 +440,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "member", roles = "MEMBER")
     void givenAMemberSession_whenChangingAPerson_thenItIsDenied() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(personBody("Jane", "Major", "jane.major@example.org"))
                         .with(csrf()))
@@ -454,15 +456,15 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAPersonWithoutAnAccount_whenCreatingOne_thenTheEntryCarriesItAndThePasswordIsNotStored()
             throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when
-        mockMvc.perform(post("/api/admin/roster/{personId}/account", mary.getId())
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(accountBody("major.mary", "one-time-password", "MEMBER", "TRAINER"))
                         .with(csrf()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.personId").value(mary.getId().toString()))
+                .andExpect(jsonPath("$.personId").value(mary.toString()))
                 .andExpect(jsonPath("$.username").value("major.mary"))
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.roles[0]").value("MEMBER"))
@@ -480,10 +482,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnAccountHoldingSeveralRoles_whenReadingIt_thenTheRolesAscendByName() throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
-        mockMvc.perform(post("/api/admin/roster/{personId}/account", mary.getId())
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(accountBody("major.mary", "one-time-password", "TRAINER", "ADMIN", "MEMBER"))
                         .with(csrf()))
@@ -497,12 +499,12 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenATakenUsername_whenCreatingAnAccount_thenTheResponseCarriesItsOwnType() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER)));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when / then
-        mockMvc.perform(post("/api/admin/roster/{personId}/account", mary.getId())
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(accountBody("doe.jane", "one-time-password", "MEMBER"))
                         .with(csrf()))
@@ -515,11 +517,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAPersonHoldingAnAccount_whenCreatingASecondOne_thenTheResponseCarriesItsOwnType()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER)));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when / then
-        mockMvc.perform(post("/api/admin/roster/{personId}/account", jane.getId())
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(accountBody("doe.jane.second", "one-time-password", "MEMBER"))
                         .with(csrf()))
@@ -557,10 +559,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAnAccountTheContractRefuses_whenCreatingIt_thenTheContractNamesTheField(
             String field, String code, String body) throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        mockMvc.perform(post("/api/admin/roster/{personId}/account", jane.getId())
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .with(csrf()))
@@ -575,11 +577,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnAccount_whenItsRolesAreReplaced_thenTheEntryCarriesTheNewOnes() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER, Role.ADMIN)));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jane", Set.of(Role.MEMBER, Role.ADMIN));
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roles": ["MEMBER"]}
@@ -595,10 +597,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAPersonWithoutAnAccount_whenChangingRoles_thenTheResponseCarriesItsOwnType()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roles": ["MEMBER"]}
@@ -612,13 +614,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnEnabledAccount_whenItIsDeactivated_thenTheEntryAndTheAccountSaySo() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
-        account.enable();
-        accounts.save(account);
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = identity.createEnabledAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
 
         // when
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/active", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/active", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"active": false}
@@ -628,7 +628,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.enabled").value(false));
 
         // then
-        assertThat(accounts.findById(account.getId())).get()
+        assertThat(accounts.findById(account)).get()
                 .satisfies(stored -> assertThat(stored.isEnabled()).isFalse());
     }
 
@@ -637,11 +637,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenTheOnlyEnabledAdministrator_whenTheRoleIsTakenFromThem_thenTheInstanceKeepsIt()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = enabledAccount(jane, "doe.jane", Role.ADMIN);
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = enabledAccount(jane, "doe.jane", Role.ADMIN);
 
         // when
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roles": ["MEMBER"]}
@@ -652,7 +652,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].code").value("roster.lastAdministrator"));
 
         // then
-        assertThat(accounts.findById(account.getId())).get()
+        assertThat(accounts.findById(account)).get()
                 .satisfies(stored -> assertThat(stored.getRoles()).contains(Role.ADMIN));
     }
 
@@ -661,11 +661,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenTheOnlyEnabledAdministrator_whenTheirAccountIsDisabled_thenTheInstanceKeepsThem()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = enabledAccount(jane, "doe.jane", Role.ADMIN);
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = enabledAccount(jane, "doe.jane", Role.ADMIN);
 
         // when
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/active", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/active", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"active": false}
@@ -676,7 +676,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].code").value("roster.lastAdministrator"));
 
         // then
-        assertThat(accounts.findById(account.getId())).get()
+        assertThat(accounts.findById(account)).get()
                 .satisfies(stored -> assertThat(stored.isEnabled()).isTrue());
     }
 
@@ -684,13 +684,13 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenASecondEnabledAdministrator_whenOneStepsDown_thenTheChangeStands() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        UserAccount stepping = enabledAccount(jane, "doe.jane", Role.ADMIN);
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID stepping = enabledAccount(jane, "doe.jane", Role.ADMIN);
         enabledAccount(mary, "major.mary", Role.ADMIN);
 
         // when
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roles": ["MEMBER"]}
@@ -701,7 +701,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.roles.length()").value(1));
 
         // then
-        assertThat(accounts.findById(stepping.getId())).get()
+        assertThat(accounts.findById(stepping)).get()
                 .satisfies(stored -> assertThat(stored.getRoles()).containsExactly(Role.MEMBER));
     }
 
@@ -710,13 +710,13 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenADisabledSecondAdministrator_whenTheEnabledOneStepsDown_thenTheInstanceKeepsThem()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         enabledAccount(jane, "doe.jane", Role.ADMIN);
-        accounts.save(new UserAccount(mary, "major.mary", "hash", Set.of(Role.ADMIN)));
+        identity.createAccount(mary, "major.mary", Set.of(Role.ADMIN));
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/roles", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roles": ["MEMBER"]}
@@ -730,10 +730,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "member", roles = "MEMBER")
     void givenAMemberSession_whenCreatingAnAccount_thenItIsDenied() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        mockMvc.perform(post("/api/admin/roster/{personId}/account", jane.getId())
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(accountBody("doe.jane", "one-time-password", "ADMIN"))
                         .with(csrf()))
@@ -746,16 +746,16 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAMistypedUsername_whenItIsCorrected_thenTheEntryCarriesTheNewOne() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        accounts.save(new UserAccount(jane, "doe.jaen", "hash", Set.of(Role.MEMBER)));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jaen", Set.of(Role.MEMBER));
 
         // when
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(usernameBody("doe.jane"))
                         .with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.personId").value(jane.getId().toString()))
+                .andExpect(jsonPath("$.personId").value(jane.toString()))
                 .andExpect(jsonPath("$.username").value("doe.jane"))
                 .andExpect(jsonPath("$.roles[0]").value("MEMBER"));
 
@@ -769,11 +769,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenTheUsernameItAlreadyHolds_whenCorrectingIt_thenItIsAcceptedRatherThanConflicting()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER)));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(usernameBody("doe.jane"))
                         .with(csrf()))
@@ -786,13 +786,13 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAUsernameAnotherAccountHolds_whenCorrectingIt_thenTheResponseCarriesItsOwnType()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        accounts.save(new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER)));
-        accounts.save(new UserAccount(mary, "major.mary", "hash", Set.of(Role.MEMBER)));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        identity.createAccount(mary, "major.mary", Set.of(Role.MEMBER));
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(usernameBody("doe.jane"))
                         .with(csrf()))
@@ -806,10 +806,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAPersonWithoutAnAccount_whenCorrectingTheUsername_thenTheResponseCarriesItsOwnType()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(usernameBody("doe.jane"))
                         .with(csrf()))
@@ -847,11 +847,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAUsernameTheContractRefuses_whenCorrectingIt_thenTheContractNamesTheField(
             String label, String code, String body) throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        accounts.save(new UserAccount(jane, "doe.jaen", "hash", Set.of(Role.MEMBER)));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jaen", Set.of(Role.MEMBER));
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .with(csrf()))
@@ -867,13 +867,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAnAccount_whenItsPasswordIsReset_thenTheEntryCarriesItWithoutEchoingThePassword()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
-        account.enable();
-        accounts.save(account);
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = identity.createEnabledAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
 
         // when
-        String body = mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane.getId())
+        String body = mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(passwordBody("second-one-time-password"))
                         .with(csrf()))
@@ -886,7 +884,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         assertThat(body)
                 .as("the response is the roster entry and never carries the password back")
                 .doesNotContain("second-one-time-password");
-        assertThat(accounts.findById(account.getId())).get()
+        assertThat(accounts.findById(account)).get()
                 .satisfies(stored -> {
                     assertThat(stored.isPasswordChangeRequired()).isTrue();
                     assertThat(stored.getPasswordHash()).isNotEqualTo("hash");
@@ -899,10 +897,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAPersonWithoutAnAccount_whenResettingThePassword_thenTheResponseCarriesItsOwnType()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(passwordBody("second-one-time-password"))
                         .with(csrf()))
@@ -937,12 +935,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAPasswordTheContractRefuses_whenResettingIt_thenTheContractNamesTheField(
             String label, String code, String body) throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
-        accounts.save(account);
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = identity.createAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .with(csrf()))
@@ -950,7 +947,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("oneTimePassword"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value(code));
-        assertThat(accounts.findById(account.getId())).get()
+        assertThat(accounts.findById(account)).get()
                 .satisfies(stored -> assertThat(stored.getPasswordHash()).isEqualTo("hash"));
     }
 
@@ -958,11 +955,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "member", roles = "MEMBER")
     void givenAMemberSession_whenCorrectingAUsername_thenItIsDenied() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        accounts.save(new UserAccount(jane, "doe.jaen", "hash", Set.of(Role.MEMBER)));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jaen", Set.of(Role.MEMBER));
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/username", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(usernameBody("doe.jane"))
                         .with(csrf()))
@@ -974,18 +971,17 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @Test
     void givenNoSession_whenResettingAPassword_thenItIsUnauthenticated() throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = new UserAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
-        accounts.save(account);
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = identity.createAccount(jane, "doe.jane", "hash", Set.of(Role.MEMBER));
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/password", jane)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(passwordBody("second-one-time-password"))
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
-        assertThat(accounts.findById(account.getId())).get()
+        assertThat(accounts.findById(account)).get()
                 .satisfies(stored -> assertThat(stored.getPasswordHash()).isEqualTo("hash"));
     }
 
@@ -994,15 +990,15 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAPersonWithoutAMembership_whenOneIsAssigned_thenTheEntryAndTheRosterCarryIt()
             throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when
-        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(membershipBody(MEMBERSHIP_TYPE_ID.toString()))
                         .with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.personId").value(mary.getId().toString()))
+                .andExpect(jsonPath("$.personId").value(mary.toString()))
                 .andExpect(jsonPath("$.membershipTypeId").value(MEMBERSHIP_TYPE_ID.toString()));
 
         // then
@@ -1017,11 +1013,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAPersonOnTheWrongType_whenAnotherIsAssigned_thenTheyHoldOnlyTheNewOne()
             throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        members.save(memberSince(mary.getId(), MEMBERSHIP_TYPE_ID));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        members.save(memberSince(mary, MEMBERSHIP_TYPE_ID));
 
         // when
-        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(membershipBody(OTHER_MEMBERSHIP_TYPE_ID.toString()))
                         .with(csrf()))
@@ -1029,7 +1025,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.membershipTypeId").value(OTHER_MEMBERSHIP_TYPE_ID.toString()));
 
         // then
-        assertThat(members.findByPersonIdIn(List.of(mary.getId())))
+        assertThat(members.findByPersonIdIn(List.of(mary)))
                 .singleElement()
                 .satisfies(member -> assertThat(member.getMembershipTypeId())
                         .isEqualTo(OTHER_MEMBERSHIP_TYPE_ID));
@@ -1040,7 +1036,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenADeactivatedMembershipType_whenAssigningIt_thenTheResponseCarriesItsOwnType()
             throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         mockMvc.perform(put("/api/admin/membership-types/{id}/active", MEMBERSHIP_TYPE_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -1050,7 +1046,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(membershipBody(MEMBERSHIP_TYPE_ID.toString()))
                         .with(csrf()))
@@ -1058,7 +1054,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:membership-type-inactive"))
                 .andExpect(jsonPath("$.violations[0].code").value("membershipType.inactive"))
                 .andExpect(jsonPath("$.violations[0].params.field").value("membershipTypeId"));
-        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
+        assertThat(members.findByPersonIdIn(List.of(mary))).isEmpty();
     }
 
     @Test
@@ -1066,10 +1062,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAnUnknownMembershipType_whenAssigningIt_thenTheResponseCarriesItsOwnType()
             throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(membershipBody(UUID.randomUUID().toString()))
                         .with(csrf()))
@@ -1104,10 +1100,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAMembershipTypeIdTheContractRefuses_whenAssigningIt_thenTheContractNamesTheField(
             String label, String code, String body) throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .with(csrf()))
@@ -1115,7 +1111,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("membershipTypeId"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value(code));
-        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
+        assertThat(members.findByPersonIdIn(List.of(mary))).isEmpty();
     }
 
     @Test
@@ -1136,19 +1132,19 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAMembership_whenItIsEnded_thenTheEntryReportsTheDateItEnded() throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        members.save(memberSince(mary.getId(), MEMBERSHIP_TYPE_ID));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        members.save(memberSince(mary, MEMBERSHIP_TYPE_ID));
 
         // when
-        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary)
                         .with(csrf()))
                 .andExpect(status().isNoContent());
 
         // then
-        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isNotEmpty();
+        assertThat(members.findByPersonIdIn(List.of(mary))).isNotEmpty();
         mockMvc.perform(get("/api/admin/roster"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.entries[0].personId").value(mary.getId().toString()))
+                .andExpect(jsonPath("$.entries[0].personId").value(mary.toString()))
                 .andExpect(jsonPath("$.entries[0].membershipTypeId")
                         .value(MEMBERSHIP_TYPE_ID.toString()))
                 .andExpect(jsonPath("$.entries[0].membershipStartedOn")
@@ -1161,11 +1157,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAMembership_whenItIsEndedOnAGivenDate_thenThatDateIsWhatTheEntryReports()
             throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        members.save(memberSince(mary.getId(), MEMBERSHIP_TYPE_ID));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        members.save(memberSince(mary, MEMBERSHIP_TYPE_ID));
 
         // when
-        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"membershipTypeId":"%s","startedOn":"2026-01-01","endedOn":"2026-03-31"}
@@ -1176,7 +1172,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.membershipEndedOn").value("2026-03-31"));
 
         // then
-        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"membershipTypeId":"%s","startedOn":"2026-01-01","endedOn":"2026-04-30"}
@@ -1192,10 +1188,10 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAMembershipEndedBeforeItBegan_whenWritingIt_thenTheOrderingIsRefused()
             throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"membershipTypeId":"%s","startedOn":"2026-05-01","endedOn":"2026-04-30"}
@@ -1206,7 +1202,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                         .value("urn:courtside:error:invalid-membership-period"))
                 .andExpect(jsonPath("$.violations[0].code")
                         .value("membershipPeriod.endsBeforeItBegan"));
-        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
+        assertThat(members.findByPersonIdIn(List.of(mary))).isEmpty();
     }
 
     @Test
@@ -1214,13 +1210,13 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAPersonWithoutAMembership_whenEndingIt_thenItIsTheStateTheRequestAsksFor()
             throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
-        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary)
                         .with(csrf()))
                 .andExpect(status().isNoContent());
-        assertThat(persons.findById(mary.getId()))
+        assertThat(persons.findById(mary))
                 .as("only the membership goes; the person stays")
                 .isPresent();
     }
@@ -1240,30 +1236,30 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "member", roles = "MEMBER")
     void givenAMemberSession_whenAssigningAMembership_thenItIsDenied() throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
-        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(put("/api/admin/roster/{personId}/membership", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(membershipBody(MEMBERSHIP_TYPE_ID.toString()))
                         .with(csrf()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
-        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isEmpty();
+        assertThat(members.findByPersonIdIn(List.of(mary))).isEmpty();
     }
 
     @Test
     void givenNoSession_whenEndingAMembership_thenItIsUnauthenticated() throws Exception {
         // given
-        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
-        members.save(memberSince(mary.getId(), MEMBERSHIP_TYPE_ID));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        members.save(memberSince(mary, MEMBERSHIP_TYPE_ID));
 
         // when / then
-        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary.getId())
+        mockMvc.perform(delete("/api/admin/roster/{personId}/membership", mary)
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
-        assertThat(members.findByPersonIdIn(List.of(mary.getId()))).isNotEmpty();
+        assertThat(members.findByPersonIdIn(List.of(mary))).isNotEmpty();
     }
 
     private static String membershipBody(String membershipTypeId) {
@@ -1276,10 +1272,8 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 """.formatted(membershipTypeId);
     }
 
-    private UserAccount enabledAccount(Person person, String username, Role... roles) {
-        UserAccount account = new UserAccount(person, username, "hash", Set.of(roles));
-        account.enable();
-        return accounts.save(account);
+    private UUID enabledAccount(UUID personId, String username, Role... roles) {
+        return identity.createEnabledAccount(personId, username, Set.of(roles));
     }
 
     private static String usernameBody(String username) {

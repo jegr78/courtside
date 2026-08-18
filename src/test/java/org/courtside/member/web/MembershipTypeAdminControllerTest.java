@@ -2,8 +2,7 @@ package org.courtside.member.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.courtside.member.MemberService;
@@ -11,6 +10,7 @@ import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,13 +31,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
+@Import(IdentityTestFixture.class)
 class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private WebApplicationContext context;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private MemberRepository members;
@@ -207,8 +208,8 @@ class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
     void givenAMemberOfAType_whenDeactivatingTheType_thenTheMemberStillResolvesToIt() throws Exception {
         // given
         String typeId = createMembershipType("Veterans", null);
-        Person person = persons.save(new Person("Jane", "Doe", "jane@example.org"));
-        members.save(memberSince(person.getId(), UUID.fromString(typeId)));
+        UUID personId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        members.save(memberSince(personId, UUID.fromString(typeId)));
 
         // when
         mockMvc.perform(put("/api/admin/membership-types/" + typeId + "/active")
@@ -221,7 +222,7 @@ class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.active").value(false));
 
         // then
-        assertThat(memberService.membershipTypeIdOf(person.getId()))
+        assertThat(memberService.membershipTypeIdOf(personId))
                 .contains(UUID.fromString(typeId));
     }
 

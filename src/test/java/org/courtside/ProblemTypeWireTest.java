@@ -2,10 +2,8 @@ package org.courtside;
 
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import com.jayway.jsonpath.JsonPath;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class ProblemTypeWireTest extends AbstractIntegrationTest {
 
     private static final Pattern ALLOWED_TYPE = Pattern.compile("^urn:courtside:error:[a-z0-9-]+$");
@@ -55,8 +53,9 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @Autowired
     private FacilityTestFixture facilityFixture;
 
+
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private UserAccountRepository accounts;
@@ -535,8 +534,8 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
 
     private void createAccount(String username, Role role) {
         String[] name = username.split("\\.");
-        Person person = persons.save(new Person(capitalize(name[1]), capitalize(name[0]), username + "@example.org"));
-        accounts.save(new UserAccount(person, username, "irrelevant", Set.of(role)));
+        UUID person = identity.createPerson(capitalize(name[1]), capitalize(name[0]), username + "@example.org");
+        identity.createAccount(person, username, Set.of(role));
     }
 
     private MockHttpServletRequestBuilder bookingPost() {

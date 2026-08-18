@@ -6,9 +6,8 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.shared.OpeningWindow;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.rules.internal.MaxOpenBookingsRule;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +27,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
@@ -47,7 +46,7 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private JdbcClient jdbc;
@@ -62,7 +61,7 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
         courtId = facilityFixture.createCourt(1, "Court 1");
-        bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
     }
 
     @Test

@@ -4,9 +4,8 @@ import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.courtside.shared.TimeSlot;
@@ -27,7 +26,7 @@ import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class AdminOverrideTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -52,7 +51,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private MemberRepository members;
@@ -63,7 +62,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         courtId = facilityFixture.createCourt(1, "Court 1");
-        bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
+        bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
 
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
@@ -83,7 +82,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     @Test
     void givenAnAdvanceWindowOfSevenDays_whenAnAdminBooksBeyondIt_thenItIsAccepted() {
         // given
-        UUID personId = persons.save(new Person("John", "Roe", "john@example.org")).getId();
+        UUID personId = identity.createPerson("John", "Roe", "john@example.org");
         members.save(memberSince(personId, STANDARD_MEMBERSHIP));
 
         // when
@@ -98,7 +97,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     @Test
     void givenAnAdvanceWindowOfSevenDays_whenAMemberBooksBeyondIt_thenItIsRejected() {
         // given
-        UUID personId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
+        UUID personId = identity.createPerson("Mary", "Major", "mary@example.org");
         members.save(memberSince(personId, STANDARD_MEMBERSHIP));
 
         // when / then

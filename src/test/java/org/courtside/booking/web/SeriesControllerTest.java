@@ -5,10 +5,8 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.series.BookingSeriesRepository;
 import org.courtside.shared.OpeningWindow;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
@@ -41,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class SeriesControllerTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_MEMBERSHIP =
@@ -55,8 +53,9 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @Autowired
     private FacilityTestFixture facilityFixture;
 
+
     @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identity;
 
     @Autowired
     private UserAccountRepository accounts;
@@ -78,11 +77,11 @@ class SeriesControllerTest extends AbstractIntegrationTest {
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
-        Person trainer = persons.save(new Person("John", "Roe", "john@example.org"));
-        trainerPersonId = trainer.getId();
-        accounts.save(new UserAccount(trainer, "trainer.john", "irrelevant", Set.of(Role.TRAINER)));
-        Person member = persons.save(new Person("Jane", "Doe", "jane@example.org"));
-        accounts.save(new UserAccount(member, "doe.jane", "irrelevant", Set.of(Role.MEMBER)));
+        UUID trainer = identity.createPerson("John", "Roe", "john@example.org");
+        trainerPersonId = trainer;
+        identity.createAccount(trainer, "trainer.john", Set.of(Role.TRAINER));
+        UUID member = identity.createPerson("Jane", "Doe", "jane@example.org");
+        identity.createAccount(member, "doe.jane", Set.of(Role.MEMBER));
     }
 
     @Test

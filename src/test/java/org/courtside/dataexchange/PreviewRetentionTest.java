@@ -3,16 +3,16 @@ package org.courtside.dataexchange;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.dataexchange.internal.ImportPreview;
 import org.courtside.dataexchange.internal.ImportPreviewRepository;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
+import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Import(IdentityTestFixture.class)
 class PreviewRetentionTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID =
@@ -51,6 +52,9 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
     private PersonRepository persons;
 
     @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
     private MemberRepository members;
 
     @Autowired
@@ -72,8 +76,8 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
                         "Email", CanonicalField.EMAIL),
                 Map.of(), MEMBERSHIP_TYPE_ID,
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
-        Person admin = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
-        account = accounts.save(new UserAccount(admin, "admin", "hash", Set.of(Role.ADMIN))).getId();
+        UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        account = identity.createAccount(admin, "admin", Set.of(Role.ADMIN));
     }
 
     @Test
@@ -120,8 +124,8 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
     }
 
     private UUID memberLinkedAs(String externalId, String firstName, String lastName) {
-        UUID personId = persons.save(new Person(firstName, lastName,
-                firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org")).getId();
+        UUID personId = identity.createPerson(firstName, lastName,
+                firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org");
         members.save(new Member(personId, MEMBERSHIP_TYPE_ID, LocalDate.of(2026, 1, 1)));
         references.link(source, externalId, personId);
         return personId;
