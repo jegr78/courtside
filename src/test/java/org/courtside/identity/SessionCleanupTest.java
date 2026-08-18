@@ -1,10 +1,12 @@
 package org.courtside.identity;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.internal.SessionCleanupCadence;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.session.jdbc.autoconfigure.JdbcSessionProperties;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
 
@@ -26,6 +28,9 @@ class SessionCleanupTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcSessionProperties properties;
 
+    @Autowired
+    private ApplicationContext context;
+
     @Test
     void whenTheDeploymentNamesACadence_thenTheCleanupIsTheThingItConfigures() {
         // when / then
@@ -33,6 +38,15 @@ class SessionCleanupTest extends AbstractIntegrationTest {
                 .as("COURTSIDE_SESSION_CLEANUP_CRON is documented in deploy/README.md; a value that"
                         + " does not reach the cleanup makes that row describe nothing")
                 .isEqualTo("* * * * * *");
+    }
+
+    @Test
+    void whenTheApplicationStarts_thenTheCadenceIsHeldToOneThatDeletes() {
+        // when / then
+        assertThat(context.getBeanNamesForType(SessionCleanupCadence.class))
+                .as("without the guard a deployment can switch the cleanup off, and section 11 of"
+                        + " the design specification says it cannot")
+                .isNotEmpty();
     }
 
     @Test
@@ -51,13 +65,14 @@ class SessionCleanupTest extends AbstractIntegrationTest {
                 .isEqualTo(1);
     }
 
-    // The row disappears on the cleanup's own schedule, so the test waits for the state it names
-    // rather than for a duration it guessed.
+    // Every cached context in the suite sweeps the same database, so this holds that an expired row
+    // goes — not which schedule got there first. The cadence itself is held by the test above.
     private void awaitRemovalOf(String sessionId) {
         long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
         while (rowsFor(sessionId) > 0) {
             if (System.nanoTime() > deadline) {
-                throw new AssertionError("An expired session survived its cleanup schedule");
+                throw new AssertionError("An expired session survived every cleanup schedule running"
+                        + " against this database");
             }
             pause();
         }
