@@ -1,12 +1,7 @@
 package org.courtside.facility.web;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.booking.Booking;
-import org.courtside.booking.BookingRepository;
-import org.courtside.booking.BookingService;
-import org.courtside.booking.BookingStatus;
-import org.courtside.booking.CreateBookingCommand;
-import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.Court;
 import org.courtside.facility.CourtRepository;
 import org.courtside.identity.Person;
@@ -18,12 +13,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(BookingTestFixture.class)
 class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -53,10 +49,7 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
     private PersonRepository persons;
 
     @Autowired
-    private BookingService bookings;
-
-    @Autowired
-    private BookingRepository bookingRepository;
+    private BookingTestFixture bookingFixture;
 
     private MockMvc mockMvc;
 
@@ -160,21 +153,17 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
         setHours("TUESDAY", "08:00", "22:00");
         UUID courtId = courts.save(new Court(1, null)).getId();
         UUID bookerPersonId = persons.save(new Person("Jane", "Doe", "jane@example.org")).getId();
-        UUID bookingId = bookings.create(new CreateBookingCommand(
-                List.of(courtId), MEMBER_BOOKING_CARD,
+        UUID bookingId = bookingFixture.createBookingWithGuest(
+                courtId, MEMBER_BOOKING_CARD,
                 new TimeSlot(Instant.parse("2026-05-12T19:00:00Z"),
                         Instant.parse("2026-05-12T20:00:00Z")),
-                UUID.randomUUID(), bookerPersonId, Set.of(Role.MEMBER), null,
-                List.of(ParticipantSpec.guest("Partner")), null));
+                bookerPersonId, Set.of(Role.MEMBER), "Partner");
 
         // when
         setHours("TUESDAY", "08:00", "18:00");
 
         // then
-        assertThat(bookingRepository.findById(bookingId))
-                .get()
-                .extracting(Booking::getStatus)
-                .isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(bookingFixture.isConfirmed(bookingId)).isTrue();
     }
 
     private void setHours(String day, String opensAt, String closesAt) throws Exception {

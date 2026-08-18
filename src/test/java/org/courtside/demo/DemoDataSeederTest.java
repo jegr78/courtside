@@ -1,6 +1,6 @@
 package org.courtside;
 
-import org.courtside.booking.BookingRepository;
+import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.CourtRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "courtside.test.clock=2026-05-12T20:00:00Z"
         })
 @ActiveProfiles({"test", "demo"})
-@Import({TestcontainersConfiguration.class, FixedClockConfiguration.class})
+@Import({TestcontainersConfiguration.class, FixedClockConfiguration.class, BookingTestFixture.class})
 class DemoDataSeederTest {
 
     @Autowired
@@ -42,7 +42,7 @@ class DemoDataSeederTest {
     private CourtRepository courts;
 
     @Autowired
-    private BookingRepository bookings;
+    private BookingTestFixture bookingFixture;
 
     @Autowired
     private JdbcClient jdbc;
@@ -53,7 +53,7 @@ class DemoDataSeederTest {
         long accountCount = accounts.count();
         long memberCount = members.count();
         long courtCount = courts.count();
-        long bookingCount = bookings.count();
+        long bookingCount = bookingFixture.countBookings();
         long migrationCount = jdbc.sql("SELECT count(*) FROM flyway_schema_history")
                 .query(Long.class).single();
 
@@ -64,7 +64,7 @@ class DemoDataSeederTest {
         assertThat(accounts.count()).isEqualTo(accountCount).isEqualTo(3);
         assertThat(members.count()).isEqualTo(memberCount).isEqualTo(2);
         assertThat(courts.count()).isEqualTo(courtCount).isEqualTo(2);
-        assertThat(bookings.count()).isEqualTo(bookingCount).isEqualTo(2);
+        assertThat(bookingFixture.countBookings()).isEqualTo(bookingCount).isEqualTo(2);
         assertThat(jdbc.sql("SELECT count(*) FROM flyway_schema_history").query(Long.class).single())
                 .isEqualTo(migrationCount);
         assertThat(jdbc.sql("SELECT date(starts_at AT TIME ZONE 'Europe/Berlin') "

@@ -2,12 +2,8 @@ package org.courtside.rules.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingRulesViolatedException;
-import org.courtside.booking.BookingService;
-import org.courtside.booking.BookingStatus;
-import org.courtside.booking.CreateBookingCommand;
-import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.Court;
 import org.courtside.facility.CourtRepository;
 import org.courtside.facility.OpeningHours;
@@ -25,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -50,6 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
+@Import(BookingTestFixture.class)
 class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD_RULE_SET =
@@ -66,10 +64,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
     private WebApplicationContext context;
 
     @Autowired
-    private BookingService bookingService;
-
-    @Autowired
-    private BookingRepository bookings;
+    private BookingTestFixture bookingFixture;
 
     @Autowired
     private CourtRepository courts;
@@ -259,16 +254,14 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         setRule(STANDARD_RULE_SET.toString(), "ADVANCE_WINDOW", "maxDays", 365);
         UUID bookingId = book(courtId, personId, eightDaysOut);
-        assertThat(bookings.findWithAllocationsById(bookingId).orElseThrow().getStatus())
-                .isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(bookingFixture.isConfirmed(bookingId)).isTrue();
     }
 
     private UUID book(UUID courtId, UUID personId, Instant start) {
-        return bookingService.create(new CreateBookingCommand(
-                List.of(courtId), MEMBER_BOOKING_CARD,
+        return bookingFixture.createBookingWithGuest(
+                courtId, MEMBER_BOOKING_CARD,
                 new TimeSlot(start, start.plus(1, ChronoUnit.HOURS)),
-                UUID.randomUUID(), personId, Set.of(Role.MEMBER), null,
-                List.of(ParticipantSpec.guest("John Roe")), null));
+                personId, Set.of(Role.MEMBER), "John Roe");
     }
 
     private void setRule(String ruleSetId, String ruleType, String paramKey, int value) throws Exception {

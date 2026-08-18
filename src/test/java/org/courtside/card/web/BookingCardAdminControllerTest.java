@@ -2,12 +2,7 @@ package org.courtside.card.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.booking.Booking;
-import org.courtside.booking.BookingRepository;
-import org.courtside.booking.BookingService;
-import org.courtside.booking.BookingStatus;
-import org.courtside.booking.CreateBookingCommand;
-import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.CardService;
 import org.courtside.facility.Court;
 import org.courtside.facility.CourtRepository;
@@ -23,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -31,7 +27,6 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
+@Import(BookingTestFixture.class)
 class BookingCardAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -54,10 +50,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
     private CardService cardService;
 
     @Autowired
-    private BookingService bookingService;
-
-    @Autowired
-    private BookingRepository bookings;
+    private BookingTestFixture bookingFixture;
 
     @Autowired
     private CourtRepository courts;
@@ -321,10 +314,9 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
         }
         Instant sixPm = Instant.parse("2026-05-12T16:00:00Z");
         Instant sevenPm = Instant.parse("2026-05-12T17:00:00Z");
-        UUID bookingId = bookingService.create(new CreateBookingCommand(
-                List.of(courtId), UUID.fromString(id), new TimeSlot(sixPm, sevenPm),
-                UUID.randomUUID(), personId, Set.of(Role.MEMBER), null,
-                List.of(ParticipantSpec.guest("Partner")), null));
+        UUID bookingId = bookingFixture.createBookingWithGuest(
+                courtId, UUID.fromString(id), new TimeSlot(sixPm, sevenPm),
+                personId, Set.of(Role.MEMBER), "Partner");
 
         // when
         mockMvc.perform(put("/api/admin/booking-cards/" + id)
@@ -339,9 +331,8 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.label").value("Match play (renamed)"));
 
         // then
-        Booking booking = bookings.findWithAllocationsById(bookingId).orElseThrow();
-        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
-        assertThat(booking.getCardId()).isEqualTo(UUID.fromString(id));
+        assertThat(bookingFixture.isConfirmed(bookingId)).isTrue();
+        assertThat(bookingFixture.cardIdOf(bookingId)).isEqualTo(UUID.fromString(id));
     }
 
     @Test
