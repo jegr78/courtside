@@ -88,6 +88,23 @@ public class RosterService {
         return load(List.of(person.getId())).getFirst();
     }
 
+    // Only what the caller carries is checked: a synchronisation must not fail on a stored value
+    // it is not touching, or one bad address would stop every later run of that source.
+    @Transactional
+    public void correctPerson(UUID personId, String firstName, String lastName, String email) {
+        UUID id = requiredPersonId(personId);
+        Person person = persons.findById(id)
+                .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        if (firstName != null || lastName != null) {
+            person.rename(
+                    firstName == null ? person.getFirstName() : strippedNonBlank(firstName, "first name"),
+                    lastName == null ? person.getLastName() : strippedNonBlank(lastName, "last name"));
+        }
+        if (email != null) {
+            person.changeEmail(strippedAddress(email));
+        }
+    }
+
     @Transactional
     public RosterEntry createAccount(UUID personId, String username, String oneTimePassword,
                                      Set<Role> roles) {

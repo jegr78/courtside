@@ -73,6 +73,47 @@ class ChangeSetResolverTest {
     }
 
     @Test
+    void givenACreationWhoseCategoryCellIsEmpty_whenResolving_thenItTakesTheSourcesDefault() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe"));
+
+        // when
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, emptyRoster());
+
+        // then
+        assertThat(resolved.changes()).singleElement()
+                .satisfies(change -> assertThat(change.membershipTypeId()).isEqualTo(ACTIVE_TYPE));
+    }
+
+    @Test
+    void givenAKnownRecordWhoseCategoryCellIsEmpty_whenResolving_thenItsTypeIsLeftAlone() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe"));
+
+        // when
+        ResolvedChangeSet resolved = ChangeSetResolver.resolve(snapshot, owningMembershipType(),
+                SnapshotMode.FULL_SNAPSHOT, rosterHoldingType(RETIRED_TYPE));
+
+        // then
+        assertThat(resolved.changes()).isEmpty();
+    }
+
+    @Test
+    void givenAKnownRecordWhoseCategoryCellNamesAType_whenResolving_thenItIsWritten() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe",
+                Map.of(CanonicalField.MEMBERSHIP_TYPE, "A")));
+
+        // when
+        ResolvedChangeSet resolved = ChangeSetResolver.resolve(snapshot, owningMembershipType(),
+                SnapshotMode.FULL_SNAPSHOT, rosterHoldingType(RETIRED_TYPE));
+
+        // then
+        assertThat(resolved.changes()).singleElement()
+                .satisfies(change -> assertThat(change.membershipTypeId()).isEqualTo(ACTIVE_TYPE));
+    }
+
+    @Test
     void givenAKnownRecordAbsentFromAFullSnapshot_whenResolving_thenItsMembershipEnds() {
         // given
         CsvSnapshot snapshot = snapshotOf();
@@ -233,6 +274,20 @@ class ChangeSetResolverTest {
 
     private static CurrentRoster emptyRoster() {
         return new CurrentRoster(Map.of(), Map.of(), Set.of(ACTIVE_TYPE), Map.of());
+    }
+
+    private static SourceConfiguration owningMembershipType() {
+        SourceConfiguration base = configuration();
+        return new SourceConfiguration(base.sourceId(), base.sourceKey(), base.displayName(),
+                base.columns(), base.membershipTypes(), base.defaultMembershipTypeId(),
+                Set.of(CanonicalField.MEMBERSHIP_TYPE), base.removalWarningPercent());
+    }
+
+    private static CurrentRoster rosterHoldingType(UUID membershipTypeId) {
+        return new CurrentRoster(Map.of("4711", JANE),
+                Map.of(JANE, new CurrentRoster.RosterPerson(JANE, "Jane", "Doe",
+                        "jane.doe@example.org", membershipTypeId, true)),
+                Set.of(ACTIVE_TYPE, RETIRED_TYPE), Map.of());
     }
 
     private static CurrentRoster rosterOfThree() {

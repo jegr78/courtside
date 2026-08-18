@@ -12,9 +12,18 @@ public final class PersonFieldLimits {
         return isUsable(value, MAX_NAME_LENGTH);
     }
 
+    // Spelled out rather than matched: the equivalent pattern backtracks over every candidate dot,
+    // and its safety would rest on the length check in front of it rather than on the rule itself.
     public static boolean isUsableEmail(String value) {
-        return isUsable(value, MAX_EMAIL_LENGTH)
-                && value.strip().matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
+        if (!isUsable(value, MAX_EMAIL_LENGTH)) {
+            return false;
+        }
+        String stripped = value.strip();
+        int at = stripped.indexOf('@');
+        int dot = stripped.lastIndexOf('.');
+        return at > 0 && at == stripped.lastIndexOf('@')
+                && dot > at + 1 && dot < stripped.length() - 1
+                && stripped.chars().noneMatch(Character::isWhitespace);
     }
 
     private static boolean isUsable(String value, int maxLength) {
@@ -22,7 +31,12 @@ public final class PersonFieldLimits {
             return false;
         }
         String stripped = value.strip();
-        return !stripped.isEmpty() && stripped.length() <= maxLength
-                && stripped.indexOf('\n') < 0 && stripped.indexOf('\r') < 0;
+        return !stripped.isEmpty() && stripped.length() <= maxLength && carriesNoControls(stripped);
+    }
+
+    // A control character is not storable text: PostgreSQL refuses a NUL outright, and the rest
+    // read as padding nobody typed.
+    private static boolean carriesNoControls(String value) {
+        return value.codePoints().noneMatch(Character::isISOControl);
     }
 }

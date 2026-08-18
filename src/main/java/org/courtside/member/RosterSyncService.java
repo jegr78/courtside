@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -35,8 +36,9 @@ public class RosterSyncService {
         RosterChangeSet requested = requiredChangeSet(changeSet);
         Map<String, UUID> created = new HashMap<>();
         requested.creations().forEach(creation -> created.put(creation.externalId(), create(creation)));
-        // Two runs touching the same person lock its row in the same order, so they queue
-        // rather than deadlock.
+        // One order over both phases, not one per phase: two runs that correct and end opposite
+        // people would otherwise take the same two rows in opposite orders and deadlock.
+        lockInIdOrder(requested);
         requested.corrections().stream()
                 .sorted(Comparator.comparing(RosterChangeSet.PersonCorrection::personId))
                 .forEach(this::correct);
@@ -51,6 +53,15 @@ public class RosterSyncService {
                 departures.rolesRemoved());
     }
 
+    private void lockInIdOrder(RosterChangeSet changeSet) {
+        Stream.concat(changeSet.corrections().stream().map(RosterChangeSet.PersonCorrection::personId),
+                        changeSet.membershipEndings().stream())
+                .distinct()
+                .sorted()
+                .forEach(personId -> persons.findWithLockById(personId)
+                        .orElseThrow(() -> new PersonNotFoundException("No person with id " + personId)));
+    }
+
     private UUID create(RosterChangeSet.NewPerson creation) {
         UUID personId = roster.createPerson(creation.firstName(), creation.lastName(),
                 creation.email()).personId();
@@ -59,32 +70,25 @@ public class RosterSyncService {
     }
 
     private void correct(RosterChangeSet.PersonCorrection correction) {
-        Person person = persons.findById(correction.personId())
-                .orElseThrow(() -> new PersonNotFoundException(
-                        "No person with id " + correction.personId()));
         if (correction.firstName() != null || correction.lastName() != null
                 || correction.email() != null) {
-            roster.changePerson(person.getId(),
-                    correction.firstName() == null ? person.getFirstName() : correction.firstName(),
-                    correction.lastName() == null ? person.getLastName() : correction.lastName(),
-                    correction.email() == null ? person.getEmail() : correction.email());
+            roster.correctPerson(correction.personId(), correction.firstName(),
+                    correction.lastName(), correction.email());
         }
         if (correction.membershipTypeId() != null) {
-            roster.writeMembership(person.getId(), correction.membershipTypeId(),
+            roster.writeMembership(correction.personId(), correction.membershipTypeId(),
                     MembershipPeriod.running());
         }
     }
 
     private Departures endMemberships(List<UUID> personIds) {
+        personIds.forEach(roster::endMembership);
         int disabled = 0;
         int rolesRemoved = 0;
-        for (UUID personId : personIds) {
-            roster.endMembership(personId);
-            for (UserAccount account : accounts.findByPersonIdIn(List.of(personId))) {
-                Departure departure = withdrawMembershipFrom(account);
-                disabled += departure == Departure.DISABLED ? 1 : 0;
-                rolesRemoved += departure == Departure.ROLE_REMOVED ? 1 : 0;
-            }
+        for (UserAccount account : accounts.findByPersonIdIn(personIds)) {
+            Departure departure = withdrawMembershipFrom(account);
+            disabled += departure == Departure.DISABLED ? 1 : 0;
+            rolesRemoved += departure == Departure.ROLE_REMOVED ? 1 : 0;
         }
         return new Departures(disabled, rolesRemoved);
     }

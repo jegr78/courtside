@@ -112,6 +112,39 @@ class ConcurrentExecutionTest extends AbstractIntegrationTest {
         }
     }
 
+    @Test
+    void givenOnePreviewExecutedTwiceAtOnce_whenBothAreInFlight_thenTheLoserIsToldItIsSuperseded()
+            throws Exception {
+        // given
+        UUID only = preview(TWO_MEMBERS);
+        CountDownLatch applied = new CountDownLatch(1);
+        CountDownLatch allowCommit = new CountDownLatch(1);
+
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<?> running = pool.submit(() -> new TransactionTemplate(transactions)
+                    .executeWithoutResult(status -> {
+                        executions.execute(only, false, actor);
+                        applied.countDown();
+                        await(allowCommit);
+                    }));
+            assertThat(applied.await(10, TimeUnit.SECONDS)).isTrue();
+
+            // when
+            Future<?> queued = pool.submit(() -> executions.execute(only, false, actor));
+            allowCommit.countDown();
+            running.get(10, TimeUnit.SECONDS);
+
+            // then
+            assertThatThrownBy(() -> queued.get(10, TimeUnit.SECONDS))
+                    .isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(ImportPreviewSupersededException.class);
+            assertThat(persons.count()).isEqualTo(3);
+            assertThat(members.count()).isEqualTo(2);
+        } finally {
+            allowCommit.countDown();
+        }
+    }
+
     private UUID preview(String content) {
         return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
                 content.getBytes(StandardCharsets.UTF_8), actor).previewId();

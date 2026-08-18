@@ -5,18 +5,21 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 public final class PersonFingerprint {
-
-    private static final String FIELD_SEPARATOR = Character.toString(0x1f);
 
     private PersonFingerprint() {
     }
 
+    // Every field carries its own length, so no arrangement of two fields hashes like another.
     public static String of(String firstName, String lastName, String email, UUID membershipTypeId,
                             boolean membershipCurrent) {
-        return sha256(String.join(FIELD_SEPARATOR, nullSafe(firstName), nullSafe(lastName),
-                nullSafe(email), String.valueOf(membershipTypeId), String.valueOf(membershipCurrent)));
+        StringBuilder joined = new StringBuilder();
+        Stream.of(nullSafe(firstName), nullSafe(lastName), nullSafe(email),
+                        String.valueOf(membershipTypeId), String.valueOf(membershipCurrent))
+                .forEach(field -> joined.append(field.length()).append(':').append(field));
+        return sha256(joined.toString());
     }
 
     public static String sha256(String value) {

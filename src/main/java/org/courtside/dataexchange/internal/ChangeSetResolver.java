@@ -86,7 +86,7 @@ public final class ChangeSetResolver {
         if (!configuration.ownedFields().contains(CanonicalField.MEMBERSHIP_TYPE)) {
             return null;
         }
-        UUID requested = membershipTypeOf(row, configuration);
+        UUID requested = mappedMembershipTypeOf(row, configuration);
         if (requested == null || current == null) {
             return requested;
         }
@@ -177,12 +177,18 @@ public final class ChangeSetResolver {
         }
     }
 
+    // A creation must hold a type, so a file that names none falls back to the source's. An update
+    // must not: a blank cell says the file has nothing to say, not that this member changed category.
     private static UUID membershipTypeOf(CsvSnapshot.SnapshotRow row,
                                          SourceConfiguration configuration) {
+        UUID mapped = mappedMembershipTypeOf(row, configuration);
+        return mapped == null ? configuration.defaultMembershipTypeId() : mapped;
+    }
+
+    private static UUID mappedMembershipTypeOf(CsvSnapshot.SnapshotRow row,
+                                               SourceConfiguration configuration) {
         String value = row.values().get(CanonicalField.MEMBERSHIP_TYPE);
-        return value == null || value.isBlank()
-                ? configuration.defaultMembershipTypeId()
-                : configuration.membershipTypes().get(value);
+        return value == null || value.isBlank() ? null : configuration.membershipTypes().get(value);
     }
 
     private static List<ResolvedChangeSet.RowError> errorsOf(CsvSnapshot snapshot) {

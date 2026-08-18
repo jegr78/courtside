@@ -855,7 +855,8 @@ components:
     PersonRequest:
       type: object
       description: |
-        None of the three values may be blank, and no name may hold a line break.
+        None of the three values may be blank, and none may hold a control character — not a line
+        break, and not a NUL, which PostgreSQL refuses to store at all.
 
         Surrounding whitespace is removed before the values are checked and stored, so a name or
         an address pasted with padding is accepted, `maxLength` counts what is left, and the
@@ -868,16 +869,20 @@ components:
         firstName:
           type: string
           maxLength: 60
-          pattern: "[^\\u000a\\u000d]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u000a\\u000d]*"
+          pattern: "[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u009f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u0000-\\u001f\\u007f-\\u009f]*"
         lastName:
           type: string
           maxLength: 60
-          pattern: "[^\\u000a\\u000d]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u000a\\u000d]*"
+          pattern: "[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u009f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u0000-\\u001f\\u007f-\\u009f]*"
         email:
           type: string
           format: email
           maxLength: 120
-          pattern: "[^\\u000a\\u000d]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u000a\\u000d]*"
+          description: |
+            One `@` with something before it, and a dotted domain after it. The rule is spelled out
+            here because the service enforces exactly it: a shape this pattern accepts and the
+            service then refuses would reach a club board as a `500`.
+          pattern: "[^\\u0000-\\u0020\\u007f-\\u009f@]+@[^\\u0000-\\u0020\\u007f-\\u009f@.]+(\\.[^\\u0000-\\u0020\\u007f-\\u009f@.]+)+"
 
     RosterEntry:
       type: object

@@ -1,5 +1,6 @@
 package org.courtside.member.internal;
 
+import org.courtside.member.PersonFieldLimits;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 
@@ -28,6 +29,9 @@ class PersonTextTest {
             if (Character.isBmpCodePoint(codePoint) && Character.isSurrogate((char) codePoint)) {
                 continue;
             }
+            if (Character.isISOControl(codePoint)) {
+                continue;
+            }
             String single = new String(Character.toChars(codePoint));
             boolean contractRefusesIt = !nonBlank.matcher(single).matches();
             boolean stripperRemovesIt = PersonText.stripped(single).isEmpty();
@@ -44,15 +48,52 @@ class PersonTextTest {
                 .isEmpty();
     }
 
+    // Control characters are the one thing both sides refuse outright rather than strip, so they
+    // are asserted here instead of through the stripper, which only ever removes at the ends.
     @Test
-    void whenReadingThePersonRequestSchema_thenAllThreeValuesCarryTheSameNonBlankPattern()
+    void whenReadingEveryControlCharacter_thenNeitherTheContractNorTheServiceAcceptsIt()
             throws IOException {
         // given
-        String nonBlank = patternOf("firstName");
+        Pattern nonBlank = Pattern.compile(patternOf("firstName"));
+        List<String> accepted = new ArrayList<>();
+
+        // when
+        for (int codePoint = Character.MIN_CODE_POINT; codePoint <= Character.MAX_CODE_POINT; codePoint++) {
+            if (!Character.isISOControl(codePoint)) {
+                continue;
+            }
+            String inside = "Mary" + new String(Character.toChars(codePoint)) + "Major";
+            if (nonBlank.matcher(inside).matches() || PersonFieldLimits.isUsableName(inside)) {
+                accepted.add("U+%04X".formatted(codePoint));
+            }
+        }
+
+        // then
+        assertThat(accepted)
+                .as("a control character PostgreSQL refuses to store must be refused where it"
+                        + " enters, not at the INSERT")
+                .isEmpty();
+    }
+
+    @Test
+    void whenReadingThePersonRequestSchema_thenBothNamesCarryTheSameNonBlankPattern()
+            throws IOException {
+        // when / then
+        assertThat(patternOf("lastName")).isEqualTo(patternOf("firstName"));
+    }
+
+    @Test
+    void whenReadingTheAddressPattern_thenItCarriesTheRuleTheServiceEnforces() throws IOException {
+        // given
+        Pattern address = Pattern.compile(patternOf("email"));
 
         // when / then
-        assertThat(List.of(patternOf("lastName"), patternOf("email")))
-                .containsOnly(nonBlank);
+        assertThat(address.matcher("mary.major@example.org").matches()).isTrue();
+        assertThat(address.matcher("mary.major@localhost").matches()).isFalse();
+        assertThat(address.matcher("").matches()).isFalse();
+        assertThat(address.matcher(" ").matches()).isFalse();
+        assertThat(address.matcher("mary major@example.org").matches()).isFalse();
+        assertThat(address.matcher("mary@major@example.org").matches()).isFalse();
     }
 
     @Test

@@ -56,10 +56,10 @@ public class ExecutionService {
 
     @Transactional
     public RunOutcome execute(UUID previewId, boolean confirmRemovals, UUID accountId) {
-        // Under the lock before anything is read from it: the checks below must see the state the
-        // run will write against, not the one a competing run was about to change.
-        sourceLock.acquire(require(previewId).getSourceId());
-        ImportPreview preview = require(previewId);
+        // The id is read as a scalar so the entity is not in the persistence context yet: a second
+        // findById would answer from the identity map and gate on the state before the lock.
+        sourceLock.acquire(sourceOf(previewId));
+        ImportPreview preview = lockedPreview(previewId);
         Instant now = clock.instant();
         requireExecutable(preview, now);
         PreviewContent content = contentOf(preview);
@@ -102,6 +102,7 @@ public class ExecutionService {
     private void requireNobodyChangedSince(ImportPreview preview, PreviewContent content) {
         Map<String, String> taken = fingerprintsTakenWith(preview);
         List<UUID> affected = affectedPersonIdsOf(content);
+        lockInIdOrder(affected);
         Map<UUID, String> now = fingerprintsOf(affected);
         TreeSet<String> changed = new TreeSet<>();
         affected.forEach(personId -> {
@@ -147,6 +148,24 @@ public class ExecutionService {
                             "percent", preview.getRemovalPercent(),
                             "threshold", preview.getRemovalWarningPercent()));
         }
+    }
+
+    // The source lock excludes another run of this source, not a hand correction or a run of a
+    // second source that knows the same person, so the rows this run compares are held while it does.
+    private void lockInIdOrder(List<UUID> personIds) {
+        personIds.stream().sorted().forEach(personId -> persons.findWithLockById(personId)
+                .orElseThrow(() -> new ImportPreviewStaleException("import.preview.stale",
+                        Map.of("personIds", List.of(personId.toString())))));
+    }
+
+    private UUID sourceOf(UUID previewId) {
+        return previews.findSourceIdById(requiredPreviewId(previewId)).orElseThrow(() ->
+                new ImportPreviewNotFoundException("No import preview with id " + previewId));
+    }
+
+    private ImportPreview lockedPreview(UUID previewId) {
+        return previews.findWithLockById(previewId).orElseThrow(() ->
+                new ImportPreviewNotFoundException("No import preview with id " + previewId));
     }
 
     private static List<UUID> affectedPersonIdsOf(PreviewContent content) {
@@ -213,12 +232,11 @@ public class ExecutionService {
         return json.readValue(preview.getChangeSet(), PreviewContent.class);
     }
 
-    private ImportPreview require(UUID previewId) {
+    private static UUID requiredPreviewId(UUID previewId) {
         if (previewId == null) {
             throw new IllegalStateException("An execution names the preview it applies");
         }
-        return previews.findById(previewId).orElseThrow(() ->
-                new ImportPreviewNotFoundException("No import preview with id " + previewId));
+        return previewId;
     }
 
     private static UUID requiredAccountId(UUID accountId) {
