@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, selectJourneyDate, test } from "./fixtures";
 
 async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.goto("/login");
@@ -42,4 +42,24 @@ test("an administrator can open both core administration views", async ({ page }
 
   // then
   await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+});
+
+test("a member books a court with an idempotency key the browser could generate", async ({ page, journeyService }) => {
+  // given
+  await signIn(page, "doe.jane");
+  await selectJourneyDate(page, journeyService.visualDate);
+
+  // when
+  await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"][data-state="free"]').click();
+  await page.getByTestId("booking-card").selectOption("11111111-1111-1111-1111-111111111111");
+  await page.getByTestId("member-search").fill("Mary");
+  await page.getByTestId("member-match").click();
+  const created = page.waitForResponse((response) =>
+    response.url().endsWith("/api/bookings") && response.request().method() === "POST");
+  await page.getByTestId("booking-submit").click();
+
+  // then
+  expect((await created).status()).toBe(201);
+  expect(await (await created).request().headerValue("Idempotency-Key"))
+    .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });

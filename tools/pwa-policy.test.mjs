@@ -14,10 +14,10 @@ const documentation = readFileSync(join(repository, "docs/browser-pwa-testing.md
 
 test("given supported desktop browsers, when qualifying a pull request, then Chromium and WebKit run core smoke journeys", () => {
   assert.match(playwright, /name: "chromium"/);
-  assert.match(playwright, /name: "webkit-core"/);
   assert.match(playwright, /supported-browser\\\.spec\\\.ts/);
   assert.match(pom, /playwright install chromium/);
-  assert.match(fixtures, /"webkit-core"/);
+  assert.match(playwright, /name: "webkit-core".*metadata: \{ pinnedBrowser: true \}/);
+  assert.match(fixtures, /project\.metadata\.pinnedBrowser === true/);
 });
 
 test("given periodic browser qualification, when the stability workflow runs, then Firefox and mobile devices produce evidence", () => {

@@ -25,11 +25,13 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "off"
   },
+  // WebKit and the pixel suite draw in the pinned image: WebKit so no runner needs its system
+  // libraries, the pixel suite so one reviewed baseline holds on every machine.
   projects: [
     { name: "chromium", testIgnore: /responsive-mobile\.spec\.ts|visual-regression\.spec\.ts/, use: { browserName: "chromium" } },
-    { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" } },
-    { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" } },
-    { name: "webkit-core", testMatch: /supported-browser\.spec\.ts/, use: { browserName: "webkit" } },
+    { name: "visual", testMatch: /visual-regression\.spec\.ts/, metadata: { pinnedBrowser: true }, use: { browserName: "chromium" } },
+    { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, metadata: { pinnedBrowser: true }, use: { browserName: "webkit" } },
+    { name: "webkit-core", testMatch: /supported-browser\.spec\.ts/, metadata: { pinnedBrowser: true }, use: { browserName: "webkit" } },
     ...periodicProjects
   ],
   globalSetup: "./e2e/global-setup.ts"
