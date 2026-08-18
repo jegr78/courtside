@@ -12,11 +12,14 @@ const periodicProjects = process.env.COURTSIDE_PERIODIC_BROWSERS === "true" ? [
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.spec.ts",
-  snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}-{platform}{ext}",
+  snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.005 } },
+  // Pinned so nobody reaches "changed" or "all", under which a missing baseline passes silently.
+  // "missing" writes the new baseline for collection and still fails the run that needed it.
+  updateSnapshots: "missing",
   use: {
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

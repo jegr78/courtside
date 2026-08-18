@@ -5,8 +5,11 @@ import { appendFileSync, cpSync, mkdtempSync, readdirSync, rmSync, statSync } fr
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { GenericContainer, type StartedTestContainer } from "testcontainers";
+import { GenericContainer, TestContainers, type StartedTestContainer } from "testcontainers";
 import { requireBuiltAfterItsSources } from "./build-freshness";
+
+const PINNED_BROWSER_IMAGE =
+  "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e";
 
 async function waitForApplication(application: ChildProcess, baseURL: string): Promise<void> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -166,12 +169,18 @@ export const journeyDate = dayAfterInBerlin(journeyInstant);
 export interface JourneyService {
   baseURL: string;
   visualDate: string;
+  pinnedBrowser(): Promise<PinnedBrowser>;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): void;
   reset(): Promise<void>;
   restart(): Promise<void>;
   stop(): Promise<void>;
+}
+
+export interface PinnedBrowser {
+  wsEndpoint: string;
+  baseURL: string;
 }
 
 export interface DatabaseLock {
@@ -228,6 +237,7 @@ export async function startJourneyService(): Promise<JourneyService> {
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
   let staticDirectory: string | undefined;
+  let browserServer: StartedTestContainer | undefined;
   try {
     const visualDate = journeyDate;
     const port = await availableLoopbackPort();
@@ -332,9 +342,25 @@ export async function startJourneyService(): Promise<JourneyService> {
     await startApplication();
     await seedJourneyData(postgres, visualDate);
     const tables = await snapshotJourneyData(postgres);
+    // Pixel baselines are only comparable across machines when the renderer is the same one, so
+    // the visual suite draws in this image rather than in whatever browser the host happens to run.
+    const startPinnedBrowser = async (): Promise<PinnedBrowser> => {
+      if (!browserServer) {
+        await TestContainers.exposeHostPorts(port);
+        browserServer = await new GenericContainer(PINNED_BROWSER_IMAGE)
+          .withCommand(["npx", "playwright", "run-server", "--port", "3000", "--host", "0.0.0.0"])
+          .withExposedPorts(3000)
+          .start();
+      }
+      return {
+        wsEndpoint: `ws://${browserServer.getHost()}:${browserServer.getMappedPort(3000)}/`,
+        baseURL: `http://host.testcontainers.internal:${port}`
+      };
+    };
     return {
       baseURL,
       visualDate,
+      pinnedBrowser: startPinnedBrowser,
       executeSql,
       holdDatabaseLock,
       publishServiceWorkerUpdate: () => {
@@ -351,12 +377,14 @@ export async function startJourneyService(): Promise<JourneyService> {
       stop: async () => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         await stopApplication();
+        await browserServer?.stop();
         await postgres?.stop();
         rmSync(staticDirectory!, { recursive: true, force: true });
       }
     };
   } catch (error) {
     application?.kill();
+    await browserServer?.stop();
     await postgres?.stop();
     if (staticDirectory) rmSync(staticDirectory, { recursive: true, force: true });
     throw error;

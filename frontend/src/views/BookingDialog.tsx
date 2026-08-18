@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type BookingGrid, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
+import { idempotencyKey } from "../api/idempotency";
 import { problemMessage, problemReference } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -35,7 +36,7 @@ export function BookingDialog({ selection, grid, courts, closed, created, confli
   const [violations, setViolations] = useState<Array<{ field: string; code: string; message: string }>>([]);
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [requestKey, setRequestKey] = useState(() => idempotencyKey());
 
   useEffect(() => {
     void Promise.all([api.bookingCards(), api.participantCards()]).then(([cards, participants]) => {
@@ -85,7 +86,7 @@ export function BookingDialog({ selection, grid, courts, closed, created, confli
         endsAt,
         note: note.trim() || undefined,
         participants
-      }, idempotencyKey);
+      }, requestKey);
       await created();
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 409) {
@@ -97,7 +98,7 @@ export function BookingDialog({ selection, grid, courts, closed, created, confli
         setError(translated.length > 0
           ? problemReference(failure, t)
           : problemMessage(failure, t));
-        setIdempotencyKey(crypto.randomUUID());
+        setRequestKey(idempotencyKey());
       } else {
         setError(problemMessage(failure, t));
       }

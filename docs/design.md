@@ -1016,6 +1016,10 @@ whether it is built or designed. **Designed means absent today.**
   deployment, which sets HSTS, `X-Content-Type-Options`, `X-Frame-Options` and a referrer policy
   and obtains its own certificate). An operator without a public address can use Tailscale Funnel
   instead, which terminates TLS the same way; that is documented as an option, not a dependency.
+  That sentence binds the client too: a browser withholds `crypto.randomUUID`, service workers and
+  the rest of the secure-context APIs from a plain-HTTP origin that is not `localhost`, so no such
+  API may sit on the path of a booking. `crypto.getRandomValues` is one that carries no such
+  condition and is what the booking form draws its idempotency key from. *Built.*
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the release workflow signs each image keylessly with
   cosign and attaches an SBOM attestation. Image scanning is designed and not built.*
