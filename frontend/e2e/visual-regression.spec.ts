@@ -1,31 +1,19 @@
-import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
+import { type Locator, type Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { journeyInstant } from "./global-setup";
+
+// Locale, theme, viewport and timezone are fixed here; the renderer is fixed by the project,
+// which draws in the pinned image rather than in whatever browser the host provides.
+test.use({
+  viewport: { width: 1440, height: 1000 }, colorScheme: "dark", locale: "de-DE",
+  timezoneId: "Europe/Berlin"
+});
 
 const screenshotOptions = {
   animations: "disabled" as const,
   caret: "hide" as const
 };
 
-// The renderer is pinned to an image, not to whoever runs the suite, so one reviewed baseline per
-// surface holds on every machine and a red run means a regression rather than a different host.
-const pinnedPage = test.extend<{ pinned: Page }>({
-  pinned: async ({ journeyService }, provide) => {
-    const { wsEndpoint, baseURL } = await journeyService.pinnedBrowser();
-    const browser: Browser = await chromium.connect(wsEndpoint);
-    const context = await browser.newContext({
-      baseURL, viewport: { width: 1440, height: 1000 }, colorScheme: "dark", locale: "de-DE",
-      timezoneId: "Europe/Berlin"
-    });
-    await context.clock.setFixedTime(new Date(journeyInstant));
-    const page = await context.newPage();
-    await provide(page);
-    await context.close();
-    await browser.close();
-  }
-});
-
-pinnedPage("stable member surfaces match their reviewed baselines", async ({ pinned: page, journeyService }) => {
+test("stable member surfaces match their reviewed baselines", async ({ page, journeyService }) => {
   // given
   await page.goto("/");
   await selectVisualDate(page, journeyService.visualDate);
@@ -70,7 +58,7 @@ pinnedPage("stable member surfaces match their reviewed baselines", async ({ pin
     page.getByTestId("move-preview").locator("li p"));
 });
 
-pinnedPage("stable administration surfaces match their reviewed baselines", async ({ pinned: page }) => {
+test("stable administration surfaces match their reviewed baselines", async ({ page }) => {
   // given
   await signIn(page, "configuration-admin");
 

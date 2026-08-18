@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
 
 const visual = readFileSync(new URL("../frontend/e2e/visual-regression.spec.ts", import.meta.url), "utf8");
+const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync(new URL("../frontend/playwright.config.ts", import.meta.url), "utf8");
 const eslint = readFileSync(new URL("../frontend/eslint.config.js", import.meta.url), "utf8");
 const setup = readFileSync(new URL("../frontend/e2e/global-setup.ts", import.meta.url), "utf8");
@@ -23,7 +24,8 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
 
 test("given visual baselines, when running them on different hosts, then their path and rendering controls stay deterministic", () => {
   assert.doesNotMatch(playwright, /snapshotPathTemplate:.*\{platform\}/);
-  assert.match(visual, /journeyService\.pinnedBrowser\(\)/);
+  assert.match(fixtures, /journeyService\.pinnedBrowser\(\)/);
+  assert.match(playwright, /name: "visual"/);
   assert.match(setup, /mcr\.microsoft\.com\/playwright:[^"]*@sha256:/);
   assert.match(visual, /timezoneId: "Europe\/Berlin"/);
   assert.doesNotMatch(visual, /expect\(page\)\.toHaveScreenshot/);

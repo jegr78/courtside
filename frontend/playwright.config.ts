@@ -26,7 +26,8 @@ export default defineConfig({
     video: "off"
   },
   projects: [
-    { name: "chromium", testIgnore: /responsive-mobile\.spec\.ts/, use: { browserName: "chromium" } },
+    { name: "chromium", testIgnore: /responsive-mobile\.spec\.ts|visual-regression\.spec\.ts/, use: { browserName: "chromium" } },
+    { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" } },
     { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" } },
     { name: "webkit-core", testMatch: /supported-browser\.spec\.ts/, use: { browserName: "webkit" } },
     ...periodicProjects

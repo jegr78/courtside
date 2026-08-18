@@ -1,6 +1,10 @@
 import { expect, test as base, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { journeyInstant, startJourneyService, type JourneyService } from "./global-setup";
 
+// WebKit and the pixel suite draw in the pinned image: WebKit so no runner needs its system
+// libraries, the pixel suite so one reviewed baseline holds on every machine.
+const PINNED_PROJECTS = new Set(["visual", "webkit-accessibility", "webkit-core"]);
+
 interface WorkerFixtures {
   journeyService: JourneyService;
 }
@@ -27,8 +31,23 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await provide(service);
     await service.stop();
   }, { scope: "worker" }],
-  baseURL: async ({ journeyService }, provide) => {
-    await provide(journeyService.baseURL);
+  browser: [async ({ playwright, browserName, journeyService }, provide, workerInfo) => {
+    if (!PINNED_PROJECTS.has(workerInfo.project.name)) {
+      // Delegating to Playwright's own fixture would launch a local browser for the pinned
+      // projects too, which is the installation this exists to avoid.
+      const local = await playwright[browserName].launch(workerInfo.project.use.launchOptions);
+      await provide(local);
+      await local.close();
+      return;
+    }
+    const pinned = await playwright[browserName].connect(await journeyService.pinnedBrowser());
+    await provide(pinned);
+    await pinned.close();
+  }, { scope: "worker" }],
+  baseURL: async ({ journeyService }, provide, testInfo) => {
+    await provide(PINNED_PROJECTS.has(testInfo.project.name)
+      ? await journeyService.containerBaseURL()
+      : journeyService.baseURL);
   },
   context: async ({ context }, provide) => {
     await pinJourneyClock(context);
