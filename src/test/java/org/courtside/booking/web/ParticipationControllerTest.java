@@ -2,21 +2,15 @@ package org.courtside.booking.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
-import org.courtside.identity.UserAccountRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -35,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class ParticipationControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -44,33 +39,25 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
     private WebApplicationContext context;
 
     @Autowired
-    private CourtRepository courts;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private OpeningHoursRepository openingHours;
-
-    @Autowired
-    private PersonRepository persons;
-
-    @Autowired
-    private UserAccountRepository accounts;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private IdentityTestFixture identityFixture;
 
     private MockMvc mockMvc;
     private UUID courtId;
+    private UUID maryPersonId;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day,
-                    new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day,
+                    new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
-        courtId = courts.save(new Court(1, "Court 1")).getId();
+        courtId = facilityFixture.createCourt(1, "Court 1");
         createAccount("Jane", "Doe", "doe.jane");
-        createAccount("Mary", "Major", "major.mary");
+        maryPersonId = createAccount("Mary", "Major", "major.mary");
     }
 
     @Test
@@ -84,7 +71,7 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
     void givenAMemberNamedInSomebodyElsesBooking_whenTheyList_thenTheyFindItWithoutAnyName()
             throws Exception {
         // given
-        bookNaming("major.mary", "doe.jane");
+        bookNaming(maryPersonId, "doe.jane");
 
         // when / then
         mockMvc.perform(get("/api/my/participations").with(user("major.mary").roles("MEMBER")))
@@ -102,7 +89,7 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
     void givenTheirOwnBooking_whenTheBookerLists_thenItIsNotAmongTheirParticipations()
             throws Exception {
         // given
-        bookNaming("major.mary", "doe.jane");
+        bookNaming(maryPersonId, "doe.jane");
 
         // when / then
         mockMvc.perform(get("/api/my/participations").with(user("doe.jane").roles("MEMBER")))
@@ -114,7 +101,7 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
     void givenAMemberNamedInSomebodyElsesBooking_whenTheyWithdraw_thenTheyAreNoLongerRecorded()
             throws Exception {
         // given
-        bookNaming("major.mary", "doe.jane");
+        bookNaming(maryPersonId, "doe.jane");
         String bookingId = JsonPath.read(
                 mockMvc.perform(get("/api/my/participations").with(user("major.mary").roles("MEMBER")))
                         .andReturn().getResponse().getContentAsString(), "$.items[0].id");
@@ -134,7 +121,7 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
     void givenABookingTheyAreNotRecordedIn_whenAMemberWithdraws_thenItSaysSoRatherThanJustFailing()
             throws Exception {
         // given
-        bookNaming("major.mary", "doe.jane");
+        bookNaming(maryPersonId, "doe.jane");
 
         // when / then
         mockMvc.perform(delete("/api/my/participations/" + UUID.randomUUID())
@@ -147,7 +134,7 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
     void givenTheirOwnBooking_whenTheBookerWithdrawsFromIt_thenItIsRefusedAsNoParticipation()
             throws Exception {
         // given
-        String bookingId = bookNaming("major.mary", "doe.jane");
+        String bookingId = bookNaming(maryPersonId, "doe.jane");
 
         // when / then
         mockMvc.perform(delete("/api/my/participations/" + bookingId)
@@ -156,9 +143,7 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:participation-not-found"));
     }
 
-    private String bookNaming(String namedUsername, String bookerUsername) throws Exception {
-        UUID namedPersonId = accounts.findByUsername(namedUsername).orElseThrow()
-                .getPerson().getId();
+    private String bookNaming(UUID namedPersonId, String bookerUsername) throws Exception {
         String response = mockMvc.perform(post("/api/bookings")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -179,11 +164,9 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
         return JsonPath.read(response, "$.id");
     }
 
-    private void createAccount(String firstName, String lastName, String username) {
-        Person person = persons.save(new Person(firstName, lastName, username + "@example.org"));
-        UserAccount account = new UserAccount(
-                person, username, passwordEncoder.encode("secret"), Set.of(Role.MEMBER));
-        account.enable();
-        accounts.save(account);
+    private UUID createAccount(String firstName, String lastName, String username) {
+        UUID personId = identityFixture.createPerson(firstName, lastName, username + "@example.org");
+        identityFixture.createEnabledAccount(personId, username, Set.of(Role.MEMBER));
+        return personId;
     }
 }

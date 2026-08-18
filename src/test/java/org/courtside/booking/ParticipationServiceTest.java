@@ -1,18 +1,15 @@
 package org.courtside.booking;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.facility.Court;
-import org.courtside.facility.CourtRepository;
-import org.courtside.facility.OpeningHours;
-import org.courtside.facility.OpeningHoursRepository;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
+import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -24,6 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class ParticipationServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -42,13 +40,10 @@ class ParticipationServiceTest extends AbstractIntegrationTest {
     private BookingRepository bookings;
 
     @Autowired
-    private CourtRepository courts;
+    private FacilityTestFixture facilityFixture;
 
     @Autowired
-    private OpeningHoursRepository openingHours;
-
-    @Autowired
-    private PersonRepository persons;
+    private IdentityTestFixture identityFixture;
 
     private UUID courtId;
     private UUID bookerAccountId;
@@ -58,14 +53,14 @@ class ParticipationServiceTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        courtId = courts.save(new Court(1, "Court 1")).getId();
+        courtId = facilityFixture.createCourt(1, "Court 1");
         bookerAccountId = UUID.randomUUID();
-        bookerPersonId = persons.save(new Person("Jane", "Doe", "jane.doe@example.org")).getId();
+        bookerPersonId = identityFixture.createPerson("Jane", "Doe", "jane.doe@example.org");
         namedAccountId = UUID.randomUUID();
-        namedPersonId = persons.save(new Person("John", "Roe", "john.roe@example.org")).getId();
+        namedPersonId = identityFixture.createPerson("John", "Roe", "john.roe@example.org");
         for (DayOfWeek day : DayOfWeek.values()) {
-            openingHours.save(new OpeningHours(day,
-                    new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            facilityFixture.setOpeningHours(day,
+                    new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
     }
 
@@ -125,7 +120,7 @@ class ParticipationServiceTest extends AbstractIntegrationTest {
     void givenAMemberNobodyNamed_whenTheyWithdrawFromABooking_thenItIsRefused() {
         // given
         UUID bookingId = bookingByJaneNaming(namedPersonId);
-        UUID strangerPersonId = persons.save(new Person("Mary", "Major", "mary@example.org")).getId();
+        UUID strangerPersonId = identityFixture.createPerson("Mary", "Major", "mary@example.org");
 
         // when / then
         assertThatThrownBy(() -> participations.withdraw(bookingId, strangerPersonId, UUID.randomUUID()))
