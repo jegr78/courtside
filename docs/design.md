@@ -1125,6 +1125,9 @@ deliver the implementation.
   months after season end (utilisation statistics survive, the personal reference does
   not); inactive accounts deleted after departure plus retention period; login logs after
   90 days.
+- **A sign-in session's row goes when the session does.** A session stops working the moment it
+  expires, but its row — which carries the username it belonged to — is deleted on the cadence of
+  `COURTSIDE_SESSION_CLEANUP_CRON`, a minute by default. **Built.**
 - **An import never keeps the file it was given.** What a preview holds is the SHA-256 of the
   uploaded bytes and the change set resolved from them — a club's whole membership list, in other
   words — and that change set is bounded by `COURTSIDE_IMPORT_PREVIEW_RETENTION`. What survives

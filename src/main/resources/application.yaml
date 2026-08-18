@@ -16,6 +16,7 @@ spring:
   session:
     jdbc:
       initialize-schema: always
+      cleanup-cron: ${COURTSIDE_SESSION_CLEANUP_CRON:0 * * * * *}
   messages:
     basename: messages
     fallback-to-system-locale: false
