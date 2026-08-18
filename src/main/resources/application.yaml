@@ -25,6 +25,10 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      max-file-size: ${COURTSIDE_IMPORT_MAX_FILE_SIZE:8MB}
+      max-request-size: ${COURTSIDE_IMPORT_MAX_FILE_SIZE:8MB}
 
 server:
   forward-headers-strategy: framework
@@ -55,6 +59,8 @@ courtside:
       block: ${COURTSIDE_LOGIN_GLOBAL_BLOCK:1m}
   booking:
     series-horizon-months: 12
+  import:
+    preview-retention: ${COURTSIDE_IMPORT_PREVIEW_RETENTION:7d}
 
 management:
   tracing:

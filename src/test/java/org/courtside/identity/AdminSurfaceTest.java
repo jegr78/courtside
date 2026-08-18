@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
-    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 56;
+    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 58;
 
     private static final String CATCH_ALL_UUID = "11111111-1111-1111-1111-111111111111";
 
@@ -262,7 +262,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             MockHttpServletRequest servletRequest =
                     new MockHttpServletRequest(endpoint.method().name(), endpoint.concretePath());
             // The mappings state what they consume, so a probe with no content type matches nothing.
-            servletRequest.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            servletRequest.setContentType(endpoint.consumes().toString());
             servletRequest.addHeader(HttpHeaders.ACCEPT, MediaType.ALL_VALUE);
             ServletRequestPathUtils.parseAndCache(servletRequest);
             if (handlerMapping.getHandler(servletRequest) == null) {
@@ -284,8 +284,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     private String forbiddenAsMemberFailure(MappedEndpoint endpoint) {
         try {
             mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}")
+                            .contentType(endpoint.consumes())
+                            .content(endpoint.probeBody())
                             .with(csrf()))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
@@ -298,8 +298,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     private String unauthorizedAsAnonymousFailure(MappedEndpoint endpoint) {
         try {
             mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}")
+                            .contentType(endpoint.consumes())
+                            .content(endpoint.probeBody())
                             .with(anonymous())
                             .with(csrf()))
                     .andExpect(status().isUnauthorized())
@@ -314,8 +314,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     private String successfulAsAnonymousFailure(MappedEndpoint endpoint) {
         try {
             MockHttpServletRequestBuilder request = request(endpoint.method(), endpoint.concretePath())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{}")
+                    .contentType(endpoint.consumes())
+                    .content(endpoint.probeBody())
                     .with(anonymous())
                     .with(csrf());
             if (endpoint.method() == HttpMethod.GET && endpoint.pattern().equals("/api/bookings")) {
@@ -334,8 +334,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     private String reachableAsAuthenticatedMemberFailure(MappedEndpoint endpoint) {
         try {
             int status = mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}")
+                            .contentType(endpoint.consumes())
+                            .content(endpoint.probeBody())
                             .with(csrf()))
                     .andReturn().getResponse().getStatus();
             if (status == HttpStatus.UNAUTHORIZED.value()) {
@@ -368,7 +368,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 .flatMap(info -> info.getPathPatternsCondition().getPatternValues().stream()
                         .filter(patternFilter)
                         .flatMap(pattern -> methodsOf(info).stream()
-                                .map(method -> new MappedEndpoint(method, pattern, producesOf(info)))))
+                                .map(method -> new MappedEndpoint(method, pattern, producesOf(info),
+                                        consumesOf(info)))))
                 .toList();
     }
 
@@ -383,6 +384,12 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
 
     private static boolean isAuthenticatedOnly(MappedEndpoint endpoint) {
         return AUTHENTICATED_PATHS.contains(endpoint.pattern()) && !isAnonymousAllowed(endpoint);
+    }
+
+    private static MediaType consumesOf(RequestMappingInfo info) {
+        return info.getConsumesCondition().getConsumableMediaTypes().stream()
+                .findFirst()
+                .orElse(MediaType.APPLICATION_JSON);
     }
 
     private static MediaType producesOf(RequestMappingInfo info) {
@@ -402,7 +409,12 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 .toList();
     }
 
-    private record MappedEndpoint(HttpMethod method, String pattern, MediaType produces) {
+    private record MappedEndpoint(HttpMethod method, String pattern, MediaType produces,
+                                  MediaType consumes) {
+
+        String probeBody() {
+            return MediaType.APPLICATION_JSON.includes(consumes) ? "{}" : "";
+        }
 
         String concretePath() {
             return pattern

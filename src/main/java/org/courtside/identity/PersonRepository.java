@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +17,12 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
     // user_account carries no unique person, so the person row is the one to lock.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Person> findWithLockById(UUID id);
+
+    @Query("""
+            SELECT person FROM Person person
+            WHERE lower(concat(person.firstName, ' ', person.lastName)) IN :nameKeys
+            """)
+    List<Person> findByNameKeyIn(@Param("nameKeys") Collection<String> nameKeys);
 
     @Query("""
             SELECT person.id FROM Person person

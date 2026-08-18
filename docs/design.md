@@ -35,8 +35,10 @@ club can also describe the systems it means to synchronise its roster from: the 
 membership types a source's categories stand for, the fields that source owns and the share of the
 roster whose disappearance needs confirming — and it can say which member number of a source stands
 for which person, which is what makes a second snapshot an update rather than a second set of
-people. Nothing reads a file yet; what exists is the configuration and the references a run will
-need. `/actuator/health` is exposed. The
+people. A club can upload a snapshot and see exactly what it would change — every creation, every
+field of every update, every membership that would end, every row that could not be read and every
+creation that resembles somebody the roster already holds. Nothing is written by that: executing a
+reviewed preview is the part that is not built yet. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -48,9 +50,9 @@ configuration and facilities. The roster and the import sources are the exceptio
 the API and have no browser surface yet, so a board reaches them through the API alone.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
-container image scanning, the upload, preview and execution of a roster snapshot against a
-configured source, reports and exports, and the self-service password reset of
-section 4 — an administrator hands out a new one-time password through the roster instead.
+container image scanning, the execution of a reviewed roster snapshot, reports and exports, and the
+self-service password reset of section 4 — an administrator hands out a new one-time password
+through the roster instead.
 
 ---
 
@@ -848,6 +850,13 @@ Import and export:
   board recognises the resemblance it links the two by hand instead. One person may hold a
   reference from each of several sources, which is what lets a club migrate between membership
   systems without the second one duplicating everybody.
+- **A preview writes nothing and is never edited.** It resolves the whole file and answers with the
+  change set a later execution would apply, so what a board approves is what runs. A header problem
+  fails the file, because nothing in it can then be trusted; a cell problem fails one row and is
+  reported beside the rest. Correcting a mistake means uploading the corrected file — an editable
+  preview would no longer be what anybody reviewed. Above the source's own threshold, the share of
+  its memberships that would end is flagged as needing a deliberate confirmation, which is what
+  stands between a truncated export and a club that has lost half its roster.
 - **CSV export** for every list view in the admin backend, matching what existing booking
   systems offer today.
 - **Per-member JSON export** for subject access requests (section 11).
@@ -1103,6 +1112,12 @@ deliver the implementation.
   months after season end (utilisation statistics survive, the personal reference does
   not); inactive accounts deleted after departure plus retention period; login logs after
   90 days.
+- **An import never keeps the file it was given.** What a preview holds is the SHA-256 of the
+  uploaded bytes and the change set resolved from them — a club's whole membership list, in other
+  words — and that change set is bounded by `COURTSIDE_IMPORT_PREVIEW_RETENTION`. What survives
+  past it is the row, its hash and its counts, which is what an audit of *what was executed* needs
+  and is not personal data. **Built:** the bound is recorded on every preview, and a preview past
+  it answers without its change set. **Designed:** the scheduled sweep that erases the stored one.
 - **Subject access and portability** (Art. 15/20) as self-service: every member can export
   their own data as JSON. The Release 1 export covers this.
 - **Documentation templates in the repository**: a pre-filled record of processing
