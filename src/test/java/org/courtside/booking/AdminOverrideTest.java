@@ -6,8 +6,7 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
-import org.courtside.member.Member;
-import org.courtside.member.MemberRepository;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,11 +21,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class AdminOverrideTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -54,7 +52,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
-    private MemberRepository members;
+    private MemberTestFixture members;
 
     private UUID courtId;
     private UUID bookerPersonId;
@@ -83,7 +81,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     void givenAnAdvanceWindowOfSevenDays_whenAnAdminBooksBeyondIt_thenItIsAccepted() {
         // given
         UUID personId = identity.createPerson("John", "Roe", "john@example.org");
-        members.save(memberSince(personId, STANDARD_MEMBERSHIP));
+        members.assignMembership(personId, STANDARD_MEMBERSHIP);
 
         // when
         UUID bookingId = bookAs(personId, Role.ADMIN, TRAINING_CARD,
@@ -98,7 +96,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     void givenAnAdvanceWindowOfSevenDays_whenAMemberBooksBeyondIt_thenItIsRejected() {
         // given
         UUID personId = identity.createPerson("Mary", "Major", "mary@example.org");
-        members.save(memberSince(personId, STANDARD_MEMBERSHIP));
+        members.assignMembership(personId, STANDARD_MEMBERSHIP);
 
         // when / then
         assertThatThrownBy(() -> bookAs(personId, Role.MEMBER, MEMBER_BOOKING_CARD,

@@ -9,8 +9,8 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
-import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +23,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -37,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import(IdentityTestFixture.class)
+@Import({IdentityTestFixture.class, MemberTestFixture.class})
 class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE =
@@ -73,6 +72,9 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private MemberRepository members;
+
+    @Autowired
+    private MemberTestFixture memberFixture;
 
     private MockMvc mockMvc;
 
@@ -332,7 +334,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
     private UUID memberLinkedAs(String externalId, String firstName, String lastName) {
         UUID personId = identity.createPerson(firstName, lastName,
                 firstName.toLowerCase() + "." + lastName.toLowerCase() + "@example.org");
-        members.save(new Member(personId, MEMBERSHIP_TYPE_ID, LocalDate.of(2026, 1, 1)));
+        memberFixture.assignMembership(personId, MEMBERSHIP_TYPE_ID);
         references.link(source, externalId, personId);
         return personId;
     }

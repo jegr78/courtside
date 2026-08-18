@@ -8,8 +8,7 @@ import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
-import org.courtside.member.Member;
-import org.courtside.member.MemberRepository;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +26,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -39,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class SeriesControllerTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_MEMBERSHIP =
@@ -61,7 +59,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     private UserAccountRepository accounts;
 
     @Autowired
-    private MemberRepository members;
+    private MemberTestFixture members;
 
     @Autowired
     private BookingSeriesRepository series;
@@ -188,7 +186,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     void givenTheTrainerIsAlsoAMember_whenPreviewing_thenTheAdvanceWindowNarrowsTheCreatableCount()
             throws Exception {
         // given
-        members.save(memberSince(trainerPersonId, ACTIVE_MEMBERSHIP));
+        members.assignMembership(trainerPersonId, ACTIVE_MEMBERSHIP);
 
         // when / then
         mockMvc.perform(post("/api/booking-series/preview")
