@@ -46,7 +46,7 @@ class ValidationMessageCoverageTest {
 
     // What toMap's "validation." + AnnotationSimpleName can produce today.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
-            List.of("DurationMin", "Email", "Max", "Min", "NotNull", "Pattern", "Size");
+            List.of("DurationMax", "DurationMin", "Email", "Max", "Min", "NotNull", "Pattern", "Size");
 
     // Minted by an advice rather than by a constraint, so no literal search reaches them.
     private static final List<String> ADVICE_MINTED_CODES =
