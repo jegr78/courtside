@@ -229,16 +229,29 @@ test("core administration is operable using only the keyboard", async ({ page, b
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
 });
 
-test("the core layout reflows at 400 percent zoom", async ({ page }) => {
+test("the core layout reflows at the 400 percent zoom equivalent", async ({ page }) => {
   // given
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
 
   // when
-  await page.evaluate(() => { document.documentElement.style.zoom = "4"; });
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.evaluate(() => document.fonts.ready);
 
   // then
-  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await expect(async () => {
+    const layout = await page.evaluate(() => ({
+      content: document.documentElement.scrollWidth,
+      viewport: document.documentElement.clientWidth,
+      fonts: document.fonts.status,
+      reflowed: window.matchMedia("(max-width: 640px)").matches
+    }));
+    // A face still loading renders in a fallback whose metrics are not the layout under test.
+    expect(layout.fonts).toBe("loaded");
+    expect(layout.reflowed).toBe(true);
+    expect(layout.content).toBeLessThanOrEqual(layout.viewport);
+  }).toPass();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
 });
 

@@ -19,7 +19,10 @@ technology versions, locale, result and linked defect for every failure.
 - With VoiceOver and Safari on macOS or iOS, repeat the public plan and booking-dialog journey.
 - At 200% and 400% browser zoom, verify that content reflows without two-dimensional scrolling,
   clipped controls or obscured focus, except for the court-plan data table where horizontal table
-  scrolling remains available from the keyboard.
+  scrolling remains available from the keyboard. The automated suite covers the 400% case only as its
+  320 CSS pixel equivalent, by narrowing the viewport; real browser zoom stays a manual check,
+  because scaling the page in script leaves the media queries at the wide breakpoint and therefore
+  never reflows at all.
 - Enable increased contrast or forced colours and verify that availability, ownership, errors,
   disabled controls and focus never depend on colour alone.
 - Enable reduced motion and verify that no transition or animation impedes navigation.
