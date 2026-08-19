@@ -6,8 +6,11 @@ import org.courtside.member.MemberService;
 import org.courtside.member.MembershipPeriod;
 import org.courtside.member.RosterService;
 
+import org.courtside.identity.Role;
+
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -18,6 +21,34 @@ public class MemberTestFixture {
     private final MemberService memberships;
     private final RosterService roster;
     private final MemberRepository members;
+
+    public UUID addPerson(String firstName, String lastName, String email) {
+        return roster.createPerson(firstName, lastName, email).personId();
+    }
+
+    public void correctPerson(UUID personId, String firstName, String lastName, String email) {
+        roster.changePerson(personId, firstName, lastName, email);
+    }
+
+    public void giveAccount(UUID personId, String username, String oneTimePassword, Set<Role> roles) {
+        roster.createAccount(personId, username, oneTimePassword, roles);
+    }
+
+    public void changeAccountRoles(UUID personId, Set<Role> roles) {
+        roster.changeRoles(personId, roles);
+    }
+
+    public void correctAccountUsername(UUID personId, String username) {
+        roster.changeUsername(personId, username);
+    }
+
+    public void resetAccountPassword(UUID personId, String oneTimePassword) {
+        roster.resetPassword(personId, oneTimePassword);
+    }
+
+    public void setAccountEnabled(UUID personId, boolean enabled) {
+        roster.setAccountEnabled(personId, enabled);
+    }
 
     public UUID createMembershipType(String name) {
         return memberships.createMembershipType(name, null).getId();
