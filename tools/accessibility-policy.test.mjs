@@ -26,3 +26,14 @@ test("given automation cannot decide assistive-technology usability, when qualif
   assert.match(documentation, /forced colours/);
   assert.match(documentation, /reduced motion/);
 });
+
+test("given the reflow check, when it narrows the viewport, then it proves the layout actually reflowed", () => {
+  // Scaling with style.zoom leaves the media queries at the wide breakpoint, so it never reflows.
+  assert.doesNotMatch(accessibility, /style\.zoom/);
+  assert.match(accessibility, /setViewportSize\(\{ width: 320, height: 720 \}\)/);
+  assert.match(accessibility, /expect\(layout\.reflowed\)\.toBe\(true\);/);
+  assert.match(accessibility, /expect\(layout\.fonts\)\.toBe\("loaded"\);/);
+  assert.match(accessibility, /\}\)\.toPass\(\);/);
+  assert.doesNotMatch(accessibility, /toPass\(\{/);
+  assert.doesNotMatch(accessibility, /expect\.poll/);
+});
