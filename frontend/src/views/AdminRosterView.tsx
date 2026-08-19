@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { api, type Role, type RosterEntry } from "../api/client";
+import { api, type PersonRequest, type Role, type RosterEntry } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -10,6 +10,11 @@ import { TextField } from "../components/TextField";
 const roles: Role[] = [
   "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"
 ];
+
+const NAME_LENGTH = 60;
+const EMAIL_LENGTH = 120;
+const USERNAME_LENGTH = 60;
+const PASSWORD_LENGTH = 200;
 
 export function AdminRosterView() {
   const { t } = useTranslation();
@@ -92,15 +97,16 @@ export function AdminRosterView() {
     }
   }
 
-  async function mutate(key: string, change: () => Promise<RosterEntry>): Promise<boolean> {
-    if (!beginMutation(key)) return false;
+  async function mutate(key: string, change: () => Promise<RosterEntry>): Promise<RosterEntry | undefined> {
+    if (!beginMutation(key)) return undefined;
     try {
-      replaceEntry(await change());
+      const changed = await change();
+      replaceEntry(changed);
       reportSuccess();
-      return true;
+      return changed;
     } catch (failure) {
       reportError(failure);
-      return false;
+      return undefined;
     } finally {
       endMutation(key);
     }
@@ -149,23 +155,20 @@ export function AdminRosterView() {
     {error && <Alert>{error}</Alert>}
     {success && <Alert tone="success">{success}</Alert>}
     <form noValidate onSubmit={(event) => void search(event)} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-      <TextField data-testid="roster-search" name="query" label={t("admin.roster.search")} />
+      <TextField data-testid="roster-search" name="query" maxLength={NAME_LENGTH} label={t("admin.roster.search")} />
       <Button data-testid="roster-search-submit" disabled={pending.has("roster:page")} type="submit">{t("admin.roster.searchSubmit")}</Button>
     </form>
     <section className="grid gap-4">
       <h2 className="text-2xl font-bold">{t("admin.roster.people")}</h2>
-      {entries.length === 0 && <p>{t("admin.roster.empty")}</p>}
+      {entries.length === 0 && <p data-testid="roster-empty">{t("admin.roster.empty")}</p>}
       {entries.map((entry) => <PersonCard
         key={entry.personId}
         entry={entry}
         disabled={pending.has(`person:${entry.personId}`)}
         accountDisabled={pending.has(`account:${entry.personId}`)}
-        changed={replaceEntry}
-        savePerson={() => mutate(`person:${entry.personId}`, () => api.changePerson(entry.personId, {
-          firstName: entry.firstName, lastName: entry.lastName, email: entry.email
-        }))}
-        saveRoles={() => mutate(`account:${entry.personId}`, () => api.changeAccountRoles(entry.personId, entry.roles))}
-        saveUsername={() => mutate(`account:${entry.personId}`, () => api.changeAccountUsername(entry.personId, entry.username ?? ""))}
+        savePerson={(person) => mutate(`person:${entry.personId}`, () => api.changePerson(entry.personId, person))}
+        saveRoles={(chosen) => mutate(`account:${entry.personId}`, () => api.changeAccountRoles(entry.personId, chosen))}
+        saveUsername={(username) => mutate(`account:${entry.personId}`, () => api.changeAccountUsername(entry.personId, username))}
         resetPassword={(oneTimePassword) => mutate(`account:${entry.personId}`, () => api.resetAccountPassword(entry.personId, oneTimePassword))}
         toggleAccount={() => mutate(`account:${entry.personId}`, () => api.setAccountActive(entry.personId, !entry.enabled))}
         createAccount={(event) => createAccount(entry.personId, event)}
@@ -175,67 +178,86 @@ export function AdminRosterView() {
     <form noValidate onSubmit={(event) => void createPerson(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
       <h2 className="text-2xl font-bold">{t("admin.roster.newPerson")}</h2>
       <div className="grid gap-3 md:grid-cols-3">
-        <TextField data-testid="new-person-first-name" disabled={pending.has("person:new")} name="firstName" label={t("admin.roster.firstName")} />
-        <TextField data-testid="new-person-last-name" disabled={pending.has("person:new")} name="lastName" label={t("admin.roster.lastName")} />
-        <TextField data-testid="new-person-email" disabled={pending.has("person:new")} name="email" type="email" label={t("admin.roster.email")} />
+        <TextField data-testid="new-person-first-name" disabled={pending.has("person:new")} name="firstName" maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} />
+        <TextField data-testid="new-person-last-name" disabled={pending.has("person:new")} name="lastName" maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} />
+        <TextField data-testid="new-person-email" disabled={pending.has("person:new")} name="email" type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} />
       </div>
       <Button data-testid="create-person" disabled={pending.has("person:new")} className="justify-self-start" type="submit">{t("admin.create")}</Button>
     </form>
   </section>;
 }
 
+type Saved = Promise<RosterEntry | undefined>;
+
 interface PersonCardProps {
   entry: RosterEntry;
   disabled: boolean;
   accountDisabled: boolean;
-  changed: (entry: RosterEntry) => void;
-  savePerson: () => Promise<boolean>;
-  saveRoles: () => Promise<boolean>;
-  saveUsername: () => Promise<boolean>;
-  resetPassword: (oneTimePassword: string) => Promise<boolean>;
-  toggleAccount: () => Promise<boolean>;
-  createAccount: (event: FormEvent<HTMLFormElement>) => Promise<boolean>;
+  savePerson: (person: PersonRequest) => Saved;
+  saveRoles: (roles: Role[]) => Saved;
+  saveUsername: (username: string) => Saved;
+  resetPassword: (oneTimePassword: string) => Saved;
+  toggleAccount: () => Saved;
+  createAccount: (event: FormEvent<HTMLFormElement>) => Saved;
 }
 
-function PersonCard({ entry, disabled, accountDisabled, changed, savePerson, createAccount, ...account }: PersonCardProps) {
+function PersonCard({ entry, disabled, accountDisabled, savePerson, createAccount, ...account }: PersonCardProps) {
   const { t } = useTranslation();
-  return <article aria-label={`${entry.firstName} ${entry.lastName}`} className="surface-subtle grid gap-4 rounded-xl border p-4">
+  const [person, setPerson] = useState<PersonRequest>({
+    firstName: entry.firstName, lastName: entry.lastName, email: entry.email
+  });
+  async function save() {
+    const changed = await savePerson(person);
+    if (changed) {
+      setPerson({ firstName: changed.firstName, lastName: changed.lastName, email: changed.email });
+    }
+  }
+  return <article aria-label={`${person.firstName} ${person.lastName}`} className="surface-subtle grid gap-4 rounded-xl border p-4">
     <div className="grid gap-3 md:grid-cols-3">
-      <TextField data-testid={`person-first-name-${entry.personId}`} disabled={disabled} label={t("admin.roster.firstName")} value={entry.firstName} onChange={(event) => changed({ ...entry, firstName: event.target.value })} />
-      <TextField data-testid={`person-last-name-${entry.personId}`} disabled={disabled} label={t("admin.roster.lastName")} value={entry.lastName} onChange={(event) => changed({ ...entry, lastName: event.target.value })} />
-      <TextField data-testid={`person-email-${entry.personId}`} disabled={disabled} type="email" label={t("admin.roster.email")} value={entry.email} onChange={(event) => changed({ ...entry, email: event.target.value })} />
+      <TextField data-testid={`person-first-name-${entry.personId}`} disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} value={person.firstName} onChange={(event) => setPerson({ ...person, firstName: event.target.value })} />
+      <TextField data-testid={`person-last-name-${entry.personId}`} disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} value={person.lastName} onChange={(event) => setPerson({ ...person, lastName: event.target.value })} />
+      <TextField data-testid={`person-email-${entry.personId}`} disabled={disabled} type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} value={person.email} onChange={(event) => setPerson({ ...person, email: event.target.value })} />
     </div>
-    <Button data-testid={`save-person-${entry.personId}`} disabled={disabled} className="justify-self-start" type="button" onClick={() => void savePerson()}>{t("admin.save")}</Button>
+    <Button data-testid={`save-person-${entry.personId}`} disabled={disabled} className="justify-self-start" type="button" onClick={() => void save()}>{t("admin.save")}</Button>
     {entry.accountId
-      ? <AccountEditor entry={entry} disabled={accountDisabled} changed={changed} {...account} />
+      ? <AccountEditor entry={entry} disabled={accountDisabled} {...account} />
       : <AccountCreateForm entry={entry} disabled={accountDisabled} create={createAccount} />}
   </article>;
 }
 
-function AccountEditor({ entry, disabled, changed, saveRoles, saveUsername, resetPassword, toggleAccount }: {
+function AccountEditor({ entry, disabled, saveRoles, saveUsername, resetPassword, toggleAccount }: {
   entry: RosterEntry;
   disabled: boolean;
-  changed: (entry: RosterEntry) => void;
-  saveRoles: () => Promise<boolean>;
-  saveUsername: () => Promise<boolean>;
-  resetPassword: (oneTimePassword: string) => Promise<boolean>;
-  toggleAccount: () => Promise<boolean>;
+  saveRoles: (roles: Role[]) => Saved;
+  saveUsername: (username: string) => Saved;
+  resetPassword: (oneTimePassword: string) => Saved;
+  toggleAccount: () => Saved;
 }) {
   const { t } = useTranslation();
+  const [username, setUsername] = useState(entry.username ?? "");
+  const [chosenRoles, setChosenRoles] = useState(entry.roles);
   const [oneTimePassword, setOneTimePassword] = useState("");
+  async function saveName() {
+    const changed = await saveUsername(username);
+    if (changed) setUsername(changed.username ?? "");
+  }
+  async function saveChosenRoles() {
+    const changed = await saveRoles(chosenRoles);
+    if (changed) setChosenRoles(changed.roles);
+  }
   async function reset() {
     if (await resetPassword(oneTimePassword)) setOneTimePassword("");
   }
   return <div className="grid gap-3 border-t pt-4">
     <h3 className="font-bold">{t("admin.roster.account")}</h3>
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-      <TextField data-testid={`account-username-${entry.personId}`} disabled={disabled} autoComplete="off" label={t("admin.roster.username")} value={entry.username ?? ""} onChange={(event) => changed({ ...entry, username: event.target.value })} />
-      <Button data-testid={`save-username-${entry.personId}`} disabled={disabled} className="self-end" type="button" onClick={() => void saveUsername()}>{t("admin.save")}</Button>
+      <TextField data-testid={`account-username-${entry.personId}`} disabled={disabled} autoComplete="off" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} value={username} onChange={(event) => setUsername(event.target.value)} />
+      <Button data-testid={`save-username-${entry.personId}`} disabled={disabled} className="self-end" type="button" onClick={() => void saveName()}>{t("admin.save")}</Button>
     </div>
-    <RoleCheckboxes testIdPrefix={`account-roles-${entry.personId}`} disabled={disabled} selected={entry.roles} changed={(chosen) => changed({ ...entry, roles: chosen })} />
-    <Button data-testid={`save-roles-${entry.personId}`} disabled={disabled} className="justify-self-start" type="button" onClick={() => void saveRoles()}>{t("admin.save")}</Button>
+    <RoleCheckboxes testIdPrefix={`account-roles-${entry.personId}`} disabled={disabled} selected={chosenRoles} changed={setChosenRoles} />
+    <Button data-testid={`save-roles-${entry.personId}`} disabled={disabled} className="justify-self-start" type="button" onClick={() => void saveChosenRoles()}>{t("admin.save")}</Button>
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-      <TextField data-testid={`account-password-${entry.personId}`} disabled={disabled} autoComplete="off" label={t("admin.roster.oneTimePassword")} value={oneTimePassword} onChange={(event) => setOneTimePassword(event.target.value)} />
+      <TextField data-testid={`account-password-${entry.personId}`} disabled={disabled} autoComplete="off" maxLength={PASSWORD_LENGTH} label={t("admin.roster.oneTimePassword")} value={oneTimePassword} onChange={(event) => setOneTimePassword(event.target.value)} />
       <Button data-testid={`reset-password-${entry.personId}`} disabled={disabled || !oneTimePassword} className="self-end" type="button" onClick={() => void reset()}>{t("admin.roster.resetPassword")}</Button>
     </div>
     <Button data-testid={`toggle-account-${entry.personId}`} disabled={disabled} className="justify-self-start" type="button" onClick={() => void toggleAccount()}>{t(entry.enabled ? "admin.deactivate" : "admin.activate")}</Button>
@@ -245,14 +267,14 @@ function AccountEditor({ entry, disabled, changed, saveRoles, saveUsername, rese
 function AccountCreateForm({ entry, disabled, create }: {
   entry: RosterEntry;
   disabled: boolean;
-  create: (event: FormEvent<HTMLFormElement>) => Promise<boolean>;
+  create: (event: FormEvent<HTMLFormElement>) => Saved;
 }) {
   const { t } = useTranslation();
   return <form noValidate onSubmit={(event) => void create(event)} className="grid gap-3 border-t pt-4">
     <h3 className="font-bold">{t("admin.roster.newAccount")}</h3>
     <div className="grid gap-3 md:grid-cols-2">
-      <TextField data-testid={`new-account-username-${entry.personId}`} disabled={disabled} autoComplete="off" name="username" label={t("admin.roster.username")} />
-      <TextField data-testid={`new-account-password-${entry.personId}`} disabled={disabled} autoComplete="off" name="oneTimePassword" label={t("admin.roster.oneTimePassword")} />
+      <TextField data-testid={`new-account-username-${entry.personId}`} disabled={disabled} autoComplete="off" name="username" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} />
+      <TextField data-testid={`new-account-password-${entry.personId}`} disabled={disabled} autoComplete="off" name="oneTimePassword" maxLength={PASSWORD_LENGTH} label={t("admin.roster.oneTimePassword")} />
     </div>
     <RoleCheckboxes testIdPrefix={`new-account-role-${entry.personId}`} disabled={disabled} name="roles" selected={[]} />
     <Button data-testid={`create-account-${entry.personId}`} disabled={disabled} className="justify-self-start" type="submit">{t("admin.roster.newAccount")}</Button>

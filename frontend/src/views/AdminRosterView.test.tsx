@@ -223,6 +223,58 @@ describe("AdminRosterView", () => {
     expect(screen.getByTestId("toggle-account-person-1")).toHaveAccessibleName("Activate");
   });
 
+  it("given an unsaved correction, when the account is disabled, then the correction is not thrown away", async () => {
+    // given
+    vi.spyOn(api, "setAccountActive").mockResolvedValue({ ...withAccount, enabled: false });
+    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    const user = userEvent.setup();
+
+    // when
+    await user.clear(await screen.findByTestId("person-first-name-person-1"));
+    await user.type(screen.getByTestId("person-first-name-person-1"), "Mary");
+    await user.click(screen.getByTestId("toggle-account-person-1"));
+
+    // then
+    expect(screen.getByTestId("toggle-account-person-1")).toHaveAccessibleName("Activate");
+    expect(screen.getByTestId("person-first-name-person-1")).toHaveValue("Mary");
+  });
+
+  it("given an unsaved username, when the person is saved, then the username is not thrown away", async () => {
+    // given
+    vi.spyOn(api, "changePerson").mockResolvedValue(withAccount);
+    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    const user = userEvent.setup();
+
+    // when
+    await user.clear(await screen.findByTestId("account-username-person-1"));
+    await user.type(screen.getByTestId("account-username-person-1"), "doe.mary");
+    await user.click(screen.getByTestId("save-person-person-1"));
+
+    // then
+    expect(await screen.findByRole("status")).toBeInTheDocument();
+    expect(screen.getByTestId("account-username-person-1")).toHaveValue("doe.mary");
+  });
+
+  it("given nobody matches the search, when the roster is read, then the empty list says so", async () => {
+    // given
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });
+    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("roster-empty")).toHaveTextContent("No person found.");
+    expect(screen.queryByTestId("roster-load-more")).not.toBeInTheDocument();
+  });
+
+  it("given a person without an account, when the view loads, then nothing offers to enable one", async () => {
+    // when
+    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("toggle-account-person-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("toggle-account-person-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("save-roles-person-2")).not.toBeInTheDocument();
+  });
+
   it("given the last administrator, when their account is disabled, then the refusal is shown", async () => {
     // given
     vi.spyOn(api, "setAccountActive").mockRejectedValue(new ApiError(409, {
