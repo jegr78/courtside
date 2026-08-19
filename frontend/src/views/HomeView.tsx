@@ -27,6 +27,7 @@ export function HomeView({ session, signedOut }: { session: SessionStatus; signe
         {session.authenticated && <NavLink to="/my-bookings" data-testid="my-bookings-link" className="underline-offset-4">{t("nav.myBookings")}</NavLink>}
         {session.roles.includes("ADMIN") && <NavLink to="/admin/configuration" data-testid="admin-configuration-link" className="underline-offset-4">{t("nav.adminConfiguration")}</NavLink>}
         {session.roles.includes("ADMIN") && <NavLink to="/admin/facility" data-testid="admin-facility-link" className="underline-offset-4">{t("nav.adminFacility")}</NavLink>}
+        {session.roles.includes("ADMIN") && <NavLink to="/admin/roster" data-testid="admin-roster-link" className="underline-offset-4">{t("nav.adminRoster")}</NavLink>}
       </nav>
       {session.authenticated
         ? <Button type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>

@@ -247,3 +247,65 @@ test("an admin takes a court out of service and restores it through the browser"
   // then
   await expect(page.getByTestId("court-column-4")).toBeVisible();
 });
+
+test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("admin-roster-link").click();
+  await expect(page.getByTestId("admin-roster-view")).toBeVisible();
+
+  // when
+  await page.getByTestId("new-person-first-name").fill("Mary");
+  await page.getByTestId("new-person-last-name").fill("Roe");
+  await page.getByTestId("new-person-email").fill("mary.roe@example.org");
+  const personCreated = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/roster") && response.request().method() === "POST"
+  );
+  await page.getByTestId("create-person").click();
+  const { personId } = await (await personCreated).json() as { personId: string };
+
+  // then
+  await expect(page.getByTestId(`person-email-${personId}`)).toHaveValue("mary.roe@example.org");
+
+  // when
+  await page.getByTestId(`new-account-username-${personId}`).fill("roe.mary");
+  await page.getByTestId(`new-account-password-${personId}`).fill("handover-password");
+  await page.getByTestId(`new-account-role-${personId}-MEMBER`).check();
+  const accountCreated = page.waitForResponse((response) =>
+    response.url().endsWith(`/api/admin/roster/${personId}/account`) && response.request().method() === "POST"
+  );
+  await page.getByTestId(`create-account-${personId}`).click();
+  expect((await accountCreated).status()).toBe(201);
+
+  // then
+  await expect(page.getByTestId(`account-username-${personId}`)).toHaveValue("roe.mary");
+  await expect(page.getByTestId(`account-roles-${personId}-MEMBER`)).toBeChecked();
+
+  // when
+  await page.goto("/");
+  await page.getByTestId("logout").click();
+  await page.getByTestId("username").fill("roe.mary");
+  await page.getByTestId("password").fill("handover-password");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("initial-password-view")).toBeVisible();
+  await page.getByTestId("new-password").fill("her-own-password");
+  await page.getByTestId("confirm-password").fill("her-own-password");
+  await page.getByTestId("password-submit").click();
+  await expect(page.getByTestId("sign-in-link")).toBeVisible();
+  await page.getByTestId("sign-in-link").click();
+  await page.getByTestId("username").fill("roe.mary");
+  await page.getByTestId("password").fill("her-own-password");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await selectJourneyDate(page, journeyService.visualDate);
+  await freeSlot(page, 2, "15:00").click();
+  await page.getByTestId("member-search").fill("Major");
+  await page.getByTestId("member-match").click();
+  await page.getByTestId("booking-submit").click();
+
+  // then
+  await expect(page.getByTestId("own-allocation")).toBeVisible();
+});
