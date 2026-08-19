@@ -10,121 +10,110 @@ import java.util.UUID;
 
 public sealed interface RosterEvent extends DomainEventRecord {
 
+    UUID personId();
+
+    @Override
+    default UUID subjectId() {
+        return personId();
+    }
+
     record PersonAdded(UUID personId) implements RosterEvent {
+
+        static final String TYPE = "roster.person.added";
 
         @Override
         public String eventType() {
-            return "roster.person.added";
+            return TYPE;
         }
 
-        @Override
-        public UUID subjectId() {
-            return personId;
-        }
     }
 
     record PersonCorrected(UUID personId, Set<String> fields) implements RosterEvent {
 
-        @Override
-        public String eventType() {
-            return "roster.person.corrected";
-        }
+        static final String TYPE = "roster.person.corrected";
 
         @Override
-        public UUID subjectId() {
-            return personId;
+        public String eventType() {
+            return TYPE;
         }
+
     }
 
     record AccountCreated(UUID personId, UUID accountId, Set<Role> roles) implements RosterEvent {
 
-        @Override
-        public String eventType() {
-            return "roster.account.created";
-        }
+        static final String TYPE = "roster.account.created";
 
         @Override
-        public UUID subjectId() {
-            return personId;
+        public String eventType() {
+            return TYPE;
         }
+
     }
 
     record AccountRolesChanged(UUID personId, UUID accountId, Set<Role> roles) implements RosterEvent {
 
-        @Override
-        public String eventType() {
-            return "roster.account.rolesChanged";
-        }
+        static final String TYPE = "roster.account.rolesChanged";
 
         @Override
-        public UUID subjectId() {
-            return personId;
+        public String eventType() {
+            return TYPE;
         }
+
     }
 
     record AccountUsernameCorrected(UUID personId, UUID accountId) implements RosterEvent {
 
-        @Override
-        public String eventType() {
-            return "roster.account.usernameCorrected";
-        }
+        static final String TYPE = "roster.account.usernameCorrected";
 
         @Override
-        public UUID subjectId() {
-            return personId;
+        public String eventType() {
+            return TYPE;
         }
+
     }
 
     record AccountPasswordReset(UUID personId, UUID accountId) implements RosterEvent {
 
-        @Override
-        public String eventType() {
-            return "roster.account.passwordReset";
-        }
+        static final String TYPE = "roster.account.passwordReset";
 
         @Override
-        public UUID subjectId() {
-            return personId;
+        public String eventType() {
+            return TYPE;
         }
+
     }
 
     record AccountAvailabilityChanged(UUID personId, UUID accountId, boolean enabled) implements RosterEvent {
 
-        @Override
-        public String eventType() {
-            return "roster.account.availabilityChanged";
-        }
+        static final String TYPE = "roster.account.availabilityChanged";
 
         @Override
-        public UUID subjectId() {
-            return personId;
+        public String eventType() {
+            return TYPE;
         }
+
     }
 
     record MembershipWritten(UUID personId, UUID membershipTypeId, LocalDate startedOn,
                              LocalDate endedOn) implements RosterEvent {
 
-        @Override
-        public String eventType() {
-            return "roster.membership.written";
-        }
+        static final String TYPE = "roster.membership.written";
 
         @Override
-        public UUID subjectId() {
-            return personId;
+        public String eventType() {
+            return TYPE;
         }
+
     }
 
     record MembershipEnded(UUID personId) implements RosterEvent {
 
-        @Override
-        public String eventType() {
-            return "roster.membership.ended";
-        }
+        static final String TYPE = "roster.membership.ended";
 
         @Override
-        public UUID subjectId() {
-            return personId;
+        public String eventType() {
+            return TYPE;
         }
+
     }
 }

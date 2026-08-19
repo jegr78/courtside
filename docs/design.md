@@ -1166,7 +1166,9 @@ deliver the implementation.
   append-only and is never rewritten to erase somebody: it holds ids and values that are not
   personal, so removing the person the id names is what makes the entry anonymous. What the log
   keeps is that a change happened, when, and which account made it — never a name, an address or a
-  credential.
+  credential. The event publication registry beside it holds an event only until its
+  consumers finish: a completed publication is deleted rather than retained, so nothing accumulates
+  there for a job to clean up later.
 - **A sign-in session's row goes when the session does.** A session stops working the moment it
   expires, but its row — and the attributes cascading from it, which carry the username, the account
   id, the roles and the security epoch it was signed in with — is deleted on the cadence of

@@ -8,12 +8,10 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.RecordComponent;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -58,29 +56,16 @@ class DomainEventPayloadTest {
                 .collect(Collectors.joining(","));
     }
 
+    // Read, never instantiated: a record of this project validates in its compact constructor.
     private static String eventTypeOf(Class<?> type) {
         try {
-            Constructor<?> constructor = type.getDeclaredConstructors()[0];
-            constructor.setAccessible(true);
-            return ((DomainEventRecord) constructor.newInstance(blankArguments(constructor))).eventType();
+            Field declared = type.getDeclaredField("TYPE");
+            declared.setAccessible(true);
+            return (String) declared.get(null);
         } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Cannot read the event type of " + type.getName(), e);
+            throw new IllegalStateException(
+                    type.getName() + " must declare its event type as a TYPE constant", e);
         }
-    }
-
-    private static Object[] blankArguments(Constructor<?> constructor) {
-        List<Object> arguments = new ArrayList<>();
-        for (Class<?> parameter : constructor.getParameterTypes()) {
-            arguments.add(parameter.isPrimitive() ? blankPrimitive(parameter) : null);
-        }
-        return arguments.toArray();
-    }
-
-    private static Object blankPrimitive(Class<?> parameter) {
-        if (parameter == boolean.class) return false;
-        if (parameter == long.class) return 0L;
-        if (parameter == double.class) return 0d;
-        return 0;
     }
 
     private static Class<?> loadClass(String name) {

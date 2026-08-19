@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.events.IncompleteEventPublications;
-import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
@@ -58,7 +57,6 @@ class DomainEventDeliveryTest extends AbstractIntegrationTest {
                 .query(Long.class).single();
     }
 
-    @Component
     static class RefusingConsumer {
 
         private final CountDownLatch refused = new CountDownLatch(1);

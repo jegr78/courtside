@@ -1,6 +1,12 @@
 spring:
   application:
     name: courtside
+  modulith:
+    events:
+      completion-mode: delete
+      jdbc:
+        schema-initialization:
+          enabled: false
   jpa:
     open-in-view: false
     hibernate:
