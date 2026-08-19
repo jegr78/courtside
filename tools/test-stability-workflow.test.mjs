@@ -17,7 +17,7 @@ test("given periodic stability evidence, when reading its workflow, then order a
 });
 
 test("given a required build failure, when collecting evidence, then backend and browser diagnostics survive", () => {
-  assert.match(build, /timeout-minutes: 25/);
+  assert.match(build, /timeout-minutes: 30/);
   assert.match(build, /target\/surefire-reports\/\*\.xml/);
   assert.match(build, /frontend\/test-results\/visual-journeys/);
   assert.match(build, /frontend\/test-results\/\*\*\/trace\.zip/);

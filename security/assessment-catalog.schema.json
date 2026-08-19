@@ -1,0 +1,794 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:assessment-catalog:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "catalogVersion",
+    "standards",
+    "threatModel",
+    "profiles",
+    "outcomes",
+    "severity",
+    "governance",
+    "controlCoverage",
+    "tests"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "catalogVersion": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$"
+    },
+    "standards": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wstg",
+        "asvs",
+        "apiSecurityTop10",
+        "owaspTop10",
+        "cvss"
+      ],
+      "properties": {
+        "wstg": {
+          "const": "4.2"
+        },
+        "asvs": {
+          "const": "5.0.0-level-2"
+        },
+        "apiSecurityTop10": {
+          "const": "2023"
+        },
+        "owaspTop10": {
+          "const": "2025"
+        },
+        "cvss": {
+          "const": "4.0"
+        }
+      }
+    },
+    "threatModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deployment",
+        "roles",
+        "roleCombinations",
+        "surfaces",
+        "trustBoundaries"
+      ],
+      "properties": {
+        "deployment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roles": {
+          "type": "array",
+          "minItems": 9,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/actor"
+          }
+        },
+        "roleCombinations": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/productRole"
+            }
+          }
+        },
+        "surfaces": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/namedItem"
+          }
+        },
+        "trustBoundaries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/namedItem"
+          }
+        }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "safe",
+        "active",
+        "destructive"
+      ],
+      "properties": {
+        "safe": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/profile"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "allowedEnvironments": {
+                  "const": [
+                    "SECURITY",
+                    "UAT",
+                    "EXPLICIT_PRODUCTION"
+                  ]
+                },
+                "productionAllowed": {
+                  "const": true
+                },
+                "productionRequiresExplicitAuthorization": {
+                  "const": true
+                },
+                "requiresExplicitAuthorization": {
+                  "const": false
+                }
+              }
+            }
+          ]
+        },
+        "active": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/profile"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "allowedEnvironments": {
+                  "const": [
+                    "SECURITY"
+                  ]
+                },
+                "productionAllowed": {
+                  "const": false
+                },
+                "productionRequiresExplicitAuthorization": {
+                  "const": true
+                },
+                "requiresExplicitAuthorization": {
+                  "const": true
+                }
+              }
+            }
+          ]
+        },
+        "destructive": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/profile"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "allowedEnvironments": {
+                  "const": [
+                    "SECURITY"
+                  ]
+                },
+                "productionAllowed": {
+                  "const": false
+                },
+                "productionRequiresExplicitAuthorization": {
+                  "const": true
+                },
+                "requiresExplicitAuthorization": {
+                  "const": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "passed",
+        "incomplete",
+        "failed"
+      ],
+      "properties": {
+        "passed": {
+          "$ref": "#/$defs/outcome"
+        },
+        "incomplete": {
+          "$ref": "#/$defs/outcome"
+        },
+        "failed": {
+          "$ref": "#/$defs/outcome"
+        }
+      }
+    },
+    "severity": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "level",
+          "cvssMinimum",
+          "triageWithinHours",
+          "releasePolicy"
+        ],
+        "properties": {
+          "level": {
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          },
+          "cvssMinimum": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "triageWithinHours": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "releasePolicy": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "singleMaintainerMayApprove",
+        "independentReviewRecorded",
+        "missingIndependentReviewBlocks",
+        "privateFindingChannel"
+      ],
+      "properties": {
+        "singleMaintainerMayApprove": {
+          "type": "boolean"
+        },
+        "independentReviewRecorded": {
+          "type": "boolean"
+        },
+        "missingIndependentReviewBlocks": {
+          "type": "boolean"
+        },
+        "privateFindingChannel": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "controlCoverage": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/controlSet"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "standard": {
+                  "const": "asvs"
+                },
+                "version": {
+                  "const": "5.0.0-level-2"
+                },
+                "controls": {
+                  "type": "array",
+                  "items": {
+                    "allOf": [
+                      {
+                        "$ref": "#/$defs/control"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^v5\\.0\\.0-[0-9]+\\.[0-9]+\\.[0-9]+$"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/controlSet"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "standard": {
+                  "const": "wstg"
+                },
+                "version": {
+                  "const": "4.2"
+                },
+                "controls": {
+                  "type": "array",
+                  "items": {
+                    "allOf": [
+                      {
+                        "$ref": "#/$defs/control"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^WSTG-v4\\.2-[A-Z]+-[0-9]{2}$"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "items": false
+    },
+    "tests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/test"
+      }
+    }
+  },
+  "$defs": {
+    "productRole": {
+      "enum": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ]
+    },
+    "actor": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/productRole"
+        },
+        {
+          "enum": [
+            "ANONYMOUS",
+            "COMPROMISED_ACCOUNT"
+          ]
+        }
+      ]
+    },
+    "namedItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "description"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]+$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "allowedEnvironments",
+        "productionAllowed",
+        "productionRequiresExplicitAuthorization",
+        "requiresExplicitAuthorization",
+        "prohibitedActions"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowedEnvironments": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "SECURITY",
+              "UAT",
+              "EXPLICIT_PRODUCTION"
+            ]
+          }
+        },
+        "productionAllowed": {
+          "type": "boolean"
+        },
+        "productionRequiresExplicitAuthorization": {
+          "type": "boolean"
+        },
+        "requiresExplicitAuthorization": {
+          "type": "boolean"
+        },
+        "prohibitedActions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "releaseEligible"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "releaseEligible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "controlSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "standard",
+        "version",
+        "source",
+        "sourceCommit",
+        "controls"
+      ],
+      "properties": {
+        "standard": {
+          "enum": [
+            "asvs",
+            "wstg"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "pattern": "^https://github\\.com/OWASP/"
+        },
+        "sourceCommit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "controls": {
+          "type": "array",
+          "minItems": 1
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "implemented",
+            "not-applicable",
+            "blocked"
+          ]
+        },
+        "assessmentTestIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^CSA-[A-Z]+-[0-9]{3}$"
+          }
+        },
+        "trackingIssue": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "planned",
+                  "blocked"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "trackingIssue"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "blocked",
+                  "not-applicable"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "rationale"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "implemented"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "assessmentTestIds"
+            ]
+          }
+        }
+      ]
+    },
+    "references": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wstg",
+        "asvs",
+        "apiSecurityTop10",
+        "owaspTop10"
+      ],
+      "properties": {
+        "wstg": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^WSTG-v4\\.2-[A-Z]+-[0-9]{2}$"
+          }
+        },
+        "asvs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^v5\\.0\\.0-[0-9]+\\.[0-9]+\\.[0-9]+$"
+          }
+        },
+        "apiSecurityTop10": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^API[1-9][0-9]?:2023$"
+          }
+        },
+        "owaspTop10": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^A(0[1-9]|10):2025$"
+          }
+        }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "status",
+        "standardReferences",
+        "roles",
+        "surface",
+        "profile",
+        "prerequisites",
+        "expectedSecureOutcome",
+        "executionMode",
+        "evidenceRequirements",
+        "qualityRiskIds"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^CSA-[A-Z]+-[0-9]{3}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "implemented",
+            "not-applicable",
+            "blocked"
+          ]
+        },
+        "standardReferences": {
+          "$ref": "#/$defs/references"
+        },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/actor"
+          }
+        },
+        "surface": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]+$"
+        },
+        "profile": {
+          "enum": [
+            "safe",
+            "active",
+            "destructive"
+          ]
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "expectedSecureOutcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executionMode": {
+          "enum": [
+            "automated",
+            "manual",
+            "hybrid"
+          ]
+        },
+        "evidenceRequirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "qualityRiskIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z]+-[0-9]+$"
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trackingIssue": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "blocked",
+                  "not-applicable"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "rationale"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "planned",
+                  "blocked"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "trackingIssue"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
