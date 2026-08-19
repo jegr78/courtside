@@ -10,6 +10,7 @@ const playwright = readFileSync(join(repository, "frontend/playwright.config.ts"
 const pom = readFileSync(join(repository, "pom.xml"), "utf8");
 const stability = readFileSync(join(repository, ".github/workflows/test-stability.yml"), "utf8");
 const pwa = readFileSync(join(repository, "frontend/e2e/pwa-lifecycle.spec.ts"), "utf8");
+const supported = readFileSync(join(repository, "frontend/e2e/supported-browser.spec.ts"), "utf8");
 const documentation = readFileSync(join(repository, "docs/browser-pwa-testing.md"), "utf8");
 
 test("given supported desktop browsers, when qualifying a pull request, then Chromium and WebKit run core smoke journeys", () => {
@@ -19,6 +20,8 @@ test("given supported desktop browsers, when qualifying a pull request, then Chr
   // One project stays on the plain origin, so the club that serves Courtside without TLS is covered.
   assert.match(playwright, /name: "webkit-core".*metadata: \{ plainOrigin: true \}/);
   assert.match(fixtures, /project\.metadata\.plainOrigin === true/);
+  assert.match(supported, /isSecureContext\)\)\.toBe\(overTls\)/);
+  assert.match(supported, /typeof crypto\.randomUUID === "function"\)\)\.toBe\(overTls\)/);
 });
 
 test("given periodic browser qualification, when the stability workflow runs, then Firefox and mobile devices produce evidence", () => {

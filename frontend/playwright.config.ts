@@ -4,6 +4,8 @@ delete process.env.NO_COLOR;
 process.env.FORCE_COLOR = "0";
 
 const periodicProjects = process.env.COURTSIDE_PERIODIC_BROWSERS === "true" ? [
+  // Firefox keeps its own certificate store, which neither the system store nor a Chromium
+  // argument reaches, so it stays on the origin that needs no certificate at all.
   { name: "firefox-periodic", testMatch: /supported-browser\.spec\.ts/, metadata: { plainOrigin: true }, use: { ...devices["Desktop Firefox"] } },
   { name: "iphone-periodic", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["iPhone 15"] } },
   { name: "android-periodic", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["Pixel 7"] } }
@@ -16,7 +18,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   // A project's first test also pays for starting its database, application, proxy and browser,
-  // measured at around 25 seconds before any assertion runs.
+  // measured at around 25 seconds before any assertion runs. Issue #333 wants that cost paid once.
   timeout: 120_000,
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.005 } },
   // Pinned so nobody reaches "changed" or "all", under which a missing baseline passes silently.

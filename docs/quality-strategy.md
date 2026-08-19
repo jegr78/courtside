@@ -139,12 +139,19 @@ A secure origin is what the PWA journeys need: `navigator.serviceWorker`, `crypt
 it, so the club that serves Courtside without TLS keeps its cover, down to a booking whose
 idempotency key comes from the fallback generator.
 
-Trust is distributed rather than switched off. The local authority goes into each browser
-container's system store, which WebKit and Firefox read. Chromium reads NSS instead and the image
-carries no `certutil`, so it receives the public keys this proxy actually serves and no others;
-certificate validation stays on. Launch arguments are baked into the browser server, which therefore
-never runs in the mode that lets a connecting client choose its own launch options. The server has
-no authentication of its own, so its endpoint path is an unguessable per-run value.
+Trust is distributed where a browser will take it. The local authority goes into each browser
+container's system store, which WebKit reads; Firefox keeps its own store and therefore runs on the
+origin that needs no certificate. Chromium reads NSS and the image carries no `certutil`, so it is
+started with the public keys this proxy serves on its exemption list. That list is a narrower test
+bypass than disabling certificate validation, not a pinning primitive: Chromium matches it against
+the chain a server presents, before verifying it. The distinction matters only inside this network,
+where the sole reachable server is the proxy the test started.
+
+Launch arguments are baked into the browser server, which therefore never runs in the mode that
+lets a connecting client choose its own launch options, an executable path among them. That mode is
+what the alternative server command would have required. Its client limit is the price: the launch
+server accepts any number of connections and offers no way to cap them, so the endpoint path, an
+unguessable per-run value, is the only thing standing in front of it.
 
 A deliberate UI change updates the baselines the same way anywhere:
 `npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots`, then

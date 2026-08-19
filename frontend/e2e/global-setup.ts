@@ -280,12 +280,11 @@ export async function startJourneyService(): Promise<JourneyService> {
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
   let staticDirectory: string | undefined;
-  const browserServers = new Map<string, StartedTestContainer>();
-  const browserPaths = new Map<string, string>();
+  const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string }>();
   let clubNetwork: StartedNetwork | undefined;
   let clubProxy: StartedTestContainer | undefined;
   const stopContainers = async () => {
-    await Promise.all([...browserServers.values()].map((server) => server.stop()));
+    await Promise.all([...browserServers.values()].map((server) => server.container.stop()));
     browserServers.clear();
     await clubProxy?.stop();
     await postgres?.stop();
@@ -411,33 +410,34 @@ export async function startJourneyService(): Promise<JourneyService> {
     const servedKeys = publicKeyFingerprints(
       rootCertificate + await readProxyCertificates(clubProxy, CADDY_ISSUED_CERTIFICATES));
     const startPinnedBrowser = async (browserName: string): Promise<string> => {
-      let browserServer = browserServers.get(browserName);
-      if (!browserServer) {
-        // Docker publishes the mapped port on every interface and the server has no authentication,
-        // so the unguessable endpoint path is what keeps a reachable port from being a browser.
-        const wsPath = `/${randomUUID()}`;
-        const options = {
-          port: 3000, host: "0.0.0.0", wsPath,
-          args: browserName === "chromium"
-            ? [`--ignore-certificate-errors-spki-list=${servedKeys.join(",")}`] : []
-        };
-        browserServer = await new GenericContainer(PINNED_BROWSER_IMAGE)
-          .withNetwork(clubNetwork!)
-          .withCopyContentToContainer([
-            { content: rootCertificate, target: "/usr/local/share/ca-certificates/courtside-club.crt" },
-            { content: JSON.stringify(options), target: "/tmp/launch-options.json" }
-          ])
-          // Baking the arguments into the server keeps the mode out of the picture under which a
-          // connecting client may set launch options, an executable path among them.
-          .withCommand(["bash", "-c", "update-ca-certificates >/dev/null"
-            + ` && npx playwright launch-server --browser ${browserName} --config /tmp/launch-options.json`])
-          .withExposedPorts(3000)
-          .withWaitStrategy(Wait.forLogMessage(/ws:\/\//))
-          .start();
-        browserServers.set(browserName, browserServer);
-        browserPaths.set(browserName, wsPath);
+      const running = browserServers.get(browserName);
+      if (running) {
+        return running.endpoint;
       }
-      return `ws://${browserServer.getHost()}:${browserServer.getMappedPort(3000)}${browserPaths.get(browserName)}`;
+      // Docker publishes the mapped port on every interface and the server has no authentication,
+      // so the unguessable endpoint path is what keeps a reachable port from being a browser.
+      const wsPath = `/${randomUUID()}`;
+      const options = {
+        port: 3000, host: "0.0.0.0", wsPath,
+        args: browserName === "chromium"
+          ? [`--ignore-certificate-errors-spki-list=${servedKeys.join(",")}`] : []
+      };
+      const container = await new GenericContainer(PINNED_BROWSER_IMAGE)
+        .withNetwork(clubNetwork!)
+        .withCopyContentToContainer([
+          { content: rootCertificate, target: "/usr/local/share/ca-certificates/courtside-club.crt" },
+          { content: JSON.stringify(options), target: "/tmp/launch-options.json" }
+        ])
+        // Baking the arguments into the server keeps the mode out of the picture under which a
+        // connecting client may set launch options, an executable path among them.
+        .withCommand(["bash", "-c", "update-ca-certificates >/dev/null"
+          + ` && npx playwright launch-server --browser ${browserName} --config /tmp/launch-options.json`])
+        .withExposedPorts(3000)
+        .withWaitStrategy(Wait.forLogMessage(/ws:\/\//))
+        .start();
+      const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
+      browserServers.set(browserName, { container, endpoint });
+      return endpoint;
     };
     return {
       baseURL: `https://${CLUB_HOST}`,
