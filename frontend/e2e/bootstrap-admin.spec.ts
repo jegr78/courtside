@@ -26,16 +26,17 @@ test("language and theme preferences persist across reloads", async ({ page }) =
   await expect(page.locator("#theme-preference")).toHaveValue("light");
 });
 
-test("the application shell identifies the exact running build", async ({ page, request }) => {
+test("the application shell identifies the exact running build", async ({ page }) => {
   // given
-  const source = await (await request.get("/api/source")).json() as {
+  await page.goto("/");
+  // Asking from the page keeps the request on the origin the member uses, proxy and all.
+  const source = await page.evaluate(() => fetch("/api/source").then((response) => response.json())) as {
     version: string;
     commit?: string;
     environment: string;
   };
 
   // when
-  await page.goto("/");
   await page.getByTestId("build-identity").click();
 
   // then
