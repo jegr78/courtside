@@ -4,13 +4,18 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import {
   assertSecurityIdentity, availableLoopbackPort, recoveryEnvironment, securityComposeArgs, securityDownPlan,
-  securityEnvironment, securityProject
+  securityEnvironment, securityProject, securityStateFile
 } from "./security-environment.mjs";
 
 test("given parallel assessment runs, when naming projects, then their resources cannot collide", () => {
   // when / then
   assert.equal(securityProject("run-0001"), "courtside-security-run-0001");
   assert.notDeepEqual(securityComposeArgs("run-0001"), securityComposeArgs("run-0002"));
+});
+
+test("given a path-like run identity, when resolving private state, then it cannot leave the security root", () => {
+  // when / then
+  assert.throws(() => securityStateFile("../../outside"), /security run ID/);
 });
 
 test("given a security run, when deriving its identity, then secrets and seed identity are generated", () => {
@@ -60,6 +65,10 @@ test("given a different running image, when verifying identity, then active use 
 test("given a mutable image tag, when preparing a security run, then startup is rejected", () => {
   // when / then
   assert.throws(() => securityEnvironment("run-0001", "courtside:latest"), /immutable image digest/);
+  assert.throws(
+    () => securityEnvironment("run-0001", `invalid @sha256:${"b".repeat(64)}`),
+    /immutable image digest/,
+  );
 });
 
 test("given parallel workspaces, when reserving loopback ports, then the operating system chooses usable ports", async () => {

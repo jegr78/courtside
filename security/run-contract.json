@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "profiles": {
+    "safe": {
+      "durationSeconds": 600,
+      "requests": 1000,
+      "concurrency": 4,
+      "generatedDataMegabytes": 0,
+      "cpu": 2,
+      "memoryMegabytes": 1024,
+      "evidenceMegabytes": 25,
+      "expectedDuration": "up to 10 minutes"
+    },
+    "active": {
+      "durationSeconds": 1800,
+      "requests": 10000,
+      "concurrency": 10,
+      "generatedDataMegabytes": 100,
+      "cpu": 4,
+      "memoryMegabytes": 4096,
+      "evidenceMegabytes": 100,
+      "expectedDuration": "up to 30 minutes"
+    },
+    "destructive": {
+      "durationSeconds": 900,
+      "requests": 50000,
+      "concurrency": 50,
+      "generatedDataMegabytes": 500,
+      "cpu": 6,
+      "memoryMegabytes": 6144,
+      "evidenceMegabytes": 200,
+      "expectedDuration": "up to 15 minutes"
+    }
+  },
+  "tools": [
+    {
+      "id": "target-identity",
+      "version": "1.0.0",
+      "testIds": []
+    }
+  ],
+  "selectedTests": []
+}

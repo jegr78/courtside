@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
 const stateRoot = join(root, "build", "security");
+export const securityStateRoot = stateRoot;
 
 export function securityProject(runId) {
   if (!/^[a-z0-9][a-z0-9-]{5,47}$/.test(runId)) {
@@ -21,7 +22,7 @@ export function securityComposeArgs(runId) {
 }
 
 export function securityEnvironment(runId, image, password = randomBytes(24).toString("base64url"), httpsPort = 0) {
-  if (!/^sha256:[a-f0-9]{64}$/.test(image) && !/@sha256:[a-f0-9]{64}$/.test(image)) {
+  if (!/^(?:sha256:[a-f0-9]{64}|[^\s@]+@sha256:[a-f0-9]{64})$/.test(image)) {
     throw new Error("The security candidate must be selected by immutable image digest");
   }
   const seed = readFileSync(join(root, "src/main/resources/security-assessment-dataset.properties"));
@@ -68,22 +69,39 @@ function execute(command, args, environment = process.env) {
   return execFileSync(command, args, { cwd: root, env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
-function stateFile(runId) {
+export function securityStateFile(runId) {
+  securityProject(runId);
   return join(stateRoot, runId, "environment.json");
 }
 
+export function securityIdentityFile(runId) {
+  securityProject(runId);
+  return join(stateRoot, runId, "identity.json");
+}
+
 function writeState(runId, environment) {
-  const file = stateFile(runId);
+  const file = securityStateFile(runId);
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   writeFileSync(file, `${JSON.stringify(environment, null, 2)}\n`, { mode: 0o600 });
   chmodSync(file, 0o600);
 }
 
-function readState(runId) {
-  return JSON.parse(readFileSync(stateFile(runId), "utf8"));
+export function readSecurityEnvironment(runId) {
+  return JSON.parse(readFileSync(securityStateFile(runId), "utf8"));
 }
 
-async function start(runId, image) {
+export function readSecurityIdentity(runId) {
+  return JSON.parse(readFileSync(securityIdentityFile(runId), "utf8"));
+}
+
+function writeIdentity(runId, identity) {
+  const file = securityIdentityFile(runId);
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  writeFileSync(file, `${JSON.stringify(identity, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(file, 0o600);
+}
+
+export async function startSecurityEnvironment(runId, image) {
   let environment = securityEnvironment(runId, image, randomBytes(24).toString("base64url"),
     await availableLoopbackPort());
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -98,13 +116,14 @@ async function start(runId, image) {
       environment = { ...environment, COURTSIDE_SECURITY_HTTPS_PORT: String(await availableLoopbackPort()) };
     }
   }
-  verify(runId);
+  const identity = verifySecurityEnvironment(runId);
+  writeIdentity(runId, identity);
   process.stdout.write(`Security environment ${runId} is ready\n`);
   process.stdout.write(`Shared synthetic credential: ${environment.COURTSIDE_SECURITY_SHARED_PASSWORD}\n`);
 }
 
-function verify(runId) {
-  const environment = readState(runId);
+export function verifySecurityEnvironment(runId) {
+  const environment = readSecurityEnvironment(runId);
   const port = environment.COURTSIDE_SECURITY_HTTPS_PORT;
   const source = JSON.parse(execute("curl", ["--fail", "--silent", "--insecure",
     "--resolve", `localhost:${port}:127.0.0.1`, `https://localhost:${port}/api/source`]));
@@ -112,25 +131,41 @@ function verify(runId) {
   const expectedImage = execute("docker", ["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
     "--format", "{{.Id}}"]).trim();
   assertSecurityIdentity({ source, labels: container.Config.Labels, image: container.Image }, environment, expectedImage);
+  if (typeof source.commit !== "string" || !/^[a-f0-9]{7,64}$/.test(source.commit)) {
+    throw new Error("The security candidate does not report a traceable source commit");
+  }
+  return {
+    target: `https://localhost:${port}`,
+    environment: source.environment,
+    imageDigest: environment.COURTSIDE_SECURITY_IMAGE,
+    applicationCommit: source.commit,
+    applicationVersion: source.version,
+    sourceUrl: source.sourceUrl,
+    seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    containerImage: container.Image,
+    runId
+  };
 }
 
-function stop(runId) {
-  const environment = readState(runId);
+export function stopSecurityEnvironment(runId) {
+  const environment = readSecurityEnvironment(runId);
   execute("docker", securityDownPlan(runId).args, { ...process.env, ...environment });
-  rmSync(join(stateRoot, runId), { recursive: true, force: true });
+  rmSync(securityStateFile(runId), { force: true });
+  rmSync(securityIdentityFile(runId), { force: true });
 }
 
-function recover(runId) {
+export function recoverSecurityEnvironment(runId) {
   execute("docker", securityDownPlan(runId).args, { ...process.env, ...recoveryEnvironment(runId) });
-  rmSync(join(stateRoot, runId), { recursive: true, force: true });
+  rmSync(securityStateFile(runId), { force: true });
+  rmSync(securityIdentityFile(runId), { force: true });
 }
 
 async function main(argv) {
   const [command, runId, image] = argv;
-  if (command === "start" && runId && image) return await start(runId, image);
-  if (command === "verify" && runId) return verify(runId);
-  if ((command === "stop" || command === "reset") && runId) return stop(runId);
-  if (command === "recover" && runId) return recover(runId);
+  if (command === "start" && runId && image) return await startSecurityEnvironment(runId, image);
+  if (command === "verify" && runId) return verifySecurityEnvironment(runId);
+  if ((command === "stop" || command === "reset") && runId) return stopSecurityEnvironment(runId);
+  if (command === "recover" && runId) return recoverSecurityEnvironment(runId);
   throw new Error(
     "Usage: security-environment.mjs <start RUN_ID IMAGE|verify RUN_ID|stop RUN_ID|reset RUN_ID|recover RUN_ID>");
 }
