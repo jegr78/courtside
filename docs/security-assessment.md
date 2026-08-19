@@ -78,3 +78,5 @@ Automated scanner output begins as a candidate. It affects a release only after 
 ## Scope boundary
 
 This contract introduces no scanner and sends no assessment traffic. The following issues provide the environment, orchestration, finding lifecycle and executable suites. Product vulnerabilities discovered by those suites are remediated separately so the framework cannot hide product changes inside its own implementation.
+
+The disposable target is described in [`security-environment.md`](security-environment.md). Its run-specific marker, synthetic role matrix, network isolation and cleanup are prerequisites for every `active` or `destructive` assessment.

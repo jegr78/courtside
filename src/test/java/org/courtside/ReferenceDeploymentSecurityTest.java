@@ -34,9 +34,12 @@ class ReferenceDeploymentSecurityTest {
             "image: ${COURTSIDE_UPGRADE_IMAGE}";
     private static final String RESTORE_CANDIDATE_IMAGE_ALIAS =
             "image: ${COURTSIDE_RESTORE_IMAGE}";
+    private static final String SECURITY_CANDIDATE_IMAGE_ALIAS =
+            "image: ${COURTSIDE_SECURITY_IMAGE:?required}";
     private static final Set<String> OWN_IMAGE_REFERENCES =
             Set.of(GHCR_RELEASE_IMAGE, UAT_LOCAL_IMAGE_ALIAS, PERF_LOCAL_IMAGE_ALIAS,
-                    UPGRADE_CANDIDATE_IMAGE_ALIAS, RESTORE_CANDIDATE_IMAGE_ALIAS);
+                    UPGRADE_CANDIDATE_IMAGE_ALIAS, RESTORE_CANDIDATE_IMAGE_ALIAS,
+                    SECURITY_CANDIDATE_IMAGE_ALIAS);
 
     @Test
     void whenReadingImageSources_thenEveryThirdPartyImageIsPinnedByDigest() throws IOException {
@@ -112,6 +115,26 @@ class ReferenceDeploymentSecurityTest {
                 "header_up X-Forwarded-For {remote_host}",
                 "header_up X-Forwarded-Host {host}",
                 "header_up X-Forwarded-Proto {scheme}");
+    }
+
+    @Test
+    void whenReadingSecurityCaddyfile_thenProductionProxyTrustBoundaryIsPreserved() throws IOException {
+        // given
+        String production = Files.readString(Path.of("deploy/Caddyfile"));
+        String security = Files.readString(Path.of("deploy/Caddyfile.security"));
+        Matcher productionProxy = REVERSE_PROXY_BLOCK.matcher(production);
+        Matcher securityProxy = REVERSE_PROXY_BLOCK.matcher(security);
+
+        // when / then
+        assertThat(productionProxy.find()).isTrue();
+        assertThat(securityProxy.find()).isTrue();
+        assertThat(securityProxy.group("directives").lines().map(String::strip).toList())
+                .containsExactlyElementsOf(productionProxy.group("directives").lines().map(String::strip).toList());
+        assertThat(security)
+                .contains("X-Content-Type-Options nosniff", "X-Frame-Options DENY",
+                        "Referrer-Policy strict-origin-when-cross-origin",
+                        "Permissions-Policy \"geolocation=(), camera=(), microphone=()\"")
+                .doesNotContain("Strict-Transport-Security");
     }
 
     @Test

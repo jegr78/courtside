@@ -1,0 +1,123 @@
+services:
+  db:
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    pull_policy: never
+    environment:
+      POSTGRES_DB: courtside_security
+      POSTGRES_USER: courtside
+      POSTGRES_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
+    cpus: 1.0
+    mem_limit: 1g
+    tmpfs:
+      - /var/lib/postgresql/data:size=512m,mode=0700
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courtside -d courtside_security"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+
+  app:
+    image: ${COURTSIDE_SECURITY_IMAGE:?required}
+    pull_policy: never
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 1.0
+    mem_limit: 768m
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: security
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_security
+      SPRING_DATASOURCE_USERNAME: courtside
+      SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
+      COURTSIDE_COOKIE_SECURE: "true"
+      COURTSIDE_ENVIRONMENT: SECURITY
+      COURTSIDE_SECURITY_CONFIRM_DISPOSABLE: "true"
+      COURTSIDE_SECURITY_RUN_ID: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      COURTSIDE_SECURITY_SEED_FINGERPRINT: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      COURTSIDE_SECURITY_SHARED_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
+      COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: security.bootstrap
+      COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
+      COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
+    networks:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+
+  callback:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    pull_policy: never
+    command: ["caddy", "respond", "--listen", ":8080", "--body", "callback-ok"]
+    read_only: true
+    tmpfs:
+      - /config:size=1m
+      - /data:size=1m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    cpus: 0.25
+    mem_limit: 64m
+    networks:
+      - backend
+
+  proxy:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    pull_policy: never
+    read_only: true
+    tmpfs:
+      - /config:size=8m
+      - /data:size=32m
+      - /tmp:size=8m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    cpus: 0.25
+    mem_limit: 128m
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${COURTSIDE_SECURITY_HTTPS_PORT:?required}:443"
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "--quiet", "--output-document=-", "https://localhost/api/source"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./Caddyfile.security:/etc/caddy/Caddyfile:ro
+    networks:
+      - frontend
+      - exposure
+
+networks:
+  backend:
+    internal: true
+  frontend:
+    internal: true
+  exposure:
