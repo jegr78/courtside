@@ -44,9 +44,13 @@ test("an administrator can open both core administration views", async ({ page }
   await expect(page.getByTestId("admin-facility-view")).toBeVisible();
 });
 
-test("a member books a court with an idempotency key the browser could generate", async ({ page, journeyService }) => {
+test("a member books a court with an idempotency key the browser could generate", async ({ page, journeyService }, testInfo) => {
   // given
+  const overTls = testInfo.project.metadata.plainOrigin !== true;
   await signIn(page, "doe.jane");
+  // The two projects cover the two generators: a club with TLS and one without.
+  expect(await page.evaluate(() => window.isSecureContext)).toBe(overTls);
+  expect(await page.evaluate(() => typeof crypto.randomUUID === "function")).toBe(overTls);
   await selectJourneyDate(page, journeyService.visualDate);
 
   // when

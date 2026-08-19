@@ -2,15 +2,58 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
 import { appendFileSync, cpSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, X509Certificate } from "node:crypto";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { GenericContainer, TestContainers, type StartedTestContainer } from "testcontainers";
+import { GenericContainer, Network, Wait,
+  type StartedNetwork, type StartedTestContainer } from "testcontainers";
 import { requireBuiltAfterItsSources } from "./build-freshness";
 
 const PINNED_BROWSER_IMAGE =
   "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e";
+const PINNED_PROXY_IMAGE =
+  "caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648";
+// The name the certificate is issued for, so browsers reach the proxy the way a member reaches a club.
+const CLUB_HOST = "courtside.test";
+const CLUB_PLAIN_PORT = 8081;
+const CADDY_LOCAL_AUTHORITY = "/data/caddy/pki/authorities/local";
+const CADDY_ISSUED_CERTIFICATES = "/data/caddy/certificates";
+
+async function readProxyCertificates(proxy: StartedTestContainer, where: string): Promise<string> {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const result = await proxy.exec(["sh", "-c", `find ${where} -name '*.crt' -exec cat {} +`]);
+    if (result.exitCode === 0 && result.stdout.includes("BEGIN CERTIFICATE")) {
+      return result.stdout;
+    }
+    await new Promise((wait) => setTimeout(wait, 250));
+  }
+  throw new Error(`The club proxy issued no certificate under ${where}`);
+}
+
+function clubProxyConfiguration(applicationPort: number): string {
+  return `{
+	admin off
+	local_certs
+}
+
+https://${CLUB_HOST} {
+	reverse_proxy host.docker.internal:${applicationPort}
+}
+
+http://${CLUB_HOST}:${CLUB_PLAIN_PORT} {
+	reverse_proxy host.docker.internal:${applicationPort}
+}
+`;
+}
+
+// Chromium reads NSS rather than the system store, and the image carries no certutil to write it.
+// Naming the keys this proxy actually serves beats disabling certificate validation for the browser.
+function publicKeyFingerprints(certificates: string): string[] {
+  return [...certificates.matchAll(/-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----/g)]
+    .map((match) => new X509Certificate(match[0]).publicKey.export({ type: "spki", format: "der" }))
+    .map((key) => createHash("sha256").update(key).digest("base64"));
+}
 
 async function waitForApplication(application: ChildProcess, baseURL: string): Promise<void> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -172,9 +215,9 @@ export const journeyDate = dayAfterInBerlin(journeyInstant);
 
 export interface JourneyService {
   baseURL: string;
+  plainBaseURL: string;
   visualDate: string;
-  pinnedBrowser(): Promise<string>;
-  containerBaseURL(): Promise<string>;
+  pinnedBrowser(browserName: string): Promise<string>;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): void;
@@ -237,8 +280,16 @@ export async function startJourneyService(): Promise<JourneyService> {
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
   let staticDirectory: string | undefined;
-  let browserServer: StartedTestContainer | undefined;
-  let browserPath = "/";
+  const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string }>();
+  let clubNetwork: StartedNetwork | undefined;
+  let clubProxy: StartedTestContainer | undefined;
+  const stopContainers = async () => {
+    await Promise.all([...browserServers.values()].map((server) => server.container.stop()));
+    browserServers.clear();
+    await clubProxy?.stop();
+    await postgres?.stop();
+    await clubNetwork?.stop();
+  };
   try {
     const visualDate = journeyDate;
     const port = await availableLoopbackPort();
@@ -343,31 +394,56 @@ export async function startJourneyService(): Promise<JourneyService> {
     await startApplication();
     await seedJourneyData(postgres, visualDate);
     const tables = await snapshotJourneyData(postgres);
-    // The host tunnel must exist before the browser container is created: Testcontainers gives
-    // host.testcontainers.internal only to containers it starts afterwards.
-    const startPinnedBrowser = async (): Promise<string> => {
-      if (!browserServer) {
-        await TestContainers.exposeHostPorts(port);
-        // Docker publishes the mapped port on every interface and run-server has no authentication,
-        // so the unguessable endpoint path is what keeps a reachable port from being a browser.
-        browserPath = `/${randomUUID()}`;
-        browserServer = await new GenericContainer(PINNED_BROWSER_IMAGE)
-          .withCommand(["npx", "playwright", "run-server", "--port", "3000", "--host", "0.0.0.0",
-            "--path", browserPath, "--max-clients", "1"])
-          .withExposedPorts(3000)
-          .start();
+    clubNetwork = await new Network().start();
+    clubProxy = await new GenericContainer(PINNED_PROXY_IMAGE)
+      .withNetwork(clubNetwork)
+      .withNetworkAliases(CLUB_HOST)
+      .withCopyContentToContainer([
+        { content: clubProxyConfiguration(port), target: "/etc/caddy/Caddyfile" }
+      ])
+      // Reaching the host the way deploy/Caddyfile.dev does. The Testcontainers host tunnel runs
+      // inside this process, and its socket errors are uncaught when the application restarts.
+      .withExtraHosts([{ host: "host.docker.internal", ipAddress: "host-gateway" }])
+      .withWaitStrategy(Wait.forLogMessage(/serving initial configuration/))
+      .start();
+    const rootCertificate = await readProxyCertificates(clubProxy, CADDY_LOCAL_AUTHORITY);
+    const servedKeys = publicKeyFingerprints(
+      rootCertificate + await readProxyCertificates(clubProxy, CADDY_ISSUED_CERTIFICATES));
+    const startPinnedBrowser = async (browserName: string): Promise<string> => {
+      const running = browserServers.get(browserName);
+      if (running) {
+        return running.endpoint;
       }
-      return `ws://${browserServer.getHost()}:${browserServer.getMappedPort(3000)}${browserPath}`;
-    };
-    const containerBaseURL = async (): Promise<string> => {
-      await TestContainers.exposeHostPorts(port);
-      return `http://host.testcontainers.internal:${port}`;
+      // Docker publishes the mapped port on every interface and the server has no authentication,
+      // so the unguessable endpoint path is what keeps a reachable port from being a browser.
+      const wsPath = `/${randomUUID()}`;
+      const options = {
+        port: 3000, host: "0.0.0.0", wsPath,
+        args: browserName === "chromium"
+          ? [`--ignore-certificate-errors-spki-list=${servedKeys.join(",")}`] : []
+      };
+      const container = await new GenericContainer(PINNED_BROWSER_IMAGE)
+        .withNetwork(clubNetwork!)
+        .withCopyContentToContainer([
+          { content: rootCertificate, target: "/usr/local/share/ca-certificates/courtside-club.crt" },
+          { content: JSON.stringify(options), target: "/tmp/launch-options.json" }
+        ])
+        // Baking the arguments into the server keeps the mode out of the picture under which a
+        // connecting client may set launch options, an executable path among them.
+        .withCommand(["bash", "-c", "update-ca-certificates >/dev/null"
+          + ` && npx playwright launch-server --browser ${browserName} --config /tmp/launch-options.json`])
+        .withExposedPorts(3000)
+        .withWaitStrategy(Wait.forLogMessage(/ws:\/\//))
+        .start();
+      const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
+      browserServers.set(browserName, { container, endpoint });
+      return endpoint;
     };
     return {
-      baseURL,
+      baseURL: `https://${CLUB_HOST}`,
+      plainBaseURL: `http://${CLUB_HOST}:${CLUB_PLAIN_PORT}`,
       visualDate,
       pinnedBrowser: startPinnedBrowser,
-      containerBaseURL,
       executeSql,
       holdDatabaseLock,
       publishServiceWorkerUpdate: () => {
@@ -384,15 +460,13 @@ export async function startJourneyService(): Promise<JourneyService> {
       stop: async () => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         await stopApplication();
-        await browserServer?.stop();
-        await postgres?.stop();
+        await stopContainers();
         rmSync(staticDirectory!, { recursive: true, force: true });
       }
     };
   } catch (error) {
     application?.kill();
-    await browserServer?.stop();
-    await postgres?.stop();
+    await stopContainers();
     if (staticDirectory) rmSync(staticDirectory, { recursive: true, force: true });
     throw error;
   }
