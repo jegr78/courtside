@@ -53,7 +53,7 @@ An implemented entry can still be incomplete in a particular run. Catalog state 
 
 ## Evidence and outcomes
 
-Evidence must identify the catalog and tool versions, application commit and immutable image digest where applicable, target fingerprint, selected entries, profile, timestamps and first-attempt result. Requests retained for reproduction are minimized and redacted. Passwords, cookies, CSRF tokens, personal fields and sensitive headers do not enter retained or public artifacts.
+Evidence must identify the catalog and tool versions, application commit and immutable image digest where applicable, target fingerprint, selected entries, profile, timestamps and first-attempt result. This foundation retains only its manifest and target-identity result; assessment adapters remain disabled until an isolated runner and closed evidence schemas are available. Passwords, cookies, CSRF tokens, personal fields and sensitive headers do not enter retained or public artifacts.
 
 `passed` means every selected entry executed, all required evidence exists and no validated finding remains outside an unexpired acceptance. An untriaged scanner candidate prevents a final pass until it is validated or rejected reproducibly.
 
@@ -80,3 +80,5 @@ Automated scanner output begins as a candidate. It affects a release only after 
 This contract introduces no scanner and sends no assessment traffic. The following issues provide the environment, orchestration, finding lifecycle and executable suites. Product vulnerabilities discovered by those suites are remediated separately so the framework cannot hide product changes inside its own implementation.
 
 The disposable target is described in [`security-environment.md`](security-environment.md). Its run-specific marker, synthetic role matrix, network isolation and cleanup are prerequisites for every `active` or `destructive` assessment.
+
+The same document describes the bounded CLI workflow. The machine-readable run contract and manifest schema fix its budgets, first-attempt evidence and interruption semantics before assessment tools are added.
