@@ -15,13 +15,14 @@ const documentation = readFileSync(join(repository, "docs/browser-pwa-testing.md
 test("given supported desktop browsers, when qualifying a pull request, then Chromium and WebKit run core smoke journeys", () => {
   assert.match(playwright, /name: "chromium"/);
   assert.match(playwright, /supported-browser\\\.spec\\\.ts/);
-  assert.match(pom, /playwright install chromium/);
-  assert.match(playwright, /name: "webkit-core".*metadata: \{ pinnedBrowser: true \}/);
-  assert.match(fixtures, /project\.metadata\.pinnedBrowser === true/);
+  assert.doesNotMatch(pom, /playwright install/);
+  // One project stays on the plain origin, so the club that serves Courtside without TLS is covered.
+  assert.match(playwright, /name: "webkit-core".*metadata: \{ plainOrigin: true \}/);
+  assert.match(fixtures, /project\.metadata\.plainOrigin === true/);
 });
 
 test("given periodic browser qualification, when the stability workflow runs, then Firefox and mobile devices produce evidence", () => {
-  assert.match(stability, /playwright install --with-deps chromium webkit firefox/);
+  assert.doesNotMatch(stability, /playwright install/);
   assert.match(stability, /--project=firefox-periodic/);
   assert.match(stability, /--project=iphone-periodic/);
   assert.match(stability, /--project=android-periodic/);

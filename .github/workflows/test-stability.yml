@@ -51,12 +51,11 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
-      - name: Package application and install browser
+      - name: Package application
         run: |
           ./mvnw -B package -DskipTests
           cd frontend
           npm ci --ignore-scripts
-          npx playwright install chromium
       - name: Prove browser isolation with two workers
         working-directory: frontend
         run: |
@@ -85,12 +84,11 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
-      - name: Package application and install browsers
+      - name: Package application
         run: |
           ./mvnw -B package -DskipTests
           cd frontend
           npm ci --ignore-scripts
-          npx playwright install --with-deps chromium webkit firefox
       - name: Qualify periodic browser and mobile projects
         working-directory: frontend
         env:

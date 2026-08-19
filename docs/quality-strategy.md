@@ -124,22 +124,27 @@ them. Build identity needs no mask — the footer carrying it sits outside every
 covers the court plan, booking and validation dialogs, personal bookings, series preview, and both
 administration surfaces.
 
-**The renderer is pinned, not the host.** The suite draws in the Playwright image matching the
-installed Playwright version, addressed by digest, started as a browser server by the journey
-service and reached over `chromium.connect`; the application under test stays on the host and the
-container reaches it through the Testcontainers host tunnel. One reviewed baseline per surface
-therefore holds on every machine with Docker, `mvn verify` compares pixels wherever it runs, and a
-red run means a regression rather than a different operating system. There is exactly one PNG per
-surface and no platform suffix.
+**The renderer is pinned, not the host.** Every project draws its browser from the Playwright image
+matching the installed Playwright version, addressed by digest, started as a browser server by the
+journey service and reached over `connect`. Nothing installs a browser on the runner, so no gate
+waits on distribution packages. One reviewed baseline per surface therefore holds on every machine
+with Docker, `mvn verify` compares pixels wherever it runs, and a red run means a regression rather
+than a different operating system. There is exactly one PNG per surface and no platform suffix.
 
-The WebKit projects draw in the same image, so no runner installs WebKit or its system libraries and
-`mvn verify` installs Chromium alone, without distribution packages. A project declares where it
-renders with `metadata.pinnedBrowser`. The container reaches the application under a hostname rather
-than `127.0.0.1`, and that origin is not a secure context: `crypto.subtle`, `navigator.serviceWorker`
-and `crypto.randomUUID` are withheld from it. The PWA and service-worker journeys therefore stay on
-the host browser, while the WebKit gate covers the club that serves Courtside without TLS, down to a
-booking whose idempotency key comes from the fallback generator. The browser server carries no
-authentication, so its endpoint path is an unguessable per-run value and it accepts one client.
+**Browsers reach the application the way a member does.** The journey service puts the same
+digest-pinned Caddy the reference deployment uses in front of the application, issuing a certificate
+from its own local authority, and the browsers reach it by the name that certificate is issued for.
+A secure origin is what the PWA journeys need: `navigator.serviceWorker`, `crypto.subtle` and
+`crypto.randomUUID` exist only there. The proxy also serves a plain-HTTP site, and one project uses
+it, so the club that serves Courtside without TLS keeps its cover, down to a booking whose
+idempotency key comes from the fallback generator.
+
+Trust is distributed rather than switched off. The local authority goes into each browser
+container's system store, which WebKit and Firefox read. Chromium reads NSS instead and the image
+carries no `certutil`, so it receives the public keys this proxy actually serves and no others;
+certificate validation stays on. Launch arguments are baked into the browser server, which therefore
+never runs in the mode that lets a connecting client choose its own launch options. The server has
+no authentication of its own, so its endpoint path is an unguessable per-run value.
 
 A deliberate UI change updates the baselines the same way anywhere:
 `npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots`, then
