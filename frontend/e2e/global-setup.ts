@@ -58,7 +58,8 @@ function publicKeyFingerprints(certificates: string): string[] {
 async function waitForApplication(application: ChildProcess, baseURL: string): Promise<void> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (application.exitCode !== null) {
-      throw new Error(`Courtside stopped with exit code ${application.exitCode}`);
+      throw new Error(`Courtside stopped with exit code ${application.exitCode} while starting`
+        + ` on ${baseURL}. Its own output says why, above this line.`);
     }
     try {
       const response = await fetch(`${baseURL}/actuator/health`);
@@ -292,8 +293,6 @@ export async function startJourneyService(): Promise<JourneyService> {
   };
   try {
     const visualDate = journeyDate;
-    const port = await availableLoopbackPort();
-    const baseURL = `http://127.0.0.1:${port}`;
     postgres = await new GenericContainer(
       "postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
       .withEnvironment({
@@ -308,6 +307,10 @@ export async function startJourneyService(): Promise<JourneyService> {
     requireBuiltAfterItsSources(applicationJar(), resolve("../src/main"), "./mvnw package -DskipTests");
     staticDirectory = mkdtempSync(resolve(tmpdir(), "courtside-pwa-"));
     cpSync(resolve("dist"), staticDirectory, { recursive: true });
+    // Last, because a reserved port is only reserved until it is closed: anything started in
+    // between can be handed the same number before Tomcat ever binds it.
+    const port = await availableLoopbackPort();
+    const baseURL = `http://127.0.0.1:${port}`;
     const applicationEnvironment = {
       ...process.env,
       SERVER_PORT: String(port),
@@ -454,6 +457,7 @@ export async function startJourneyService(): Promise<JourneyService> {
         await resetJourneyData(postgres!, tables);
       },
       restart: async () => {
+        // The same port again, not a new one: the club proxy is already configured against it.
         await stopApplication();
         await startApplication();
       },
