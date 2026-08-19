@@ -15,6 +15,10 @@ export type SetOpeningHoursRequest = components["schemas"]["SetOpeningHoursReque
 export type BookingCard = components["schemas"]["BookingCard"];
 export type BookingCardRequest = components["schemas"]["BookingCardRequest"];
 export type Role = components["schemas"]["Role"];
+export type RosterEntry = components["schemas"]["RosterEntry"];
+export type RosterPage = components["schemas"]["RosterPage"];
+export type PersonRequest = components["schemas"]["PersonRequest"];
+export type AccountRequest = components["schemas"]["AccountRequest"];
 export type SourceOffer = components["schemas"]["SourceOffer"];
 export type Problem = components["schemas"]["Problem"];
 export type PublicCourt = components["schemas"]["PublicCourt"];
@@ -119,6 +123,42 @@ export const api = {
   setAdminBookingCardActive: (id: string, active: boolean) => request<BookingCard>(`/api/admin/booking-cards/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
+  roster: (query?: string, cursor?: string, limit = 50) => request<RosterPage>(
+    `/api/admin/roster?${new URLSearchParams({
+      limit: String(limit), ...(query ? { query } : {}), ...(cursor ? { cursor } : {})
+    })}`
+  ),
+  createPerson: (person: PersonRequest) => request<RosterEntry>("/api/admin/roster", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(person)
+  }),
+  changePerson: (personId: string, person: PersonRequest) => request<RosterEntry>(`/api/admin/roster/${personId}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(person)
+  }),
+  createAccount: (personId: string, account: AccountRequest) => request<RosterEntry>(
+    `/api/admin/roster/${personId}/account`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(account)
+    }
+  ),
+  changeAccountRoles: (personId: string, roles: Role[]) => request<RosterEntry>(
+    `/api/admin/roster/${personId}/account/roles`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles })
+    }
+  ),
+  changeAccountUsername: (personId: string, username: string) => request<RosterEntry>(
+    `/api/admin/roster/${personId}/account/username`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username })
+    }
+  ),
+  resetAccountPassword: (personId: string, oneTimePassword: string) => request<RosterEntry>(
+    `/api/admin/roster/${personId}/account/password`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ oneTimePassword })
+    }
+  ),
+  setAccountActive: (personId: string, active: boolean) => request<RosterEntry>(
+    `/api/admin/roster/${personId}/account/active`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+    }
+  ),
   source: () => request<SourceOffer>("/api/source"),
   courts: () => request<PublicCourt[]>("/api/public/courts"),
   bookingGrid: () => request<BookingGrid>("/api/public/booking-grid"),

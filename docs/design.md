@@ -48,7 +48,9 @@ carrying an SBOM attestation, and attaches the OpenAPI document to the release.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers, and the browser admin surface for
-configuration and facilities. The roster and the import sources are the exceptions: they are served by
+configuration, facilities and the club's people — adding somebody, correcting their name or address,
+giving them an account, changing its roles, correcting its username, handing out a new one-time
+password and disabling it. Memberships and the import sources are the exceptions: they are served by
 the API and have no browser surface yet, so a board reaches them through the API alone.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,

@@ -13,6 +13,7 @@ import { LoginView } from "./views/LoginView";
 import { MyBookingsPage } from "./views/MyBookingsPage";
 import { AdminConfigurationView } from "./views/AdminConfigurationView";
 import { AdminFacilityView } from "./views/AdminFacilityView";
+import { AdminRosterView } from "./views/AdminRosterView";
 
 interface AppRoutesProps {
   session: SessionStatus;
@@ -44,6 +45,9 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <Navigate to="/" replace />} />
     <Route path="/admin/facility" element={session.roles.includes("ADMIN")
       ? <AdminFacilityView />
+      : <Navigate to="/" replace />} />
+    <Route path="/admin/roster" element={session.roles.includes("ADMIN")
+      ? <AdminRosterView />
       : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>;

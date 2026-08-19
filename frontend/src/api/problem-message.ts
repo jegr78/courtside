@@ -3,7 +3,9 @@ import { ApiError, type Problem } from "./client";
 
 const typeMessageKeys: Record<string, string> = {
   "urn:courtside:error:unauthenticated": "auth.failed",
-  "urn:courtside:error:court-unavailable": "booking.courtUnavailable"
+  "urn:courtside:error:court-unavailable": "booking.courtUnavailable",
+  "urn:courtside:error:username-taken": "roster.usernameTaken",
+  "urn:courtside:error:person-account-exists": "roster.accountExists"
 };
 
 export function problemMessage(failure: unknown, t: TFunction): string {
