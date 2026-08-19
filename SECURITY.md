@@ -25,9 +25,9 @@ Courtside is deployed by each club on its own infrastructure. Reports about the 
 belong here; reports about a specific club's installation belong to that club.
 
 In scope: authentication and session handling, authorisation across the roles `MEMBER`,
-`TRAINER`, `GROUNDSKEEPER`, `TREASURER` and `ADMIN`, the booking rules that decide who may book
-what, injection into the API or the database, and anything that lets one member read or change
-another member's data.
+`TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER` and `ADMIN`, the
+booking rules that decide who may book what, injection into the API or the database, and anything
+that lets one member read or change another member's data.
 
 Out of scope: findings that require an already-compromised database or host, missing hardening
 headers with no demonstrated impact, and results from automated scanners that are not backed by

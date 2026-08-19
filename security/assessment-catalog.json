@@ -1,0 +1,406 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "1.0.0",
+  "standards": {
+    "wstg": "4.2",
+    "asvs": "5.0.0-level-2",
+    "apiSecurityTop10": "2023",
+    "owaspTop10": "2025",
+    "cvss": "4.0"
+  },
+  "threatModel": {
+    "deployment": "One club operates one Courtside instance behind the reference proxy with PostgreSQL and server-side sessions.",
+    "roles": [
+      "ANONYMOUS",
+      "MEMBER",
+      "TRAINER",
+      "SPORT_DIRECTOR",
+      "YOUTH_DIRECTOR",
+      "GROUNDSKEEPER",
+      "TREASURER",
+      "ADMIN",
+      "COMPROMISED_ACCOUNT"
+    ],
+    "roleCombinations": [
+      ["MEMBER", "TRAINER"],
+      ["MEMBER", "SPORT_DIRECTOR"],
+      ["MEMBER", "YOUTH_DIRECTOR"],
+      ["MEMBER", "GROUNDSKEEPER"],
+      ["MEMBER", "TREASURER"],
+      ["MEMBER", "ADMIN"]
+    ],
+    "surfaces": [
+      { "id": "public-pwa", "description": "Public HTML shell, court plan, static assets and PWA lifecycle." },
+      { "id": "authentication", "description": "Login, bootstrap, initial password and brute-force controls." },
+      { "id": "session-store", "description": "Server-side sessions, CSRF, logout, expiry and credential changes." },
+      { "id": "member-booking", "description": "Bookings, series, participants and personal booking data." },
+      { "id": "member-participation", "description": "Participant consent, lookup and withdrawal." },
+      { "id": "admin-configuration", "description": "Facility, cards, rules and club configuration administration." },
+      { "id": "admin-membership", "description": "People, accounts, roles, memberships and membership types." },
+      { "id": "data-exchange", "description": "CSV snapshots, previews, external references and full synchronization." },
+      { "id": "rest-api", "description": "Contract-first JSON boundary and RFC 9457 error surface." },
+      { "id": "reference-deployment", "description": "Caddy, container runtime, network and PostgreSQL topology." },
+      { "id": "release-artifact", "description": "Candidate image, dependencies, SBOM, provenance and signature." },
+      { "id": "operations-data", "description": "Logs, metrics, backups, restores and retained evidence." }
+    ],
+    "trustBoundaries": [
+      { "id": "browser-proxy", "description": "Untrusted browser and network traffic enters through Caddy." },
+      { "id": "proxy-application", "description": "Forwarded identity and transport metadata crosses into Spring Boot." },
+      { "id": "application-database", "description": "Application data and server-side sessions enter PostgreSQL." },
+      { "id": "build-artifact", "description": "Source and dependencies become a signed container image." },
+      { "id": "operator-evidence", "description": "Operational commands create logs, backups and security evidence." }
+    ]
+  },
+  "profiles": {
+    "safe": {
+      "description": "Bounded passive and non-destructive checks that do not alter domain state or exhaust resources.",
+      "allowedEnvironments": ["SECURITY", "UAT", "EXPLICIT_PRODUCTION"],
+      "productionAllowed": true,
+      "productionRequiresExplicitAuthorization": true,
+      "requiresExplicitAuthorization": false,
+      "prohibitedActions": ["domain mutation", "credential guessing", "resource exhaustion", "foreign-origin discovery"]
+    },
+    "active": {
+      "description": "Curated authentication, authorization, mutation and injection attacks against a disposable target.",
+      "allowedEnvironments": ["SECURITY"],
+      "productionAllowed": false,
+      "productionRequiresExplicitAuthorization": true,
+      "requiresExplicitAuthorization": true,
+      "prohibitedActions": ["volumetric denial of service", "foreign-origin callbacks", "unbounded payload generation"]
+    },
+    "destructive": {
+      "description": "Bounded exhaustion and protocol-abuse checks that may make the disposable target unavailable.",
+      "allowedEnvironments": ["SECURITY"],
+      "productionAllowed": false,
+      "productionRequiresExplicitAuthorization": true,
+      "requiresExplicitAuthorization": true,
+      "prohibitedActions": ["public targets", "unbounded concurrency", "traffic outside circuit-breaker budgets"]
+    }
+  },
+  "outcomes": {
+    "passed": {
+      "description": "Every selected control executed with complete evidence and no unaccepted validated finding.",
+      "releaseEligible": true
+    },
+    "incomplete": {
+      "description": "A tool, prerequisite, target proof, control or required evidence is missing or failed to execute.",
+      "releaseEligible": false
+    },
+    "failed": {
+      "description": "A secure outcome was violated or a validated finding remains outside an unexpired acceptance.",
+      "releaseEligible": false
+    }
+  },
+  "severity": [
+    { "level": "P0", "cvssMinimum": 9.0, "triageWithinHours": 24, "releasePolicy": "Blocks release until fixed and retested." },
+    { "level": "P1", "cvssMinimum": 7.0, "triageWithinHours": 72, "releasePolicy": "Blocks release unless an explicit unexpired acceptance records compensating controls." },
+    { "level": "P2", "cvssMinimum": 4.0, "triageWithinHours": 336, "releasePolicy": "Requires an owned remediation or time-bounded acceptance." },
+    { "level": "P3", "cvssMinimum": 0.0, "triageWithinHours": 720, "releasePolicy": "Recorded and prioritized with product context." }
+  ],
+  "governance": {
+    "singleMaintainerMayApprove": true,
+    "independentReviewRecorded": true,
+    "missingIndependentReviewBlocks": false,
+    "privateFindingChannel": "GitHub private vulnerability reporting"
+  },
+  "tests": [
+    {
+      "id": "CSA-AUTHN-001",
+      "title": "Authentication and brute-force boundaries",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-ATHN-03"],
+        "asvs": ["v5.0.0-6.3.1"],
+        "apiSecurityTop10": ["API2:2023", "API4:2023"],
+        "owaspTop10": ["A07:2025"]
+      },
+      "roles": ["ANONYMOUS", "MEMBER", "COMPROMISED_ACCOUNT"],
+      "surface": "authentication",
+      "profile": "active",
+      "prerequisites": ["Disposable security environment", "Synthetic accounts", "Bounded request budget"],
+      "expectedSecureOutcome": "Invalid and abusive authentication attempts cannot enumerate or take over an account and remain rate limited across path variants.",
+      "executionMode": "hybrid",
+      "evidenceRequirements": ["Normalized request sequence", "Typed responses", "Rate-limit state", "Timing method and sample"],
+      "qualityRiskIds": ["ID-2"],
+      "trackingIssue": 246
+    },
+    {
+      "id": "CSA-AUTHN-002",
+      "title": "Administrative multi-factor authentication",
+      "status": "blocked",
+      "standardReferences": {
+        "wstg": [],
+        "asvs": ["v5.0.0-6.3.3"],
+        "apiSecurityTop10": ["API2:2023"],
+        "owaspTop10": ["A07:2025"]
+      },
+      "roles": ["ADMIN"],
+      "surface": "authentication",
+      "profile": "active",
+      "prerequisites": ["Administrative MFA product capability"],
+      "expectedSecureOutcome": "Administrative access requires the documented ASVS Level 2 authentication strength.",
+      "executionMode": "manual",
+      "evidenceRequirements": ["Authentication-factor enrollment and challenge evidence"],
+      "qualityRiskIds": ["ID-2"],
+      "rationale": "Courtside does not yet provide a second factor for administrators.",
+      "trackingIssue": 69
+    },
+    {
+      "id": "CSA-SESS-001",
+      "title": "Session lifecycle and browser isolation",
+      "status": "implemented",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-SESS-01"],
+        "asvs": ["v5.0.0-7.4.1", "v5.0.0-14.3.1"],
+        "apiSecurityTop10": ["API2:2023"],
+        "owaspTop10": ["A07:2025"]
+      },
+      "roles": ["MEMBER", "TRAINER", "ADMIN", "COMPROMISED_ACCOUNT"],
+      "surface": "session-store",
+      "profile": "active",
+      "prerequisites": ["Packaged application", "Two independent browser sessions"],
+      "expectedSecureOutcome": "Login rotates the session and logout, expiry, password change and authority removal invalidate stale access without browser-history disclosure.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Browser trace", "Session identifiers", "Post-transition authorization result"],
+      "qualityRiskIds": ["ID-2", "UI-2"]
+    },
+    {
+      "id": "CSA-AUTHZ-001",
+      "title": "Operation, role and object authorization matrix",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-ATHZ-02"],
+        "asvs": ["v5.0.0-8.2.1", "v5.0.0-8.2.2"],
+        "apiSecurityTop10": ["API1:2023", "API5:2023"],
+        "owaspTop10": ["A01:2025"]
+      },
+      "roles": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "COMPROMISED_ACCOUNT"],
+      "surface": "rest-api",
+      "profile": "active",
+      "prerequisites": ["OpenAPI operation inventory", "Two identities per authorization class"],
+      "expectedSecureOutcome": "Every operation and object is accessible only to explicitly authorized roles and owners, with rejected attempts leaving state unchanged.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Operation-role matrix", "Typed response", "Before and after state"],
+      "qualityRiskIds": ["ID-1", "MB-1"],
+      "trackingIssue": 246
+    },
+    {
+      "id": "CSA-BOOK-001",
+      "title": "Booking integrity under competing and abusive requests",
+      "status": "implemented",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-BUSL-03"],
+        "asvs": ["v5.0.0-2.3.4"],
+        "apiSecurityTop10": ["API6:2023"],
+        "owaspTop10": ["A06:2025"]
+      },
+      "roles": ["MEMBER", "TRAINER", "GROUNDSKEEPER", "ADMIN", "COMPROMISED_ACCOUNT"],
+      "surface": "member-booking",
+      "profile": "active",
+      "prerequisites": ["PostgreSQL 17", "Coordinated concurrent clients"],
+      "expectedSecureOutcome": "Competing writes preserve one occupancy, authorization, participant capacity and idempotency without partial state.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Transaction coordination", "Constraint result", "Final database state"],
+      "qualityRiskIds": ["BK-1", "BK-3"]
+    },
+    {
+      "id": "CSA-PRIV-001",
+      "title": "Participation consent and personal-data isolation",
+      "status": "implemented",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-ATHZ-04"],
+        "asvs": ["v5.0.0-8.2.2", "v5.0.0-14.2.4"],
+        "apiSecurityTop10": ["API1:2023", "API3:2023"],
+        "owaspTop10": ["A01:2025"]
+      },
+      "roles": ["MEMBER"],
+      "surface": "member-participation",
+      "profile": "active",
+      "prerequisites": ["Two synthetic members", "Booking that names one participant"],
+      "expectedSecureOutcome": "A participant can discover and withdraw only their own participation without resolving another person's identity.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Typed response", "Wire-field inventory", "Final participation state"],
+      "qualityRiskIds": ["BK-4", "ID-3"]
+    },
+    {
+      "id": "CSA-ADMIN-001",
+      "title": "Configuration administration boundaries",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-ATHZ-03"],
+        "asvs": ["v5.0.0-8.2.1", "v5.0.0-15.3.3"],
+        "apiSecurityTop10": ["API3:2023", "API5:2023"],
+        "owaspTop10": ["A01:2025"]
+      },
+      "roles": ["GROUNDSKEEPER", "TREASURER", "ADMIN", "COMPROMISED_ACCOUNT"],
+      "surface": "admin-configuration",
+      "profile": "active",
+      "prerequisites": ["Role matrix", "Existing facility, card and rule resources"],
+      "expectedSecureOutcome": "Only authorized fields and operations can change club configuration, with conflicts and invalid references leaving state unchanged.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Request field set", "Authorization result", "Final configuration state"],
+      "qualityRiskIds": ["AD-1", "AD-2"],
+      "trackingIssue": 246
+    },
+    {
+      "id": "CSA-MEMBER-001",
+      "title": "People, account and membership administration",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-ATHZ-04"],
+        "asvs": ["v5.0.0-8.2.2", "v5.0.0-15.3.1"],
+        "apiSecurityTop10": ["API1:2023", "API3:2023"],
+        "owaspTop10": ["A01:2025"]
+      },
+      "roles": ["SPORT_DIRECTOR", "YOUTH_DIRECTOR", "TREASURER", "ADMIN", "COMPROMISED_ACCOUNT"],
+      "surface": "admin-membership",
+      "profile": "active",
+      "prerequisites": ["Synthetic roster with ownership and role boundaries"],
+      "expectedSecureOutcome": "Person, account, role and membership mutations cannot cross role or person boundaries or expose unrelated personal fields.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Operation-role matrix", "Response field inventory", "Final identity and membership state"],
+      "qualityRiskIds": ["MB-1"],
+      "trackingIssue": 246
+    },
+    {
+      "id": "CSA-IMPORT-001",
+      "title": "Snapshot parser and synchronization abuse",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-INPV-01"],
+        "asvs": ["v5.0.0-2.2.1", "v5.0.0-2.3.3", "v5.0.0-5.2.1"],
+        "apiSecurityTop10": ["API3:2023", "API4:2023"],
+        "owaspTop10": ["A05:2025"]
+      },
+      "roles": ["TREASURER", "ADMIN", "COMPROMISED_ACCOUNT"],
+      "surface": "data-exchange",
+      "profile": "active",
+      "prerequisites": ["Synthetic snapshot fixtures", "Deterministic reset"],
+      "expectedSecureOutcome": "Malformed, oversized, ambiguous and conflicting snapshots cannot escape parsing limits, take over accounts or leave a partial synchronization.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Minimized input", "Typed response", "Before and after roster state"],
+      "qualityRiskIds": ["MB-2"],
+      "trackingIssue": 248
+    },
+    {
+      "id": "CSA-PWA-001",
+      "title": "Browser injection and client-side data retention",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-CLNT-02"],
+        "asvs": ["v5.0.0-1.2.1", "v5.0.0-14.3.3"],
+        "apiSecurityTop10": ["API8:2023"],
+        "owaspTop10": ["A05:2025"]
+      },
+      "roles": ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"],
+      "surface": "public-pwa",
+      "profile": "active",
+      "prerequisites": ["Supported browser matrix", "Harmless injection payloads"],
+      "expectedSecureOutcome": "Untrusted values remain data, CSP violations are observable and personal data is unavailable from browser storage after session termination.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Browser trace", "CSP events", "Storage and cache inventory"],
+      "qualityRiskIds": ["ID-3", "UI-2"],
+      "trackingIssue": 249
+    },
+    {
+      "id": "CSA-DEPLOY-001",
+      "title": "Proxy, TLS and runtime exposure",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-CONF-07"],
+        "asvs": ["v5.0.0-4.1.3", "v5.0.0-12.1.1"],
+        "apiSecurityTop10": ["API8:2023", "API9:2023"],
+        "owaspTop10": ["A02:2025", "A10:2025"]
+      },
+      "roles": ["ANONYMOUS", "ADMIN", "COMPROMISED_ACCOUNT"],
+      "surface": "reference-deployment",
+      "profile": "safe",
+      "prerequisites": ["Qualified candidate image", "Reference proxy", "Target allowlist"],
+      "expectedSecureOutcome": "The proxy and runtime expose only intended routes and methods, preserve trusted forwarding boundaries and use the documented TLS and container controls.",
+      "executionMode": "hybrid",
+      "evidenceRequirements": ["Image digest", "TLS report", "Header and route inventory", "Runtime configuration"],
+      "qualityRiskIds": ["OP-1", "ID-3"],
+      "trackingIssue": 244
+    },
+    {
+      "id": "CSA-SUPPLY-001",
+      "title": "Source, dependency and candidate-image evidence",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-CONF-05"],
+        "asvs": ["v5.0.0-15.1.2"],
+        "apiSecurityTop10": ["API8:2023"],
+        "owaspTop10": ["A03:2025"]
+      },
+      "roles": ["COMPROMISED_ACCOUNT"],
+      "surface": "release-artifact",
+      "profile": "safe",
+      "prerequisites": ["Required build", "Candidate image digest"],
+      "expectedSecureOutcome": "Required static and dependency evidence is complete, exceptions are current and release attestations bind to the assessed digest.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["CodeQL and Trivy summaries", "Dependency evidence", "SBOM", "Provenance and signature verification"],
+      "qualityRiskIds": ["ID-3", "OP-4"],
+      "trackingIssue": 245
+    },
+    {
+      "id": "CSA-API-001",
+      "title": "Contract-bound malformed input and error handling",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-INPV-01"],
+        "asvs": ["v5.0.0-2.2.1", "v5.0.0-4.1.1", "v5.0.0-15.3.3"],
+        "apiSecurityTop10": ["API3:2023", "API4:2023", "API8:2023"],
+        "owaspTop10": ["A05:2025", "A06:2025"]
+      },
+      "roles": ["ANONYMOUS", "MEMBER", "ADMIN", "COMPROMISED_ACCOUNT"],
+      "surface": "rest-api",
+      "profile": "active",
+      "prerequisites": ["Pinned OpenAPI fuzzer", "Reproducible seed", "State reset"],
+      "expectedSecureOutcome": "Malformed and boundary inputs produce stable typed failures without undocumented routes, unhandled exceptions or partial state.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Seed", "Minimized request", "RFC 9457 response", "Before and after state"],
+      "qualityRiskIds": ["ID-3", "BK-3", "AD-1"],
+      "trackingIssue": 248
+    },
+    {
+      "id": "CSA-RES-001",
+      "title": "Adversarial resource consumption and recovery",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-BUSL-07"],
+        "asvs": ["v5.0.0-2.4.1", "v5.0.0-15.2.2"],
+        "apiSecurityTop10": ["API4:2023", "API6:2023"],
+        "owaspTop10": ["A06:2025"]
+      },
+      "roles": ["ANONYMOUS", "MEMBER", "COMPROMISED_ACCOUNT"],
+      "surface": "member-booking",
+      "profile": "destructive",
+      "prerequisites": ["Disposable security environment", "Resource telemetry", "Circuit breakers", "Recovery checks"],
+      "expectedSecureOutcome": "Bounded attacker-shaped load stops before host limits, preserves integrity and leaves the service recoverable.",
+      "executionMode": "automated",
+      "evidenceRequirements": ["Load manifest", "Resource signals", "Circuit-breaker event", "Recovery and integrity result"],
+      "qualityRiskIds": ["ID-2", "BK-1", "OP-4"],
+      "trackingIssue": 250
+    },
+    {
+      "id": "CSA-OPS-001",
+      "title": "Sensitive operational data and recovery evidence",
+      "status": "planned",
+      "standardReferences": {
+        "wstg": ["WSTG-v4.2-ERRH-02"],
+        "asvs": ["v5.0.0-14.1.2", "v5.0.0-16.2.5"],
+        "apiSecurityTop10": ["API8:2023"],
+        "owaspTop10": ["A09:2025"]
+      },
+      "roles": ["TREASURER", "ADMIN", "COMPROMISED_ACCOUNT"],
+      "surface": "operations-data",
+      "profile": "safe",
+      "prerequisites": ["Synthetic operational dataset", "Protected evidence storage"],
+      "expectedSecureOutcome": "Logs, metrics, backups and assessment evidence contain no credentials or unintended personal data and retain sufficient provenance for recovery and investigation.",
+      "executionMode": "hybrid",
+      "evidenceRequirements": ["Adversarial redaction fixtures", "Evidence manifest", "Backup and restore result"],
+      "qualityRiskIds": ["ID-3", "OP-3", "OP-4"],
+      "trackingIssue": 243
+    }
+  ]
+}
