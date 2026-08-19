@@ -22,13 +22,14 @@ seed disposable environments — a walkthrough dataset and a synthetic load-test
 refuses to start unless its environment guard confirms the database it is about to fill is the
 disposable one it names (`courtside_dev` for `demo`, `courtside_perf` for `performance`), not
 whatever the deployment happens to point at. The `notification`, `reporting` and `integration`
-modules of section 3 are designed and not built, so nothing consumes domain events yet and the
-`domain_event` table does not exist. No port interface has been introduced, because no second
-adapter has needed one.
+modules of section 3 are designed and not built. `audit` is built: every administrative change on
+the roster is recorded in the append-only `domain_event` table, written in the transaction that made
+the change. No port interface has been introduced, because no second adapter has needed one.
 
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
-courts, accounts, roles and session login, club configuration and branding, the roster — the club's
+courts, accounts, roles and session login, club configuration and branding, the audit log of every
+administrative change, the roster — the club's
 people, the account and roles a person holds, the membership they hold with the dates it runs
 between, correcting a username and resetting a password — and the admin surface for all of it. A
 club can also describe the systems it means to synchronise its roster from: the column mapping, the
@@ -231,6 +232,20 @@ the core depends on may depend back on it.** `notification`, `reporting`, `audit
 
 The booking core therefore knows nothing about email, nothing about door control and
 nothing about payment. Adding a new consumer is additive.
+
+The two consumers want different guarantees, and both are served from one publication. `audit`
+listens **before the commit** and writes its row in the same transaction: no commit without a row,
+which is the property that makes a log an audit log. Everything else listens **after** it, through
+the event publication registry, which stores the publication in that same transaction and therefore
+delivers again after a restart that interrupted it — at least once, never never. A producer knows
+neither consumer.
+
+An event carries ids and values that are not personal. A correction to a name or an address records
+which fields changed, not what they were: an id whose row is gone is how section 11 erases somebody
+from a table that is never rewritten. In the process the events are typed records the compiler
+checks; in the table the payload is `jsonb` a reader reads defensively, because stored rows outlive
+the code that wrote them. Payload changes are additive, a field that would be renamed or removed
+gets a new event type, and a guard holds every payload shape against a recorded snapshot.
 
 ### Integration ports
 
@@ -1147,6 +1162,13 @@ deliver the implementation.
   months after season end (utilisation statistics survive, the personal reference does
   not); inactive accounts deleted after departure plus retention period; login logs after
   90 days.
+- **The audit log is covered by that job rather than exempt from it.** `domain_event` is
+  append-only and is never rewritten to erase somebody: it holds ids and values that are not
+  personal, so removing the person the id names is what makes the entry anonymous. What the log
+  keeps is that a change happened, when, and which account made it — never a name, an address or a
+  credential. The event publication registry beside it holds an event only until its
+  consumers finish: a completed publication is deleted rather than retained, so nothing accumulates
+  there for a job to clean up later.
 - **A sign-in session's row goes when the session does.** A session stops working the moment it
   expires, but its row — and the attributes cascading from it, which carry the username, the account
   id, the roles and the security epoch it was signed in with — is deleted on the cadence of

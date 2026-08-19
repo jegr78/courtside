@@ -17,6 +17,7 @@ import org.courtside.member.internal.PersonText;
 import org.courtside.member.internal.RosterCursorUnknownException;
 import org.courtside.member.internal.UsernameTakenException;
 import org.courtside.shared.CursorPage;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +28,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +59,7 @@ public class RosterService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
     private final ClubTimeZone clubTimeZone;
+    private final ApplicationEventPublisher events;
 
     public CursorPage.Result<RosterEntry> list(String query, UUID cursor, int limit) {
         validateLimit(limit);
@@ -72,7 +75,9 @@ public class RosterService {
         Person person = new Person(strippedNonBlank(firstName, "first name"),
                 strippedNonBlank(lastName, "last name"),
                 strippedAddress(email));
-        return toEntry(persons.save(person), null, null);
+        Person saved = persons.save(person);
+        events.publishEvent(new RosterEvent.PersonAdded(saved.getId()));
+        return toEntry(saved, null, null);
     }
 
     @Transactional
@@ -83,8 +88,12 @@ public class RosterService {
         String address = strippedAddress(email);
         Person person = persons.findById(id)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        Set<String> changed = changedFields(person, first, last, address);
         person.rename(first, last);
         person.changeEmail(address);
+        if (!changed.isEmpty()) {
+            events.publishEvent(new RosterEvent.PersonCorrected(person.getId(), changed));
+        }
         return load(List.of(person.getId())).getFirst();
     }
 
@@ -95,6 +104,7 @@ public class RosterService {
         UUID id = requiredPersonId(personId);
         Person person = persons.findById(id)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        Set<String> corrected = correctedFields(person, firstName, lastName, email);
         if (firstName != null || lastName != null) {
             person.rename(
                     firstName == null ? person.getFirstName() : strippedNonBlank(firstName, "first name"),
@@ -102,6 +112,9 @@ public class RosterService {
         }
         if (email != null) {
             person.changeEmail(strippedAddress(email));
+        }
+        if (!corrected.isEmpty()) {
+            events.publishEvent(new RosterEvent.PersonCorrected(id, corrected));
         }
     }
 
@@ -121,6 +134,7 @@ public class RosterService {
         account.enable();
         account.requirePasswordChange();
         saveOrRejectTakenUsername(account);
+        events.publishEvent(new RosterEvent.AccountCreated(id, account.getId(), requested));
         return load(List.of(id)).getFirst();
     }
 
@@ -135,6 +149,7 @@ public class RosterService {
         long epoch = account.getSecurityEpoch();
         account.changeRoles(requested);
         endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
+        events.publishEvent(new RosterEvent.AccountRolesChanged(id, account.getId(), requested));
         return load(List.of(id)).getFirst();
     }
 
@@ -148,6 +163,7 @@ public class RosterService {
         account.changeUsername(name);
         saveOrRejectTakenUsername(account);
         endStoredSessionsIfRevoked(account, previous, epoch);
+        events.publishEvent(new RosterEvent.AccountUsernameCorrected(id, account.getId()));
         return load(List.of(id)).getFirst();
     }
 
@@ -159,6 +175,7 @@ public class RosterService {
         long epoch = account.getSecurityEpoch();
         account.resetPassword(passwordEncoder.encode(oneTimePassword));
         endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
+        events.publishEvent(new RosterEvent.AccountPasswordReset(id, account.getId()));
         return load(List.of(id)).getFirst();
     }
 
@@ -174,6 +191,7 @@ public class RosterService {
             account.disable();
             endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
         }
+        events.publishEvent(new RosterEvent.AccountAvailabilityChanged(id, account.getId(), enabled));
         return load(List.of(id)).getFirst();
     }
 
@@ -188,6 +206,8 @@ public class RosterService {
         if (applyMembership(id, existing, typeId, requested)) {
             revokeSessionsOf(id);
         }
+        events.publishEvent(new RosterEvent.MembershipWritten(
+                id, typeId, requested.startedOn(), requested.endedOn()));
         return load(List.of(id)).getFirst();
     }
 
@@ -198,6 +218,7 @@ public class RosterService {
         members.findCurrentByPersonId(id).ifPresent(member -> {
             member.endOn(today());
             revokeSessionsOf(id);
+            events.publishEvent(new RosterEvent.MembershipEnded(id));
         });
     }
 
@@ -301,6 +322,28 @@ public class RosterService {
     private Person requireLockedPerson(UUID personId) {
         return persons.findWithLockById(personId)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + personId));
+    }
+
+    private static Set<String> correctedFields(Person person, String firstName, String lastName, String email) {
+        Set<String> changed = new LinkedHashSet<>();
+        if (firstName != null && !person.getFirstName().equals(strippedNonBlank(firstName, "first name"))) {
+            changed.add("firstName");
+        }
+        if (lastName != null && !person.getLastName().equals(strippedNonBlank(lastName, "last name"))) {
+            changed.add("lastName");
+        }
+        if (email != null && !person.getEmail().equals(strippedAddress(email))) {
+            changed.add("email");
+        }
+        return changed;
+    }
+
+    private static Set<String> changedFields(Person person, String firstName, String lastName, String email) {
+        Set<String> changed = new LinkedHashSet<>();
+        if (!person.getFirstName().equals(firstName)) changed.add("firstName");
+        if (!person.getLastName().equals(lastName)) changed.add("lastName");
+        if (!person.getEmail().equals(email)) changed.add("email");
+        return changed;
     }
 
     private static UUID requiredPersonId(UUID personId) {

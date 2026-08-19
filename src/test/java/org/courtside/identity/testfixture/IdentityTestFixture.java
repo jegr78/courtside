@@ -7,6 +7,11 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -16,6 +21,17 @@ public class IdentityTestFixture {
 
     private final PersonRepository persons;
     private final UserAccountRepository accounts;
+    private final UserDetailsService userDetails;
+
+    public void signInAs(String username) {
+        UserDetails details = userDetails.loadUserByUsername(username);
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(details, null, details.getAuthorities()));
+    }
+
+    public void signOut() {
+        SecurityContextHolder.clearContext();
+    }
 
     public UUID createPerson(String firstName, String lastName) {
         String email = (firstName + "." + lastName).toLowerCase(Locale.ROOT) + "@example.org";

@@ -58,10 +58,10 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
 
   // then
-  const title = await screen.findByTestId("my-bookings-title");
+  expect(await screen.findByTestId("upcoming-bookings")).toHaveTextContent("Upcoming");
+  const title = screen.getByTestId("my-bookings-title");
   expect(title).toHaveRole("heading");
   expect(title).toHaveTextContent("My bookings");
-  expect(screen.getByTestId("upcoming-bookings")).toHaveTextContent("Upcoming");
   expect(screen.getByTestId("past-bookings")).toHaveTextContent("Past");
   expect(screen.getAllByTestId("series-marker")).toHaveLength(2);
   expect(screen.getByTestId(`booking-${upcomingId}`)).toHaveTextContent("Centre Court");
