@@ -4,7 +4,7 @@ The `security` Spring profile and `deploy/compose.security.yaml` create one disp
 
 - `COURTSIDE_ENVIRONMENT=SECURITY`;
 - a confirmed disposable profile;
-- a valid per-run identifier and seed fingerprint; and
+- a valid per-run identifier, seed fingerprint and instance fingerprint; and
 - the Compose-local `courtside_security` database on host `db`.
 
 ## Prepare the images
@@ -17,7 +17,9 @@ docker pull caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cd
 node tools/courtside.mjs security run-0001 ghcr.io/jegr78/courtside@sha256:<digest>
 ```
 
-The command creates a random shared password, a seed fingerprint and a private state file below `build/security/run-0001`. It prints the synthetic credential once for the operator. The password never appears in a tracked file or command argument.
+The command creates a random shared password, a seed fingerprint, a random instance fingerprint and a private state file below `build/security/run-0001`. It prints the synthetic credential once for the operator. The password never appears in a tracked file or command argument.
+
+Startup atomically reserves the run ID in Docker before Compose can create resources. The instance fingerprint binds that reservation, private state, manifests, containers and networks; another workspace cannot reuse or clean up the same run ID.
 
 Each run gets its own Compose project, networks, containers and dynamically allocated loopback TLS port. Both application networks are Docker-internal. The application and scanners attached only to these networks have no routed Internet or private-network access.
 
@@ -72,7 +74,7 @@ node tools/courtside.mjs security-run run-0001 destructive --authorize authorize
 
 The current CLI executes all three profiles only against the loopback-bound environment it created and verified. The orchestration API also supports an explicitly authorized exact origin for future `safe` adapters. Redirects never extend that allowlist. `active` and `destructive` reject every non-loopback origin and every environment other than `SECURITY`.
 
-[`security/run-contract.json`](../security/run-contract.json) fixes duration, request, concurrency, generated-data, CPU, memory and evidence limits for each profile. Adapters must invoke the supplied guard before every request and when they observe redirects, generated data or resource use. They also report their final measurements. A limit breach, changed target identity, unstable target, missing tool, failed tool or missing assessment adapter makes the attempt `incomplete`.
+[`security/run-contract.json`](../security/run-contract.json) fixes duration, request, concurrency, generated-data, CPU, memory and evidence limits for each profile. Assessment traffic is disabled in this foundation: the runner accepts only the internal `target-identity` prerequisite with no selected tests and always finishes `incomplete`. Any other tool or test selection is rejected before execution. A later isolated runner must own scanner containers, network access, resource enforcement and closed evidence schemas before it can open this gate.
 
 Each attempt writes a private manifest below `build/security/<run-id>/assessment/attempt-<number>`. A rerun always gets a new attempt number. It cannot replace or upgrade the first result. The manifest follows [`security/run-manifest.schema.json`](../security/run-manifest.schema.json) and contains no credential, cookie or authorization value.
 
@@ -85,7 +87,7 @@ node tools/courtside.mjs security-report run-0001
 node tools/courtside.mjs security-report run-0001 --attempt 1
 ```
 
-The emergency stop is local and immediate. The orchestrator checks it before every registered tool and preserves the current manifest and diagnostics:
+The emergency stop is local and immediate. The current prerequisite checks it before target verification and preserves the current manifest:
 
 ```bash
 node tools/courtside.mjs security-stop run-0001

@@ -73,6 +73,7 @@ export function buildSecurityPlan(input) {
     imageDigest: input.imageDigest,
     applicationCommit: input.applicationCommit,
     seedFingerprint: input.seedFingerprint,
+    instanceFingerprint: input.instanceFingerprint,
     targetFingerprint: input.targetFingerprint,
     catalogVersion: input.catalogVersion,
     tools,
@@ -124,89 +125,35 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   const root = runtime.root ?? join("build", "security");
   const now = runtime.now ?? (() => new Date());
   const verifyTarget = runtime.verifyTarget ?? missingTargetVerifier;
-  const executeTool = runtime.executeTool ?? missingToolExecutor;
   const { attempt, paths } = reserveAttempt(root, plan.runId);
   const startedAt = now();
   const manifest = createManifest(plan, attempt, startedAt);
   writeManifest(paths.manifest, manifest);
-  let requests = 0;
-  let generatedDataMegabytes = 0;
-  const guard = securityExecutionGuard(plan, paths, startedAt, now, verifyTarget);
   try {
-    for (const tool of plan.tools) {
-      assertRunning(paths, startedAt, now(), plan.budgets);
-      const identity = await verifyTarget(plan);
-      assertTargetIdentity(plan, identity);
-      const result = await executeTool(tool, {
-        target: plan.target,
-        runId: plan.runId,
-        profile: plan.profile,
-        budgets: plan.budgets,
-        evidenceDirectory: paths.evidence,
-        guard
-      });
-      assertRunning(paths, startedAt, now(), plan.budgets);
-      requests += result?.requests ?? 0;
-      generatedDataMegabytes += result?.generatedDataMegabytes ?? 0;
-      requests = Math.max(requests, guard.usage().requests);
-      generatedDataMegabytes = Math.max(generatedDataMegabytes, guard.usage().generatedDataMegabytes);
-      assertUsage(requests, generatedDataMegabytes, result, plan.budgets);
-      manifest.toolResults.push({ id: tool.id, version: tool.version, outcome: result?.outcome ?? "incomplete" });
-      if (result?.outcome === "failed") {
-        const failure = new Error(`${tool.id} reported a security failure`);
-        failure.assessmentOutcome = "failed";
-        throw failure;
-      }
-      if (result?.outcome !== "passed") throw new Error(`${tool.id} did not complete`);
-      assertEvidenceSize(paths.evidence, plan.budgets.evidenceMegabytes);
-      writeManifest(paths.manifest, manifest);
-    }
+    assertPrerequisiteOnly(plan);
+    assertRunning(paths, startedAt, now(), plan.budgets);
+    assertTargetIdentity(plan, await verifyTarget(plan));
+    manifest.toolResults.push({ id: "target-identity", version: plan.tools[0].version, outcome: "passed" });
     manifest.status = "finished";
-    manifest.outcome = plan.tools.length && plan.selectedTests.length ? "passed" : "incomplete";
-    if (!plan.tools.length) manifest.reason = "No executable security tool was selected";
-    else if (!plan.selectedTests.length) manifest.reason = "No executable assessment test was selected";
+    manifest.outcome = "incomplete";
+    manifest.reason = "No isolated assessment adapter is registered";
   } catch (failure) {
     manifest.status = "finished";
     manifest.outcome = failure.assessmentOutcome ?? "incomplete";
     manifest.reason = redactSecurityText(failure.message);
   }
-  requests = Math.max(requests, guard.usage().requests);
-  generatedDataMegabytes = Math.max(generatedDataMegabytes, guard.usage().generatedDataMegabytes);
   manifest.finishedAt = now().toISOString();
-  manifest.usage = { requests, generatedDataMegabytes, evidenceBytes: directoryBytes(paths.evidence) };
+  manifest.usage = { requests: 0, generatedDataMegabytes: 0, evidenceBytes: directoryBytes(paths.evidence) };
   writeManifest(paths.manifest, manifest);
   return manifest;
 }
 
-function securityExecutionGuard(plan, paths, startedAt, now, verifyTarget) {
-  let guardedRequests = 0;
-  let guardedGeneratedData = 0;
-  return Object.freeze({
-    async beforeRequest(target = plan.target) {
-      assertRunning(paths, startedAt, now(), plan.budgets);
-      if (new URL(target, plan.target).origin !== plan.target) {
-        throw new Error("The request is outside the target allowlist");
-      }
-      assertTargetIdentity(plan, await verifyTarget(plan));
-      guardedRequests++;
-      if (guardedRequests > plan.budgets.requests) throw new Error("The request budget was exceeded");
-    },
-    validateRedirect(location) {
-      return validateSecurityRedirect(location, plan.target);
-    },
-    recordGeneratedData(megabytes) {
-      guardedGeneratedData += megabytes;
-      if (guardedGeneratedData > plan.budgets.generatedDataMegabytes) {
-        throw new Error("The generated-data budget was exceeded");
-      }
-    },
-    observeResources(observation) {
-      assertUsage(guardedRequests, guardedGeneratedData, observation, plan.budgets);
-    },
-    usage() {
-      return { requests: guardedRequests, generatedDataMegabytes: guardedGeneratedData };
-    }
-  });
+function assertPrerequisiteOnly(plan) {
+  const tool = plan.tools[0];
+  if (plan.selectedTests.length || plan.tools.length !== 1 || tool?.id !== "target-identity"
+      || tool.testIds.length) {
+    throw new Error("Assessment adapters require an isolated orchestrator-owned runner");
+  }
 }
 
 export function redactSecurityText(value) {
@@ -243,7 +190,7 @@ function validateIdentity(input) {
     throw new Error("Invalid application image digest");
   }
   if (!/^[a-f0-9]{7,64}$/.test(input.applicationCommit)) throw new Error("Invalid application commit");
-  for (const value of [input.seedFingerprint, input.targetFingerprint]) {
+  for (const value of [input.seedFingerprint, input.instanceFingerprint, input.targetFingerprint]) {
     if (!/^sha256:[a-f0-9]{64}$/.test(value)) throw new Error("Invalid security target fingerprint");
   }
 }
@@ -265,6 +212,7 @@ function createManifest(plan, attempt, startedAt) {
     application: { imageDigest: plan.imageDigest, commit: plan.applicationCommit },
     targetFingerprint: plan.targetFingerprint,
     seedFingerprint: plan.seedFingerprint,
+    instanceFingerprint: plan.instanceFingerprint,
     catalogVersion: plan.catalogVersion,
     tools: plan.tools,
     selectedTests: plan.selectedTests,
@@ -280,6 +228,7 @@ function createManifest(plan, attempt, startedAt) {
 function assertTargetIdentity(plan, actual) {
   if (actual.environment !== plan.environment || actual.target !== plan.target
       || actual.imageDigest !== plan.imageDigest || actual.seedFingerprint !== plan.seedFingerprint
+      || actual.instanceFingerprint !== plan.instanceFingerprint
       || actual.targetFingerprint !== plan.targetFingerprint) {
     throw new Error("The target identity changed during the security run");
   }
@@ -290,23 +239,6 @@ function assertRunning(paths, startedAt, currentTime, budgets) {
   if ((currentTime.getTime() - startedAt.getTime()) / 1000 > budgets.durationSeconds) {
     throw new Error("The duration budget was exceeded");
   }
-}
-
-function assertUsage(requests, generatedDataMegabytes, result, budgets) {
-  if (result?.unstable) throw new Error("The target became unstable");
-  if (requests > budgets.requests) throw new Error("The request budget was exceeded");
-  if ((result?.peakConcurrency ?? 0) > budgets.concurrency) throw new Error("The concurrency budget was exceeded");
-  if (generatedDataMegabytes > budgets.generatedDataMegabytes) {
-    throw new Error("The generated-data budget was exceeded");
-  }
-  if ((result?.peakCpu ?? 0) > budgets.cpu) throw new Error("The CPU budget was exceeded");
-  if ((result?.peakMemoryMegabytes ?? 0) > budgets.memoryMegabytes) {
-    throw new Error("The memory budget was exceeded");
-  }
-}
-
-function assertEvidenceSize(directory, megabytes) {
-  if (directoryBytes(directory) > megabytes * 1024 * 1024) throw new Error("The evidence budget was exceeded");
 }
 
 function directoryBytes(directory) {
@@ -362,10 +294,6 @@ function writePrivate(file, content) {
 
 function missingTargetVerifier() {
   throw new Error("No target verifier is configured");
-}
-
-function missingToolExecutor() {
-  throw new Error("No security tool executor is configured");
 }
 
 export function fingerprintSecurityTarget(identity) {

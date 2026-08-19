@@ -53,7 +53,7 @@ An implemented entry can still be incomplete in a particular run. Catalog state 
 
 ## Evidence and outcomes
 
-Evidence must identify the catalog and tool versions, application commit and immutable image digest where applicable, target fingerprint, selected entries, profile, timestamps and first-attempt result. Requests retained for reproduction are minimized and redacted. Passwords, cookies, CSRF tokens, personal fields and sensitive headers do not enter retained or public artifacts.
+Evidence must identify the catalog and tool versions, application commit and immutable image digest where applicable, target fingerprint, selected entries, profile, timestamps and first-attempt result. This foundation retains only its manifest and target-identity result; assessment adapters remain disabled until an isolated runner and closed evidence schemas are available. Passwords, cookies, CSRF tokens, personal fields and sensitive headers do not enter retained or public artifacts.
 
 `passed` means every selected entry executed, all required evidence exists and no validated finding remains outside an unexpired acceptance. An untriaged scanner candidate prevents a final pass until it is validated or rejected reproducibly.
 

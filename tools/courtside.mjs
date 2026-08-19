@@ -600,8 +600,7 @@ async function execute(options) {
     const plan = securityAssessmentPlan(options, false);
     const manifest = await executeSecurityPlan(plan, {
       root: securityStateRoot,
-      verifyTarget: async () => verifiedSecurityIdentity(options.runId),
-      executeTool: async (tool) => executeSecurityTool(tool)
+      verifyTarget: async () => verifiedSecurityIdentity(options.runId)
     });
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
     if (manifest.outcome !== "passed") process.exitCode = 1;
@@ -618,7 +617,11 @@ async function execute(options) {
   }
   if (options.command === "security-recover") {
     const manifest = recoverSecurityRun(securityStateRoot, options.runId, options.attempt);
-    recoverSecurityEnvironment(options.runId);
+    recoverSecurityEnvironment(options.runId, {
+      runId: manifest.runId,
+      seedFingerprint: manifest.seedFingerprint,
+      instanceFingerprint: manifest.instanceFingerprint
+    });
     rmSync(clearEmergencyStop(securityStateRoot, options.runId), { force: true });
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
     return;
@@ -629,7 +632,16 @@ async function execute(options) {
     return;
   }
   if (options.command === "security-reset") {
-    try { stopSecurityEnvironment(options.runId); } catch { recoverSecurityEnvironment(options.runId); }
+    try {
+      stopSecurityEnvironment(options.runId);
+    } catch {
+      const identity = readSecurityIdentity(options.runId);
+      recoverSecurityEnvironment(options.runId, {
+        runId: identity.runId,
+        seedFingerprint: identity.seedFingerprint,
+        instanceFingerprint: identity.instanceFingerprint
+      });
+    }
     rmSync(join(securityStateRoot, options.runId), { recursive: true, force: true });
     process.stdout.write(`Security environment and evidence for ${options.runId} removed.\n`);
     return;
@@ -656,11 +668,6 @@ function securityAssessmentPlan(options, dryRun) {
 function verifiedSecurityIdentity(runId) {
   const identity = verifySecurityEnvironment(runId);
   return { ...identity, targetFingerprint: fingerprintSecurityTarget(identity) };
-}
-
-function executeSecurityTool(tool) {
-  if (tool.id !== "target-identity") throw new Error(`Unsupported security tool: ${tool.id}`);
-  return { outcome: "passed", requests: 0, generatedDataMegabytes: 0 };
 }
 
 function startUat(options) {

@@ -6,12 +6,13 @@ import { createRequire } from "node:module";
 import { test } from "node:test";
 import {
   authorizeSecurityProfile, buildSecurityPlan, executeSecurityPlan, recoverSecurityRun,
-  redactSecurityText, requestEmergencyStop, securityRunContract, securityRunPaths, validateSecurityRedirect,
+  redactSecurityText, securityRunContract, securityRunPaths, validateSecurityRedirect,
   validateSecurityTarget
 } from "./security-runner.mjs";
 
 const digest = `sha256:${"a".repeat(64)}`;
 const seedFingerprint = `sha256:${"b".repeat(64)}`;
+const instanceFingerprint = `sha256:${"d".repeat(64)}`;
 const targetFingerprint = `sha256:${"c".repeat(64)}`;
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = require("ajv/dist/2020").default;
@@ -33,10 +34,11 @@ function input(overrides = {}) {
     imageDigest: digest,
     applicationCommit: "abcdef0123456789",
     seedFingerprint,
+    instanceFingerprint,
     targetFingerprint,
     catalogVersion: "1.0.0",
-    tools: [{ id: "identity", version: "1.0.0", testIds: ["CSA-SESS-001"] }],
-    selectedTests: ["CSA-SESS-001"],
+    tools: [{ id: "target-identity", version: "1.0.0", testIds: [] }],
+    selectedTests: [],
     authorization: "authorize-active-run-0001",
     ...overrides
   };
@@ -114,24 +116,27 @@ test("given a security plan, when rendering a dry run, then budgets and authoriz
   assert.ok(plan.budgets.cpu > 0);
   assert.ok(plan.budgets.memoryMegabytes > 0);
   assert.ok(plan.budgets.evidenceMegabytes > 0);
-  assert.deepEqual(plan.selectedTests, ["CSA-SESS-001"]);
+  assert.deepEqual(plan.selectedTests, []);
 });
 
 test("given a selected test without an adapter, when planning it, then a passing run is impossible", () => {
   // when / then
   assert.throws(() => buildSecurityPlan(input({
-    tools: [{ id: "identity", version: "1.0.0", testIds: [] }]
+    tools: [{ id: "target-identity", version: "1.0.0", testIds: [] }],
+    selectedTests: ["CSA-SESS-001"]
   })), /No executable tool covers: CSA-SESS-001/);
 });
 
 test("given a planned catalog test, when selecting it, then the run cannot claim executable coverage", () => {
   // when / then
   assert.throws(() => buildSecurityPlan(input({
+    tools: [{ id: "identity", version: "1.0.0", testIds: ["CSA-SESS-001"] }],
+    selectedTests: ["CSA-SESS-001"],
     catalogTests: [{ id: "CSA-SESS-001", status: "planned", profile: "active" }]
   })), /not implemented/);
 });
 
-test("given a tool failure, when executing a run, then the immutable first attempt is incomplete", async () => {
+test("given a target verifier failure, when executing a run, then the immutable first attempt is incomplete", async () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
   const plan = buildSecurityPlan(input());
@@ -140,13 +145,12 @@ test("given a tool failure, when executing a run, then the immutable first attem
   const manifest = await executeSecurityPlan(plan, {
     root,
     now: () => new Date("2026-08-19T12:00:00.000Z"),
-    verifyTarget: async () => input(),
-    executeTool: async () => { throw new Error("scanner exited 2"); }
+    verifyTarget: async () => { throw new Error("target verification exited 2"); }
   });
 
   // then
   assert.equal(manifest.outcome, "incomplete");
-  assert.match(manifest.reason, /scanner exited 2/);
+  assert.match(manifest.reason, /target verification exited 2/);
   assert.equal(manifest.attempt, 1);
   const paths = securityRunPaths(root, "run-0001", 1);
   assert.equal(JSON.parse(readFileSync(paths.manifest, "utf8")).outcome, "incomplete");
@@ -154,20 +158,65 @@ test("given a tool failure, when executing a run, then the immutable first attem
   assert.equal(validate(manifest), true, JSON.stringify(validate.errors));
 });
 
-test("given a completed assessment that violates a secure outcome, when reporting it, then the run fails", async () => {
+test("given an unregistered assessment tool, when execution starts, then no adapter is invoked", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  let executed = false;
+  const plan = buildSecurityPlan(input({
+    tools: [{ id: "scanner", version: "1.0.0", testIds: [] }]
+  }));
+
+  // when
+  const manifest = await executeSecurityPlan(plan, {
+    root,
+    verifyTarget: async () => input(),
+    executeTool: async () => { executed = true; }
+  });
+
+  // then
+  assert.equal(executed, false);
+  assert.equal(manifest.outcome, "incomplete");
+  assert.match(manifest.reason, /isolated orchestrator-owned runner/);
+});
+
+test("given selected assessment tests, when execution starts, then no adapter is invoked", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  let executed = false;
+  const plan = buildSecurityPlan(input({
+    tools: [{ id: "target-identity", version: "1.0.0", testIds: ["CSA-SESS-001"] }],
+    selectedTests: ["CSA-SESS-001"]
+  }));
+
+  // when
+  const manifest = await executeSecurityPlan(plan, {
+    root,
+    verifyTarget: async () => input(),
+    executeTool: async () => { executed = true; }
+  });
+
+  // then
+  assert.equal(executed, false);
+  assert.equal(manifest.outcome, "incomplete");
+  assert.match(manifest.reason, /isolated orchestrator-owned runner/);
+});
+
+test("given only the identity prerequisite, when execution finishes, then assessment remains incomplete", async () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
 
   // when
   const manifest = await executeSecurityPlan(buildSecurityPlan(input()), {
     root,
-    verifyTarget: async () => input(),
-    executeTool: async () => ({ outcome: "failed", requests: 1, generatedDataMegabytes: 0 })
+    verifyTarget: async () => input()
   });
 
   // then
-  assert.equal(manifest.outcome, "failed");
-  assert.match(manifest.reason, /reported a security failure/);
+  assert.equal(manifest.outcome, "incomplete");
+  assert.match(manifest.reason, /No isolated assessment adapter/);
+  assert.deepEqual(manifest.toolResults, [
+    { id: "target-identity", version: "1.0.0", outcome: "passed" }
+  ]);
 });
 
 test("given sensitive diagnostics, when retaining them, then credentials and session material are redacted", () => {
@@ -183,149 +232,19 @@ test("given sensitive diagnostics, when retaining them, then credentials and ses
   assert.match(redacted, /Cookie: \[REDACTED\]/);
 });
 
-test("given a rerun, when it succeeds, then it cannot replace the incomplete first attempt", async () => {
+test("given a changed target identity, when the prerequisite runs, then execution stops incomplete", async () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
-  const plan = buildSecurityPlan(input());
-  const runtime = {
-    root,
-    now: () => new Date("2026-08-19T12:00:00.000Z"),
-    verifyTarget: async () => input(),
-    executeTool: async () => ({ outcome: "passed", requests: 1, generatedDataMegabytes: 0 })
-  };
-  await executeSecurityPlan(plan, { ...runtime, executeTool: async () => { throw new Error("first failure"); } });
-
-  // when
-  const rerun = await executeSecurityPlan(plan, runtime);
-
-  // then
-  assert.equal(rerun.attempt, 2);
-  assert.equal(rerun.outcome, "passed");
-  assert.equal(JSON.parse(readFileSync(securityRunPaths(root, "run-0001", 1).manifest, "utf8")).outcome,
-    "incomplete");
-});
-
-test("given a changed target identity, when a tool is about to run, then attack traffic stops", async () => {
-  // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
-  let executed = false;
 
   // when
   const manifest = await executeSecurityPlan(buildSecurityPlan(input()), {
     root,
-    verifyTarget: async () => input({ targetFingerprint: `sha256:${"d".repeat(64)}` }),
-    executeTool: async () => { executed = true; }
+    verifyTarget: async () => input({ targetFingerprint: `sha256:${"d".repeat(64)}` })
   });
 
   // then
-  assert.equal(executed, false);
   assert.equal(manifest.outcome, "incomplete");
   assert.match(manifest.reason, /target identity changed/);
-});
-
-test("given an emergency stop, when another tool would start, then no further attack request is sent", async () => {
-  // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
-  const plan = buildSecurityPlan(input());
-  const executed = [];
-
-  // when
-  const manifest = await executeSecurityPlan(plan, {
-    root,
-    verifyTarget: async () => input(),
-    executeTool: async (tool, { guard }) => {
-      await guard.beforeRequest();
-      executed.push(`${tool.id}:first`);
-      requestEmergencyStop(root, "run-0001", "operator");
-      await guard.beforeRequest();
-      executed.push(`${tool.id}:second`);
-    }
-  });
-
-  // then
-  assert.deepEqual(executed, ["identity:first"]);
-  assert.equal(manifest.outcome, "incomplete");
-  assert.match(manifest.reason, /emergency stop/);
-});
-
-test("given a changed marker between requests, when another request would start, then traffic stops", async () => {
-  // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
-  let verification = 0;
-  let requests = 0;
-
-  // when
-  const manifest = await executeSecurityPlan(buildSecurityPlan(input()), {
-    root,
-    verifyTarget: async () => ++verification < 3
-      ? input()
-      : input({ targetFingerprint: `sha256:${"d".repeat(64)}` }),
-    executeTool: async (tool, { guard }) => {
-      await guard.beforeRequest();
-      requests++;
-      await guard.beforeRequest();
-      requests++;
-      return { outcome: "passed" };
-    }
-  });
-
-  // then
-  assert.equal(requests, 1);
-  assert.equal(manifest.outcome, "incomplete");
-  assert.match(manifest.reason, /target identity changed/);
-});
-
-test("given a request budget breach, when a tool completes, then the run stops incomplete", async () => {
-  // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
-  const plan = buildSecurityPlan(input());
-
-  // when
-  const manifest = await executeSecurityPlan(plan, {
-    root,
-    verifyTarget: async () => input(),
-    executeTool: async () => ({ outcome: "passed", requests: plan.budgets.requests + 1,
-      generatedDataMegabytes: 0 })
-  });
-
-  // then
-  assert.equal(manifest.outcome, "incomplete");
-  assert.match(manifest.reason, /request budget/);
-});
-
-test("given a concurrency budget breach, when a tool completes, then the run stops incomplete", async () => {
-  // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
-  const plan = buildSecurityPlan(input());
-
-  // when
-  const manifest = await executeSecurityPlan(plan, {
-    root,
-    verifyTarget: async () => input(),
-    executeTool: async () => ({ outcome: "passed", requests: 1, generatedDataMegabytes: 0,
-      peakConcurrency: plan.budgets.concurrency + 1 })
-  });
-
-  // then
-  assert.equal(manifest.outcome, "incomplete");
-  assert.match(manifest.reason, /concurrency budget/);
-});
-
-test("given target instability, when a tool observes it, then the run stops incomplete", async () => {
-  // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
-
-  // when
-  const manifest = await executeSecurityPlan(buildSecurityPlan(input()), {
-    root,
-    verifyTarget: async () => input(),
-    executeTool: async () => ({ outcome: "passed", requests: 1, generatedDataMegabytes: 0,
-      unstable: true })
-  });
-
-  // then
-  assert.equal(manifest.outcome, "incomplete");
-  assert.match(manifest.reason, /target became unstable/);
 });
 
 test("given an interrupted run, when recovering it, then only its exact identity is changed", () => {

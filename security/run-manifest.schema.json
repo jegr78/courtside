@@ -3,7 +3,7 @@
   "$id": "urn:courtside:security:run-manifest:v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "attempt", "status", "outcome", "profile", "target", "environment", "application", "targetFingerprint", "seedFingerprint", "catalogVersion", "tools", "selectedTests", "budgets", "startedAt", "finishedAt", "toolResults", "reason", "usage"],
+  "required": ["schemaVersion", "runId", "attempt", "status", "outcome", "profile", "target", "environment", "application", "targetFingerprint", "seedFingerprint", "instanceFingerprint", "catalogVersion", "tools", "selectedTests", "budgets", "startedAt", "finishedAt", "toolResults", "reason", "usage"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "runId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,47}$" },
@@ -24,6 +24,7 @@
     },
     "targetFingerprint": { "$ref": "#/$defs/digest" },
     "seedFingerprint": { "$ref": "#/$defs/digest" },
+    "instanceFingerprint": { "$ref": "#/$defs/digest" },
     "catalogVersion": { "type": "string", "pattern": "^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$" },
     "tools": { "type": "array", "items": { "$ref": "urn:courtside:security:run-contract:v1#/$defs/tool" } },
     "selectedTests": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^CSA-[A-Z]+-[0-9]{3}$" } },
