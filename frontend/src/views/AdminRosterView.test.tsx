@@ -98,6 +98,24 @@ describe("AdminRosterView", () => {
     expect(screen.queryByTestId("roster-load-more")).not.toBeInTheDocument();
   });
 
+  it("given a search with a further page, when reading it, then the same name is asked for again", async () => {
+    // given
+    const roster = vi.spyOn(api, "roster")
+      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: null })
+      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: "person-2" })
+      .mockResolvedValueOnce({ entries: [], nextCursor: null });
+    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    const user = userEvent.setup();
+
+    // when
+    await user.type(await screen.findByTestId("roster-search"), "Roe");
+    await user.click(screen.getByTestId("roster-search-submit"));
+    await user.click(await screen.findByTestId("roster-load-more"));
+
+    // then
+    expect(roster).toHaveBeenNthCalledWith(3, "Roe", "person-2");
+  });
+
   it("when adding a person, then they join the roster", async () => {
     // given
     const created: RosterEntry = {
