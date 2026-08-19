@@ -1,0 +1,10 @@
+courtside:
+  security-assessment:
+    confirm-disposable: ${COURTSIDE_SECURITY_CONFIRM_DISPOSABLE:false}
+    run-id: ${COURTSIDE_SECURITY_RUN_ID:}
+    seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:}
+    shared-password: ${COURTSIDE_SECURITY_SHARED_PASSWORD:}
+
+spring:
+  datasource:
+    url: ${COURTSIDE_DB_URL:jdbc:postgresql://db:5432/courtside_security}

@@ -45,14 +45,14 @@ class SourceOfferController implements SourceApi {
     private static EnvironmentEnum requireKnownEnvironment(String environment) {
         if (environment == null || environment.isBlank()) {
             throw new IllegalStateException(
-                    "courtside.environment must be PRODUCTION, UAT, DEVELOPMENT, or PERFORMANCE");
+                    "courtside.environment must be PRODUCTION, UAT, DEVELOPMENT, PERFORMANCE, or SECURITY");
         }
         String normalized = environment.toUpperCase(Locale.ROOT);
         return Arrays.stream(EnvironmentEnum.values())
                 .filter(candidate -> candidate.getValue().equals(normalized))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
-                        "courtside.environment must be PRODUCTION, UAT, DEVELOPMENT, or PERFORMANCE. Got: "
+                        "courtside.environment must be PRODUCTION, UAT, DEVELOPMENT, PERFORMANCE, or SECURITY. Got: "
                                 + environment));
     }
 

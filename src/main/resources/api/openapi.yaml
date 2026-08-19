@@ -1306,7 +1306,7 @@ components:
             build from a source archive, where the version is all there is to go on.
         environment:
           type: string
-          enum: [PRODUCTION, UAT, DEVELOPMENT, PERFORMANCE]
+          enum: [PRODUCTION, UAT, DEVELOPMENT, PERFORMANCE, SECURITY]
           description: The deployment environment this instance identifies itself as.
         sourceUrl:
           type: string
