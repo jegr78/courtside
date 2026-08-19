@@ -5,10 +5,10 @@ import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.test.context.support.WithMockUser;
 
 import java.util.Set;
 import java.util.UUID;
@@ -26,6 +26,11 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @AfterEach
+    void signOut() {
+        identity.signOut();
+    }
 
     @Test
     void givenABoardAddsAPerson_whenTheChangeIsCommitted_thenTheAuditLogHoldsIt() {
@@ -45,7 +50,7 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when
-        roster.correctPerson(personId, "Mary", "Doe", "jane.doe@example.org");
+        roster.changePerson(personId, "Mary", "Doe", "jane.doe@example.org");
 
         // then
         assertThat(audit.eventsAbout(personId)).last().satisfies(event -> {
@@ -94,11 +99,11 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "miles.richard")
     void givenAnAdministratorMakesTheChange_whenTheAuditLogIsRead_thenItNamesTheAccountThatDidIt() {
         // given
         UUID actorPersonId = identity.createPerson("Richard", "Miles");
         UUID actorAccountId = identity.createEnabledAccount(actorPersonId, "miles.richard", Set.of(Role.ADMIN));
+        identity.signInAs("miles.richard");
 
         // when
         UUID personId = roster.addPerson("Jane", "Roe", "jane.roe@example.org");
@@ -107,5 +112,53 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
         assertThat(audit.eventsAbout(personId)).singleElement()
                 .extracting(AuditTestFixture.RecordedEvent::actorAccountId)
                 .isEqualTo(actorAccountId);
+    }
+
+    @Test
+    void givenAnAdministratorRenamesTheirOwnAccount_whenTheAuditLogIsRead_thenItStillNamesThem() {
+        // given
+        UUID personId = identity.createPerson("Richard", "Miles");
+        UUID accountId = identity.createEnabledAccount(personId, "miles.richard", Set.of(Role.ADMIN));
+        identity.signInAs("miles.richard");
+
+        // when
+        roster.correctAccountUsername(personId, "miles.rich");
+
+        // then
+        assertThat(audit.eventsAbout(personId)).last()
+                .extracting(AuditTestFixture.RecordedEvent::actorAccountId)
+                .isEqualTo(accountId);
+    }
+
+    @Test
+    void givenASynchronisationCorrectsAName_whenTheAuditLogIsRead_thenItIsRecordedLikeAnyOtherChange() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+
+        // when
+        roster.synchroniseCorrectedLastName(personId, "Roe");
+
+        // then
+        assertThat(audit.eventsAbout(personId)).last().satisfies(event -> {
+            assertThat(event.eventType()).isEqualTo("roster.person.corrected");
+            assertThat(event.payload()).containsEntry("fields", java.util.List.of("lastName"));
+        });
+    }
+
+    @Test
+    void givenASynchronisationEndsTheLastMembership_whenTheAuditLogIsRead_thenTheDisablingIsRecorded() {
+        // given
+        UUID personId = roster.addPerson("John", "Roe", "john.roe@example.org");
+        UUID membershipTypeId = roster.createMembershipType("Adults");
+        roster.assignMembership(personId, membershipTypeId);
+        roster.giveAccount(personId, "roe.john", "handover-password", Set.of(Role.MEMBER));
+
+        // when
+        roster.synchroniseDeparture(personId);
+
+        // then
+        assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
+                .endsWith("roster.membership.ended", "roster.account.availabilityChanged");
+        assertThat(audit.eventsAbout(personId).getLast().payload()).containsEntry("enabled", false);
     }
 }

@@ -6,7 +6,7 @@ import org.springframework.security.core.userdetails.User;
 import java.util.List;
 import java.util.UUID;
 
-final class CourtsideUserDetails extends User {
+public final class CourtsideUserDetails extends User {
 
     private final UUID accountId;
     private final long securityEpoch;
@@ -19,7 +19,7 @@ final class CourtsideUserDetails extends User {
         this.securityEpoch = securityEpoch;
     }
 
-    UUID accountId() {
+    public UUID accountId() {
         return accountId;
     }
 

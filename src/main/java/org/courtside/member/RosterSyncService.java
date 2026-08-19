@@ -9,6 +9,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.PersonNotFoundException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class RosterSyncService {
     private final UserAccountRepository accounts;
     private final RosterService roster;
     private final AccountSessions sessions;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public RosterSyncOutcome apply(RosterChangeSet changeSet) {
@@ -108,10 +110,14 @@ public class RosterSyncService {
             }
             account.disable();
             sessions.endIfRevoked(account, account.getUsername(), epoch);
+            events.publishEvent(new RosterEvent.AccountAvailabilityChanged(
+                    account.getPerson().getId(), account.getId(), false));
             return Departure.DISABLED;
         }
         account.changeRoles(remaining);
         sessions.endIfRevoked(account, account.getUsername(), epoch);
+        events.publishEvent(new RosterEvent.AccountRolesChanged(
+                account.getPerson().getId(), account.getId(), remaining));
         return Departure.ROLE_REMOVED;
     }
 

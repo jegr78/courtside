@@ -2,7 +2,6 @@ package org.courtside.audit.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.identity.CurrentUser;
-import org.courtside.identity.UserAccount;
 import org.courtside.shared.DomainEventRecord;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -29,6 +28,6 @@ class DomainEventWriter {
     }
 
     private UUID actor() {
-        return currentUser.account().map(UserAccount::getId).orElse(null);
+        return currentUser.accountId().orElse(null);
     }
 }

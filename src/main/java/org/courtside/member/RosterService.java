@@ -104,6 +104,7 @@ public class RosterService {
         UUID id = requiredPersonId(personId);
         Person person = persons.findById(id)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        Set<String> corrected = correctedFields(person, firstName, lastName, email);
         if (firstName != null || lastName != null) {
             person.rename(
                     firstName == null ? person.getFirstName() : strippedNonBlank(firstName, "first name"),
@@ -111,6 +112,9 @@ public class RosterService {
         }
         if (email != null) {
             person.changeEmail(strippedAddress(email));
+        }
+        if (!corrected.isEmpty()) {
+            events.publishEvent(new RosterEvent.PersonCorrected(id, corrected));
         }
     }
 
@@ -318,6 +322,20 @@ public class RosterService {
     private Person requireLockedPerson(UUID personId) {
         return persons.findWithLockById(personId)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + personId));
+    }
+
+    private static Set<String> correctedFields(Person person, String firstName, String lastName, String email) {
+        Set<String> changed = new LinkedHashSet<>();
+        if (firstName != null && !person.getFirstName().equals(strippedNonBlank(firstName, "first name"))) {
+            changed.add("firstName");
+        }
+        if (lastName != null && !person.getLastName().equals(strippedNonBlank(lastName, "last name"))) {
+            changed.add("lastName");
+        }
+        if (email != null && !person.getEmail().equals(strippedAddress(email))) {
+            changed.add("email");
+        }
+        return changed;
     }
 
     private static Set<String> changedFields(Person person, String firstName, String lastName, String email) {

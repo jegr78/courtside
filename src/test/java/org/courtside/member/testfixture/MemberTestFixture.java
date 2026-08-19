@@ -4,11 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.member.MemberRepository;
 import org.courtside.member.MemberService;
 import org.courtside.member.MembershipPeriod;
+import org.courtside.member.RosterChangeSet;
 import org.courtside.member.RosterService;
+import org.courtside.member.RosterSyncService;
 
 import org.courtside.identity.Role;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -21,13 +24,24 @@ public class MemberTestFixture {
     private final MemberService memberships;
     private final RosterService roster;
     private final MemberRepository members;
+    private final RosterSyncService sync;
 
     public UUID addPerson(String firstName, String lastName, String email) {
         return roster.createPerson(firstName, lastName, email).personId();
     }
 
-    public void correctPerson(UUID personId, String firstName, String lastName, String email) {
+    public void changePerson(UUID personId, String firstName, String lastName, String email) {
         roster.changePerson(personId, firstName, lastName, email);
+    }
+
+    public void synchroniseCorrectedLastName(UUID personId, String lastName) {
+        sync.apply(new RosterChangeSet(List.of(),
+                List.of(new RosterChangeSet.PersonCorrection(personId, null, lastName, null, null)),
+                List.of()));
+    }
+
+    public void synchroniseDeparture(UUID personId) {
+        sync.apply(new RosterChangeSet(List.of(), List.of(), List.of(personId)));
     }
 
     public void giveAccount(UUID personId, String username, String oneTimePassword, Set<Role> roles) {
