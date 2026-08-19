@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { test } from "node:test";
@@ -24,10 +25,20 @@ test("given an unresolved catalog entry, when validation runs, then ownership an
   // given
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
   const blocked = catalog.tests.find(({ status }) => status === "blocked");
+  const missingControlRationale = structuredClone(catalog);
+  const blockedControl = missingControlRationale.controlCoverage.flatMap(({ controls }) => controls)
+    .find(({ status }) => status === "blocked");
+  delete blockedControl.rationale;
+  const missingControlOwner = structuredClone(catalog);
+  const plannedControl = missingControlOwner.controlCoverage.flatMap(({ controls }) => controls)
+    .find(({ status }) => status === "planned");
+  delete plannedControl.trackingIssue;
 
   // when / then
   assert.equal(validate({ ...catalog, tests: [{ ...blocked, rationale: undefined }] }), false);
   assert.equal(validate({ ...catalog, tests: [{ ...catalog.tests[0], trackingIssue: undefined }] }), false);
+  assert.equal(validate(missingControlRationale), false);
+  assert.equal(validate(missingControlOwner), false);
 });
 
 test("given the shipped attack surface, when reading the catalog, then every actor and surface is covered", () => {
@@ -77,7 +88,42 @@ test("given pinned standards, when referencing controls, then identifiers are ve
   }
 });
 
+test("given the pinned OWASP inventories, when classifying controls, then no control is omitted or classified twice", () => {
+  // given
+  const controls = catalog.controlCoverage.flatMap(({ controls }) => controls);
+  const controlIds = controls.map(({ id }) => id);
+  const expectedInventories = {
+    asvs: {
+      commit: "936f29673daa69fe90e6fa706011f89aef201988",
+      digest: "b0210d04c05d683bff51b9e7a91be3748c2b300c5ea13d2805d22647b0ceeefa"
+    },
+    wstg: {
+      commit: "dd33419e10edb22b78d89325a6c2aad9f184e3a2",
+      digest: "0133170c62fcb231d2cc3437dd4c6397590272885b9ba7cd4e94fceb8b82106b"
+    }
+  };
+
+  // when / then
+  assert.equal(new Set(controlIds).size, controlIds.length);
+  assert.equal(controls.every(({ status }) => ["planned", "implemented", "blocked", "not-applicable"].includes(status)), true);
+  for (const coverage of catalog.controlCoverage) {
+    const digest = createHash("sha256")
+      .update(coverage.controls.map(({ id }) => id).toSorted().join("\n"))
+      .digest("hex");
+    assert.equal(coverage.sourceCommit, expectedInventories[coverage.standard].commit);
+    assert.equal(digest, expectedInventories[coverage.standard].digest);
+  }
+  for (const entry of catalog.tests) {
+    for (const reference of [...entry.standardReferences.asvs, ...entry.standardReferences.wstg]) {
+      assert.equal(controlIds.includes(reference), true, `${reference} is missing from control coverage`);
+    }
+  }
+});
+
 test("given assessment profiles and outcomes, when authorizing a run, then unsafe ambiguity fails closed", () => {
+  // given
+  const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
+
   // when / then
   assert.equal(catalog.profiles.safe.productionAllowed, true);
   assert.equal(catalog.profiles.safe.productionRequiresExplicitAuthorization, true);
@@ -89,6 +135,14 @@ test("given assessment profiles and outcomes, when authorizing a run, then unsaf
   assert.equal(catalog.outcomes.failed.releaseEligible, false);
   assert.match(contract, /does not replace an independent penetration test/i);
   assert.match(contract, /docs\/quality-strategy\.md/);
+  assert.equal(validate({ ...catalog, profiles: { ...catalog.profiles, active: {
+    ...catalog.profiles.active,
+    allowedEnvironments: ["EXPLICIT_PRODUCTION"]
+  } } }), false);
+  assert.equal(validate({ ...catalog, profiles: { ...catalog.profiles, safe: {
+    ...catalog.profiles.safe,
+    productionRequiresExplicitAuthorization: false
+  } } }), false);
 });
 
 test("given a single maintainer, when recording a security decision, then independent review is transparent but not mandatory", () => {

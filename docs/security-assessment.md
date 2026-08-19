@@ -16,7 +16,7 @@ Catalog version 1 uses:
 
 ASVS references include the version, for example `v5.0.0-8.2.2`. WSTG references include `v4.2`. A standards upgrade changes the catalog version and must compare renamed, added and removed controls before it replaces an active baseline.
 
-Each catalog entry is an executable coverage unit, not a claim that the listed references exhaust every requirement in a chapter. The initial entries truthfully distinguish evidence already implemented from work planned or blocked by a missing product capability. Before the baseline in #253 can pass, every applicable ASVS Level 2 and WSTG control must be linked to an implemented entry, or explicitly recorded as blocked or not applicable with a rationale. An unclassified or merely planned applicable control makes that baseline incomplete.
+Each catalog entry is an executable coverage unit, not a claim that the listed references exhaust every requirement in a chapter. The control inventory pins all 253 ASVS requirements at Levels 1 and 2 and all 97 WSTG test identifiers from the cited source commits. A control without a more specific automated assessment remains `planned` under #251; this conservative classification prevents an unreviewed control from disappearing as implicitly not applicable. Before the baseline in #253 can pass, every applicable control must be linked to an implemented entry, or explicitly recorded as blocked or not applicable with a rationale. An unclassified or merely planned applicable control makes that baseline incomplete.
 
 ## Authorization and targets
 
