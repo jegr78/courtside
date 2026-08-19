@@ -118,6 +118,26 @@ class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void whenReadingSecurityCaddyfile_thenProductionProxyTrustBoundaryIsPreserved() throws IOException {
+        // given
+        String production = Files.readString(Path.of("deploy/Caddyfile"));
+        String security = Files.readString(Path.of("deploy/Caddyfile.security"));
+        Matcher productionProxy = REVERSE_PROXY_BLOCK.matcher(production);
+        Matcher securityProxy = REVERSE_PROXY_BLOCK.matcher(security);
+
+        // when / then
+        assertThat(productionProxy.find()).isTrue();
+        assertThat(securityProxy.find()).isTrue();
+        assertThat(securityProxy.group("directives").lines().map(String::strip).toList())
+                .containsExactlyElementsOf(productionProxy.group("directives").lines().map(String::strip).toList());
+        assertThat(security)
+                .contains("X-Content-Type-Options nosniff", "X-Frame-Options DENY",
+                        "Referrer-Policy strict-origin-when-cross-origin",
+                        "Permissions-Policy \"geolocation=(), camera=(), microphone=()\"")
+                .doesNotContain("Strict-Transport-Security");
+    }
+
+    @Test
     void whenReadingCaddyfile_thenRequestBodiesHaveABoundedSize() throws IOException {
         // when
         String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));

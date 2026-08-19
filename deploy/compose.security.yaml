@@ -90,6 +90,7 @@ services:
     tmpfs:
       - /config:size=8m
       - /data:size=32m
+      - /tmp:size=8m
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -103,6 +104,11 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${COURTSIDE_SECURITY_HTTPS_PORT:?required}:443"
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "--quiet", "--output-document=-", "https://localhost/api/source"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes:
       - ./Caddyfile.security:/etc/caddy/Caddyfile:ro
     networks:

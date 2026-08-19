@@ -1,28 +1,23 @@
 package org.courtside.securityassessment;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.DefaultApplicationArguments;
+import org.springframework.boot.EnvironmentPostProcessor;
+import org.springframework.core.io.support.SpringFactoriesLoader;
+import org.springframework.mock.env.MockEnvironment;
 
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class SecurityAssessmentSafetyTest {
 
     @Test
     void givenDisposableUseWasNotConfirmed_whenGuardingSecurityAssessment_thenStartupIsRejected() {
         // given
-        SecurityAssessmentEnvironmentGuard guard = new SecurityAssessmentEnvironmentGuard(
-                mock(DataSource.class), new SecurityAssessmentProperties(false, "run-01", "fingerprint", "password"),
-                "SECURITY");
+        MockEnvironment environment = validEnvironment()
+                .withProperty("courtside.security-assessment.confirm-disposable", "false");
 
         // when / then
-        assertThatThrownBy(() -> guard.run(new DefaultApplicationArguments(new String[0])))
+        assertThatThrownBy(() -> SecurityAssessmentEnvironmentGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("COURTSIDE_SECURITY_CONFIRM_DISPOSABLE");
     }
@@ -30,27 +25,22 @@ class SecurityAssessmentSafetyTest {
     @Test
     void givenWrongMarker_whenGuardingSecurityAssessment_thenStartupIsRejected() {
         // given
-        SecurityAssessmentEnvironmentGuard guard = new SecurityAssessmentEnvironmentGuard(
-                mock(DataSource.class), new SecurityAssessmentProperties(true, "run-01", "fingerprint", "password"),
-                "UAT");
+        MockEnvironment environment = validEnvironment().withProperty("courtside.environment", "UAT");
 
         // when / then
-        assertThatThrownBy(() -> guard.run(new DefaultApplicationArguments(new String[0])))
+        assertThatThrownBy(() -> SecurityAssessmentEnvironmentGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("COURTSIDE_ENVIRONMENT=SECURITY");
     }
 
     @Test
-    void givenRemoteDatabase_whenGuardingSecurityAssessment_thenStartupIsRejected() throws Exception {
+    void givenRemoteDatabase_whenGuardingSecurityAssessment_thenStartupIsRejected() {
         // given
-        DataSource dataSource = dataSource("jdbc:postgresql://database.example.org:5432/courtside_security");
-        SecurityAssessmentEnvironmentGuard guard = new SecurityAssessmentEnvironmentGuard(
-                dataSource, new SecurityAssessmentProperties(true, "run-01",
-                        SecurityAssessmentDataSeeder.SEED_FINGERPRINT,
-                        "long-test-password"), "SECURITY");
+        MockEnvironment environment = validEnvironment().withProperty(
+                "spring.datasource.url", "jdbc:postgresql://database.example.org:5432/courtside_security");
 
         // when / then
-        assertThatThrownBy(() -> guard.run(new DefaultApplicationArguments(new String[0])))
+        assertThatThrownBy(() -> SecurityAssessmentEnvironmentGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Compose database host db");
     }
@@ -58,36 +48,46 @@ class SecurityAssessmentSafetyTest {
     @Test
     void givenAnotherDatasetFingerprint_whenGuardingSecurityAssessment_thenStartupIsRejected() {
         // given
-        SecurityAssessmentEnvironmentGuard guard = new SecurityAssessmentEnvironmentGuard(
-                mock(DataSource.class), new SecurityAssessmentProperties(true, "run-01",
-                        "sha256:" + "a".repeat(64), "long-test-password"), "SECURITY");
+        MockEnvironment environment = validEnvironment().withProperty(
+                "courtside.security-assessment.seed-fingerprint", "sha256:" + "a".repeat(64));
 
         // when / then
-        assertThatThrownBy(() -> guard.run(new DefaultApplicationArguments(new String[0])))
+        assertThatThrownBy(() -> SecurityAssessmentEnvironmentGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("does not match this dataset");
     }
 
     @Test
-    void givenCompleteLocalIdentity_whenGuardingSecurityAssessment_thenStartupIsAllowed() throws Exception {
+    void givenSecurityProfileWithoutDatabase_whenProcessingEnvironment_thenGuardRejectsBeforeContextStartup() {
         // given
-        SecurityAssessmentEnvironmentGuard guard = new SecurityAssessmentEnvironmentGuard(
-                dataSource("jdbc:postgresql://db:5432/courtside_security"),
-                new SecurityAssessmentProperties(true, "run-01", SecurityAssessmentDataSeeder.SEED_FINGERPRINT,
-                        "long-test-password"), "SECURITY");
+        MockEnvironment environment = validEnvironment();
+        environment.setActiveProfiles("security");
+        environment.setProperty("spring.datasource.url", "jdbc:postgresql://remote.example.org/courtside_security");
 
         // when / then
-        assertThatCode(() -> guard.run(new DefaultApplicationArguments(new String[0])))
-                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> new SecurityAssessmentEnvironmentGuard().postProcessEnvironment(environment, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Compose database host db");
     }
 
-    private DataSource dataSource(String url) throws Exception {
-        DataSource dataSource = mock(DataSource.class);
-        Connection connection = mock(Connection.class);
-        DatabaseMetaData metadata = mock(DatabaseMetaData.class);
-        when(dataSource.getConnection()).thenReturn(connection);
-        when(connection.getMetaData()).thenReturn(metadata);
-        when(metadata.getURL()).thenReturn(url);
-        return dataSource;
+    @Test
+    void whenLoadingEnvironmentProcessors_thenSecurityGuardRunsBeforeContextCreation() {
+        // when
+        var processorNames = SpringFactoriesLoader.loadFactoryNames(
+                EnvironmentPostProcessor.class, SecurityAssessmentSafetyTest.class.getClassLoader());
+
+        // then
+        assertThat(processorNames).contains(SecurityAssessmentEnvironmentGuard.class.getName());
+    }
+
+    private MockEnvironment validEnvironment() {
+        return new MockEnvironment()
+                .withProperty("courtside.environment", "SECURITY")
+                .withProperty("courtside.security-assessment.confirm-disposable", "true")
+                .withProperty("courtside.security-assessment.run-id", "run-01")
+                .withProperty("courtside.security-assessment.seed-fingerprint",
+                        SecurityAssessmentDataset.fingerprint())
+                .withProperty("courtside.security-assessment.shared-password", "long-test-password")
+                .withProperty("spring.datasource.url", "jdbc:postgresql://db:5432/courtside_security");
     }
 }

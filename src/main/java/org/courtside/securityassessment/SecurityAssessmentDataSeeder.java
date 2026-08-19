@@ -45,9 +45,7 @@ import java.util.UUID;
 class SecurityAssessmentDataSeeder implements ApplicationRunner {
 
     static final String MARKER_USERNAME = "security.member.1";
-    static final String SEED_FINGERPRINT =
-            "sha256:0f2c471c621e36b85eb17cec3cc0a134a84995ae8b14bdee9212d2faa9efc2e9";
-    static final int ROLE_ACCOUNT_COUNT = Role.values().length * 2;
+    static final int ROLE_ACCOUNT_COUNT = Role.values().length * SecurityAssessmentDataset.isolatedAccountsPerRole();
     private static final UUID ACTIVE_MEMBERSHIP_TYPE =
             UUID.fromString("cccccccc-0000-0000-0000-000000000001");
     private static final UUID MEMBER_BOOKING_CARD =
@@ -89,8 +87,9 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
     }
 
     private void requireCompleteSeed() {
-        if (accounts.count() != ROLE_ACCOUNT_COUNT + 2L || members.count() != ROLE_ACCOUNT_COUNT + 1L
-                || bookings.count() != 2 || countSeries() != 1 || facility.allCourts().size() != 2
+        long seededAccounts = ROLE_ACCOUNT_COUNT + SecurityAssessmentDataset.managerCombinationAccounts();
+        if (accounts.count() != seededAccounts + 1 || members.count() != seededAccounts
+                || bookings.count() != expectedBookingCount() || countSeries() != 1 || facility.allCourts().size() != 2
                 || cards.allParticipantCards().size() != 5) {
             throw new IllegalStateException("The security dataset is incomplete; recreate the environment");
         }
@@ -107,7 +106,7 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
         String hash = passwordEncoder.encode(properties.sharedPassword());
         List<SecurityIdentity> result = new ArrayList<>(ROLE_ACCOUNT_COUNT);
         for (Role role : Role.values()) {
-            for (int index = 1; index <= 2; index++) {
+            for (int index = 1; index <= SecurityAssessmentDataset.isolatedAccountsPerRole(); index++) {
                 String key = "security." + role.name().toLowerCase().replace('_', '.') + "." + index;
                 result.add(createIdentity("Security", roleLabel(role) + index, key, hash, Set.of(role), true));
             }
@@ -117,8 +116,10 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
 
     private void createRoleCombination(List<SecurityIdentity> identities) {
         String hash = passwordEncoder.encode(properties.sharedPassword());
-        identities.add(createIdentity("Security", "Manager", "security.manager", hash,
-                Set.of(Role.MEMBER, Role.TRAINER, Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR), false));
+        for (int index = 1; index <= SecurityAssessmentDataset.managerCombinationAccounts(); index++) {
+            identities.add(createIdentity("Security", "Manager" + index, "security.manager." + index, hash,
+                    Set.of(Role.MEMBER, Role.TRAINER, Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR), false));
+        }
     }
 
     private SecurityIdentity createIdentity(String firstName, String lastName, String username,
@@ -148,7 +149,7 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
     private void createBookingsAndSeries(List<SecurityIdentity> identities, List<Court> courts) {
         Instant now = clock.instant();
         LocalDate tomorrow = LocalDate.now(clock.withZone(timeZone.zoneId())).plusDays(1);
-        for (int index = 0; index < 2; index++) {
+        for (int index = 0; index < SecurityAssessmentDataset.standaloneBookings(); index++) {
             SecurityIdentity owner = identities.get(index);
             Instant start = ZonedDateTime.of(tomorrow.plusDays(index), LocalTime.of(10, 0),
                     timeZone.zoneId()).toInstant();
@@ -158,20 +159,37 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
             booking.addParticipant(ParticipantSpec.member(owner.person().getId()));
             bookings.save(booking);
         }
+        createSeries(identities.getFirst(), courts.getFirst(), tomorrow.plusWeeks(1), now);
+    }
+
+    private void createSeries(SecurityIdentity owner, Court court, LocalDate startsOn, Instant now) {
         UUID seriesId = UUID.randomUUID();
-        LocalDate startsOn = tomorrow.plusWeeks(1);
         jdbc.update("""
                 INSERT INTO booking_series (
                     id, card_id, starts_on, start_time, duration_minutes, interval_weeks,
                     weekdays, occurrence_count, note, created_by, created_at
-                ) VALUES (?, ?, ?, ?, 60, 1, ARRAY[?]::smallint[], 2, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, 60, 1, ARRAY[?]::smallint[], ?, ?, ?, ?)
                 """, seriesId, MEMBER_BOOKING_CARD, startsOn, LocalTime.of(12, 0),
-                DayOfWeek.from(startsOn).getValue(), "Security assessment series",
-                identities.getFirst().account().getId(), Timestamp.from(now));
+                DayOfWeek.from(startsOn).getValue(), SecurityAssessmentDataset.seriesOccurrences(),
+                "Security assessment series", owner.account().getId(), Timestamp.from(now));
         jdbc.update("""
                 INSERT INTO booking_series_court (booking_series_id, position, court_id)
                 VALUES (?, 0, ?)
-                """, seriesId, courts.getFirst().getId());
+                """, seriesId, court.getId());
+        for (int index = 0; index < SecurityAssessmentDataset.seriesOccurrences(); index++) {
+            Instant start = ZonedDateTime.of(startsOn.plusWeeks(index), LocalTime.of(12, 0),
+                    timeZone.zoneId()).toInstant();
+            Booking booking = new Booking(MEMBER_BOOKING_CARD, owner.account().getId(),
+                    "Security assessment series occurrence " + (index + 1), now);
+            booking.allocate(court.getId(), new TimeSlot(start, start.plusSeconds(3600)));
+            booking.addParticipant(ParticipantSpec.member(owner.person().getId()));
+            bookings.saveAndFlush(booking);
+            jdbc.update("UPDATE booking SET series_id = ? WHERE id = ?", seriesId, booking.getId());
+        }
+    }
+
+    private int expectedBookingCount() {
+        return SecurityAssessmentDataset.standaloneBookings() + SecurityAssessmentDataset.seriesOccurrences();
     }
 
     private long countSeries() {

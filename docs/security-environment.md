@@ -9,7 +9,7 @@ The `security` Spring profile and `deploy/compose.security.yaml` create one disp
 
 ## Prepare the images
 
-The environment has no Internet route and every service uses `pull_policy: never`. Pull the pinned PostgreSQL and Caddy images before starting it. Build or pull the Courtside candidate separately and refer to it by immutable image ID or registry digest.
+The application networks have no Internet route and every service uses `pull_policy: never`. Pull the pinned PostgreSQL and Caddy images before starting it. Build or pull the Courtside candidate separately and refer to it by immutable image ID or registry digest.
 
 ```bash
 docker pull postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
@@ -19,11 +19,13 @@ node tools/security-environment.mjs start run-0001 ghcr.io/jegr78/courtside@sha2
 
 The command creates a random shared password, a seed fingerprint and a private state file below `build/security/run-0001`. It prints the synthetic credential once for the operator. The password never appears in a tracked file or command argument.
 
-Each run gets its own Compose project, networks, containers and dynamically allocated loopback TLS port. Both networks are Docker-internal. The application can reach PostgreSQL and the local callback service, but neither the application nor a scanner attached to these networks can follow a redirect or callback to the Internet or the host's private network.
+Each run gets its own Compose project, networks, containers and dynamically allocated loopback TLS port. Both application networks are Docker-internal. The application and scanners attached only to these networks have no routed Internet or private-network access.
+
+Docker's host and container runtime remain part of the host trust boundary. Run active and destructive assessments inside a dedicated VM with no sensitive host services or private-network access. The Compose isolation alone is sufficient only for safe checks.
 
 ## Dataset
 
-The profile creates two enabled accounts for each product role and one account carrying the relevant member and manager role combination. Every identity uses an English placeholder name and an `@example.org` address. The dataset also contains current and ended memberships, two courts, foreign-owned bookings and a series. The shared password is unique to the run.
+The profile creates two enabled accounts for each product role and two accounts carrying the relevant member and manager role combination. Every identity uses an English placeholder name and an `@example.org` address. The dataset also contains current and ended memberships, two courts, foreign-owned bookings and a series with two usable occurrences. The shared password is unique to the run.
 
 The bootstrap administrator is separate and retains its mandatory initial-password state. Assessment code should use the role-specific accounts unless it is explicitly testing bootstrap behavior.
 
@@ -41,4 +43,10 @@ A different environment, run ID or seed fingerprint stops verification. Reset re
 node tools/security-environment.mjs reset run-0001
 ```
 
-The database and Caddy state use size-limited tmpfs mounts, so no data volume survives `down`. An interrupted run can use the same reset command. If its private state file is lost, use `docker compose -p courtside-security-run-0001 -f deploy/compose.security.yaml down --volumes --remove-orphans`; the explicit project name keeps cleanup away from other workspaces.
+The database and Caddy state use size-limited tmpfs mounts, so no data volume survives `down`. An interrupted run can use the same reset command. If its private state file is lost, recover by explicit run ID:
+
+```bash
+node tools/security-environment.mjs recover run-0001
+```
+
+The validated project name keeps cleanup away from other workspaces.
