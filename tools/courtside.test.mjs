@@ -268,6 +268,25 @@ test("given performance commands, when parsing them, then lifecycle and diagnosi
   assert.throws(() => parseArguments(["perf-promote", "summary.json"]), /--confirm courtside-perf/);
 });
 
+test("given security commands, when parsing them, then run identity and authorization stay explicit", () => {
+  // when
+  const plan = parseArguments(["security-plan", "run-0001", "active"]);
+  const run = parseArguments([
+    "security-run", "run-0001", "active", "--authorize", "authorize-active-run-0001"
+  ]);
+
+  // then
+  assert.equal(plan.runId, "run-0001");
+  assert.equal(plan.profile, "active");
+  assert.equal(run.authorization, "authorize-active-run-0001");
+  assert.throws(() => parseArguments(["security-run", "run-0001", "active"]), /--authorize/);
+  assert.equal(parseArguments(["security-stop", "run-0001"]).runId, "run-0001");
+  assert.equal(parseArguments(["security-report", "run-0001", "--attempt", "2"]).attempt, 2);
+  assert.throws(() => parseArguments(["security-recover", "run-0001"]), /--attempt/);
+  assert.throws(() => parseArguments(["security-reset", "run-0001", "--confirm", "wrong"]),
+    /courtside-security-run-0001/);
+});
+
 test("given automated performance startup, when suppressing credentials, then the password is absent from output", () => {
   // given
   const options = parseArguments(["perf", "--skip-verify", "--no-credential-output"]);

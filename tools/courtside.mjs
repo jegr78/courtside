@@ -11,6 +11,14 @@ import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, re
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
+import {
+  readSecurityIdentity, recoverSecurityEnvironment, securityProject, securityStateRoot,
+  startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment
+} from "./security-environment.mjs";
+import {
+  buildSecurityPlan, clearEmergencyStop, executeSecurityPlan, fingerprintSecurityTarget, readSecurityManifest,
+  recoverSecurityRun, requestEmergencyStop, securityRunContract
+} from "./security-runner.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devComposeFile = join(root, "deploy", "compose.dev.yaml");
@@ -56,6 +64,8 @@ export function parseArguments(argv) {
     "build", "verify", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
     "uat-share", "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore",
     "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset", "perf-run", "perf-promote", "perf-compare",
+    "security", "security-verify", "security-plan", "security-run", "security-report", "security-stop",
+    "security-cleanup", "security-recover", "security-reset",
     "status", "help"
   ]);
   if (!command || !supported.has(command)) {
@@ -65,7 +75,8 @@ export function parseArguments(argv) {
     command, suspend: false, json: false, environment: undefined, version: undefined,
     skipVerify: false, dbPort: false, file: undefined, confirm: undefined, all: false,
     profile: undefined, fresh: false, telemetry: false, remoteWrite: false, showCredentials: true,
-    target: undefined, baseline: undefined, output: undefined
+    target: undefined, baseline: undefined, output: undefined, runId: undefined, authorization: undefined,
+    attempt: undefined, image: undefined
   };
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
@@ -118,6 +129,22 @@ export function parseArguments(argv) {
       options.baseline = requiredOptionValue(flags, ++index, "--baseline");
     } else if (flag === "--output" && command === "perf-compare") {
       options.output = requiredOptionValue(flags, ++index, "--output");
+    } else if (!flag.startsWith("--") && command === "security" && !options.runId) {
+      options.runId = flag;
+    } else if (!flag.startsWith("--") && command === "security" && !options.image) {
+      options.image = flag;
+    } else if (!flag.startsWith("--") && command.startsWith("security-") && !options.runId) {
+      options.runId = flag;
+    } else if (!flag.startsWith("--") && ["security-plan", "security-run"].includes(command) && !options.profile) {
+      options.profile = flag;
+    } else if (flag === "--authorize" && ["security-plan", "security-run"].includes(command)) {
+      options.authorization = requiredOptionValue(flags, ++index, "--authorize");
+    } else if (flag === "--attempt" && ["security-report", "security-recover"].includes(command)) {
+      const attempt = requiredOptionValue(flags, ++index, "--attempt");
+      if (!/^[1-9][0-9]*$/.test(attempt)) throw new Error("--attempt requires a positive integer");
+      options.attempt = Number(attempt);
+    } else if (flag === "--confirm" && command === "security-reset") {
+      options.confirm = requiredOptionValue(flags, ++index, "--confirm");
     } else {
       throw new Error(`Unknown option for ${command}: ${flag}`);
     }
@@ -168,6 +195,22 @@ export function parseArguments(argv) {
   }
   if (command === "perf-compare" && (!options.file || !options.baseline || !options.output)) {
     throw new Error("perf-compare requires a candidate, --baseline, and --output");
+  }
+  if (command === "security" && (!options.runId || !options.image)) {
+    throw new Error("security requires RUN_ID and IMAGE_DIGEST");
+  }
+  if (command.startsWith("security-") && !options.runId) throw new Error(`${command} requires RUN_ID`);
+  if (["security-plan", "security-run"].includes(command) && !["safe", "active", "destructive"].includes(options.profile)) {
+    throw new Error(`${command} requires safe, active, or destructive`);
+  }
+  if (command === "security-run" && options.profile !== "safe" && !options.authorization) {
+    throw new Error(`security-run ${options.profile} requires --authorize`);
+  }
+  if (command === "security-recover" && !options.attempt) {
+    throw new Error("security-recover requires --attempt with the interrupted attempt number");
+  }
+  if (command === "security-reset" && options.confirm !== securityProject(options.runId)) {
+    throw new Error(`security-reset requires --confirm ${securityProject(options.runId)}`);
   }
   return options;
 }
@@ -454,7 +497,7 @@ async function main() {
     if (["build", "verify", "dev", "dev-debug", "uat", "uat-share", "perf"].includes(options.command) && !options.version) {
       validateJava();
     }
-    if (!["build", "help", "perf-compare"].includes(options.command)) {
+    if (!["build", "help", "perf-compare", "security-plan", "security-report", "security-stop"].includes(options.command)) {
       validateDocker();
     }
     await execute(options);
@@ -541,7 +584,90 @@ async function execute(options) {
     await showStatus(options.environment, options.json);
     return;
   }
+  if (options.command === "security") {
+    await startSecurityEnvironment(options.runId, options.image);
+    return;
+  }
+  if (options.command === "security-verify") {
+    process.stdout.write(`${JSON.stringify(verifiedSecurityIdentity(options.runId), null, 2)}\n`);
+    return;
+  }
+  if (options.command === "security-plan") {
+    process.stdout.write(`${JSON.stringify(securityAssessmentPlan(options, true), null, 2)}\n`);
+    return;
+  }
+  if (options.command === "security-run") {
+    const plan = securityAssessmentPlan(options, false);
+    const manifest = await executeSecurityPlan(plan, {
+      root: securityStateRoot,
+      verifyTarget: async () => verifiedSecurityIdentity(options.runId)
+    });
+    process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
+    if (manifest.outcome !== "passed") process.exitCode = 1;
+    return;
+  }
+  if (options.command === "security-report") {
+    process.stdout.write(`${JSON.stringify(readSecurityManifest(securityStateRoot, options.runId, options.attempt), null, 2)}\n`);
+    return;
+  }
+  if (options.command === "security-stop") {
+    requestEmergencyStop(securityStateRoot, options.runId, "local-maintainer");
+    process.stdout.write(`Emergency stop requested for ${options.runId}.\n`);
+    return;
+  }
+  if (options.command === "security-recover") {
+    const manifest = recoverSecurityRun(securityStateRoot, options.runId, options.attempt);
+    recoverSecurityEnvironment(options.runId, {
+      runId: manifest.runId,
+      seedFingerprint: manifest.seedFingerprint,
+      instanceFingerprint: manifest.instanceFingerprint
+    });
+    rmSync(clearEmergencyStop(securityStateRoot, options.runId), { force: true });
+    process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
+    return;
+  }
+  if (options.command === "security-cleanup") {
+    stopSecurityEnvironment(options.runId);
+    process.stdout.write(`Security environment ${options.runId} removed; assessment evidence retained.\n`);
+    return;
+  }
+  if (options.command === "security-reset") {
+    try {
+      stopSecurityEnvironment(options.runId);
+    } catch {
+      const identity = readSecurityIdentity(options.runId);
+      recoverSecurityEnvironment(options.runId, {
+        runId: identity.runId,
+        seedFingerprint: identity.seedFingerprint,
+        instanceFingerprint: identity.instanceFingerprint
+      });
+    }
+    rmSync(join(securityStateRoot, options.runId), { recursive: true, force: true });
+    process.stdout.write(`Security environment and evidence for ${options.runId} removed.\n`);
+    return;
+  }
   await startDevelopment(options);
+}
+
+function securityAssessmentPlan(options, dryRun) {
+  const identity = readSecurityIdentity(options.runId);
+  const catalog = JSON.parse(readFileSync(join(root, "security", "assessment-catalog.json"), "utf8"));
+  return buildSecurityPlan({
+    ...identity,
+    profile: options.profile,
+    targetFingerprint: fingerprintSecurityTarget(identity),
+    catalogVersion: catalog.catalogVersion,
+    catalogTests: catalog.tests,
+    tools: securityRunContract.tools,
+    selectedTests: securityRunContract.selectedTests,
+    authorization: options.authorization,
+    dryRun
+  });
+}
+
+function verifiedSecurityIdentity(runId) {
+  const identity = verifySecurityEnvironment(runId);
+  return { ...identity, targetFingerprint: fingerprintSecurityTarget(identity) };
 }
 
 function startUat(options) {
@@ -1785,7 +1911,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

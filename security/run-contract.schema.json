@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:run-contract:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profiles", "tools", "selectedTests"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["safe", "active", "destructive"],
+      "properties": {
+        "safe": { "$ref": "#/$defs/profile" },
+        "active": { "$ref": "#/$defs/profile" },
+        "destructive": { "$ref": "#/$defs/profile" }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/tool" }
+    },
+    "selectedTests": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^CSA-[A-Z]+-[0-9]{3}$" }
+    }
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durationSeconds", "requests", "concurrency", "generatedDataMegabytes", "cpu", "memoryMegabytes", "evidenceMegabytes", "expectedDuration"],
+      "properties": {
+        "durationSeconds": { "type": "integer", "minimum": 1 },
+        "requests": { "type": "integer", "minimum": 1 },
+        "concurrency": { "type": "integer", "minimum": 1 },
+        "generatedDataMegabytes": { "type": "number", "minimum": 0 },
+        "cpu": { "type": "number", "exclusiveMinimum": 0 },
+        "memoryMegabytes": { "type": "integer", "minimum": 1 },
+        "evidenceMegabytes": { "type": "integer", "minimum": 1 },
+        "expectedDuration": { "type": "string", "pattern": "^up to [1-9][0-9]* minutes$" }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "testIds"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" },
+        "version": { "type": "string", "minLength": 1 },
+        "testIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^CSA-[A-Z]+-[0-9]{3}$" }
+        }
+      }
+    }
+  }
+}

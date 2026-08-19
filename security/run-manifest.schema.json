@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:run-manifest:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "attempt", "status", "outcome", "profile", "target", "environment", "application", "targetFingerprint", "seedFingerprint", "instanceFingerprint", "catalogVersion", "tools", "selectedTests", "budgets", "startedAt", "finishedAt", "toolResults", "reason", "usage"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "runId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,47}$" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["running", "finished"] },
+    "outcome": { "type": ["string", "null"], "enum": ["passed", "incomplete", "failed", null] },
+    "profile": { "enum": ["safe", "active", "destructive"] },
+    "target": { "type": "string", "pattern": "^https://" },
+    "environment": { "type": "string", "minLength": 1 },
+    "application": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["imageDigest", "commit"],
+      "properties": {
+        "imageDigest": { "type": "string", "pattern": "^(?:sha256:[a-f0-9]{64}|[^\\s@]+@sha256:[a-f0-9]{64})$" },
+        "commit": { "type": "string", "pattern": "^[a-f0-9]{7,64}$" }
+      }
+    },
+    "targetFingerprint": { "$ref": "#/$defs/digest" },
+    "seedFingerprint": { "$ref": "#/$defs/digest" },
+    "instanceFingerprint": { "$ref": "#/$defs/digest" },
+    "catalogVersion": { "type": "string", "pattern": "^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$" },
+    "tools": { "type": "array", "items": { "$ref": "urn:courtside:security:run-contract:v1#/$defs/tool" } },
+    "selectedTests": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^CSA-[A-Z]+-[0-9]{3}$" } },
+    "budgets": { "$ref": "urn:courtside:security:run-contract:v1#/$defs/profile" },
+    "startedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T" },
+    "finishedAt": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T" },
+    "toolResults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version", "outcome"],
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "string" },
+          "outcome": { "enum": ["passed", "incomplete", "failed"] }
+        }
+      }
+    },
+    "reason": { "type": ["string", "null"] },
+    "usage": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["requests", "generatedDataMegabytes", "evidenceBytes"],
+      "properties": {
+        "requests": { "type": "integer", "minimum": 0 },
+        "generatedDataMegabytes": { "type": "number", "minimum": 0 },
+        "evidenceBytes": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}
