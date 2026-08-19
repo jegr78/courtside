@@ -67,6 +67,9 @@ for (const locale of ["de", "en"]) {
     await page.goto("/admin/facility");
     await expect(page.getByTestId("admin-facility-view")).toBeVisible();
     await expectNoWcagViolations(page);
+    await page.goto("/admin/roster");
+    await expect(page.getByTestId("admin-roster-view")).toBeVisible();
+    await expectNoWcagViolations(page);
   });
 }
 
