@@ -25,14 +25,26 @@ function weekdayLabel(entry: AuditEntry, t: TFunction): string | undefined {
   return typeof dayOfWeek === "number" ? t(`weekday.${isoWeekdayNames[dayOfWeek - 1]}`) : undefined;
 }
 
+function isNullish(value: unknown): boolean {
+  return value === null || value === undefined;
+}
+
+function contextFor(entry: AuditEntry): string | undefined {
+  if (entry.eventType.endsWith(".availabilityChanged")) {
+    const flagKey = enabledFlagByEventType[entry.eventType] ?? "active";
+    return entry.parameters[flagKey] ? "active" : "inactive";
+  }
+  if (entry.eventType === "card.participantCard.added" && isNullish(entry.parameters.capacity)) {
+    return "unlimited";
+  }
+  if (entry.eventType === "roster.membership.written" && isNullish(entry.parameters.startedOn)) {
+    return "unknownStart";
+  }
+  return undefined;
+}
+
 function auditMessage(entry: AuditEntry, t: TFunction): string {
-  const flagKey = enabledFlagByEventType[entry.eventType] ?? "active";
-  const context = entry.eventType.endsWith(".availabilityChanged")
-    ? (entry.parameters[flagKey] ? "active" : "inactive")
-    : entry.eventType === "card.participantCard.added"
-        && (entry.parameters.capacity === null || entry.parameters.capacity === undefined)
-      ? "unlimited"
-      : undefined;
+  const context = contextFor(entry);
   const weekday = weekdayLabel(entry, t);
   const ruleType = typeof entry.parameters.ruleType === "string"
     ? t(`admin.rules.type.${entry.parameters.ruleType}`)

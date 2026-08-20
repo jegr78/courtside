@@ -9,6 +9,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // A placeholder the view derives from a field rather than rendering it directly.
 const DERIVED_PLACEHOLDERS = { weekday: "dayOfWeek" };
 
+// Every payload field whose value can be null, so a message interpolating it is a decision, not an accident.
+const NULLABLE_FIELDS = {
+  "card.participantCard.added": ["capacity"],
+  "card.participantCard.changed": ["capacity"],
+  "roster.membership.written": ["startedOn", "endedOn"]
+};
+
 const eventFields = () => new Map(
   readFileSync(join(root, "src/test/resources/domain-event-payload.properties"), "utf8")
     .split("\n")
@@ -48,6 +55,33 @@ test("given every audit message, when checking its placeholders, then each names
         const derivedFrom = DERIVED_PLACEHOLDERS[placeholder];
         if (known.has(placeholder) || (derivedFrom && known.has(derivedFrom))) continue;
         problems.push(`${locale} ${key}: {{${placeholder}}} is not a field of ${eventType}`);
+      }
+    }
+  }
+
+  // then
+  assert.deepEqual(problems, []);
+});
+
+test("given a message that interpolates a nullable field, when checking its variants, then a null-safe one exists", () => {
+  // given
+  const source = readFileSync(join(root, "frontend/src/i18n.ts"), "utf8");
+  const { de, en } = auditMessages(source);
+
+  // when
+  const problems = [];
+  for (const [locale, messages] of [["de", de], ["en", en]]) {
+    for (const [eventType, nullableFields] of Object.entries(NULLABLE_FIELDS)) {
+      const baseKey = `audit.event.${eventType}`;
+      const baseText = messages.get(baseKey);
+      if (baseText === undefined) continue;
+      for (const field of nullableFields) {
+        if (!baseText.includes(`{{${field}}}`)) continue;
+        const hasNullSafeVariant = [...messages.entries()].some(([key, text]) =>
+          key !== baseKey && key.startsWith(`${baseKey}_`) && !text.includes(`{{${field}}}`));
+        if (!hasNullSafeVariant) {
+          problems.push(`${locale} ${baseKey}: {{${field}}} is nullable and has no null-safe variant`);
+        }
       }
     }
   }

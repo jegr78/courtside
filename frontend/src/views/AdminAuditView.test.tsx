@@ -133,7 +133,8 @@ describe("AdminAuditView", () => {
     ["config.club.timeZoneChanged", { timeZone: "Europe/Berlin" }, "Time zone changed to Europe/Berlin"],
     ["rules.definition.set", { ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 } }, "Rule Advance booking window set: Maximum days in advance: 14"],
     ["rules.definition.removed", { ruleType: "ADVANCE_WINDOW" }, "Rule Advance booking window removed"],
-    ["roster.membership.written", { startedOn: "2026-01-01" }, "Membership recorded from 2026-01-01"]
+    ["roster.membership.written", { startedOn: "2026-01-01" }, "Membership recorded from 2026-01-01"],
+    ["roster.membership.written", { startedOn: null }, "Membership recorded"]
   ])("given a %s event, when it is shown, then its interpolated values are resolved, not left as template text", async (eventType, parameters, expected) => {
     // given
     const entry: AuditEntry = { ...courtAdded, eventType, parameters };
