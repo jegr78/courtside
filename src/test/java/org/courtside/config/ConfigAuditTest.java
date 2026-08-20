@@ -57,6 +57,8 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(latestPayloadOf(ConfigEvent.LocaleChanged.TYPE)).containsEntry("defaultLocale", "en");
         assertThat(countOf(ConfigEvent.ClubChanged.TYPE)).isZero();
+        assertThat(countOf(ConfigEvent.SlotDurationChanged.TYPE)).isZero();
+        assertThat(countOf(ConfigEvent.TimeZoneChanged.TYPE)).isZero();
     }
 
     @Test
@@ -72,6 +74,8 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(latestPayloadOf(ConfigEvent.SlotDurationChanged.TYPE)).containsEntry("slotMinutes", 60);
         assertThat(countOf(ConfigEvent.ClubChanged.TYPE)).isZero();
+        assertThat(countOf(ConfigEvent.LocaleChanged.TYPE)).isZero();
+        assertThat(countOf(ConfigEvent.TimeZoneChanged.TYPE)).isZero();
     }
 
     @Test
@@ -87,6 +91,8 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(latestPayloadOf(ConfigEvent.TimeZoneChanged.TYPE)).containsEntry("timeZone", "UTC");
         assertThat(countOf(ConfigEvent.ClubChanged.TYPE)).isZero();
+        assertThat(countOf(ConfigEvent.LocaleChanged.TYPE)).isZero();
+        assertThat(countOf(ConfigEvent.SlotDurationChanged.TYPE)).isZero();
     }
 
     @Test
