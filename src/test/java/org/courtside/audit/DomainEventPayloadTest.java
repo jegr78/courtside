@@ -10,10 +10,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.RecordComponent;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,16 +42,30 @@ class DomainEventPayloadTest {
                 .containsExactlyInAnyOrderEntriesOf(recorded);
     }
 
+    static Set<String> publishedTypes() {
+        return domainEventRecordClasses().stream()
+                .map(DomainEventPayloadTest::eventTypeOf)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
     private static Map<String, String> publishedPayloads() {
+        Map<String, String> payloads = new LinkedHashMap<>();
+        domainEventRecordClasses().forEach(type -> payloads.put(eventTypeOf(type), fieldsOf(type)));
+        return payloads;
+    }
+
+    private static List<Class<?>> domainEventRecordClasses() {
         ClassPathScanningCandidateComponentProvider scan =
                 new ClassPathScanningCandidateComponentProvider(false);
         scan.addIncludeFilter(new AssignableTypeFilter(DomainEventRecord.class));
-        Map<String, String> payloads = new LinkedHashMap<>();
-        scan.findCandidateComponents("org.courtside").stream()
-                .map(candidate -> loadClass(candidate.getBeanClassName()))
-                .filter(Class::isRecord)
-                .forEach(type -> payloads.put(eventTypeOf(type), fieldsOf(type)));
-        return payloads;
+        List<Class<?>> classes = new ArrayList<>();
+        scan.findCandidateComponents("org.courtside").forEach(candidate -> {
+            Class<?> type = loadClass(candidate.getBeanClassName());
+            if (type.isRecord()) {
+                classes.add(type);
+            }
+        });
+        return classes;
     }
 
     private static String fieldsOf(Class<?> type) {
