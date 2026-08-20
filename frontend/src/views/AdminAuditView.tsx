@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { api, type AuditEntry } from "../api/client";
+import { api, type AuditEntry, type DayOfWeek } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { formatDateTime, shortTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
@@ -12,7 +12,12 @@ const enabledFlagByEventType: Record<string, string> = {
   "roster.account.availabilityChanged": "enabled"
 };
 
-const isoWeekdayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+const isoWeekdayNumbers: Record<DayOfWeek, number> = {
+  MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3, THURSDAY: 4, FRIDAY: 5, SATURDAY: 6, SUNDAY: 7
+};
+
+const weekdayByIsoNumber = new Map<number, DayOfWeek>(
+  Object.entries(isoWeekdayNumbers).map(([weekday, isoNumber]) => [isoNumber, weekday as DayOfWeek]));
 
 function paramsLabel(params: Record<string, unknown>, t: TFunction): string {
   return Object.entries(params)
@@ -22,7 +27,8 @@ function paramsLabel(params: Record<string, unknown>, t: TFunction): string {
 
 function weekdayLabel(entry: AuditEntry, t: TFunction): string | undefined {
   const dayOfWeek = entry.parameters.dayOfWeek;
-  return typeof dayOfWeek === "number" ? t(`weekday.${isoWeekdayNames[dayOfWeek - 1]}`) : undefined;
+  const weekday = typeof dayOfWeek === "number" ? weekdayByIsoNumber.get(dayOfWeek) : undefined;
+  return weekday === undefined ? undefined : t(`weekday.${weekday}`);
 }
 
 function isNullish(value: unknown): boolean {
