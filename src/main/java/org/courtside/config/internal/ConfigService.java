@@ -6,10 +6,14 @@ import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubTimeZone;
+import org.courtside.config.ConfigEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.time.ZoneId;
@@ -21,6 +25,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
 
     private final ClubConfigurationRepository configurations;
     private final List<BookingGridConstraint> bookingGridConstraints;
+    private final ApplicationEventPublisher events;
 
     public ClubConfigurationSnapshot current() {
         return ClubConfigurationSnapshot.from(currentEntity());
@@ -71,8 +76,42 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                     });
         }
 
+        List<String> changedFields = new ArrayList<>();
+        if (!Objects.equals(configuration.getClubName(), clubName)) {
+            changedFields.add("clubName");
+        }
+        if (!Objects.equals(configuration.getPrimaryColor(), primaryColor)) {
+            changedFields.add("primaryColor");
+        }
+        if (!Objects.equals(configuration.getAccentColor(), accentColor)) {
+            changedFields.add("accentColor");
+        }
+        if (!Objects.equals(configuration.getLogoUrl(), logoUrl)) {
+            changedFields.add("logoUrl");
+        }
+        if (!Objects.equals(configuration.getImprintUrl(), imprintUrl)) {
+            changedFields.add("imprintUrl");
+        }
+        boolean localeChanged = !Objects.equals(configuration.getDefaultLocale(), defaultLocale);
+        boolean slotMinutesChanged = configuration.getSlotMinutes() != slotMinutes;
+        boolean timeZoneChanged = !configuration.getTimeZone().equals(timeZone);
+
         configuration.changeTo(clubName, primaryColor, accentColor,
                 logoUrl, imprintUrl, defaultLocale, slotMinutes, timeZone);
+
+        if (!changedFields.isEmpty()) {
+            events.publishEvent(new ConfigEvent.ClubChanged(configuration.getId(), List.copyOf(changedFields)));
+        }
+        if (localeChanged) {
+            events.publishEvent(new ConfigEvent.LocaleChanged(configuration.getId(), defaultLocale));
+        }
+        if (slotMinutesChanged) {
+            events.publishEvent(new ConfigEvent.SlotDurationChanged(configuration.getId(), slotMinutes));
+        }
+        if (timeZoneChanged) {
+            events.publishEvent(new ConfigEvent.TimeZoneChanged(configuration.getId(), timeZone));
+        }
+
         return ClubConfigurationSnapshot.from(configuration);
     }
 

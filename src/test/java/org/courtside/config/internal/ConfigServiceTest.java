@@ -3,6 +3,7 @@ package org.courtside.config.internal;
 import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.ZoneId;
 import java.util.List;
@@ -30,7 +31,7 @@ class ConfigServiceTest {
         when(configuration.getTimeZone()).thenReturn("Europe/Berlin");
         when(constraint.timeZoneConflictCode()).thenReturn(Optional.empty());
         when(constraint.conflictCode(any(), any())).thenReturn(Optional.empty());
-        ConfigService service = new ConfigService(configurations, List.of(constraint));
+        ConfigService service = new ConfigService(configurations, List.of(constraint), mock(ApplicationEventPublisher.class));
 
         // when
         service.update("Example Tennis Club", "#004f2d", "#c8a415", null, null,
