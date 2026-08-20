@@ -8,6 +8,14 @@ const safeEvidenceHeaders = new Set([
   "cache-control", "content-security-policy", "content-type", "referrer-policy",
   "strict-transport-security", "x-content-type-options", "x-frame-options"
 ]);
+const evidenceFields = new Set([
+  "method", "statusCode", "problemType", "observationCode", "observedHeaders"
+]);
+const evidenceMethods = new Set(["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]);
+const observationCodes = new Set([
+  "expected-problem", "missing-header", "response-difference", "transport-failure",
+  "unexpected-header", "unexpected-problem"
+]);
 
 function normalized(value) {
   return String(value).trim().toLowerCase().replace(/\s+/g, " ");
@@ -127,6 +135,14 @@ function validDate(value) {
     && parsed.toISOString().slice(0, 10) === value;
 }
 
+function validTimestamp(value) {
+  if (typeof value !== "string") return false;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const canonical = value.includes(".") ? value : value.replace("Z", ".000Z");
+  return parsed.toISOString() === canonical;
+}
+
 export function validateRiskAcceptances(acceptances, today = new Date().toISOString().slice(0, 10)) {
   const ids = new Set();
   const fingerprints = new Set();
@@ -147,6 +163,7 @@ export function validateRiskAcceptances(acceptances, today = new Date().toISOStr
     fingerprints.add(acceptance.fingerprint);
     if (!validDate(acceptance.expiresOn)) throw new Error(`Risk acceptance ${acceptance.id} has invalid expiry`);
     if (acceptance.expiresOn < today) throw new Error(`Risk acceptance ${acceptance.id} expired on ${acceptance.expiresOn}`);
+    if (!validTimestamp(acceptance.acceptedAt)) throw new Error(`Risk acceptance ${acceptance.id} has invalid timestamp`);
   }
 }
 
@@ -180,6 +197,106 @@ export function assessmentOutcome(lifecycle, today = new Date().toISOString().sl
   return { outcome: "passed", reason: null };
 }
 
+function requireCurrentEvidence(entry, today) {
+  if (entry.evidence.some((evidence) => !validDate(evidence.expiresOn))) {
+    throw new Error(`Finding ${entry.fingerprint} has invalid evidence expiry`);
+  }
+  if (!entry.evidence.some((evidence) => evidence.status === "retained" && evidence.expiresOn >= today)) {
+    throw new Error(`Finding ${entry.fingerprint} requires current retained evidence`);
+  }
+}
+
+function requireProvenance(entry, run, targetFingerprint) {
+  if (entry.provenance.runId !== run.runId || entry.provenance.attempt !== run.attempt
+    || entry.provenance.targetFingerprint !== targetFingerprint) {
+    throw new Error(`Finding ${entry.fingerprint} has inconsistent provenance`);
+  }
+}
+
+function replayFindingState(finding) {
+  const transitions = finding.transitions;
+  const initial = transitions[0];
+  if (initial.state !== "validated" || initial.actor !== finding.validation.actor
+    || initial.changedAt !== finding.validation.reproducedAt || initial.reference !== finding.validation.reference) {
+    throw new Error(`Finding ${finding.fingerprint} has inconsistent transition history`);
+  }
+  const allowed = {
+    validated: ["remediation-in-progress", "accepted-risk"],
+    "remediation-in-progress": ["fixed", "accepted-risk"],
+    "accepted-risk": ["remediation-in-progress"]
+  };
+  let state = "validated";
+  let retestIndex = 0;
+  for (const transition of transitions.slice(1)) {
+    if (state === "fixed") {
+      const retest = finding.retests[retestIndex];
+      const expectedState = retest?.outcome === "passed" ? "retest-passed" : "validated";
+      if (!retest || transition.state !== expectedState || transition.actor !== retest.actor
+        || transition.changedAt !== retest.testedAt || transition.reference !== retest.reference) {
+        throw new Error(`Finding ${finding.fingerprint} has inconsistent transition history`);
+      }
+      retestIndex += 1;
+    } else if (!allowed[state]?.includes(transition.state)) {
+      throw new Error(`Finding ${finding.fingerprint} has inconsistent transition history`);
+    }
+    state = transition.state;
+  }
+  if (retestIndex !== finding.retests.length) {
+    throw new Error(`Finding ${finding.fingerprint} has inconsistent transition history`);
+  }
+  if (state !== finding.state) throw new Error(`Finding ${finding.fingerprint} has inconsistent current state`);
+}
+
+function validateLifecycleSemantics(lifecycle, today) {
+  if (!validTimestamp(lifecycle.run.recordedAt)) throw new Error("Security lifecycle has invalid run timestamp");
+  const entries = [...lifecycle.candidates, ...lifecycle.findings];
+  const fingerprints = new Set();
+  for (const entry of entries) {
+    const expected = fingerprintFinding(entry.ruleId, entry.normalizedSurface, entry.parameter, entry.attackClass);
+    if (entry.fingerprint !== expected) throw new Error(`Finding ${entry.fingerprint} has inconsistent fingerprint`);
+    if (fingerprints.has(entry.fingerprint)) throw new Error(`Duplicate finding fingerprint ${entry.fingerprint}`);
+    fingerprints.add(entry.fingerprint);
+    requireProvenance(entry, lifecycle.run, lifecycle.run.targetFingerprint);
+    if (!validTimestamp(entry.provenance.observedAt)) {
+      throw new Error(`Finding ${entry.fingerprint} has invalid provenance timestamp`);
+    }
+    requireCurrentEvidence(entry, today);
+    if (entry.disposition && !validTimestamp(entry.disposition.classifiedAt)) {
+      throw new Error(`Finding ${entry.fingerprint} has invalid disposition timestamp`);
+    }
+    const terminalTimestamp = entry.disposition?.classifiedAt ?? entry.provenance.observedAt;
+    if (entry.provenance.observedAt > terminalTimestamp || terminalTimestamp > lifecycle.run.recordedAt) {
+      throw new Error(`Finding ${entry.fingerprint} has inconsistent lifecycle chronology`);
+    }
+  }
+  for (const finding of lifecycle.findings) {
+    const timestamps = [finding.validation.reproducedAt,
+      ...finding.retests.map((retest) => retest.testedAt),
+      ...finding.transitions.map((transition) => transition.changedAt)];
+    if (timestamps.some((timestamp) => !validTimestamp(timestamp))) {
+      throw new Error(`Finding ${finding.fingerprint} has invalid lifecycle timestamp`);
+    }
+    const ordered = [finding.provenance.observedAt,
+      ...finding.transitions.map((transition) => transition.changedAt)];
+    if (ordered.some((timestamp, index) => index > 0 && timestamp < ordered[index - 1])
+      || ordered.at(-1) > lifecycle.run.recordedAt) {
+      throw new Error(`Finding ${finding.fingerprint} has inconsistent lifecycle chronology`);
+    }
+    replayFindingState(finding);
+    if (finding.state === "accepted-risk") {
+      const acceptance = lifecycle.riskAcceptances.find((entry) => entry.fingerprint === finding.fingerprint);
+      const transition = finding.transitions.at(-1);
+      if (!acceptance || transition.reference !== acceptance.id
+        || acceptance.acceptedAt > transition.changedAt
+        || transition.changedAt > lifecycle.run.recordedAt
+        || acceptance.acceptedAt.slice(0, 10) > acceptance.expiresOn
+        || transition.changedAt.slice(0, 10) > acceptance.expiresOn) {
+        throw new Error(`Finding ${finding.fingerprint} has inconsistent risk acceptance`);
+      }
+    }
+  }
+}
+
 function redactEvidenceText(value) {
   return redactSecurityText(value)
     .replace(/\b(password|token|secret|csrf|sessionid|apikey|credential|clientcertificate|firstname|lastname|displayname|email|iban|address|phone)\s*[:=]\s*[^\s,;]+/gi,
@@ -189,17 +306,28 @@ function redactEvidenceText(value) {
 }
 
 export function retainFindingEvidence(input) {
-  const headers = Object.fromEntries(Object.entries(input.headers ?? {})
-    .map(([name, value]) => [name.toLowerCase(), value])
-    .filter(([name]) => safeEvidenceHeaders.has(name))
-    .map(([name, value]) => [name, redactEvidenceText(value)]));
+  if (!input || typeof input !== "object" || Array.isArray(input)
+    || Object.keys(input).some((field) => !evidenceFields.has(field))) {
+    throw new Error("Invalid retained evidence fields");
+  }
+  const method = typeof input.method === "string" ? input.method.toUpperCase() : "";
+  if (!evidenceMethods.has(method)
+    || !Number.isInteger(input.statusCode) || input.statusCode < 100 || input.statusCode > 599
+    || (input.problemType !== undefined && (typeof input.problemType !== "string"
+      || !/^urn:courtside:error:[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.problemType)))
+    || !observationCodes.has(input.observationCode)
+    || !Array.isArray(input.observedHeaders)
+    || input.observedHeaders.some((name) => typeof name !== "string" || name.length > 128)) {
+    throw new Error("Invalid retained evidence value");
+  }
+  const observedHeaders = [...new Set(input.observedHeaders.map((name) => name.toLowerCase())
+    .filter((name) => safeEvidenceHeaders.has(name)))].toSorted();
   return {
-    method: normalized(input.method).toUpperCase(),
-    path: redactEvidenceText(input.path),
+    method: redactEvidenceText(method),
     statusCode: input.statusCode,
-    problemType: input.problemType,
-    observation: redactEvidenceText(input.observation),
-    headers
+    problemType: input.problemType === undefined ? undefined : redactEvidenceText(input.problemType),
+    observationCode: redactEvidenceText(input.observationCode),
+    observedHeaders
   };
 }
 
@@ -228,6 +356,7 @@ export function summarizeFindingLifecycle(lifecycle, policy, today = new Date().
   if (!validateLifecycle(completeLifecycle)) {
     throw new Error(`Invalid security finding lifecycle: ${JSON.stringify(validateLifecycle.errors)}`);
   }
+  validateLifecycleSemantics(completeLifecycle, today);
   const outcome = assessmentOutcome(completeLifecycle, today);
   completeLifecycle.run.outcome = outcome.outcome;
   return {

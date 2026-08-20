@@ -7,7 +7,8 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
   assessmentOutcome, createCandidate, createFinding, fingerprintFinding, publicFindingSummary,
-  classifyCandidate, recordRetest, retainFindingEvidence, transitionFinding, validateRiskAcceptances
+  classifyCandidate, recordRetest, retainFindingEvidence, summarizeFindingLifecycle, transitionFinding,
+  validateRiskAcceptances
 } from "./security-triage.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -17,6 +18,19 @@ const exceptionSchema = JSON.parse(readFileSync(new URL("../security/exceptions.
 const exceptionPolicy = JSON.parse(readFileSync(new URL("../security/exceptions.json", import.meta.url)));
 const documentation = readFileSync(new URL("../docs/security-findings.md", import.meta.url), "utf8");
 const digest = `sha256:${"a".repeat(64)}`;
+
+function lifecycle(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    run: {
+      runId: "run-0001", attempt: 1, subject: "commit:abcdef0", profile: "safe",
+      outcome: "incomplete", targetFingerprint: digest,
+      catalogVersion: "1.0.0", recordedAt: "2026-08-20T14:00:00.000Z"
+    },
+    candidates: [], findings: [], riskAcceptances: [],
+    ...overrides
+  };
+}
 
 function candidate(overrides = {}) {
   return createCandidate({
@@ -64,7 +78,8 @@ test("given lifecycle records, when validating their schema, then provenance evi
     schemaVersion: 1,
     run: {
       runId: "run-0001", attempt: 1, subject: "commit:abcdef0", profile: "safe",
-      outcome: "incomplete", catalogVersion: "1.0.0", recordedAt: "2026-08-20T14:00:00.000Z"
+      outcome: "incomplete", targetFingerprint: digest,
+      catalogVersion: "1.0.0", recordedAt: "2026-08-20T14:00:00.000Z"
     },
     candidates: [candidate()], findings: [finding()], riskAcceptances: []
   };
@@ -80,6 +95,12 @@ test("given lifecycle records, when validating their schema, then provenance evi
   const withoutExpiry = structuredClone(record);
   delete withoutExpiry.candidates[0].evidence[0].expiresOn;
   assert.equal(validate(withoutExpiry), false);
+  const invalidVector = structuredClone(record);
+  invalidVector.findings[0].cvssVector = "CVSS:4.0/not-a-vector";
+  assert.equal(validate(invalidVector), false);
+  const emptyMappings = structuredClone(record);
+  emptyMappings.findings[0].mappings.cwe = [];
+  assert.equal(validate(emptyMappings), false);
 });
 
 test("given the shared exception policy, when adding dynamic risk acceptance, then the same closed policy validates it", () => {
@@ -210,16 +231,10 @@ test("given adversarial evidence, when retaining its safe projection, then secre
   // given
   const raw = {
     method: "POST",
-    path: "/api/session?token=abcdef&username=jane.doe%40example.org",
     statusCode: 401,
     problemType: "urn:courtside:error:bad-credentials",
-    observation: "Authorization: Bearer abc.def.ghi\nCookie: SESSION=secret\npassword=hunter2 apiKey=key-value firstName=Jane jane.doe@example.org",
-    headers: {
-      "content-type": "application/problem+json",
-      authorization: "Bearer abc.def.ghi",
-      "set-cookie": "SESSION=secret"
-    },
-    body: { password: "hunter2", firstName: "Jane", sessionId: "secret" }
+    observationCode: "unexpected-problem",
+    observedHeaders: ["content-type", "authorization", "set-cookie"]
   };
 
   // when
@@ -228,8 +243,59 @@ test("given adversarial evidence, when retaining its safe projection, then secre
 
   // then
   assert.doesNotMatch(serialized, /abcdef|jane\.doe|abc\.def\.ghi|SESSION=|hunter2|key-value|Jane|sessionId/i);
-  assert.deepEqual(Object.keys(retained), ["method", "path", "statusCode", "problemType", "observation", "headers"]);
-  assert.deepEqual(retained.headers, { "content-type": "application/problem+json" });
+  assert.deepEqual(Object.keys(retained),
+    ["method", "statusCode", "problemType", "observationCode", "observedHeaders"]);
+  assert.deepEqual(retained.observedHeaders, ["content-type"]);
+});
+
+test("given untrusted evidence fields, when retaining evidence, then the closed projection rejects them", () => {
+  // given
+  const valid = {
+    method: "GET", statusCode: 200,
+    problemType: "urn:courtside:error:court-unknown", observationCode: "unexpected-problem", observedHeaders: []
+  };
+
+  // when / then
+  for (const input of [
+    { ...valid, method: "TOKEN=secret" },
+    { ...valid, statusCode: { token: "secret" } },
+    { ...valid, problemType: "https://example.invalid/error?token=secret" },
+    { ...valid, observation: "memberNumber=4711 dateOfBirth=2001-02-03" },
+    { ...valid, unknown: "secret" },
+    { ...valid, path: "/api/password-reset/opaque-secret" },
+    { ...valid, observedHeaders: [42] }
+  ]) {
+    assert.throws(() => retainFindingEvidence(input), /Invalid retained evidence/);
+  }
+});
+
+test("given schema-valid but forged lifecycle relationships, when summarizing, then evaluation fails closed", () => {
+  // given
+  const validated = finding();
+  const closed = recordRetest(transitionFinding(transitionFinding(validated, {
+    state: "remediation-in-progress", actor: "maintainer",
+    changedAt: "2026-08-20T13:30:00.000Z", reference: "private-advisory"
+  }), {
+    state: "fixed", actor: "maintainer", changedAt: "2026-08-20T13:45:00.000Z", reference: "private-advisory"
+  }), {
+    outcome: "passed", testedAt: "2026-08-20T14:00:00.000Z", actor: "maintainer",
+    reference: "LoginEnumerationTest"
+  });
+  const cases = [
+    [{ ...finding(), fingerprint: digest }, /fingerprint/],
+    [finding(candidate({ provenance: { ...candidate().provenance, runId: "run-9999" } })), /provenance/],
+    [finding(candidate({ evidence: [{ ...candidate().evidence[0], expiresOn: "2026-08-19" }] })), /current retained evidence/],
+    [{ ...closed, retests: [] }, /transition history/],
+    [{ ...validated, state: "retest-passed" }, /current state/],
+    [{ ...closed, transitions: closed.transitions.map((transition, index) => index === 1
+      ? { ...transition, changedAt: "2026-08-20T12:30:00.000Z" }
+      : transition) }, /chronology/]
+  ];
+
+  // when / then
+  for (const [record, message] of cases) {
+    assert.throws(() => summarizeFindingLifecycle(lifecycle({ findings: [record] }), exceptionPolicy, "2026-08-20"), message);
+  }
 });
 
 test("given accepted risk, when its owner rationale control or expiry is absent or stale, then assessment fails closed", () => {
@@ -268,6 +334,37 @@ test("given risk acceptance, when it is stale or targets P0, then it cannot make
   assert.throws(() => validateRiskAcceptances([acceptance, {
     ...acceptance, id: "acceptance-0002"
   }], "2026-08-20"), /Duplicate risk acceptance for fingerprint/);
+});
+
+test("given accepted risk, when acceptance is future-dated or misreferenced, then lifecycle validation fails closed", () => {
+  // given
+  const source = candidate();
+  const accepted = transitionFinding(finding(source), {
+    state: "accepted-risk", actor: "maintainer", changedAt: "2026-08-20T13:30:00.000Z",
+    reference: "acceptance-0001"
+  });
+  const acceptance = {
+    id: "acceptance-0001", fingerprint: source.fingerprint, owner: "maintainer",
+    rationale: "The affected endpoint is disabled.", compensatingControl: "The proxy rejects the route.",
+    expiresOn: "2026-09-01", acceptedAt: "2026-08-20T13:00:00.000Z", independentReview: false
+  };
+
+  // when / then
+  assert.throws(() => summarizeFindingLifecycle(lifecycle({ findings: [accepted] }), {
+    ...exceptionPolicy, riskAcceptances: [{ ...acceptance, acceptedAt: "2026-08-20T13:45:00.000Z" }]
+  }, "2026-08-20"), /inconsistent risk acceptance/);
+  const misreferenced = { ...accepted, transitions: accepted.transitions.map((transition, index) => index === 1
+    ? { ...transition, reference: "acceptance-9999" }
+    : transition) };
+  assert.throws(() => summarizeFindingLifecycle(lifecycle({ findings: [misreferenced] }), {
+    ...exceptionPolicy, riskAcceptances: [acceptance]
+  }, "2026-08-20"), /inconsistent risk acceptance/);
+  const expiredTransition = { ...accepted, transitions: accepted.transitions.map((transition, index) => index === 1
+    ? { ...transition, changedAt: "2026-09-02T13:30:00.000Z" }
+    : transition) };
+  assert.throws(() => summarizeFindingLifecycle(lifecycle({
+    run: { ...lifecycle().run, recordedAt: "2026-09-02T14:00:00.000Z" }, findings: [expiredTransition]
+  }), { ...exceptionPolicy, riskAcceptances: [acceptance] }, "2026-08-20"), /inconsistent risk acceptance/);
 });
 
 test("given a fixed or accepted finding, when calculating the outcome, then retest and precise acceptance govern it", () => {
@@ -325,7 +422,8 @@ test("given an untriaged lifecycle file, when evaluating it through the CLI, the
     schemaVersion: 1,
     run: {
       runId: "run-0001", attempt: 1, subject: "commit:abcdef0", profile: "safe",
-      outcome: "passed", catalogVersion: "1.0.0", recordedAt: "2026-08-20T14:00:00.000Z"
+      outcome: "passed", targetFingerprint: digest,
+      catalogVersion: "1.0.0", recordedAt: "2026-08-20T14:00:00.000Z"
     },
     candidates: [candidate()], findings: [], riskAcceptances: []
   }));

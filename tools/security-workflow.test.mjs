@@ -24,6 +24,7 @@ test("given a pull request, when the required build runs, then dependency, sourc
   assert.match(build, /scanners: secret,misconfig/);
   assert.match(build, /--trivy build\/security\/trivy-runtime\.json[\s\S]*--trivy build\/security\/trivy-source\.json/);
   assert.match(build, /node tools\/security-findings\.mjs/);
+  assert.match(build, /--assessment-policy not-applicable/);
   assert.match(build, /--scope required-build/);
 });
 
@@ -37,6 +38,7 @@ test("given security evidence, when workflows retain it, then only normalized re
   assert.match(release, /npm-cli\.js --prefix frontend audit --json/);
   assert.match(release, /release-security-record/);
   assert.match(release, /--summary build\/security-input\/release-build\.json/);
+  assert.match(release, /--assessment-policy not-applicable/g);
 });
 
 test("given a scanner finding, when it is triaged, then exceptions are precise, expiring and single-maintainer compatible", () => {

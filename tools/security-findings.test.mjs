@@ -20,7 +20,9 @@ test("given actionable Trivy and CodeQL findings, when evaluating reports, then 
   ];
 
   // when
-  const result = evaluateSecurityReports({ reports, exceptions: [], scope: "required-build", subject: "commit", today });
+  const result = evaluateSecurityReports({
+    reports, exceptions: [], scope: "required-build", subject: "commit", assessmentPolicy: "not-applicable", today
+  });
 
   // then
   assert.equal(result.status, "blocked");
@@ -35,7 +37,9 @@ test("given findings below the blocking threshold, when evaluating reports, then
   ];
 
   // when
-  const result = evaluateSecurityReports({ reports, exceptions: [], scope: "required-build", subject: "commit", today });
+  const result = evaluateSecurityReports({
+    reports, exceptions: [], scope: "required-build", subject: "commit", assessmentPolicy: "not-applicable", today
+  });
 
   // then
   assert.equal(result.status, "passed");
@@ -43,6 +47,25 @@ test("given findings below the blocking threshold, when evaluating reports, then
   assert.deepEqual(result.informationalFindings.map((finding) => finding.id), [
     "js/weak-cryptographic-algorithm", "CVE-2026-2000"
   ]);
+});
+
+test("given an incomplete dynamic assessment, when evaluating scanner reports, then the existing gate is incomplete", () => {
+  // given
+  const assessment = {
+    schemaVersion: 1, run: { runId: "run-0001", attempt: 1, subject: "commit", outcome: "incomplete" },
+    outcome: { outcome: "incomplete", reason: "1 candidate awaits reproducible validation" },
+    counts: { candidates: 1, findings: 0, regressions: 0 }, candidates: [], findings: []
+  };
+
+  // when
+  const result = evaluateSecurityReports({
+    reports: [], exceptions: [], scope: "required-build", subject: "commit", today,
+    assessment, assessmentPolicy: "required"
+  });
+
+  // then
+  assert.equal(result.status, "incomplete");
+  assert.equal(result.assessment.outcome.outcome, "incomplete");
 });
 
 test("given a precise active exception, when its finding is present, then acceptance remains visible", () => {
@@ -55,7 +78,9 @@ test("given a precise active exception, when its finding is present, then accept
   }];
 
   // when
-  const result = evaluateSecurityReports({ reports, exceptions, scope: "required-build", subject: "commit", today });
+  const result = evaluateSecurityReports({
+    reports, exceptions, scope: "required-build", subject: "commit", assessmentPolicy: "not-applicable", today
+  });
 
   // then
   assert.equal(result.status, "passed-with-exceptions");
@@ -72,7 +97,9 @@ test("given an expired exception, when evaluating reports, then policy validatio
   }];
 
   // when / then
-  assert.throws(() => evaluateSecurityReports({ reports, exceptions, scope: "required-build", subject: "commit", today }), /expired on 2026-08-14/);
+  assert.throws(() => evaluateSecurityReports({
+    reports, exceptions, scope: "required-build", subject: "commit", assessmentPolicy: "not-applicable", today
+  }), /expired on 2026-08-14/);
 });
 
 test("given an impossible exception date, when evaluating reports, then policy validation fails", () => {
@@ -84,7 +111,9 @@ test("given an impossible exception date, when evaluating reports, then policy v
   }];
 
   // when / then
-  assert.throws(() => evaluateSecurityReports({ reports: [], exceptions, scope: "required-build", subject: "commit", today }), /invalid expiry/);
+  assert.throws(() => evaluateSecurityReports({
+    reports: [], exceptions, scope: "required-build", subject: "commit", assessmentPolicy: "not-applicable", today
+  }), /invalid expiry/);
 });
 
 test("given an exception without a current finding, when evaluating reports, then stale suppression fails", () => {
@@ -96,7 +125,9 @@ test("given an exception without a current finding, when evaluating reports, the
   }];
 
   // when / then
-  assert.throws(() => evaluateSecurityReports({ reports: [], exceptions, scope: "required-build", subject: "commit", today }), /does not match a current finding/);
+  assert.throws(() => evaluateSecurityReports({
+    reports: [], exceptions, scope: "required-build", subject: "commit", assessmentPolicy: "not-applicable", today
+  }), /does not match a current finding/);
 });
 
 test("given an exception for another scan scope, when evaluating reports, then it is not treated as unused", () => {
@@ -108,7 +139,9 @@ test("given an exception for another scan scope, when evaluating reports, then i
   }];
 
   // when
-  const result = evaluateSecurityReports({ reports: [], exceptions, scope: "required-build", subject: "commit", today });
+  const result = evaluateSecurityReports({
+    reports: [], exceptions, scope: "required-build", subject: "commit", assessmentPolicy: "not-applicable", today
+  });
 
   // then
   assert.equal(result.status, "passed");
@@ -137,9 +170,9 @@ test("given npm vulnerabilities, when parsing the audit report, then they become
 test("given normalized build and image evidence, when combining a release record, then all findings remain visible", () => {
   // given
   const summaries = [
-    { schemaVersion: 1, scope: "release-build", subject: "commit", generatedAt: "2026-08-15T00:00:00.000Z",
+    { schemaVersion: 1, scope: "release-build", subject: "commit", assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
       status: "passed", blockingFindings: [], acceptedFindings: [], informationalFindings: [{ scanner: "npm", id: "NPM-1", severity: "LOW", target: "example@1" }] },
-    { schemaVersion: 1, scope: "release-image-amd64", subject: "digest", generatedAt: "2026-08-15T00:00:00.000Z",
+    { schemaVersion: 1, scope: "release-image-amd64", subject: "digest", assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
       status: "passed", blockingFindings: [], acceptedFindings: [], informationalFindings: [{ scanner: "trivy", id: "CVE-1", severity: "MEDIUM", target: "image" }] }
   ];
 
@@ -152,9 +185,50 @@ test("given normalized build and image evidence, when combining a release record
   assert.deepEqual(result.sources.map((source) => source.scope), ["release-build", "release-image-amd64"]);
 });
 
+test("given an incomplete dynamic assessment, when combining release evidence, then release creation fails closed", () => {
+  // given
+  const summary = {
+    schemaVersion: 1, scope: "release-build", subject: "commit", assessmentPolicy: "required", status: "incomplete",
+    blockingFindings: [], acceptedFindings: [], informationalFindings: [],
+    assessment: { outcome: { outcome: "incomplete", reason: "validation pending" } }
+  };
+
+  // when / then
+  assert.throws(() => combineSecuritySummaries({ summaries: [summary], scope: "release", subject: "digest", today }),
+    /incomplete security evidence/);
+});
+
+test("given a passed dynamic assessment, when combining release evidence, then it remains in the release record", () => {
+  // given
+  const assessment = { outcome: { outcome: "passed", reason: null } };
+  const summary = {
+    schemaVersion: 1, scope: "release-build", subject: "commit", assessmentPolicy: "required", status: "passed",
+    blockingFindings: [], acceptedFindings: [], informationalFindings: [], assessment
+  };
+
+  // when
+  const result = combineSecuritySummaries({ summaries: [summary], scope: "release", subject: "digest", today });
+
+  // then
+  assert.deepEqual(result.assessments, [assessment]);
+});
+
+test("given a source summary that hides its assessment outcome, when combining it, then release creation fails closed", () => {
+  // given
+  const summary = {
+    schemaVersion: 1, scope: "release-build", subject: "commit", assessmentPolicy: "required", status: "passed",
+    blockingFindings: [], acceptedFindings: [], informationalFindings: [],
+    assessment: { outcome: { outcome: "failed", reason: "validated finding remains unresolved" } }
+  };
+
+  // when / then
+  assert.throws(() => combineSecuritySummaries({ summaries: [summary], scope: "release", subject: "digest", today }),
+    /contradicts its assessment outcome/);
+});
+
 test("given duplicate source scopes, when combining a release record, then the gate fails closed", () => {
   // given
-  const summary = { schemaVersion: 1, scope: "release-image-amd64", subject: "digest",
+  const summary = { schemaVersion: 1, scope: "release-image-amd64", subject: "digest", assessmentPolicy: "not-applicable",
     status: "passed", blockingFindings: [], acceptedFindings: [], informationalFindings: [] };
 
   // when / then
@@ -180,13 +254,73 @@ test("given separate runtime and source reports, when invoking the policy, then 
   try {
     // when
     const result = spawnSync(process.execPath, [join(toolsDirectory, "security-findings.mjs"),
-      "--trivy", runtime, "--trivy", source, "--exceptions", exceptions, "--scope", "required-build",
+      "--trivy", runtime, "--trivy", source, "--exceptions", exceptions,
+      "--assessment-policy", "not-applicable", "--scope", "required-build",
       "--subject", "commit", "--output", output]);
 
     // then
     assert.equal(result.status, 1);
     assert.deepEqual(JSON.parse(readFileSync(output, "utf8")).blockingFindings.map((finding) => finding.id),
       ["CVE-2026-4000", "DS-001"]);
+  } finally {
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("given a dynamic lifecycle, when invoking the existing policy CLI, then one normalized record contains both sources", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-security-"));
+  const report = join(directory, "report.json");
+  const lifecycle = join(directory, "lifecycle.json");
+  const exceptions = join(directory, "exceptions.json");
+  const output = join(directory, "summary.json");
+  writeFileSync(report, JSON.stringify({ Results: [] }));
+  writeFileSync(lifecycle, JSON.stringify({
+    schemaVersion: 1,
+    run: {
+      runId: "run-0001", attempt: 1, subject: "commit", profile: "safe", outcome: "incomplete",
+      targetFingerprint: `sha256:${"a".repeat(64)}`,
+      catalogVersion: "1.0.0", recordedAt: "2026-08-15T00:00:00.000Z"
+    },
+    candidates: [], findings: [], riskAcceptances: []
+  }));
+  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [], riskAcceptances: [] }));
+
+  try {
+    // when
+    const result = spawnSync(process.execPath, [join(toolsDirectory, "security-findings.mjs"),
+      "--trivy", report, "--lifecycle", lifecycle, "--exceptions", exceptions,
+      "--assessment-policy", "required",
+      "--scope", "required-build", "--subject", "commit", "--output", output]);
+
+    // then
+    assert.equal(result.status, 0, result.stderr.toString());
+    const summary = JSON.parse(readFileSync(output, "utf8"));
+    assert.equal(summary.status, "passed");
+    assert.equal(summary.assessment.run.runId, "run-0001");
+  } finally {
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("given dynamic assessment is required, when its lifecycle is absent, then the existing policy CLI fails closed", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-security-"));
+  const report = join(directory, "report.json");
+  const exceptions = join(directory, "exceptions.json");
+  const output = join(directory, "summary.json");
+  writeFileSync(report, JSON.stringify({ Results: [] }));
+  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [], riskAcceptances: [] }));
+
+  try {
+    // when
+    const result = spawnSync(process.execPath, [join(toolsDirectory, "security-findings.mjs"),
+      "--trivy", report, "--exceptions", exceptions, "--assessment-policy", "required",
+      "--scope", "required-build", "--subject", "commit", "--output", output]);
+
+    // then
+    assert.equal(result.status, 1);
+    assert.match(result.stderr.toString(), /Required lifecycle record is missing/);
   } finally {
     rmSync(directory, { recursive: true });
   }

@@ -61,13 +61,23 @@ precise scanner exceptions and dynamic risk acceptances share one policy file, b
 types stay distinct. A static scanner exception matches scope, scanner, finding id and target. A
 dynamic acceptance matches the stable lifecycle fingerprint.
 
+Every scanner-policy invocation declares `--assessment-policy`. The current build and release
+workflows record `not-applicable` because executable assessment adapters are deliberately disabled.
+They cannot silently imply that a dynamic assessment ran. Once a workflow runs an assessment, it
+uses `required` with `--lifecycle`; omitting that record then fails the gate.
+
+A required lifecycle is validated and embedded in the same normalized record as static scanner
+results. Pending validation makes that record incomplete; validated unresolved findings block it.
+Combined release evidence rejects incomplete source records and preserves explicit assessment
+policy, so a lifecycle cannot disappear between build and release policy gates.
+
 ## Evidence handling
 
 Assessment adapters may not write arbitrary retained files. The safe evidence projection accepts
-only the request method, path, status, problem type, a short observation and an allowlist of
-non-sensitive response headers. It drops request and response bodies. It drops credentials,
-cookies and unapproved headers, and redacts query values, email addresses, tokens and authentication
-material from retained text.
+only a known HTTP method, status, Courtside problem type, a fixed observation code and the names of
+present non-sensitive response headers. Unknown fields and invalid values are rejected. It drops
+URLs, header values, request and response bodies, credentials, cookies and unapproved headers, and
+redacts every retained string.
 
 Full requests, responses and exploit details belong in restricted storage with the expiry recorded
 by the evidence reference. They do not belong in repository files, ordinary GitHub issues, CI logs
