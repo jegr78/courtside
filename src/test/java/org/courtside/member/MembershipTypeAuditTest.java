@@ -2,6 +2,7 @@ package org.courtside.member;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
+import org.courtside.audit.testfixture.DomainEventTypes;
 import org.courtside.member.internal.MembershipType;
 import org.courtside.rules.testfixture.RulesTestFixture;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +43,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.latestPayload(type.getId(), MembershipTypeEvent.Added.TYPE))
                 .containsEntry("ruleSetId", ruleSetId.toString());
-        assertEventCounts(type.getId(), Map.of(MembershipTypeEvent.Added.TYPE, 1));
+        assertEventCounts(type.getId(), Map.of(MembershipTypeEvent.Added.TYPE, 1L));
     }
 
     @Test
@@ -59,7 +60,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
                 .containsEntry("ruleSetId", other.toString())
                 .containsEntry("changedFields", List.of());
         assertEventCounts(type.getId(),
-                Map.of(MembershipTypeEvent.Added.TYPE, 1, MembershipTypeEvent.Changed.TYPE, 1));
+                Map.of(MembershipTypeEvent.Added.TYPE, 1L, MembershipTypeEvent.Changed.TYPE, 1L));
     }
 
     @Test
@@ -76,7 +77,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         assertThat(payload).doesNotContainKey("name");
         assertThat(payload.toString()).doesNotContain("Senior");
         assertEventCounts(type.getId(),
-                Map.of(MembershipTypeEvent.Added.TYPE, 1, MembershipTypeEvent.Changed.TYPE, 1));
+                Map.of(MembershipTypeEvent.Added.TYPE, 1L, MembershipTypeEvent.Changed.TYPE, 1L));
     }
 
     @Test
@@ -103,7 +104,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         assertThat(audit.latestPayload(type.getId(), MembershipTypeEvent.AvailabilityChanged.TYPE))
                 .containsEntry("active", false);
         assertEventCounts(type.getId(),
-                Map.of(MembershipTypeEvent.Added.TYPE, 1, MembershipTypeEvent.AvailabilityChanged.TYPE, 1));
+                Map.of(MembershipTypeEvent.Added.TYPE, 1L, MembershipTypeEvent.AvailabilityChanged.TYPE, 1L));
     }
 
     @Test
@@ -127,13 +128,14 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         assertThat(audit.nameOf(type.getId())).isEqualTo("Adult");
     }
 
-    private static final List<String> CHANGE_EVENT_TYPES = List.of(MembershipTypeEvent.Added.TYPE,
-            MembershipTypeEvent.Changed.TYPE, MembershipTypeEvent.AvailabilityChanged.TYPE);
+    private static final List<String> CHANGE_EVENT_TYPES = DomainEventTypes.typesOf(MembershipTypeEvent.class);
 
-    private void assertEventCounts(UUID membershipTypeId, Map<String, Integer> expectedCounts) {
+    private void assertEventCounts(UUID membershipTypeId, Map<String, Long> expectedCounts) {
+        assertThat(expectedCounts.keySet()).as("every expected count names a known event type")
+                .isSubsetOf(CHANGE_EVENT_TYPES);
         Map<String, Long> actual = audit.eventCountsAbout(membershipTypeId);
         CHANGE_EVENT_TYPES.forEach(type -> assertThat(actual.getOrDefault(type, 0L))
                 .as(type)
-                .isEqualTo(expectedCounts.getOrDefault(type, 0).longValue()));
+                .isEqualTo(expectedCounts.getOrDefault(type, 0L)));
     }
 }

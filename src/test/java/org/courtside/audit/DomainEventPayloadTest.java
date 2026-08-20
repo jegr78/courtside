@@ -1,5 +1,6 @@
 package org.courtside.audit;
 
+import org.courtside.audit.testfixture.DomainEventTypes;
 import org.courtside.shared.DomainEventRecord;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -8,7 +9,6 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,13 +44,13 @@ class DomainEventPayloadTest {
 
     static Set<String> publishedTypes() {
         return domainEventRecordClasses().stream()
-                .map(DomainEventPayloadTest::eventTypeOf)
+                .map(DomainEventTypes::typeOf)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private static Map<String, String> publishedPayloads() {
         Map<String, String> payloads = new LinkedHashMap<>();
-        domainEventRecordClasses().forEach(type -> payloads.put(eventTypeOf(type), fieldsOf(type)));
+        domainEventRecordClasses().forEach(type -> payloads.put(DomainEventTypes.typeOf(type), fieldsOf(type)));
         return payloads;
     }
 
@@ -72,18 +72,6 @@ class DomainEventPayloadTest {
         return Arrays.stream(type.getRecordComponents())
                 .map(RecordComponent::getName)
                 .collect(Collectors.joining(","));
-    }
-
-    // Read, never instantiated: a record of this project validates in its compact constructor.
-    private static String eventTypeOf(Class<?> type) {
-        try {
-            Field declared = type.getDeclaredField("TYPE");
-            declared.setAccessible(true);
-            return (String) declared.get(null);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(
-                    type.getName() + " must declare its event type as a TYPE constant", e);
-        }
     }
 
     private static Class<?> loadClass(String name) {
