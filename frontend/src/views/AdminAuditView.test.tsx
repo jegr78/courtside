@@ -92,6 +92,21 @@ describe("AdminAuditView", () => {
     expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(entry.subjectId!);
   });
 
+  it("given an opening-hours entry with no subject name, when it is shown, then the subject cell names the weekday, translated", async () => {
+    // given
+    const entry: AuditEntry = {
+      ...courtAdded, eventType: "facility.openingHours.closed", parameters: { dayOfWeek: 6 }, subjectName: null
+    };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
+
+    // when
+    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    await screen.findByTestId("audit-row");
+
+    // then
+    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent("Saturday");
+  });
+
   it("given the occurred-at cell, when the club has its own time zone and the browser has a language, then both are honoured, never the browser's own zone", async () => {
     // given
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });

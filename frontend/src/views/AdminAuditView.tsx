@@ -18,6 +18,11 @@ function paramsLabel(params: Record<string, unknown>, t: TFunction): string {
     .join(", ");
 }
 
+function weekdayLabel(entry: AuditEntry, t: TFunction): string | undefined {
+  const dayOfWeek = entry.parameters.dayOfWeek;
+  return typeof dayOfWeek === "number" ? t(`audit.day.${dayOfWeek}`) : undefined;
+}
+
 function auditMessage(entry: AuditEntry, t: TFunction): string {
   const flagKey = enabledFlagByEventType[entry.eventType] ?? "active";
   const context = entry.eventType.endsWith(".availabilityChanged")
@@ -26,8 +31,7 @@ function auditMessage(entry: AuditEntry, t: TFunction): string {
         && (entry.parameters.capacity === null || entry.parameters.capacity === undefined)
       ? "unlimited"
       : undefined;
-  const dayOfWeek = entry.parameters.dayOfWeek;
-  const weekday = typeof dayOfWeek === "number" ? t(`audit.day.${dayOfWeek}`) : undefined;
+  const weekday = weekdayLabel(entry, t);
   const ruleType = typeof entry.parameters.ruleType === "string"
     ? t(`admin.rules.type.${entry.parameters.ruleType}`)
     : undefined;
@@ -52,8 +56,8 @@ function actorLabel(entry: AuditEntry, t: TFunction): string {
   return entry.actorUsername ?? entry.actorAccountId;
 }
 
-function subjectLabel(entry: AuditEntry): string {
-  return entry.subjectName ?? entry.subjectId ?? "";
+function subjectLabel(entry: AuditEntry, t: TFunction): string {
+  return entry.subjectName ?? weekdayLabel(entry, t) ?? entry.subjectId ?? "";
 }
 
 export function AdminAuditView() {
@@ -121,7 +125,7 @@ export function AdminAuditView() {
             {entries.map((entry) => <tr key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId ?? ""} data-event-type={entry.eventType} className="border-t">
               <td data-testid="audit-occurred-at" className="p-2">{formatDateTime(entry.occurredAt, language, timeZone)}</td>
               <td data-testid="audit-message" className="p-2">{auditMessage(entry, t)}</td>
-              <td data-testid="audit-subject" className="p-2">{subjectLabel(entry)}</td>
+              <td data-testid="audit-subject" className="p-2">{subjectLabel(entry, t)}</td>
               <td data-testid="audit-actor" className="p-2">{actorLabel(entry, t)}</td>
             </tr>)}
           </tbody>
