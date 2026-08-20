@@ -2,7 +2,6 @@ package org.courtside.rules;
 
 import org.courtside.rules.internal.RuleParameterInvalidException;
 import org.courtside.rules.internal.RuleParameters;
-import org.courtside.rules.internal.RuleType;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

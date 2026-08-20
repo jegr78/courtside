@@ -1,6 +1,7 @@
 package org.courtside.rules.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.rules.RuleType;
 import org.courtside.rules.RulesEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;

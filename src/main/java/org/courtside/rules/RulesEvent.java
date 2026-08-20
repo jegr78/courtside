@@ -1,6 +1,5 @@
 package org.courtside.rules;
 
-import org.courtside.rules.internal.RuleType;
 import org.courtside.shared.DomainEventRecord;
 
 import java.util.List;

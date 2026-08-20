@@ -1,6 +1,7 @@
 package org.courtside.rules.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.rules.RuleType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 

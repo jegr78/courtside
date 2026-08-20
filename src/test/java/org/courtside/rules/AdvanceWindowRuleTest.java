@@ -3,7 +3,6 @@ package org.courtside.rules;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.rules.internal.AdvanceWindowRule;
 import org.courtside.rules.internal.RuleAdminService;
-import org.courtside.rules.internal.RuleType;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

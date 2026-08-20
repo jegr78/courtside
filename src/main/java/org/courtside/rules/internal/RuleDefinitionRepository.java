@@ -1,5 +1,6 @@
 package org.courtside.rules.internal;
 
+import org.courtside.rules.RuleType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

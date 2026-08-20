@@ -6,7 +6,7 @@ import org.courtside.api.ApiRole;
 import org.courtside.api.ApiRuleType;
 import org.courtside.booking.series.CancelScope;
 import org.courtside.identity.Role;
-import org.courtside.rules.internal.RuleType;
+import org.courtside.rules.RuleType;
 import org.junit.jupiter.api.Test;
 
 import java.time.DayOfWeek;
