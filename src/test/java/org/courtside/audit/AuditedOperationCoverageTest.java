@@ -2,7 +2,6 @@ package org.courtside.audit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,20 +27,49 @@ class AuditedOperationCoverageTest {
             "org.courtside.member.RosterSyncService");
 
     private static final List<String> KNOWN_OPERATIONS = List.of(
+            "CardService#activeCards",
+            "CardService#activeParticipantCards",
+            "CardService#allCards",
+            "CardService#allParticipantCards",
+            "CardService#bookableCards",
             "CardService#changeCard",
             "CardService#changeParticipantCard",
             "CardService#createCard",
             "CardService#createParticipantCard",
+            "CardService#findCard",
+            "CardService#findParticipantCard",
+            "CardService#lockParticipantCards",
+            "CardService#requireCard",
+            "CardService#requireParticipantCard",
             "CardService#setCardActive",
             "CardService#setParticipantCardActive",
+            "ConfigService#current",
+            "ConfigService#lock",
+            "ConfigService#slotDuration",
             "ConfigService#update",
+            "ConfigService#zoneId",
+            "FacilityService#activeCourts",
+            "FacilityService#allCourts",
+            "FacilityService#allOpeningHours",
             "FacilityService#changeCourt",
             "FacilityService#closeOn",
             "FacilityService#createCourt",
+            "FacilityService#findCourt",
+            "FacilityService#findUnbookableCourts",
+            "FacilityService#openingHoursFor",
+            "FacilityService#requireBookableCourts",
+            "FacilityService#requireCourt",
             "FacilityService#setCourtActive",
             "FacilityService#setOpeningHours",
+            "FacilityService#weeklyOpeningHours",
+            "MemberService#activeMembershipTypeIds",
+            "MemberService#allMembershipTypes",
             "MemberService#changeMembershipType",
             "MemberService#createMembershipType",
+            "MemberService#findParticipants",
+            "MemberService#knowsMembershipType",
+            "MemberService#membershipTypeIdOf",
+            "MemberService#requireMembershipType",
             "MemberService#setMembershipTypeActive",
             "RosterService#changePerson",
             "RosterService#changeRoles",
@@ -50,13 +78,17 @@ class AuditedOperationCoverageTest {
             "RosterService#createAccount",
             "RosterService#createPerson",
             "RosterService#endMembership",
+            "RosterService#list",
             "RosterService#resetPassword",
             "RosterService#setAccountEnabled",
             "RosterService#writeMembership",
             "RosterSyncService#apply",
+            "RuleAdminService#allRuleSets",
             "RuleAdminService#changeRuleSet",
             "RuleAdminService#createRuleSet",
             "RuleAdminService#removeRule",
+            "RuleAdminService#requireRuleSet",
+            "RuleAdminService#rulesOf",
             "RuleAdminService#setRule",
             "RuleAdminService#setRuleSetActive");
 
@@ -66,7 +98,7 @@ class AuditedOperationCoverageTest {
         Properties inventory = inventory();
 
         // when
-        List<String> operations = writeOperations();
+        List<String> operations = declaredOperations();
 
         // then
         assertThat(operations).as(
@@ -77,16 +109,16 @@ class AuditedOperationCoverageTest {
     }
 
     @Test
-    void givenTheOperationDiscovery_whenItScansTheSevenServices_thenItFindsExactlyTheKnownWriteOperations() {
+    void givenTheOperationDiscovery_whenItScansTheSevenServices_thenItFindsExactlyTheKnownOperations() {
         // given / when
-        List<String> operations = writeOperations();
+        List<String> operations = declaredOperations();
 
         // then
         assertThat(operations).as(
-                        "Discovery reads method-level @Transactional only. If this list shrinks below "
-                                + "the known write operations, some method now relies on its class's own "
-                                + "@Transactional instead of declaring one, and the coverage test above "
-                                + "would go blind to it while staying green.")
+                        "A public method was added, renamed or removed on one of the seven services. "
+                                + "Update KNOWN_OPERATIONS to match, and give the method its own line in "
+                                + INVENTORY + " naming its event type, or 'none' if it deliberately "
+                                + "records nothing.")
                 .containsExactlyInAnyOrderElementsOf(KNOWN_OPERATIONS);
     }
 
@@ -112,12 +144,11 @@ class AuditedOperationCoverageTest {
                 .containsAll(declared);
     }
 
-    private static List<String> writeOperations() {
+    private static List<String> declaredOperations() {
         return SERVICES.stream()
                 .map(AuditedOperationCoverageTest::loadClass)
                 .flatMap(service -> Arrays.stream(service.getDeclaredMethods())
                         .filter(method -> Modifier.isPublic(method.getModifiers()))
-                        .filter(method -> method.isAnnotationPresent(Transactional.class))
                         .map(method -> service.getSimpleName() + "#" + method.getName()))
                 .distinct()
                 .sorted()
