@@ -10,6 +10,13 @@ import java.util.UUID;
 
 public sealed interface CardEvent extends DomainEventRecord {
 
+    UUID cardId();
+
+    @Override
+    default UUID subjectId() {
+        return cardId();
+    }
+
     record BookingCardAdded(UUID cardId, List<Role> allowedRoles, List<Role> managingRoles,
                             List<Short> allowedPlayerCounts, boolean countsAgainstLimits,
                             boolean guestAllowed, boolean showGenericOccupancy) implements CardEvent {
@@ -25,11 +32,6 @@ public sealed interface CardEvent extends DomainEventRecord {
         @Override
         public String eventType() {
             return TYPE;
-        }
-
-        @Override
-        public UUID subjectId() {
-            return cardId;
         }
 
     }
@@ -53,11 +55,6 @@ public sealed interface CardEvent extends DomainEventRecord {
             return TYPE;
         }
 
-        @Override
-        public UUID subjectId() {
-            return cardId;
-        }
-
     }
 
     record BookingCardAvailabilityChanged(UUID cardId, boolean active) implements CardEvent {
@@ -69,11 +66,6 @@ public sealed interface CardEvent extends DomainEventRecord {
             return TYPE;
         }
 
-        @Override
-        public UUID subjectId() {
-            return cardId;
-        }
-
     }
 
     record ParticipantCardAdded(UUID cardId, Integer capacity) implements CardEvent {
@@ -83,11 +75,6 @@ public sealed interface CardEvent extends DomainEventRecord {
         @Override
         public String eventType() {
             return TYPE;
-        }
-
-        @Override
-        public UUID subjectId() {
-            return cardId;
         }
 
     }
@@ -106,11 +93,6 @@ public sealed interface CardEvent extends DomainEventRecord {
             return TYPE;
         }
 
-        @Override
-        public UUID subjectId() {
-            return cardId;
-        }
-
     }
 
     record ParticipantCardAvailabilityChanged(UUID cardId, boolean active) implements CardEvent {
@@ -120,11 +102,6 @@ public sealed interface CardEvent extends DomainEventRecord {
         @Override
         public String eventType() {
             return TYPE;
-        }
-
-        @Override
-        public UUID subjectId() {
-            return cardId;
         }
 
     }
