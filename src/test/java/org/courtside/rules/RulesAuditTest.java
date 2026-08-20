@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.audit.testfixture.AuditTestFixture.RecordedEvent;
 import org.courtside.rules.internal.RuleAdminService;
+import org.courtside.rules.internal.RuleParameterInvalidException;
 import org.courtside.rules.internal.RuleSet;
 import org.courtside.rules.internal.RuleType;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Import(AuditTestFixture.class)
 class RulesAuditTest extends AbstractIntegrationTest {
@@ -117,6 +119,17 @@ class RulesAuditTest extends AbstractIntegrationTest {
 
         // then
         assertThat(eventsOfTypeAbout(ruleSet.getId(), RulesEvent.RuleDefinitionSet.TYPE)).hasSize(1);
+    }
+
+    @Test
+    void givenAnOutOfBoundsParameter_whenARuleIsSet_thenNothingIsRecorded() {
+        // given
+        RuleSet ruleSet = rules.createRuleSet("Summer");
+
+        // when / then
+        assertThatThrownBy(() -> rules.setRule(ruleSet.getId(), RuleType.MAX_OPEN_BOOKINGS, Map.of("limit", 100)))
+                .isInstanceOf(RuleParameterInvalidException.class);
+        assertThat(eventsOfTypeAbout(ruleSet.getId(), RulesEvent.RuleDefinitionSet.TYPE)).isEmpty();
     }
 
     @Test
