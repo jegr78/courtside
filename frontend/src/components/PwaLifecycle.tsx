@@ -7,15 +7,22 @@ import { Button } from "./Button";
 export function PwaLifecycle() {
   const { t } = useTranslation();
   const [needsRefresh, setNeedsRefresh] = useState(false);
+  const [registrationFailed, setRegistrationFailed] = useState(false);
   const update = useRef<ReturnType<typeof registerSW> | undefined>(undefined);
 
   useEffect(() => {
     update.current = registerSW({
       immediate: false,
-      onNeedRefresh: () => setNeedsRefresh(true)
+      onNeedRefresh: () => setNeedsRefresh(true),
+      onRegisterError: () => setRegistrationFailed(true)
     });
   }, []);
 
+  if (registrationFailed) {
+    return <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl shadow-xl" data-testid="pwa-registration-warning">
+      <Alert>{t("pwa.registrationFailed")}</Alert>
+    </div>;
+  }
   if (!needsRefresh) {
     return null;
   }

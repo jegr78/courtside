@@ -39,4 +39,23 @@ describe("PwaLifecycle", () => {
     // then
     expect(screen.queryByTestId("pwa-update")).not.toBeInTheDocument();
   });
+
+  it("given service-worker registration fails, when the callback reports it, then the limitation is visible", async () => {
+    // given
+    let registrationFailed: (() => void) | undefined;
+    registerSW.mockImplementation((options?: { onRegisterError: () => void }) => {
+      registrationFailed = options?.onRegisterError;
+      return vi.fn();
+    });
+    render(<PwaLifecycle />);
+
+    // when
+    registrationFailed?.();
+
+    // then
+    const warning = await screen.findByTestId("pwa-registration-warning");
+    expect(warning.querySelector("[role='alert']")).not.toBeNull();
+    expect(warning).toHaveTextContent("Offline-Nutzung und automatische Update-Hinweise");
+    expect(warning).toHaveTextContent("vertrauenswürdiges HTTPS-Zertifikat");
+  });
 });
