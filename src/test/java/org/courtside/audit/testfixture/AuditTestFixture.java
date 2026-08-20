@@ -21,7 +21,7 @@ public class AuditTestFixture {
     private final AuditService audit;
 
     public List<RecordedEvent> eventsAbout(UUID subjectId) {
-        return events.findBySubjectIdOrderByOccurredAtAsc(subjectId).stream()
+        return events.findBySubjectIdOrderByOccurredAtAscIdAsc(subjectId).stream()
                 .map(this::toRecordedEvent)
                 .toList();
     }
@@ -33,7 +33,7 @@ public class AuditTestFixture {
     }
 
     public List<RecordedEvent> eventsOfType(String eventType) {
-        return events.findByEventTypeOrderByOccurredAtAsc(eventType).stream()
+        return events.findByEventTypeOrderByOccurredAtAscIdAsc(eventType).stream()
                 .map(this::toRecordedEvent)
                 .toList();
     }

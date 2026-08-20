@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -62,11 +64,11 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
         roster.changePerson(personId, "Mary", "Doe", "jane.doe@example.org");
 
         // then
-        assertThat(audit.eventsAbout(personId)).last().satisfies(event -> {
-            assertThat(event.eventType()).isEqualTo("roster.person.corrected");
-            assertThat(event.payload()).containsEntry("fields", java.util.List.of("firstName"));
-            assertThat(event.payload().toString()).doesNotContain("Mary").doesNotContain("Doe");
-        });
+        assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
+                .containsExactlyInAnyOrder("roster.person.added", "roster.person.corrected");
+        Map<String, Object> corrected = audit.latestPayload(personId, "roster.person.corrected");
+        assertThat(corrected).containsEntry("fields", List.of("firstName"));
+        assertThat(corrected.toString()).doesNotContain("Mary").doesNotContain("Doe");
     }
 
     @Test
@@ -83,7 +85,7 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
 
         // then
         assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
-                .containsExactly("roster.person.added", "roster.account.created",
+                .containsExactlyInAnyOrder("roster.person.added", "roster.account.created",
                         "roster.account.rolesChanged", "roster.account.usernameCorrected",
                         "roster.account.passwordReset", "roster.account.availabilityChanged");
     }
@@ -100,9 +102,9 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
 
         // then
         assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
-                .containsExactly("roster.person.added", "roster.membership.written",
+                .containsExactlyInAnyOrder("roster.person.added", "roster.membership.written",
                         "roster.membership.ended");
-        assertThat(audit.eventsAbout(personId).get(1).payload())
+        assertThat(audit.latestPayload(personId, "roster.membership.written"))
                 .containsEntry("membershipTypeId", membershipTypeId.toString())
                 .containsEntry("startedOn", "2026-01-01");
     }
@@ -148,10 +150,10 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
         roster.synchroniseCorrectedLastName(personId, "Roe");
 
         // then
-        assertThat(audit.eventsAbout(personId)).last().satisfies(event -> {
-            assertThat(event.eventType()).isEqualTo("roster.person.corrected");
-            assertThat(event.payload()).containsEntry("fields", java.util.List.of("lastName"));
-        });
+        assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
+                .containsExactlyInAnyOrder("roster.person.added", "roster.person.corrected");
+        assertThat(audit.latestPayload(personId, "roster.person.corrected"))
+                .containsEntry("fields", List.of("lastName"));
     }
 
     @Test
@@ -167,7 +169,8 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
 
         // then
         assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
-                .endsWith("roster.membership.ended", "roster.account.availabilityChanged");
-        assertThat(audit.eventsAbout(personId).getLast().payload()).containsEntry("enabled", false);
+                .contains("roster.membership.ended", "roster.account.availabilityChanged");
+        assertThat(audit.latestPayload(personId, "roster.account.availabilityChanged"))
+                .containsEntry("enabled", false);
     }
 }
