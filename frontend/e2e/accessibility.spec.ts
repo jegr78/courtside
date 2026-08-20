@@ -63,9 +63,11 @@ for (const locale of ["de", "en"]) {
     // when / then
     await page.goto("/admin/configuration");
     await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
+    await expect(page.getByTestId("save-club-config")).toBeVisible();
     await expectNoWcagViolations(page);
     await page.goto("/admin/facility");
     await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+    await expect(page.getByTestId("create-court")).toBeVisible();
     await expectNoWcagViolations(page);
     // The audit table needs a row to check its own markup, not the empty state.
     const courtToggled = page.waitForResponse((response) =>
@@ -76,6 +78,7 @@ for (const locale of ["de", "en"]) {
     await courtToggled;
     await page.goto("/admin/roster");
     await expect(page.getByTestId("admin-roster-view")).toBeVisible();
+    await expect(page.getByTestId("create-person")).toBeVisible();
     await expectNoWcagViolations(page);
     await page.goto("/admin/audit");
     await expect(page.getByTestId("admin-audit-view")).toBeVisible();
