@@ -5,12 +5,14 @@ import test from "node:test";
 const workflow = readFileSync(new URL("../.github/workflows/test-stability.yml", import.meta.url), "utf8");
 const build = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
 
-test("given periodic stability evidence, when reading its workflow, then order and worker proofs retain first attempts", () => {
+test("given periodic stability evidence, when reading its workflow, then backend and browser order proofs retain first attempts", () => {
   assert.match(workflow, /schedule:/);
   assert.match(workflow, /reversealphabetical, random/);
   assert.match(workflow, /surefire\.runOrder\.random\.seed/);
-  assert.match(workflow, /--workers=2/);
-  assert.match(workflow, /for attempt in 1 2 3/);
+  assert.match(workflow, /project_order: \[configured, reversed\]/);
+  assert.match(workflow, /COURTSIDE_PROJECT_ORDER:/);
+  assert.doesNotMatch(workflow, /--workers=2/);
+  assert.doesNotMatch(workflow, /for attempt in 1 2 3/);
   assert.doesNotMatch(workflow, /retries:/);
   assert.match(workflow, /Upload first-attempt evidence/);
   assert.match(workflow, /Upload first-attempt browser evidence/);
