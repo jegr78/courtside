@@ -1042,6 +1042,15 @@ whether it is built or designed. **Designed means absent today.**
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the release workflow signs each image keylessly with
   cosign and attaches an SBOM attestation. Image scanning is designed and not built.*
+- **Accepted: the mail server fetches its admin interface unpinned.** The reference deployment
+  pins every image it names by digest, and the mail image is no exception — but on first start
+  that image downloads its own web interface from the latest GitHub release, outside the digest
+  the deployment pinned. An operator watching the container's first start sees the download; an
+  observer wanting more needs read access to the volume it lands in. It stays open because the
+  download happens inside a third-party image and closing it would mean forking that image or
+  vendoring an interface this product does not maintain. What bounds it: the admin port is bound
+  to the loopback interface, nothing else in the deployment reads that interface, and it is
+  reached only during setup and recovery. *Built, as described.*
 
 ### Roles
 

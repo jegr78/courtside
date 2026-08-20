@@ -20,6 +20,7 @@ const runtime = mkdtempSync(join(tmpdir(), "courtside-mail-smoke-"));
 
 function openssl(args) {
   const result = spawnSync("openssl", args, { cwd: runtime, encoding: "utf8" });
+  if (result.error) throw new Error(`openssl ${args[0]} could not run: ${result.error.message}`);
   if (result.status !== 0) throw new Error(`openssl ${args[0]} failed: ${result.stderr}`);
 }
 
@@ -43,8 +44,8 @@ function issueCertificate() {
     JSON.stringify({ "@type": "update", object: "SystemSettings",
       value: { defaultCertificateId: "#certificate-smoke" } })
   ].join("\n") + "\n");
-  // The CLI container reads this as another user, and mkdtemp hands out a directory only its
-  // owner may enter. The keys beside the plan keep their mode; the plan itself is one run old.
+  // Readable to anyone on the host, server key included, because the CLI container reads it as
+  // another user and mkdtemp yields a directory only its owner may enter. The run deletes it.
   chmodSync(runtime, 0o711);
   chmodSync(join(runtime, "certificate.ndjson"), 0o644);
   return read("ca.crt");

@@ -225,9 +225,14 @@ domain the relay test asks about.
 `node tools/courtside.mail-smoke.mjs` brings this same mail server up on a scratch Compose project,
 renders and applies these same plans, and hands it a message over the submission port the way the
 application will — authenticated, over STARTTLS — then reads that message back out of a local sink.
-It tears the project down afterwards and needs nothing but Docker. The `mail smoke` workflow runs it
-whenever anything under `deploy/mail/` changes, so the configuration a club applies is configuration
-that has been applied.
+It tears the project down afterwards and needs Docker and `openssl`. The `mail smoke` workflow runs
+it whenever anything under `deploy/mail/` changes, so the configuration a club applies is
+configuration that has been applied.
+
+One thing the run does differently on purpose: it issues itself a throwaway authority and installs
+a certificate for the mail hostname, where your instance serves the self-signed one it generated.
+That is what lets the run validate the handshake instead of accepting whatever it is handed, and it
+is the single point at which the smoke world and your world differ.
 
 ### Back up the mail volumes too
 
