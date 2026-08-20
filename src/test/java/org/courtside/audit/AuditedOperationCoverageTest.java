@@ -5,10 +5,13 @@ import org.springframework.core.io.ClassPathResource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -142,6 +145,39 @@ class AuditedOperationCoverageTest {
                                 + "Every event type it names must be a TYPE constant some DomainEventRecord "
                                 + "actually declares.")
                 .containsAll(declared);
+    }
+
+    @Test
+    void givenTwoPublicMethods_whenTheyShareANameOnTheSameService_thenTheBuildSaysSo() {
+        // given / when
+        List<String> duplicates = duplicateMethodNames();
+
+        // then
+        assertThat(duplicates).as(
+                        "The inventory key is Service#methodName. Two public methods sharing a name "
+                                + "on the same service would collapse into that one key, and a write hidden "
+                                + "inside whichever overload discovery does not see would never reach "
+                                + INVENTORY + ". Give the methods different names, or widen the key to "
+                                + "include the signature and rewrite every line in " + INVENTORY
+                                + " to match.")
+                .isEmpty();
+    }
+
+    private static List<String> duplicateMethodNames() {
+        return SERVICES.stream()
+                .map(AuditedOperationCoverageTest::loadClass)
+                .flatMap(AuditedOperationCoverageTest::duplicateNamesOn)
+                .sorted()
+                .toList();
+    }
+
+    private static Stream<String> duplicateNamesOn(Class<?> service) {
+        return Arrays.stream(service.getDeclaredMethods())
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .collect(Collectors.groupingBy(Method::getName, Collectors.counting()))
+                .entrySet().stream()
+                .filter(entry -> entry.getValue() > 1)
+                .map(entry -> service.getSimpleName() + "#" + entry.getKey());
     }
 
     private static List<String> declaredOperations() {
