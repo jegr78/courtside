@@ -10,4 +10,6 @@ public interface DomainEventRepository extends Repository<DomainEvent, UUID> {
     DomainEvent save(DomainEvent event);
 
     List<DomainEvent> findBySubjectIdOrderByOccurredAtAsc(UUID subjectId);
+
+    List<DomainEvent> findByEventTypeOrderByOccurredAtAsc(String eventType);
 }

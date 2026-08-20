@@ -9,6 +9,7 @@ import org.courtside.config.BookingGridSettings;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.BookingGridCoordination;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -34,6 +36,7 @@ public class FacilityService {
     private final OpeningHoursRepository openingHours;
     private final BookingGridSettings bookingGridSettings;
     private final BookingGridCoordination bookingGridCoordination;
+    private final ApplicationEventPublisher events;
 
     public List<Court> activeCourts() {
         return courts.findByActiveTrueOrderByNumberAsc();
@@ -49,24 +52,37 @@ public class FacilityService {
 
     @Transactional
     public Court createCourt(int number, String name) {
-        return saveOrRejectTakenNumber(new Court(number, name));
+        Court court = saveOrRejectTakenNumber(new Court(number, name));
+        events.publishEvent(new FacilityEvent.CourtAdded(court.getId(), court.getNumber()));
+        return court;
     }
 
     @Transactional
     public Court changeCourt(UUID courtId, int number, String name) {
         Court court = requireCourt(courtId);
+        List<String> changedFields = Objects.equals(court.getName(), name) ? List.of() : List.of("name");
+        boolean numberChanged = court.getNumber() != number;
         court.changeTo(number, name);
-        return saveOrRejectTakenNumber(court);
+        Court saved = saveOrRejectTakenNumber(court);
+        if (numberChanged || !changedFields.isEmpty()) {
+            events.publishEvent(
+                    new FacilityEvent.CourtChanged(saved.getId(), saved.getNumber(), changedFields));
+        }
+        return saved;
     }
 
     @Transactional
     public Court setCourtActive(UUID courtId, boolean active) {
         Court court = requireCourt(courtId);
+        if (court.isActive() == active) {
+            return court;
+        }
         if (active) {
             court.activate();
         } else {
             court.deactivate();
         }
+        events.publishEvent(new FacilityEvent.CourtAvailabilityChanged(court.getId(), active));
         return court;
     }
 
@@ -98,17 +114,30 @@ public class FacilityService {
                 || !slotDuration.isAligned(required.closesAt())) {
             throw new OpeningHoursGridMismatchException(slotDuration.minutes());
         }
-        return openingHours.findByDayOfWeek(day.getValue())
+        Optional<OpeningHours> existing = openingHours.findByDayOfWeek(day.getValue());
+        boolean changed = existing
+                .map(hours -> !hours.getOpensAt().equals(required.opensAt())
+                        || !hours.getClosesAt().equals(required.closesAt()))
+                .orElse(true);
+        OpeningHours saved = existing
                 .map(hours -> {
                     hours.changeTo(required);
                     return hours;
                 })
                 .orElseGet(() -> openingHours.save(new OpeningHours(day, required)));
+        if (changed) {
+            events.publishEvent(new FacilityEvent.OpeningHoursSet(
+                    saved.getId(), day.getValue(), required.opensAt(), required.closesAt()));
+        }
+        return saved;
     }
 
     @Transactional
     public void closeOn(DayOfWeek day) {
-        openingHours.deleteByDayOfWeek(day.getValue());
+        openingHours.findByDayOfWeek(day.getValue()).ifPresent(hours -> {
+            events.publishEvent(new FacilityEvent.OpeningHoursClosed(hours.getId(), day.getValue()));
+            openingHours.deleteByDayOfWeek(day.getValue());
+        });
     }
 
     public List<UUID> findUnbookableCourts(Collection<UUID> courtIds) {
