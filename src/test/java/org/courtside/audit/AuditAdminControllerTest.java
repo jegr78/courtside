@@ -116,6 +116,20 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACourtWithNoName_whenTheLogIsRead_thenTheSubjectNameIsAbsentRatherThanFailing()
+            throws Exception {
+        // given
+        UUID courtId = facilityFixture.createCourt(11, null);
+
+        // when / then
+        mockMvc.perform(get("/api/admin/audit").param("subjectId", courtId.toString())
+                        .with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].subjectId").value(courtId.toString()))
+                .andExpect(jsonPath("$.entries[0].subjectName").doesNotExist());
+    }
+
+    @Test
     void givenACursorNamingNoEntry_whenTheLogIsRead_thenItIsRejected() throws Exception {
         // when / then
         mockMvc.perform(get("/api/admin/audit").param("cursor", UUID.randomUUID().toString())

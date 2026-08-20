@@ -1,9 +1,10 @@
 import type { TFunction } from "i18next";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, type AuditEntry } from "../api/client";
 import { problemMessage } from "../api/problem-message";
+import { formatDateTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 
@@ -16,7 +17,13 @@ function auditMessage(entry: AuditEntry, t: TFunction): string {
   const context = entry.eventType.endsWith(".availabilityChanged")
     ? (entry.parameters[flagKey] ? "active" : "inactive")
     : undefined;
-  return t(`audit.event.${entry.eventType}`, { ...entry.parameters, ...(context ? { context } : {}) });
+  const dayOfWeek = entry.parameters.dayOfWeek;
+  const weekday = typeof dayOfWeek === "number" ? t(`audit.day.${dayOfWeek}`) : undefined;
+  return t(`audit.event.${entry.eventType}`, {
+    ...entry.parameters,
+    ...(weekday !== undefined ? { weekday } : {}),
+    ...(context ? { context } : {})
+  });
 }
 
 function actorLabel(entry: AuditEntry, t: TFunction): string {
@@ -29,22 +36,29 @@ function subjectLabel(entry: AuditEntry): string {
 }
 
 export function AdminAuditView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage ?? i18n.language;
   const [entries, setEntries] = useState<AuditEntry[]>();
   const [cursor, setCursor] = useState<string>();
+  const [timeZone, setTimeZone] = useState("UTC");
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
 
   const reportError = useCallback((failure: unknown) => setError(problemMessage(failure, t)), [t]);
+  const reportErrorRef = useRef(reportError);
+  useEffect(() => {
+    reportErrorRef.current = reportError;
+  }, [reportError]);
 
   useEffect(() => {
-    void api.audit()
-      .then((page) => {
+    void Promise.all([api.audit(), api.config()])
+      .then(([page, config]) => {
         setEntries(page.entries);
         setCursor(page.nextCursor ?? undefined);
+        setTimeZone(config.timeZone);
       })
-      .catch(reportError);
-  }, [reportError]);
+      .catch((failure: unknown) => reportErrorRef.current(failure));
+  }, []);
 
   async function readNextPage() {
     if (pending) return;
@@ -83,8 +97,8 @@ export function AdminAuditView() {
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => <tr key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId ?? ""} className="border-t">
-              <td className="p-2">{new Date(entry.occurredAt).toLocaleString()}</td>
+            {entries.map((entry) => <tr key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId ?? ""} data-event-type={entry.eventType} className="border-t">
+              <td data-testid="audit-occurred-at" className="p-2">{formatDateTime(entry.occurredAt, language, timeZone)}</td>
               <td data-testid="audit-message" className="p-2">{auditMessage(entry, t)}</td>
               <td data-testid="audit-subject" className="p-2">{subjectLabel(entry)}</td>
               <td data-testid="audit-actor" className="p-2">{actorLabel(entry, t)}</td>

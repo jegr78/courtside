@@ -1,8 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { api, type AuditEntry } from "../api/client";
+import { api, type AuditEntry, type ClubConfig } from "../api/client";
 import i18n from "../i18n";
 import { AdminAuditView } from "./AdminAuditView";
 
@@ -17,6 +17,11 @@ const courtAdded: AuditEntry = {
   actorUsername: "doe.jane"
 };
 
+const clubConfig: ClubConfig = {
+  clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff",
+  logoUrl: null, imprintUrl: null, defaultLocale: "en", slotMinutes: 60, timeZone: "Europe/Berlin"
+};
+
 function row(entryId: string): HTMLElement {
   const found = screen.getAllByTestId("audit-row")
     .find((element) => element.getAttribute("data-entry-id") === entryId);
@@ -28,6 +33,7 @@ describe("AdminAuditView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
+    vi.spyOn(api, "config").mockResolvedValue(clubConfig);
   });
 
   it("given an entry, when the log is shown, then its row names the change, the subject and the actor", async () => {
@@ -86,9 +92,57 @@ describe("AdminAuditView", () => {
     expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(entry.subjectId!);
   });
 
+  it("given the occurred-at cell, when the club has its own time zone and the browser has a language, then both are honoured, never the browser's own zone", async () => {
+    // given
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    vi.spyOn(api, "config").mockResolvedValue({ ...clubConfig, timeZone: "America/New_York" });
+    await i18n.changeLanguage("de");
+
+    // when
+    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    await screen.findByTestId("audit-row");
+
+    // then
+    const expected = new Intl.DateTimeFormat("de", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" })
+      .format(new Date(courtAdded.occurredAt));
+    expect(within(row(courtAdded.id)).getByTestId("audit-occurred-at")).toHaveTextContent(expected);
+  });
+
+  it.each([
+    ["facility.openingHours.set", { dayOfWeek: 1, opensAt: "08:00:00", closesAt: "22:00:00" }, "Opening hours set: Monday, 08:00:00–22:00:00"],
+    ["facility.openingHours.closed", { dayOfWeek: 7 }, "Sunday closed"],
+    ["card.participantCard.added", { capacity: 4 }, "Participant card with capacity 4 added"],
+    ["config.club.localeChanged", { defaultLocale: "de" }, "Default language changed to de"],
+    ["config.club.slotDurationChanged", { slotMinutes: 30 }, "Slot duration changed to 30 minutes"],
+    ["config.club.timeZoneChanged", { timeZone: "Europe/Berlin" }, "Time zone changed to Europe/Berlin"],
+    ["rules.definition.set", { ruleType: "ADVANCE_WINDOW" }, "Rule ADVANCE_WINDOW set"],
+    ["rules.definition.removed", { ruleType: "ADVANCE_WINDOW" }, "Rule ADVANCE_WINDOW removed"],
+    ["roster.membership.written", { startedOn: "2026-01-01" }, "Membership recorded from 2026-01-01"]
+  ])("given a %s event, when it is shown, then its interpolated values are resolved, not left as template text", async (eventType, parameters, expected) => {
+    // given
+    const entry: AuditEntry = { ...courtAdded, eventType, parameters };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
+
+    // when
+    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    await screen.findByTestId("audit-row");
+
+    // then
+    expect(within(row(entry.id)).getByTestId("audit-message")).toHaveTextContent(expected);
+    expect(within(row(entry.id)).getByTestId("audit-message")).not.toHaveTextContent("{{");
+  });
+
   it.each([
     ["facility.court.availabilityChanged", { active: true }, "Court activated"],
     ["facility.court.availabilityChanged", { active: false }, "Court deactivated"],
+    ["card.bookingCard.availabilityChanged", { active: true }, "Booking card activated"],
+    ["card.bookingCard.availabilityChanged", { active: false }, "Booking card deactivated"],
+    ["card.participantCard.availabilityChanged", { active: true }, "Participant card activated"],
+    ["card.participantCard.availabilityChanged", { active: false }, "Participant card deactivated"],
+    ["rules.ruleSet.availabilityChanged", { active: true }, "Rule set activated"],
+    ["rules.ruleSet.availabilityChanged", { active: false }, "Rule set deactivated"],
+    ["roster.membershipType.availabilityChanged", { active: true }, "Membership type activated"],
+    ["roster.membershipType.availabilityChanged", { active: false }, "Membership type deactivated"],
     ["roster.account.availabilityChanged", { enabled: true }, "Account enabled"],
     ["roster.account.availabilityChanged", { enabled: false }, "Account disabled"]
   ])("given a %s event with %j, when it is shown, then it reads %j", async (eventType, parameters, expected) => {
@@ -121,6 +175,25 @@ describe("AdminAuditView", () => {
     expect(await screen.findAllByTestId("audit-row")).toHaveLength(2);
     expect(within(row(second.id)).getByTestId("audit-message")).toBeInTheDocument();
     expect(screen.queryByTestId("audit-load-more")).not.toBeInTheDocument();
+  });
+
+  it("given a page already loaded through 'load more', when the language changes, then the collected pages are not thrown away", async () => {
+    // given
+    const second: AuditEntry = { ...courtAdded, id: "44444444-4444-4444-4444-444444444444" };
+    const audit = vi.spyOn(api, "audit")
+      .mockResolvedValueOnce({ entries: [courtAdded], nextCursor: courtAdded.id })
+      .mockResolvedValueOnce({ entries: [second], nextCursor: null });
+    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("audit-load-more"));
+    expect(await screen.findAllByTestId("audit-row")).toHaveLength(2);
+
+    // when
+    await i18n.changeLanguage("de");
+
+    // then
+    await waitFor(() => expect(screen.getAllByTestId("audit-row")).toHaveLength(2));
+    expect(audit).toHaveBeenCalledTimes(2);
   });
 
   it("given nobody has changed anything yet, when the log is read, then the empty state says so", async () => {

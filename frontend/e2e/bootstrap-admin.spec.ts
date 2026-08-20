@@ -270,7 +270,9 @@ test("an admin changes a court and finds that change in the log", async ({ page 
   await expect(page.getByTestId("admin-audit-view")).toBeVisible();
 
   // then
-  const entry = page.locator(`[data-testid="audit-row"][data-subject-id="${court}"]`);
+  const entry = page.locator(
+    `[data-testid="audit-row"][data-subject-id="${court}"][data-event-type="facility.court.availabilityChanged"]`
+  );
   await expect(entry).toBeVisible();
   await expect(entry.getByTestId("audit-message")).toHaveText("Court deactivated");
   await expect(entry.getByTestId("audit-subject")).toHaveText(court);
