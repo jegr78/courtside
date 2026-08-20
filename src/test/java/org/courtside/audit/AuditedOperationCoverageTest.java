@@ -148,6 +148,25 @@ class AuditedOperationCoverageTest {
     }
 
     @Test
+    void givenTheSevenServices_whenCheckingTheirSuperclass_thenNoneExtendsAnythingButObject() {
+        // given / when
+        List<String> withSuperclass = SERVICES.stream()
+                .map(AuditedOperationCoverageTest::loadClass)
+                .filter(service -> service.getSuperclass() != Object.class)
+                .map(Class::getSimpleName)
+                .toList();
+
+        // then
+        assertThat(withSuperclass).as(
+                        "Discovery reads getDeclaredMethods(), which only sees a class's own methods, not "
+                                + "what it inherits. A service that now extends something else can carry a "
+                                + "public write method this coverage test never notices. Either widen "
+                                + "declaredOperations() to include inherited public methods (filtering out "
+                                + "Object's own), or add the new superclass here once it is deliberate.")
+                .isEmpty();
+    }
+
+    @Test
     void givenTwoPublicMethods_whenTheyShareANameOnTheSameService_thenTheBuildSaysSo() {
         // given / when
         List<String> duplicates = duplicateMethodNames();
