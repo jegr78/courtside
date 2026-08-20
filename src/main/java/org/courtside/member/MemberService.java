@@ -6,6 +6,7 @@ import org.courtside.member.internal.MembershipTypeNameTakenException;
 import org.courtside.member.internal.MembershipTypeNotFoundException;
 import org.courtside.member.internal.MembershipTypeRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -30,6 +32,7 @@ public class MemberService {
     private final MemberRepository members;
     private final MembershipTypeRepository membershipTypes;
     private final RuleSetActivationRepository ruleSetActivation;
+    private final ApplicationEventPublisher events;
 
     public Optional<UUID> membershipTypeIdOf(UUID personId) {
         return members.findCurrentByPersonId(personId).map(Member::getMembershipTypeId);
@@ -65,25 +68,38 @@ public class MemberService {
     @Transactional
     public MembershipType createMembershipType(String name, UUID ruleSetId) {
         requireActiveRuleSet(ruleSetId);
-        return saveOrRejectTakenName(new MembershipType(name, ruleSetId));
+        MembershipType saved = saveOrRejectTakenName(new MembershipType(name, ruleSetId));
+        events.publishEvent(new MembershipTypeEvent.Added(saved.getId(), saved.getRuleSetId()));
+        return saved;
     }
 
     @Transactional
     public MembershipType changeMembershipType(UUID membershipTypeId, String name, UUID ruleSetId) {
         MembershipType type = requireMembershipType(membershipTypeId);
         requireActiveRuleSet(ruleSetId);
+        List<String> changedFields = Objects.equals(type.getName(), name) ? List.of() : List.of("name");
+        boolean ruleSetChanged = !Objects.equals(type.getRuleSetId(), ruleSetId);
         type.changeTo(name, ruleSetId);
-        return saveOrRejectTakenName(type);
+        MembershipType saved = saveOrRejectTakenName(type);
+        if (!changedFields.isEmpty() || ruleSetChanged) {
+            events.publishEvent(
+                    new MembershipTypeEvent.Changed(saved.getId(), saved.getRuleSetId(), changedFields));
+        }
+        return saved;
     }
 
     @Transactional
     public MembershipType setMembershipTypeActive(UUID membershipTypeId, boolean active) {
         MembershipType type = requireMembershipType(membershipTypeId);
+        if (type.isActive() == active) {
+            return type;
+        }
         if (active) {
             type.activate();
         } else {
             type.deactivate();
         }
+        events.publishEvent(new MembershipTypeEvent.AvailabilityChanged(type.getId(), active));
         return type;
     }
 
