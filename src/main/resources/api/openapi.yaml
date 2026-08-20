@@ -128,7 +128,10 @@ components:
       name: cursor
       in: query
       required: false
-      description: The opaque `nextCursor` returned by the preceding page.
+      description: |
+        The opaque `nextCursor` returned by the preceding page. This is the plain variant: a paging
+        endpoint whose cursor needs prose of its own declares that cursor inline instead of sharing
+        this one, so not every paging endpoint refers to it.
       schema: { type: string, format: uuid }
     PageLimit:
       name: limit
