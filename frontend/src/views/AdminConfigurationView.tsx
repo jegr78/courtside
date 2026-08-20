@@ -112,56 +112,58 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     }
   }
 
-  if (!config) return <p role="status">{t("status.loading")}</p>;
-
   return <section data-testid="admin-configuration-view" className="surface-panel grid w-full max-w-5xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-3xl font-bold">{t("admin.config.title")}</h1>
       <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
     </div>
-    {error && <Alert>{error}</Alert>}
-    {success && <div data-testid="admin-save-success"><Alert tone="success">{success}</Alert></div>}
-    <form noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5">
-      <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
-      <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
-      <div className="grid gap-5 sm:grid-cols-2">
-        <TextField label={t("admin.config.primaryColor")} value={config.primaryColor} onChange={(event) => changeConfig({ primaryColor: event.target.value })} />
-        <TextField label={t("admin.config.accentColor")} value={config.accentColor} onChange={(event) => changeConfig({ accentColor: event.target.value })} />
-        <TextField label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""} onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
-        <TextField label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
-      </div>
-      <label className="grid gap-2 font-medium">
-        {t("admin.config.defaultLocale")}
-        <select className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} onChange={(event) => changeConfig({ defaultLocale: event.target.value })}>
-          <option value="de">Deutsch</option><option value="en">English</option>
-        </select>
-      </label>
-      <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
-      <div className="grid gap-1">
-        <label className="grid gap-2 font-medium">
-          {t("admin.config.timeZone")}
-          <select data-testid="time-zone" className="form-control rounded-lg border px-3 py-3"
-                  value={config.timeZone}
-                  onChange={(event) => changeConfig({ timeZone: event.target.value })}>
-            {timeZones(config.timeZone).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
-          </select>
-        </label>
-        <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
-      </div>
-      <Button data-testid="save-club-config" className="justify-self-start" type="submit">{t("admin.save")}</Button>
-    </form>
-    <div className="grid gap-5">
-      <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
-      <label className="grid gap-2 font-medium">
-        {t("admin.rules.ruleSet")}
-        <select data-testid="rule-set" className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => selectRuleSet(event.target.value)}>
-          {ruleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
-        </select>
-      </label>
-      <div className="grid gap-4">
-        {ruleTypes.map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} />)}
-      </div>
-    </div>
+    {!config
+      ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+      : <>
+        {error && <Alert>{error}</Alert>}
+        {success && <div data-testid="admin-save-success"><Alert tone="success">{success}</Alert></div>}
+        <form noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5">
+          <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
+          <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
+          <div className="grid gap-5 sm:grid-cols-2">
+            <TextField label={t("admin.config.primaryColor")} value={config.primaryColor} onChange={(event) => changeConfig({ primaryColor: event.target.value })} />
+            <TextField label={t("admin.config.accentColor")} value={config.accentColor} onChange={(event) => changeConfig({ accentColor: event.target.value })} />
+            <TextField label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""} onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
+            <TextField label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
+          </div>
+          <label className="grid gap-2 font-medium">
+            {t("admin.config.defaultLocale")}
+            <select className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} onChange={(event) => changeConfig({ defaultLocale: event.target.value })}>
+              <option value="de">Deutsch</option><option value="en">English</option>
+            </select>
+          </label>
+          <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
+          <div className="grid gap-1">
+            <label className="grid gap-2 font-medium">
+              {t("admin.config.timeZone")}
+              <select data-testid="time-zone" className="form-control rounded-lg border px-3 py-3"
+                      value={config.timeZone}
+                      onChange={(event) => changeConfig({ timeZone: event.target.value })}>
+                {timeZones(config.timeZone).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+              </select>
+            </label>
+            <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
+          </div>
+          <Button data-testid="save-club-config" className="justify-self-start" type="submit">{t("admin.save")}</Button>
+        </form>
+        <div className="grid gap-5">
+          <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
+          <label className="grid gap-2 font-medium">
+            {t("admin.rules.ruleSet")}
+            <select data-testid="rule-set" className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => selectRuleSet(event.target.value)}>
+              {ruleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
+            </select>
+          </label>
+          <div className="grid gap-4">
+            {ruleTypes.map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} />)}
+          </div>
+        </div>
+      </>}
   </section>;
 }
 

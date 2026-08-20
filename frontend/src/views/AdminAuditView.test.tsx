@@ -235,5 +235,7 @@ describe("AdminAuditView", () => {
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("link")).toBeInTheDocument();
   });
 });

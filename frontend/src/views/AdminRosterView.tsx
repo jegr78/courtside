@@ -144,46 +144,47 @@ export function AdminRosterView() {
     }));
   }
 
-  if (error && !entries) return <Alert>{error}</Alert>;
-  if (!entries) return <p role="status">{t("status.loading")}</p>;
-
   return <section data-testid="admin-roster-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-3xl font-bold">{t("admin.roster.title")}</h1>
       <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
     </div>
-    {error && <Alert>{error}</Alert>}
-    {success && <Alert tone="success">{success}</Alert>}
-    <form noValidate onSubmit={(event) => void search(event)} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-      <TextField data-testid="roster-search" name="query" maxLength={NAME_LENGTH} label={t("admin.roster.search")} />
-      <Button data-testid="roster-search-submit" disabled={pending.has("roster:page")} type="submit">{t("admin.roster.searchSubmit")}</Button>
-    </form>
-    <section className="grid gap-4">
-      <h2 className="text-2xl font-bold">{t("admin.roster.people")}</h2>
-      {entries.length === 0 && <p data-testid="roster-empty">{t("admin.roster.empty")}</p>}
-      {entries.map((entry) => <PersonCard
-        key={entry.personId}
-        entry={entry}
-        disabled={pending.has(`person:${entry.personId}`)}
-        accountDisabled={pending.has(`account:${entry.personId}`)}
-        savePerson={(person) => mutate(`person:${entry.personId}`, () => api.changePerson(entry.personId, person))}
-        saveRoles={(chosen) => mutate(`account:${entry.personId}`, () => api.changeAccountRoles(entry.personId, chosen))}
-        saveUsername={(username) => mutate(`account:${entry.personId}`, () => api.changeAccountUsername(entry.personId, username))}
-        resetPassword={(oneTimePassword) => mutate(`account:${entry.personId}`, () => api.resetAccountPassword(entry.personId, oneTimePassword))}
-        toggleAccount={() => mutate(`account:${entry.personId}`, () => api.setAccountActive(entry.personId, !entry.enabled))}
-        createAccount={(event) => createAccount(entry.personId, event)}
-      />)}
-      {cursor && <Button data-testid="roster-load-more" disabled={pending.has("roster:page")} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("admin.roster.loadMore")}</Button>}
-    </section>
-    <form noValidate onSubmit={(event) => void createPerson(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
-      <h2 className="text-2xl font-bold">{t("admin.roster.newPerson")}</h2>
-      <div className="grid gap-3 md:grid-cols-3">
-        <TextField data-testid="new-person-first-name" disabled={pending.has("person:new")} name="firstName" maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} />
-        <TextField data-testid="new-person-last-name" disabled={pending.has("person:new")} name="lastName" maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} />
-        <TextField data-testid="new-person-email" disabled={pending.has("person:new")} name="email" type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} />
-      </div>
-      <Button data-testid="create-person" disabled={pending.has("person:new")} className="justify-self-start" type="submit">{t("admin.create")}</Button>
-    </form>
+    {!entries
+      ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+      : <>
+        {error && <Alert>{error}</Alert>}
+        {success && <Alert tone="success">{success}</Alert>}
+        <form noValidate onSubmit={(event) => void search(event)} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <TextField data-testid="roster-search" name="query" maxLength={NAME_LENGTH} label={t("admin.roster.search")} />
+          <Button data-testid="roster-search-submit" disabled={pending.has("roster:page")} type="submit">{t("admin.roster.searchSubmit")}</Button>
+        </form>
+        <section className="grid gap-4">
+          <h2 className="text-2xl font-bold">{t("admin.roster.people")}</h2>
+          {entries.length === 0 && <p data-testid="roster-empty">{t("admin.roster.empty")}</p>}
+          {entries.map((entry) => <PersonCard
+            key={entry.personId}
+            entry={entry}
+            disabled={pending.has(`person:${entry.personId}`)}
+            accountDisabled={pending.has(`account:${entry.personId}`)}
+            savePerson={(person) => mutate(`person:${entry.personId}`, () => api.changePerson(entry.personId, person))}
+            saveRoles={(chosen) => mutate(`account:${entry.personId}`, () => api.changeAccountRoles(entry.personId, chosen))}
+            saveUsername={(username) => mutate(`account:${entry.personId}`, () => api.changeAccountUsername(entry.personId, username))}
+            resetPassword={(oneTimePassword) => mutate(`account:${entry.personId}`, () => api.resetAccountPassword(entry.personId, oneTimePassword))}
+            toggleAccount={() => mutate(`account:${entry.personId}`, () => api.setAccountActive(entry.personId, !entry.enabled))}
+            createAccount={(event) => createAccount(entry.personId, event)}
+          />)}
+          {cursor && <Button data-testid="roster-load-more" disabled={pending.has("roster:page")} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("admin.roster.loadMore")}</Button>}
+        </section>
+        <form noValidate onSubmit={(event) => void createPerson(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
+          <h2 className="text-2xl font-bold">{t("admin.roster.newPerson")}</h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            <TextField data-testid="new-person-first-name" disabled={pending.has("person:new")} name="firstName" maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} />
+            <TextField data-testid="new-person-last-name" disabled={pending.has("person:new")} name="lastName" maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} />
+            <TextField data-testid="new-person-email" disabled={pending.has("person:new")} name="email" type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} />
+          </div>
+          <Button data-testid="create-person" disabled={pending.has("person:new")} className="justify-self-start" type="submit">{t("admin.create")}</Button>
+        </form>
+      </>}
   </section>;
 }
 

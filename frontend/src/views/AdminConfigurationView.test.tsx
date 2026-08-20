@@ -43,6 +43,20 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range")).toHaveTextContent("Allowed range: 1 to 365");
   });
 
+  it("given configuration cannot load, when opening the view, then the failure replaces the loading state", async () => {
+    // given
+    vi.spyOn(api, "adminConfig").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("link")).toBeInTheDocument();
+  });
+
   it("given changed settings, when saving, then both writes use the admin API", async () => {
     // given
     const changeConfig = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({

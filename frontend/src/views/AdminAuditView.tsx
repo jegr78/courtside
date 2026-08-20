@@ -114,37 +114,38 @@ export function AdminAuditView() {
     }
   }
 
-  if (error && !entries) return <Alert>{error}</Alert>;
-  if (!entries) return <p role="status">{t("status.loading")}</p>;
-
   return <section data-testid="admin-audit-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-3xl font-bold">{t("audit.title")}</h1>
       <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
     </div>
-    {error && <Alert>{error}</Alert>}
-    {entries.length === 0
-      ? <p data-testid="audit-empty">{t("audit.empty")}</p>
-      : <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr>
-              <th scope="col" className="p-2">{t("audit.column.occurredAt")}</th>
-              <th scope="col" className="p-2">{t("audit.column.change")}</th>
-              <th scope="col" className="p-2">{t("audit.column.subject")}</th>
-              <th scope="col" className="p-2">{t("audit.column.actor")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => <tr key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId} data-event-type={entry.eventType} className="border-t">
-              <td data-testid="audit-occurred-at" className="p-2">{formatDateTime(entry.occurredAt, language, timeZone)}</td>
-              <td data-testid="audit-message" className="p-2">{auditMessage(entry, t)}</td>
-              <td data-testid="audit-subject" className="p-2">{subjectLabel(entry, t)}</td>
-              <td data-testid="audit-actor" className="p-2">{actorLabel(entry, t)}</td>
-            </tr>)}
-          </tbody>
-        </table>
-      </div>}
-    {cursor && <Button data-testid="audit-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("audit.more")}</Button>}
+    {!entries
+      ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+      : <>
+        {error && <Alert>{error}</Alert>}
+        {entries.length === 0
+          ? <p data-testid="audit-empty">{t("audit.empty")}</p>
+          : <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr>
+                  <th scope="col" className="p-2">{t("audit.column.occurredAt")}</th>
+                  <th scope="col" className="p-2">{t("audit.column.change")}</th>
+                  <th scope="col" className="p-2">{t("audit.column.subject")}</th>
+                  <th scope="col" className="p-2">{t("audit.column.actor")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry) => <tr key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId} data-event-type={entry.eventType} className="border-t">
+                  <td data-testid="audit-occurred-at" className="p-2">{formatDateTime(entry.occurredAt, language, timeZone)}</td>
+                  <td data-testid="audit-message" className="p-2">{auditMessage(entry, t)}</td>
+                  <td data-testid="audit-subject" className="p-2">{subjectLabel(entry, t)}</td>
+                  <td data-testid="audit-actor" className="p-2">{actorLabel(entry, t)}</td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>}
+        {cursor && <Button data-testid="audit-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("audit.more")}</Button>}
+      </>}
   </section>;
 }

@@ -205,36 +205,37 @@ export function AdminFacilityView() {
     }
   }
 
-  if (error && (!courts || !hours || !cards)) return <Alert>{error}</Alert>;
-  if (!courts || !hours || !cards) return <p role="status">{t("status.loading")}</p>;
-
   return <section data-testid="admin-facility-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-3xl font-bold">{t("admin.facility.title")}</h1>
       <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
     </div>
-    {error && <Alert>{error}</Alert>}
-    {success && <Alert tone="success">{success}</Alert>}
-    <section className="grid gap-4">
-      <h2 className="text-2xl font-bold">{t("admin.facility.courts")}</h2>
-      {courts.map((court) => <CourtEditor key={court.id} court={court} disabled={pending.has(`court:${court.id}`)} changed={(changed) => setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCourt} toggle={toggleCourt} />)}
-      <form noValidate onSubmit={(event) => void createCourt(event)} className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
-        <TextField data-testid="new-court-number" disabled={pending.has("court:new")} name="number" type="number" label={t("admin.facility.number")} />
-        <TextField data-testid="new-court-name" disabled={pending.has("court:new")} name="name" label={t("admin.facility.name")} />
-        <Button data-testid="create-court" disabled={pending.has("court:new")} type="submit">{t("admin.create")}</Button>
-      </form>
-    </section>
-    <section className="grid gap-4">
-      <h2 className="text-2xl font-bold">{t("admin.facility.openingHours")}</h2>
-      <div className="grid gap-3 lg:grid-cols-2">
-        {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} />)}
-      </div>
-    </section>
-    <section className="grid gap-4">
-      <h2 className="text-2xl font-bold">{t("admin.facility.cards")}</h2>
-      {cards.map((card) => <CardEditor key={card.id} card={card} disabled={pending.has(`card:${card.id}`)} changed={(changed) => setCards((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCard} toggle={toggleCard} />)}
-      <CardCreateForm disabled={pending.has("card:new")} create={createCard} />
-    </section>
+    {!courts || !hours || !cards
+      ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+      : <>
+        {error && <Alert>{error}</Alert>}
+        {success && <Alert tone="success">{success}</Alert>}
+        <section className="grid gap-4">
+          <h2 className="text-2xl font-bold">{t("admin.facility.courts")}</h2>
+          {courts.map((court) => <CourtEditor key={court.id} court={court} disabled={pending.has(`court:${court.id}`)} changed={(changed) => setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCourt} toggle={toggleCourt} />)}
+          <form noValidate onSubmit={(event) => void createCourt(event)} className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
+            <TextField data-testid="new-court-number" disabled={pending.has("court:new")} name="number" type="number" label={t("admin.facility.number")} />
+            <TextField data-testid="new-court-name" disabled={pending.has("court:new")} name="name" label={t("admin.facility.name")} />
+            <Button data-testid="create-court" disabled={pending.has("court:new")} type="submit">{t("admin.create")}</Button>
+          </form>
+        </section>
+        <section className="grid gap-4">
+          <h2 className="text-2xl font-bold">{t("admin.facility.openingHours")}</h2>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} />)}
+          </div>
+        </section>
+        <section className="grid gap-4">
+          <h2 className="text-2xl font-bold">{t("admin.facility.cards")}</h2>
+          {cards.map((card) => <CardEditor key={card.id} card={card} disabled={pending.has(`card:${card.id}`)} changed={(changed) => setCards((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCard} toggle={toggleCard} />)}
+          <CardCreateForm disabled={pending.has("card:new")} create={createCard} />
+        </section>
+      </>}
   </section>;
 }
 

@@ -47,6 +47,8 @@ describe("AdminRosterView", () => {
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("link")).toBeInTheDocument();
   });
 
   it("given a mistyped name, when correcting it, then the correction is sent", async () => {
