@@ -19,6 +19,11 @@ const isoWeekdayNumbers: Record<DayOfWeek, number> = {
 const weekdayByIsoNumber = new Map<number, DayOfWeek>(
   Object.entries(isoWeekdayNumbers).map(([weekday, isoNumber]) => [isoNumber, weekday as DayOfWeek]));
 
+const nullSafeContexts: { eventType: string; field: string; context: string }[] = [
+  { eventType: "card.participantCard.added", field: "capacity", context: "unlimited" },
+  { eventType: "roster.membership.written", field: "startedOn", context: "unknownStart" }
+];
+
 function paramsLabel(params: Record<string, unknown>, t: TFunction): string {
   return Object.entries(params)
     .map(([name, value]) => `${t(`admin.rules.parameter.${name}`)}: ${String(value)}`)
@@ -40,13 +45,8 @@ function contextFor(entry: AuditEntry): string | undefined {
     const flagKey = enabledFlagByEventType[entry.eventType] ?? "active";
     return entry.parameters[flagKey] ? "active" : "inactive";
   }
-  if (entry.eventType === "card.participantCard.added" && isNullish(entry.parameters.capacity)) {
-    return "unlimited";
-  }
-  if (entry.eventType === "roster.membership.written" && isNullish(entry.parameters.startedOn)) {
-    return "unknownStart";
-  }
-  return undefined;
+  return nullSafeContexts.find((candidate) => candidate.eventType === entry.eventType
+    && isNullish(entry.parameters[candidate.field]))?.context;
 }
 
 function auditMessage(entry: AuditEntry, t: TFunction): string {

@@ -1,11 +1,13 @@
 package org.courtside.facility;
 
 import org.courtside.shared.DomainEventRecord;
+import org.jspecify.annotations.NullMarked;
 
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
+@NullMarked
 public sealed interface FacilityEvent extends DomainEventRecord {
 
     record CourtAdded(UUID courtId, int number) implements FacilityEvent {

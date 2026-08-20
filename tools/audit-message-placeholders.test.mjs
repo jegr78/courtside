@@ -9,15 +9,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // A placeholder the view derives from a field rather than rendering it directly.
 const DERIVED_PLACEHOLDERS = { weekday: "dayOfWeek" };
 
-// Every payload field whose value can be null, so a message interpolating it is a decision, not an accident.
-const NULLABLE_FIELDS = {
-  "card.participantCard.added": ["capacity"],
-  "card.participantCard.changed": ["capacity"],
-  "roster.membership.written": ["startedOn", "endedOn"]
-};
-
-const eventFields = () => new Map(
-  readFileSync(join(root, "src/test/resources/domain-event-payload.properties"), "utf8")
+const fieldsPerEventType = (inventory) => new Map(
+  readFileSync(join(root, "src/test/resources", inventory), "utf8")
     .split("\n")
     .filter((line) => line.trim() && !line.trim().startsWith("#"))
     .map((line) => {
@@ -27,6 +20,18 @@ const eventFields = () => new Map(
       return [type, new Set(fields)];
     })
 );
+
+// The view returns one of these contexts for a null field; any other sibling key it cannot reach.
+const nullSafeContexts = () => {
+  const source = readFileSync(join(root, "frontend/src/views/AdminAuditView.tsx"), "utf8");
+  const block = source.match(/const nullSafeContexts[^=]*=\s*\[([\s\S]*?)\n\];/);
+  assert.ok(block, "could not locate nullSafeContexts in AdminAuditView.tsx");
+  const contexts = [...block[1].matchAll(
+    /\{\s*eventType:\s*"([^"]+)",\s*field:\s*"([^"]+)",\s*context:\s*"([^"]+)"\s*\}/g
+  )].map(([, eventType, field, context]) => ({ eventType, field, context }));
+  assert.ok(contexts.length > 0, "nullSafeContexts in AdminAuditView.tsx lists no context");
+  return contexts;
+};
 
 const auditMessages = (source) => {
   const blocks = source.match(
@@ -43,7 +48,7 @@ test("given every audit message, when checking its placeholders, then each names
   // given
   const source = readFileSync(join(root, "frontend/src/i18n.ts"), "utf8");
   const { de, en } = auditMessages(source);
-  const fields = eventFields();
+  const fields = fieldsPerEventType("domain-event-payload.properties");
 
   // when
   const problems = [];
@@ -63,24 +68,32 @@ test("given every audit message, when checking its placeholders, then each names
   assert.deepEqual(problems, []);
 });
 
-test("given a message that interpolates a nullable field, when checking its variants, then a null-safe one exists", () => {
+test("given a message that interpolates a nullable field, when checking its variants, then the view reaches a null-safe one", () => {
   // given
   const source = readFileSync(join(root, "frontend/src/i18n.ts"), "utf8");
   const { de, en } = auditMessages(source);
+  const nullableFields = fieldsPerEventType("domain-event-nullable-field.properties");
+  const contexts = nullSafeContexts();
 
   // when
   const problems = [];
   for (const [locale, messages] of [["de", de], ["en", en]]) {
-    for (const [eventType, nullableFields] of Object.entries(NULLABLE_FIELDS)) {
+    for (const [eventType, fields] of nullableFields) {
       const baseKey = `audit.event.${eventType}`;
       const baseText = messages.get(baseKey);
       if (baseText === undefined) continue;
-      for (const field of nullableFields) {
+      for (const field of fields) {
         if (!baseText.includes(`{{${field}}}`)) continue;
-        const hasNullSafeVariant = [...messages.entries()].some(([key, text]) =>
-          key !== baseKey && key.startsWith(`${baseKey}_`) && !text.includes(`{{${field}}}`));
-        if (!hasNullSafeVariant) {
-          problems.push(`${locale} ${baseKey}: {{${field}}} is nullable and has no null-safe variant`);
+        const reachable = contexts.find((entry) => entry.eventType === eventType && entry.field === field);
+        if (!reachable) {
+          problems.push(`${locale} ${baseKey}: {{${field}}} is nullable and the view returns no context for it`);
+          continue;
+        }
+        const variant = messages.get(`${baseKey}_${reachable.context}`);
+        if (variant === undefined) {
+          problems.push(`${locale} ${baseKey}_${reachable.context}: the context the view returns has no message`);
+        } else if (variant.includes(`{{${field}}}`)) {
+          problems.push(`${locale} ${baseKey}_${reachable.context}: still interpolates the nullable {{${field}}}`);
         }
       }
     }

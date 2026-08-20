@@ -1,11 +1,13 @@
 package org.courtside.rules;
 
 import org.courtside.shared.DomainEventRecord;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@NullMarked
 public sealed interface RulesEvent extends DomainEventRecord {
 
     UUID ruleSetId();

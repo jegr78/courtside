@@ -1,10 +1,12 @@
 package org.courtside.member;
 
 import org.courtside.shared.DomainEventRecord;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.List;
 import java.util.UUID;
 
+@NullMarked
 public sealed interface MembershipTypeEvent extends DomainEventRecord {
 
     UUID membershipTypeId();

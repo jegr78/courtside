@@ -2,12 +2,15 @@ package org.courtside.card;
 
 import org.courtside.identity.Role;
 import org.courtside.shared.DomainEventRecord;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+@NullMarked
 public sealed interface CardEvent extends DomainEventRecord {
 
     UUID cardId();
@@ -68,7 +71,7 @@ public sealed interface CardEvent extends DomainEventRecord {
 
     }
 
-    record ParticipantCardAdded(UUID cardId, Integer capacity) implements CardEvent {
+    record ParticipantCardAdded(UUID cardId, @Nullable Integer capacity) implements CardEvent {
 
         static final String TYPE = "card.participantCard.added";
 
@@ -79,7 +82,7 @@ public sealed interface CardEvent extends DomainEventRecord {
 
     }
 
-    record ParticipantCardChanged(UUID cardId, Integer capacity, List<String> changedFields)
+    record ParticipantCardChanged(UUID cardId, @Nullable Integer capacity, List<String> changedFields)
             implements CardEvent {
 
         static final String TYPE = "card.participantCard.changed";

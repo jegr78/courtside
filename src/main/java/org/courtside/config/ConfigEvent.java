@@ -1,10 +1,12 @@
 package org.courtside.config;
 
 import org.courtside.shared.DomainEventRecord;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.List;
 import java.util.UUID;
 
+@NullMarked
 public sealed interface ConfigEvent extends DomainEventRecord {
 
     UUID configId();
