@@ -8,7 +8,9 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { GenericContainer, Network, Wait,
   type StartedNetwork, type StartedTestContainer } from "testcontainers";
+import type { FullConfig } from "@playwright/test";
 import { requireBuiltAfterItsSources } from "./build-freshness";
+import { startJourneyControl } from "./journey-control";
 
 const PINNED_BROWSER_IMAGE =
   "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e";
@@ -221,9 +223,12 @@ export interface JourneyService {
   pinnedBrowser(browserName: string): Promise<string>;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string): Promise<DatabaseLock>;
-  publishServiceWorkerUpdate(): void;
+  publishServiceWorkerUpdate(): Promise<void>;
   reset(): Promise<void>;
   restart(): Promise<void>;
+}
+
+interface StartedJourneyService extends JourneyService {
   stop(): Promise<void>;
 }
 
@@ -277,7 +282,7 @@ async function resetJourneyData(postgres: StartedTestContainer, tables: string[]
   }
 }
 
-export async function startJourneyService(): Promise<JourneyService> {
+export async function startJourneyService(): Promise<StartedJourneyService> {
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
   let staticDirectory: string | undefined;
@@ -307,6 +312,10 @@ export async function startJourneyService(): Promise<JourneyService> {
     requireBuiltAfterItsSources(applicationJar(), resolve("../src/main"), "./mvnw package -DskipTests");
     staticDirectory = mkdtempSync(resolve(tmpdir(), "courtside-pwa-"));
     cpSync(resolve("dist"), staticDirectory, { recursive: true });
+    const resetStaticAssets = () => {
+      rmSync(staticDirectory!, { recursive: true, force: true });
+      cpSync(resolve("dist"), staticDirectory!, { recursive: true });
+    };
     // Last, because a reserved port is only reserved until it is closed: anything started in
     // between can be handed the same number before Tomcat ever binds it.
     const port = await availableLoopbackPort();
@@ -451,9 +460,11 @@ export async function startJourneyService(): Promise<JourneyService> {
       holdDatabaseLock,
       publishServiceWorkerUpdate: () => {
         appendFileSync(resolve(staticDirectory!, "sw.js"), `\nself.addEventListener("message",event=>{if(event.data==="COURTSIDE_TEST_VERSION")event.source.postMessage({courtsideVersion:2})});\n`);
+        return Promise.resolve();
       },
       reset: async () => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
+        resetStaticAssets();
         await resetJourneyData(postgres!, tables);
       },
       restart: async () => {
@@ -476,6 +487,26 @@ export async function startJourneyService(): Promise<JourneyService> {
   }
 }
 
-export default function globalSetup(): void {
+export default async function globalSetup(config: FullConfig): Promise<() => Promise<void>> {
+  if (config.workers !== 1) throw new Error("The shared journey world requires exactly one Playwright worker");
   rmSync(resolve("test-results", "visual-journeys"), { recursive: true, force: true });
+  const service = await startJourneyService();
+  try {
+    const browserNames = new Set(config.projects.map((project) => project.use.browserName ?? "chromium"));
+    for (const browserName of browserNames) {
+      await service.pinnedBrowser(browserName);
+    }
+    const control = await startJourneyControl(service);
+    process.env.COURTSIDE_JOURNEY_CONTROL = JSON.stringify(control.reference);
+    return async () => {
+      try {
+        await control.close();
+      } finally {
+        await service.stop();
+      }
+    };
+  } catch (error) {
+    await service.stop();
+    throw error;
+  }
 }

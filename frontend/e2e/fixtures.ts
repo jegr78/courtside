@@ -1,5 +1,6 @@
 import { expect, test as base, type Browser, type BrowserContext, type Metadata, type Page } from "@playwright/test";
-import { journeyInstant, startJourneyService, type JourneyService } from "./global-setup";
+import { journeyInstant, type JourneyService } from "./global-setup";
+import { connectJourneyService, type JourneyControlReference } from "./journey-control";
 
 // Every browser is drawn from the pinned image, so a run compares like for like anywhere.
 // A project on the plain origin covers the club that serves Courtside without TLS.
@@ -28,9 +29,9 @@ async function pinJourneyClock(context: BrowserContext): Promise<void> {
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   journeyService: [async ({ browserName }, provide) => {
     void browserName;
-    const service = await startJourneyService();
-    await provide(service);
-    await service.stop();
+    const serialized = process.env.COURTSIDE_JOURNEY_CONTROL;
+    if (!serialized) throw new Error("Global setup did not publish the journey control endpoint");
+    await provide(connectJourneyService(JSON.parse(serialized) as JourneyControlReference));
   }, { scope: "worker" }],
   browser: [async ({ playwright, browserName, journeyService }, provide) => {
     const pinned = await playwright[browserName].connect(await journeyService.pinnedBrowser(browserName));

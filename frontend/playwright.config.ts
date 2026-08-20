@@ -11,15 +11,30 @@ const periodicProjects = process.env.COURTSIDE_PERIODIC_BROWSERS === "true" ? [
   { name: "android-periodic", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["Pixel 7"] } }
 ] : [];
 
+const projectOrder = process.env.COURTSIDE_PROJECT_ORDER;
+if (projectOrder !== undefined && projectOrder !== "configured" && projectOrder !== "reversed") {
+  throw new Error(`Unsupported browser project order: ${projectOrder}`);
+}
+
+const configuredProjects = [
+  { name: "chromium", testIgnore: /responsive-mobile\.spec\.ts|visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
+  { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
+  { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" as const } },
+  { name: "webkit-core", testMatch: /supported-browser\.spec\.ts/, metadata: { plainOrigin: true }, use: { browserName: "webkit" as const } },
+  ...periodicProjects
+];
+
+const projects = projectOrder === "reversed"
+  ? [...configuredProjects].reverse()
+  : configuredProjects;
+
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.spec.ts",
   snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
   fullyParallel: false,
   workers: 1,
-  // A project's first test also pays for starting its database, application, proxy and browser,
-  // measured at around 25 seconds before any assertion runs. Issue #333 wants that cost paid once.
-  timeout: 120_000,
+  timeout: 60_000,
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.005 } },
   // Pinned so nobody reaches "changed" or "all", under which a missing baseline passes silently.
   // "missing" writes the new baseline for collection and still fails the run that needed it.
@@ -31,12 +46,6 @@ export default defineConfig({
   },
   // Every project draws its browser from the pinned image and reaches the application through the
   // same reverse proxy a club runs, so a red run means a regression rather than a different host.
-  projects: [
-    { name: "chromium", testIgnore: /responsive-mobile\.spec\.ts|visual-regression\.spec\.ts/, use: { browserName: "chromium" } },
-    { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" } },
-    { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" } },
-    { name: "webkit-core", testMatch: /supported-browser\.spec\.ts/, metadata: { plainOrigin: true }, use: { browserName: "webkit" } },
-    ...periodicProjects
-  ],
+  projects,
   globalSetup: "./e2e/global-setup.ts"
 });

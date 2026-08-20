@@ -10,20 +10,23 @@ public class SqlStatementCounter {
 
     private final Map<String, LongAdder> counts = new ConcurrentHashMap<>();
     private volatile boolean active;
+    private volatile long ownerThreadId = -1;
 
     void record(String sql) {
-        if (active) {
+        if (active && Thread.currentThread().threadId() == ownerThreadId) {
             counts.computeIfAbsent(categoryOf(sql), ignored -> new LongAdder()).increment();
         }
     }
 
     public void reset() {
         counts.clear();
+        ownerThreadId = Thread.currentThread().threadId();
         active = true;
     }
 
     public void pause() {
         active = false;
+        ownerThreadId = -1;
     }
 
     public Snapshot snapshot() {

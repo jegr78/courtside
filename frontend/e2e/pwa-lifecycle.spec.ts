@@ -80,7 +80,7 @@ test("a waiting service-worker update activates once and reloads one coherent ap
   await install(page);
   await expect(page.getByTestId("build-identity")).toBeEnabled();
   const buildIdentity = await page.getByTestId("build-identity").textContent();
-  journeyService.publishServiceWorkerUpdate();
+  await journeyService.publishServiceWorkerUpdate();
 
   // when
   await page.evaluate(() => navigator.serviceWorker.getRegistration().then((registration) => registration?.update()));
