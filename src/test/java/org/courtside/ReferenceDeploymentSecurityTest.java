@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReferenceDeploymentSecurityTest {
 
     private static final Pattern REVERSE_PROXY_BLOCK = Pattern.compile(
-            "(?ms)^\\treverse_proxy app:8080 \\{\\R(?<directives>(?:\\t\\t.*\\R)*)\\t}$");
+            "(?m)^\\treverse_proxy app:8080 \\{\\R(?<directives>(?:\\t\\t[^\\r\\n]*\\R)*)\\t}$");
     private static final Pattern PRODUCTION_SITE_BLOCK = Pattern.compile(
             "(?m)^\\{\\$COURTSIDE_DOMAIN} \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern UAT_PUBLIC_SITE_BLOCK = Pattern.compile(

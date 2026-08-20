@@ -12,13 +12,15 @@ import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import {
-  readSecurityIdentity, recoverSecurityEnvironment, securityProject, securityStateRoot,
+  inspectPassiveSecurityRuntime, readSecurityIdentity, readSecurityProxyCa, recoverSecurityEnvironment, runPassiveZap,
+  securityProject, securityStateRoot,
   startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment
 } from "./security-environment.mjs";
 import {
   buildSecurityPlan, clearEmergencyStop, executeSecurityPlan, fingerprintSecurityTarget, readSecurityManifest,
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
+import { runPassiveDeploymentAssessment } from "./security-passive-deployment.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devComposeFile = join(root, "deploy", "compose.dev.yaml");
@@ -600,7 +602,13 @@ async function execute(options) {
     const plan = securityAssessmentPlan(options, false);
     const manifest = await executeSecurityPlan(plan, {
       root: securityStateRoot,
-      verifyTarget: async () => verifiedSecurityIdentity(options.runId)
+      verifyTarget: async () => verifiedSecurityIdentity(options.runId),
+      runPassiveAssessment: async (selectedPlan, context) => runPassiveDeploymentAssessment(selectedPlan, {
+        ...context,
+        ca: readSecurityProxyCa(options.runId),
+        inspectRuntime: inspectPassiveSecurityRuntime,
+        runZap: (candidate) => runPassiveZap(candidate, context.evidenceDirectory, context.stopFile)
+      })
     });
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
     if (manifest.outcome !== "passed") process.exitCode = 1;
@@ -652,14 +660,18 @@ async function execute(options) {
 function securityAssessmentPlan(options, dryRun) {
   const identity = readSecurityIdentity(options.runId);
   const catalog = JSON.parse(readFileSync(join(root, "security", "assessment-catalog.json"), "utf8"));
+  const selectedTests = securityRunContract.selectedTests.filter((testId) =>
+    catalog.tests.some((entry) => entry.id === testId && entry.profile === options.profile));
+  const tools = securityRunContract.tools.filter((tool) => tool.id === "target-identity"
+    || tool.testIds.some((testId) => selectedTests.includes(testId)));
   return buildSecurityPlan({
     ...identity,
     profile: options.profile,
     targetFingerprint: fingerprintSecurityTarget(identity),
     catalogVersion: catalog.catalogVersion,
     catalogTests: catalog.tests,
-    tools: securityRunContract.tools,
-    selectedTests: securityRunContract.selectedTests,
+    tools,
+    selectedTests,
     authorization: options.authorization,
     dryRun
   });

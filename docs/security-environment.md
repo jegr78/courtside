@@ -9,11 +9,12 @@ The `security` Spring profile and `deploy/compose.security.yaml` create one disp
 
 ## Prepare the images
 
-The application networks have no Internet route and every service uses `pull_policy: never`. Pull the pinned PostgreSQL and Caddy images before starting it. Build or pull the Courtside candidate separately and refer to it by immutable image ID or registry digest.
+The application networks have no Internet route and every service uses `pull_policy: never`. Pull the pinned PostgreSQL, Caddy and ZAP images before starting it. Build or pull the Courtside candidate separately and refer to it by immutable image ID or registry digest.
 
 ```bash
 docker pull postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
 docker pull caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+docker pull zaproxy/zap-stable:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab
 node tools/courtside.mjs security run-0001 ghcr.io/jegr78/courtside@sha256:<digest>
 ```
 
@@ -65,6 +66,14 @@ Planning reads the identity recorded during environment startup. It sends no req
 node tools/courtside.mjs security-plan run-0001 active
 ```
 
+The safe profile runs the bounded deployment suite without a separate authorization string:
+
+```bash
+node tools/courtside.mjs security-run run-0001 safe
+```
+
+It checks the TLS policy, security headers, private-route exposure, unusual methods, request-size rejection, forwarded-header handling and live container restrictions. The scanner uses the internal proxy listener and cannot route outside the run network. The public target still uses its run-specific trusted CA; the suite never disables TLS verification.
+
 Active and destructive runs require their separate exact authorization strings. They work only against the loopback-bound `SECURITY` environment:
 
 ```bash
@@ -74,11 +83,11 @@ node tools/courtside.mjs security-run run-0001 destructive --authorize authorize
 
 The current CLI executes all three profiles only against the loopback-bound environment it created and verified. The orchestration API also supports an explicitly authorized exact origin for future `safe` adapters. Redirects never extend that allowlist. `active` and `destructive` reject every non-loopback origin and every environment other than `SECURITY`.
 
-[`security/run-contract.json`](../security/run-contract.json) fixes duration, request, concurrency, generated-data, CPU, memory and evidence limits for each profile. Assessment traffic is disabled in this foundation: the runner accepts only the internal `target-identity` prerequisite with no selected tests and always finishes `incomplete`. Any other tool or test selection is rejected before execution. A later isolated runner must own scanner containers, network access, resource enforcement and closed evidence schemas before it can open this gate.
+[`security/run-contract.json`](../security/run-contract.json) fixes duration, request, concurrency, generated-data, CPU, memory and evidence limits for each profile. The runner owns the safe ZAP container, kills it on deadline or emergency stop, and restricts it to the run's internal frontend network. Only the exact `CSA-DEPLOY-001` safe plan can open that path. Every other adapter remains blocked until it has equivalent process, network, resource and evidence controls.
 
 Each attempt writes a private manifest below `build/security/<run-id>/assessment/attempt-<number>`. A rerun always gets a new attempt number. It cannot replace or upgrade the first result. The manifest follows [`security/run-manifest.schema.json`](../security/run-manifest.schema.json) and contains no credential, cookie or authorization value.
 
-The orchestrator currently registers only its target-identity prerequisite. Until later issues register executable assessment tests, a run ends `incomplete`; it cannot claim that a security assessment passed merely because target verification succeeded.
+The safe suite writes `passive-deployment.json` and `passive-deployment.md` beside the manifest. It deletes the raw ZAP report after converting it to the closed evidence schema. Scanner alerts contain only plugin, risk, confidence and occurrence counts. Any alert leaves the run incomplete until the finding lifecycle validates or rejects it.
 
 Inspect the latest or a specific attempt with:
 

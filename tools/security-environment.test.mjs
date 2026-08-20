@@ -161,10 +161,20 @@ test("given the security Compose file, when inspecting boundaries, then resource
   // when / then
   assert.match(compose, /127\.0\.0\.1:\$\{COURTSIDE_SECURITY_HTTPS_PORT:\?required\}:443/);
   assert.equal((compose.match(/internal: true/g) ?? []).length, 2);
-  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 4);
-  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 7);
-  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 7);
+  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 5);
+  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 8);
+  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 8);
   assert.match(compose, /\/var\/lib\/postgresql\/data:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
+  assert.match(compose, /zaproxy\/zap-stable:2\.16\.1@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /profiles: \[assessment\]/);
   assert.doesNotMatch(compose, /^volumes:/m);
+});
+
+test("given the scanner proxy, when counting requests, then its raw access log stays inside tmpfs", () => {
+  // given
+  const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.security", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(caddy, /http:\/\/proxy:8080 \{[\s\S]*output file \/tmp\/zap-access\.log[\s\S]*import security_proxy/);
 });

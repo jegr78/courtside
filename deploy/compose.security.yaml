@@ -127,6 +127,31 @@ services:
       org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
+  zap:
+    profiles: [assessment]
+    image: zaproxy/zap-stable:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab
+    pull_policy: never
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m
+      - /home/zap:uid=1000,gid=1000,mode=0700,size=256m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 2.0
+    mem_limit: 1g
+    pids_limit: 256
+    volumes:
+      - ${COURTSIDE_SECURITY_EVIDENCE_DIR:-/tmp}:/zap/wrk
+    networks:
+      - frontend
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+
 networks:
   backend:
     internal: true

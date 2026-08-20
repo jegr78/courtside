@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { dirname, join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
+import { runOwnedProcess } from "./security-passive-deployment.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
@@ -195,6 +196,73 @@ export function verifySecurityEnvironment(runId) {
     containerImage: container.Image,
     runId
   };
+}
+
+export async function inspectPassiveSecurityRuntime(plan) {
+  const project = securityProject(plan.runId);
+  const inspect = (service) => JSON.parse(execute("docker", ["inspect", `${project}-${service}-1`, "--format", "{{json .}}"]));
+  const hardened = [inspect("app"), inspect("proxy")].every((container) => container.HostConfig.ReadonlyRootfs
+    && container.HostConfig.CapDrop?.includes("ALL")
+    && container.HostConfig.SecurityOpt?.includes("no-new-privileges:true")
+    && container.HostConfig.Memory > 0 && container.HostConfig.NanoCpus > 0);
+  const published = inspect("proxy").NetworkSettings.Ports?.["443/tcp"] ?? [];
+  const management = execute("docker", ["exec", `${project}-app-1`, "curl", "--silent", "--output", "/dev/null",
+    "--write-out", "%{http_code}", "http://127.0.0.1:8080/actuator/health"]).trim();
+  return [
+    { id: "runtime-hardening", layer: "container", passed: hardened,
+      observation: hardened ? "runtime-controls-present" : "runtime-controls-incomplete" },
+    { id: "loopback-publication", layer: "host", passed: published.length === 1
+        && published[0].HostIp === "127.0.0.1",
+      observation: published.length === 1 && published[0].HostIp === "127.0.0.1"
+        ? "proxy-loopback-only" : "proxy-publication-mismatch" },
+    { id: "management-separation", layer: "application", passed: management === "200",
+      observation: management === "200" ? "management-internal-only" : "management-internal-unavailable" }
+  ];
+}
+
+export async function runPassiveZap(plan, evidenceDirectory, stopFile) {
+  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
+    COURTSIDE_SECURITY_EVIDENCE_DIR: evidenceDirectory };
+  const name = `courtside-security-zap-${plan.runId}`;
+  const proxy = `${securityProject(plan.runId)}-proxy-1`;
+  resetZapAccessLog(proxy, environment);
+  const args = [...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "--rm", "--no-deps",
+    "--name", name, "zap", "zap-baseline.py", "-t", "http://proxy:8080", "-m", "0", "-I", "-J", "zap.json"];
+  const result = await runOwnedProcess("docker", args, {
+    timeoutMilliseconds: plan.budgets.durationSeconds * 1000,
+    stopFile,
+    cleanup: async () => {
+      try { execute("docker", ["rm", "-f", name], environment); } catch { }
+      try { resetZapAccessLog(proxy, environment); } catch { }
+    },
+    environment,
+    acceptedExitCodes: [0, 1, 2]
+  });
+  const reportFile = join(evidenceDirectory, "zap.json");
+  try {
+    if (!existsSync(reportFile)) {
+      throw new Error(`ZAP produced no JSON report (exit ${result.code})`);
+    }
+    const report = JSON.parse(readFileSync(reportFile, "utf8"));
+    rmSync(reportFile);
+    const requestCount = Number(execute("docker", ["exec", proxy, "sh", "-c",
+      "wc -l < /tmp/zap-access.log"], environment).trim());
+    if (!Number.isSafeInteger(requestCount) || requestCount < 1) {
+      throw new Error("The proxy produced no valid ZAP request count");
+    }
+    return { ...report, requestCount };
+  } finally {
+    resetZapAccessLog(proxy, environment);
+  }
+}
+
+function resetZapAccessLog(proxy, environment) {
+  execute("docker", ["exec", proxy, "sh", "-c", ": > /tmp/zap-access.log"], environment);
+}
+
+export function readSecurityProxyCa(runId) {
+  return execute("docker", ["exec", `${securityProject(runId)}-proxy-1`, "cat",
+    "/data/caddy/pki/authorities/local/root.crt"]);
 }
 
 export function stopSecurityEnvironment(runId) {

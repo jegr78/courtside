@@ -4,8 +4,7 @@
 	skip_install_trust
 }
 
-https://localhost {
-	tls internal
+(security_proxy) {
 	request_body {
 		max_size 2MB
 	}
@@ -16,6 +15,8 @@ https://localhost {
 		Permissions-Policy "geolocation=(), camera=(), microphone=()"
 		-Server
 	}
+	@private path /api-ui* /actuator* /api/openapi.yaml
+	respond @private 404
 	reverse_proxy app:8080 {
 		header_up -Forwarded
 		header_up -X-Forwarded-For
@@ -28,4 +29,16 @@ https://localhost {
 		header_up X-Forwarded-Host {host}
 		header_up X-Forwarded-Proto {scheme}
 	}
+}
+
+https://localhost {
+	tls internal
+	import security_proxy
+}
+
+http://proxy:8080 {
+	log {
+		output file /tmp/zap-access.log
+	}
+	import security_proxy
 }
