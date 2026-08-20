@@ -83,7 +83,7 @@ public class AuditService {
         return new AuditEntry(event.getId(), event.getOccurredAt(), event.getEventType(),
                 payloadOf(event.getPayload()), event.getSubjectId(),
                 subjectNamesById.get(event.getSubjectId()),
-                actorAccountId, actorAccountId == null ? null : actorUsernames.get(actorAccountId));
+                actorAccountId, actorUsernames.get(actorAccountId));
     }
 
     @SuppressWarnings("unchecked")

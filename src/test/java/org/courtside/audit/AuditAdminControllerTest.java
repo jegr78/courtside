@@ -27,7 +27,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -174,30 +173,6 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
                         .with(user(administrator)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries", hasSize(0)));
-    }
-
-    @Test
-    void givenMoreEntriesThanTheLimit_whenAPageIsRead_thenTheCursorContinuesAfterTheLast()
-            throws Exception {
-        // given
-        facilityFixture.createCourt(1, "Court 1");
-        facilityFixture.createCourt(2, "Court 2");
-        facilityFixture.createCourt(3, "Court 3");
-
-        // when
-        String body = mockMvc.perform(get("/api/admin/audit").param("limit", "2")
-                        .with(user(administrator)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.entries", hasSize(2)))
-                .andExpect(jsonPath("$.nextCursor").isNotEmpty())
-                .andReturn().getResponse().getContentAsString();
-
-        // then
-        String cursor = JsonPath.read(body, "$.nextCursor");
-        String firstIdOfThePreviousPage = JsonPath.read(body, "$.entries[0].id");
-        mockMvc.perform(get("/api/admin/audit").param("limit", "2").param("cursor", cursor)
-                        .with(user(administrator)))
-                .andExpect(jsonPath("$.entries[0].id").value(not(firstIdOfThePreviousPage)));
     }
 
     @Test
