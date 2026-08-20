@@ -169,7 +169,9 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
 
         // then
         assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
-                .contains("roster.membership.ended", "roster.account.availabilityChanged");
+                .containsExactlyInAnyOrder("roster.person.added", "roster.membership.written",
+                        "roster.account.created", "roster.membership.ended",
+                        "roster.account.availabilityChanged");
         assertThat(audit.latestPayload(personId, "roster.account.availabilityChanged"))
                 .containsEntry("enabled", false);
     }
