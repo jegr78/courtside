@@ -1,0 +1,66 @@
+name: courtside-mail-smoke
+
+services:
+  mail:
+    image: stalwartlabs/stalwart:v0.16.18@sha256:9ed1d343243b7aa72969e372a7240b7ddea07730781d4b68a0dc3d8d51c418bb
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    environment:
+      STALWART_RECOVERY_ADMIN: ${COURTSIDE_MAIL_RECOVERY_ADMIN:-}
+    volumes:
+      - mail-config:/etc/stalwart
+      - mail-data:/var/lib/stalwart
+    ports:
+      - "127.0.0.1::587"
+      - "127.0.0.1::8080"
+
+  sink:
+    image: axllent/mailpit:v1.28@sha256:d5ecbb067db3705fa953d79e1b7f81ef84038df67aba6c52825d8c02a1ea748a
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1::8025"
+
+  plan:
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME}
+      COURTSIDE_MAIL_DOMAIN: ${COURTSIDE_MAIL_DOMAIN}
+      COURTSIDE_MAIL_ADMIN_PASSWORD: ${COURTSIDE_MAIL_ADMIN_PASSWORD}
+      COURTSIDE_MAIL_SINK: sink
+    volumes:
+      - ./mail:/mail:ro
+      - plan:/plan
+    entrypoint: ["sh", "/mail/render.sh", "bootstrap", "base", "journey"]
+
+  apply:
+    image: stalwartlabs/cli:1.0.12@sha256:fe199affac1d120a8c200ef39ae629765a2976270e0453575c1caf906ee15b52
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp
+      STALWART_URL: http://mail:8080
+      STALWART_USER: admin
+      STALWART_PASSWORD: ${COURTSIDE_MAIL_SETUP_PASSWORD}
+    volumes:
+      - plan:/plan:ro
+
+volumes:
+  mail-config:
+  mail-data:
+  plan:

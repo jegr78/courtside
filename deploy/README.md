@@ -116,41 +116,63 @@ Nothing starts it otherwise, and until the application can send mail
 ([#337](https://github.com/jegr78/courtside/issues/337)) it has no client. Bring it up when you are
 ready to work through the DNS below, not before.
 
-### What the first start looks like
+### Setting it up without touching a wizard
 
-With an empty configuration volume Stalwart starts a setup wizard on its admin port and fetches its
-web interface from GitHub, so the first start needs outbound HTTPS. Open
-`http://127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT}/` — over an SSH tunnel if the host is remote, because
-the port is bound to the loopback interface and belongs on no public address — and work through it.
-The wizard asks for the hostname and the domain, generates the DKIM key, and shows the
-administrator password once.
+Stalwart normally asks for its configuration through a setup wizard in the browser. This deployment
+does not: `deploy/mail/` holds the configuration as two plans in NDJSON — one operation per line,
+readable and diffable — and `stalwart-cli apply` loads them. The values that differ between clubs
+come from `.env`, so `.env` is the only place any of it is written down.
 
-Three things about that first start are worth knowing before you do it:
+```sh
+docker compose --profile mail up -d mail
+docker compose --profile mail-setup run --rm mail-bootstrap
+docker compose --profile mail restart mail
+docker compose --profile mail-setup run --rm mail-configure
+docker compose --profile mail up -d --force-recreate mail
+```
 
-- **The administrator password is also in the container log.** Stalwart prints it to standard error,
-  and this deployment keeps container logs. It stays readable through `docker compose logs mail`
-  across restarts and for anything that ships logs elsewhere. Change the password in the web
-  interface as your first action after the wizard, which makes the copy in the log worthless, or set
-  `COURTSIDE_MAIL_RECOVERY_ADMIN` for the first start and remove it afterwards.
+Two applies with a restart between them, because the first one answers the questions the wizard
+would have asked — hostname, domain, whether to generate DKIM keys — and the server only leaves
+setup mode on the next start. The second one loads the listeners, the delivery routes and the
+administrator account.
+
+Before the first command, `.env` needs four values: `COURTSIDE_MAIL_HOSTNAME`,
+`COURTSIDE_MAIL_DOMAIN`, `COURTSIDE_MAIL_ADMIN_PASSWORD` for the club's mail administrator, and
+`COURTSIDE_MAIL_SETUP_PASSWORD` together with
+`COURTSIDE_MAIL_RECOVERY_ADMIN=admin:$COURTSIDE_MAIL_SETUP_PASSWORD` — the credential the setup
+commands authenticate with while the server has no accounts yet.
+
+**Clear `COURTSIDE_MAIL_RECOVERY_ADMIN` when you are done**, which the last command above picks up.
+While it is set the server runs in recovery mode and serves nothing but its admin port: no SMTP, no
+mail. It is a way back in, not a setting to leave on.
+
+Afterwards the mail administrator signs in at `http://127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT}/` —
+over an SSH tunnel if the host is remote, because the port is bound to the loopback interface and
+belongs on no public address — as `${COURTSIDE_MAIL_ADMIN_USERNAME}@${COURTSIDE_MAIL_DOMAIN}`.
+
+### What the plans do and do not carry
+
+**The DKIM key is never ours.** The plan declares that the domain manages DKIM automatically; the
+server then generates its own key pair on first start and rotates it on its own schedule. Nothing
+about your signing key comes from this repository, and the selector to publish is the one the
+server shows — which is also why `COURTSIDE_MAIL_DKIM_SELECTOR` in `.env` has to be updated after a
+rotation.
+
+**No secret is in them either.** `stalwart-cli snapshot`, which is how these plans were produced,
+strips secret values by default. The administrator password is substituted from `.env` when the
+plan is rendered, and the rendered copy lives in a volume rather than in the repository.
+
+Two things about the mail container are worth knowing regardless:
+
 - **The web interface is not pinned.** Every image in `compose.yaml` is pinned by digest; the admin
-  interface is the one artefact here that is fetched at runtime from a release URL, and it is the
-  component with full control over the mail server. Its integrity rests on TLS to GitHub and nothing
-  else. That is a deliberate exception, not an oversight.
-- **Leave the wizard's ACME option off.** Caddy is this deployment's only certificate client, and two
-  processes racing for the same certificate is a way to get rate-limited rather than a way to get a
-  certificate. Caddy issues for `COURTSIDE_DOMAIN`, not for `COURTSIDE_MAIL_HOSTNAME`, so the mail
-  server serves a self-signed certificate on port 25 until somebody gives it a real one. For
-  inbound STARTTLS that is the ordinary state of affairs between mail servers; it becomes a real gap
-  the day you want MTA-STS or DANE. [#342](https://github.com/jegr78/courtside/issues/342) covers
-  the production settings, this one included.
-
-### Copy the hostname and domain into `.env` afterwards
-
-The mail server keeps its own configuration in its volume — it never reads `COURTSIDE_MAIL_DOMAIN`
-or `COURTSIDE_MAIL_HOSTNAME`. Those exist for `mail-check`, which is why they have to match what you
-typed into the wizard. They are two records of one fact, and if they drift, the check reports six
-green lines for a name the server does not send under. When you change either in the web interface,
-change it here too.
+  interface is the one artefact fetched at runtime from a release URL, and it is the component with
+  full control over the mail server. Its integrity rests on TLS to GitHub and nothing else. A
+  deliberate exception, not an oversight.
+- **There is no ACME here.** Caddy is this deployment's only certificate client and it issues for
+  `COURTSIDE_DOMAIN`, not for `COURTSIDE_MAIL_HOSTNAME`, so the mail server serves a self-signed
+  certificate on port 25. For inbound STARTTLS that is the ordinary state of affairs between mail
+  servers; it becomes a real gap the day you want MTA-STS or DANE.
+  [#342](https://github.com/jegr78/courtside/issues/342) covers the production settings.
 
 ### What DNS has to say before anyone believes this server
 
@@ -198,6 +220,15 @@ The outbound probe contacts a third party by default. `COURTSIDE_MAIL_OUTBOUND_P
 somewhere else if you would rather it did not, and `COURTSIDE_MAIL_RELAY_PROBE` names the foreign
 domain the relay test asks about.
 
+### Proving it works before a member depends on it
+
+`node tools/courtside.mail-smoke.mjs` brings this same mail server up on a scratch Compose project,
+renders and applies these same plans, and hands it a message over the submission port the way the
+application will — authenticated, over STARTTLS — then reads that message back out of a local sink.
+It tears the project down afterwards and needs nothing but Docker. The `mail smoke` workflow runs it
+whenever anything under `deploy/mail/` changes, so the configuration a club applies is configuration
+that has been applied.
+
 ### Back up the mail volumes too
 
 The backup below covers PostgreSQL. `mail-config` holds the private DKIM key and the mail server's
@@ -207,10 +238,13 @@ in whatever backs this host up, and treat `mail-config` as a secret when you do.
 
 ### When the mail administrator password is lost
 
-Set `COURTSIDE_MAIL_RECOVERY_ADMIN` to `admin:<password>` and restart the `mail` service. Stalwart
-then accepts that password for its own administrator, in addition to the stored one. Unset it and
-restart again once you are back in — a recovery password left in `.env` is a second door that never
-closes.
+Set `COURTSIDE_MAIL_RECOVERY_ADMIN` to `admin:<password>` and restart the `mail` service, then sign
+in as `admin`. **The server stops accepting and delivering mail while that variable is set** — it
+runs in recovery mode and serves only its admin port. Clear it and recreate the container once you
+are back in.
+
+To change the administrator password instead, edit `COURTSIDE_MAIL_ADMIN_PASSWORD` and run
+`mail-configure` again: the plan upserts the account, so it reconciles rather than duplicates.
 
 
 ## Environment variables
@@ -229,8 +263,12 @@ default.
 | `COURTSIDE_MAIL_DOMAIN` | *required with the mail server* | The domain Courtside sends from, and the domain SPF, DKIM and DMARC are published for. |
 | `COURTSIDE_MAIL_HOSTNAME` | *required with the mail server* | The mail server's own name. Its forward and reverse DNS must agree. |
 | `COURTSIDE_MAIL_DKIM_SELECTOR` | *required with the mail server* | The selector of the DKIM key the setup wizard generated, as it appears in the admin interface. |
+| `COURTSIDE_MAIL_ADMIN_PASSWORD` | *required with the mail server* | Password for the club's mail administrator, written into the account by `mail-configure`. |
+| `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. |
+| `COURTSIDE_MAIL_ADMIN_USERNAME` | `postmaster` | Local part of the mail administrator's address. |
+| `COURTSIDE_MAIL_RECOVERY_MODE` | *unset* | Set to `1` to force recovery mode without a recovery credential. Mail stops while it is set. |
 | `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
-| `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`. Set it to get back in, then unset it. |
+| `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`. Needed for the initial setup, and a way back in afterwards. **The server serves no mail while it is set.** |
 | `COURTSIDE_MAIL_OUTBOUND_PROBE` | `gmail-smtp-in.l.google.com` | The host `mail-check` opens port 25 to when testing whether outbound mail leaves at all. A third party by default; point it at a server of your own if you would rather not tell one. |
 | `COURTSIDE_MAIL_RELAY_PROBE` | `relay-probe.example.com` | The foreign domain `mail-check` asks this instance to relay for, to prove it refuses. |
 | `COURTSIDE_MAIL_RELAY_TARGET` | `mail` | Where the relay test connects. The service on the compose network by default, because a host seldom reaches its own published port from inside a container. |

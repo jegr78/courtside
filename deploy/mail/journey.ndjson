@@ -1,0 +1,2 @@
+{"@type": "upsert", "matchOn": ["name"], "object": "MtaRoute", "value": {"mtaroute-jaqni7dxktaa": {"@type": "Relay", "address": "{{sink}}", "allowInvalidCerts": false, "authSecret": {"@type": "None"}, "authUsername": null, "description": "Relay every message into the local sink instead of the internet", "implicitTls": false, "name": "sink", "port": 1025, "protocol": "smtp"}}}
+{"@type": "update", "object": "MtaOutboundStrategy", "value": {"route": {"else": "'sink'", "match": {"0": {"if": "is_local_domain(rcpt_domain)", "then": "'local'"}}}}}

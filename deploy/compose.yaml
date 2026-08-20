@@ -83,12 +83,80 @@ services:
       - NET_BIND_SERVICE
     environment:
       STALWART_RECOVERY_ADMIN: ${COURTSIDE_MAIL_RECOVERY_ADMIN:-}
+      STALWART_RECOVERY_MODE: ${COURTSIDE_MAIL_RECOVERY_MODE:-}
     volumes:
       - mail-config:/etc/stalwart
       - mail-data:/var/lib/stalwart
     ports:
       - "25:25"
       - "127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT:-8081}:8080"
+
+  mail-plan:
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    profiles: [mail-setup]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      COURTSIDE_MAIL_DOMAIN: ${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}
+      COURTSIDE_MAIL_ADMIN_USERNAME: ${COURTSIDE_MAIL_ADMIN_USERNAME:-postmaster}
+      COURTSIDE_MAIL_ADMIN_PASSWORD: ${COURTSIDE_MAIL_ADMIN_PASSWORD:?set COURTSIDE_MAIL_ADMIN_PASSWORD in .env}
+    volumes:
+      - ./mail:/mail:ro
+      - mail-plan:/plan
+    entrypoint: ["sh", "/mail/render.sh", "bootstrap", "base"]
+
+  mail-bootstrap:
+    image: stalwartlabs/cli:1.0.12@sha256:fe199affac1d120a8c200ef39ae629765a2976270e0453575c1caf906ee15b52
+    profiles: [mail-setup]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      mail-plan:
+        condition: service_completed_successfully
+    environment:
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp
+      STALWART_URL: http://mail:8080
+      STALWART_USER: admin
+      STALWART_PASSWORD: ${COURTSIDE_MAIL_SETUP_PASSWORD:?set COURTSIDE_MAIL_SETUP_PASSWORD in .env}
+    volumes:
+      - mail-plan:/plan:ro
+    command: ["apply", "--file", "/plan/bootstrap.ndjson"]
+
+  mail-configure:
+    image: stalwartlabs/cli:1.0.12@sha256:fe199affac1d120a8c200ef39ae629765a2976270e0453575c1caf906ee15b52
+    profiles: [mail-setup]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      mail-plan:
+        condition: service_completed_successfully
+    environment:
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp
+      STALWART_URL: http://mail:8080
+      STALWART_USER: admin
+      STALWART_PASSWORD: ${COURTSIDE_MAIL_SETUP_PASSWORD:?set COURTSIDE_MAIL_SETUP_PASSWORD in .env}
+    volumes:
+      - mail-plan:/plan:ro
+    command: ["apply", "--file", "/plan/base.ndjson"]
 
   mail-check:
     image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
@@ -134,5 +202,6 @@ volumes:
   db:
   mail-config:
   mail-data:
+  mail-plan:
   caddy-data:
   caddy-config:
