@@ -44,6 +44,12 @@ Caddy obtains a certificate for `COURTSIDE_DOMAIN` on its own, so ports 80 and 4
 host and the name must already point at it. The application itself is published on
 `127.0.0.1:8080` and never directly on a public interface.
 
+Use a certificate that every member device trusts. Clicking through a browser warning for an
+untrusted certificate chain can leave the application usable while the browser still refuses to
+install its service worker. Offline use and automatic update notices then remain unavailable. A
+private certificate authority works only after the club installs its root certificate in every
+member device's trust store, which makes a publicly trusted certificate the practical default.
+
 Flyway runs the migrations on startup. On an empty account table, startup creates exactly one
 enabled local account with the `ADMIN` role. Missing bootstrap values stop startup instead of
 leaving an instance that nobody can enter. `docker compose ps` shows the application as `healthy`,
