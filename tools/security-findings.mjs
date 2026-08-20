@@ -1,13 +1,22 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { summarizeFindingLifecycle, validateRiskAcceptances } from "./security-triage.mjs";
 
 const requiredExceptionFields = [
   "id", "scope", "scanner", "findingId", "target", "rationale", "owner", "compensatingControl", "expiresOn"
 ];
 
-export function evaluateSecurityReports({ reports, exceptions, scope, subject, today = new Date().toISOString().slice(0, 10) }) {
+export function evaluateSecurityReports({
+  reports, exceptions, scope, subject, assessment, assessmentPolicy,
+  today = new Date().toISOString().slice(0, 10)
+}) {
   if (!scope || !subject) throw new Error("Security evidence requires a scope and subject");
+  if (!["required", "not-applicable"].includes(assessmentPolicy)
+    || (assessmentPolicy === "required" && !assessment)
+    || (assessmentPolicy === "not-applicable" && assessment)) {
+    throw new Error("Security evidence requires a consistent dynamic assessment policy");
+  }
   validateExceptions(exceptions, today);
   const scopedExceptions = exceptions.filter((exception) => exception.scope === scope);
   const allFindings = reports.flatMap((report) => report.findings.map((finding) => ({ scanner: report.scanner, ...finding })))
@@ -29,27 +38,43 @@ export function evaluateSecurityReports({ reports, exceptions, scope, subject, t
   for (const exception of scopedExceptions) {
     if (!matchedExceptions.has(exception.id)) throw new Error(`Security exception ${exception.id} does not match a current finding`);
   }
-  const status = blockingFindings.length > 0 ? "blocked" : acceptedFindings.length > 0 ? "passed-with-exceptions" : "passed";
+  const status = blockingFindings.length > 0 || assessment?.outcome.outcome === "failed"
+    ? "blocked"
+    : assessment?.outcome.outcome === "incomplete"
+      ? "incomplete"
+      : acceptedFindings.length > 0 ? "passed-with-exceptions" : "passed";
   return {
-    schemaVersion: 1, scope, subject, generatedAt: `${today}T00:00:00.000Z`, status,
-    blockingFindings, acceptedFindings, informationalFindings
+    schemaVersion: 1, scope, subject, assessmentPolicy, generatedAt: `${today}T00:00:00.000Z`, status,
+    blockingFindings, acceptedFindings, informationalFindings,
+    ...(assessment ? { assessment: structuredClone(assessment) } : {})
   };
 }
 
 export function combineSecuritySummaries({ summaries, scope, subject, today = new Date().toISOString().slice(0, 10) }) {
   if (!scope || !subject || summaries.length === 0) throw new Error("Combined security evidence requires summaries, a scope and subject");
   for (const summary of summaries) validateSummary(summary);
+  if (summaries.some((summary) => summary.status === "incomplete")) {
+    throw new Error("Cannot combine incomplete security evidence");
+  }
+  if (summaries.some((summary) => summary.status === "blocked")) {
+    throw new Error("Cannot combine blocked security evidence");
+  }
   const sourceScopes = new Set(summaries.map((summary) => summary.scope));
   if (sourceScopes.size !== summaries.length) throw new Error("Combined security evidence requires unique source scopes");
   const blockingFindings = summaries.flatMap((summary) => summary.blockingFindings).toSorted(compareFinding);
   const acceptedFindings = summaries.flatMap((summary) => summary.acceptedFindings).toSorted(compareFinding);
   const informationalFindings = summaries.flatMap((summary) => summary.informationalFindings).toSorted(compareFinding);
+  const assessments = summaries.filter((summary) => summary.assessment).map((summary) => structuredClone(summary.assessment));
   if (blockingFindings.length > 0) throw new Error("Cannot combine blocked security evidence");
   return {
     schemaVersion: 1, scope, subject, generatedAt: `${today}T00:00:00.000Z`,
     status: acceptedFindings.length > 0 ? "passed-with-exceptions" : "passed",
-    sources: summaries.map((summary) => ({ scope: summary.scope, subject: summary.subject, status: summary.status })),
-    blockingFindings, acceptedFindings, informationalFindings
+    sources: summaries.map((summary) => ({
+      scope: summary.scope, subject: summary.subject, status: summary.status,
+      assessmentPolicy: summary.assessmentPolicy
+    })),
+    blockingFindings, acceptedFindings, informationalFindings,
+    ...(assessments.length > 0 ? { assessments } : {})
   };
 }
 
@@ -79,8 +104,22 @@ function validateSummary(summary) {
   for (const field of ["blockingFindings", "acceptedFindings", "informationalFindings"]) {
     if (!Array.isArray(summary[field])) throw new Error(`Security summary requires ${field}`);
   }
-  if (summary.status !== "passed" && summary.status !== "passed-with-exceptions" && summary.status !== "blocked") {
+  if (!["passed", "passed-with-exceptions", "blocked", "incomplete"].includes(summary.status)) {
     throw new Error("Security summary has an invalid status");
+  }
+  if (!["required", "not-applicable"].includes(summary.assessmentPolicy)
+    || (summary.assessmentPolicy === "required") !== Boolean(summary.assessment)) {
+    throw new Error("Security summary has an inconsistent dynamic assessment policy");
+  }
+  if (summary.assessment) {
+    const outcome = summary.assessment?.outcome?.outcome;
+    if (!["passed", "incomplete", "failed"].includes(outcome)) {
+      throw new Error("Security summary has an invalid assessment outcome");
+    }
+    if ((outcome === "incomplete" && summary.status !== "incomplete")
+      || (outcome === "failed" && summary.status !== "blocked")) {
+      throw new Error("Security summary status contradicts its assessment outcome");
+    }
   }
 }
 
@@ -162,7 +201,8 @@ export function parseCodeqlReport(input) {
 
 function parseArguments(args) {
   const values = {
-    trivy: [], npm: [], codeql: [], summary: [], exceptions: undefined, output: undefined, scope: undefined, subject: undefined
+    trivy: [], npm: [], codeql: [], summary: [], lifecycle: undefined,
+    assessmentPolicy: undefined, exceptions: undefined, output: undefined, scope: undefined, subject: undefined
   };
   for (let index = 0; index < args.length; index += 2) {
     const option = args[index];
@@ -172,6 +212,8 @@ function parseArguments(args) {
     else if (option === "--npm") values.npm.push(value);
     else if (option === "--codeql") values.codeql.push(value);
     else if (option === "--summary") values.summary.push(value);
+    else if (option === "--lifecycle") values.lifecycle = value;
+    else if (option === "--assessment-policy") values.assessmentPolicy = value;
     else if (option === "--exceptions") values.exceptions = value;
     else if (option === "--output") values.output = value;
     else if (option === "--scope") values.scope = value;
@@ -183,8 +225,14 @@ function parseArguments(args) {
   if (!values.subject) throw new Error("Missing --subject");
   const reportCount = values.trivy.length + values.npm.length + values.codeql.length;
   if (values.summary.length > 0 && reportCount > 0) throw new Error("Summaries and scanner reports cannot be combined in one invocation");
+  if (values.summary.length > 0 && values.lifecycle) throw new Error("Lifecycle records cannot be combined directly with summaries");
   if (values.summary.length === 0 && reportCount === 0) throw new Error("At least one security report is required");
   if (reportCount > 0 && !values.exceptions) throw new Error("Missing --exceptions");
+  if (reportCount > 0 && !values.assessmentPolicy) throw new Error("Missing --assessment-policy");
+  if (values.assessmentPolicy === "required" && !values.lifecycle) throw new Error("Required lifecycle record is missing");
+  if (values.assessmentPolicy === "not-applicable" && values.lifecycle) {
+    throw new Error("A not-applicable assessment cannot include a lifecycle record");
+  }
   return values;
 }
 
@@ -197,20 +245,30 @@ function main(args) {
   } else {
     const policy = JSON.parse(readFileSync(values.exceptions, "utf8"));
     if (policy.schemaVersion !== 1 || !Array.isArray(policy.exceptions)) throw new Error("Unsupported security exception policy");
+    validateRiskAcceptances(policy.riskAcceptances ?? []);
     const reports = [
       ...values.trivy.map(trivyReport),
       ...values.npm.map(npmReport),
       ...values.codeql.flatMap(codeqlReports)
     ];
+    const assessment = values.lifecycle
+      ? summarizeFindingLifecycle(JSON.parse(readFileSync(values.lifecycle, "utf8")), policy)
+      : undefined;
+    if (assessment && assessment.run.subject !== values.subject) {
+      throw new Error("Security lifecycle subject does not match the normalized record subject");
+    }
     result = evaluateSecurityReports({
-      reports, exceptions: policy.exceptions, scope: values.scope, subject: values.subject
+      reports, exceptions: policy.exceptions, scope: values.scope, subject: values.subject,
+      assessment, assessmentPolicy: values.assessmentPolicy
     });
   }
   writeFileSync(values.output, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
   if (result.status === "blocked") {
     const ids = result.blockingFindings.map((finding) => `${finding.scanner}:${finding.id}:${finding.target}`).join(", ");
-    throw new Error(`Actionable security findings: ${ids}`);
+    const reason = ids || result.assessment?.outcome.reason || "security policy rejected the evidence";
+    throw new Error(`Actionable security findings: ${reason}`);
   }
+  if (result.status === "incomplete") throw new Error("Security evidence is incomplete");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -74,6 +74,7 @@ jobs:
           --npm build/security/npm.json
           --trivy build/security/trivy-runtime.json
           --exceptions security/exceptions.json
+          --assessment-policy not-applicable
           --scope release-build
           --subject ${{ github.sha }}
           --output build/security/release-build.json
@@ -212,6 +213,7 @@ jobs:
           node tools/security-findings.mjs
           --trivy build/uat-smoke/trivy-${{ matrix.architecture }}.json
           --exceptions security/exceptions.json
+          --assessment-policy not-applicable
           --scope release-image-${{ matrix.architecture }}
           --subject ${{ needs.image.outputs.digest }}
           --output build/uat-smoke/security-summary-${{ matrix.architecture }}.json

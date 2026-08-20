@@ -84,6 +84,7 @@ jobs:
           --trivy build/security/trivy-source.json
           --codeql build/security/codeql
           --exceptions security/exceptions.json
+          --assessment-policy not-applicable
           --scope required-build
           --subject ${{ github.sha }}
           --output build/security/summary.json

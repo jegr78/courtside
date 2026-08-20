@@ -29,7 +29,9 @@ test("given visual baselines, when running them on different hosts, then their p
   assert.match(setup, /mcr\.microsoft\.com\/playwright:[^"]*@sha256:/);
   // Browsers reach the application through the same reverse proxy a club runs, pinned the same way.
   assert.match(setup, /caddy:[^"]*@sha256:/);
-  assert.match(setup, /playwright launch-server/);
+  assert.match(setup, /playwright\/cli\.js launch-server/);
+  assert.match(setup, /withCopyDirectoriesToContainer/);
+  assert.doesNotMatch(setup, /\bnpx playwright\b/);
   assert.doesNotMatch(setup, /--unsafe/);
   assert.match(visual, /timezoneId: "Europe\/Berlin"/);
   assert.doesNotMatch(visual, /expect\(page\)\.toHaveScreenshot/);
