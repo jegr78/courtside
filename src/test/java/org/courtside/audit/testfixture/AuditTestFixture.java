@@ -10,6 +10,7 @@ import org.courtside.audit.internal.DomainEventRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class AuditTestFixture {
@@ -25,10 +26,28 @@ public class AuditTestFixture {
                 .toList();
     }
 
+    public List<RecordedEvent> eventsAbout(UUID subjectId, String eventType) {
+        return eventsAbout(subjectId).stream()
+                .filter(event -> event.eventType().equals(eventType))
+                .toList();
+    }
+
     public List<RecordedEvent> eventsOfType(String eventType) {
         return events.findByEventTypeOrderByOccurredAtAsc(eventType).stream()
                 .map(this::toRecordedEvent)
                 .toList();
+    }
+
+    public Map<String, Long> eventCountsAbout(UUID subjectId) {
+        return eventsAbout(subjectId).stream()
+                .collect(Collectors.groupingBy(RecordedEvent::eventType, Collectors.counting()));
+    }
+
+    public Map<String, Object> latestPayload(UUID subjectId, String eventType) {
+        return eventsAbout(subjectId, eventType).stream()
+                .reduce((first, second) -> second)
+                .map(RecordedEvent::payload)
+                .orElseThrow();
     }
 
     public String nameOf(UUID subjectId) {

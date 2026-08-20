@@ -32,7 +32,7 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         Court court = facility.createCourt(7, "Centre Court");
 
         // then
-        assertThat(payloadOf(court.getId(), FacilityEvent.CourtAdded.TYPE))
+        assertThat(audit.latestPayload(court.getId(), FacilityEvent.CourtAdded.TYPE))
                 .containsEntry("number", 7)
                 .doesNotContainKey("name");
     }
@@ -46,7 +46,7 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         facility.changeCourt(court.getId(), 7, "Show Court");
 
         // then
-        Map<String, Object> payload = payloadOf(court.getId(), FacilityEvent.CourtChanged.TYPE);
+        Map<String, Object> payload = audit.latestPayload(court.getId(), FacilityEvent.CourtChanged.TYPE);
         assertThat(payload)
                 .containsEntry("number", 7)
                 .containsEntry("changedFields", List.of("name"));
@@ -62,7 +62,7 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         facility.setCourtActive(court.getId(), true);
 
         // then
-        assertThat(eventsOfTypeAbout(court.getId(), FacilityEvent.CourtAvailabilityChanged.TYPE)).isEmpty();
+        assertThat(audit.eventsAbout(court.getId(), FacilityEvent.CourtAvailabilityChanged.TYPE)).isEmpty();
     }
 
     @Test
@@ -74,7 +74,7 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         facility.changeCourt(court.getId(), 7, "Centre Court");
 
         // then
-        assertThat(eventsOfTypeAbout(court.getId(), FacilityEvent.CourtChanged.TYPE)).isEmpty();
+        assertThat(audit.eventsAbout(court.getId(), FacilityEvent.CourtChanged.TYPE)).isEmpty();
     }
 
     @Test
@@ -86,7 +86,7 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         facility.setCourtActive(court.getId(), false);
 
         // then
-        assertThat(payloadOf(court.getId(), FacilityEvent.CourtAvailabilityChanged.TYPE))
+        assertThat(audit.latestPayload(court.getId(), FacilityEvent.CourtAvailabilityChanged.TYPE))
                 .containsEntry("active", false);
     }
 
@@ -97,7 +97,7 @@ class FacilityAuditTest extends AbstractIntegrationTest {
                 new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
 
         // then
-        assertThat(payloadOf(hours.getId(), FacilityEvent.OpeningHoursSet.TYPE))
+        assertThat(audit.latestPayload(hours.getId(), FacilityEvent.OpeningHoursSet.TYPE))
                 .containsEntry("openingHoursId", hours.getId().toString())
                 .containsEntry("dayOfWeek", DayOfWeek.SATURDAY.getValue())
                 .containsEntry("opensAt", "08:00:00")
@@ -159,19 +159,6 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         excluded.add(publishedType);
         CHANGE_EVENT_TYPES.stream()
                 .filter(type -> !excluded.contains(type))
-                .forEach(type -> assertThat(eventsOfTypeAbout(subjectId, type)).as(type).isEmpty());
-    }
-
-    private Map<String, Object> payloadOf(UUID subjectId, String eventType) {
-        return eventsOfTypeAbout(subjectId, eventType).stream()
-                .reduce((first, second) -> second)
-                .map(RecordedEvent::payload)
-                .orElseThrow();
-    }
-
-    private List<RecordedEvent> eventsOfTypeAbout(UUID subjectId, String eventType) {
-        return audit.eventsAbout(subjectId).stream()
-                .filter(event -> event.eventType().equals(eventType))
-                .toList();
+                .forEach(type -> assertThat(audit.eventsAbout(subjectId, type)).as(type).isEmpty());
     }
 }

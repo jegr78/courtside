@@ -2,7 +2,6 @@ package org.courtside.member;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
-import org.courtside.audit.testfixture.AuditTestFixture.RecordedEvent;
 import org.courtside.member.internal.MembershipType;
 import org.courtside.rules.testfixture.RulesTestFixture;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,9 +40,9 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         MembershipType type = members.createMembershipType("Adult", ruleSetId);
 
         // then
-        assertThat(payloadOf(type.getId(), MembershipTypeEvent.Added.TYPE))
+        assertThat(audit.latestPayload(type.getId(), MembershipTypeEvent.Added.TYPE))
                 .containsEntry("ruleSetId", ruleSetId.toString());
-        assertSiblingsSilent(type.getId(), MembershipTypeEvent.Added.TYPE);
+        assertEventCounts(type.getId(), Map.of(MembershipTypeEvent.Added.TYPE, 1));
     }
 
     @Test
@@ -57,10 +55,11 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         members.changeMembershipType(type.getId(), "Adult", other);
 
         // then
-        assertThat(payloadOf(type.getId(), MembershipTypeEvent.Changed.TYPE))
+        assertThat(audit.latestPayload(type.getId(), MembershipTypeEvent.Changed.TYPE))
                 .containsEntry("ruleSetId", other.toString())
                 .containsEntry("changedFields", List.of());
-        assertSiblingsSilent(type.getId(), MembershipTypeEvent.Changed.TYPE, MembershipTypeEvent.Added.TYPE);
+        assertEventCounts(type.getId(),
+                Map.of(MembershipTypeEvent.Added.TYPE, 1, MembershipTypeEvent.Changed.TYPE, 1));
     }
 
     @Test
@@ -72,11 +71,12 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         members.changeMembershipType(type.getId(), "Senior", ruleSetId);
 
         // then
-        Map<String, Object> payload = payloadOf(type.getId(), MembershipTypeEvent.Changed.TYPE);
+        Map<String, Object> payload = audit.latestPayload(type.getId(), MembershipTypeEvent.Changed.TYPE);
         assertThat(payload).containsEntry("changedFields", List.of("name"));
         assertThat(payload).doesNotContainKey("name");
         assertThat(payload.toString()).doesNotContain("Senior");
-        assertSiblingsSilent(type.getId(), MembershipTypeEvent.Changed.TYPE, MembershipTypeEvent.Added.TYPE);
+        assertEventCounts(type.getId(),
+                Map.of(MembershipTypeEvent.Added.TYPE, 1, MembershipTypeEvent.Changed.TYPE, 1));
     }
 
     @Test
@@ -88,7 +88,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         members.changeMembershipType(type.getId(), "Adult", ruleSetId);
 
         // then
-        assertThat(eventsOfTypeAbout(type.getId(), MembershipTypeEvent.Changed.TYPE)).isEmpty();
+        assertThat(audit.eventsAbout(type.getId(), MembershipTypeEvent.Changed.TYPE)).isEmpty();
     }
 
     @Test
@@ -100,9 +100,10 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         members.setMembershipTypeActive(type.getId(), false);
 
         // then
-        assertThat(payloadOf(type.getId(), MembershipTypeEvent.AvailabilityChanged.TYPE))
+        assertThat(audit.latestPayload(type.getId(), MembershipTypeEvent.AvailabilityChanged.TYPE))
                 .containsEntry("active", false);
-        assertSiblingsSilent(type.getId(), MembershipTypeEvent.AvailabilityChanged.TYPE, MembershipTypeEvent.Added.TYPE);
+        assertEventCounts(type.getId(),
+                Map.of(MembershipTypeEvent.Added.TYPE, 1, MembershipTypeEvent.AvailabilityChanged.TYPE, 1));
     }
 
     @Test
@@ -114,7 +115,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
         members.setMembershipTypeActive(type.getId(), true);
 
         // then
-        assertThat(eventsOfTypeAbout(type.getId(), MembershipTypeEvent.AvailabilityChanged.TYPE)).isEmpty();
+        assertThat(audit.eventsAbout(type.getId(), MembershipTypeEvent.AvailabilityChanged.TYPE)).isEmpty();
     }
 
     @Test
@@ -129,24 +130,10 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
     private static final List<String> CHANGE_EVENT_TYPES = List.of(MembershipTypeEvent.Added.TYPE,
             MembershipTypeEvent.Changed.TYPE, MembershipTypeEvent.AvailabilityChanged.TYPE);
 
-    private void assertSiblingsSilent(UUID membershipTypeId, String publishedType, String... alreadyExpectedTypes) {
-        List<String> excluded = new ArrayList<>(List.of(alreadyExpectedTypes));
-        excluded.add(publishedType);
-        CHANGE_EVENT_TYPES.stream()
-                .filter(type -> !excluded.contains(type))
-                .forEach(type -> assertThat(eventsOfTypeAbout(membershipTypeId, type)).as(type).isEmpty());
-    }
-
-    private Map<String, Object> payloadOf(UUID subjectId, String eventType) {
-        return eventsOfTypeAbout(subjectId, eventType).stream()
-                .reduce((first, second) -> second)
-                .map(RecordedEvent::payload)
-                .orElseThrow();
-    }
-
-    private List<RecordedEvent> eventsOfTypeAbout(UUID subjectId, String eventType) {
-        return audit.eventsAbout(subjectId).stream()
-                .filter(event -> event.eventType().equals(eventType))
-                .toList();
+    private void assertEventCounts(UUID membershipTypeId, Map<String, Integer> expectedCounts) {
+        Map<String, Long> actual = audit.eventCountsAbout(membershipTypeId);
+        CHANGE_EVENT_TYPES.forEach(type -> assertThat(actual.getOrDefault(type, 0L))
+                .as(type)
+                .isEqualTo(expectedCounts.getOrDefault(type, 0).longValue()));
     }
 }

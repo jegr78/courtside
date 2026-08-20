@@ -2,7 +2,6 @@ package org.courtside.card;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
-import org.courtside.audit.testfixture.AuditTestFixture.RecordedEvent;
 import org.courtside.identity.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +10,6 @@ import org.springframework.context.annotation.Import;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,7 +29,7 @@ class CardAuditTest extends AbstractIntegrationTest {
                 Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
 
         // then
-        assertThat(payloadOf(card.getId(), CardEvent.BookingCardAdded.TYPE))
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
                 .containsEntry("guestAllowed", false)
                 .containsEntry("countsAgainstLimits", true)
                 .doesNotContainKey("label")
@@ -49,7 +47,7 @@ class CardAuditTest extends AbstractIntegrationTest {
                 Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
 
         // then
-        Map<String, Object> payload = payloadOf(card.getId(), CardEvent.BookingCardChanged.TYPE);
+        Map<String, Object> payload = audit.latestPayload(card.getId(), CardEvent.BookingCardChanged.TYPE);
         assertThat(payload).containsEntry("changedFields", List.of("label", "color"));
         assertThat(payload.toString()).doesNotContain("Squad").doesNotContain("#445566");
     }
@@ -63,7 +61,7 @@ class CardAuditTest extends AbstractIntegrationTest {
                 new short[]{2, 4}, true, false, false);
 
         // then
-        assertThat(payloadOf(card.getId(), CardEvent.BookingCardAdded.TYPE))
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
                 .containsEntry("allowedRoles", List.of("ADMIN", "MEMBER", "TRAINER"))
                 .containsEntry("managingRoles", List.of("ADMIN", "YOUTH_DIRECTOR"));
     }
@@ -79,7 +77,7 @@ class CardAuditTest extends AbstractIntegrationTest {
                 Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
 
         // then
-        assertThat(eventsOfTypeAbout(card.getId(), CardEvent.BookingCardChanged.TYPE)).isEmpty();
+        assertThat(audit.eventsAbout(card.getId(), CardEvent.BookingCardChanged.TYPE)).isEmpty();
     }
 
     @Test
@@ -88,7 +86,7 @@ class CardAuditTest extends AbstractIntegrationTest {
         ParticipantCard card = cards.createParticipantCard("Guests", null);
 
         // then
-        Map<String, Object> payload = payloadOf(card.getId(), CardEvent.ParticipantCardAdded.TYPE);
+        Map<String, Object> payload = audit.latestPayload(card.getId(), CardEvent.ParticipantCardAdded.TYPE);
         assertThat(payload).containsKey("capacity");
         assertThat(payload.get("capacity")).isNull();
     }
@@ -102,7 +100,7 @@ class CardAuditTest extends AbstractIntegrationTest {
         cards.changeParticipantCard(card.getId(), "Guests", 4);
 
         // then
-        assertThat(payloadOf(card.getId(), CardEvent.ParticipantCardChanged.TYPE))
+        assertThat(audit.latestPayload(card.getId(), CardEvent.ParticipantCardChanged.TYPE))
                 .containsEntry("capacity", 4)
                 .containsEntry("changedFields", List.of());
     }
@@ -116,7 +114,7 @@ class CardAuditTest extends AbstractIntegrationTest {
         cards.changeParticipantCard(card.getId(), "Guests", 2);
 
         // then
-        assertThat(eventsOfTypeAbout(card.getId(), CardEvent.ParticipantCardChanged.TYPE)).isEmpty();
+        assertThat(audit.eventsAbout(card.getId(), CardEvent.ParticipantCardChanged.TYPE)).isEmpty();
     }
 
     @Test
@@ -128,7 +126,7 @@ class CardAuditTest extends AbstractIntegrationTest {
         cards.changeParticipantCard(card.getId(), "Visitors", 2);
 
         // then
-        Map<String, Object> payload = payloadOf(card.getId(), CardEvent.ParticipantCardChanged.TYPE);
+        Map<String, Object> payload = audit.latestPayload(card.getId(), CardEvent.ParticipantCardChanged.TYPE);
         assertThat(payload).containsEntry("changedFields", List.of("label"));
         assertThat(payload.toString()).doesNotContain("Visitors");
     }
@@ -144,7 +142,7 @@ class CardAuditTest extends AbstractIntegrationTest {
         cards.setCardActive(card.getId(), false);
 
         // then
-        assertThat(eventsOfTypeAbout(card.getId(), CardEvent.BookingCardAvailabilityChanged.TYPE))
+        assertThat(audit.eventsAbout(card.getId(), CardEvent.BookingCardAvailabilityChanged.TYPE))
                 .hasSize(1);
     }
 
@@ -158,7 +156,7 @@ class CardAuditTest extends AbstractIntegrationTest {
         cards.setCardActive(card.getId(), false);
 
         // then
-        assertThat(payloadOf(card.getId(), CardEvent.BookingCardAvailabilityChanged.TYPE))
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAvailabilityChanged.TYPE))
                 .containsEntry("active", false);
     }
 
@@ -172,7 +170,7 @@ class CardAuditTest extends AbstractIntegrationTest {
         cards.setParticipantCardActive(card.getId(), false);
 
         // then
-        assertThat(eventsOfTypeAbout(card.getId(), CardEvent.ParticipantCardAvailabilityChanged.TYPE))
+        assertThat(audit.eventsAbout(card.getId(), CardEvent.ParticipantCardAvailabilityChanged.TYPE))
                 .hasSize(1);
     }
 
@@ -185,7 +183,7 @@ class CardAuditTest extends AbstractIntegrationTest {
         cards.setParticipantCardActive(card.getId(), false);
 
         // then
-        assertThat(payloadOf(card.getId(), CardEvent.ParticipantCardAvailabilityChanged.TYPE))
+        assertThat(audit.latestPayload(card.getId(), CardEvent.ParticipantCardAvailabilityChanged.TYPE))
                 .containsEntry("active", false);
     }
 
@@ -199,18 +197,5 @@ class CardAuditTest extends AbstractIntegrationTest {
         // when / then
         assertThat(audit.nameOf(booking.getId())).isEqualTo("Team");
         assertThat(audit.nameOf(participant.getId())).isEqualTo("Guests");
-    }
-
-    private Map<String, Object> payloadOf(UUID subjectId, String eventType) {
-        return eventsOfTypeAbout(subjectId, eventType).stream()
-                .reduce((first, second) -> second)
-                .map(RecordedEvent::payload)
-                .orElseThrow();
-    }
-
-    private List<RecordedEvent> eventsOfTypeAbout(UUID subjectId, String eventType) {
-        return audit.eventsAbout(subjectId).stream()
-                .filter(event -> event.eventType().equals(eventType))
-                .toList();
     }
 }
