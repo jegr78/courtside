@@ -26,20 +26,22 @@ modules of section 3 are designed and not built. `audit` is built: every configu
 through the admin API — facility, cards, config, rule sets and the roster — is recorded in the
 append-only `domain_event` table before the commit that makes it: actor, time, entity, and, except
 for free text, the values. A free-text field never carries its value — a create event omits it, a
-change event names it in `changedFields` — which is what keeps section 11's erasure working, since
-the log then holds nothing personal to remove. Bookings are not included; they carry their own
-status history. Coverage is enforced by a test, not by memory: it inventories every public method
-of the seven administrative services against an event type or an explicit `none`. The log is read
-back through `GET /api/admin/audit`, a cursor-paged, administrator-only endpoint that resolves the
-subject and the acting account to the names they carry today. `ConfigurationSubjectNames` is the
-port interface that resolution uses: an adapter beside each of the five publishing modules, plus
-one in `identity` that resolves a roster event's subject — a person id — to that person's display
-name, since `member` publishes the event but `identity` owns the person. `audit` depends on none of
-the five directly. Two gaps are accepted rather than closed: the bootstrap administrator's own
-account is created by writing `Person` and `UserAccount` straight to their repositories, bypassing
-the roster service, so that one write is never recorded at all; and the demo seed runs as an
-`ApplicationRunner` before any session exists, so every event it produces is recorded with no
-actor.
+change event names it in `changedFields` (`fields` for `roster.person.corrected`) — which is what
+keeps section 11's erasure working, since the log then holds nothing personal to remove. Bookings
+are not included; they carry their own status history. Coverage is enforced by a test, not by
+memory: it inventories every public method of the seven administrative services against an event
+type or an explicit `none`. The log is read back through `GET /api/admin/audit`, a cursor-paged,
+administrator-only endpoint that resolves the subject and the acting account to the names they
+carry today. `ConfigurationSubjectNames` is the port interface that resolution uses: an adapter
+beside each of the five publishing modules, plus one in `identity` that resolves a roster event's
+subject — a person id — to that person's display name, since `member` publishes the event but
+`identity` owns the person. `audit` depends on none of the five directly. Three gaps are accepted
+rather than closed: the bootstrap administrator's own account is created by writing `Person` and
+`UserAccount` straight to their repositories, bypassing the roster service, so that one write is
+never recorded at all; the demo seed does the same for its own two demo members — `Person`,
+`UserAccount` and `Member` written straight to their repositories — so those writes are not
+recorded either; and the demo seed's court changes, which do go through `FacilityService`, are
+recorded with no actor, because the seed runs as an `ApplicationRunner` before any session exists.
 
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
