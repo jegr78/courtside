@@ -26,8 +26,15 @@ modules of section 3 are designed and not built. `audit` is built: every adminis
 across facility, cards, config, rule sets and the roster is recorded in the append-only
 `domain_event` table, written in the transaction that made the change, and read back through
 `GET /api/admin/audit`, a cursor-paged, administrator-only endpoint that resolves the subject and
-the actor to the names they carry today. `ConfigurationSubjectNames` is the port interface that
-resolution uses — one adapter per publishing module, so `audit` depends on none of them directly.
+the acting account to the names they carry today. `ConfigurationSubjectNames` is the port
+interface that resolution uses: an adapter beside each of the five publishing modules, plus one in
+`identity` that resolves a roster event's subject — a person id — to that person's display name,
+since `member` publishes the event but `identity` owns the person. `audit` depends on none of the
+five directly. Two gaps remain, closed by a later task: the bootstrap administrator's own account
+is created by writing `Person` and `UserAccount` straight to their repositories, bypassing the
+roster service, so that one write is never recorded at all; and the demo seed runs as an
+`ApplicationRunner` before any session exists, so every event it produces is recorded with no
+actor.
 
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and

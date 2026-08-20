@@ -17,6 +17,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({FacilityTestFixture.class, IdentityTestFixture.class})
 class AuditAdminControllerTest extends AbstractIntegrationTest {
 
+    private static final int MAX_PAGES = 10;
+
     @Autowired
     private WebApplicationContext context;
 
@@ -46,6 +50,9 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private UserDetailsService userDetailsService;
+
+    @Autowired
+    private Clock clock;
 
     private MockMvc mockMvc;
     private UserDetails administrator;
@@ -109,6 +116,53 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACursorNamingNoEntry_whenTheLogIsRead_thenItIsRejected() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/audit").param("cursor", UUID.randomUUID().toString())
+                        .with(user(administrator)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:audit-cursor-unknown"));
+    }
+
+    @Test
+    void givenToEqualsTheEventsTimestamp_whenTheLogIsRead_thenToExcludesIt() throws Exception {
+        // given
+        UUID courtId = facilityFixture.createCourt(9, "Court 9");
+        Instant occurredAt = clock.instant();
+
+        // when / then
+        mockMvc.perform(get("/api/admin/audit").param("subjectId", courtId.toString())
+                        .param("to", occurredAt.toString())
+                        .with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(0)));
+        mockMvc.perform(get("/api/admin/audit").param("subjectId", courtId.toString())
+                        .param("to", occurredAt.plusSeconds(1).toString())
+                        .with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(1)));
+    }
+
+    @Test
+    void givenFromEqualsTheEventsTimestamp_whenTheLogIsRead_thenFromIncludesIt() throws Exception {
+        // given
+        UUID courtId = facilityFixture.createCourt(10, "Court 10");
+        Instant occurredAt = clock.instant();
+
+        // when / then
+        mockMvc.perform(get("/api/admin/audit").param("subjectId", courtId.toString())
+                        .param("from", occurredAt.toString())
+                        .with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(1)));
+        mockMvc.perform(get("/api/admin/audit").param("subjectId", courtId.toString())
+                        .param("from", occurredAt.plusSeconds(1).toString())
+                        .with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(0)));
+    }
+
+    @Test
     void givenMoreEntriesThanTheLimit_whenAPageIsRead_thenTheCursorContinuesAfterTheLast()
             throws Exception {
         // given
@@ -132,7 +186,6 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.entries[0].id").value(not(firstIdOfThePreviousPage)));
     }
 
-    // Every court-added event in this test shares one Instant: the fixed test clock never advances.
     @Test
     void givenSeveralEventsSharingATimestamp_whenPagedWithASmallLimit_thenEveryEventAppearsExactlyOnce()
             throws Exception {
@@ -140,10 +193,18 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
         for (int number = 1; number <= 5; number++) {
             facilityFixture.createCourt(number, "Court " + number);
         }
+        String wholePage = mockMvc.perform(get("/api/admin/audit").param("limit", "5")
+                        .with(user(administrator)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<String> occurredAtValues = JsonPath.read(wholePage, "$.entries[*].occurredAt");
+        assertThat(occurredAtValues).as("the fixed test clock must not have advanced")
+                .containsOnly(occurredAtValues.get(0));
 
         // when
         List<String> collected = new ArrayList<>();
         String cursor = null;
+        int pages = 0;
         do {
             MockHttpServletRequestBuilder request = get("/api/admin/audit")
                     .param("limit", "2").with(user(administrator));
@@ -155,9 +216,11 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
                     .andReturn().getResponse().getContentAsString();
             collected.addAll(JsonPath.read(body, "$.entries[*].id"));
             cursor = JsonPath.read(body, "$.nextCursor");
-        } while (cursor != null);
+            pages++;
+        } while (cursor != null && pages < MAX_PAGES);
 
         // then
+        assertThat(pages).as("five entries at limit 2 need at most three pages").isLessThan(MAX_PAGES);
         assertThat(collected).hasSize(5);
         assertThat(new HashSet<>(collected)).hasSize(5);
     }

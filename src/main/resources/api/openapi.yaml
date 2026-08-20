@@ -1470,11 +1470,13 @@ components:
         subjectId: { type: [string, "null"], format: uuid }
         subjectName:
           type: [string, "null"]
-          description: What the entity is called today. Absent once the entity is gone.
+          description: What the entity is called today, or `null` once the entity is gone.
         actorAccountId: { type: [string, "null"], format: uuid }
         actorUsername:
           type: [string, "null"]
-          description: Absent when no account acted, and when the account that acted was erased.
+          description: |
+            The acting account's username, or `null` when no account acted, and when the account
+            that acted was erased.
 
     AuditPage:
       type: object
@@ -4159,6 +4161,11 @@ paths:
         Every entry names the account that made the change, or no account at all when the change
         had no signed-in person behind it. An account id that resolves to nothing is an account
         that has been erased; the id stands in its place.
+
+        The page is ordered by `occurredAt` descending, and by `id` descending where several
+        entries share one `occurredAt` — which happens whenever one administrative call records
+        more than one change — so the order is total and a page boundary never drops or repeats a
+        row. `cursor` continues after the entry it names in that same order.
       parameters:
         - name: subjectId
           in: query
@@ -4169,11 +4176,22 @@ paths:
           in: query
           required: false
           schema: { type: string, format: date-time }
+          description: Include only entries recorded at or after this instant.
         - name: to
           in: query
           required: false
           schema: { type: string, format: date-time }
-        - $ref: "#/components/parameters/ImpactCursor"
+          description: |
+            Exclude entries recorded at or after this instant. A boundary of midnight excludes
+            anything recorded exactly at midnight; ask for the following instant to include it.
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor that does not name an
+            entry of this log is answered `400` rather than silently starting the page over, because
+            a restarted page is the one wrong answer a client cannot detect.
+          schema: { type: string, format: uuid }
         - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":

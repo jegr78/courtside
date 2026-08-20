@@ -45,6 +45,15 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABoardAddsAPerson_whenTheAuditLogResolvesTheSubject_thenItNamesThePerson() {
+        // when
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+
+        // then
+        assertThat(audit.nameOf(personId)).isEqualTo("Jane Doe");
+    }
+
+    @Test
     void givenAPersonIsCorrected_whenTheAuditLogIsRead_thenItNamesTheFieldsAndNotTheirValues() {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");

@@ -10,7 +10,7 @@ public class AuditCursorUnknownException extends CodedDomainFailure {
 
     public static final ProblemType PROBLEM_TYPE = new ProblemType(
             "audit-cursor-unknown", HttpStatus.BAD_REQUEST,
-            "Audit cursor unknown", "The cursor names an entry the audit log does not hold");
+            "Audit cursor unknown", "The cursor does not name an entry of the log");
 
     public AuditCursorUnknownException(String code, Map<String, Object> params) {
         super(code, params);
