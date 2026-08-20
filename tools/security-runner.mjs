@@ -71,6 +71,7 @@ export function buildSecurityPlan(input) {
     target,
     environment: input.environment,
     imageDigest: input.imageDigest,
+    imageArchitecture: input.imageArchitecture,
     applicationCommit: input.applicationCommit,
     seedFingerprint: input.seedFingerprint,
     instanceFingerprint: input.instanceFingerprint,
@@ -133,11 +134,13 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   try {
     const passive = assertSupportedPlan(plan);
     assertRunning(paths, startedAt, now(), plan.budgets);
-    assertTargetIdentity(plan, await verifyTarget(plan));
+    const deadline = new Date(startedAt.getTime() + plan.budgets.durationSeconds * 1000);
+    assertTargetIdentity(plan, await verifyTarget(plan, { stopFile: paths.stop, deadline }));
     manifest.toolResults.push({ id: "target-identity", version: plan.tools[0].version, outcome: "passed" });
     if (passive) {
       assertRunning(paths, startedAt, now(), plan.budgets);
-      const evidence = await runPassiveAssessment(plan, { evidenceDirectory: paths.evidence, stopFile: paths.stop });
+      const evidence = await runPassiveAssessment(plan, { evidenceDirectory: paths.evidence, stopFile: paths.stop,
+        attempt, deadline });
       assertRunning(paths, startedAt, now(), plan.budgets);
       manifest.toolResults.push({ id: "passive-deployment", version: plan.tools[1].version,
         outcome: evidence.outcome });
@@ -220,6 +223,7 @@ function validateIdentity(input) {
     throw new Error("Invalid application image digest");
   }
   if (!/^[a-f0-9]{7,64}$/.test(input.applicationCommit)) throw new Error("Invalid application commit");
+  if (!["amd64", "arm64"].includes(input.imageArchitecture)) throw new Error("Invalid application image architecture");
   for (const value of [input.seedFingerprint, input.instanceFingerprint, input.targetFingerprint]) {
     if (!/^sha256:[a-f0-9]{64}$/.test(value)) throw new Error("Invalid security target fingerprint");
   }
@@ -257,7 +261,8 @@ function createManifest(plan, attempt, startedAt) {
 
 function assertTargetIdentity(plan, actual) {
   if (actual.environment !== plan.environment || actual.target !== plan.target
-      || actual.imageDigest !== plan.imageDigest || actual.seedFingerprint !== plan.seedFingerprint
+      || actual.imageDigest !== plan.imageDigest || actual.imageArchitecture !== plan.imageArchitecture
+      || actual.seedFingerprint !== plan.seedFingerprint
       || actual.instanceFingerprint !== plan.instanceFingerprint
       || actual.targetFingerprint !== plan.targetFingerprint) {
     throw new Error("The target identity changed during the security run");

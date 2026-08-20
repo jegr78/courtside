@@ -4,8 +4,22 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import {
   assertSecurityIdentity, assertSecurityRecoveryOwnership, assertSecurityStartAvailable, availableLoopbackPort, recoveryEnvironment,
-  securityComposeArgs, securityDownPlan, securityEnvironment, securityProject, securityReservationArgs, securityStateFile
+  isMissingDockerResource,
+  securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
+  securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
+
+test("given Docker cleanup inspection failures, when classifying absence, then only an explicit missing resource is accepted", () => {
+  // when / then
+  assert.equal(isMissingDockerResource(
+    new Error("Owned security process failed (1): Error: No such object: scanner-one\n"), "scanner-one"), true);
+  assert.equal(isMissingDockerResource(
+    new Error("Owned security process exceeded its duration limit: "), "scanner-one"), false);
+  assert.equal(isMissingDockerResource(
+    new Error("Owned security process failed (1): permission denied"), "scanner-one"), false);
+  assert.equal(isMissingDockerResource(
+    new Error("Owned security process failed (1): Error: No such object: scanner-two\n"), "scanner-one"), false);
+});
 
 test("given parallel assessment runs, when naming projects, then their resources cannot collide", () => {
   // when / then
@@ -154,27 +168,49 @@ test("given a new run instance, when reserving it, then Docker create is globall
   assert.ok(args.includes(`org.courtside.security.instance-fingerprint=${environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT}`));
 });
 
+test("given parallel attempts for one run, when reserving scanner access, then only one global name can exist", () => {
+  // given
+  const environment = securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`);
+
+  // when
+  const first = securityAssessmentReservationArgs(environment, 1);
+  const second = securityAssessmentReservationArgs(environment, 2);
+
+  // then
+  assert.equal(first[first.indexOf("--name") + 1], "courtside-security-assessment-run-0001");
+  assert.equal(second[second.indexOf("--name") + 1], "courtside-security-assessment-run-0001");
+  assert.ok(first.includes("org.courtside.security.attempt=1"));
+  assert.ok(second.includes("org.courtside.security.attempt=2"));
+});
+
 test("given the security Compose file, when inspecting boundaries, then resources are bounded and internal", () => {
   // given
   const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.security.yaml", import.meta.url)), "utf8");
 
   // when / then
   assert.match(compose, /127\.0\.0\.1:\$\{COURTSIDE_SECURITY_HTTPS_PORT:\?required\}:443/);
-  assert.equal((compose.match(/internal: true/g) ?? []).length, 2);
-  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 5);
-  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 8);
-  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 8);
+  assert.equal((compose.match(/internal: true/g) ?? []).length, 4);
+  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 6);
+  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 11);
+  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 11);
   assert.match(compose, /\/var\/lib\/postgresql\/data:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
   assert.match(compose, /zaproxy\/zap-stable:2\.16\.1@sha256:[a-f0-9]{64}/);
   assert.match(compose, /profiles: \[assessment\]/);
+  assert.match(compose, /\/zap\/wrk:uid=1000,gid=1000,mode=0700,size=25m/);
+  assert.match(compose, /zap:[\s\S]*networks:[\s\S]*- scanner-client/);
+  assert.match(compose, /scanner-gateway:[\s\S]*- scanner-client[\s\S]*- scanner-upstream/);
+  assert.match(compose, /proxy:[\s\S]*networks:[\s\S]*- scanner-upstream/);
+  assert.doesNotMatch(compose, /zap:[\s\S]*networks:[\s\S]*- frontend/);
   assert.doesNotMatch(compose, /^volumes:/m);
 });
 
-test("given the scanner proxy, when counting requests, then its raw access log stays inside tmpfs", () => {
+test("given the scanner gateway, when enforcing budgets, then target access is counted synchronously", () => {
   // given
-  const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.security", import.meta.url)), "utf8");
+  const gateway = readFileSync(fileURLToPath(new URL("./security-request-gateway.py", import.meta.url)), "utf8");
 
   // when / then
-  assert.match(caddy, /http:\/\/proxy:8080 \{[\s\S]*output file \/tmp\/zap-access\.log[\s\S]*import security_proxy/);
+  assert.match(gateway, /request_count >= MAX_REQUESTS/);
+  assert.match(gateway, /concurrency\.acquire\(blocking=False\)/);
+  assert.match(gateway, /UPSTREAM_HOST = "proxy"/);
 });

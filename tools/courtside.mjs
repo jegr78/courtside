@@ -14,7 +14,7 @@ import { createRequire } from "node:module";
 import {
   inspectPassiveSecurityRuntime, readSecurityIdentity, readSecurityProxyCa, recoverSecurityEnvironment, runPassiveZap,
   securityProject, securityStateRoot,
-  startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment
+  startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment, verifySecurityEnvironmentForAssessment
 } from "./security-environment.mjs";
 import {
   buildSecurityPlan, clearEmergencyStop, executeSecurityPlan, fingerprintSecurityTarget, readSecurityManifest,
@@ -78,6 +78,7 @@ export function parseArguments(argv) {
     skipVerify: false, dbPort: false, file: undefined, confirm: undefined, all: false,
     profile: undefined, fresh: false, telemetry: false, remoteWrite: false, showCredentials: true,
     target: undefined, baseline: undefined, output: undefined, runId: undefined, authorization: undefined,
+    qualification: undefined,
     attempt: undefined, image: undefined
   };
   for (let index = 0; index < flags.length; index++) {
@@ -141,6 +142,8 @@ export function parseArguments(argv) {
       options.profile = flag;
     } else if (flag === "--authorize" && ["security-plan", "security-run"].includes(command)) {
       options.authorization = requiredOptionValue(flags, ++index, "--authorize");
+    } else if (flag === "--qualification" && command === "security-run") {
+      options.qualification = requiredOptionValue(flags, ++index, "--qualification");
     } else if (flag === "--attempt" && ["security-report", "security-recover"].includes(command)) {
       const attempt = requiredOptionValue(flags, ++index, "--attempt");
       if (!/^[1-9][0-9]*$/.test(attempt)) throw new Error("--attempt requires a positive integer");
@@ -207,6 +210,9 @@ export function parseArguments(argv) {
   }
   if (command === "security-run" && options.profile !== "safe" && !options.authorization) {
     throw new Error(`security-run ${options.profile} requires --authorize`);
+  }
+  if (command === "security-run" && !options.qualification) {
+    throw new Error("security-run requires --qualification with digest-bound deployment evidence");
   }
   if (command === "security-recover" && !options.attempt) {
     throw new Error("security-recover requires --attempt with the interrupted attempt number");
@@ -600,14 +606,21 @@ async function execute(options) {
   }
   if (options.command === "security-run") {
     const plan = securityAssessmentPlan(options, false);
+    const ca = readSecurityProxyCa(options.runId);
+    const qualification = JSON.parse(readFileSync(resolve(options.qualification), "utf8"));
     const manifest = await executeSecurityPlan(plan, {
       root: securityStateRoot,
-      verifyTarget: async () => verifiedSecurityIdentity(options.runId),
+      verifyTarget: async (selectedPlan, context) => {
+        if (selectedPlan.runId !== options.runId) throw new Error("The selected security run identity changed");
+        const identity = await verifySecurityEnvironmentForAssessment(options.runId, context);
+        return { ...identity, targetFingerprint: fingerprintSecurityTarget(identity) };
+      },
       runPassiveAssessment: async (selectedPlan, context) => runPassiveDeploymentAssessment(selectedPlan, {
         ...context,
-        ca: readSecurityProxyCa(options.runId),
+        ca,
+        qualification,
         inspectRuntime: inspectPassiveSecurityRuntime,
-        runZap: (candidate) => runPassiveZap(candidate, context.evidenceDirectory, context.stopFile)
+        runZap: (candidate, limits) => runPassiveZap(candidate, context.stopFile, limits)
       })
     });
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
@@ -1932,7 +1945,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

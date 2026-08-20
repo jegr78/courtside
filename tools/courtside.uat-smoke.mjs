@@ -215,9 +215,10 @@ try {
   assert.doesNotMatch(logs, new RegExp(`${password}|${permanentPassword}`));
   writeFileSync(join(build, "qualification.json"), `${JSON.stringify({
     schemaVersion: 1,
+    status: "passed",
     image: JSON.parse(image),
     manifestDigest: version?.split("@")[1] ?? null,
-    architecture: process.arch,
+    architecture: process.arch === "x64" ? "amd64" : process.arch,
     checks: { deployment: true, authentication: true, bookingPersistence: true, hardening: true }
   }, null, 2)}\n`);
 

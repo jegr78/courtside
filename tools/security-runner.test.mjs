@@ -32,6 +32,7 @@ function input(overrides = {}) {
     target: "https://localhost:23456",
     environment: "SECURITY",
     imageDigest: digest,
+    imageArchitecture: "arm64",
     applicationCommit: "abcdef0123456789",
     seedFingerprint,
     instanceFingerprint,

@@ -272,14 +272,17 @@ test("given security commands, when parsing them, then run identity and authoriz
   // when
   const plan = parseArguments(["security-plan", "run-0001", "active"]);
   const run = parseArguments([
-    "security-run", "run-0001", "active", "--authorize", "authorize-active-run-0001"
+    "security-run", "run-0001", "active", "--qualification", "qualification.json",
+    "--authorize", "authorize-active-run-0001"
   ]);
 
   // then
   assert.equal(plan.runId, "run-0001");
   assert.equal(plan.profile, "active");
   assert.equal(run.authorization, "authorize-active-run-0001");
-  assert.throws(() => parseArguments(["security-run", "run-0001", "active"]), /--authorize/);
+  assert.throws(() => parseArguments(["security-run", "run-0001", "active", "--qualification", "qualification.json"]),
+    /--authorize/);
+  assert.throws(() => parseArguments(["security-run", "run-0001", "safe"]), /--qualification/);
   assert.equal(parseArguments(["security-stop", "run-0001"]).runId, "run-0001");
   assert.equal(parseArguments(["security-report", "run-0001", "--attempt", "2"]).attempt, 2);
   assert.throws(() => parseArguments(["security-recover", "run-0001"]), /--attempt/);

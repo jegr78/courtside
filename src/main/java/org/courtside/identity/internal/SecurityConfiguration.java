@@ -125,7 +125,7 @@ public class SecurityConfiguration {
                         .csrfTokenRequestHandler(csrfHandler))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
-                                "default-src 'self'; img-src 'self' https: http: data:; "
+                                "default-src 'self'; object-src 'none'; img-src 'self' https: http: data:; "
                                         + "style-src 'self'; script-src 'self'; connect-src 'self'; "
                                         + "manifest-src 'self'; worker-src 'self'; "
                                         + "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"))

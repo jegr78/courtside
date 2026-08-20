@@ -66,28 +66,28 @@ Planning reads the identity recorded during environment startup. It sends no req
 node tools/courtside.mjs security-plan run-0001 active
 ```
 
-The safe profile runs the bounded deployment suite without a separate authorization string:
+The safe profile runs the bounded deployment suite without a separate authorization string. It requires the digest-bound deployment qualification created by the release UAT smoke:
 
 ```bash
-node tools/courtside.mjs security-run run-0001 safe
+node tools/courtside.mjs security-run run-0001 safe --qualification build/uat-smoke/qualification.json
 ```
 
-It checks the TLS policy, security headers, private-route exposure, unusual methods, request-size rejection, forwarded-header handling and live container restrictions. The scanner uses the internal proxy listener and cannot route outside the run network. The public target still uses its run-specific trusted CA; the suite never disables TLS verification.
+It checks the TLS policy and certificate, security and cache headers, secure cookie delivery, private-route exposure, unusual methods, request and header limits, forwarded-header handling, direct application behavior and live container restrictions. Separate scanner-client and scanner-upstream networks force every scanner request through the synchronous request and concurrency gate before it can reach the proxy. The public target still uses its run-specific trusted CA; the suite never disables TLS verification.
 
 Active and destructive runs require their separate exact authorization strings. They work only against the loopback-bound `SECURITY` environment:
 
 ```bash
-node tools/courtside.mjs security-run run-0001 active --authorize authorize-active-run-0001
-node tools/courtside.mjs security-run run-0001 destructive --authorize authorize-destructive-run-0001
+node tools/courtside.mjs security-run run-0001 active --qualification build/uat-smoke/qualification.json --authorize authorize-active-run-0001
+node tools/courtside.mjs security-run run-0001 destructive --qualification build/uat-smoke/qualification.json --authorize authorize-destructive-run-0001
 ```
 
 The current CLI executes all three profiles only against the loopback-bound environment it created and verified. The orchestration API also supports an explicitly authorized exact origin for future `safe` adapters. Redirects never extend that allowlist. `active` and `destructive` reject every non-loopback origin and every environment other than `SECURITY`.
 
-[`security/run-contract.json`](../security/run-contract.json) fixes duration, request, concurrency, generated-data, CPU, memory and evidence limits for each profile. The runner owns the safe ZAP container, kills it on deadline or emergency stop, and restricts it to the run's internal frontend network. Only the exact `CSA-DEPLOY-001` safe plan can open that path. Every other adapter remains blocked until it has equivalent process, network, resource and evidence controls.
+[`security/run-contract.json`](../security/run-contract.json) fixes duration, request, concurrency, generated-data, CPU, memory and evidence limits for each profile. The runner owns the safe ZAP container, kills it on deadline, request limit or emergency stop, and restricts it to the dedicated scanner network. Attempts for one run reserve scanner access atomically and cannot reset each other's request counter. Only the exact `CSA-DEPLOY-001` safe plan can open that path. Every other adapter remains blocked until it has equivalent process, network, resource and evidence controls.
 
 Each attempt writes a private manifest below `build/security/<run-id>/assessment/attempt-<number>`. A rerun always gets a new attempt number. It cannot replace or upgrade the first result. The manifest follows [`security/run-manifest.schema.json`](../security/run-manifest.schema.json) and contains no credential, cookie or authorization value.
 
-The safe suite writes `passive-deployment.json` and `passive-deployment.md` beside the manifest. It deletes the raw ZAP report after converting it to the closed evidence schema. Scanner alerts contain only plugin, risk, confidence and occurrence counts. Any alert leaves the run incomplete until the finding lifecycle validates or rejects it.
+The safe suite writes `passive-deployment.json` and `passive-deployment.md` beside the manifest. ZAP creates its raw report in a size-limited container tmpfs. The runner reads it while the container is alive, converts it to the closed evidence schema and removes the container without retaining the raw report. Scanner alerts contain only plugin, risk, confidence and occurrence counts. Any alert leaves the run incomplete until the finding lifecycle validates or rejects it.
 
 Inspect the latest or a specific attempt with:
 

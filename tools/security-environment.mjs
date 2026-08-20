@@ -36,7 +36,9 @@ export function securityEnvironment(runId, image, password = randomBytes(24).toS
     COURTSIDE_SECURITY_HTTPS_PORT: String(httpsPort),
     COURTSIDE_SECURITY_SHARED_PASSWORD: password,
     COURTSIDE_SECURITY_SEED_FINGERPRINT: seedFingerprint,
-    COURTSIDE_SECURITY_INSTANCE_FINGERPRINT: instanceFingerprint
+    COURTSIDE_SECURITY_INSTANCE_FINGERPRINT: instanceFingerprint,
+    COURTSIDE_SECURITY_MAX_REQUESTS: "1",
+    COURTSIDE_SECURITY_MAX_CONCURRENCY: "1"
   };
 }
 
@@ -64,6 +66,18 @@ export function securityReservationArgs(environment) {
     "--label", `org.courtside.security.seed-fingerprint=${environment.COURTSIDE_SECURITY_SEED_FINGERPRINT}`,
     "--label", `org.courtside.security.instance-fingerprint=${environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT}`,
     reservationImage, "caddy", "version"];
+}
+
+export function securityAssessmentReservationArgs(environment, attempt) {
+  if (!Number.isInteger(attempt) || attempt < 1) throw new Error("The security attempt must be a positive integer");
+  const runId = environment.COURTSIDE_SECURITY_RUN_ID;
+  return ["create", "--pull", "never", "--name", `courtside-security-assessment-${runId}`, "--network", "none",
+    "--label", `com.docker.compose.project=${securityProject(runId)}`,
+    "--label", "org.courtside.environment=SECURITY",
+    "--label", `org.courtside.security.run-id=${runId}`,
+    "--label", `org.courtside.security.seed-fingerprint=${environment.COURTSIDE_SECURITY_SEED_FINGERPRINT}`,
+    "--label", `org.courtside.security.instance-fingerprint=${environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT}`,
+    "--label", `org.courtside.security.attempt=${attempt}`, reservationImage, "caddy", "version"];
 }
 
 export function recoveryEnvironment(runId, seedFingerprint) {
@@ -109,7 +123,9 @@ export function assertSecurityIdentity({ source, labels, image }, expected, expe
 }
 
 function execute(command, args, environment = process.env) {
-  return execFileSync(command, args, { cwd: root, env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  return execFileSync(command, args, {
+    cwd: root, env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000
+  });
 }
 
 export function securityStateFile(runId) {
@@ -157,12 +173,12 @@ export async function startSecurityEnvironment(runId, image) {
       break;
     } catch (failure) {
       const output = `${failure.stderr ?? ""}`;
-      if (attempt === 3 || !/address already in use|port is already allocated/i.test(output)) throw failure;
       removeOwnedSecurityEnvironment(runId, {
         runId,
         seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
         instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
       });
+      if (attempt === 3 || !/address already in use|port is already allocated/i.test(output)) throw failure;
       environment = { ...environment, COURTSIDE_SECURITY_HTTPS_PORT: String(await availableLoopbackPort()) };
     }
   }
@@ -180,6 +196,8 @@ export function verifySecurityEnvironment(runId) {
   const container = JSON.parse(execute("docker", ["inspect", `${securityProject(runId)}-app-1`, "--format", "{{json .}}"]));
   const expectedImage = execute("docker", ["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
     "--format", "{{.Id}}"]).trim();
+  const imageArchitecture = execute("docker", ["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
+    "--format", "{{.Architecture}}"]).trim();
   assertSecurityIdentity({ source, labels: container.Config.Labels, image: container.Image }, environment, expectedImage);
   if (typeof source.commit !== "string" || !/^[a-f0-9]{7,64}$/.test(source.commit)) {
     throw new Error("The security candidate does not report a traceable source commit");
@@ -194,21 +212,85 @@ export function verifySecurityEnvironment(runId) {
     seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
     instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT,
     containerImage: container.Image,
+    imageArchitecture,
     runId
   };
 }
 
-export async function inspectPassiveSecurityRuntime(plan) {
+export async function verifySecurityEnvironmentForAssessment(runId, { stopFile, deadline }) {
+  const environment = readSecurityEnvironment(runId);
+  const control = {
+    beforeRequest() {
+      if (existsSync(stopFile)) throw new Error("Emergency stop requested");
+      if (Date.now() >= deadline.getTime()) throw new Error("The duration budget was exceeded");
+    },
+    remainingMilliseconds() {
+      return Math.max(1, deadline.getTime() - Date.now());
+    }
+  };
+  const command = async (args) => runSecurityCommand("docker", args, environment, control, stopFile);
+  control.beforeRequest();
+  const port = environment.COURTSIDE_SECURITY_HTTPS_PORT;
+  const sourceResult = await runOwnedProcess("curl", ["--fail", "--silent", "--insecure",
+    "--resolve", `localhost:${port}:127.0.0.1`, `https://localhost:${port}/api/source`], {
+    timeoutMilliseconds: control.remainingMilliseconds(), stopFile, environment
+  });
+  const source = JSON.parse(sourceResult.stdout);
+  const containerResult = await command(["inspect", `${securityProject(runId)}-app-1`, "--format", "{{json .}}"]);
+  const imageResult = await command(["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE, "--format", "{{.Id}}"]);
+  const architectureResult = await command(["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
+    "--format", "{{.Architecture}}"]);
+  const container = JSON.parse(containerResult.stdout);
+  const expectedImage = imageResult.stdout.trim();
+  const imageArchitecture = architectureResult.stdout.trim();
+  assertSecurityIdentity({ source, labels: container.Config.Labels, image: container.Image }, environment, expectedImage);
+  if (typeof source.commit !== "string" || !/^[a-f0-9]{7,64}$/.test(source.commit)) {
+    throw new Error("The security candidate does not report a traceable source commit");
+  }
+  return {
+    target: `https://localhost:${port}`, environment: source.environment,
+    imageDigest: environment.COURTSIDE_SECURITY_IMAGE, imageArchitecture,
+    applicationCommit: source.commit, applicationVersion: source.version, sourceUrl: source.sourceUrl,
+    seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT,
+    containerImage: container.Image, runId
+  };
+}
+
+async function runSecurityCommand(command, args, environment, control, stopFile, acceptedExitCodes = [0]) {
+  control.beforeRequest();
+  return runOwnedProcess(command, args, {
+    timeoutMilliseconds: control.remainingMilliseconds(), stopFile, environment, acceptedExitCodes
+  });
+}
+
+function responseHeader(output, name) {
+  const match = output.match(new RegExp(`^\\s*${name}:\\s*(.+)$`, "im"));
+  return match?.[1]?.trim();
+}
+
+export async function inspectPassiveSecurityRuntime(plan, { control, stopFile }) {
   const project = securityProject(plan.runId);
-  const inspect = (service) => JSON.parse(execute("docker", ["inspect", `${project}-${service}-1`, "--format", "{{json .}}"]));
-  const hardened = [inspect("app"), inspect("proxy")].every((container) => container.HostConfig.ReadonlyRootfs
+  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId) };
+  const inspect = async (service) => JSON.parse((await runSecurityCommand("docker",
+    ["inspect", `${project}-${service}-1`, "--format", "{{json .}}"], environment, control, stopFile)).stdout);
+  const app = await inspect("app");
+  const proxy = await inspect("proxy");
+  const hardened = [app, proxy].every((container) => container.HostConfig.ReadonlyRootfs
     && container.HostConfig.CapDrop?.includes("ALL")
     && container.HostConfig.SecurityOpt?.includes("no-new-privileges:true")
     && container.HostConfig.Memory > 0 && container.HostConfig.NanoCpus > 0);
-  const published = inspect("proxy").NetworkSettings.Ports?.["443/tcp"] ?? [];
-  const management = execute("docker", ["exec", `${project}-app-1`, "curl", "--silent", "--output", "/dev/null",
-    "--write-out", "%{http_code}", "http://127.0.0.1:8080/actuator/health"]).trim();
-  return [
+  const published = proxy.NetworkSettings.Ports?.["443/tcp"] ?? [];
+  const management = (await runSecurityCommand("docker", ["exec", `${project}-app-1`, "curl", "--silent",
+    "--output", "/dev/null", "--write-out", "%{http_code}", "http://127.0.0.1:8080/actuator/health"],
+  environment, control, stopFile)).stdout.trim();
+  const direct = (await runSecurityCommand("docker", ["exec", `${project}-app-1`, "curl", "--silent", "--dump-header", "-",
+    "--output", "/dev/null", "--header", "Host: attacker.example", "--header", "X-Forwarded-Host: attacker.example",
+    "--header", "X-Forwarded-Proto: https", "http://127.0.0.1:8080/actuator/health"],
+  environment, control, stopFile)).stdout;
+  const directObserved = responseHeader(direct, "X-Courtside-Observed-Host") === "attacker.example"
+    && responseHeader(direct, "X-Courtside-Observed-Scheme") === "https";
+  return { requestCount: 2, observations: [
     { id: "runtime-hardening", layer: "container", passed: hardened,
       observation: hardened ? "runtime-controls-present" : "runtime-controls-incomplete" },
     { id: "loopback-publication", layer: "host", passed: published.length === 1
@@ -216,48 +298,155 @@ export async function inspectPassiveSecurityRuntime(plan) {
       observation: published.length === 1 && published[0].HostIp === "127.0.0.1"
         ? "proxy-loopback-only" : "proxy-publication-mismatch" },
     { id: "management-separation", layer: "application", passed: management === "200",
-      observation: management === "200" ? "management-internal-only" : "management-internal-unavailable" }
-  ];
+      observation: management === "200" ? "management-internal-only" : "management-internal-unavailable" },
+    { id: "direct-forwarded-behavior", layer: "application", passed: directObserved,
+      observation: directObserved ? "direct-app-distinguished-from-proxy" : "direct-app-probe-failed" }
+  ] };
 }
 
-export async function runPassiveZap(plan, evidenceDirectory, stopFile) {
+export async function runPassiveZap(plan, stopFile, limits) {
   const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
-    COURTSIDE_SECURITY_EVIDENCE_DIR: evidenceDirectory };
-  const name = `courtside-security-zap-${plan.runId}`;
-  const proxy = `${securityProject(plan.runId)}-proxy-1`;
-  resetZapAccessLog(proxy, environment);
-  const args = [...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "--rm", "--no-deps",
-    "--name", name, "zap", "zap-baseline.py", "-t", "http://proxy:8080", "-m", "0", "-I", "-J", "zap.json"];
-  const result = await runOwnedProcess("docker", args, {
-    timeoutMilliseconds: plan.budgets.durationSeconds * 1000,
-    stopFile,
-    cleanup: async () => {
-      try { execute("docker", ["rm", "-f", name], environment); } catch { }
-      try { resetZapAccessLog(proxy, environment); } catch { }
-    },
-    environment,
-    acceptedExitCodes: [0, 1, 2]
-  });
-  const reportFile = join(evidenceDirectory, "zap.json");
+    COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests),
+    COURTSIDE_SECURITY_MAX_CONCURRENCY: String(plan.budgets.concurrency) };
+  const attempt = limits.attempt;
+  const name = `courtside-security-zap-${plan.runId}-${attempt}`;
+  const reservation = `courtside-security-assessment-${plan.runId}`;
+  const gateway = `${securityProject(plan.runId)}-scanner-gateway-1`;
+  const deadline = Date.now() + limits.timeoutMilliseconds;
+  const command = async (args, acceptedExitCodes = [0]) => {
+    if (existsSync(stopFile)) throw new Error("Emergency stop requested");
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error("Owned security process exceeded its duration limit");
+    return runOwnedProcess("docker", args, {
+      timeoutMilliseconds: remaining, stopFile, environment, acceptedExitCodes
+    });
+  };
+  await command(securityAssessmentReservationArgs(environment, attempt));
+  const args = [...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "--no-deps",
+    "--name", name, "zap", "sh", "-c", "/zap/zap-baseline.py -t http://scanner-gateway:8090 -m 0 -I -J zap.json; "
+      + "printf '%s' $? >/tmp/zap-exit; test -f /zap/wrk/zap.json || exit 3; touch /tmp/zap-complete; "
+      + "while [ ! -e /tmp/zap-collected ]; do sleep 0.1; done; exit \"$(cat /tmp/zap-exit)\""];
   try {
-    if (!existsSync(reportFile)) {
-      throw new Error(`ZAP produced no JSON report (exit ${result.code})`);
+    await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "up", "-d", "--wait",
+      "scanner-gateway"]);
+    let processResult;
+    let processFailure;
+    const scannerTimeout = deadline - Date.now();
+    if (scannerTimeout <= 0) throw new Error("Owned security process exceeded its duration limit");
+    const process = runOwnedProcess("docker", args, {
+      timeoutMilliseconds: scannerTimeout,
+      stopFile,
+      environment,
+      acceptedExitCodes: [0, 1, 2]
+    }).then((result) => { processResult = result; }, (failure) => { processFailure = failure; });
+    while (!processFailure && !processResult && !await containerExists(name, command)) {
+      await new Promise((resolveWait) => setTimeout(resolveWait, 50));
     }
-    const report = JSON.parse(readFileSync(reportFile, "utf8"));
-    rmSync(reportFile);
-    const requestCount = Number(execute("docker", ["exec", proxy, "sh", "-c",
-      "wc -l < /tmp/zap-access.log"], environment).trim());
+    if (processFailure) throw processFailure;
+    const scannerRuntimeResult = await command(["inspect", name, "--format", "{{json .}}"]);
+    const gatewayRuntimeResult = await command(["inspect", gateway, "--format", "{{json .}}"]);
+    const scannerRuntime = JSON.parse(scannerRuntimeResult.stdout);
+    const gatewayRuntime = JSON.parse(gatewayRuntimeResult.stdout);
+    const runtimeHardened = scannerRuntimeHardened(scannerRuntime, {
+      memory: 1024 * 1024 * 1024, nanoCpus: 2_000_000_000, pids: 256,
+      networks: [`${securityProject(plan.runId)}_scanner-client`]
+    }) && scannerRuntimeHardened(gatewayRuntime, {
+      memory: 128 * 1024 * 1024, nanoCpus: 500_000_000, pids: 64,
+      networks: [`${securityProject(plan.runId)}_scanner-client`, `${securityProject(plan.runId)}_scanner-upstream`]
+    });
+    let reportReady = await containerFileExists(name, "/tmp/zap-complete", command);
+    while (!processFailure && !processResult && !reportReady) {
+      await new Promise((resolveWait) => setTimeout(resolveWait, 50));
+      reportReady = await containerFileExists(name, "/tmp/zap-complete", command);
+    }
+    if (processFailure) throw processFailure;
+    if (!reportReady) throw new Error(`ZAP stopped before producing its report: ${processResult?.stderr ?? ""}`);
+    const rawReport = (await command(["exec", name, "cat", "/zap/wrk/zap.json"])).stdout;
+    await command(["exec", name, "touch", "/tmp/zap-collected"]);
+    await process;
+    if (processFailure) throw processFailure;
+    const report = JSON.parse(rawReport);
+    const requestCount = await zapRequestCount(gateway, command);
     if (!Number.isSafeInteger(requestCount) || requestCount < 1) {
       throw new Error("The proxy produced no valid ZAP request count");
     }
-    return { ...report, requestCount };
+    if (requestCount > limits.maxRequests) throw new Error("The scanner request budget was exceeded");
+    return { ...report, requestCount, runtimeHardened };
   } finally {
-    resetZapAccessLog(proxy, environment);
+    const cleanupFailures = [];
+    for (const resource of [name, gateway, reservation]) {
+      let removalFailure;
+      try {
+        await runOwnedProcess("docker", ["rm", "-f", resource], {
+          timeoutMilliseconds: 10_000, stopFile: "/dev/null/courtside-cleanup-stop-disabled", environment
+        });
+      } catch (failure) {
+        removalFailure = failure;
+      }
+      try {
+        if (await containerExistsForCleanup(resource, environment)) {
+          cleanupFailures.push(`${resource}: ${removalFailure?.message ?? "still present"}`);
+        }
+      } catch (failure) {
+        cleanupFailures.push(`${resource}: cleanup could not be verified: ${failure.message}`);
+      }
+    }
+    if (cleanupFailures.length) throw new Error(`Scanner cleanup was incomplete: ${cleanupFailures.join("; ")}`);
   }
 }
 
-function resetZapAccessLog(proxy, environment) {
-  execute("docker", ["exec", proxy, "sh", "-c", ": > /tmp/zap-access.log"], environment);
+function scannerRuntimeHardened(container, expected) {
+  const host = container.HostConfig;
+  const networks = Object.keys(container.NetworkSettings.Networks ?? {}).toSorted();
+  return host.ReadonlyRootfs && host.CapDrop?.includes("ALL")
+    && host.SecurityOpt?.includes("no-new-privileges:true")
+    && host.Memory === expected.memory && host.NanoCpus === expected.nanoCpus && host.PidsLimit === expected.pids
+    && Object.keys(host.PortBindings ?? {}).length === 0
+    && JSON.stringify(networks) === JSON.stringify(expected.networks.toSorted());
+}
+
+async function containerExistsForCleanup(name, environment) {
+  try {
+    await runOwnedProcess("docker", ["inspect", name], {
+      timeoutMilliseconds: 10_000, stopFile: "/dev/null/courtside-cleanup-stop-disabled", environment
+    });
+    return true;
+  } catch (failure) {
+    if (isMissingDockerResource(failure, name)) return false;
+    throw failure;
+  }
+}
+
+export function isMissingDockerResource(failure, name) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:Error:|Error response from daemon:) No such (?:object|container): ${escapedName}\\s*$`)
+    .test(failure?.message ?? "");
+}
+
+async function containerFileExists(name, path, command) {
+  try {
+    await command(["exec", name, "test", "-e", path]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function containerExists(name, command) {
+  try {
+    await command(["inspect", name]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function zapRequestCount(gateway, command) {
+  try {
+    return Number((await command(["exec", gateway, "cat", "/tmp/security-gateway-count"])).stdout.trim());
+  } catch {
+    return 0;
+  }
 }
 
 export function readSecurityProxyCa(runId) {

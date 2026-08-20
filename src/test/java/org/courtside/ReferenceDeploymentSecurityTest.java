@@ -129,7 +129,18 @@ class ReferenceDeploymentSecurityTest {
         assertThat(productionProxy.find()).isTrue();
         assertThat(securityProxy.find()).isTrue();
         assertThat(securityProxy.group("directives").lines().map(String::strip).toList())
-                .containsExactlyElementsOf(productionProxy.group("directives").lines().map(String::strip).toList());
+                .containsExactly("header_up Host localhost",
+                        "header_up -Forwarded",
+                        "header_up -X-Forwarded-For",
+                        "header_up -X-Forwarded-Host",
+                        "header_up -X-Forwarded-Port",
+                        "header_up -X-Forwarded-Prefix",
+                        "header_up -X-Forwarded-Proto",
+                        "header_up -X-Forwarded-Ssl",
+                        "header_up Forwarded \"for={remote_host};host=localhost;proto={scheme}\"",
+                        "header_up X-Forwarded-For {remote_host}",
+                        "header_up X-Forwarded-Host localhost",
+                        "header_up X-Forwarded-Proto {scheme}");
         assertThat(security)
                 .contains("X-Content-Type-Options nosniff", "X-Frame-Options DENY",
                         "Referrer-Policy strict-origin-when-cross-origin",
