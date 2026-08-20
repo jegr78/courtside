@@ -78,14 +78,16 @@ public class RuleAdminService {
         requireRuleSet(ruleSetId);
         Map<String, Integer> validated = RuleParameters.validated(type, params);
         Optional<RuleDefinition> existing = definitions.findByRuleSetIdAndRuleType(ruleSetId, type);
-        boolean changed = existing.map(definition -> !definition.getParams().equals(validated)).orElse(true);
-        RuleDefinition definition = existing
-                .map(found -> {
-                    found.changeTo(validated);
-                    return found;
-                })
-                .orElseGet(() -> definitions.save(
-                        new RuleDefinition(ruleSetId, type, validated)));
+        RuleDefinition definition;
+        boolean changed;
+        if (existing.isPresent()) {
+            definition = existing.get();
+            changed = !definition.getParams().equals(validated);
+            definition.changeTo(validated);
+        } else {
+            definition = definitions.save(new RuleDefinition(ruleSetId, type, validated));
+            changed = true;
+        }
         if (changed) {
             events.publishEvent(new RulesEvent.RuleDefinitionSet(ruleSetId, type, validated));
         }
