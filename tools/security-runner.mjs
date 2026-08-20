@@ -127,17 +127,18 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   const now = runtime.now ?? (() => new Date());
   const verifyTarget = runtime.verifyTarget ?? missingTargetVerifier;
   const runPassiveAssessment = runtime.runPassiveAssessment ?? missingPassiveAssessment;
+  const runAuthorizationAssessment = runtime.runAuthorizationAssessment ?? missingAuthorizationAssessment;
   const { attempt, paths } = reserveAttempt(root, plan.runId);
   const startedAt = now();
   const manifest = createManifest(plan, attempt, startedAt);
   writeManifest(paths.manifest, manifest);
   try {
-    const passive = assertSupportedPlan(plan);
+    const adapter = assertSupportedPlan(plan);
     assertRunning(paths, startedAt, now(), plan.budgets);
     const deadline = new Date(startedAt.getTime() + plan.budgets.durationSeconds * 1000);
     assertTargetIdentity(plan, await verifyTarget(plan, { stopFile: paths.stop, deadline }));
     manifest.toolResults.push({ id: "target-identity", version: plan.tools[0].version, outcome: "passed" });
-    if (passive) {
+    if (adapter === "passive-deployment") {
       assertRunning(paths, startedAt, now(), plan.budgets);
       const evidence = await runPassiveAssessment(plan, { evidenceDirectory: paths.evidence, stopFile: paths.stop,
         attempt, deadline });
@@ -146,6 +147,18 @@ export async function executeSecurityPlan(plan, runtime = {}) {
         outcome: evidence.outcome });
       manifest.outcome = evidence.outcome;
       manifest.reason = evidence.outcome === "passed" ? null : "Passive deployment security checks did not pass";
+      manifest.usage = { requests: evidence.requestCount, generatedDataMegabytes: 0,
+        evidenceBytes: directoryBytes(paths.evidence) };
+      assertUsage(manifest.usage, plan.budgets);
+    } else if (adapter === "authorization-matrix") {
+      assertRunning(paths, startedAt, now(), plan.budgets);
+      const evidence = await runAuthorizationAssessment(plan, { evidenceDirectory: paths.evidence,
+        stopFile: paths.stop, attempt, deadline });
+      assertRunning(paths, startedAt, now(), plan.budgets);
+      manifest.toolResults.push({ id: "authorization-matrix", version: plan.tools[1].version,
+        outcome: evidence.outcome });
+      manifest.outcome = evidence.outcome;
+      manifest.reason = evidence.outcome === "passed" ? null : "Authorization security checks did not pass";
       manifest.usage = { requests: evidence.requestCount, generatedDataMegabytes: 0,
         evidenceBytes: directoryBytes(paths.evidence) };
       assertUsage(manifest.usage, plan.budgets);
@@ -179,14 +192,20 @@ function assertSupportedPlan(plan) {
   const identity = plan.tools[0];
   const prerequisiteOnly = plan.selectedTests.length === 0 && plan.tools.length === 1
     && identity?.id === "target-identity" && identity.testIds.length === 0;
-  if (prerequisiteOnly) return false;
+  if (prerequisiteOnly) return null;
   const passive = plan.profile === "safe" && plan.environment === "SECURITY"
     && plan.selectedTests.length === 1 && plan.selectedTests[0] === "CSA-DEPLOY-001"
     && plan.tools.length === 2 && identity?.id === "target-identity" && identity.testIds.length === 0
     && plan.tools[1]?.id === "passive-deployment"
     && plan.tools[1].testIds.length === 1 && plan.tools[1].testIds[0] === "CSA-DEPLOY-001";
-  if (!passive) throw new Error("Assessment adapters require an isolated orchestrator-owned runner");
-  return true;
+  if (passive) return "passive-deployment";
+  const authorization = plan.profile === "active" && plan.environment === "SECURITY"
+    && JSON.stringify(plan.selectedTests) === JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001"])
+    && plan.tools.length === 2 && identity?.id === "target-identity" && identity.testIds.length === 0
+    && plan.tools[1]?.id === "authorization-matrix"
+    && JSON.stringify(plan.tools[1].testIds) === JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001"]);
+  if (authorization) return "authorization-matrix";
+  throw new Error("Assessment adapters require an isolated orchestrator-owned runner");
 }
 
 export function redactSecurityText(value) {
@@ -335,6 +354,19 @@ function missingPassiveAssessment() {
   throw new Error("No orchestrator-owned passive assessment is configured");
 }
 
+function missingAuthorizationAssessment() {
+  throw new Error("No orchestrator-owned authorization assessment is configured");
+}
+
 export function fingerprintSecurityTarget(identity) {
-  return `sha256:${createHash("sha256").update(JSON.stringify(identity)).digest("hex")}`;
+  return `sha256:${createHash("sha256").update(JSON.stringify(canonicalSecurityValue(identity))).digest("hex")}`;
+}
+
+function canonicalSecurityValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalSecurityValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).toSorted(([left], [right]) => left.localeCompare(right))
+      .map(([name, nested]) => [name, canonicalSecurityValue(nested)]));
+  }
+  return value;
 }

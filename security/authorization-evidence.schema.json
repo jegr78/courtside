@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://courtside.example/schemas/authorization-evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "testIds", "targetFingerprint", "results", "identityChecks", "objectChecks", "boundaryChecks", "timing", "bruteForce", "requestCount", "outcome"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "testIds": { "const": ["CSA-AUTHN-001", "CSA-AUTHZ-001"] },
+    "targetFingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "results": { "type": "array", "items": { "$ref": "#/$defs/operationResult" } },
+    "identityChecks": { "type": "array", "items": { "$ref": "#/$defs/identityCheck" } },
+    "objectChecks": { "type": "array", "items": { "$ref": "#/$defs/objectCheck" } },
+    "boundaryChecks": { "type": "array", "items": { "$ref": "#/$defs/boundaryCheck" } },
+    "timing": { "$ref": "#/$defs/timing" },
+    "bruteForce": { "$ref": "#/$defs/bruteForce" },
+    "requestCount": { "type": "integer", "minimum": 1 },
+    "outcome": { "$ref": "#/$defs/outcome" }
+  },
+  "$defs": {
+    "outcome": { "enum": ["passed", "failed", "incomplete"] },
+    "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+    "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$", "maxLength": 128 },
+    "operationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "actor", "expected", "status", "outcome", "observation"],
+      "properties": {
+        "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$", "maxLength": 100 },
+        "actor": { "enum": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "INITIAL_PASSWORD"] },
+        "expected": { "enum": ["allow", "deny-unauthenticated", "deny-forbidden"] },
+        "status": { "$ref": "#/$defs/status" },
+        "problemType": { "$ref": "#/$defs/problemType" },
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "observation": { "enum": ["typed-unauthenticated", "unauthenticated-boundary-mismatch", "typed-access-denied", "forbidden-boundary-mismatch", "authorization-gate-passed", "authorized-actor-rejected"] }
+      }
+    },
+    "objectCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "outcome", "observation"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
+        "status": { "$ref": "#/$defs/status" },
+        "problemType": { "$ref": "#/$defs/problemType" },
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "observation": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 100 }
+      }
+    },
+    "identityCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor", "sessionStatus", "adminStatus", "outcome", "observation"],
+      "properties": {
+        "actor": { "enum": ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "MANAGER_COMBINATION_1", "MANAGER_COMBINATION_2"] },
+        "sessionStatus": { "const": 200 },
+        "managedStatus": { "const": 200 },
+        "adminStatus": { "enum": [200, 403] },
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "observation": { "enum": ["independent-identity-boundary-proven", "independent-identity-boundary-mismatch"] }
+      }
+    },
+    "boundaryCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "boundary", "status", "outcome", "observation"],
+      "properties": {
+        "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$", "maxLength": 100 },
+        "boundary": { "enum": ["csrf", "cors", "host", "forwarded-host"] },
+        "status": { "$ref": "#/$defs/status" },
+        "problemType": { "$ref": "#/$defs/problemType" },
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "observation": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 100 }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "samplesPerClass", "medianKnownMilliseconds", "medianUnknownMilliseconds", "medianRelativeDifference"],
+      "properties": {
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "samplesPerClass": { "type": "integer", "minimum": 12, "maximum": 100 },
+        "medianKnownMilliseconds": { "type": "number", "exclusiveMinimum": 0 },
+        "medianUnknownMilliseconds": { "type": "number", "exclusiveMinimum": 0 },
+        "medianRelativeDifference": { "type": "number", "minimum": 0 }
+      }
+    },
+    "bruteForce": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "attemptsBeforeLimit", "status", "problemType", "observation"],
+      "properties": {
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "attemptsBeforeLimit": { "const": 20 },
+        "status": { "const": 429 },
+        "problemType": { "const": "urn:courtside:error:login-rate-limited" },
+        "observation": { "const": "encoded-and-canonical-login-share-rate-limit" }
+      }
+    }
+  }
+}

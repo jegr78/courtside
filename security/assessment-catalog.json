@@ -2092,7 +2092,7 @@
     {
       "id": "CSA-AUTHN-001",
       "title": "Authentication and brute-force boundaries",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-ATHN-03"
@@ -2130,8 +2130,7 @@
       ],
       "qualityRiskIds": [
         "ID-2"
-      ],
-      "trackingIssue": 246
+      ]
     },
     {
       "id": "CSA-AUTHN-002",
@@ -2214,7 +2213,7 @@
     {
       "id": "CSA-AUTHZ-001",
       "title": "Operation, role and object authorization matrix",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-ATHZ-02"
@@ -2258,8 +2257,7 @@
       "qualityRiskIds": [
         "ID-1",
         "MB-1"
-      ],
-      "trackingIssue": 246
+      ]
     },
     {
       "id": "CSA-BOOK-001",

@@ -81,7 +81,17 @@ Automated scanner output begins as a candidate. It affects a release only after 
 
 ## Scope boundary
 
-The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. Active and destructive adapters remain disabled. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
+The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. The active authentication and authorization suite is also enabled for `SECURITY`; all other active adapters and every destructive adapter remain disabled. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
+
+## Authentication and authorization method
+
+The active suite generates its operation inventory from OpenAPI. Every operation records an explicit result for anonymous access, all seven product roles and an initial-password session. A second independently authenticated identity for every role verifies that the result is not tied to one seeded account. Separate object checks substitute booking and series identifiers between two members, try administrative field injection and compare domain state before and after the rejected requests.
+
+Every mutation receives a missing-CSRF request, a hostile-origin preflight and an untrusted forwarded-host request. The retained record contains only operation identifiers, actors, normalized outcomes, status codes and Courtside problem URNs. [`security/authorization-evidence.schema.json`](../security/authorization-evidence.schema.json) rejects additional fields, and semantic validation rejects a missing operation, actor, object check or request boundary.
+
+Login enumeration uses twelve paired samples for an existing synthetic account and a missing account. Each pair runs in the same process and target, and a successful synthetic login clears the address counter before the next pair. The suite compares the two medians and fails when their relative difference exceeds 0.5. It retains the sample count and aggregate medians, not usernames, passwords or individual timings. A separate sequence sends twenty failed requests through the encoded login path and requires the next canonical request to return the typed `login-rate-limited` problem.
+
+Session invalidation remains part of the packaged-browser regression suite. Login rotates the session identifier; logout invalidates it; password, username, role, account-status and membership changes advance the account security epoch. The server compares that durable epoch on every authenticated request, so an already loaded session cannot restore stale authority after a concurrent response saves it.
 
 The disposable target is described in [`security-environment.md`](security-environment.md). Its run-specific marker, synthetic role matrix, network isolation and cleanup are prerequisites for every `active` or `destructive` assessment.
 
