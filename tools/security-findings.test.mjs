@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
-  combineSecuritySummaries, evaluateSecurityReports, parseCodeqlReport, parseNpmReport, parseTrivyReport
+  combineSecuritySummaries, evaluateSecurityReports, finalizeSupplyChainEvidence, parseCodeqlReport,
+  parseNpmReport, parseTrivyReport
 } from "./security-findings.mjs";
 
 const today = "2026-08-15";
@@ -85,6 +86,11 @@ test("given a precise active exception, when its finding is present, then accept
   // then
   assert.equal(result.status, "passed-with-exceptions");
   assert.deepEqual(result.acceptedFindings.map((finding) => finding.exceptionId), ["security-exception-1"]);
+  assert.equal(result.acceptedFindings[0].exceptionStatus, "active");
+  assert.deepEqual(result.acceptedFindings[0].exception, {
+    id: "security-exception-1", owner: "Security", rationale: "The affected code path is not reachable.",
+    compensatingControl: "The input is rejected at the proxy.", expiresOn: "2026-09-01", independentReview: false
+  });
 });
 
 test("given an expired exception, when evaluating reports, then policy validation fails", () => {
@@ -157,38 +163,181 @@ test("given structurally incomplete scanner reports, when parsing them, then the
 test("given npm vulnerabilities, when parsing the audit report, then they become policy findings", () => {
   // given
   const input = { auditReportVersion: 2, vulnerabilities: {
-    example: { severity: "high", range: "<2.0.0", via: [{ source: 1234, url: "https://example.test/advisories/1234" }] }
+    example: { severity: "high", range: "<2.0.0", via: [{
+      source: 1234, url: "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz", cwe: ["CWE-79"]
+    }] }
   } };
 
   // when
-  const report = parseNpmReport(input);
+  const report = parseNpmReport(input, { version: "11.6.0", subject: "commit:abcdef0" });
 
   // then
-  assert.deepEqual(report, { scanner: "npm", findings: [{ id: "1234", severity: "HIGH", target: "example@<2.0.0" }] });
+  assert.equal(report.version, "11.6.0");
+  assert.equal(report.status, "completed");
+  assert.equal(report.subject, "commit:abcdef0");
+  assert.deepEqual(report.findings[0], {
+    id: "1234", severity: "HIGH", target: "example@<2.0.0", component: "example",
+    advisorySource: "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz",
+    aliases: ["1234", "GHSA-XXXX-YYYY-ZZZZ"], cwes: ["CWE-79"], reachability: "not-assessed"
+  });
+});
+
+test("given Trivy and CodeQL reports, when importing them, then scanner provenance and security metadata survive", () => {
+  // given
+  const trivy = {
+    SchemaVersion: 2, Results: [{ Target: "Java", Vulnerabilities: [{
+      VulnerabilityID: "CVE-2026-5000", Severity: "HIGH", PkgName: "org.example:example",
+      InstalledVersion: "1.0", PrimaryURL: "https://avd.aquasec.com/nvd/cve-2026-5000",
+      References: ["https://github.com/advisories/GHSA-xxxx-yyyy-zzzz"], CweIDs: ["CWE-89"]
+    }] }]
+  };
+  const codeql = { runs: [{
+    tool: { driver: { name: "CodeQL", semanticVersion: "2.23.0", rules: [{
+      id: "java/sql-injection", helpUri: "https://codeql.github.com/codeql-query-help/java/java-sql-injection/",
+      properties: { "security-severity": "8.8", tags: ["external/cwe/cwe-089"] }
+    }] } },
+    results: [{ ruleId: "java/sql-injection", locations: [{ physicalLocation: {
+      artifactLocation: { uri: "src/main/java/Example.java" }
+    } }] }]
+  }] };
+
+  // when
+  const trivyReport = parseTrivyReport(trivy, {
+    version: "0.69.3", subject: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  });
+  const codeqlReport = parseCodeqlReport(codeql, { subject: "commit:abcdef0" });
+
+  // then
+  assert.equal(trivyReport.version, "0.69.3");
+  assert.deepEqual(trivyReport.findings[0].cwes, ["CWE-89"]);
+  assert.deepEqual(trivyReport.findings[0].aliases, ["CVE-2026-5000", "GHSA-XXXX-YYYY-ZZZZ"]);
+  assert.equal(codeqlReport.version, "2.23.0");
+  assert.deepEqual(codeqlReport.findings[0].cwes, ["CWE-89"]);
+  assert.equal(codeqlReport.findings[0].reachability, "source-reachable");
+  const result = evaluateSecurityReports({
+    reports: [trivyReport], exceptions: [], scope: "release-image-amd64",
+    subject: trivyReport.subject, assessmentPolicy: "not-applicable", today
+  });
+  assert.equal(result.evidenceSources[0].artifactDigest, trivyReport.subject);
+  assert.equal(result.blockingFindings[0].artifactDigest, trivyReport.subject);
+});
+
+test("given matching npm and Trivy observations, when evaluating them, then one finding retains both scanners", () => {
+  // given
+  const reports = [
+    { scanner: "npm", version: "11.6.0", status: "completed", subject: "commit", findings: [{
+      id: "1234", severity: "HIGH", target: "example@<2", component: "example",
+      aliases: ["1234", "GHSA-xxxx-yyyy-zzzz"], cwes: ["CWE-79"], advisorySource: "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz",
+      reachability: "not-assessed"
+    }] },
+    { scanner: "trivy", version: "0.69.3", status: "completed", subject: "commit", findings: [{
+      id: "CVE-2026-5000", severity: "CRITICAL", target: "node_modules:example@1", component: "example",
+      aliases: ["CVE-2026-5000", "GHSA-xxxx-yyyy-zzzz"], cwes: ["CWE-79"], advisorySource: "https://avd.aquasec.com/nvd/cve-2026-5000",
+      reachability: "not-assessed"
+    }] }
+  ];
+
+  // when
+  const result = evaluateSecurityReports({
+    reports, exceptions: [], scope: "release-build", subject: "commit",
+    assessmentPolicy: "not-applicable", today
+  });
+
+  // then
+  assert.equal(result.blockingFindings.length, 1);
+  assert.deepEqual(result.blockingFindings[0].observations.map((finding) => finding.scanner), ["npm", "trivy"]);
+  assert.equal(result.blockingFindings[0].severity, "CRITICAL");
+  assert.deepEqual(result.evidenceSources.map((source) => source.scanner), ["npm", "trivy"]);
+});
+
+test("given a release record and verified supply-chain outputs, when finalizing it, then every proof binds to its digest", () => {
+  // given
+  const digest = `sha256:${"a".repeat(64)}`;
+  const summary = {
+    schemaVersion: 1, scope: "release", subject: digest, status: "passed",
+    sources: [], blockingFindings: [], acceptedFindings: [], informationalFindings: []
+  };
+
+  // when
+  const result = finalizeSupplyChainEvidence(summary, {
+    image: `ghcr.io/example/courtside@${digest}`, sbomDigest: `sha256:${"b".repeat(64)}`,
+    signature: { status: "verified", subjectDigest: digest },
+    provenance: { status: "verified", subjectDigest: digest },
+    sbom: { status: "verified", subjectDigest: digest }
+  });
+
+  // then
+  assert.equal(result.supplyChain.imageDigest, digest);
+  assert.equal(result.supplyChain.signature.status, "verified");
+  assert.equal(result.supplyChain.sbomDigest, `sha256:${"b".repeat(64)}`);
+  assert.throws(() => finalizeSupplyChainEvidence(summary, {
+    image: `ghcr.io/example/courtside@${digest}`,
+    signature: { status: "verified", subjectDigest: `sha256:${"c".repeat(64)}` },
+    provenance: { status: "verified", subjectDigest: digest }, sbom: { status: "verified", subjectDigest: digest },
+    sbomDigest: `sha256:${"b".repeat(64)}`
+  }), /digest mismatch/);
 });
 
 test("given normalized build and image evidence, when combining a release record, then all findings remain visible", () => {
   // given
   const summaries = [
     { schemaVersion: 1, scope: "release-build", subject: "commit", assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
-      status: "passed", blockingFindings: [], acceptedFindings: [], informationalFindings: [{ scanner: "npm", id: "NPM-1", severity: "LOW", target: "example@1" }] },
+      status: "passed", evidenceSources: [{ scanner: "npm", subject: "commit" }], blockingFindings: [], acceptedFindings: [], informationalFindings: [{
+        scanner: "npm", id: "NPM-1", severity: "LOW", target: "example@1", component: "example",
+        aliases: ["GHSA-XXXX-YYYY-ZZZZ"]
+      }] },
     { schemaVersion: 1, scope: "release-image-amd64", subject: "digest", assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
-      status: "passed", blockingFindings: [], acceptedFindings: [], informationalFindings: [{ scanner: "trivy", id: "CVE-1", severity: "MEDIUM", target: "image" }] }
+      status: "passed", evidenceSources: [{ scanner: "trivy", subject: "digest" }], blockingFindings: [], acceptedFindings: [], informationalFindings: [{
+        scanner: "trivy", id: "CVE-1", severity: "MEDIUM", target: "image", component: "example",
+        aliases: ["CVE-1", "GHSA-XXXX-YYYY-ZZZZ"]
+      }] },
+    { schemaVersion: 1, scope: "release-image-arm64", subject: "digest", assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
+      status: "passed", evidenceSources: [{ scanner: "trivy", subject: "digest" }], blockingFindings: [], acceptedFindings: [], informationalFindings: [] }
   ];
 
   // when
-  const result = combineSecuritySummaries({ summaries, scope: "release", subject: "digest", today });
+  const result = combineSecuritySummaries({
+    summaries, scope: "release", subject: "digest", sourceSubject: "commit", today
+  });
 
   // then
   assert.equal(result.status, "passed");
-  assert.deepEqual(result.informationalFindings.map((finding) => finding.id), ["NPM-1", "CVE-1"]);
-  assert.deepEqual(result.sources.map((source) => source.scope), ["release-build", "release-image-amd64"]);
+  assert.deepEqual(result.informationalFindings.map((finding) => finding.id), ["NPM-1"]);
+  assert.deepEqual(result.informationalFindings[0].observations.map((finding) => finding.scanner), ["npm", "trivy"]);
+  assert.deepEqual(result.sources.map((source) => source.scope),
+    ["release-build", "release-image-amd64", "release-image-arm64"]);
+});
+
+test("given stale or digest-mismatched inputs, when combining release evidence, then publication fails closed", () => {
+  // given
+  const source = (scope, subject, generatedAt = "2026-08-15T00:00:00.000Z") => ({
+    schemaVersion: 1, scope, subject, assessmentPolicy: "not-applicable", generatedAt, status: "passed",
+    evidenceSources: [{ scanner: "trivy", subject }],
+    blockingFindings: [], acceptedFindings: [], informationalFindings: []
+  });
+  const summaries = [
+    source("release-build", "commit"), source("release-image-amd64", "digest"),
+    source("release-image-arm64", "digest")
+  ];
+
+  // when / then
+  assert.throws(() => combineSecuritySummaries({
+    summaries: summaries.map((summary, index) => index === 1 ? { ...summary, subject: "other-digest" } : summary),
+    scope: "release", subject: "digest", sourceSubject: "commit", today
+  }), /subject mismatch/);
+  assert.throws(() => combineSecuritySummaries({
+    summaries: summaries.map((summary, index) => index === 0
+      ? { ...summary, generatedAt: "2026-08-01T00:00:00.000Z" }
+      : summary),
+    scope: "release", subject: "digest", sourceSubject: "commit", today
+  }), /stale/);
 });
 
 test("given an incomplete dynamic assessment, when combining release evidence, then release creation fails closed", () => {
   // given
   const summary = {
     schemaVersion: 1, scope: "release-build", subject: "commit", assessmentPolicy: "required", status: "incomplete",
+    generatedAt: "2026-08-15T00:00:00.000Z",
     blockingFindings: [], acceptedFindings: [], informationalFindings: [],
     assessment: { outcome: { outcome: "incomplete", reason: "validation pending" } }
   };
@@ -203,11 +352,12 @@ test("given a passed dynamic assessment, when combining release evidence, then i
   const assessment = { outcome: { outcome: "passed", reason: null } };
   const summary = {
     schemaVersion: 1, scope: "release-build", subject: "commit", assessmentPolicy: "required", status: "passed",
+    generatedAt: "2026-08-15T00:00:00.000Z",
     blockingFindings: [], acceptedFindings: [], informationalFindings: [], assessment
   };
 
   // when
-  const result = combineSecuritySummaries({ summaries: [summary], scope: "release", subject: "digest", today });
+  const result = combineSecuritySummaries({ summaries: [summary], scope: "combined-test", subject: "digest", today });
 
   // then
   assert.deepEqual(result.assessments, [assessment]);
@@ -217,6 +367,7 @@ test("given a source summary that hides its assessment outcome, when combining i
   // given
   const summary = {
     schemaVersion: 1, scope: "release-build", subject: "commit", assessmentPolicy: "required", status: "passed",
+    generatedAt: "2026-08-15T00:00:00.000Z",
     blockingFindings: [], acceptedFindings: [], informationalFindings: [],
     assessment: { outcome: { outcome: "failed", reason: "validated finding remains unresolved" } }
   };
@@ -229,7 +380,8 @@ test("given a source summary that hides its assessment outcome, when combining i
 test("given duplicate source scopes, when combining a release record, then the gate fails closed", () => {
   // given
   const summary = { schemaVersion: 1, scope: "release-image-amd64", subject: "digest", assessmentPolicy: "not-applicable",
-    status: "passed", blockingFindings: [], acceptedFindings: [], informationalFindings: [] };
+    generatedAt: "2026-08-15T00:00:00.000Z", status: "passed",
+    blockingFindings: [], acceptedFindings: [], informationalFindings: [] };
 
   // when / then
   assert.throws(() => combineSecuritySummaries({ summaries: [summary, summary], scope: "release", subject: "digest", today }),
@@ -255,7 +407,7 @@ test("given separate runtime and source reports, when invoking the policy, then 
     // when
     const result = spawnSync(process.execPath, [join(toolsDirectory, "security-findings.mjs"),
       "--trivy", runtime, "--trivy", source, "--exceptions", exceptions,
-      "--assessment-policy", "not-applicable", "--scope", "required-build",
+      "--trivy-version", "0.70.0", "--assessment-policy", "not-applicable", "--scope", "required-build",
       "--subject", "commit", "--output", output]);
 
     // then
@@ -290,7 +442,7 @@ test("given a dynamic lifecycle, when invoking the existing policy CLI, then one
     // when
     const result = spawnSync(process.execPath, [join(toolsDirectory, "security-findings.mjs"),
       "--trivy", report, "--lifecycle", lifecycle, "--exceptions", exceptions,
-      "--assessment-policy", "required",
+      "--trivy-version", "0.70.0", "--assessment-policy", "required",
       "--scope", "required-build", "--subject", "commit", "--output", output]);
 
     // then
@@ -316,6 +468,7 @@ test("given dynamic assessment is required, when its lifecycle is absent, then t
     // when
     const result = spawnSync(process.execPath, [join(toolsDirectory, "security-findings.mjs"),
       "--trivy", report, "--exceptions", exceptions, "--assessment-policy", "required",
+      "--trivy-version", "0.70.0",
       "--scope", "required-build", "--subject", "commit", "--output", output]);
 
     // then

@@ -39,6 +39,12 @@ test("given security evidence, when workflows retain it, then only normalized re
   assert.match(release, /release-security-record/);
   assert.match(release, /--summary build\/security-input\/release-build\.json/);
   assert.match(release, /--assessment-policy not-applicable/g);
+  assert.match(release, /--trivy build\/security\/trivy-source\.json/);
+  assert.match(release, /--codeql build\/security\/codeql/);
+  assert.match(release, /--npm-version/);
+  assert.match(release, /--trivy-version[\s\S]+trivy --version/);
+  assert.match(release, /node tools\/security-supply-chain\.mjs/);
+  assert.match(release, /cosign verify[\s\S]+gh attestation verify[\s\S]+security-supply-chain\.mjs/);
 });
 
 test("given a scanner finding, when it is triaged, then exceptions are precise, expiring and single-maintainer compatible", () => {
