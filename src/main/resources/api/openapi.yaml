@@ -94,6 +94,8 @@ tags:
     description: What an uploaded roster snapshot would change, before anything is written.
   - name: admin-import-runs
     description: Executing a reviewed snapshot, and the log of what was executed.
+  - name: admin-audit
+    description: The configuration changes this instance recorded.
 
 security:
   - sessionCookie: []
@@ -1448,6 +1450,43 @@ components:
         bookings:
           type: array
           items: { $ref: "#/components/schemas/AffectedBooking" }
+
+    AuditEntry:
+      type: object
+      required: [id, occurredAt, eventType, parameters]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        eventType:
+          type: string
+          description: |
+            The client resolves its message from this: `audit.event.${eventType}`. The key is
+            derived rather than stored, so it never joins the contract that keeps stored rows
+            readable.
+        parameters:
+          type: object
+          additionalProperties: true
+          description: The recorded payload, as the message's parameters.
+        subjectId: { type: [string, "null"], format: uuid }
+        subjectName:
+          type: [string, "null"]
+          description: What the entity is called today. Absent once the entity is gone.
+        actorAccountId: { type: [string, "null"], format: uuid }
+        actorUsername:
+          type: [string, "null"]
+          description: Absent when no account acted, and when the account that acted was erased.
+
+    AuditPage:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/AuditEntry" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: Pass this entry id as `cursor` to continue after the current page.
 
   responses:
     Unauthenticated:
@@ -4104,6 +4143,44 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Impact" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/audit:
+    get:
+      tags: [admin-audit]
+      operationId: readAuditLog
+      summary: The configuration changes this instance recorded, newest first.
+      description: |
+        Every entry names the account that made the change, or no account at all when the change
+        had no signed-in person behind it. An account id that resolves to nothing is an account
+        that has been erased; the id stands in its place.
+      parameters:
+        - name: subjectId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: Restrict the page to one configuration entity.
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageLimit"
+      responses:
+        "200":
+          description: A page of the log.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditPage" }
         "400":
           $ref: "#/components/responses/Invalid"
         "401":

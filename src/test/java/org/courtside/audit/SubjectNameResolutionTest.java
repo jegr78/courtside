@@ -26,7 +26,7 @@ class SubjectNameResolutionTest {
         // given
         AuditService service = new AuditService(null, null, List.of(
                 answering(KNOWN_TO_ONE, "Court 1"),
-                answering(KNOWN_TO_ANOTHER, "Summer rules")));
+                answering(KNOWN_TO_ANOTHER, "Summer rules")), null);
 
         // when
         Map<UUID, String> names = service.namesFor(
@@ -44,7 +44,7 @@ class SubjectNameResolutionTest {
         // given
         AuditService service = new AuditService(null, null, List.of(subjectIds -> {
             throw new IllegalStateException("asked for an empty page");
-        }));
+        }), null);
 
         // when
         Map<UUID, String> names = service.namesFor(List.of());

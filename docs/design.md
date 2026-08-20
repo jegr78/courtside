@@ -22,9 +22,12 @@ seed disposable environments — a walkthrough dataset and a synthetic load-test
 refuses to start unless its environment guard confirms the database it is about to fill is the
 disposable one it names (`courtside_dev` for `demo`, `courtside_perf` for `performance`), not
 whatever the deployment happens to point at. The `notification`, `reporting` and `integration`
-modules of section 3 are designed and not built. `audit` is built: every administrative change on
-the roster is recorded in the append-only `domain_event` table, written in the transaction that made
-the change. No port interface has been introduced, because no second adapter has needed one.
+modules of section 3 are designed and not built. `audit` is built: every administrative change
+across facility, cards, config, rule sets and the roster is recorded in the append-only
+`domain_event` table, written in the transaction that made the change, and read back through
+`GET /api/admin/audit`, a cursor-paged, administrator-only endpoint that resolves the subject and
+the actor to the names they carry today. `ConfigurationSubjectNames` is the port interface that
+resolution uses — one adapter per publishing module, so `audit` depends on none of them directly.
 
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and

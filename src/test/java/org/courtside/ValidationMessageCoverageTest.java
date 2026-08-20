@@ -32,7 +32,7 @@ class ValidationMessageCoverageTest {
                     "InvalidMembershipPeriodException",
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
                     "MembershipTypeRuleSetInactiveException", "MembershipTypeInactiveException",
-                    "RosterCursorUnknownException", "LastAdministratorException",
+                    "RosterCursorUnknownException", "LastAdministratorException", "AuditCursorUnknownException",
                     "ImportSourceInvalidException", "SnapshotHeaderInvalidException",
                     "SnapshotBlockedException", "SnapshotFileNameInvalidException",
                     "ImportPreviewStaleException", "ImportPreviewSupersededException",
