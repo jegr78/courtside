@@ -5,10 +5,22 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import {
-  authorizeSecurityProfile, buildSecurityPlan, executeSecurityPlan, recoverSecurityRun,
+  authorizeSecurityProfile, buildSecurityPlan, executeSecurityPlan, fingerprintSecurityTarget, recoverSecurityRun,
   redactSecurityText, securityRunContract, securityRunPaths, validateSecurityRedirect,
   validateSecurityTarget
 } from "./security-runner.mjs";
+
+test("given the same target identity in a different property order, when fingerprinting it, then the identity is stable", () => {
+  // given
+  const first = { target: "https://localhost:9443", image: { digest: "sha256:first", architecture: "arm64" } };
+  const reordered = { image: { architecture: "arm64", digest: "sha256:first" }, target: "https://localhost:9443" };
+
+  // when / then
+  assert.equal(fingerprintSecurityTarget(first), fingerprintSecurityTarget(reordered));
+  assert.notEqual(fingerprintSecurityTarget(first), fingerprintSecurityTarget({
+    target: "https://localhost:9443", image: { digest: "sha256:second", architecture: "arm64" }
+  }));
+});
 
 const digest = `sha256:${"a".repeat(64)}`;
 const seedFingerprint = `sha256:${"b".repeat(64)}`;
@@ -246,6 +258,38 @@ test("given the bounded passive suite, when every check passes, then its evidenc
   assert.equal(manifest.usage.requests, 24);
   assert.deepEqual(manifest.toolResults.at(-1), {
     id: "passive-deployment", version: "1.0.0", outcome: "passed"
+  });
+});
+
+test("given the bounded authorization suite, when every attack check passes, then its evidence governs the outcome", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const plan = buildSecurityPlan(input({
+    profile: "active",
+    authorization: "authorize-active-run-0001",
+    tools: [
+      { id: "target-identity", version: "1.0.0", testIds: [] },
+      { id: "authorization-matrix", version: "1.0.0", testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"] }
+    ],
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001"],
+    catalogTests: [
+      { id: "CSA-AUTHN-001", status: "implemented", profile: "active" },
+      { id: "CSA-AUTHZ-001", status: "implemented", profile: "active" }
+    ]
+  }));
+
+  // when
+  const manifest = await executeSecurityPlan(plan, {
+    root,
+    verifyTarget: async () => input(),
+    runAuthorizationAssessment: async () => ({ outcome: "passed", requestCount: 900 })
+  });
+
+  // then
+  assert.equal(manifest.outcome, "passed");
+  assert.equal(manifest.usage.requests, 900);
+  assert.deepEqual(manifest.toolResults.at(-1), {
+    id: "authorization-matrix", version: "1.0.0", outcome: "passed"
   });
 });
 

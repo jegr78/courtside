@@ -5,9 +5,22 @@ import { test } from "node:test";
 import {
   assertSecurityIdentity, assertSecurityRecoveryOwnership, assertSecurityStartAvailable, availableLoopbackPort, recoveryEnvironment,
   isMissingDockerResource,
+  mergeSecurityProcessEnvironment,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
+
+test("given security state and a host toolchain, when launching owned commands, then PATH survives and run values win", () => {
+  // when
+  const environment = mergeSecurityProcessEnvironment(
+    { COURTSIDE_SECURITY_RUN_ID: "run-0001", PATH: "state-must-not-control-tools" },
+    { PATH: "/trusted/bin", LANG: "en_US.UTF-8", COURTSIDE_SECURITY_RUN_ID: "foreign" });
+
+  // then
+  assert.equal(environment.PATH, "/trusted/bin");
+  assert.equal(environment.LANG, "en_US.UTF-8");
+  assert.equal(environment.COURTSIDE_SECURITY_RUN_ID, "run-0001");
+});
 
 test("given Docker cleanup inspection failures, when classifying absence, then only an explicit missing resource is accepted", () => {
   // when / then

@@ -16,11 +16,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 class SecurityRequestObservationFilter extends OncePerRequestFilter {
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().equals("/actuator/health");
-    }
-
-    @Override
     protected void doFilterInternal(
             HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {

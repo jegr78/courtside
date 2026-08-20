@@ -28,15 +28,18 @@ class SecurityRequestObservationFilterTest {
     }
 
     @Test
-    void givenNonHealthRequest_whenObserved_thenNoDiagnosticHeadersAreReturned() throws Exception {
+    void givenApiRequest_whenObserved_thenNormalizedHostAndSchemeAreReturned() throws Exception {
         // given
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/source");
+        request.setServerName("localhost");
+        request.setScheme("https");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         // when
         filter.doFilter(request, response, new MockFilterChain());
 
         // then
-        assertThat(response.getHeaderNames()).isEmpty();
+        assertThat(response.getHeader("X-Courtside-Observed-Host")).isEqualTo("localhost");
+        assertThat(response.getHeader("X-Courtside-Observed-Scheme")).isEqualTo("https");
     }
 }

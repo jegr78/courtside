@@ -25,6 +25,7 @@ test("given an unresolved catalog entry, when validation runs, then ownership an
   // given
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
   const blocked = catalog.tests.find(({ status }) => status === "blocked");
+  const planned = catalog.tests.find(({ status }) => status === "planned");
   const missingControlRationale = structuredClone(catalog);
   const blockedControl = missingControlRationale.controlCoverage.flatMap(({ controls }) => controls)
     .find(({ status }) => status === "blocked");
@@ -36,7 +37,7 @@ test("given an unresolved catalog entry, when validation runs, then ownership an
 
   // when / then
   assert.equal(validate({ ...catalog, tests: [{ ...blocked, rationale: undefined }] }), false);
-  assert.equal(validate({ ...catalog, tests: [{ ...catalog.tests[0], trackingIssue: undefined }] }), false);
+  assert.equal(validate({ ...catalog, tests: [{ ...planned, trackingIssue: undefined }] }), false);
   assert.equal(validate(missingControlRationale), false);
   assert.equal(validate(missingControlOwner), false);
 });

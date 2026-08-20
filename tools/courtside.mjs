@@ -12,7 +12,8 @@ import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import {
-  inspectPassiveSecurityRuntime, readSecurityIdentity, readSecurityProxyCa, recoverSecurityEnvironment, runPassiveZap,
+  inspectPassiveSecurityRuntime, readSecurityEnvironment, readSecurityIdentity, readSecurityProxyCa,
+  recoverSecurityEnvironment, runPassiveZap,
   securityProject, securityStateRoot,
   startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment, verifySecurityEnvironmentForAssessment
 } from "./security-environment.mjs";
@@ -21,6 +22,7 @@ import {
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
 import { runPassiveDeploymentAssessment } from "./security-passive-deployment.mjs";
+import { runAuthorizationAssessment } from "./security-authorization.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devComposeFile = join(root, "deploy", "compose.dev.yaml");
@@ -607,6 +609,7 @@ async function execute(options) {
   if (options.command === "security-run") {
     const plan = securityAssessmentPlan(options, false);
     const ca = readSecurityProxyCa(options.runId);
+    const securityEnvironment = readSecurityEnvironment(options.runId);
     const qualification = JSON.parse(readFileSync(resolve(options.qualification), "utf8"));
     const manifest = await executeSecurityPlan(plan, {
       root: securityStateRoot,
@@ -621,6 +624,11 @@ async function execute(options) {
         qualification,
         inspectRuntime: inspectPassiveSecurityRuntime,
         runZap: (candidate, limits) => runPassiveZap(candidate, context.stopFile, limits)
+      }),
+      runAuthorizationAssessment: async (selectedPlan, context) => runAuthorizationAssessment(selectedPlan, {
+        ...context,
+        ca,
+        sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD
       })
     });
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);

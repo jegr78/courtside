@@ -149,6 +149,12 @@ export function readSecurityEnvironment(runId) {
   return JSON.parse(readFileSync(securityStateFile(runId), "utf8"));
 }
 
+export function mergeSecurityProcessEnvironment(security, host = process.env) {
+  const selected = Object.fromEntries(Object.entries(security)
+    .filter(([name]) => name.startsWith("COURTSIDE_SECURITY_")));
+  return { ...host, ...selected };
+}
+
 export function readSecurityIdentity(runId) {
   return JSON.parse(readFileSync(securityIdentityFile(runId), "utf8"));
 }
@@ -218,7 +224,7 @@ export function verifySecurityEnvironment(runId) {
 }
 
 export async function verifySecurityEnvironmentForAssessment(runId, { stopFile, deadline }) {
-  const environment = readSecurityEnvironment(runId);
+  const environment = mergeSecurityProcessEnvironment(readSecurityEnvironment(runId));
   const control = {
     beforeRequest() {
       if (existsSync(stopFile)) throw new Error("Emergency stop requested");
