@@ -83,6 +83,7 @@ jobs:
           --trivy build/security/trivy-runtime.json
           --trivy build/security/trivy-source.json
           --codeql build/security/codeql
+          --trivy-version "$(trivy --version | awk 'NR == 1 { print $2 }')"
           --exceptions security/exceptions.json
           --assessment-policy not-applicable
           --scope required-build

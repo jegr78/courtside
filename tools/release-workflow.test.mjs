@@ -37,6 +37,10 @@ test("given a qualified manifest, when publishing it, then tags and signatures a
   assert.match(publish, /docker buildx imagetools create/);
   assert.match(publish, /ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(publish, /cosign sign --yes "\$IMAGE"/);
+  assert.match(publish, /cosign verify/);
+  assert.match(publish, /gh attestation verify/);
+  assert.match(publish, /node tools\/security-supply-chain\.mjs/);
   assert.ok(publish.indexOf("cosign sign") < publish.indexOf("docker buildx imagetools create"));
+  assert.ok(publish.indexOf("security-supply-chain.mjs") < publish.indexOf("docker buildx imagetools create"));
   assert.ok(publish.indexOf("docker buildx imagetools create") < publish.indexOf("softprops/action-gh-release"));
 });

@@ -19,10 +19,14 @@ export function evaluateSecurityReports({
   }
   validateExceptions(exceptions, today);
   const scopedExceptions = exceptions.filter((exception) => exception.scope === scope);
-  const allFindings = reports.flatMap((report) => report.findings.map((finding) => ({ scanner: report.scanner, ...finding })))
+  const allFindings = reports.flatMap((report) => report.findings.map((finding) => ({
+    scanner: report.scanner,
+    ...(report.subject?.startsWith("sha256:") ? { artifactDigest: report.subject } : {}),
+    ...finding
+  })))
     .toSorted(compareFinding);
   const findings = allFindings.filter(isBlocking);
-  const informationalFindings = allFindings.filter((finding) => !isBlocking(finding));
+  const informationalFindings = deduplicateFindings(allFindings.filter((finding) => !isBlocking(finding)));
   const matchedExceptions = new Set();
   const blockingFindings = [];
   const acceptedFindings = [];
@@ -30,7 +34,17 @@ export function evaluateSecurityReports({
     const exception = scopedExceptions.find((candidate) => matches(candidate, finding));
     if (exception) {
       matchedExceptions.add(exception.id);
-      acceptedFindings.push({ ...finding, exceptionId: exception.id, expiresOn: exception.expiresOn });
+      acceptedFindings.push({
+        ...finding,
+        exceptionId: exception.id,
+        exceptionStatus: "active",
+        expiresOn: exception.expiresOn,
+        exception: {
+          id: exception.id, owner: exception.owner, rationale: exception.rationale,
+          compensatingControl: exception.compensatingControl, expiresOn: exception.expiresOn,
+          independentReview: exception.independentReview
+        }
+      });
     } else {
       blockingFindings.push(finding);
     }
@@ -45,14 +59,61 @@ export function evaluateSecurityReports({
       : acceptedFindings.length > 0 ? "passed-with-exceptions" : "passed";
   return {
     schemaVersion: 1, scope, subject, assessmentPolicy, generatedAt: `${today}T00:00:00.000Z`, status,
-    blockingFindings, acceptedFindings, informationalFindings,
+    evidenceSources: reports.map((report) => ({
+      scanner: report.scanner, version: report.version ?? "unknown", status: report.status ?? "completed",
+      subject: report.subject ?? subject,
+      ...((report.subject ?? subject).startsWith("sha256:") ? { artifactDigest: report.subject ?? subject } : {}),
+      findingCount: report.findings.length
+    })).toSorted((left, right) => left.scanner.localeCompare(right.scanner)),
+    blockingFindings: deduplicateFindings(blockingFindings),
+    acceptedFindings: deduplicateFindings(acceptedFindings), informationalFindings,
     ...(assessment ? { assessment: structuredClone(assessment) } : {})
   };
 }
 
-export function combineSecuritySummaries({ summaries, scope, subject, today = new Date().toISOString().slice(0, 10) }) {
+function severityRank(severity) {
+  return ({ UNKNOWN: 0, LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 })[severity] ?? Number(severity) / 2.5;
+}
+
+function findingAliases(finding) {
+  return new Set(finding.aliases ?? [finding.id]);
+}
+
+function canMerge(left, right) {
+  if (!left.component || left.component !== right.component) return false;
+  const aliases = findingAliases(left);
+  return [...findingAliases(right)].some((alias) => aliases.has(alias));
+}
+
+function deduplicateFindings(findings) {
+  const merged = [];
+  for (const finding of findings) {
+    const existing = merged.find((candidate) => canMerge(candidate, finding));
+    const { observations: priorObservations, ...findingRecord } = structuredClone(finding);
+    const observations = priorObservations ?? [findingRecord];
+    if (!existing) {
+      merged.push({
+        ...findingRecord, observations,
+        ...(findingRecord.exception ? { exceptions: [findingRecord.exception] } : {})
+      });
+      continue;
+    }
+    existing.observations.push(...observations);
+    existing.aliases = [...new Set([...findingAliases(existing), ...findingAliases(finding)])].toSorted();
+    existing.cwes = [...new Set([...(existing.cwes ?? []), ...(finding.cwes ?? [])])].toSorted();
+    if (findingRecord.exception) {
+      existing.exceptions = [...(existing.exceptions ?? []), findingRecord.exception];
+    }
+    if (severityRank(finding.severity) > severityRank(existing.severity)) existing.severity = finding.severity;
+  }
+  return merged;
+}
+
+export function combineSecuritySummaries({
+  summaries, scope, subject, sourceSubject, today = new Date().toISOString().slice(0, 10)
+}) {
   if (!scope || !subject || summaries.length === 0) throw new Error("Combined security evidence requires summaries, a scope and subject");
-  for (const summary of summaries) validateSummary(summary);
+  for (const summary of summaries) validateSummary(summary, today);
   if (summaries.some((summary) => summary.status === "incomplete")) {
     throw new Error("Cannot combine incomplete security evidence");
   }
@@ -61,9 +122,11 @@ export function combineSecuritySummaries({ summaries, scope, subject, today = ne
   }
   const sourceScopes = new Set(summaries.map((summary) => summary.scope));
   if (sourceScopes.size !== summaries.length) throw new Error("Combined security evidence requires unique source scopes");
-  const blockingFindings = summaries.flatMap((summary) => summary.blockingFindings).toSorted(compareFinding);
-  const acceptedFindings = summaries.flatMap((summary) => summary.acceptedFindings).toSorted(compareFinding);
-  const informationalFindings = summaries.flatMap((summary) => summary.informationalFindings).toSorted(compareFinding);
+  if (scope === "release") validateReleaseSources(summaries, subject, sourceSubject);
+  const blockingFindings = deduplicateFindings(summaries.flatMap((summary) => summary.blockingFindings).toSorted(compareFinding));
+  const acceptedFindings = deduplicateFindings(summaries.flatMap((summary) => summary.acceptedFindings).toSorted(compareFinding));
+  const informationalFindings = deduplicateFindings(
+    summaries.flatMap((summary) => summary.informationalFindings).toSorted(compareFinding));
   const assessments = summaries.filter((summary) => summary.assessment).map((summary) => structuredClone(summary.assessment));
   if (blockingFindings.length > 0) throw new Error("Cannot combine blocked security evidence");
   return {
@@ -76,6 +139,22 @@ export function combineSecuritySummaries({ summaries, scope, subject, today = ne
     blockingFindings, acceptedFindings, informationalFindings,
     ...(assessments.length > 0 ? { assessments } : {})
   };
+}
+
+function validateReleaseSources(summaries, imageDigest, sourceSubject) {
+  const requiredScopes = ["release-build", "release-image-amd64", "release-image-arm64"];
+  if (!sourceSubject || summaries.length !== requiredScopes.length
+    || requiredScopes.some((scope) => !summaries.some((summary) => summary.scope === scope))) {
+    throw new Error("Release security evidence is incomplete");
+  }
+  for (const summary of summaries) {
+    const expectedSubject = summary.scope === "release-build" ? sourceSubject : imageDigest;
+    if (summary.subject !== expectedSubject) throw new Error(`Security evidence subject mismatch for ${summary.scope}`);
+    if (!Array.isArray(summary.evidenceSources) || summary.evidenceSources.length === 0
+      || summary.evidenceSources.some((source) => source.subject !== expectedSubject)) {
+      throw new Error(`Security evidence sources are incomplete for ${summary.scope}`);
+    }
+  }
 }
 
 function validateExceptions(exceptions, today) {
@@ -97,7 +176,7 @@ function validateExceptions(exceptions, today) {
   }
 }
 
-function validateSummary(summary) {
+function validateSummary(summary, today) {
   if (summary?.schemaVersion !== 1 || typeof summary.scope !== "string" || typeof summary.subject !== "string") {
     throw new Error("Unsupported security summary");
   }
@@ -106,6 +185,12 @@ function validateSummary(summary) {
   }
   if (!["passed", "passed-with-exceptions", "blocked", "incomplete"].includes(summary.status)) {
     throw new Error("Security summary has an invalid status");
+  }
+  const generatedAt = new Date(summary.generatedAt);
+  const assessmentDate = new Date(`${today}T23:59:59.999Z`);
+  if (Number.isNaN(generatedAt.getTime()) || generatedAt > assessmentDate
+    || assessmentDate.getTime() - generatedAt.getTime() > 48 * 60 * 60 * 1000) {
+    throw new Error("Security summary is stale or has an invalid generation time");
   }
   if (!["required", "not-applicable"].includes(summary.assessmentPolicy)
     || (summary.assessmentPolicy === "required") !== Boolean(summary.assessment)) {
@@ -139,21 +224,44 @@ function compareFinding(left, right) {
   return `${left.scanner}\0${left.id}\0${left.target}`.localeCompare(`${right.scanner}\0${right.id}\0${right.target}`);
 }
 
-export function parseTrivyReport(input) {
+function advisoryAliases(finding) {
+  const aliases = [finding.VulnerabilityID];
+  for (const reference of finding.References ?? []) {
+    const match = reference.match(/(?:GHSA-[a-z0-9-]+|CVE-[0-9]{4}-[0-9]+)/i);
+    if (match) aliases.push(match[0].toUpperCase());
+  }
+  return [...new Set(aliases)].toSorted();
+}
+
+export function parseTrivyReport(input, metadata = {}) {
   if (!Array.isArray(input?.Results)) throw new Error("Trivy report requires a Results array");
   const findings = input.Results.flatMap((result) => [
     ...(result.Vulnerabilities ?? []).map((finding) => ({
       id: finding.VulnerabilityID,
       severity: finding.Severity,
-      target: `${result.Target}:${finding.PkgName}@${finding.InstalledVersion}`
+      target: `${result.Target}:${finding.PkgName}@${finding.InstalledVersion}`,
+      component: finding.PkgName,
+      advisorySource: finding.PrimaryURL ?? null,
+      aliases: advisoryAliases(finding),
+      cwes: [...new Set(finding.CweIDs ?? [])].toSorted(),
+      reachability: "not-assessed"
     })),
-    ...(result.Misconfigurations ?? []).map((finding) => ({ id: finding.ID, severity: finding.Severity, target: result.Target })),
-    ...(result.Secrets ?? []).map((finding) => ({ id: finding.RuleID, severity: finding.Severity, target: result.Target }))
+    ...(result.Misconfigurations ?? []).map((finding) => ({
+      id: finding.ID, severity: finding.Severity, target: result.Target, component: result.Target,
+      advisorySource: finding.PrimaryURL ?? null, aliases: [finding.ID], cwes: [], reachability: "configuration-reachable"
+    })),
+    ...(result.Secrets ?? []).map((finding) => ({
+      id: finding.RuleID, severity: finding.Severity, target: result.Target, component: result.Target,
+      advisorySource: null, aliases: [finding.RuleID], cwes: [], reachability: "source-reachable"
+    }))
   ]);
-  return { scanner: "trivy", findings };
+  return {
+    scanner: "trivy", version: metadata.version ?? "unknown", status: "completed",
+    subject: metadata.subject ?? "unknown", findings
+  };
 }
 
-export function parseNpmReport(input) {
+export function parseNpmReport(input, metadata = {}) {
   if (typeof input?.auditReportVersion !== "number") throw new Error("npm audit report requires auditReportVersion");
   if (!input.vulnerabilities || Array.isArray(input.vulnerabilities) || typeof input.vulnerabilities !== "object") {
     throw new Error("npm audit report requires vulnerabilities");
@@ -163,53 +271,104 @@ export function parseNpmReport(input) {
     return {
       id: String(advisory?.source ?? advisory?.url ?? `npm:${name}`),
       severity: String(finding.severity).toUpperCase(),
-      target: `${name}@${finding.range}`
+      target: `${name}@${finding.range}`,
+      component: name,
+      advisorySource: advisory?.url ?? null,
+      aliases: [...new Set([
+        String(advisory?.source ?? `npm:${name}`),
+        ...(String(advisory?.url ?? "").match(/(?:GHSA-[a-z0-9-]+|CVE-[0-9]{4}-[0-9]+)/ig) ?? [])
+      ].map((alias) => alias.toUpperCase()))].toSorted(),
+      cwes: [...new Set(advisory?.cwe ?? [])].toSorted(),
+      reachability: "not-assessed"
     };
   });
-  return { scanner: "npm", findings };
+  return {
+    scanner: "npm", version: metadata.version ?? "unknown", status: "completed",
+    subject: metadata.subject ?? "unknown", findings
+  };
 }
 
-function trivyReport(path) {
-  return parseTrivyReport(JSON.parse(readFileSync(path, "utf8")));
+function trivyReport(path, metadata) {
+  return parseTrivyReport(JSON.parse(readFileSync(path, "utf8")), metadata);
 }
 
-function npmReport(path) {
-  return parseNpmReport(JSON.parse(readFileSync(path, "utf8")));
+function npmReport(path, metadata) {
+  return parseNpmReport(JSON.parse(readFileSync(path, "utf8")), metadata);
 }
 
-function codeqlReports(directory) {
+function codeqlReports(directory, metadata) {
   const paths = readdirSync(directory, { recursive: true }).filter((path) => path.endsWith(".sarif"));
   if (paths.length === 0) throw new Error("CodeQL produced no SARIF report");
   return paths.map((path) => {
     const input = JSON.parse(readFileSync(join(directory, path), "utf8"));
-    return parseCodeqlReport(input);
+    return parseCodeqlReport(input, metadata);
   });
 }
 
-export function parseCodeqlReport(input) {
+function normalizedCwes(tags) {
+  return [...new Set((tags ?? []).flatMap((tag) => {
+    const match = tag.match(/^external\/cwe\/cwe-0*([1-9][0-9]*)$/i);
+    return match ? [`CWE-${match[1]}`] : [];
+  }))].toSorted();
+}
+
+export function parseCodeqlReport(input, metadata = {}) {
   if (!Array.isArray(input?.runs)) throw new Error("CodeQL SARIF report requires a runs array");
   const findings = input.runs.flatMap((run) => {
       const rules = new Map((run.tool?.driver?.rules ?? []).map((rule) => [rule.id, rule]));
       return (run.results ?? []).map((result) => ({
         id: result.ruleId,
         severity: String(rules.get(result.ruleId)?.properties?.["security-severity"] ?? "0"),
-        target: result.locations?.[0]?.physicalLocation?.artifactLocation?.uri ?? "unknown"
+        target: result.locations?.[0]?.physicalLocation?.artifactLocation?.uri ?? "unknown",
+        component: result.locations?.[0]?.physicalLocation?.artifactLocation?.uri ?? "unknown",
+        advisorySource: rules.get(result.ruleId)?.helpUri ?? null,
+        aliases: [result.ruleId], cwes: normalizedCwes(rules.get(result.ruleId)?.properties?.tags),
+        reachability: "source-reachable"
       }));
   });
-  return { scanner: "codeql", findings };
+  const versions = input.runs.map((run) => run.tool?.driver?.semanticVersion ?? run.tool?.driver?.version).filter(Boolean);
+  return {
+    scanner: "codeql", version: metadata.version ?? versions[0] ?? "unknown", status: "completed",
+    subject: metadata.subject ?? "unknown", findings
+  };
+}
+
+export function finalizeSupplyChainEvidence(summary, evidence) {
+  const digestPattern = /^sha256:[a-f0-9]{64}$/;
+  const imageDigest = evidence?.image?.split("@").at(-1);
+  if (!digestPattern.test(imageDigest ?? "") || summary.subject !== imageDigest
+    || !digestPattern.test(evidence.sbomDigest ?? "")) {
+    throw new Error("Supply-chain digest mismatch");
+  }
+  for (const proof of [evidence.signature, evidence.provenance, evidence.sbom]) {
+    if (proof?.status !== "verified" || proof.subjectDigest !== imageDigest) {
+      throw new Error("Supply-chain digest mismatch");
+    }
+  }
+  return {
+    ...structuredClone(summary),
+    supplyChain: {
+      image: evidence.image, imageDigest, sbomDigest: evidence.sbomDigest,
+      signature: structuredClone(evidence.signature), provenance: structuredClone(evidence.provenance),
+      sbom: structuredClone(evidence.sbom)
+    }
+  };
 }
 
 function parseArguments(args) {
   const values = {
     trivy: [], npm: [], codeql: [], summary: [], lifecycle: undefined,
-    assessmentPolicy: undefined, exceptions: undefined, output: undefined, scope: undefined, subject: undefined
+    trivyVersion: undefined, npmVersion: undefined, assessmentPolicy: undefined,
+    sourceSubject: undefined, exceptions: undefined, output: undefined, scope: undefined, subject: undefined
   };
   for (let index = 0; index < args.length; index += 2) {
     const option = args[index];
     const value = args[index + 1];
     if (!value) throw new Error(`Missing value for ${option}`);
     if (option === "--trivy") values.trivy.push(value);
+    else if (option === "--trivy-version") values.trivyVersion = value;
     else if (option === "--npm") values.npm.push(value);
+    else if (option === "--npm-version") values.npmVersion = value;
     else if (option === "--codeql") values.codeql.push(value);
     else if (option === "--summary") values.summary.push(value);
     else if (option === "--lifecycle") values.lifecycle = value;
@@ -218,6 +377,7 @@ function parseArguments(args) {
     else if (option === "--output") values.output = value;
     else if (option === "--scope") values.scope = value;
     else if (option === "--subject") values.subject = value;
+    else if (option === "--source-subject") values.sourceSubject = value;
     else throw new Error(`Unknown option ${option}`);
   }
   if (!values.output) throw new Error("Missing --output");
@@ -228,6 +388,8 @@ function parseArguments(args) {
   if (values.summary.length > 0 && values.lifecycle) throw new Error("Lifecycle records cannot be combined directly with summaries");
   if (values.summary.length === 0 && reportCount === 0) throw new Error("At least one security report is required");
   if (reportCount > 0 && !values.exceptions) throw new Error("Missing --exceptions");
+  if (values.trivy.length > 0 && !values.trivyVersion) throw new Error("Missing --trivy-version");
+  if (values.npm.length > 0 && !values.npmVersion) throw new Error("Missing --npm-version");
   if (reportCount > 0 && !values.assessmentPolicy) throw new Error("Missing --assessment-policy");
   if (values.assessmentPolicy === "required" && !values.lifecycle) throw new Error("Required lifecycle record is missing");
   if (values.assessmentPolicy === "not-applicable" && values.lifecycle) {
@@ -241,16 +403,21 @@ function main(args) {
   let result;
   if (values.summary.length > 0) {
     const summaries = values.summary.map((path) => JSON.parse(readFileSync(path, "utf8")));
-    result = combineSecuritySummaries({ summaries, scope: values.scope, subject: values.subject });
+    result = combineSecuritySummaries({
+      summaries, scope: values.scope, subject: values.subject, sourceSubject: values.sourceSubject
+    });
   } else {
     const policy = JSON.parse(readFileSync(values.exceptions, "utf8"));
     if (policy.schemaVersion !== 1 || !Array.isArray(policy.exceptions)) throw new Error("Unsupported security exception policy");
     validateRiskAcceptances(policy.riskAcceptances ?? []);
     const reports = [
-      ...values.trivy.map(trivyReport),
-      ...values.npm.map(npmReport),
-      ...values.codeql.flatMap(codeqlReports)
+      ...values.trivy.map((path) => trivyReport(path, { version: values.trivyVersion, subject: values.subject })),
+      ...values.npm.map((path) => npmReport(path, { version: values.npmVersion, subject: values.subject })),
+      ...values.codeql.flatMap((path) => codeqlReports(path, { subject: values.subject }))
     ];
+    if (reports.some((report) => report.version === "unknown" || report.status !== "completed")) {
+      throw new Error("Security scanner identity or completion status is missing");
+    }
     const assessment = values.lifecycle
       ? summarizeFindingLifecycle(JSON.parse(readFileSync(values.lifecycle, "utf8")), policy)
       : undefined;

@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+      security-events: write
     outputs:
       upgrade-origins: ${{ steps.upgrade-origins.outputs.origins }}
     steps:
@@ -32,6 +33,12 @@ jobs:
 
       - name: Take the version from the tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - uses: github/codeql-action/init@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef # v4
+        with:
+          languages: java-kotlin,javascript-typescript
+          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
 
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
@@ -54,7 +61,7 @@ jobs:
 
       - name: Capture npm audit evidence
         run: |
-          mkdir -p build/security
+          mkdir -p build/security/codeql
           frontend/node/node frontend/node/node_modules/npm/bin/npm-cli.js --prefix frontend audit --json \
             > build/security/npm.json || true
 
@@ -68,11 +75,32 @@ jobs:
           severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
           exit-code: '0'
 
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          format: json
+          output: build/security/trivy-source.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+          skip-dirs: frontend/node_modules,frontend/node,target,build/layers
+
+      - uses: github/codeql-action/analyze@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef # v4
+        with:
+          output: build/security/codeql
+          upload: never
+          upload-database: false
+
       - name: Enforce release-build security policy
         run: >
           node tools/security-findings.mjs
           --npm build/security/npm.json
           --trivy build/security/trivy-runtime.json
+          --trivy build/security/trivy-source.json
+          --codeql build/security/codeql
+          --npm-version "$(frontend/node/node frontend/node/node_modules/npm/bin/npm-cli.js --version)"
+          --trivy-version "$(trivy --version | awk 'NR == 1 { print $2 }')"
           --exceptions security/exceptions.json
           --assessment-policy not-applicable
           --scope release-build
@@ -81,7 +109,7 @@ jobs:
 
       - name: Remove raw release-build security reports
         if: always()
-        run: rm -f build/security/npm.json build/security/trivy-runtime.json
+        run: rm -rf build/security/npm.json build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql
 
       - name: Collect the upgrade notes
         run: |
@@ -212,6 +240,7 @@ jobs:
         run: >
           node tools/security-findings.mjs
           --trivy build/uat-smoke/trivy-${{ matrix.architecture }}.json
+          --trivy-version "$(trivy --version | awk 'NR == 1 { print $2 }')"
           --exceptions security/exceptions.json
           --assessment-policy not-applicable
           --scope release-image-${{ matrix.architecture }}
@@ -264,11 +293,12 @@ jobs:
           --summary build/security-input/security-summary-arm64.json
           --scope release
           --subject ${{ needs.image.outputs.digest }}
+          --source-subject ${{ github.sha }}
           --output build/security-record.json
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: release-security-record
+          name: release-security-record-input
           path: build/security-record.json
           retention-days: 14
           if-no-files-found: error
@@ -367,7 +397,7 @@ jobs:
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: release-security-record
+          name: release-security-record-input
           path: build
 
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
@@ -410,6 +440,37 @@ jobs:
         env:
           IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
         run: cosign sign --yes "$IMAGE"
+
+      - name: Verify release supply-chain evidence
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+        run: |
+          cosign verify \
+            --certificate-identity "https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --output json "$IMAGE" > build/signature-verification.json
+          gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" \
+            --predicate-type https://slsa.dev/provenance/v1 --format json \
+            > build/provenance-verification.json
+          gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" \
+            --predicate-type https://spdx.dev/Document/v2.3 --format json \
+            > build/sbom-verification.json
+          node tools/security-supply-chain.mjs \
+            --record build/security-record.json --image "$IMAGE" --sbom build/courtside.spdx.json \
+            --signature-proof build/signature-verification.json \
+            --provenance-proof build/provenance-verification.json \
+            --sbom-proof build/sbom-verification.json --output build/security-record.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-security-record
+          path: build/security-record.json
+          retention-days: 14
+          if-no-files-found: error
 
       - name: Publish release tags without rebuilding
         env:
