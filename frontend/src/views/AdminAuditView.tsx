@@ -12,6 +12,8 @@ const enabledFlagByEventType: Record<string, string> = {
   "roster.account.availabilityChanged": "enabled"
 };
 
+const isoWeekdayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+
 function paramsLabel(params: Record<string, unknown>, t: TFunction): string {
   return Object.entries(params)
     .map(([name, value]) => `${t(`admin.rules.parameter.${name}`)}: ${String(value)}`)
@@ -20,7 +22,7 @@ function paramsLabel(params: Record<string, unknown>, t: TFunction): string {
 
 function weekdayLabel(entry: AuditEntry, t: TFunction): string | undefined {
   const dayOfWeek = entry.parameters.dayOfWeek;
-  return typeof dayOfWeek === "number" ? t(`audit.day.${dayOfWeek}`) : undefined;
+  return typeof dayOfWeek === "number" ? t(`weekday.${isoWeekdayNames[dayOfWeek - 1]}`) : undefined;
 }
 
 function auditMessage(entry: AuditEntry, t: TFunction): string {

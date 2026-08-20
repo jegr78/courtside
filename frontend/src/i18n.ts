@@ -393,14 +393,7 @@ const resources = {
     "audit.event.roster.membershipType.changed": "Mitgliedsart geändert",
     "audit.event.roster.membershipType.availabilityChanged": "Verfügbarkeit der Mitgliedsart geändert",
     "audit.event.roster.membershipType.availabilityChanged_active": "Mitgliedsart aktiviert",
-    "audit.event.roster.membershipType.availabilityChanged_inactive": "Mitgliedsart deaktiviert",
-    "audit.day.1": "Montag",
-    "audit.day.2": "Dienstag",
-    "audit.day.3": "Mittwoch",
-    "audit.day.4": "Donnerstag",
-    "audit.day.5": "Freitag",
-    "audit.day.6": "Samstag",
-    "audit.day.7": "Sonntag"
+    "audit.event.roster.membershipType.availabilityChanged_inactive": "Mitgliedsart deaktiviert"
   } },
   en: { translation: {
     "app.name": "Courtside",
@@ -791,14 +784,7 @@ const resources = {
     "audit.event.roster.membershipType.changed": "Membership type changed",
     "audit.event.roster.membershipType.availabilityChanged": "Membership type availability changed",
     "audit.event.roster.membershipType.availabilityChanged_active": "Membership type activated",
-    "audit.event.roster.membershipType.availabilityChanged_inactive": "Membership type deactivated",
-    "audit.day.1": "Monday",
-    "audit.day.2": "Tuesday",
-    "audit.day.3": "Wednesday",
-    "audit.day.4": "Thursday",
-    "audit.day.5": "Friday",
-    "audit.day.6": "Saturday",
-    "audit.day.7": "Sunday"
+    "audit.event.roster.membershipType.availabilityChanged_inactive": "Membership type deactivated"
   } }
 };
 
