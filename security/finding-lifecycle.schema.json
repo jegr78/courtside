@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:finding-lifecycle:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "run", "candidates", "findings", "riskAcceptances"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "run": { "$ref": "#/$defs/run" },
+    "candidates": { "type": "array", "items": { "$ref": "#/$defs/candidate" } },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "riskAcceptances": { "type": "array", "items": { "$ref": "#/$defs/riskAcceptance" } }
+  },
+  "$defs": {
+    "timestamp": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T" },
+    "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "attempt", "subject", "profile", "outcome", "catalogVersion", "recordedAt"],
+      "properties": {
+        "runId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,47}$" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "subject": { "$ref": "#/$defs/nonEmpty" },
+        "profile": { "enum": ["safe", "active", "destructive"] },
+        "outcome": { "enum": ["passed", "incomplete", "failed"] },
+        "catalogVersion": { "type": "string", "pattern": "^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$" },
+        "recordedAt": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "version", "runId", "attempt", "targetFingerprint", "observedAt"],
+      "properties": {
+        "tool": { "$ref": "#/$defs/nonEmpty" },
+        "version": { "$ref": "#/$defs/nonEmpty" },
+        "runId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,47}$" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "targetFingerprint": { "$ref": "#/$defs/digest" },
+        "observedAt": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "classification", "digest", "expiresOn"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,63}$" },
+        "status": { "enum": ["retained", "withheld", "discarded"] },
+        "classification": { "enum": ["public", "protected"] },
+        "digest": { "$ref": "#/$defs/digest" },
+        "expiresOn": { "$ref": "#/$defs/date" },
+        "location": { "$ref": "#/$defs/nonEmpty" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fingerprint", "state", "scanner", "ruleId", "normalizedSurface", "parameter", "attackClass", "provenance", "evidence", "regression"],
+      "properties": {
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "state": { "enum": ["candidate", "false-positive", "duplicate"] },
+        "scanner": { "$ref": "#/$defs/nonEmpty" },
+        "ruleId": { "$ref": "#/$defs/nonEmpty" },
+        "normalizedSurface": { "$ref": "#/$defs/nonEmpty" },
+        "parameter": { "$ref": "#/$defs/nonEmpty" },
+        "attackClass": { "$ref": "#/$defs/nonEmpty" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidence" } },
+        "regression": { "type": "boolean" },
+        "disposition": { "$ref": "#/$defs/disposition" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "enum": ["false-positive", "duplicate"] } } },
+          "then": {
+            "properties": { "disposition": { "$ref": "#/$defs/disposition" } },
+            "required": ["disposition"]
+          },
+          "else": { "properties": { "disposition": false } }
+        }
+      ]
+    },
+    "mappings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cwe", "wstg", "asvs", "apiTop10"],
+      "properties": {
+        "cwe": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^CWE-[1-9][0-9]*$" } },
+        "wstg": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmpty" } },
+        "asvs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmpty" } },
+        "apiTop10": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmpty" } }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "reference", "reproducedAt", "actor"],
+      "properties": {
+        "method": { "enum": ["minimized-request", "regression-test", "manual-reproduction"] },
+        "reference": { "$ref": "#/$defs/nonEmpty" },
+        "reproducedAt": { "$ref": "#/$defs/timestamp" },
+        "actor": { "$ref": "#/$defs/nonEmpty" }
+      }
+    },
+    "retest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "testedAt", "actor", "reference"],
+      "properties": {
+        "outcome": { "enum": ["passed", "failed"] },
+        "testedAt": { "$ref": "#/$defs/timestamp" },
+        "actor": { "$ref": "#/$defs/nonEmpty" },
+        "reference": { "$ref": "#/$defs/nonEmpty" }
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rationale", "actor", "classifiedAt", "reference"],
+      "properties": {
+        "rationale": { "$ref": "#/$defs/nonEmpty" },
+        "actor": { "$ref": "#/$defs/nonEmpty" },
+        "classifiedAt": { "$ref": "#/$defs/timestamp" },
+        "reference": { "$ref": "#/$defs/nonEmpty" }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "actor", "changedAt", "reference"],
+      "properties": {
+        "state": { "enum": ["validated", "remediation-in-progress", "fixed", "retest-passed", "accepted-risk"] },
+        "actor": { "$ref": "#/$defs/nonEmpty" },
+        "changedAt": { "$ref": "#/$defs/timestamp" },
+        "reference": { "$ref": "#/$defs/nonEmpty" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fingerprint", "state", "scanner", "ruleId", "normalizedSurface", "parameter", "attackClass", "provenance", "evidence", "regression", "priority", "cvssVector", "mappings", "context", "validation", "retests", "transitions"],
+      "properties": {
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "state": { "enum": ["validated", "remediation-in-progress", "fixed", "retest-passed", "accepted-risk"] },
+        "scanner": { "$ref": "#/$defs/nonEmpty" },
+        "ruleId": { "$ref": "#/$defs/nonEmpty" },
+        "normalizedSurface": { "$ref": "#/$defs/nonEmpty" },
+        "parameter": { "$ref": "#/$defs/nonEmpty" },
+        "attackClass": { "$ref": "#/$defs/nonEmpty" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidence" } },
+        "regression": { "type": "boolean" },
+        "priority": { "enum": ["P0", "P1", "P2", "P3"] },
+        "cvssVector": { "type": "string", "pattern": "^CVSS:4\\.0/" },
+        "mappings": { "$ref": "#/$defs/mappings" },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["impact", "reachability"],
+          "properties": {
+            "impact": { "$ref": "#/$defs/nonEmpty" },
+            "reachability": { "$ref": "#/$defs/nonEmpty" }
+          }
+        },
+        "validation": { "$ref": "#/$defs/validation" },
+        "retests": { "type": "array", "items": { "$ref": "#/$defs/retest" } },
+        "transitions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/transition" } }
+      }
+    },
+    "riskAcceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fingerprint", "owner", "rationale", "compensatingControl", "expiresOn", "acceptedAt", "independentReview"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,63}$" },
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "owner": { "$ref": "#/$defs/nonEmpty" },
+        "rationale": { "$ref": "#/$defs/nonEmpty" },
+        "compensatingControl": { "$ref": "#/$defs/nonEmpty" },
+        "expiresOn": { "$ref": "#/$defs/date" },
+        "acceptedAt": { "$ref": "#/$defs/timestamp" },
+        "independentReview": { "type": "boolean" }
+      }
+    }
+  }
+}

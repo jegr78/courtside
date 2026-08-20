@@ -436,6 +436,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       };
       const container = await new GenericContainer(PINNED_BROWSER_IMAGE)
         .withNetwork(clubNetwork!)
+        .withCopyDirectoriesToContainer([
+          { source: resolve("node_modules/playwright"), target: "/opt/courtside/node_modules/playwright" },
+          { source: resolve("node_modules/playwright-core"), target: "/opt/courtside/node_modules/playwright-core" }
+        ])
         .withCopyContentToContainer([
           { content: rootCertificate, target: "/usr/local/share/ca-certificates/courtside-club.crt" },
           { content: JSON.stringify(options), target: "/tmp/launch-options.json" }
@@ -443,7 +447,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         // Baking the arguments into the server keeps the mode out of the picture under which a
         // connecting client may set launch options, an executable path among them.
         .withCommand(["bash", "-c", "update-ca-certificates >/dev/null"
-          + ` && npx playwright launch-server --browser ${browserName} --config /tmp/launch-options.json`])
+          + ` && node /opt/courtside/node_modules/playwright/cli.js launch-server --browser ${browserName}`
+          + " --config /tmp/launch-options.json"])
         .withExposedPorts(3000)
         .withWaitStrategy(Wait.forLogMessage(/ws:\/\//))
         .start();

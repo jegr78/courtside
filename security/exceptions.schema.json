@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:exceptions:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "exceptions", "riskAcceptances"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "exceptions": { "type": "array", "items": { "$ref": "#/$defs/scannerException" } },
+    "riskAcceptances": { "type": "array", "items": { "$ref": "#/$defs/riskAcceptance" } }
+  },
+  "$defs": {
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "timestamp": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T" },
+    "fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "scannerException": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "scope", "scanner", "findingId", "target", "rationale", "owner", "compensatingControl", "expiresOn", "independentReview"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmpty" },
+        "scope": { "$ref": "#/$defs/nonEmpty" },
+        "scanner": { "$ref": "#/$defs/nonEmpty" },
+        "findingId": { "$ref": "#/$defs/nonEmpty" },
+        "target": { "$ref": "#/$defs/nonEmpty" },
+        "rationale": { "$ref": "#/$defs/nonEmpty" },
+        "owner": { "$ref": "#/$defs/nonEmpty" },
+        "compensatingControl": { "$ref": "#/$defs/nonEmpty" },
+        "expiresOn": { "$ref": "#/$defs/date" },
+        "independentReview": { "type": "boolean" }
+      }
+    },
+    "riskAcceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fingerprint", "owner", "rationale", "compensatingControl", "expiresOn", "acceptedAt", "independentReview"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmpty" },
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "owner": { "$ref": "#/$defs/nonEmpty" },
+        "rationale": { "$ref": "#/$defs/nonEmpty" },
+        "compensatingControl": { "$ref": "#/$defs/nonEmpty" },
+        "expiresOn": { "$ref": "#/$defs/date" },
+        "acceptedAt": { "$ref": "#/$defs/timestamp" },
+        "independentReview": { "type": "boolean" }
+      }
+    }
+  }
+}

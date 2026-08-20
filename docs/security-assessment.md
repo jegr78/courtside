@@ -55,6 +55,10 @@ An implemented entry can still be incomplete in a particular run. Catalog state 
 
 Evidence must identify the catalog and tool versions, application commit and immutable image digest where applicable, target fingerprint, selected entries, profile, timestamps and first-attempt result. This foundation retains only its manifest and target-identity result; assessment adapters remain disabled until an isolated runner and closed evidence schemas are available. Passwords, cookies, CSRF tokens, personal fields and sensitive headers do not enter retained or public artifacts.
 
+The [security finding lifecycle](security-findings.md) defines candidate validation, stable
+fingerprints, protected evidence references, risk acceptance, remediation and retests. Scanner
+adapters must produce that closed record before their results can affect an assessment outcome.
+
 `passed` means every selected entry executed, all required evidence exists and no validated finding remains outside an unexpired acceptance. An untriaged scanner candidate prevents a final pass until it is validated or rejected reproducibly.
 
 `incomplete` means execution cannot support a security conclusion. Tool failure, missing evidence, stale or mismatched target identity, lost authentication, an unexecuted selected control and an expired exception all produce this outcome. A retry is a separate run and cannot rewrite the first attempt.

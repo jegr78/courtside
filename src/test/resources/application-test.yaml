@@ -10,6 +10,12 @@ server:
       cookie:
         secure: false
 
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 0
+
 logging:
   level:
     org.hibernate.orm.jdbc.error: ERROR

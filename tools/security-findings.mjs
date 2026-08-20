@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { validateRiskAcceptances } from "./security-triage.mjs";
 
 const requiredExceptionFields = [
   "id", "scope", "scanner", "findingId", "target", "rationale", "owner", "compensatingControl", "expiresOn"
@@ -197,6 +198,7 @@ function main(args) {
   } else {
     const policy = JSON.parse(readFileSync(values.exceptions, "utf8"));
     if (policy.schemaVersion !== 1 || !Array.isArray(policy.exceptions)) throw new Error("Unsupported security exception policy");
+    validateRiskAcceptances(policy.riskAcceptances ?? []);
     const reports = [
       ...values.trivy.map(trivyReport),
       ...values.npm.map(npmReport),

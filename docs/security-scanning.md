@@ -10,6 +10,11 @@ High and Critical npm and Trivy findings and CodeQL findings with a security sev
 
 Exceptions live in `security/exceptions.json` and match one scan scope, scanner, finding id and target exactly. The maintained scopes are `required-build`, `release-build`, `release-image-amd64` and `release-image-arm64`. Each record contains a rationale, owning area, compensating control, expiry and whether independent review occurred. Expired, duplicate and incomplete exceptions fail every gate; an unused exception fails its own scope without blocking unrelated scopes.
 
+The same file contains dynamic `riskAcceptances`, keyed by the stable fingerprint from the
+[security finding lifecycle](security-findings.md). The two lists are separate because a raw static
+scanner result and a reproducibly validated product vulnerability do not have the same identity or
+state. The closed schema rejects fields that could become an informal evidence store.
+
 The project currently has a single maintainer. That maintainer may set `independentReview` to `false` to stay operational, but the missing peer review remains visible in the record. This is intentionally not an approval requirement until another regular maintainer exists.
 
 Raw scanner output is temporary because it can contain source excerpts or secret matches. The retained `summary.json` contains only scanner identifiers, severities, targets and exception metadata; findings below the blocking threshold remain visible as informational evidence. Workflow artifacts are retained for fourteen days; CodeQL also uploads its findings to GitHub code scanning.
