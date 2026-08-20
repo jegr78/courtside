@@ -9,6 +9,7 @@ import {
   evaluateOperationResult,
   executeMutationBoundaryChecks,
   evaluateLoginTiming,
+  loginTimingSampleOrder,
   executeObjectAuthorizationChecks,
   executeOperationMatrix,
   SecurityCookieJar,
@@ -87,7 +88,7 @@ test("given mutating operations, when attacking request boundaries, then each op
       return { status: 403, problemType: "urn:courtside:error:access-denied" };
     }
     if (boundary === "cors") return { status: 403, accessControlAllowed: false };
-    if (boundary === "host") return { status: 400, accessControlAllowed: false, redirected: false };
+    if (boundary === "host") return { status: 400, observedHost: "localhost" };
     return { status: 421 };
   });
 
@@ -98,6 +99,13 @@ test("given mutating operations, when attacking request boundaries, then each op
   assert.equal(calls[1].probe.headers.origin, "https://attacker.example");
   assert.equal(calls[2].probe.headers.host, "attacker.example");
   assert.equal(calls[3].probe.headers["x-forwarded-host"], "attacker.example");
+});
+
+test("given paired login timing samples, when ordering requests, then class order alternates", () => {
+  // when / then
+  assert.deepEqual(loginTimingSampleOrder(0), ["known", "unknown"]);
+  assert.deepEqual(loginTimingSampleOrder(1), ["unknown", "known"]);
+  assert.deepEqual(loginTimingSampleOrder(2), ["known", "unknown"]);
 });
 
 test("given session cookies, when rotating and expiring them, then the request jar keeps only current values", () => {

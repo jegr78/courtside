@@ -125,7 +125,7 @@ export async function executeMutationBoundaryChecks(matrix, send) {
       ...probe, headers: { ...probe.headers, host: "attacker.example" }
     });
     checks.push(boundaryResult(operation.operationId, "host", host,
-      !host.redirected && host.accessControlAllowed === false, "host-header-not-authoritative"));
+      host.observedHost === "localhost", "host-header-canonicalized"));
     const forwarded = await send(operation, "forwarded-host", {
       ...probe, headers: { ...probe.headers, "x-forwarded-host": "attacker.example" }
     });
@@ -280,8 +280,12 @@ export async function executeAuthenticationChecks(send, password) {
   const knownSamples = [];
   const unknownSamples = [];
   for (let sample = 0; sample < 12; sample += 1) {
-    const known = await failedLogin(send, client, "/api/session", "security.member.1", `${password}-wrong`);
-    const unknown = await failedLogin(send, client, "/api/session", "security.missing", `${password}-wrong`);
+    const responses = {};
+    for (const identity of loginTimingSampleOrder(sample)) {
+      responses[identity] = await failedLogin(send, client, "/api/session",
+        identity === "known" ? "security.member.1" : "security.missing", `${password}-wrong`);
+    }
+    const { known, unknown } = responses;
     if (!typedResponse(known, 401, "urn:courtside:error:unauthenticated")
         || !typedResponse(unknown, 401, "urn:courtside:error:unauthenticated")) {
       throw new Error("Login timing samples did not return the typed authentication failure");
@@ -308,6 +312,10 @@ export async function executeAuthenticationChecks(send, password) {
     observation: "encoded-and-canonical-login-share-rate-limit"
   };
   return { timing, bruteForce };
+}
+
+export function loginTimingSampleOrder(sample) {
+  return sample % 2 === 0 ? ["known", "unknown"] : ["unknown", "known"];
 }
 
 export async function executeSecondaryIdentityChecks(send, password) {
@@ -554,6 +562,8 @@ export function authorizationRequest(origin, client, probe, options = {}) {
         resolve({ status: response.statusCode, elapsedMilliseconds: performance.now() - startedAt,
           ...(problemType ? { problemType } : {}),
           ...(json ? { json } : {}),
+          ...(response.headers["x-courtside-observed-host"]
+            ? { observedHost: response.headers["x-courtside-observed-host"] } : {}),
           accessControlAllowed: response.headers["access-control-allow-origin"] !== undefined,
           redirected: response.statusCode >= 300 && response.statusCode < 400 });
       });
