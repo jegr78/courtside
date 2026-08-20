@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import test from "node:test";
 
-const accessibility = readFileSync("e2e/accessibility.spec.ts", "utf8");
-const documentation = readFileSync("../docs/accessibility-testing.md", "utf8");
-const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
-const playwright = readFileSync("playwright.config.ts", "utf8");
-const pom = readFileSync("../pom.xml", "utf8");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+const accessibility = readFileSync(join(root, "frontend/e2e/accessibility.spec.ts"), "utf8");
+const documentation = readFileSync(join(root, "docs/accessibility-testing.md"), "utf8");
+const fixtures = readFileSync(join(root, "frontend/e2e/fixtures.ts"), "utf8");
+const playwright = readFileSync(join(root, "frontend/playwright.config.ts"), "utf8");
+const pom = readFileSync(join(root, "pom.xml"), "utf8");
 
 test("given the required accessibility gate, when inspecting its browser coverage, then axe runs in Chromium and WebKit", () => {
   assert.match(accessibility, /wcag22aa/);
