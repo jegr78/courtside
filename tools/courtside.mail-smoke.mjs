@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { connect as connectTls } from "node:tls";
 import { createConnection } from "node:net";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,6 +43,10 @@ function issueCertificate() {
     JSON.stringify({ "@type": "update", object: "SystemSettings",
       value: { defaultCertificateId: "#certificate-smoke" } })
   ].join("\n") + "\n");
+  // The CLI container reads this as another user, and mkdtemp hands out a directory only its
+  // owner may enter. The keys beside the plan keep their mode; the plan itself is one run old.
+  chmodSync(runtime, 0o711);
+  chmodSync(join(runtime, "certificate.ndjson"), 0o644);
   return read("ca.crt");
 }
 
