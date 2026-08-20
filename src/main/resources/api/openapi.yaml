@@ -124,7 +124,7 @@ components:
         token is indistinguishable from a missing session.
 
   parameters:
-    ImpactCursor:
+    PageCursor:
       name: cursor
       in: query
       required: false
@@ -4077,7 +4077,7 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
-        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageCursor"
         - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
@@ -4102,7 +4102,7 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
-        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageCursor"
         - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
@@ -4137,7 +4137,7 @@ paths:
           in: query
           required: false
           schema: { type: string, format: time }
-        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageCursor"
         - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
