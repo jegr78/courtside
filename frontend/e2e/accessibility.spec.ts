@@ -70,6 +70,9 @@ for (const locale of ["de", "en"]) {
     await page.goto("/admin/roster");
     await expect(page.getByTestId("admin-roster-view")).toBeVisible();
     await expectNoWcagViolations(page);
+    await page.goto("/admin/audit");
+    await expect(page.getByTestId("admin-audit-view")).toBeVisible();
+    await expectNoWcagViolations(page);
   });
 }
 

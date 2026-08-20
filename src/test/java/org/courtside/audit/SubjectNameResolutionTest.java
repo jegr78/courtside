@@ -5,6 +5,7 @@ import org.courtside.shared.ConfigurationSubjectNames;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -37,6 +38,23 @@ class SubjectNameResolutionTest {
                 .containsEntry(KNOWN_TO_ONE, "Court 1")
                 .containsEntry(KNOWN_TO_ANOTHER, "Summer rules")
                 .doesNotContainKey(KNOWN_TO_NOBODY);
+    }
+
+    @Test
+    void givenAnUnnamedSubject_whenNamesAreResolved_thenTheNullNamePassesThrough() {
+        // given
+        ConfigurationSubjectNames unnamed = subjectIds -> {
+            Map<UUID, String> names = new HashMap<>();
+            names.put(KNOWN_TO_ONE, null);
+            return names;
+        };
+        AuditService service = new AuditService(null, null, List.of(unnamed), null);
+
+        // when
+        Map<UUID, String> names = service.namesFor(List.of(KNOWN_TO_ONE));
+
+        // then
+        assertThat(names).containsEntry(KNOWN_TO_ONE, null);
     }
 
     @Test

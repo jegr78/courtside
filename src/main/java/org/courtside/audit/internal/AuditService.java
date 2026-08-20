@@ -12,6 +12,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +39,8 @@ public class AuditService {
         }
         Map<UUID, String> resolved = new HashMap<>();
         subjectNames.forEach(source -> resolved.putAll(source.namesFor(subjectIds)));
-        return Map.copyOf(resolved);
+        // Map.copyOf rejects a null value, and an unnamed subject is an ordinary, expected one.
+        return Collections.unmodifiableMap(resolved);
     }
 
     public CursorPage.Result<AuditEntry> page(UUID subjectId, Instant from, Instant to, UUID cursor, int limit) {
