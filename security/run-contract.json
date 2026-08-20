@@ -37,7 +37,12 @@
       "id": "target-identity",
       "version": "1.0.0",
       "testIds": []
+    },
+    {
+      "id": "passive-deployment",
+      "version": "1.0.0",
+      "testIds": ["CSA-DEPLOY-001"]
     }
   ],
-  "selectedTests": []
+  "selectedTests": ["CSA-DEPLOY-001"]
 }

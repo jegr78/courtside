@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:passive-deployment-evidence:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "testId", "targetFingerprint", "imageDigest", "layers", "checks", "zap", "requestCount", "outcome"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "testId": { "const": "CSA-DEPLOY-001" },
+    "targetFingerprint": { "$ref": "#/$defs/digest" },
+    "imageDigest": { "type": "string", "pattern": "^(?:sha256:[a-f0-9]{64}|[^\\s@]+@sha256:[a-f0-9]{64})$" },
+    "layers": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "enum": ["application", "proxy", "container", "host"] }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 28,
+      "maxItems": 28,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "layer", "outcome", "observation"],
+        "properties": {
+          "id": { "$ref": "#/$defs/checkId" },
+          "layer": { "enum": ["application", "proxy", "container", "host"] },
+          "outcome": { "enum": ["passed", "failed", "not-applicable"] },
+          "observation": { "$ref": "#/$defs/observation" }
+        }
+      }
+    },
+    "zap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "version", "status", "alerts"],
+      "properties": {
+        "image": { "type": "string", "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$" },
+        "version": { "const": "2.16.1" },
+        "status": { "enum": ["completed", "failed"] },
+        "alerts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pluginId", "riskCode", "confidence", "count"],
+            "properties": {
+              "pluginId": { "type": "string", "pattern": "^[0-9]+$" },
+              "riskCode": { "type": "integer", "minimum": 0, "maximum": 3 },
+              "confidence": { "type": "integer", "minimum": 0, "maximum": 4 },
+              "count": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "requestCount": { "type": "integer", "minimum": 1, "maximum": 1000 },
+    "outcome": { "enum": ["passed", "failed", "incomplete"] }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "checkId": {
+      "enum": ["body-limit", "certificate-trust", "direct-forwarded-behavior", "exposure--git-config",
+        "exposure-actuator", "exposure-actuator-health", "exposure-assets-app-js-map",
+        "exposure-swagger-ui-index-html", "forwarded-boundary", "header-limit", "headers-api-source",
+        "headers-does-not-exist", "headers-icon-svg", "headers-login", "headers-root", "host-boundary", "http-redirect",
+        "loopback-publication", "management-separation", "method-connect", "method-trace", "method-track",
+        "qualified-image-evidence", "runtime-hardening", "scanner-runtime-hardening", "secure-cookie-delivery", "tls-versions",
+        "transport-security"]
+    },
+    "observation": {
+      "enum": ["certificate-chain-and-host-valid", "certificate-validation-failed",
+        "covered-by-image-qualification", "direct-app-distinguished-from-proxy", "direct-app-probe-failed",
+        "http-port-not-published", "insecure-cookie-issued", "issued-cookies-secure",
+        "localhost-transport-qualified-externally", "management-internal-only", "management-internal-unavailable",
+        "method-accepted", "method-rejected", "oversized-header-accepted", "oversized-header-rejected",
+        "proxy-body-limit-enforced", "proxy-body-limit-not-proven", "proxy-loopback-only",
+        "proxy-publication-mismatch", "route-not-exposed", "runtime-controls-incomplete",
+        "runtime-controls-present", "scanner-runtime-controls-incomplete", "scanner-runtime-controls-present",
+        "security-and-cache-headers-valid", "security-or-cache-headers-invalid",
+        "server-header-exposed", "spoofed-host-not-rejected", "spoofed-host-rejected", "tls-policy-mismatch",
+        "tls12-and-tls13-only", "unexpected-route-response", "upstream-host-canonicalized",
+        "upstream-host-not-canonicalized"]
+    }
+  }
+}

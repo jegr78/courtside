@@ -121,6 +121,65 @@ services:
     networks:
       - frontend
       - exposure
+      - scanner-upstream
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+
+  scanner-gateway:
+    profiles: [assessment]
+    image: zaproxy/zap-stable:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab
+    pull_policy: never
+    command: ["python3", "/opt/courtside/security-request-gateway.py"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=1m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 0.5
+    mem_limit: 128m
+    pids_limit: 64
+    environment:
+      COURTSIDE_SECURITY_MAX_REQUESTS: ${COURTSIDE_SECURITY_MAX_REQUESTS:?required}
+      COURTSIDE_SECURITY_MAX_CONCURRENCY: ${COURTSIDE_SECURITY_MAX_CONCURRENCY:?required}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 8090), 1).close()"]
+      interval: 1s
+      timeout: 2s
+      retries: 10
+    volumes:
+      - ../tools/security-request-gateway.py:/opt/courtside/security-request-gateway.py:ro
+    networks:
+      - scanner-client
+      - scanner-upstream
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+
+  zap:
+    profiles: [assessment]
+    image: zaproxy/zap-stable:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab
+    pull_policy: never
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m
+      - /home/zap:uid=1000,gid=1000,mode=0700,size=256m
+      - /zap/wrk:uid=1000,gid=1000,mode=0700,size=25m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 2.0
+    mem_limit: 1g
+    pids_limit: 256
+    networks:
+      - scanner-client
     labels:
       org.courtside.environment: SECURITY
       org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
@@ -143,6 +202,20 @@ networks:
       org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
   exposure:
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+  scanner-client:
+    internal: true
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+  scanner-upstream:
+    internal: true
     labels:
       org.courtside.environment: SECURITY
       org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}

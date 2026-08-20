@@ -32,6 +32,7 @@ function input(overrides = {}) {
     target: "https://localhost:23456",
     environment: "SECURITY",
     imageDigest: digest,
+    imageArchitecture: "arm64",
     applicationCommit: "abcdef0123456789",
     seedFingerprint,
     instanceFingerprint,
@@ -217,6 +218,35 @@ test("given only the identity prerequisite, when execution finishes, then assess
   assert.deepEqual(manifest.toolResults, [
     { id: "target-identity", version: "1.0.0", outcome: "passed" }
   ]);
+});
+
+test("given the bounded passive suite, when every check passes, then its evidence governs the outcome", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const plan = buildSecurityPlan(input({
+    profile: "safe",
+    authorization: undefined,
+    tools: [
+      { id: "target-identity", version: "1.0.0", testIds: [] },
+      { id: "passive-deployment", version: "1.0.0", testIds: ["CSA-DEPLOY-001"] }
+    ],
+    selectedTests: ["CSA-DEPLOY-001"],
+    catalogTests: [{ id: "CSA-DEPLOY-001", status: "implemented", profile: "safe" }]
+  }));
+
+  // when
+  const manifest = await executeSecurityPlan(plan, {
+    root,
+    verifyTarget: async () => input({ profile: "safe", authorization: undefined }),
+    runPassiveAssessment: async () => ({ outcome: "passed", requestCount: 24 })
+  });
+
+  // then
+  assert.equal(manifest.outcome, "passed");
+  assert.equal(manifest.usage.requests, 24);
+  assert.deepEqual(manifest.toolResults.at(-1), {
+    id: "passive-deployment", version: "1.0.0", outcome: "passed"
+  });
 });
 
 test("given sensitive diagnostics, when retaining them, then credentials and session material are redacted", () => {

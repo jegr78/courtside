@@ -53,7 +53,7 @@ An implemented entry can still be incomplete in a particular run. Catalog state 
 
 ## Evidence and outcomes
 
-Evidence must identify the catalog and tool versions, application commit and immutable image digest where applicable, target fingerprint, selected entries, profile, timestamps and first-attempt result. This foundation retains only its manifest and target-identity result; assessment adapters remain disabled until an isolated runner and closed evidence schemas are available. Passwords, cookies, CSRF tokens, personal fields and sensitive headers do not enter retained or public artifacts.
+Evidence identifies the catalog and tool versions, application commit and immutable image digest where applicable, target fingerprint, selected entries, profile, timestamps and first-attempt result. The safe deployment suite retains a closed JSON record and a Markdown summary. Both contain normalized observations and scanner identifiers, never URLs, response bodies, cookies, CSRF tokens or sensitive header values.
 
 The [security finding lifecycle](security-findings.md) defines candidate validation, stable
 fingerprints, protected evidence references, risk acceptance, remediation and retests. Scanner
@@ -81,7 +81,7 @@ Automated scanner output begins as a candidate. It affects a release only after 
 
 ## Scope boundary
 
-This contract introduces no scanner and sends no assessment traffic. The following issues provide the environment, orchestration, finding lifecycle and executable suites. Product vulnerabilities discovered by those suites are remediated separately so the framework cannot hide product changes inside its own implementation.
+The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. Active and destructive adapters remain disabled. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
 
 The disposable target is described in [`security-environment.md`](security-environment.md). Its run-specific marker, synthetic role matrix, network isolation and cleanup are prerequisites for every `active` or `destructive` assessment.
 

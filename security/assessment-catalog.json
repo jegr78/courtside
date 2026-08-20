@@ -2528,7 +2528,7 @@
     {
       "id": "CSA-DEPLOY-001",
       "title": "Proxy, TLS and runtime exposure",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-CONF-07"

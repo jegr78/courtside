@@ -71,6 +71,7 @@ export function buildSecurityPlan(input) {
     target,
     environment: input.environment,
     imageDigest: input.imageDigest,
+    imageArchitecture: input.imageArchitecture,
     applicationCommit: input.applicationCommit,
     seedFingerprint: input.seedFingerprint,
     instanceFingerprint: input.instanceFingerprint,
@@ -125,35 +126,67 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   const root = runtime.root ?? join("build", "security");
   const now = runtime.now ?? (() => new Date());
   const verifyTarget = runtime.verifyTarget ?? missingTargetVerifier;
+  const runPassiveAssessment = runtime.runPassiveAssessment ?? missingPassiveAssessment;
   const { attempt, paths } = reserveAttempt(root, plan.runId);
   const startedAt = now();
   const manifest = createManifest(plan, attempt, startedAt);
   writeManifest(paths.manifest, manifest);
   try {
-    assertPrerequisiteOnly(plan);
+    const passive = assertSupportedPlan(plan);
     assertRunning(paths, startedAt, now(), plan.budgets);
-    assertTargetIdentity(plan, await verifyTarget(plan));
+    const deadline = new Date(startedAt.getTime() + plan.budgets.durationSeconds * 1000);
+    assertTargetIdentity(plan, await verifyTarget(plan, { stopFile: paths.stop, deadline }));
     manifest.toolResults.push({ id: "target-identity", version: plan.tools[0].version, outcome: "passed" });
+    if (passive) {
+      assertRunning(paths, startedAt, now(), plan.budgets);
+      const evidence = await runPassiveAssessment(plan, { evidenceDirectory: paths.evidence, stopFile: paths.stop,
+        attempt, deadline });
+      assertRunning(paths, startedAt, now(), plan.budgets);
+      manifest.toolResults.push({ id: "passive-deployment", version: plan.tools[1].version,
+        outcome: evidence.outcome });
+      manifest.outcome = evidence.outcome;
+      manifest.reason = evidence.outcome === "passed" ? null : "Passive deployment security checks did not pass";
+      manifest.usage = { requests: evidence.requestCount, generatedDataMegabytes: 0,
+        evidenceBytes: directoryBytes(paths.evidence) };
+      assertUsage(manifest.usage, plan.budgets);
+    } else {
+      manifest.outcome = "incomplete";
+      manifest.reason = "No isolated assessment adapter is registered";
+    }
     manifest.status = "finished";
-    manifest.outcome = "incomplete";
-    manifest.reason = "No isolated assessment adapter is registered";
   } catch (failure) {
     manifest.status = "finished";
     manifest.outcome = failure.assessmentOutcome ?? "incomplete";
     manifest.reason = redactSecurityText(failure.message);
   }
   manifest.finishedAt = now().toISOString();
-  manifest.usage = { requests: 0, generatedDataMegabytes: 0, evidenceBytes: directoryBytes(paths.evidence) };
+  manifest.usage ??= { requests: 0, generatedDataMegabytes: 0, evidenceBytes: directoryBytes(paths.evidence) };
   writeManifest(paths.manifest, manifest);
   return manifest;
 }
 
-function assertPrerequisiteOnly(plan) {
-  const tool = plan.tools[0];
-  if (plan.selectedTests.length || plan.tools.length !== 1 || tool?.id !== "target-identity"
-      || tool.testIds.length) {
-    throw new Error("Assessment adapters require an isolated orchestrator-owned runner");
+function assertUsage(usage, budgets) {
+  if (usage.requests > budgets.requests) throw new Error("The request budget was exceeded");
+  if (usage.generatedDataMegabytes > budgets.generatedDataMegabytes) {
+    throw new Error("The generated-data budget was exceeded");
   }
+  if (usage.evidenceBytes > budgets.evidenceMegabytes * 1024 * 1024) {
+    throw new Error("The evidence budget was exceeded");
+  }
+}
+
+function assertSupportedPlan(plan) {
+  const identity = plan.tools[0];
+  const prerequisiteOnly = plan.selectedTests.length === 0 && plan.tools.length === 1
+    && identity?.id === "target-identity" && identity.testIds.length === 0;
+  if (prerequisiteOnly) return false;
+  const passive = plan.profile === "safe" && plan.environment === "SECURITY"
+    && plan.selectedTests.length === 1 && plan.selectedTests[0] === "CSA-DEPLOY-001"
+    && plan.tools.length === 2 && identity?.id === "target-identity" && identity.testIds.length === 0
+    && plan.tools[1]?.id === "passive-deployment"
+    && plan.tools[1].testIds.length === 1 && plan.tools[1].testIds[0] === "CSA-DEPLOY-001";
+  if (!passive) throw new Error("Assessment adapters require an isolated orchestrator-owned runner");
+  return true;
 }
 
 export function redactSecurityText(value) {
@@ -190,6 +223,7 @@ function validateIdentity(input) {
     throw new Error("Invalid application image digest");
   }
   if (!/^[a-f0-9]{7,64}$/.test(input.applicationCommit)) throw new Error("Invalid application commit");
+  if (!["amd64", "arm64"].includes(input.imageArchitecture)) throw new Error("Invalid application image architecture");
   for (const value of [input.seedFingerprint, input.instanceFingerprint, input.targetFingerprint]) {
     if (!/^sha256:[a-f0-9]{64}$/.test(value)) throw new Error("Invalid security target fingerprint");
   }
@@ -227,7 +261,8 @@ function createManifest(plan, attempt, startedAt) {
 
 function assertTargetIdentity(plan, actual) {
   if (actual.environment !== plan.environment || actual.target !== plan.target
-      || actual.imageDigest !== plan.imageDigest || actual.seedFingerprint !== plan.seedFingerprint
+      || actual.imageDigest !== plan.imageDigest || actual.imageArchitecture !== plan.imageArchitecture
+      || actual.seedFingerprint !== plan.seedFingerprint
       || actual.instanceFingerprint !== plan.instanceFingerprint
       || actual.targetFingerprint !== plan.targetFingerprint) {
     throw new Error("The target identity changed during the security run");
@@ -294,6 +329,10 @@ function writePrivate(file, content) {
 
 function missingTargetVerifier() {
   throw new Error("No target verifier is configured");
+}
+
+function missingPassiveAssessment() {
+  throw new Error("No orchestrator-owned passive assessment is configured");
 }
 
 export function fingerprintSecurityTarget(identity) {

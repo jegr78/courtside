@@ -4,7 +4,11 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.goto("/login");
   await page.getByTestId("username").fill(username);
   await page.getByTestId("password").fill("temporary-password");
+  const sessionResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/session") && response.request().method() === "POST");
   await page.getByTestId("login-submit").click();
+  expect((await sessionResponse).status()).toBe(200);
+  await expect(page.getByTestId("logout")).toBeVisible();
 }
 
 test("a member can navigate the core signed-in journey", async ({ page }) => {

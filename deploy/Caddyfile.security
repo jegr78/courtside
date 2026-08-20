@@ -4,11 +4,12 @@
 	skip_install_trust
 }
 
-https://localhost {
-	tls internal
+(security_proxy) {
 	request_body {
 		max_size 2MB
 	}
+	@oversized expression `size({http.request.header.Content-Length}) > 0 && int({http.request.header.Content-Length}) > 2000000`
+	respond @oversized 413
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
@@ -16,7 +17,14 @@ https://localhost {
 		Permissions-Policy "geolocation=(), camera=(), microphone=()"
 		-Server
 	}
+	@private path /api-ui* /actuator* /api/openapi.yaml /swagger-ui* /.git* *.map
+	respond @private 404
+	@unsupported method TRACE CONNECT TRACK
+	respond @unsupported 405
+	@forwardedInput header X-Forwarded-Host *
+	respond @forwardedInput 421
 	reverse_proxy app:8080 {
+		header_up Host localhost
 		header_up -Forwarded
 		header_up -X-Forwarded-For
 		header_up -X-Forwarded-Host
@@ -24,8 +32,38 @@ https://localhost {
 		header_up -X-Forwarded-Prefix
 		header_up -X-Forwarded-Proto
 		header_up -X-Forwarded-Ssl
+		header_up Forwarded "for={remote_host};host=localhost;proto={scheme}"
 		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Host localhost
 		header_up X-Forwarded-Proto {scheme}
 	}
+}
+
+https://localhost, https://attacker.example {
+	tls internal
+	@observation path /__security/request-observation
+	handle @observation {
+		rewrite * /actuator/health
+		reverse_proxy app:8080 {
+			header_up Host localhost
+			header_up -Forwarded
+			header_up -X-Forwarded-For
+			header_up -X-Forwarded-Host
+			header_up -X-Forwarded-Port
+			header_up -X-Forwarded-Prefix
+			header_up -X-Forwarded-Proto
+			header_up -X-Forwarded-Ssl
+			header_up Forwarded "for={remote_host};host=localhost;proto=https"
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Host localhost
+			header_up X-Forwarded-Proto https
+		}
+	}
+	handle {
+		import security_proxy
+	}
+}
+
+http://proxy:8080 {
+	import security_proxy
 }
