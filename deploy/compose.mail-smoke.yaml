@@ -59,6 +59,7 @@ services:
       STALWART_PASSWORD: ${COURTSIDE_MAIL_SETUP_PASSWORD}
     volumes:
       - plan:/plan:ro
+      - ${COURTSIDE_MAIL_RUNTIME_PLAN:-./mail}:/runtime:ro
 
 volumes:
   mail-config:
