@@ -1761,7 +1761,8 @@ async function showStatus(environment, asJson) {
         : {})
     },
     health: isPerf ? readPerformanceHealth(composeArgs) : await readHealth(
-      isUat ? "https://localhost:8443/actuator/health" : "http://127.0.0.1:8080/actuator/health", isUat),
+      isUat ? "https://localhost:8443/actuator/health" : "http://127.0.0.1:8080/actuator/health",
+      isUat ? composeArgs : undefined),
     volumes: volumes.stdout.trim().split(/\r?\n/).filter(Boolean),
     containers: compose.stdout.trim().split(/\r?\n/).filter(Boolean).map(parseJson),
     ...(isUat ? { funnel } : {})
@@ -1854,12 +1855,20 @@ function isProcessRunning(pid) {
   }
 }
 
-async function readHealth(url, allowLocalCertificate = false) {
+function localAuthority(composeArgs) {
+  const result = spawnSync("docker", [...composeArgs, "exec", "-T", "proxy",
+    "cat", "/data/caddy/pki/authorities/local/root.crt"], { cwd: root, encoding: "utf8" });
+  return result.status === 0 && result.stdout.includes("BEGIN CERTIFICATE") ? result.stdout : undefined;
+}
+
+async function readHealth(url, composeArgs) {
   try {
-    if (allowLocalCertificate) {
+    if (composeArgs) {
+      const ca = localAuthority(composeArgs);
+      if (!ca) return "unavailable";
       const target = new URL(url);
       const response = await localRequest({
-        secure: true, port: Number(target.port), path: target.pathname
+        secure: true, port: Number(target.port), path: target.pathname, ca
       });
       if (response.statusCode < 200 || response.statusCode >= 300) return `HTTP ${response.statusCode}`;
       return parseJson(response.body).status ?? "unknown";
@@ -1882,7 +1891,7 @@ export function localRequest({ secure, port, path, method = "GET", headers = {},
   return new Promise((resolveResponse, rejectResponse) => {
     const request = (secure ? httpsRequest : httpRequest)({
       hostname: "127.0.0.1", port, path, method, headers: { Host: `localhost:${port}`, ...headers },
-      ...(secure ? { rejectUnauthorized: Boolean(ca), servername: servername ?? "localhost", ...(ca ? { ca } : {}) } : {})
+      ...(secure ? { rejectUnauthorized: true, servername: servername ?? "localhost", ca } : {})
     }, (response) => {
       const peerCertificate = secure ? response.socket.getPeerCertificate() : undefined;
       const certificatePin = peerCertificate?.raw ? certificatePublicKeyPin(peerCertificate.raw) : undefined;

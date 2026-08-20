@@ -1,0 +1,32 @@
+name: mail smoke
+
+on:
+  schedule:
+    - cron: '41 4 * * 4'
+  pull_request:
+    paths:
+      - 'deploy/mail/**'
+      - 'deploy/compose.mail-smoke.yaml'
+      - 'deploy/compose.yaml'
+      - 'tools/courtside.mail-smoke.mjs'
+      - '.github/workflows/mail-smoke.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: mail-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Configure the shipped mail server and deliver through it
+        run: node tools/courtside.mail-smoke.mjs

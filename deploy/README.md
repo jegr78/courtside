@@ -104,6 +104,160 @@ Three things this path costs you, all worth knowing before you choose it:
 This is an option, not part of the reference deployment — the project must not depend on one
 vendor, and everything here works without it.
 
+## The club's own mail server
+
+A member's first password is meant to reach that member and nobody else, which an instance cannot
+do without a way to send mail. The reference deployment therefore carries its own MTA,
+[Stalwart](https://stalw.art), under the `mail` profile.
+
+Treat it as separate from whatever the club already uses for its own correspondence. It exists to
+send from one address, it holds no member's mailbox, and a club that runs its mail elsewhere keeps
+running it there.
+
+```sh
+docker compose --profile mail up -d
+```
+
+Nothing starts it otherwise, and until the application can send mail
+([#337](https://github.com/jegr78/courtside/issues/337)) it has no client. Bring it up when you are
+ready to work through the DNS below, not before.
+
+### Setting it up without touching a wizard
+
+Stalwart normally asks for its configuration through a setup wizard in the browser. This deployment
+does not: `deploy/mail/` holds the configuration as two plans in NDJSON — one operation per line,
+readable and diffable — and `stalwart-cli apply` loads them. The values that differ between clubs
+come from `.env`, so `.env` is the only place any of it is written down.
+
+```sh
+docker compose --profile mail up -d mail
+docker compose --profile mail-setup run --rm mail-bootstrap
+docker compose --profile mail restart mail
+docker compose --profile mail-setup run --rm mail-configure
+docker compose --profile mail up -d --force-recreate mail
+```
+
+Two applies with a restart between them, because the first one answers the questions the wizard
+would have asked — hostname, domain, whether to generate DKIM keys — and the server only leaves
+setup mode on the next start. The second one loads the listeners, the delivery routes and the
+administrator account.
+
+Before the first command, `.env` needs four values: `COURTSIDE_MAIL_HOSTNAME`,
+`COURTSIDE_MAIL_DOMAIN`, `COURTSIDE_MAIL_ADMIN_PASSWORD` for the club's mail administrator, and
+`COURTSIDE_MAIL_SETUP_PASSWORD` together with
+`COURTSIDE_MAIL_RECOVERY_ADMIN=admin:$COURTSIDE_MAIL_SETUP_PASSWORD` — the credential the setup
+commands authenticate with while the server has no accounts yet.
+
+**Clear `COURTSIDE_MAIL_RECOVERY_ADMIN` when you are done**, which the last command above picks up.
+While it is set the server runs in recovery mode and serves nothing but its admin port: no SMTP, no
+mail. It is a way back in, not a setting to leave on.
+
+Afterwards the mail administrator signs in at `http://127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT}/` —
+over an SSH tunnel if the host is remote, because the port is bound to the loopback interface and
+belongs on no public address — as `${COURTSIDE_MAIL_ADMIN_USERNAME}@${COURTSIDE_MAIL_DOMAIN}`.
+
+### What the plans do and do not carry
+
+**The DKIM key is never ours.** The plan declares that the domain manages DKIM automatically; the
+server then generates its own key pair on first start and rotates it on its own schedule. Nothing
+about your signing key comes from this repository, and the selector to publish is the one the
+server shows — which is also why `COURTSIDE_MAIL_DKIM_SELECTOR` in `.env` has to be updated after a
+rotation.
+
+**No secret is in them either.** `stalwart-cli snapshot`, which is how these plans were produced,
+strips secret values by default. The administrator password is substituted from `.env` when the
+plan is rendered, and the rendered copy lives in a volume rather than in the repository.
+
+Two things about the mail container are worth knowing regardless:
+
+- **The web interface is not pinned.** Every image in `compose.yaml` is pinned by digest; the admin
+  interface is the one artefact fetched at runtime from a release URL, and it is the component with
+  full control over the mail server. Its integrity rests on TLS to GitHub and nothing else. A
+  deliberate exception, not an oversight.
+- **There is no ACME here.** Caddy is this deployment's only certificate client and it issues for
+  `COURTSIDE_DOMAIN`, not for `COURTSIDE_MAIL_HOSTNAME`, so the mail server serves a self-signed
+  certificate on port 25. For inbound STARTTLS that is the ordinary state of affairs between mail
+  servers; it becomes a real gap the day you want MTA-STS or DANE.
+  [#342](https://github.com/jegr78/courtside/issues/342) covers the production settings.
+
+### What DNS has to say before anyone believes this server
+
+Six records, all published by you, none of them optional if the mail is to arrive:
+
+| Record | Where | Why |
+|---|---|---|
+| `A` / `AAAA` | `COURTSIDE_MAIL_HOSTNAME` | The address the server sends from. |
+| `PTR` | that address, at your hosting provider | Receivers reject a host whose reverse name disagrees with its forward one. |
+| `MX` | `COURTSIDE_MAIL_DOMAIN` | Where bounces and DMARC reports come back to. |
+| `TXT` `v=spf1` | `COURTSIDE_MAIL_DOMAIN` | Names this host as allowed to send, ending in `-all`. |
+| `TXT` | `<selector>._domainkey.<domain>` | The public half of the key Stalwart signs with. |
+| `TXT` `v=DMARC1` | `_dmarc.<domain>` | What a receiver should do when the first two disagree. |
+
+A seventh thing is not DNS and is the one that most often ends the exercise: **most hosting
+providers block outbound port 25** until you ask them to unblock it, and some never will. If yours
+will not, the mail still has somewhere to go: give the server a relay host under
+*MTA → Outbound → Routes* in the web interface — the club's provider, or any server that will accept
+authenticated submission — and point the outbound routing strategy at it. Delivery straight to the
+recipient is what this deployment does by default, not what it requires.
+
+### Port 25 is public, and a host firewall will not change that
+
+`25:25` binds every interface. That is what an MTA is for, but it is also the one published port in
+`compose.yaml` that is not pinned to `127.0.0.1`, and Docker installs its forwarding rules ahead of
+`ufw` or `nftables` — a host firewall rule will not close it. If you need it restricted, do it in
+your provider's security groups or in Stalwart's own configuration.
+
+Inbound port 25 is here so that bounces and DMARC reports arrive at all. What to do with them —
+read them, forward them, act on them — has no answer in this deployment yet.
+
+### Checking all of it at once
+
+```sh
+docker compose --profile mail-check run --rm mail-check
+```
+
+That resolves every record above, compares each address's reverse name against the forward one,
+opens a connection to a public MX to see whether outbound 25 leaves the host, and asks the mail
+server to relay a message for a foreign domain — the one state in which a mail
+server harms people who are not its members. One line per check, non-zero exit if any failed, so it
+also works as a cron job that tells you the day a record expires.
+
+The outbound probe contacts a third party by default. `COURTSIDE_MAIL_OUTBOUND_PROBE` points it
+somewhere else if you would rather it did not, and `COURTSIDE_MAIL_RELAY_PROBE` names the foreign
+domain the relay test asks about.
+
+### Proving it works before a member depends on it
+
+`node tools/courtside.mail-smoke.mjs` brings this same mail server up on a scratch Compose project,
+renders and applies these same plans, and hands it a message over the submission port the way the
+application will — authenticated, over STARTTLS — then reads that message back out of a local sink.
+It tears the project down afterwards and needs Docker and `openssl`. The `mail smoke` workflow runs
+it whenever anything under `deploy/mail/` changes, so the configuration a club applies is
+configuration that has been applied.
+
+One thing the run does differently on purpose: it issues itself a throwaway authority and installs
+a certificate for the mail hostname, where your instance serves the self-signed one it generated.
+That is what lets the run validate the handshake instead of accepting whatever it is handed, and it
+is the single point at which the smoke world and your world differ.
+
+### Back up the mail volumes too
+
+The backup below covers PostgreSQL. `mail-config` holds the private DKIM key and the mail server's
+credentials, and it is not in it. Losing it means generating a new key and publishing a new selector;
+leaking it means somebody can sign mail as your domain until you notice. Include both mail volumes
+in whatever backs this host up, and treat `mail-config` as a secret when you do.
+
+### When the mail administrator password is lost
+
+Set `COURTSIDE_MAIL_RECOVERY_ADMIN` to `admin:<password>` and restart the `mail` service, then sign
+in as `admin`. **The server stops accepting and delivering mail while that variable is set** — it
+runs in recovery mode and serves only its admin port. Clear it and recreate the container once you
+are back in.
+
+To change the administrator password instead, edit `COURTSIDE_MAIL_ADMIN_PASSWORD` and run
+`mail-configure` again: the plan upserts the account, so it reconciles rather than duplicates.
+
+
 ## Environment variables
 
 These are a published surface: renaming one is a breaking change, and every optional variable has a
@@ -117,6 +271,19 @@ default.
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
 | `COURTSIDE_DOMAIN` | *required with the proxy* | The public name Caddy obtains a certificate for. |
+| `COURTSIDE_MAIL_DOMAIN` | *required with the mail server* | The domain Courtside sends from, and the domain SPF, DKIM and DMARC are published for. |
+| `COURTSIDE_MAIL_HOSTNAME` | *required with the mail server* | The mail server's own name. Its forward and reverse DNS must agree. |
+| `COURTSIDE_MAIL_DKIM_SELECTOR` | *required with the mail server* | The selector of the DKIM key the setup wizard generated, as it appears in the admin interface. |
+| `COURTSIDE_MAIL_ADMIN_PASSWORD` | *required with the mail server* | Password for the club's mail administrator, written into the account by `mail-configure`. |
+| `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. |
+| `COURTSIDE_MAIL_ADMIN_USERNAME` | `postmaster` | Local part of the mail administrator's address. |
+| `COURTSIDE_MAIL_RECOVERY_MODE` | *unset* | Set to `1` to force recovery mode without a recovery credential. Mail stops while it is set. |
+| `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
+| `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`. Needed for the initial setup, and a way back in afterwards. **The server serves no mail while it is set.** |
+| `COURTSIDE_MAIL_OUTBOUND_PROBE` | `gmail-smtp-in.l.google.com` | The host `mail-check` opens port 25 to when testing whether outbound mail leaves at all. A third party by default; point it at a server of your own if you would rather not tell one. |
+| `COURTSIDE_MAIL_RELAY_PROBE` | `relay-probe.example.com` | The foreign domain `mail-check` asks this instance to relay for, to prove it refuses. |
+| `COURTSIDE_MAIL_RELAY_TARGET` | `mail` | Where the relay test connects. The service on the compose network by default, because a host seldom reaches its own published port from inside a container. |
+| `COURTSIDE_MAIL_MEMORY` | `512m` | Memory ceiling for the mail server, which is the one container taking unauthenticated traffic from the internet. |
 | `COURTSIDE_MEMORY` | `1g` | Memory ceiling for the application container. |
 | `COURTSIDE_COOKIE_SECURE` | `true` | Sends the session cookie over HTTPS only. Lower it only for a local test. |
 | `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` | `20` | Login attempts allowed per source address and window. |
@@ -246,14 +413,15 @@ database and do not combine the archive with an image or configuration from a di
 
 ## Image updates between releases
 
-`postgres:17-alpine` and `caddy:2-alpine` in `compose.yaml` are pinned by digest, not by floating
-tag, so `docker compose pull` alone will never change them. That is deliberate — a club's database
-and reverse proxy should not change without anyone deciding it should — but it means the digests do
-not update themselves. Dependabot opens a pull request against this repository when either image
-gets a new patch release; a maintainer bumping the digest here is how it reaches your instance —
-take the updated `compose.yaml` and run `docker compose up -d` to apply it.
+Every image `compose.yaml` names other than Courtside itself — `postgres:17-alpine`,
+`caddy:2-alpine`, `stalwartlabs/stalwart` and `alpine:3` — is pinned by digest, not by floating tag,
+so `docker compose pull` alone will never change them. That is deliberate: a club's database, its
+reverse proxy and its mail server should not change without anyone deciding they should. It also
+means the digests do not update themselves. Dependabot opens a pull request against this repository
+when one of them gets a new patch release; a maintainer bumping the digest here is how it reaches
+your instance — take the updated `compose.yaml` and run `docker compose up -d` to apply it.
 Until then, you can raise it yourself: look up the current tag's digest with
-`docker buildx imagetools inspect postgres:17-alpine` (or `caddy:2-alpine`) and replace the
+`docker buildx imagetools inspect postgres:17-alpine` (or any of the others) and replace the
 `@sha256:…` suffix in `compose.yaml`.
 
 ## Two things to adjust before the web client arrives
@@ -270,3 +438,14 @@ Until then, you can raise it yourself: look up the current tag's digest with
   [#27](https://github.com/jegr78/courtside/issues/27)
 - **No collector is included.** Courtside can export metrics and traces over OTLP, but operating,
   securing and retaining telemetry remains the operator's responsibility.
+- **Nothing sends mail yet.** The mail server is here and can be made deliverable, but the
+  application has no client for it until
+  [#337](https://github.com/jegr78/courtside/issues/337) lands. Until then a first password still
+  passes through an administrator's hands.
+- **Inbound mail arrives and nothing reads it.** Port 25 is open so bounces and DMARC reports
+  reach the instance rather than vanishing, but nothing acts on them.
+  [#340](https://github.com/jegr78/courtside/issues/340) tracks the delivery state a roster needs;
+  DMARC reports have no reader at all.
+- **The mail server serves a self-signed certificate.** Caddy issues for `COURTSIDE_DOMAIN`, not for
+  the mail hostname. Ordinary between mail servers today, and the thing to fix before MTA-STS or
+  DANE.

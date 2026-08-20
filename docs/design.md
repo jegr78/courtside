@@ -45,7 +45,9 @@ created from a snapshot, and export. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
-carrying an SBOM attestation, and attaches the OpenAPI document to the release.
+carrying an SBOM attestation, and attaches the OpenAPI document to the release. The reference
+deployment carries the club's own mail server behind a profile, together with a check that resolves
+the DNS a receiver looks at; nothing in the application sends through it yet.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers, and the browser admin surface for
@@ -1040,6 +1042,15 @@ whether it is built or designed. **Designed means absent today.**
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the release workflow signs each image keylessly with
   cosign and attaches an SBOM attestation. Image scanning is designed and not built.*
+- **Accepted: the mail server fetches its admin interface unpinned.** The reference deployment
+  pins every image it names by digest, and the mail image is no exception — but on first start
+  that image downloads its own web interface from the latest GitHub release, outside the digest
+  the deployment pinned. An operator watching the container's first start sees the download; an
+  observer wanting more needs read access to the volume it lands in. It stays open because the
+  download happens inside a third-party image and closing it would mean forking that image or
+  vendoring an interface this product does not maintain. What bounds it: the admin port is bound
+  to the loopback interface, nothing else in the deployment reads that interface, and it is
+  reached only during setup and recovery. *Built, as described.*
 
 ### Roles
 
