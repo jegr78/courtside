@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -80,10 +81,12 @@ public class AuditService {
     private AuditEntry toEntry(DomainEvent event, Map<UUID, String> subjectNamesById,
                                Map<UUID, String> actorUsernames) {
         UUID actorAccountId = event.getActorAccountId();
+        // An event recorded without an actor is expected, and no Map contract covers a null key.
+        String actorUsername = Optional.ofNullable(actorAccountId).map(actorUsernames::get).orElse(null);
         return new AuditEntry(event.getId(), event.getOccurredAt(), event.getEventType(),
                 payloadOf(event.getPayload()), event.getSubjectId(),
                 subjectNamesById.get(event.getSubjectId()),
-                actorAccountId, actorUsernames.get(actorAccountId));
+                actorAccountId, actorUsername);
     }
 
     @SuppressWarnings("unchecked")
