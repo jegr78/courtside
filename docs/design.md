@@ -14,8 +14,8 @@
 
 ## 0. What is built today
 
-Thirteen modules exist: `api`, `audit`, `booking`, `card`, `config`, `dataexchange`, `demo`, `facility`,
-`identity`, `member`, `performance`, `rules`, `shared`. `api` holds the OpenAPI-generated request, response and
+Fourteen modules exist: `api`, `audit`, `booking`, `card`, `config`, `dataexchange`, `demo`, `facility`,
+`identity`, `member`, `performance`, `rules`, `securityassessment`, `shared`. `api` holds the OpenAPI-generated request, response and
 controller-interface types and carries no logic of its own, which is why it is declared shared
 alongside `shared` rather than given `allowedDependencies` of its own. `demo` and `performance`
 seed disposable environments — a walkthrough dataset and a synthetic load-test dataset — and each
