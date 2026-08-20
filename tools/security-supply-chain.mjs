@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chmodSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { finalizeSupplyChainEvidence } from "./security-findings.mjs";
@@ -21,8 +21,9 @@ function parseArguments(args) {
 }
 
 function fileDigest(path, name) {
-  if (statSync(path).size === 0) throw new Error(`${name} proof is empty`);
-  return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`;
+  const content = readFileSync(path);
+  if (content.length === 0) throw new Error(`${name} proof is empty`);
+  return `sha256:${createHash("sha256").update(content).digest("hex")}`;
 }
 
 function jsonProof(path, name) {
