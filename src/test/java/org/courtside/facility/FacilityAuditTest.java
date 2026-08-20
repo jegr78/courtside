@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -65,6 +66,18 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACourt_whenChangedWithTheStoredNumberAndName_thenNothingIsRecorded() {
+        // given
+        Court court = facility.createCourt(7, "Centre Court");
+
+        // when
+        facility.changeCourt(court.getId(), 7, "Centre Court");
+
+        // then
+        assertThat(eventsOfTypeAbout(court.getId(), FacilityEvent.CourtChanged.TYPE)).isEmpty();
+    }
+
+    @Test
     void givenAnActiveCourt_whenItIsDeactivated_thenTheLogCarriesTheFlag() {
         // given
         Court court = facility.createCourt(7, "Centre Court");
@@ -75,6 +88,33 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(payloadOf(court.getId(), FacilityEvent.CourtAvailabilityChanged.TYPE))
                 .containsEntry("active", false);
+    }
+
+    @Test
+    void givenOpeningHours_whenAWindowIsSet_thenTheLogCarriesTheWindow() {
+        // when
+        OpeningHours hours = facility.setOpeningHours(DayOfWeek.SATURDAY,
+                new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+
+        // then
+        assertThat(payloadOf(hours.getId(), FacilityEvent.OpeningHoursSet.TYPE))
+                .containsEntry("openingHoursId", hours.getId().toString())
+                .containsEntry("dayOfWeek", DayOfWeek.SATURDAY.getValue())
+                .containsEntry("opensAt", "08:00:00")
+                .containsEntry("closesAt", "22:00:00");
+        assertSiblingsSilent(hours.getId(), FacilityEvent.OpeningHoursSet.TYPE);
+    }
+
+    @Test
+    void givenOpeningHours_whenSetAgainWithTheStoredWindow_thenNothingIsRecorded() {
+        // given
+        facility.setOpeningHours(DayOfWeek.SATURDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+
+        // when
+        facility.setOpeningHours(DayOfWeek.SATURDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+
+        // then
+        assertThat(audit.eventsOfType(FacilityEvent.OpeningHoursSet.TYPE)).hasSize(1);
     }
 
     @Test
@@ -108,6 +148,18 @@ class FacilityAuditTest extends AbstractIntegrationTest {
 
         // then
         assertThat(audit.nameOf(court.getId())).isEqualTo("Centre Court");
+    }
+
+    private static final List<String> CHANGE_EVENT_TYPES = List.of(FacilityEvent.CourtChanged.TYPE,
+            FacilityEvent.CourtAvailabilityChanged.TYPE, FacilityEvent.OpeningHoursSet.TYPE,
+            FacilityEvent.OpeningHoursClosed.TYPE);
+
+    private void assertSiblingsSilent(UUID subjectId, String publishedType, String... alreadyExpectedTypes) {
+        List<String> excluded = new ArrayList<>(List.of(alreadyExpectedTypes));
+        excluded.add(publishedType);
+        CHANGE_EVENT_TYPES.stream()
+                .filter(type -> !excluded.contains(type))
+                .forEach(type -> assertThat(eventsOfTypeAbout(subjectId, type)).as(type).isEmpty());
     }
 
     private Map<String, Object> payloadOf(UUID subjectId, String eventType) {
