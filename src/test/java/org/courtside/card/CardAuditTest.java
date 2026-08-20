@@ -83,6 +83,17 @@ class CardAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAParticipantCardWithNoCapacityLimit_whenItIsCreated_thenTheLogCarriesTheNullCapacity() {
+        // when
+        ParticipantCard card = cards.createParticipantCard("Guests", null);
+
+        // then
+        Map<String, Object> payload = payloadOf(card.getId(), CardEvent.ParticipantCardAdded.TYPE);
+        assertThat(payload).containsKey("capacity");
+        assertThat(payload.get("capacity")).isNull();
+    }
+
+    @Test
     void givenAParticipantCard_whenItsCapacityChanges_thenTheLogCarriesTheNewCapacity() {
         // given
         ParticipantCard card = cards.createParticipantCard("Guests", 2);

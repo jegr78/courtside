@@ -109,14 +109,15 @@ describe("AdminAuditView", () => {
   });
 
   it.each([
-    ["facility.openingHours.set", { dayOfWeek: 1, opensAt: "08:00:00", closesAt: "22:00:00" }, "Opening hours set: Monday, 08:00:00–22:00:00"],
+    ["facility.openingHours.set", { dayOfWeek: 1, opensAt: "08:00:00", closesAt: "22:00:00" }, "Opening hours set: Monday, 08:00–22:00"],
     ["facility.openingHours.closed", { dayOfWeek: 7 }, "Sunday closed"],
     ["card.participantCard.added", { capacity: 4 }, "Participant card with capacity 4 added"],
+    ["card.participantCard.added", { capacity: null }, "Participant card with no capacity limit added"],
     ["config.club.localeChanged", { defaultLocale: "de" }, "Default language changed to de"],
     ["config.club.slotDurationChanged", { slotMinutes: 30 }, "Slot duration changed to 30 minutes"],
     ["config.club.timeZoneChanged", { timeZone: "Europe/Berlin" }, "Time zone changed to Europe/Berlin"],
-    ["rules.definition.set", { ruleType: "ADVANCE_WINDOW" }, "Rule ADVANCE_WINDOW set"],
-    ["rules.definition.removed", { ruleType: "ADVANCE_WINDOW" }, "Rule ADVANCE_WINDOW removed"],
+    ["rules.definition.set", { ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 } }, "Rule Advance booking window set: Maximum days in advance: 14"],
+    ["rules.definition.removed", { ruleType: "ADVANCE_WINDOW" }, "Rule Advance booking window removed"],
     ["roster.membership.written", { startedOn: "2026-01-01" }, "Membership recorded from 2026-01-01"]
   ])("given a %s event, when it is shown, then its interpolated values are resolved, not left as template text", async (eventType, parameters, expected) => {
     // given

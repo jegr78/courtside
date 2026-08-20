@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, type AuditEntry } from "../api/client";
 import { problemMessage } from "../api/problem-message";
-import { formatDateTime } from "../time/clubZone";
+import { formatDateTime, shortTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 
@@ -12,16 +12,37 @@ const enabledFlagByEventType: Record<string, string> = {
   "roster.account.availabilityChanged": "enabled"
 };
 
+function paramsLabel(params: Record<string, unknown>, t: TFunction): string {
+  return Object.entries(params)
+    .map(([name, value]) => `${t(`admin.rules.parameter.${name}`)}: ${String(value)}`)
+    .join(", ");
+}
+
 function auditMessage(entry: AuditEntry, t: TFunction): string {
   const flagKey = enabledFlagByEventType[entry.eventType] ?? "active";
   const context = entry.eventType.endsWith(".availabilityChanged")
     ? (entry.parameters[flagKey] ? "active" : "inactive")
-    : undefined;
+    : entry.eventType === "card.participantCard.added"
+        && (entry.parameters.capacity === null || entry.parameters.capacity === undefined)
+      ? "unlimited"
+      : undefined;
   const dayOfWeek = entry.parameters.dayOfWeek;
   const weekday = typeof dayOfWeek === "number" ? t(`audit.day.${dayOfWeek}`) : undefined;
+  const ruleType = typeof entry.parameters.ruleType === "string"
+    ? t(`admin.rules.type.${entry.parameters.ruleType}`)
+    : undefined;
+  const params = typeof entry.parameters.params === "object" && entry.parameters.params !== null
+    ? paramsLabel(entry.parameters.params as Record<string, unknown>, t)
+    : undefined;
+  const opensAt = typeof entry.parameters.opensAt === "string" ? shortTime(entry.parameters.opensAt) : undefined;
+  const closesAt = typeof entry.parameters.closesAt === "string" ? shortTime(entry.parameters.closesAt) : undefined;
   return t(`audit.event.${entry.eventType}`, {
     ...entry.parameters,
     ...(weekday !== undefined ? { weekday } : {}),
+    ...(ruleType !== undefined ? { ruleType } : {}),
+    ...(params !== undefined ? { params } : {}),
+    ...(opensAt !== undefined ? { opensAt } : {}),
+    ...(closesAt !== undefined ? { closesAt } : {}),
     ...(context ? { context } : {})
   });
 }

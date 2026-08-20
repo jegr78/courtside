@@ -11,6 +11,7 @@ import {
   type Role
 } from "../api/client";
 import { problemMessage } from "../api/problem-message";
+import { shortTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
@@ -339,10 +340,6 @@ function cardRequest(card: BookingCard): BookingCardRequest {
 
 function playerCounts(value: string): number[] {
   return value.split(",").map((count) => count.trim()).filter(Boolean).map(Number);
-}
-
-function shortTime(value: string | null | undefined): string {
-  return value?.slice(0, 5) ?? "";
 }
 
 function formString(form: FormData, name: string): string {
