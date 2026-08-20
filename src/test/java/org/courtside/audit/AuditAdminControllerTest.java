@@ -116,7 +116,7 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenACourtWithNoName_whenTheLogIsRead_thenTheSubjectNameIsAbsentRatherThanFailing()
+    void givenACourtWithNoName_whenTheLogIsRead_thenTheSubjectNameFallsBackToItsNumber()
             throws Exception {
         // given
         UUID courtId = facilityFixture.createCourt(11, null);
@@ -126,7 +126,7 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
                         .with(user(administrator)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries[0].subjectId").value(courtId.toString()))
-                .andExpect(jsonPath("$.entries[0].subjectName").doesNotExist());
+                .andExpect(jsonPath("$.entries[0].subjectName").value("11"));
     }
 
     @Test

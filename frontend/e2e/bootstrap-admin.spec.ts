@@ -275,7 +275,7 @@ test("an admin changes a court and finds that change in the log", async ({ page 
   );
   await expect(entry).toBeVisible();
   await expect(entry.getByTestId("audit-message")).toHaveText("Court deactivated");
-  await expect(entry.getByTestId("audit-subject")).toHaveText(court);
+  await expect(entry.getByTestId("audit-subject")).toHaveText("3");
   await expect(entry.getByTestId("audit-actor")).toHaveText("configuration-admin");
 });
 
