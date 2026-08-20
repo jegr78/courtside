@@ -32,8 +32,7 @@ class AuditAdminController implements AdminAuditApi {
 
     private static ApiAuditEntry toResponse(AuditService.AuditEntry entry) {
         return new ApiAuditEntry(entry.id(), WireTypes.toOffsetDateTime(entry.occurredAt()),
-                entry.eventType(), entry.parameters())
-                .subjectId(entry.subjectId())
+                entry.eventType(), entry.parameters(), entry.subjectId())
                 .subjectName(entry.subjectName())
                 .actorAccountId(entry.actorAccountId())
                 .actorUsername(entry.actorUsername());

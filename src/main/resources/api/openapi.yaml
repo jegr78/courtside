@@ -1453,7 +1453,7 @@ components:
 
     AuditEntry:
       type: object
-      required: [id, occurredAt, eventType, parameters]
+      required: [id, occurredAt, eventType, parameters, subjectId]
       properties:
         id: { type: string, format: uuid }
         occurredAt: { type: string, format: date-time }
@@ -1467,7 +1467,7 @@ components:
           type: object
           additionalProperties: true
           description: The recorded payload, as the message's parameters.
-        subjectId: { type: [string, "null"], format: uuid }
+        subjectId: { type: string, format: uuid }
         subjectName:
           type: [string, "null"]
           description: What the entity is called today, or `null` once the entity is gone.

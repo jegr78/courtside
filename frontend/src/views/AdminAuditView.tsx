@@ -57,7 +57,7 @@ function actorLabel(entry: AuditEntry, t: TFunction): string {
 }
 
 function subjectLabel(entry: AuditEntry, t: TFunction): string {
-  return entry.subjectName ?? weekdayLabel(entry, t) ?? entry.subjectId ?? "";
+  return entry.subjectName ?? weekdayLabel(entry, t) ?? entry.subjectId;
 }
 
 export function AdminAuditView() {
@@ -122,7 +122,7 @@ export function AdminAuditView() {
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => <tr key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId ?? ""} data-event-type={entry.eventType} className="border-t">
+            {entries.map((entry) => <tr key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId} data-event-type={entry.eventType} className="border-t">
               <td data-testid="audit-occurred-at" className="p-2">{formatDateTime(entry.occurredAt, language, timeZone)}</td>
               <td data-testid="audit-message" className="p-2">{auditMessage(entry, t)}</td>
               <td data-testid="audit-subject" className="p-2">{subjectLabel(entry, t)}</td>

@@ -89,7 +89,7 @@ describe("AdminAuditView", () => {
     await screen.findByTestId("audit-row");
 
     // then
-    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(entry.subjectId!);
+    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(entry.subjectId);
   });
 
   it("given an opening-hours entry with no subject name, when it is shown, then the subject cell names the weekday, translated", async () => {
