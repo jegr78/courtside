@@ -2479,7 +2479,7 @@
     {
       "id": "CSA-PWA-001",
       "title": "Browser injection and client-side data retention",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-CLNT-02"

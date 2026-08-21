@@ -8,9 +8,13 @@ const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync(join(repository, "frontend/playwright.config.ts"), "utf8");
 const pom = readFileSync(join(repository, "pom.xml"), "utf8");
+const buildWorkflow = readFileSync(join(repository, ".github/workflows/build.yml"), "utf8");
 const stability = readFileSync(join(repository, ".github/workflows/test-stability.yml"), "utf8");
 const pwa = readFileSync(join(repository, "frontend/e2e/pwa-lifecycle.spec.ts"), "utf8");
 const supported = readFileSync(join(repository, "frontend/e2e/supported-browser.spec.ts"), "utf8");
+const browserSecurity = readFileSync(join(repository, "frontend/e2e/browser-security.spec.ts"), "utf8");
+const browserSecuritySmoke = readFileSync(join(repository, "frontend/e2e/browser-security-smoke.spec.ts"), "utf8");
+const catalog = JSON.parse(readFileSync(join(repository, "security/assessment-catalog.json"), "utf8"));
 const documentation = readFileSync(join(repository, "docs/browser-pwa-testing.md"), "utf8");
 
 test("given supported desktop browsers, when qualifying a pull request, then Chromium and WebKit run core smoke journeys", () => {
@@ -45,4 +49,20 @@ test("given a release on physical devices, when recording evidence, then both mo
   assert.match(documentation, /Android\/Chrome/);
   assert.match(documentation, /candidate commit, image digest/);
   assert.match(documentation, /link it from the release checklist/);
+});
+
+test("given browser-controlled and stored values, when qualifying the PWA, then security evidence covers injection and retention", () => {
+  assert.match(browserSecurity, /securitypolicyviolation/);
+  assert.match(browserSecurity, /localStorage/);
+  assert.match(browserSecurity, /sessionStorage/);
+  assert.match(browserSecurity, /context\(\)\.cookies/);
+  assert.match(browserSecurity, /caches\.keys/);
+  assert.match(browserSecurity, /URL and fragment payloads/);
+  assert.match(browserSecurity, /page\.on\("console"/);
+  assert.match(browserSecurity, /cross-role/);
+  assert.match(browserSecuritySmoke, /content-security-policy/);
+  assert.match(playwright, /browser-security-smoke\\\.spec\\\.ts/);
+  assert.match(stability, /--project=firefox-periodic/);
+  assert.match(buildWorkflow, /browser-security\/browser-security-inventory\.json/);
+  assert.equal(catalog.tests.find(({ id }) => id === "CSA-PWA-001")?.status, "implemented");
 });

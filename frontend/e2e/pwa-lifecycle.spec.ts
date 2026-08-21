@@ -89,8 +89,10 @@ test("a waiting service-worker update activates once and reloads one coherent ap
   await expect(page.getByTestId("pwa-update-prompt")).toBeVisible();
 
   // when
-  await Promise.all([
+  const [, updatedShell] = await Promise.all([
     page.waitForEvent("load"),
+    page.waitForResponse((response) =>
+      new URL(response.url()).pathname === "/" && response.request().resourceType() === "document"),
     page.getByTestId("pwa-update").click()
   ]);
 
@@ -109,6 +111,8 @@ test("a waiting service-worker update activates once and reloads one coherent ap
     navigator.serviceWorker.controller?.postMessage("COURTSIDE_TEST_VERSION");
   }));
   expect(workerVersion).toBe(2);
+  expect(updatedShell.headers()["content-security-policy"]).toContain("script-src 'self'");
+  await expectNoApiResponseInCache(page);
   await page.evaluate(() => navigator.serviceWorker.getRegistration().then((registration) => registration?.update()));
   await expect(page.getByTestId("pwa-update-prompt")).not.toBeVisible();
 });

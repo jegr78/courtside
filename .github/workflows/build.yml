@@ -103,6 +103,7 @@ jobs:
             frontend/coverage
             build/coverage/changed.md
             frontend/test-results/visual-journeys
+            frontend/test-results/browser-security/browser-security-inventory.json
             frontend/test-results/**/trace.zip
             frontend/test-results/**/*.png
             build/security/summary.json
