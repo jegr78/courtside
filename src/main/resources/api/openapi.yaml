@@ -572,6 +572,10 @@ components:
       description: |
         Every part of a source is given here and every part may be given again — this request is
         what a correction uses as much as a first description.
+
+        `membershipTypes` and `ownedFields` may be omitted, and the source then holds neither: no
+        exported category maps to a type, and the source owns no field. `ImportSource` reports both
+        as empty rather than absent, which is why it requires what this does not.
       required: [sourceKey, displayName, columns, defaultMembershipTypeId, removalWarningPercent]
       properties:
         sourceKey:
@@ -1493,6 +1497,12 @@ components:
           format: uuid
           description: Pass this entry id as `cursor` to continue after the current page.
 
+  headers:
+    Location:
+      description: Where the created resource can be read.
+      required: true
+      schema: { type: string, format: uri-reference }
+
   responses:
     Unauthenticated:
       description: No session, or a state-changing request without a CSRF token.
@@ -1849,6 +1859,8 @@ paths:
       responses:
         "201":
           description: Booked.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BookingCreated" }
@@ -2095,6 +2107,8 @@ paths:
       responses:
         "201":
           description: Created, with whatever was skipped.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SeriesCreated" }
@@ -2253,6 +2267,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Court" }
@@ -2395,6 +2411,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BookingCard" }
@@ -2537,6 +2555,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ParticipantCard" }
@@ -2679,6 +2699,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MembershipType" }
@@ -2855,6 +2877,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RosterEntry" }
@@ -3209,7 +3233,10 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
         "409":
-          description: The membership type is no longer offered.
+          description: |
+            The membership type is no longer offered
+            (`urn:courtside:error:membership-type-inactive`), or the person was changed while this
+            request was in flight (`urn:courtside:error:concurrent-modification`).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -3224,8 +3251,11 @@ paths:
         it ended, so a club can still see who was a member of what and until when. Nothing is
         deleted here.
 
-        Use `PUT` instead to end a membership on a different date, or to correct a date recorded
-        wrongly.
+        This is exactly `PUT` with the type unchanged and `endedOn` set to today — a shortcut for
+        the one date that needs no choosing, kept because it reads as what it does. Use `PUT`
+        instead to end a membership on a different date, or to correct a date recorded wrongly.
+        The browser uses `PUT` throughout: a board records a departure after the fact far more
+        often than on the day, and only `PUT` can correct the date afterwards.
 
         Ending a membership the person does not currently hold is the state the request asks for
         and answers the same way, and it leaves an already recorded end date where it is.
@@ -3294,6 +3324,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImportSource" }
@@ -3479,6 +3511,8 @@ paths:
       responses:
         "201":
           description: Linked.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ExternalReference" }
@@ -3573,6 +3607,8 @@ paths:
       responses:
         "201":
           description: The preview.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImportPreview" }
@@ -3733,6 +3769,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RuleSet" }
