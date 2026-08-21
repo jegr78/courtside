@@ -203,7 +203,21 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.removals.percent").value(100))
                 .andExpect(jsonPath("$.needsConfirmation").value(true))
                 .andExpect(jsonPath("$.changes[?(@.kind == 'END_MEMBERSHIP')].personId")
-                        .value(jane.toString()));
+                        .value(jane.toString()))
+                .andExpect(jsonPath("$.changes[?(@.kind == 'END_MEMBERSHIP')].personName")
+                        .value("Jane Doe"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenARowThatWouldCreateSomebody_whenPreviewing_thenItNamesNoPersonBecauseThereIsNoneYet()
+            throws Exception {
+        // when / then
+        mockMvc.perform(upload(THREE_ROWS, "UPDATE_ONLY"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.changes[0].kind").value("CREATE"))
+                .andExpect(jsonPath("$.changes[0].personName")
+                        .value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test
@@ -232,7 +246,8 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.changes[0].kind").value("CREATE"))
                 .andExpect(jsonPath("$.possibleDuplicates.length()").value(1))
-                .andExpect(jsonPath("$.possibleDuplicates[0].personId").value(jane.toString()));
+                .andExpect(jsonPath("$.possibleDuplicates[0].personId").value(jane.toString()))
+                .andExpect(jsonPath("$.possibleDuplicates[0].personName").value("Jane Doe"));
     }
 
     @Test

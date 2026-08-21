@@ -728,6 +728,13 @@ components:
             no row of its own — it follows from an absence — and reports `0`.
         externalId: { type: string }
         personId: { type: [string, "null"], format: uuid }
+        personName:
+          type: [string, "null"]
+          description: |
+            The name that person carries today, resolved when the preview is read. `null` on a
+            `CREATE`, which describes somebody who does not exist yet — their names are in `values`.
+            A board reviewing an `END_MEMBERSHIP` is reading the riskiest line of the whole preview
+            and has to see whose membership it is.
         values:
           type: object
           description: |
@@ -754,7 +761,7 @@ components:
 
     ImportPossibleDuplicate:
       type: object
-      required: [rowNumber, externalId, personId]
+      required: [rowNumber, externalId, personId, personName]
       description: |
         A row that would create somebody the roster appears to hold already. It is reported and not
         acted on: two members really are called John Roe, so only a board can tell a duplicate from
@@ -763,6 +770,9 @@ components:
         rowNumber: { type: integer }
         externalId: { type: string }
         personId: { type: string, format: uuid }
+        personName:
+          type: string
+          description: The name that person carries today, resolved when the preview is read.
 
     ImportRemovalCounts:
       type: object

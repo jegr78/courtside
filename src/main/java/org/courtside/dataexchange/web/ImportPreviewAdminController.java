@@ -61,13 +61,15 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
         return new ApiImportPreview(summary.previewId(), summary.sourceId(),
                 ApiSnapshotMode.fromValue(summary.mode().name()), summary.fileName(),
                 summary.fileHash(), summary.rowCount(), summary.ignoredColumns(),
-                changesOf(changeSet), rowErrorsOf(changeSet), duplicatesOf(changeSet),
+                changesOf(changeSet, summary.personNames()), rowErrorsOf(changeSet),
+                duplicatesOf(changeSet, summary.personNames()),
                 removalsOf(changeSet), summary.needsConfirmation(), summary.superseded(),
                 WireTypes.toOffsetDateTime(summary.createdAt()),
                 WireTypes.toOffsetDateTime(summary.expiresAt()));
     }
 
-    private static List<ApiImportPersonChange> changesOf(ResolvedChangeSet changeSet) {
+    private static List<ApiImportPersonChange> changesOf(ResolvedChangeSet changeSet,
+                                                        Map<UUID, String> names) {
         if (changeSet == null) {
             return List.of();
         }
@@ -77,8 +79,14 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
             return new ApiImportPersonChange(ApiImportChangeKind.fromValue(change.kind().name()),
                     change.rowNumber(), change.externalId(), values)
                     .personId(change.personId())
+                    .personName(nameOf(names, change.personId()))
                     .membershipTypeId(change.membershipTypeId());
         }).toList();
+    }
+
+    // An immutable Map throws on get(null), and a CREATE has no person yet.
+    private static String nameOf(Map<UUID, String> names, UUID personId) {
+        return personId == null ? null : names.get(personId);
     }
 
     private static List<ApiImportRowError> rowErrorsOf(ResolvedChangeSet changeSet) {
@@ -90,13 +98,15 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
                 .toList();
     }
 
-    private static List<ApiImportPossibleDuplicate> duplicatesOf(ResolvedChangeSet changeSet) {
+    private static List<ApiImportPossibleDuplicate> duplicatesOf(ResolvedChangeSet changeSet,
+                                                                 Map<UUID, String> names) {
         if (changeSet == null) {
             return List.of();
         }
         return changeSet.duplicates().stream()
                 .map(duplicate -> new ApiImportPossibleDuplicate(duplicate.rowNumber(),
-                        duplicate.externalId(), duplicate.personId()))
+                        duplicate.externalId(), duplicate.personId(),
+                        nameOf(names, duplicate.personId())))
                 .toList();
     }
 

@@ -24,6 +24,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -140,8 +141,24 @@ public class PreviewService {
                 : read(preview.getChangeSet());
         return new PreviewSummary(preview.getId(), preview.getSourceId(), preview.getMode(),
                 preview.getFileName(), preview.getFileHash(), preview.getRowCount(),
-                stored.ignoredColumns(), stored.changeSet(), preview.needsConfirmation(),
-                preview.getCreatedAt(), preview.getExpiresAt(), preview.isSuperseded());
+                stored.ignoredColumns(), stored.changeSet(), namesIn(stored.changeSet()),
+                preview.needsConfirmation(), preview.getCreatedAt(), preview.getExpiresAt(),
+                preview.isSuperseded());
+    }
+
+    // Resolved on read rather than stored with the change set: a board reviewing what a run would
+    // end has to see who that is, and a person renamed since the upload is still that person.
+    private Map<UUID, String> namesIn(ResolvedChangeSet changeSet) {
+        if (changeSet == null) {
+            return Map.of();
+        }
+        Set<UUID> wanted = new HashSet<>();
+        changeSet.changes().stream().map(ResolvedChangeSet.PersonChange::personId)
+                .filter(Objects::nonNull).forEach(wanted::add);
+        changeSet.duplicates().stream().map(ResolvedChangeSet.PossibleDuplicate::personId)
+                .forEach(wanted::add);
+        return persons.findAllById(wanted).stream()
+                .collect(Collectors.toMap(Person::getId, Person::getDisplayName));
     }
 
     private ImportPreview require(UUID previewId) {

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type ImportSource, type ImportSourceRequest, type MembershipType } from "../api/client";
+import { api, type ImportPreview, type ImportSource, type ImportSourceRequest, type MembershipType } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { ExternalReferencePanel } from "./import/ExternalReferencePanel";
+import { ImportPreviewPanel } from "./import/ImportPreviewPanel";
 import { ImportSourceForm } from "./import/ImportSourceForm";
 
 type Editing = { source: ImportSource } | { source: undefined } | undefined;
@@ -16,6 +17,7 @@ export function AdminImportView() {
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [editing, setEditing] = useState<Editing>();
   const [removing, setRemoving] = useState(false);
+  const [preview, setPreview] = useState<ImportPreview>();
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -49,6 +51,7 @@ export function AdminImportView() {
           : [...known, written];
       });
       setEditing({ source: written });
+      setPreview(undefined);
       setError(undefined);
       setSuccess(t("admin.import.saved"));
     } catch (failure) {
@@ -89,7 +92,7 @@ export function AdminImportView() {
         ? <p data-testid="no-sources">{t("admin.import.noSources")}</p>
         : <ul className="grid gap-2">
           {sources.map((source) => <li key={source.id}>
-            <Button data-testid={`source-choice-${source.id}`} disabled={pending} type="button" onClick={() => setEditing({ source })}>
+            <Button data-testid={`source-choice-${source.id}`} disabled={pending} type="button" onClick={() => { setEditing({ source }); setPreview(undefined); }}>
               {source.displayName}
             </Button>
           </li>)}
@@ -105,6 +108,15 @@ export function AdminImportView() {
       types={types}
       disabled={pending}
       save={save}
+    />}
+
+    {chosen && <ImportPreviewPanel
+      key={`preview-${chosen.id}`}
+      sourceId={chosen.id}
+      preview={preview}
+      disabled={pending}
+      previewed={setPreview}
+      reportError={reportError}
     />}
 
     {chosen && <ExternalReferencePanel
