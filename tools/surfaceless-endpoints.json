@@ -18,18 +18,20 @@
   "readImportPreview": "The import journey arrives in the roster and import work.",
   "executeImportPreview": "The import journey arrives in the roster and import work.",
   "listImportRuns": "The import journey arrives in the roster and import work.",
-
   "listParticipantCardsForAdmin": "A gap, not a decision: participant cards have no browser surface at all, so a board cannot create or correct one. Issue #81 does not cover them.",
   "createParticipantCard": "A gap, not a decision: participant cards have no browser surface at all, so a board cannot create or correct one. Issue #81 does not cover them.",
   "getParticipantCard": "A gap, not a decision: participant cards have no browser surface at all, so a board cannot create or correct one. Issue #81 does not cover them.",
   "changeParticipantCard": "A gap, not a decision: participant cards have no browser surface at all, so a board cannot create or correct one. Issue #81 does not cover them.",
   "setParticipantCardActive": "A gap, not a decision: participant cards have no browser surface at all, so a board cannot create or correct one. Issue #81 does not cover them.",
-
   "getRuleSet": "A gap, not a decision: the configuration view lists and creates rule sets but cannot rename or retire one, so a mistyped name has no cure in the product.",
   "changeRuleSet": "A gap, not a decision: the configuration view lists and creates rule sets but cannot rename or retire one, so a mistyped name has no cure in the product.",
   "setRuleSetActive": "A gap, not a decision: the configuration view lists and creates rule sets but cannot rename or retire one, so a mistyped name has no cure in the product.",
-
   "courtImpact": "A gap, not a decision: the facility view takes a court out of service without first showing what that would displace.",
   "bookingCardImpact": "A gap, not a decision: the facility view retires a booking card without first showing what that would displace.",
-  "openingHoursImpact": "A gap, not a decision: the facility view closes a day without first showing what that would displace."
+  "openingHoursImpact": "A gap, not a decision: the facility view closes a day without first showing what that would displace.",
+  "previewSeries": "The series form arrives in this work; a series can be moved and cancelled from the browser today but never created.",
+  "createSeries": "The series form arrives in this work; a series can be moved and cancelled from the browser today but never created.",
+  "getApiDocument": "The contract serves itself to whoever consumes it. There is nothing for a member or a board to operate here.",
+  "getWebManifest": "The browser fetches this through <link rel=\"manifest\"> when it installs the app, so no view calls it and none should.",
+  "listOpeningHours": "BookingGrid already carries the opening hours and WeekView reads them from there, so a second call would fetch what the page already holds."
 }

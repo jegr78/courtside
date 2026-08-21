@@ -17,8 +17,7 @@ const surfaceless = JSON.parse(
 
 const methods = new Set(["get", "post", "put", "patch", "delete"]);
 
-const adminOperations = () => Object.entries(api.paths)
-  .filter(([path]) => path.startsWith("/api/admin/"))
+const contractOperations = () => Object.entries(api.paths)
   .flatMap(([path, item]) => Object.entries(item)
     .filter(([method]) => methods.has(method))
     .map(([method, operation]) => ({
@@ -36,9 +35,9 @@ const isCalled = ({ path }) => {
   return new RegExp(`${pattern}(?=[?\`"'])`).test(client);
 };
 
-test("given every administrative endpoint, when looking for its browser surface, then it is called or listed as deliberately without one", () => {
+test("given every endpoint the contract declares, when looking for its browser surface, then it is called or listed as deliberately without one", () => {
   // given
-  const operations = adminOperations();
+  const operations = contractOperations();
 
   // when
   const unreachable = operations.filter((operation) => !isCalled(operation) && !surfaceless[operation.id]);
@@ -53,7 +52,7 @@ test("given every administrative endpoint, when looking for its browser surface,
 
 test("given the surfaceless inventory, when reading it, then every entry names a real operation and gives a reason", () => {
   // given
-  const known = new Set(adminOperations().map((operation) => operation.id));
+  const known = new Set(contractOperations().map((operation) => operation.id));
 
   // when
   const unknown = Object.keys(surfaceless).filter((id) => !known.has(id));
