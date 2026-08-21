@@ -336,6 +336,38 @@ test("given fuzzing changed domain state, when executing the active plan, then l
   assert.equal(manifest.usage.requests, 300);
 });
 
+test("given the destructive abuse suite, when recovery and integrity pass, then its evidence governs the outcome", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const plan = buildSecurityPlan(input({
+    profile: "destructive",
+    authorization: "authorize-destructive-run-0001",
+    tools: [
+      { id: "target-identity", version: "1.0.0", testIds: [] },
+      { id: "resource-abuse", version: "1.0.0", testIds: ["CSA-RES-001"] }
+    ],
+    selectedTests: ["CSA-RES-001"],
+    catalogTests: [{ id: "CSA-RES-001", status: "implemented", profile: "destructive" }]
+  }));
+
+  // when
+  const manifest = await executeSecurityPlan(plan, {
+    root,
+    verifyTarget: async () => input({ profile: "destructive" }),
+    runResourceAbuseAssessment: async (_plan, context) => ({
+      outcome: "passed", requestCount: 640, generatedDataMegabytes: 2,
+      maxRequests: context.maxRequests
+    })
+  });
+
+  // then
+  assert.equal(manifest.outcome, "passed");
+  assert.deepEqual(manifest.usage, { requests: 640, generatedDataMegabytes: 2, evidenceBytes: 0 });
+  assert.deepEqual(manifest.toolResults.at(-1), {
+    id: "resource-abuse", version: "1.0.0", outcome: "passed"
+  });
+});
+
 test("given sensitive diagnostics, when retaining them, then credentials and session material are redacted", () => {
   // given
   const diagnostic = "Authorization: Bearer abc.def.ghi\nCookie: SESSION=secret\npassword=hunter2 token=abcdef";

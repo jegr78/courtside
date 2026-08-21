@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { runOwnedProcess } from "./security-passive-deployment.mjs";
+import { evaluateResourceSignals } from "./security-resource-abuse.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
@@ -609,6 +610,164 @@ export async function securityDomainStateFingerprint(runId, stopFile, timeoutMil
   return `sha256:${createHash("sha256").update(stable).digest("hex")}`;
 }
 
+export async function runResourceAbuse(plan, stopFile, limits) {
+  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
+    COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests),
+    COURTSIDE_SECURITY_MAX_CONCURRENCY: String(plan.budgets.concurrency),
+    COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD,POST,DELETE,OPTIONS",
+    COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api",
+    COURTSIDE_SECURITY_MAX_TARGET_BYTES: "73728",
+    COURTSIDE_SECURITY_MAX_GENERATED_BYTES: String(plan.budgets.generatedDataMegabytes * 1024 * 1024) };
+  const reservation = `courtside-security-assessment-${plan.runId}`;
+  const gateway = `${securityProject(plan.runId)}-scanner-gateway-1`;
+  const scanner = `courtside-security-k6-${plan.runId}-${limits.attempt}`;
+  const deadline = Date.now() + limits.timeoutMilliseconds;
+  const command = async (args, options = {}) => runOwnedProcess("docker", args, {
+    timeoutMilliseconds: Math.max(1, deadline - Date.now()), stopFile, environment,
+    acceptedExitCodes: options.acceptedExitCodes ?? [0], outputLimitBytes: options.outputLimitBytes ?? 1024 * 1024
+  });
+  const samples = [];
+  let scannerStarted = false;
+  let breaker = { tripped: false, reason: null, sampleSequence: null };
+  try {
+    await command(securityAssessmentReservationArgs(environment, limits.attempt));
+    await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "up", "-d", "--wait",
+      "scanner-gateway"]);
+    await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "-d", "--no-deps",
+      "--name", scanner, "k6-abuse"]);
+    scannerStarted = true;
+    const scannerRuntime = JSON.parse((await command(["inspect", scanner, "--format", "{{json .}}"])).stdout);
+    const gatewayRuntime = JSON.parse((await command(["inspect", gateway, "--format", "{{json .}}"])).stdout);
+    const runtimeHardened = scannerRuntimeHardened(scannerRuntime, {
+      memory: 512 * 1024 * 1024, nanoCpus: 1_000_000_000, pids: 128,
+      networks: [`${securityProject(plan.runId)}_scanner-client`]
+    }) && scannerRuntimeHardened(gatewayRuntime, {
+      memory: 128 * 1024 * 1024, nanoCpus: 500_000_000, pids: 64,
+      networks: [`${securityProject(plan.runId)}_scanner-client`, `${securityProject(plan.runId)}_scanner-upstream`]
+    });
+    const stateBefore = await securityDomainStateFingerprint(plan.runId, stopFile, Math.max(1, deadline - Date.now()));
+    let result;
+    let failure;
+    command(["exec", "-e", `COURTSIDE_SECURITY_SHARED_PASSWORD=${environment.COURTSIDE_SECURITY_SHARED_PASSWORD}`,
+      "-e", `COURTSIDE_SECURITY_RUN_ID=${plan.runId}`, scanner, "k6", "run", "/scripts/resource-abuse.js"],
+    { acceptedExitCodes: [0, 99], outputLimitBytes: 4 * 1024 * 1024 })
+      .then((value) => { result = value; }, (error) => { failure = error; });
+    while (!result && !failure && !breaker.tripped) {
+      await new Promise((resolveWait) => setTimeout(resolveWait,
+        limits.policy.circuitBreakers.sampleIntervalMilliseconds));
+      samples.push(await resourceSample(plan.runId, gateway, samples.length + 1, command));
+      breaker = evaluateResourceSignals(samples, limits.policy.circuitBreakers);
+    }
+    if (breaker.tripped) {
+      await command(["kill", scanner]);
+    } else {
+      while (!result && !failure) await new Promise((resolveWait) => setTimeout(resolveWait, 50));
+      if (failure) throw failure;
+    }
+    const summary = breaker.tripped ? null
+      : JSON.parse((await command(["exec", scanner, "cat", "/results/summary.json"])).stdout);
+    const occupancy = await bookingRaceResult(plan.runId, summary, command);
+    await cleanupResourceAbuseBookings(plan.runId, command);
+    const stateAfter = await securityDomainStateFingerprint(plan.runId, stopFile, Math.max(1, deadline - Date.now()));
+    const recovery = await recoverAfterResourceAbuse(plan.runId, stateBefore, stateAfter, command);
+    const metrics = await scannerGatewayMetrics(gateway, command);
+    return {
+      runtimeHardened,
+      requestCount: metrics.requests,
+      generatedDataMegabytes: metrics.requestBytes / (1024 * 1024),
+      scenarios: limits.policy.scenarios.map(({ id, checks: requiredChecks }) => {
+        const checks = summary?.checks?.filter(({ name }) => name.startsWith(`${id}:`)) ?? [];
+        const observedNames = new Set(checks.map(({ name }) => name));
+        const missingCheck = requiredChecks.some((name) => !observedNames.has(`${id}:${name}`));
+        const fixtureFailed = checks.some(({ name, fails }) => name.endsWith(":fixtures-ready") && fails > 0);
+        const assertionFailed = checks.some(({ name, fails }) => !name.endsWith(":fixtures-ready") && fails > 0);
+        const outcome = missingCheck || fixtureFailed
+          || id === "login-rate-limit-boundary" && !summary.rateLimitedLogins ? "incomplete"
+            : assertionFailed ? "failed" : "passed";
+        return { id, outcome };
+      }),
+      samples,
+      circuitBreaker: breaker,
+      stateBefore,
+      stateAfter,
+      competingWrites: occupancy,
+      recovery
+    };
+  } finally {
+    const cleanupFailures = [];
+    for (const resource of [scannerStarted ? scanner : null, gateway, reservation].filter(Boolean)) {
+      try {
+        await runOwnedProcess("docker", ["rm", "-f", resource], {
+          timeoutMilliseconds: 10_000, stopFile: "/dev/null/courtside-cleanup-stop-disabled", environment
+        });
+      } catch (failure) {
+        if (await containerExistsForCleanup(resource, environment)) cleanupFailures.push(`${resource}: ${failure.message}`);
+      }
+    }
+    if (cleanupFailures.length) throw new Error(`Resource-abuse cleanup was incomplete: ${cleanupFailures.join("; ")}`);
+  }
+}
+
+async function resourceSample(runId, gateway, sequence, command) {
+  const project = securityProject(runId);
+  const stats = async (container) => {
+    const output = (await command(["stats", "--no-stream", "--format", "{{.CPUPerc}}|{{.MemUsage}}", container]))
+      .stdout.trim();
+    const [cpu, memory] = output.split("|");
+    return { cpu: Number(cpu.replace("%", "")), memory: parseDockerMegabytes(memory.split("/")[0].trim()) };
+  };
+  const [app, db] = await Promise.all([stats(`${project}-app-1`), stats(`${project}-db-1`)]);
+  const database = (await command([...securityComposeArgs(runId), "exec", "-T", "db", "psql", "-At", "-F", "|",
+    "-U", "courtside", "-d", "courtside_security", "-c",
+    "SELECT count(*), (SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND application_name='PostgreSQL JDBC Driver' AND state <> 'idle'), (SELECT count(*) FROM pg_locks WHERE NOT granted), (SELECT count(*) FROM spring_session), pg_database_size(current_database()) FROM pg_stat_activity WHERE datname=current_database()"])).stdout.trim();
+  const [activeConnections, activePoolConnections, waitingLocks, sessionRows, storageBytes]
+    = database.split("|").map(Number);
+  const gatewayMetrics = await scannerGatewayMetrics(gateway, command);
+  if (![app.cpu, app.memory, db.cpu, db.memory, activeConnections, activePoolConnections, waitingLocks,
+    sessionRows, storageBytes, gatewayMetrics.requestP95Milliseconds, gatewayMetrics.errorRate]
+    .every(Number.isFinite)) throw new Error("Resource telemetry is incomplete");
+  return { sequence, appCpuPercent: app.cpu, appMemoryMegabytes: app.memory,
+    dbCpuPercent: db.cpu, dbMemoryMegabytes: db.memory, activeConnections, activePoolConnections,
+    waitingLocks, sessionRows, storageMegabytes: storageBytes / (1024 * 1024),
+    requestP95Milliseconds: gatewayMetrics.requestP95Milliseconds, errorRate: gatewayMetrics.errorRate };
+}
+
+function parseDockerMegabytes(value) {
+  const match = /^([0-9.]+)([KMG]iB)$/.exec(value);
+  if (!match) throw new Error("Docker memory telemetry is invalid");
+  const factor = { KiB: 1 / 1024, MiB: 1, GiB: 1024 }[match[2]];
+  return Number(match[1]) * factor;
+}
+
+async function bookingRaceResult(runId, summary, command) {
+  const value = (await command([...securityComposeArgs(runId), "exec", "-T", "db", "psql", "-At",
+    "-U", "courtside", "-d", "courtside_security", "-c",
+    `SELECT count(*) FROM booking WHERE note = 'Security occupancy ${runId}'`])).stdout.trim();
+  const successful = Number(value);
+  return { successful, rejected: summary?.rejectedOccupancy ?? 0,
+    partialOperations: summary?.partialOperations ?? 0 };
+}
+
+async function cleanupResourceAbuseBookings(runId, command) {
+  await command([...securityComposeArgs(runId), "exec", "-T", "db", "psql", "-v", "ON_ERROR_STOP=1", "-U",
+    "courtside", "-d", "courtside_security", "-c",
+    `DELETE FROM booking WHERE note = 'Security occupancy ${runId}'`]);
+}
+
+async function recoverAfterResourceAbuse(runId, stateBefore, stateAfter, command) {
+  const database = (await command([...securityComposeArgs(runId), "exec", "-T", "db", "pg_isready", "-U",
+    "courtside", "-d", "courtside_security"], { acceptedExitCodes: [0, 1] })).code === 0;
+  await command([...securityComposeArgs(runId), "restart", "app"]);
+  await command([...securityComposeArgs(runId), "up", "-d", "--wait", "app", "proxy"]);
+  const health = verifySecurityEnvironment(runId).environment === "SECURITY";
+  return {
+    health: health ? "passed" : "failed",
+    restart: health ? "passed" : "failed",
+    database: database ? "passed" : "failed",
+    domainIntegrity: stateBefore === stateAfter ? "passed" : "failed"
+  };
+}
+
 export function authenticatedZapDiagnostic(output, sessionCookies) {
   let safe = String(output);
   for (const cookie of sessionCookies) safe = safe.replaceAll(cookie, "[REDACTED]");
@@ -684,11 +843,14 @@ async function zapRequestCount(gateway, command) {
 
 async function scannerGatewayMetrics(gateway, command) {
   const raw = (await command(["exec", gateway, "cat", "/tmp/security-gateway-metrics"])).stdout.trim();
-  const [requests, requestBytes] = raw.split(" ").map(Number);
-  if (![requests, requestBytes].every((value) => Number.isSafeInteger(value) && value >= 0)) {
+  const metrics = JSON.parse(raw);
+  const integers = [metrics.requests, metrics.requestBytes, metrics.upstreamErrors];
+  if (!integers.every((value) => Number.isSafeInteger(value) && value >= 0)
+      || ![metrics.requestP95Milliseconds, metrics.errorRate].every((value) => Number.isFinite(value) && value >= 0)
+      || metrics.errorRate > 1) {
     throw new Error("Scanner gateway metrics are invalid");
   }
-  return { requests, requestBytes };
+  return metrics;
 }
 
 export function readSecurityProxyCa(runId) {

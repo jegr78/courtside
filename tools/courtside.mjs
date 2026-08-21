@@ -13,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import {
   inspectPassiveSecurityRuntime, readSecurityEnvironment, readSecurityIdentity, readSecurityProxyCa,
-  recoverSecurityEnvironment, runAuthenticatedZap, runOpenApiFuzzer, runPassiveZap,
+  recoverSecurityEnvironment, runAuthenticatedZap, runOpenApiFuzzer, runPassiveZap, runResourceAbuse,
   securityDomainStateFingerprint,
   securityProject, securityStateRoot,
   startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment, verifySecurityEnvironmentForAssessment
@@ -28,6 +28,7 @@ import { renderAuthenticatedZapPlan, runAuthenticatedZapAssessment } from "./sec
 import {
   prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment, runOpenApiImportCases, runOpenApiInputCases
 } from "./security-openapi-fuzz.mjs";
+import { runResourceAbuseAssessment } from "./security-resource-abuse.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devComposeFile = join(root, "deploy", "compose.dev.yaml");
@@ -658,6 +659,10 @@ async function execute(options) {
           captureState: () => securityDomainStateFingerprint(candidate.runId, context.stopFile,
             Math.max(1, context.deadline.getTime() - Date.now()))
         })
+      }),
+      runResourceAbuseAssessment: async (selectedPlan, context) => runResourceAbuseAssessment(selectedPlan, {
+        ...context,
+        runAbuse: (candidate, limits) => runResourceAbuse(candidate, context.stopFile, limits)
       })
     });
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
