@@ -7,6 +7,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { TextField } from "../components/TextField";
+import { formString } from "../forms/formString";
 
 const roles: Role[] = [
   "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"
@@ -267,7 +268,3 @@ function RoleCheckboxes({ name, selected, disabled, changed, testIdPrefix }: {
   </fieldset>;
 }
 
-function formString(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}

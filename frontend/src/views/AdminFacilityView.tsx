@@ -17,6 +17,7 @@ import { shortTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { formString } from "../forms/formString";
 
 const roles: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER"];
 // The server strips MEMBER before matching a managing role.
@@ -445,7 +446,3 @@ function playerCounts(value: string): number[] {
   return value.split(",").map((count) => count.trim()).filter(Boolean).map(Number);
 }
 
-function formString(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}

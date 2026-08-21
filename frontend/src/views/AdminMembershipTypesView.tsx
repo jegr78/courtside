@@ -6,6 +6,7 @@ import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { formString } from "../forms/formString";
 
 const NAME_LENGTH = 60;
 const HOLDER_PAGE = 200;
@@ -158,7 +159,3 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
   </article>;
 }
 
-function formString(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}
