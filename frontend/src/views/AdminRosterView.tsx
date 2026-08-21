@@ -96,7 +96,7 @@ export function AdminRosterView() {
       const created = await api.createPerson({
         firstName: formString(form, "firstName"),
         lastName: formString(form, "lastName"),
-        email: formString(form, "email")
+        email: formString(form, "email") || null
       });
       await navigate(`/admin/roster/${created.personId}`);
     } catch (failure) {

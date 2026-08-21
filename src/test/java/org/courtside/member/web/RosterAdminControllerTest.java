@@ -1296,6 +1296,42 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 """.formatted(username, oneTimePassword, named);
     }
 
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAClubWithNoAddressForSomebody_whenAddingThem_thenTheyJoinTheRosterWithoutOne()
+            throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/roster")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName": "Mary", "lastName": "Major"}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.firstName").value("Mary"))
+                .andExpect(jsonPath("$.email").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAddressEnteredByMistake_whenCorrectingThePersonWithoutOne_thenItIsGone()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "typo.doe@example.org");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}", jane)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName": "Jane", "lastName": "Doe", "email": null}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(org.hamcrest.Matchers.nullValue()));
+        assertThat(persons.findById(jane)).get()
+                .satisfies(person -> assertThat(person.getEmail()).isEmpty());
+    }
+
     private static String personBody(String firstName, String lastName, String email) {
         return """
                 {"firstName": "%s", "lastName": "%s", "email": "%s"}

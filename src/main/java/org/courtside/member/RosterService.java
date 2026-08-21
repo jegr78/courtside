@@ -397,9 +397,9 @@ public class RosterService {
 
     private static String strippedAddress(String value) {
         String stripped = value == null ? "" : PersonText.stripped(value);
-        if (!PersonFieldLimits.isUsableEmail(stripped)) {
-            throw new IllegalStateException("A person's email address must be a usable address of "
-                    + "at most " + PersonFieldLimits.MAX_EMAIL_LENGTH + " characters");
+        if (!PersonFieldLimits.isUsableOrAbsentEmail(stripped)) {
+            throw new IllegalStateException("A person's email address must be absent or a usable "
+                    + "address of at most " + PersonFieldLimits.MAX_EMAIL_LENGTH + " characters");
         }
         return stripped;
     }

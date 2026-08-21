@@ -68,6 +68,30 @@ describe("AdminPersonView", () => {
     });
   });
 
+  it("given an address entered by mistake, when it is cleared and saved, then no empty address is sent", async () => {
+    // given
+    vi.spyOn(api, "changePerson").mockResolvedValue({ ...jane, email: null });
+    showPerson();
+    await screen.findByTestId("person-email");
+
+    // when
+    await userEvent.clear(screen.getByTestId("person-email"));
+    await userEvent.click(screen.getByTestId("save-person"));
+
+    // then
+    expect(api.changePerson).toHaveBeenCalledWith("person-1", {
+      firstName: "Jane", lastName: "Doe", email: null
+    });
+  });
+
+  it("given a person the club has no address for, when their page opens, then the field is empty rather than broken", async () => {
+    // when
+    showPerson({ ...jane, email: null });
+
+    // then
+    expect(await screen.findByTestId("person-email")).toHaveValue("");
+  });
+
   it("given a person, when their membership is saved, then it is written with its dates", async () => {
     // given
     vi.spyOn(api, "assignMembership").mockResolvedValue(jane);

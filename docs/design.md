@@ -885,6 +885,15 @@ Import and export:
   overwrites it — and above what share of the roster disappearing an execution needs confirming.
   Every part of it is correctable, and a change decides what the *next* snapshot means rather than
   touching the people an earlier one created.
+- **The file is read as the club's own system wrote it.** The separator is taken from the header
+  rather than assumed, and a file that is not UTF-8 is decoded as Windows-1252 rather than refused,
+  because the exports clubs actually hold are semicolon-separated and often neither. Nothing about
+  the dialect is configured on the source: it is a property of the file, not a decision a volunteer
+  can be expected to make about their own export.
+- **An email address is optional, for a person and for a snapshot.** A real member list carries
+  people a club has no address for, and a required column would have turned each of them into a
+  rejected row. A person without one simply holds none; what that costs them is that nothing can be
+  sent to them, which is a fact about the club's data and not a state Courtside invents.
 - **A record is matched by the source and the member number it carries**, never by a name and never
   by an email address: two members really are called John Roe, and a club enrols children under a
   parent's address. A member number a source does not yet know becomes a new person, and where a

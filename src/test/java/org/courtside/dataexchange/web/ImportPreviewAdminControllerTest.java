@@ -156,7 +156,19 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].code")
                         .value("import.snapshot.header.missingField"))
                 .andExpect(jsonPath("$.violations[0].params.missing")
-                        .value(org.hamcrest.Matchers.containsInAnyOrder("EMAIL", "EXTERNAL_ID")));
+                        .value(org.hamcrest.Matchers.containsInAnyOrder("EXTERNAL_ID")));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnExportCarryingNoAddresses_whenPreviewing_thenTheFileIsStillResolved()
+            throws Exception {
+        // when / then
+        mockMvc.perform(upload("Member number,First name,Last name\n4711,Jane,Doe\n",
+                        "FULL_SNAPSHOT"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.rowErrors").isEmpty())
+                .andExpect(jsonPath("$.changes[0].externalId").value("4711"));
     }
 
     @Test

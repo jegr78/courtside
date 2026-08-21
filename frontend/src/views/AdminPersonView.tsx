@@ -106,7 +106,7 @@ function PersonSection({ entry, disabled, save }: { entry: RosterEntry; disabled
     <div className="grid gap-3 md:grid-cols-3">
       <TextField data-testid="person-first-name" disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} value={person.firstName} onChange={(event) => setPerson({ ...person, firstName: event.target.value })} />
       <TextField data-testid="person-last-name" disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} value={person.lastName} onChange={(event) => setPerson({ ...person, lastName: event.target.value })} />
-      <TextField data-testid="person-email" disabled={disabled} type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} value={person.email} onChange={(event) => setPerson({ ...person, email: event.target.value })} />
+      <TextField data-testid="person-email" disabled={disabled} type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} value={person.email ?? ""} onChange={(event) => setPerson({ ...person, email: event.target.value || null })} />
     </div>
     <Button data-testid="save-person" disabled={disabled} className="justify-self-start" type="button" onClick={() => void save(person)}>{t("admin.save")}</Button>
   </section>;

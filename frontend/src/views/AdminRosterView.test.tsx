@@ -166,6 +166,32 @@ describe("AdminRosterView", () => {
     expect(await screen.findByTestId("opened-person")).toBeInTheDocument();
   });
 
+  it("given a club with no address for somebody, when adding them, then no empty address is sent", async () => {
+    // given
+    const created: RosterEntry = {
+      personId: "person-9", firstName: "Mary", lastName: "Major", email: null,
+      accountId: null, username: null, enabled: false, roles: []
+    };
+    vi.spyOn(api, "createPerson").mockResolvedValue(created);
+    render(<MemoryRouter initialEntries={["/admin/roster"]}>
+      <Routes>
+        <Route path="/admin/roster" element={<AdminRosterView />} />
+        <Route path="/admin/roster/:personId" element={<div data-testid="opened-person">opened</div>} />
+      </Routes>
+    </MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-person-first-name"), "Mary");
+    await userEvent.type(screen.getByTestId("new-person-last-name"), "Major");
+    await userEvent.click(screen.getByTestId("create-person"));
+
+    // then
+    expect(api.createPerson).toHaveBeenCalledWith({
+      firstName: "Mary", lastName: "Major", email: null
+    });
+  });
+
   it("given nobody matches the search, when the roster is read, then the empty list says so", async () => {
     // given
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });

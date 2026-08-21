@@ -330,6 +330,35 @@ class SnapshotParserTest {
         });
     }
 
+    @Test
+    void givenAHeaderWithoutAnEmailColumn_whenParsing_thenTheFileIsStillRead() {
+        // given
+        String content = "Member number,First name,Last name\n4711,Jane,Doe\n";
+
+        // when
+        CsvSnapshot snapshot = parse(content);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.values())
+                        .doesNotContainKey(CanonicalField.EMAIL));
+    }
+
+    @Test
+    void givenARowWithNoAddress_whenParsing_thenItIsNotAnError() {
+        // given
+        String content = "Member number,First name,Last name,Email\n4711,Jane,Doe,\n";
+
+        // when
+        CsvSnapshot snapshot = parse(content);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.values()).containsEntry(CanonicalField.EMAIL, ""));
+    }
+
     private static byte[] fixture(String name) {
         try (InputStream stream = SnapshotParserTest.class
                 .getResourceAsStream("/dataexchange/" + name)) {

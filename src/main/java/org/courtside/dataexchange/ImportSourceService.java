@@ -26,7 +26,7 @@ public class ImportSourceService {
 
     private static final Set<CanonicalField> REQUIRED_COLUMNS =
             EnumSet.of(CanonicalField.EXTERNAL_ID, CanonicalField.FIRST_NAME,
-                    CanonicalField.LAST_NAME, CanonicalField.EMAIL);
+                    CanonicalField.LAST_NAME);
     private static final String UNIQUE_KEY_CONSTRAINT = "import_source_unique_key";
     private static final int MAX_KEY_LENGTH = 40;
     private static final int MAX_DISPLAY_NAME_LENGTH = 80;

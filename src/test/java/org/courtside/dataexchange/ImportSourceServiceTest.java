@@ -265,6 +265,36 @@ class ImportSourceServiceTest extends AbstractIntegrationTest {
                 .extracting("code").isEqualTo("import.source.membershipTypes.tooMany");
     }
 
+    @Test
+    void givenAnExportWithNoAddressColumn_whenDescribingItsSource_thenItIsAccepted() {
+        // given
+        Map<String, CanonicalField> withoutAddress = new LinkedHashMap<>();
+        withoutAddress.put("Member number", EXTERNAL_ID);
+        withoutAddress.put("First name", FIRST_NAME);
+        withoutAddress.put("Last name", LAST_NAME);
+
+        // when
+        SourceConfiguration source = sources.create("roster-system", "Membership system",
+                withoutAddress, Map.of(), ACTIVE_TYPE, Set.of(), 10);
+
+        // then
+        assertThat(source.columns()).doesNotContainValue(EMAIL);
+    }
+
+    @Test
+    void givenAnExportWithNoNameColumn_whenDescribingItsSource_thenItIsStillRefused() {
+        // given
+        Map<String, CanonicalField> withoutName = new LinkedHashMap<>();
+        withoutName.put("Member number", EXTERNAL_ID);
+        withoutName.put("Email", EMAIL);
+
+        // when / then
+        assertThatThrownBy(() -> sources.create("roster-system", "Membership system", withoutName,
+                Map.of(), ACTIVE_TYPE, Set.of(), 10))
+                .isInstanceOf(ImportSourceInvalidException.class)
+                .extracting("code").isEqualTo("import.source.columns.incomplete");
+    }
+
     private static Map<String, CanonicalField> columns() {
         Map<String, CanonicalField> columns = new LinkedHashMap<>();
         columns.put("Member number", EXTERNAL_ID);

@@ -600,13 +600,14 @@ components:
           type: object
           description: |
             The header in the club's export, mapped to the field it holds. `EXTERNAL_ID`,
-            `FIRST_NAME`, `LAST_NAME` and `EMAIL` are required — a snapshot creates people, and this
-            product has no person without an address, so a source that cannot supply one could never
-            create anybody. `MEMBERSHIP_TYPE` is optional, because a club may not export a category
-            at all. Two headers may not name the same field.
+            `FIRST_NAME` and `LAST_NAME` are required — a snapshot creates people, and a record
+            with no name, or without the number that identifies it, describes nobody this product
+            could create. `EMAIL` and `MEMBERSHIP_TYPE` are optional, because a club's own member
+            list carries people it holds no address for, and may not export a category at all. Two
+            headers may not name the same field.
 
-            Requiring the column is not the same as requiring every cell: a row whose address is
-            empty fails on its own and the rest of the file resolves.
+            Requiring the column is not the same as requiring every cell: a row whose name is empty
+            fails on its own and the rest of the file resolves.
 
             A header is stored without its surrounding whitespace, because that is how it arrives
             from the file: a mapping kept with padding would name a column that never matches. Two
@@ -864,8 +865,8 @@ components:
     PersonRequest:
       type: object
       description: |
-        None of the three values may be blank, and none may hold a control character — not a line
-        break, and not a NUL, which PostgreSQL refuses to store at all.
+        Neither name may be blank, and no value may hold a control character — not a line break,
+        and not a NUL, which PostgreSQL refuses to store at all.
 
         Surrounding whitespace is removed before the values are checked and stored, so a name or
         an address pasted with padding is accepted, `maxLength` counts what is left, and the
@@ -873,7 +874,7 @@ components:
 
         An email address is accepted whatever the rest of the roster already holds; see
         `POST /api/admin/roster`.
-      required: [firstName, lastName, email]
+      required: [firstName, lastName]
       properties:
         firstName:
           type: string
@@ -884,13 +885,18 @@ components:
           maxLength: 60
           pattern: "[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u009f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u0000-\\u001f\\u007f-\\u009f]*"
         email:
-          type: string
+          type: [string, "null"]
           format: email
           maxLength: 120
           description: |
             One `@` with something before it, and a dotted domain after it. The rule is spelled out
             here because the service enforces exactly it: a shape this pattern accepts and the
             service then refuses would reach a club board as a `500`.
+
+            Absent or `null` is a person the club has no address for, which a real member list
+            has plenty of. The empty string is not that: it is a blank field somebody left behind,
+            and it is refused. Leaving the field out of a correction is therefore how an address
+            entered by mistake is taken away again.
           pattern: "[^\\u0000-\\u0020\\u007f-\\u009f@]+@[^\\u0000-\\u0020\\u007f-\\u009f@.]+(\\.[^\\u0000-\\u0020\\u007f-\\u009f@.]+)+"
 
     RosterEntry:
@@ -900,7 +906,7 @@ components:
         personId: { type: string, format: uuid }
         firstName: { type: string }
         lastName: { type: string }
-        email: { type: string, format: email }
+        email: { type: [string, "null"], format: email }
         accountId: { type: [string, "null"], format: uuid }
         username: { type: [string, "null"] }
         enabled:
@@ -2876,7 +2882,8 @@ paths:
         or an imported dormant record looks like.
 
         An email address is not unique across the roster: a club enrols children under a parent's
-        address, so a second person carrying an address the roster already holds is accepted.
+        address, so a second person carrying an address the roster already holds is accepted. It
+        may also be `null`, because a club's own member list carries people it has no address for.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2936,7 +2943,8 @@ paths:
       summary: Correct a person's name or email address.
       description: |
         The account and the membership the person holds are untouched; this changes the person
-        record alone.
+        record alone. Every field is written, so a request that leaves `email` out removes the
+        address the person carried.
       security:
         - sessionCookie: []
           csrfToken: []

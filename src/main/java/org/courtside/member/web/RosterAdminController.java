@@ -125,12 +125,16 @@ class RosterAdminController implements AdminRosterApi {
 
     private static ApiRosterEntry toResponse(RosterService.RosterEntry entry) {
         return new ApiRosterEntry(entry.personId(), entry.firstName(), entry.lastName(),
-                entry.email(), entry.enabled(), roleNames(entry.roles()))
+                address(entry.email()), entry.enabled(), roleNames(entry.roles()))
                 .accountId(entry.accountId())
                 .username(entry.username())
                 .membershipTypeId(membershipTypeId(entry))
                 .membershipStartedOn(membershipDate(entry, RosterService.Membership::startedOn))
                 .membershipEndedOn(membershipDate(entry, RosterService.Membership::endedOn));
+    }
+
+    private static String address(String email) {
+        return email.isEmpty() ? null : email;
     }
 
     private static UUID membershipTypeId(RosterService.RosterEntry entry) {

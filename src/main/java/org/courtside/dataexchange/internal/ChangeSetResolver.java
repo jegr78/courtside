@@ -210,7 +210,7 @@ public final class ChangeSetResolver {
             }
             String value = row.values().get(field);
             boolean usable = field == CanonicalField.EMAIL
-                    ? PersonFieldLimits.isUsableEmail(value)
+                    ? PersonFieldLimits.isUsableOrAbsentEmail(value)
                     : PersonFieldLimits.isUsableName(value);
             if (!usable) {
                 return new ResolvedChangeSet.RowError(row.rowNumber(),
