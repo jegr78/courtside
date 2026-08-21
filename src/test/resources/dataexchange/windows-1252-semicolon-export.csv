@@ -1,0 +1,5 @@
+Nr.;ID;Nachname;Vorname;Geburtsdatum;Eintrittsdatum;Status;Schnupperer;Straße;PLZ;Ort;EMail Privat;
+276;1000278;Doe;Jane;11.08.1992 00:00:00;21.08.2017 00:00:00;aktiv;Nein;Thornbury Close 17;44971;Foxhollow;jane.doe@example.org;
+277;1000279;Roe;John;03.04.1965 00:00:00;01.02.1998 00:00:00;passiv;Nein;Größere Gasse 4;44972;Foxhollow;;
+278;1000280;Major;Mary;19.12.2004 00:00:00;14.09.2019 00:00:00;fördernd;Ja;Marketplace 9;44973;Foxhollow;mary.major@example.org;
+279;1000281;Miles;Richard;07.06.1950 00:00:00;30.03.1976 00:00:00;Ehrenmitglied;Nein;Weißdornweg 22;44974;Foxhollow;richard.miles@example.org;

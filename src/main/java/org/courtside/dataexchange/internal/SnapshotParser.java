@@ -11,6 +11,7 @@ import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -28,13 +29,20 @@ public final class SnapshotParser {
     private static final Set<CanonicalField> REQUIRED_FIELDS = EnumSet.of(
             CanonicalField.EXTERNAL_ID, CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME,
             CanonicalField.EMAIL);
-    private static final byte[] BYTE_ORDER_MARK = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+    private static final char[] DELIMITERS = {',', ';', '\t'};
+    private static final byte[] UTF_8_MARK = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+    private static final byte[] UTF_16_LITTLE_ENDIAN_MARK = {(byte) 0xFF, (byte) 0xFE};
+    private static final byte[] UTF_16_BIG_ENDIAN_MARK = {(byte) 0xFE, (byte) 0xFF};
+    // Windows-1252 maps every one of the 256 bytes, so decoding cannot fail once it is reached.
+    private static final Charset LEGACY_EXPORT = Charset.forName("windows-1252");
 
     private SnapshotParser() {
     }
 
     public static CsvSnapshot parse(byte[] content, Map<String, CanonicalField> columns) {
-        try (CSVParser parser = format().parse(new StringReader(decoded(content)))) {
+        String text = decoded(content);
+        CSVFormat format = format(delimiterOf(text));
+        try (CSVParser parser = format.parse(new StringReader(text))) {
             List<String> headerNames = parser.getHeaderNames();
             return read(parser, headerOf(headerNames, columns), headerNames.size(),
                     ignoredColumns(headerNames, columns));
@@ -43,13 +51,36 @@ public final class SnapshotParser {
         }
     }
 
-    private static CSVFormat format() {
+    private static CSVFormat format(char delimiter) {
         return CSVFormat.DEFAULT.builder()
+                .setDelimiter(delimiter)
                 .setHeader()
                 .setSkipHeaderRecord(true)
+                .setAllowMissingColumnNames(true)
                 .setDuplicateHeaderMode(DuplicateHeaderMode.ALLOW_ALL)
                 .setTrim(true)
                 .get();
+    }
+
+    private static char delimiterOf(String text) {
+        char widestDelimiter = DELIMITERS[0];
+        int widestHeader = 0;
+        for (char candidate : DELIMITERS) {
+            int width = headerWidth(text, candidate);
+            if (width > widestHeader) {
+                widestHeader = width;
+                widestDelimiter = candidate;
+            }
+        }
+        return widestDelimiter;
+    }
+
+    private static int headerWidth(String text, char delimiter) {
+        try (CSVParser parser = format(delimiter).parse(new StringReader(text))) {
+            return parser.getHeaderNames().size();
+        } catch (IOException | IllegalArgumentException e) {
+            return 0;
+        }
     }
 
     private static CsvSnapshot read(CSVParser parser, Map<String, CanonicalField> header,
@@ -108,6 +139,9 @@ public final class SnapshotParser {
         Map<String, CanonicalField> header = new LinkedHashMap<>();
         Set<CanonicalField> claimed = EnumSet.noneOf(CanonicalField.class);
         for (String name : headerNames) {
+            if (name == null || name.isBlank()) {
+                continue;
+            }
             CanonicalField field = columns.get(name.strip());
             if (field == null) {
                 continue;
@@ -130,30 +164,42 @@ public final class SnapshotParser {
     private static List<String> ignoredColumns(List<String> headerNames,
                                                Map<String, CanonicalField> columns) {
         return headerNames.stream()
-                .filter(name -> !columns.containsKey(name.strip()))
+                .filter(name -> name != null && !name.isBlank())
                 .map(String::strip)
+                .filter(name -> !columns.containsKey(name))
                 .distinct()
                 .toList();
     }
 
     private static String decoded(byte[] content) {
-        byte[] withoutMark = startsWithByteOrderMark(content)
-                ? Arrays.copyOfRange(content, BYTE_ORDER_MARK.length, content.length)
-                : content;
+        if (startsWith(content, UTF_8_MARK)) {
+            return new String(content, UTF_8_MARK.length, content.length - UTF_8_MARK.length,
+                    StandardCharsets.UTF_8);
+        }
+        if (startsWith(content, UTF_16_LITTLE_ENDIAN_MARK)) {
+            return utf16(content, StandardCharsets.UTF_16LE);
+        }
+        if (startsWith(content, UTF_16_BIG_ENDIAN_MARK)) {
+            return utf16(content, StandardCharsets.UTF_16BE);
+        }
         try {
             CharBuffer decoded = StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(withoutMark));
+                    .decode(ByteBuffer.wrap(content));
             return decoded.toString();
         } catch (CharacterCodingException e) {
-            throw new SnapshotHeaderInvalidException("import.snapshot.notUtf8", Map.of());
+            return new String(content, LEGACY_EXPORT);
         }
     }
 
-    private static boolean startsWithByteOrderMark(byte[] content) {
-        return content.length >= BYTE_ORDER_MARK.length
-                && Arrays.equals(content, 0, BYTE_ORDER_MARK.length,
-                BYTE_ORDER_MARK, 0, BYTE_ORDER_MARK.length);
+    private static String utf16(byte[] content, Charset charset) {
+        int markLength = UTF_16_LITTLE_ENDIAN_MARK.length;
+        return new String(content, markLength, content.length - markLength, charset);
+    }
+
+    private static boolean startsWith(byte[] content, byte[] mark) {
+        return content.length >= mark.length
+                && Arrays.equals(content, 0, mark.length, mark, 0, mark.length);
     }
 }

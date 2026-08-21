@@ -1,0 +1,5 @@
+Person - Nachname;Person - Vorname;Person - Geburtstag;Benutzerkonto - Benutzername;Kontakt - E-Mail;Person - Kundennummer;Benutzerkonto - Aktiv;Benutzerkonto - Typ
+"Doe";"Jane";"10.01.1946";"doejane";"jane.doe@example.org";"4711";"true";"Benutzer"
+"Roe";"John";"02.07.1981";"roejohn";"john.roe@example.org";"";"true";"Administrator"
+"Major";"Mary";"23.11.1993";"majormary";"mary.major@example.org";"4713";"false";"Benutzer"
+"Miles";"Richard";"05.03.1974";"milesrichard";"richard.miles@example.org";"4714";"true";"Benutzer"

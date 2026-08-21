@@ -6,6 +6,10 @@ import org.courtside.dataexchange.internal.SnapshotHeaderInvalidException;
 import org.courtside.dataexchange.internal.SnapshotParser;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -197,15 +201,143 @@ class SnapshotParserTest {
     }
 
     @Test
-    void givenAFileThatIsNotUtf8_whenParsing_thenTheWholeFileIsRefused() {
+    void givenAFileWrittenInWindows1252_whenParsing_thenItsUmlautsArriveIntact() {
         // given
-        byte[] latin1 = "Member number,First name,Last name,Email\n4711,Jané,Doe,jane.doe@example.org\n"
-                .getBytes(StandardCharsets.ISO_8859_1);
+        byte[] windows1252 = "Member number,First name,Last name,Email\n4711,Janè,Doe,jane.doe@example.org\n"
+                .getBytes(Charset.forName("windows-1252"));
 
-        // when / then
-        assertThatThrownBy(() -> SnapshotParser.parse(latin1, COLUMNS))
-                .isInstanceOf(SnapshotHeaderInvalidException.class)
-                .extracting("code").isEqualTo("import.snapshot.notUtf8");
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(windows1252, COLUMNS);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.values())
+                        .containsEntry(CanonicalField.FIRST_NAME, "Janè"));
+    }
+
+    @Test
+    void givenAFileWrittenInUtf16WithAByteOrderMark_whenParsing_thenItIsReadRatherThanMangled() {
+        // given
+        byte[] utf16 = "Member number,First name,Last name,Email\n4711,Jane,Doe,jane.doe@example.org\n"
+                .getBytes(StandardCharsets.UTF_16LE);
+        byte[] withMark = new byte[utf16.length + 2];
+        withMark[0] = (byte) 0xFF;
+        withMark[1] = (byte) 0xFE;
+        System.arraycopy(utf16, 0, withMark, 2, utf16.length);
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(withMark, COLUMNS);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.externalId()).isEqualTo("4711"));
+    }
+
+    @Test
+    void givenASemicolonSeparatedFile_whenParsing_thenTheSeparatorIsTakenFromTheHeader() {
+        // given
+        String content = "Member number;First name;Last name;Email\n4711;Jane;Doe;jane.doe@example.org\n";
+
+        // when
+        CsvSnapshot snapshot = parse(content);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.values())
+                        .containsEntry(CanonicalField.FIRST_NAME, "Jane"));
+    }
+
+    @Test
+    void givenACommaSeparatedFileWhoseCellsHoldSemicolons_whenParsing_thenTheCommaStillSeparates() {
+        // given
+        String content = """
+                Member number,First name,Last name,Email
+                4711,"Jane;the elder","Doe;Roe",jane.doe@example.org
+                """;
+
+        // when
+        CsvSnapshot snapshot = parse(content);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).singleElement().satisfies(row -> {
+            assertThat(row.values()).containsEntry(CanonicalField.FIRST_NAME, "Jane;the elder");
+            assertThat(row.values()).containsEntry(CanonicalField.LAST_NAME, "Doe;Roe");
+        });
+    }
+
+    @Test
+    void givenAHeaderEndingOnItsSeparator_whenParsing_thenTheEmptyTrailingColumnIsNotReportedAsIgnored() {
+        // given
+        String content = "Member number;First name;Last name;Email;\n4711;Jane;Doe;jane.doe@example.org;\n";
+
+        // when
+        CsvSnapshot snapshot = parse(content);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.ignoredColumns()).isEmpty();
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.values())
+                        .containsEntry(CanonicalField.EMAIL, "jane.doe@example.org"));
+    }
+
+    @Test
+    void givenTheExportOfAClubBookingSystem_whenParsing_thenEveryRowArrivesWithoutItsQuotes() {
+        // given
+        Map<String, CanonicalField> columns = new LinkedHashMap<>();
+        columns.put("Benutzerkonto - Benutzername", CanonicalField.EXTERNAL_ID);
+        columns.put("Person - Vorname", CanonicalField.FIRST_NAME);
+        columns.put("Person - Nachname", CanonicalField.LAST_NAME);
+        columns.put("Kontakt - E-Mail", CanonicalField.EMAIL);
+        columns.put("Benutzerkonto - Typ", CanonicalField.MEMBERSHIP_TYPE);
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(fixture("quoted-semicolon-export.csv"), columns);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).hasSize(4).first().satisfies(row -> {
+            assertThat(row.externalId()).isEqualTo("doejane");
+            assertThat(row.values()).containsEntry(CanonicalField.FIRST_NAME, "Jane");
+            assertThat(row.values()).containsEntry(CanonicalField.MEMBERSHIP_TYPE, "Benutzer");
+        });
+    }
+
+    @Test
+    void givenTheExportOfAClubAdministrationSystem_whenParsing_thenItsWindows1252ColumnIsNamedIntact() {
+        // given
+        Map<String, CanonicalField> columns = new LinkedHashMap<>();
+        columns.put("ID", CanonicalField.EXTERNAL_ID);
+        columns.put("Vorname", CanonicalField.FIRST_NAME);
+        columns.put("Nachname", CanonicalField.LAST_NAME);
+        columns.put("EMail Privat", CanonicalField.EMAIL);
+        columns.put("Status", CanonicalField.MEMBERSHIP_TYPE);
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(fixture("windows-1252-semicolon-export.csv"), columns);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.ignoredColumns()).contains("Straße").doesNotContain("");
+        assertThat(snapshot.rows()).hasSize(4);
+        assertThat(snapshot.rows()).last().satisfies(row -> {
+            assertThat(row.externalId()).isEqualTo("1000281");
+            assertThat(row.values()).containsEntry(CanonicalField.MEMBERSHIP_TYPE, "Ehrenmitglied");
+        });
+    }
+
+    private static byte[] fixture(String name) {
+        try (InputStream stream = SnapshotParserTest.class
+                .getResourceAsStream("/dataexchange/" + name)) {
+            assertThat(stream).as(name).isNotNull();
+            return stream.readAllBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static CsvSnapshot parse(String content) {
