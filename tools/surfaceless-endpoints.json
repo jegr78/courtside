@@ -1,7 +1,4 @@
 {
-  "getRuleSet": "A gap, not a decision: the configuration view lists and creates rule sets but cannot rename or retire one, so a mistyped name has no cure in the product.",
-  "changeRuleSet": "A gap, not a decision: the configuration view lists and creates rule sets but cannot rename or retire one, so a mistyped name has no cure in the product.",
-  "setRuleSetActive": "A gap, not a decision: the configuration view lists and creates rule sets but cannot rename or retire one, so a mistyped name has no cure in the product.",
   "courtImpact": "A gap, not a decision: the facility view takes a court out of service without first showing what that would displace.",
   "bookingCardImpact": "A gap, not a decision: the facility view retires a booking card without first showing what that would displace.",
   "openingHoursImpact": "A gap, not a decision: the facility view closes a day without first showing what that would displace.",
@@ -13,6 +10,5 @@
   "getCourt": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getBookingCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getParticipantCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
-  "createRuleSet": "A gap the guard used to hide: listing rule sets and creating one share a path, so matching paths alone reported this as reached. No view can create a rule set, which leaves a club with whatever the seed gave it.",
-  "removeRule": "A gap the guard used to hide for the same reason. A rule can be written into a set from the browser and never taken out of it again."
+  "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding."
 }

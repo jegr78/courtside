@@ -4,6 +4,7 @@ export type SessionStatus = components["schemas"]["SessionStatus"];
 export type ClubConfig = components["schemas"]["ClubConfig"];
 export type ClubConfigRequest = components["schemas"]["ClubConfigRequest"];
 export type RuleSet = components["schemas"]["RuleSet"];
+export type RuleSetRequest = components["schemas"]["RuleSetRequest"];
 export type RuleType = components["schemas"]["RuleType"];
 export type RuleTypeConfiguration = components["schemas"]["RuleTypeConfiguration"];
 export type RuleDefinition = components["schemas"]["RuleDefinition"];
@@ -110,6 +111,22 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config)
   }),
   ruleSets: () => request<RuleSet[]>("/api/admin/rule-sets"),
+  createRuleSet: (ruleSet: RuleSetRequest) => request<RuleSet>("/api/admin/rule-sets", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ruleSet)
+  }),
+  changeRuleSet: (ruleSetId: string, ruleSet: RuleSetRequest) => request<RuleSet>(
+    `/api/admin/rule-sets/${ruleSetId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ruleSet)
+    }
+  ),
+  setRuleSetActive: (ruleSetId: string, active: boolean) => request<RuleSet>(
+    `/api/admin/rule-sets/${ruleSetId}/active`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+    }
+  ),
+  removeRule: (ruleSetId: string, ruleType: RuleType) => request<void>(
+    `/api/admin/rule-sets/${ruleSetId}/rules/${ruleType}`, { method: "DELETE" }
+  ),
   ruleTypes: () => request<RuleTypeConfiguration[]>("/api/admin/rule-types"),
   rules: (ruleSetId: string) => request<RuleDefinition[]>(`/api/admin/rule-sets/${ruleSetId}/rules`),
   setRule: (ruleSetId: string, ruleType: RuleType, params: Record<string, number>) => request<RuleDefinition>(
