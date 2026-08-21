@@ -20,6 +20,23 @@ export type RosterPage = components["schemas"]["RosterPage"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
 export type AuditPage = components["schemas"]["AuditPage"];
 export type PersonRequest = components["schemas"]["PersonRequest"];
+export type MembershipRequest = components["schemas"]["MembershipRequest"];
+export type MembershipType = components["schemas"]["MembershipType"];
+export type MembershipTypeRequest = components["schemas"]["MembershipTypeRequest"];
+export type ImportSource = components["schemas"]["ImportSource"];
+export type ImportSourceRequest = components["schemas"]["ImportSourceRequest"];
+export type CanonicalField = components["schemas"]["CanonicalField"];
+export type SnapshotMode = components["schemas"]["SnapshotMode"];
+export type ImportChangeKind = components["schemas"]["ImportChangeKind"];
+export type ImportPersonChange = components["schemas"]["ImportPersonChange"];
+export type ImportRowError = components["schemas"]["ImportRowError"];
+export type ImportPossibleDuplicate = components["schemas"]["ImportPossibleDuplicate"];
+export type ImportRemovalCounts = components["schemas"]["ImportRemovalCounts"];
+export type ImportPreview = components["schemas"]["ImportPreview"];
+export type ImportRun = components["schemas"]["ImportRun"];
+export type ExternalReference = components["schemas"]["ExternalReference"];
+export type ExternalReferencePage = components["schemas"]["ExternalReferencePage"];
+export type ExternalReferenceRequest = components["schemas"]["ExternalReferenceRequest"];
 export type AccountRequest = components["schemas"]["AccountRequest"];
 export type SourceOffer = components["schemas"]["SourceOffer"];
 export type Problem = components["schemas"]["Problem"];
@@ -125,11 +142,15 @@ export const api = {
   setAdminBookingCardActive: (id: string, active: boolean) => request<BookingCard>(`/api/admin/booking-cards/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
-  roster: (query?: string, cursor?: string, limit = 50) => request<RosterPage>(
+  roster: (query?: string, cursor?: string, limit = 50, membershipTypeId?: string) => request<RosterPage>(
     `/api/admin/roster?${new URLSearchParams({
-      limit: String(limit), ...(query ? { query } : {}), ...(cursor ? { cursor } : {})
+      limit: String(limit),
+      ...(query ? { query } : {}),
+      ...(cursor ? { cursor } : {}),
+      ...(membershipTypeId ? { membershipTypeId } : {})
     })}`
   ),
+  person: (personId: string) => request<RosterEntry>(`/api/admin/roster/${personId}`),
   createPerson: (person: PersonRequest) => request<RosterEntry>("/api/admin/roster", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(person)
   }),
@@ -161,6 +182,73 @@ export const api = {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
     }
   ),
+  assignMembership: (personId: string, membership: MembershipRequest) => request<RosterEntry>(
+    `/api/admin/roster/${personId}/membership`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(membership)
+    }
+  ),
+  endMembership: (personId: string) => request<void>(
+    `/api/admin/roster/${personId}/membership`, { method: "DELETE" }
+  ),
+  membershipTypes: () => request<MembershipType[]>("/api/admin/membership-types"),
+  membershipType: (id: string) => request<MembershipType>(`/api/admin/membership-types/${id}`),
+  createMembershipType: (type: MembershipTypeRequest) => request<MembershipType>("/api/admin/membership-types", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(type)
+  }),
+  changeMembershipType: (id: string, type: MembershipTypeRequest) => request<MembershipType>(
+    `/api/admin/membership-types/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(type)
+    }
+  ),
+  setMembershipTypeActive: (id: string, active: boolean) => request<MembershipType>(
+    `/api/admin/membership-types/${id}/active`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+    }
+  ),
+  importSources: () => request<ImportSource[]>("/api/admin/import/sources"),
+  importSource: (sourceId: string) => request<ImportSource>(`/api/admin/import/sources/${sourceId}`),
+  createImportSource: (source: ImportSourceRequest) => request<ImportSource>("/api/admin/import/sources", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(source)
+  }),
+  changeImportSource: (sourceId: string, source: ImportSourceRequest) => request<ImportSource>(
+    `/api/admin/import/sources/${sourceId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(source)
+    }
+  ),
+  deleteImportSource: (sourceId: string) => request<void>(
+    `/api/admin/import/sources/${sourceId}`, { method: "DELETE" }
+  ),
+  externalReferences: (sourceId: string, cursor?: string, limit = 50) => request<ExternalReferencePage>(
+    `/api/admin/import/sources/${sourceId}/references?${new URLSearchParams({
+      limit: String(limit), ...(cursor ? { cursor } : {})
+    })}`
+  ),
+  linkExternalReference: (sourceId: string, reference: ExternalReferenceRequest) => request<ExternalReference>(
+    `/api/admin/import/sources/${sourceId}/references`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(reference)
+    }
+  ),
+  unlinkExternalReference: (sourceId: string, externalId: string) => request<void>(
+    `/api/admin/import/sources/${sourceId}/references/${encodeURIComponent(externalId)}`,
+    { method: "DELETE" }
+  ),
+  // No Content-Type: only the browser knows the boundary it is about to write.
+  createImportPreview: (sourceId: string, file: File, mode: SnapshotMode) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("mode", mode);
+    return request<ImportPreview>(
+      `/api/admin/import/sources/${sourceId}/previews`, { method: "POST", body: form }
+    );
+  },
+  importPreview: (previewId: string) => request<ImportPreview>(`/api/admin/import/previews/${previewId}`),
+  executeImportPreview: (previewId: string, confirmRemovals: boolean) => request<ImportRun>(
+    `/api/admin/import/previews/${previewId}/execution`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmRemovals })
+    }
+  ),
+  importRuns: (sourceId: string) => request<ImportRun[]>(`/api/admin/import/sources/${sourceId}/runs`),
   audit: (cursor?: string, limit = 50) => request<AuditPage>(
     `/api/admin/audit?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
   ),
