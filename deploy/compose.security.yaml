@@ -190,6 +190,35 @@ services:
       org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
+  schemathesis:
+    profiles: [assessment]
+    image: schemathesis/schemathesis:4.25.0@sha256:980d159d1211ed2ef1f571aa8c6876955c6699dfd6463b8b5f28e788aa61e25e
+    pull_policy: never
+    entrypoint: ["tail", "-f", "/dev/null"]
+    read_only: true
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=0700,size=128m
+      - /app/.schemathesis:uid=1000,gid=1000,mode=0700,size=16m
+      - /app/.hypothesis:uid=1000,gid=1000,mode=0700,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 2.0
+    mem_limit: 1g
+    pids_limit: 256
+    environment:
+      SCHEMATHESIS_HOOKS: ""
+    volumes:
+      - ../src/main/resources/api/openapi.yaml:/schema/openapi.yaml:ro
+    networks:
+      - scanner-client
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+
 networks:
   backend:
     internal: true

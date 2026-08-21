@@ -488,6 +488,116 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan) {
   }
 }
 
+export async function runOpenApiFuzzer(plan, stopFile, limits) {
+  if (limits.maxRequests <= limits.policy.nativeRequestReserve) {
+    throw new Error("The OpenAPI fuzz request budget cannot reserve native fixture requests");
+  }
+  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
+    COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests - limits.policy.nativeRequestReserve),
+    COURTSIDE_SECURITY_MAX_CONCURRENCY: "1",
+    COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
+    COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api,/manifest.webmanifest",
+    COURTSIDE_SECURITY_CANARY_ENABLED: "false",
+    COURTSIDE_SECURITY_MAX_TARGET_BYTES: "8192" };
+  const reservation = `courtside-security-assessment-${plan.runId}`;
+  const gateway = `${securityProject(plan.runId)}-scanner-gateway-1`;
+  const scanner = `${securityProject(plan.runId)}-schemathesis-1`;
+  const deadline = Date.now() + limits.timeoutMilliseconds;
+  let fixture;
+  const command = async (args, options = {}) => {
+    if (existsSync(stopFile)) throw new Error("Emergency stop requested");
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error("Owned security process exceeded its duration limit");
+    return runOwnedProcess("docker", args, { timeoutMilliseconds: remaining, stopFile, environment,
+      acceptedExitCodes: options.acceptedExitCodes ?? [0], input: options.input,
+      outputLimitBytes: options.outputLimitBytes ?? 4 * 1024 * 1024 });
+  };
+  try {
+    await command(securityAssessmentReservationArgs(environment, limits.attempt));
+    await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "up", "-d", "--wait",
+      "scanner-gateway", "schemathesis"]);
+    const scannerRuntime = JSON.parse((await command(["inspect", scanner, "--format", "{{json .}}"])).stdout);
+    const gatewayRuntime = JSON.parse((await command(["inspect", gateway, "--format", "{{json .}}"])).stdout);
+    const runtimeHardened = scannerRuntime.Config.Image === limits.policy.image
+      && scannerRuntimeOwned(scannerRuntime, environment)
+      && scannerRuntimeOwned(gatewayRuntime, environment)
+      && scannerRuntimeHardened(scannerRuntime, { memory: 1024 * 1024 * 1024, nanoCpus: 2_000_000_000,
+        pids: 256, networks: [`${securityProject(plan.runId)}_scanner-client`] })
+      && scannerRuntimeHardened(gatewayRuntime, { memory: 128 * 1024 * 1024, nanoCpus: 500_000_000,
+        pids: 64, networks: [`${securityProject(plan.runId)}_scanner-client`,
+          `${securityProject(plan.runId)}_scanner-upstream`] });
+    if (!runtimeHardened) throw new Error("OpenAPI fuzzer runtime controls are incomplete");
+    const mountedDigest = (await command(["exec", scanner, "sha256sum", "/schema/openapi.yaml"])).stdout
+      .trim().split(/\s+/)[0];
+    if (`sha256:${mountedDigest}` !== limits.specificationDigest) {
+      throw new Error("The mounted OpenAPI document differs from the planned contract");
+    }
+    fixture = await limits.prepareFixtures();
+    const config = `headers = { Cookie = ${JSON.stringify(fixture.client.header())}, X-XSRF-TOKEN = ${JSON.stringify(fixture.client.csrfToken())} }\n`;
+    await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-schemathesis.toml"],
+      { input: config });
+    const events = {};
+    let generatedBytes = 0;
+    const runMode = async (mode) => {
+      const selected = limits.inventory.filter(({ modes }) => modes.includes(mode));
+      const reportDirectory = `/tmp/courtside-schemathesis-${mode}`;
+      const args = ["exec", scanner, "st", "--config-file", "/tmp/courtside-schemathesis.toml", "run",
+        "/schema/openapi.yaml", "--url", "http://scanner-gateway:8090", "--phases", "fuzzing", "--mode", mode,
+        "--max-examples", String(limits.policy.maxExamples), "--workers", String(limits.policy.workers),
+        "--seed", String(limits.policy.seed), "--request-timeout", String(limits.policy.requestTimeoutSeconds),
+        "--request-retries", "0", "--max-redirects", "0", "--max-failures", String(limits.policy.maxFailures),
+        "--checks", limits.policy.checks.join(","), "--report", "ndjson", "--report-dir", reportDirectory,
+        "--output-sanitize", "true", "--output-truncate", "true", "--generation-database", ":memory:", "--no-color",
+        ...selected.flatMap(({ operationId }) => ["--include-operation-id", operationId])];
+      const execution = await command(args, { acceptedExitCodes: [0, 1] });
+      if (![0, 1].includes(execution.code)) throw new Error("Schemathesis failed before producing coverage");
+      const report = (await command(["exec", scanner, "sh", "-c", `cat ${reportDirectory}/*.ndjson`],
+        { outputLimitBytes: 25 * 1024 * 1024 })).stdout;
+      generatedBytes += Buffer.byteLength(report);
+      events[mode] = report.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+    };
+    await runMode("positive");
+    const stateBefore = await limits.captureState();
+    await runMode("negative");
+    const importResult = await limits.runImportCases(fixture);
+    const stateAfter = await limits.captureState();
+    const metrics = await scannerGatewayMetrics(gateway, command);
+    const requestCount = metrics.requests + fixture.requestCount + importResult.requestCount;
+    if (fixture.requestCount + importResult.requestCount > limits.policy.nativeRequestReserve
+        || requestCount > limits.maxRequests) throw new Error("The OpenAPI fuzz request budget was exceeded");
+    return { events, importCases: importResult.cases, stateBefore, stateAfter, requestCount, runtimeHardened,
+      specificationDigest: limits.specificationDigest,
+      generatedDataMegabytes: (generatedBytes + metrics.requestBytes) / (1024 * 1024) };
+  } finally {
+    fixture?.close();
+    const cleanupFailures = [];
+    for (const resource of [scanner, gateway, reservation]) {
+      try {
+        await runOwnedProcess("docker", ["rm", "-f", resource], {
+          timeoutMilliseconds: 10_000, stopFile: "/dev/null/courtside-cleanup-stop-disabled", environment
+        });
+      } catch (failure) {
+        if (await containerExistsForCleanup(resource, environment)) cleanupFailures.push(`${resource}: ${failure.message}`);
+      }
+    }
+    if (cleanupFailures.length) throw new Error(`Scanner cleanup was incomplete: ${cleanupFailures.join("; ")}`);
+  }
+}
+
+export async function securityDomainStateFingerprint(runId, stopFile, timeoutMilliseconds) {
+  const environment = { ...process.env, ...readSecurityEnvironment(runId) };
+  const dump = await runOwnedProcess("docker", [...securityComposeArgs(runId), "exec", "-T", "db", "pg_dump",
+    "--data-only", "--column-inserts", "--no-owner", "--no-privileges",
+    "--restrict-key=4f96f35005ce47c58f86e12cb61ab144",
+    "--exclude-table=spring_session", "--exclude-table=spring_session_attributes",
+    "--exclude-table=login_attempt_limit", "--exclude-table=import_preview", "--exclude-table=import_run",
+    "-U", "courtside", "courtside_security"], {
+    timeoutMilliseconds, stopFile, environment, outputLimitBytes: 50 * 1024 * 1024
+  });
+  const stable = dump.stdout.split("\n").filter((line) => !line.startsWith("SELECT pg_catalog.setval")).join("\n");
+  return `sha256:${createHash("sha256").update(stable).digest("hex")}`;
+}
+
 export function authenticatedZapDiagnostic(output, sessionCookies) {
   let safe = String(output);
   for (const cookie of sessionCookies) safe = safe.replaceAll(cookie, "[REDACTED]");
@@ -506,6 +616,15 @@ function scannerRuntimeHardened(container, expected) {
     && host.Memory === expected.memory && host.NanoCpus === expected.nanoCpus && host.PidsLimit === expected.pids
     && Object.keys(host.PortBindings ?? {}).length === 0
     && JSON.stringify(networks) === JSON.stringify(expected.networks.toSorted());
+}
+
+function scannerRuntimeOwned(container, environment) {
+  const labels = container.Config.Labels ?? {};
+  return labels["org.courtside.environment"] === "SECURITY"
+    && labels["org.courtside.security.run-id"] === environment.COURTSIDE_SECURITY_RUN_ID
+    && labels["org.courtside.security.seed-fingerprint"] === environment.COURTSIDE_SECURITY_SEED_FINGERPRINT
+    && labels["org.courtside.security.instance-fingerprint"]
+      === environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT;
 }
 
 async function containerExistsForCleanup(name, environment) {
@@ -546,10 +665,19 @@ async function containerExists(name, command) {
 
 async function zapRequestCount(gateway, command) {
   try {
-    return Number((await command(["exec", gateway, "cat", "/tmp/security-gateway-count"])).stdout.trim());
+    return (await scannerGatewayMetrics(gateway, command)).requests;
   } catch {
     return 0;
   }
+}
+
+async function scannerGatewayMetrics(gateway, command) {
+  const raw = (await command(["exec", gateway, "cat", "/tmp/security-gateway-metrics"])).stdout.trim();
+  const [requests, requestBytes] = raw.split(" ").map(Number);
+  if (![requests, requestBytes].every((value) => Number.isSafeInteger(value) && value >= 0)) {
+    throw new Error("Scanner gateway metrics are invalid");
+  }
+  return { requests, requestBytes };
 }
 
 export function readSecurityProxyCa(runId) {

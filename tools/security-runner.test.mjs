@@ -270,29 +270,44 @@ test("given the bounded active suites, when every attack check passes, then thei
     tools: [
       { id: "target-identity", version: "1.0.0", testIds: [] },
       { id: "authenticated-zap", version: "2.16.1", testIds: ["CSA-DAST-001"] },
+      { id: "openapi-fuzzer", version: "4.25.0", testIds: ["CSA-API-001", "CSA-IMPORT-001"] },
       { id: "authorization-matrix", version: "1.0.0", testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"] }
     ],
-    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"],
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001", "CSA-API-001", "CSA-IMPORT-001"],
     catalogTests: [
       { id: "CSA-AUTHN-001", status: "implemented", profile: "active" },
       { id: "CSA-AUTHZ-001", status: "implemented", profile: "active" },
-      { id: "CSA-DAST-001", status: "implemented", profile: "active" }
+      { id: "CSA-DAST-001", status: "implemented", profile: "active" },
+      { id: "CSA-API-001", status: "implemented", profile: "active" },
+      { id: "CSA-IMPORT-001", status: "implemented", profile: "active" }
     ]
   }));
+  const limits = {};
 
   // when
   const manifest = await executeSecurityPlan(plan, {
     root,
     verifyTarget: async () => input(),
-    runAuthorizationAssessment: async () => ({ outcome: "passed", requestCount: 900 }),
-    runAuthenticatedZapAssessment: async () => ({ outcome: "passed", requestCount: 100,
-      generatedDataMegabytes: 1 })
+    runAuthorizationAssessment: async (_plan, context) => {
+      limits.authorization = context.maxRequests;
+      return { outcome: "passed", requestCount: 900 };
+    },
+    runAuthenticatedZapAssessment: async (_plan, context) => {
+      limits.zap = context.maxRequests;
+      return { outcome: "passed", requestCount: 100,
+        generatedDataMegabytes: 1 };
+    },
+    runOpenApiFuzzAssessment: async (_plan, context) => {
+      limits.fuzz = context.maxRequests;
+      return { outcome: "passed", requestCount: 200, generatedDataMegabytes: 2 };
+    }
   });
 
   // then
   assert.equal(manifest.outcome, "passed");
-  assert.equal(manifest.usage.requests, 1000);
-  assert.equal(manifest.usage.generatedDataMegabytes, 1);
+  assert.equal(manifest.usage.requests, 1200);
+  assert.equal(manifest.usage.generatedDataMegabytes, 3);
+  assert.deepEqual(limits, { zap: 6000, fuzz: 2000, authorization: 2000 });
   assert.deepEqual(manifest.toolResults.at(-1), {
     id: "authorization-matrix", version: "1.0.0", outcome: "passed"
   });

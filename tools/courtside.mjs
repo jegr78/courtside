@@ -13,7 +13,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import {
   inspectPassiveSecurityRuntime, readSecurityEnvironment, readSecurityIdentity, readSecurityProxyCa,
-  recoverSecurityEnvironment, runAuthenticatedZap, runPassiveZap,
+  recoverSecurityEnvironment, runAuthenticatedZap, runOpenApiFuzzer, runPassiveZap,
+  securityDomainStateFingerprint,
   securityProject, securityStateRoot,
   startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment, verifySecurityEnvironmentForAssessment
 } from "./security-environment.mjs";
@@ -24,6 +25,9 @@ import {
 import { runPassiveDeploymentAssessment } from "./security-passive-deployment.mjs";
 import { runAuthorizationAssessment } from "./security-authorization.mjs";
 import { renderAuthenticatedZapPlan, runAuthenticatedZapAssessment } from "./security-authenticated-zap.mjs";
+import {
+  prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment, runOpenApiImportCases
+} from "./security-openapi-fuzz.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devComposeFile = join(root, "deploy", "compose.dev.yaml");
@@ -637,6 +641,20 @@ async function execute(options) {
         sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
         runZap: (candidate, limits) => runAuthenticatedZap(candidate, context.stopFile, limits,
           renderAuthenticatedZapPlan)
+      }),
+      runOpenApiFuzzAssessment: async (selectedPlan, context) => runOpenApiFuzzAssessment(selectedPlan, {
+        ...context,
+        runFuzzer: (candidate, limits) => runOpenApiFuzzer(candidate, context.stopFile, {
+          ...limits,
+          prepareFixtures: () => prepareOpenApiFuzzFixtures(candidate, {
+            ...context, ca, sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD
+          }),
+          runImportCases: (fixture) => runOpenApiImportCases(candidate, fixture, {
+            ca, timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
+          }),
+          captureState: () => securityDomainStateFingerprint(candidate.runId, context.stopFile,
+            Math.max(1, context.deadline.getTime() - Date.now()))
+        })
       })
     });
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);

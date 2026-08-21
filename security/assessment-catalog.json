@@ -2435,7 +2435,7 @@
     {
       "id": "CSA-IMPORT-001",
       "title": "Snapshot parser and synchronization abuse",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-INPV-01"
@@ -2614,7 +2614,7 @@
     {
       "id": "CSA-API-001",
       "title": "Contract-bound malformed input and error handling",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-INPV-01"
