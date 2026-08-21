@@ -23,16 +23,28 @@ const contractOperations = () => Object.entries(api.paths)
     .map(([method, operation]) => ({
       id: operation.operationId,
       label: `${method.toUpperCase()} ${path}`,
-      path
+      path,
+      method
     })));
 
+// Each entry of the client's api object is one call, so splitting on them gives one block per
+// call to read a path and a method out of. Without an explicit method a fetch is a GET, which is
+// why a block naming none counts as one.
+const calls = client.split(/\n {2}(?=[a-zA-Z]+: )/).slice(1).map((block) => ({
+  block,
+  method: (/method:\s*"([A-Z]+)"/.exec(block)?.[1] ?? "GET").toLowerCase()
+}));
+
 // A path is called when the client writes it with an interpolation per parameter and stops there,
-// so /api/admin/roster is not satisfied by /api/admin/roster/${personId}.
-const isCalled = ({ path }) => {
+// so /api/admin/roster is not satisfied by /api/admin/roster/${personId}. The method has to match
+// too: listing a collection is not creating into it, and conflating the two hid the fact that no
+// view could create a rule set.
+const isCalled = ({ path, method }) => {
   const pattern = path.split(/\{[^}]+\}/)
     .map((literal) => literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join("\\$\\{[^}]+\\}");
-  return new RegExp(`${pattern}(?=[?\`"'])`).test(client);
+  const writesPath = new RegExp(pattern + "(?=[?`\"'])");
+  return calls.some((call) => call.method === method && writesPath.test(call.block));
 };
 
 test("given every endpoint the contract declares, when looking for its browser surface, then it is called or listed as deliberately without one", () => {
