@@ -149,10 +149,10 @@ test("stored text projections remain inert on administrative and managed views",
         '70000000-0000-0000-0000-000000000004', 'GUEST', $payload$${payload}$payload$, 0);
     UPDATE membership_type SET name = $payload$${payload}$payload$
       WHERE id = 'cccccccc-0000-0000-0000-000000000001';
-    INSERT INTO import_source (id, source_key, display_name, separator,
+    INSERT INTO import_source (id, source_key, display_name, separator, encoding,
       default_membership_type_id, removal_warning_percent, created_at)
       VALUES ('99000000-0000-0000-0000-000000000001', 'projection',
-        $payload$${payload}$payload$, ';', 'cccccccc-0000-0000-0000-000000000001', 10,
+        $payload$${payload}$payload$, ';', 'UTF-8', 'cccccccc-0000-0000-0000-000000000001', 10,
         '2026-05-01T00:00:00Z');
     INSERT INTO import_external_reference (id, source_id, external_id, person_id, linked_at)
       VALUES ('99000000-0000-0000-0000-000000000002', '99000000-0000-0000-0000-000000000001',

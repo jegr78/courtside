@@ -11,7 +11,7 @@ const passive: MembershipType = { id: "type-2", name: "Passive", ruleSetId: null
 const existing: ImportSource = {
   id: "source-1",
   sourceKey: "roster-system",
-  displayName: "Membership system", separator: ";",
+  displayName: "Membership system", separator: ";", encoding: "UTF-8",
   columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME", "Last name": "LAST_NAME" },
   membershipTypes: {},
   defaultMembershipTypeId: "type-1",
@@ -63,7 +63,7 @@ describe("ImportSourceForm", () => {
 
   it("given a file that never leaves the browser, when it is read, then nothing is uploaded", async () => {
     // given
-    const fetching = vi.spyOn(globalThis, "fetch");
+    const fetching = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
     show(undefined, vi.fn());
 
     // when
@@ -71,8 +71,9 @@ describe("ImportSourceForm", () => {
       file("Number;Status\n1;active\n"));
     await screen.findByTestId("column-EXTERNAL_ID");
 
-    // then
-    expect(fetching).not.toHaveBeenCalled();
+    // then — the readable character sets are asked for, the member list is not sent anywhere
+    expect(fetching.mock.calls.map(([path]) => path)).toEqual(["/api/admin/import/encodings"]);
+    expect(fetching.mock.calls.every(([, init]) => init?.body === undefined)).toBe(true);
   });
 
   it("given every required column, when the source is saved, then the mapping is sent as written", async () => {
@@ -173,7 +174,21 @@ describe("ImportSourceForm", () => {
       .map((option) => option.getAttribute("value"))).toContain("Nr");
   });
 
-  it("given a described source, when it is saved, then the separator travels with it", async () => {
+  it("given a source that stores a separator, when a file is chosen, then the stored one survives", async () => {
+    // given — a separator this product would never have guessed at, confirmed once by the club
+    show({ ...existing, separator: "|" }, vi.fn());
+
+    // when — counting columns would suggest a comma for this file and be wrong
+    await userEvent.upload(screen.getByTestId("source-file"),
+      new File(["Nr|Vorname\n1|Jane\n"], "members.csv", { type: "text/csv" }));
+
+    // then — a guess must not quietly replace an answer the club already gave
+    expect(screen.getByTestId("source-separator")).toHaveValue("|");
+    expect([...(await screen.findByTestId("column-EXTERNAL_ID")).querySelectorAll("option")]
+      .map((option) => option.getAttribute("value"))).toContain("Nr");
+  });
+
+  it("given a described source, when it is saved, then how to read it travels with it", async () => {
     // given
     const save = vi.fn().mockResolvedValue(undefined);
     show(existing, save);
@@ -182,7 +197,40 @@ describe("ImportSourceForm", () => {
     await userEvent.click(screen.getByTestId("save-source"));
 
     // then
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ separator: ";" }));
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ separator: ";", encoding: "UTF-8" }));
+  });
+
+  it("given a source that stores a character set, when a file in it is chosen, then nothing is asked", async () => {
+    // given — the club's export tool has written windows-1252 since before this source existed
+    show({ ...existing, encoding: "windows-1252", separator: ";" }, vi.fn());
+    expect(screen.getByTestId("source-encoding")).toHaveValue("windows-1252");
+
+    // when — "Nr;Straße" as windows-1252, which strict UTF-8 cannot decode
+    await userEvent.upload(screen.getByTestId("source-file"),
+      new File([Uint8Array.from([78, 114, 59, 83, 116, 114, 97, 223, 101, 10, 49, 59, 88, 10])],
+        "members.csv", { type: "text/csv" }));
+
+    // then — a question already answered once is not asked again
+    expect([...(await screen.findByTestId("column-EXTERNAL_ID")).querySelectorAll("option")]
+      .map((option) => option.getAttribute("value"))).toContain("Straße");
+    expect(screen.queryByTestId("source-not-utf8")).not.toBeInTheDocument();
+  });
+
+  it("given a character set the browser cannot read, when it is chosen, then the form says so and the import stays possible", async () => {
+    // given
+    show(undefined, vi.fn());
+    await userEvent.upload(screen.getByTestId("source-file"),
+      new File([Uint8Array.from([78, 114, 59, 83, 116, 114, 97, 223, 101, 10])],
+        "members.csv", { type: "text/csv" }));
+    await screen.findByTestId("source-encoding");
+
+    // when — the instance can decode this one, the browser cannot
+    await userEvent.clear(screen.getByTestId("source-encoding"));
+    await userEvent.type(screen.getByTestId("source-encoding"), "IBM930");
+
+    // then — an empty column list with no explanation is what this refuses to be
+    expect(await screen.findByTestId("source-encoding-unreadable")).toBeInTheDocument();
   });
 
   it("given an export that is not UTF-8, when it is chosen, then its columns are offered rather than refused", async () => {

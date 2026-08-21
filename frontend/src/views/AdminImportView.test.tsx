@@ -11,7 +11,7 @@ const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, 
 const rosterSystem: ImportSource = {
   id: "source-1",
   sourceKey: "roster-system",
-  displayName: "Membership system", separator: ";",
+  displayName: "Membership system", separator: ";", encoding: "UTF-8",
   columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME", "Last name": "LAST_NAME" },
   membershipTypes: {},
   defaultMembershipTypeId: "type-1",

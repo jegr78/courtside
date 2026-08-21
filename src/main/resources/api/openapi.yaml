@@ -548,8 +548,8 @@ components:
 
     ImportSource:
       type: object
-      required: [id, sourceKey, displayName, separator, columns, membershipTypes, defaultMembershipTypeId,
-                 ownedFields, removalWarningPercent]
+      required: [id, sourceKey, displayName, separator, encoding, columns, membershipTypes,
+                 defaultMembershipTypeId, ownedFields, removalWarningPercent]
       properties:
         id: { type: string, format: uuid }
         sourceKey: { type: string }
@@ -564,6 +564,19 @@ components:
             carry a header at all, a single-column file settles nothing, and a club whose file was
             read with the wrong character sees one enormous column and no way to tell why. Which
             character its own system writes is something a club can look at and answer, so it does.
+
+        encoding:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: |
+            The character set this source's export is written in, by the name
+            `GET /api/admin/import/encodings` reports. It sits beside the separator because both
+            are properties of the same export tool and a club should answer them once, not on
+            every upload. A single file may still deviate: the upload carries its own `encoding`
+            and overrides this one for that file alone.
+
+            A byte order mark and valid UTF-8 remain facts about the content and outrank both.
 
         columns:
           type: object
@@ -587,7 +600,8 @@ components:
         `membershipTypes` and `ownedFields` may be omitted, and the source then holds neither: no
         exported category maps to a type, and the source owns no field. `ImportSource` reports both
         as empty rather than absent, which is why it requires what this does not.
-      required: [sourceKey, displayName, separator, columns, defaultMembershipTypeId, removalWarningPercent]
+      required: [sourceKey, displayName, separator, encoding, columns, defaultMembershipTypeId,
+                 removalWarningPercent]
       properties:
         sourceKey:
           type: string
@@ -617,6 +631,19 @@ components:
             carry a header at all, a single-column file settles nothing, and a club whose file was
             read with the wrong character sees one enormous column and no way to tell why. Which
             character its own system writes is something a club can look at and answer, so it does.
+
+        encoding:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: |
+            The character set this source's export is written in, by the name
+            `GET /api/admin/import/encodings` reports. It sits beside the separator because both
+            are properties of the same export tool and a club should answer them once, not on
+            every upload. A single file may still deviate: the upload carries its own `encoding`
+            and overrides this one for that file alone.
+
+            A byte order mark and valid UTF-8 remain facts about the content and outrank both.
 
         columns:
           type: object
@@ -3727,13 +3754,12 @@ paths:
                 encoding:
                   type: string
                   maxLength: 60
-                  default: UTF-8
                   description: |
-                    The name of a character set this instance supports, as reported by
-                    `GET /api/admin/import/encodings`. A byte order mark and valid UTF-8 are facts
-                    about the content and are used whatever this says; the name only settles a file
-                    that is neither. A file that is neither while this says `UTF-8` is refused
-                    rather than read as something nobody chose.
+                    Overrides the source's own encoding for this file alone, for the export that
+                    came out differently once. Omitted, the source's is used. A byte order mark and
+                    valid UTF-8 are facts about the content and are used whatever either says; the
+                    name only settles a file that is neither, and such a file is refused rather
+                    than read as something nobody chose when the name in force is `UTF-8`.
 
                     This is a name and not an enumeration on purpose. Which character sets exist is
                     a property of the platform the instance runs on, not a decision this product

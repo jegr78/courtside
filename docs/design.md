@@ -931,23 +931,27 @@ Import and export:
   overwrites it — and above what share of the roster disappearing an execution needs confirming.
   Every part of it is correctable, and a change decides what the *next* snapshot means rather than
   touching the people an earlier one created.
-- **The file is read as the club's own system wrote it, and the club says how.** The separator is
-  part of the source: the browser suggests one from the chosen file, and what the club confirms is
-  what the server reads by. Detection alone was tried and is not enough — counting columns in a
-  header row settles nothing for a file with one column, and an export need not carry a header at
-  all. A file read with the wrong character produces one enormous column and no way to tell why,
+- **The file is read as the club's own system wrote it, and the club says how.** The separator and
+  the character set are both part of the source, because both are properties of the export tool
+  rather than of one file: the club answers once, and every later upload is read by that answer.
+  A single file may still deviate, so an upload carries an override that holds for that file alone.
+
+  For a source nobody has described yet, the browser suggests a separator from the chosen file; once
+  the club has confirmed one it stands, and a later file does not quietly replace it with a guess.
+  Detection alone was tried and is not enough — counting columns in a header row settles nothing for
+  a file with one column, and an export need not carry a header at all. A file read with the wrong character produces one enormous column and no way to tell why,
   so the answer belongs to the club rather than to a heuristic. Only what cannot work is refused:
   a line break ends a record and a quotation mark opens a cell, so neither can also divide one.
 
   The encoding is settled wherever the bytes settle it: a byte order mark and valid UTF-8 are facts
   about the content and are used without asking anybody.
 
-  Beyond that it is asked, and the reason is that it cannot be answered. The 8-bit character sets
-  share their byte ranges and differ in a handful of code points, so no library detects them — it
-  guesses, and a guess that lands wrong imports mangled names with nothing said. The upload
-  therefore carries the *name* of a character set, defaulting to UTF-8, and a file that is neither
-  marked nor valid UTF-8 is refused while it says UTF-8 rather than being read as something nobody
-  chose.
+  Beyond that it is the source's stored answer, and the reason it is stored rather than derived is
+  that it cannot be derived. The 8-bit character sets share their byte ranges and differ in a
+  handful of code points, so no library detects them — it guesses, and a guess that lands wrong
+  imports mangled names with nothing said. The source therefore carries the *name* of a character
+  set, defaulting to UTF-8, and a file that is neither marked nor valid UTF-8 is refused while the
+  name in force says UTF-8 rather than being read as something nobody chose.
 
   **A name and not an enumeration**, because which character sets exist is a property of the
   platform an instance runs on and not a decision this product may freeze into a release. The
@@ -988,13 +992,13 @@ Import and export:
   that accepted a file of personal data in order to learn a handful of words would be the worst of
   the options, and reading locally costs a club nothing.
 
-  Reading it there is also what keeps the encoding question honest. A board cannot be expected to
-  know what its software wrote, and a blind wrong answer would be worse than no question — so the
-  question is only put when the file is not UTF-8, which the browser can tell before anything is
-  sent, and it is never blind: the columns on offer are re-read as the answer changes, so a wrong
-  one shows itself immediately as headers nobody recognises. The separator works the same way — the
-  browser suggests, the columns follow every correction, and the club sees the consequence of its
-  answer before it saves one. A browser decodes fewer character sets
+  Reading it there is also what keeps the encoding answer honest. A board cannot be expected to know
+  what its software wrote, and a blind answer would be worse than none — so the field stands beside
+  the separator carrying what the source already says, an explanation appears when the chosen file
+  turns out not to be UTF-8, which the browser can tell before anything is sent, and neither answer
+  is ever blind: the columns on offer are re-read as each changes, so a wrong one shows itself
+  immediately as headers nobody recognises. The club sees the consequence of both answers before it
+  saves either. A browser decodes fewer character sets
   than a server does, so where it cannot read one it says so and offers no columns — the import
   itself still runs, because the instance knows the set even where the browser does not.
 - **A preview writes nothing and is never edited.** It resolves the whole file and answers with the

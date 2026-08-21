@@ -14,8 +14,9 @@ function changed(change: ImportPersonChange): string {
   return Object.entries(change.values).map(([field, value]) => `${field}: ${value}`).join(", ");
 }
 
-export function ImportPreviewPanel({ sourceId, preview, disabled, previewed, reportError }: {
+export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled, previewed, reportError }: {
   sourceId: string;
+  sourceEncoding: string;
   preview: ImportPreview | undefined;
   disabled: boolean;
   previewed: (preview: ImportPreview) => void;
@@ -24,20 +25,23 @@ export function ImportPreviewPanel({ sourceId, preview, disabled, previewed, rep
   const { t } = useTranslation();
   const [chosen, setChosen] = useState<File>();
   const [mode, setMode] = useState<SnapshotMode>("UPDATE_ONLY");
-  const [encoding, setEncoding] = useState("UTF-8");
+  const [override, setOverride] = useState<string>();
   const [encodings, setEncodings] = useState<string[]>([]);
   const [asksEncoding, setAsksEncoding] = useState(false);
   const [pending, setPending] = useState(false);
+
+  // The source answers for every upload; only a file that deviates from it carries its own answer.
+  const encoding = override ?? sourceEncoding;
 
   // The file is here in the browser, so whether it is UTF-8 is answerable before anybody uploads it.
   async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     setChosen(file);
-    setEncoding("UTF-8");
+    setOverride(undefined);
     setAsksEncoding(false);
     if (!file) return;
     try {
-      await readCsvHeader(file);
+      await readCsvHeader(file, sourceEncoding);
     } catch (failure) {
       if (!(failure instanceof NotUtf8Error)) return;
       setAsksEncoding(true);
@@ -70,7 +74,7 @@ export function ImportPreviewPanel({ sourceId, preview, disabled, previewed, rep
     {asksEncoding && <div className="grid gap-2">
       <p data-testid="snapshot-not-utf8">{t("admin.import.notUtf8")}</p>
       <label className="font-semibold" htmlFor="snapshot-encoding">{t("admin.import.encoding")}</label>
-      <input data-testid="snapshot-encoding" id="snapshot-encoding" list="snapshot-encodings" className="form-control rounded-lg border px-3 py-3" disabled={busy} value={encoding} onChange={(event) => setEncoding(event.target.value)} />
+      <input data-testid="snapshot-encoding" id="snapshot-encoding" list="snapshot-encodings" className="form-control rounded-lg border px-3 py-3" disabled={busy} value={encoding} onChange={(event) => setOverride(event.target.value)} />
       <datalist id="snapshot-encodings">
         {encodings.map((name) => <option key={name} value={name} />)}
       </datalist>

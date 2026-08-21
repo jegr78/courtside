@@ -1,4 +1,4 @@
-import { useId, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type CanonicalField, type ImportSource, type ImportSourceRequest, type MembershipType } from "../../api/client";
 import { EncodingUnreadableHereError, NotUtf8Error, readCsvColumn, readCsvHeader, suggestSeparator } from "../../import/read-csv";
@@ -50,7 +50,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   const [owned, setOwned] = useState<CanonicalField[]>(source?.ownedFields ?? []);
   const [threshold, setThreshold] = useState(String(source?.removalWarningPercent ?? 10));
   const [separator, setSeparator] = useState(source?.separator ?? ",");
-  const [encoding, setEncoding] = useState("UTF-8");
+  const [encoding, setEncoding] = useState(source?.encoding ?? "UTF-8");
   const [encodings, setEncodings] = useState<string[]>([]);
   const [unreadableHere, setUnreadableHere] = useState(false);
   const [asksEncoding, setAsksEncoding] = useState(false);
@@ -60,24 +60,29 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   const mapped = new Set(Object.values(mapping).filter(Boolean));
   const unmapped = headers.filter((header) => !mapped.has(header));
 
+  useEffect(() => {
+    void api.supportedEncodings().then(setEncodings).catch(() => setEncodings([]));
+  }, []);
+
   async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     setChosen(file);
     setAsksEncoding(false);
-    setEncoding("UTF-8");
     try {
-      const suggested = await suggestSeparator(file, "UTF-8");
-      setSeparator(suggested);
-      setHeaders(await readCsvHeader(file, "UTF-8", suggested));
-      if (categoryColumn) setReadValues(await readCsvColumn(file, categoryColumn, "UTF-8", suggested));
+      await readWith(encoding, file, await separatorFor(file, encoding));
     } catch (failure) {
+      if (failure instanceof EncodingUnreadableHereError) return showUnreadableHere();
       if (!(failure instanceof NotUtf8Error)) throw failure;
       setAsksEncoding(true);
-      void api.supportedEncodings().then(setEncodings).catch(() => setEncodings([]));
       const legacy = "windows-1252";
-      await readWith(legacy, file, await suggestSeparator(file, legacy));
+      await readWith(legacy, file, await separatorFor(file, legacy));
     }
+  }
+
+  // A source that has already been described carries the club's answer; only a new one is guessed at.
+  async function separatorFor(file: File, chosenEncoding: string) {
+    return source ? separator : suggestSeparator(file, chosenEncoding);
   }
 
   async function readWith(chosenEncoding: string, file = chosen, chosenSeparator = separator) {
@@ -92,10 +97,14 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       }
     } catch (failure) {
       if (!(failure instanceof EncodingUnreadableHereError)) throw failure;
-      setUnreadableHere(true);
-      setHeaders([]);
-      setReadValues([]);
+      showUnreadableHere();
     }
+  }
+
+  function showUnreadableHere() {
+    setUnreadableHere(true);
+    setHeaders([]);
+    setReadValues([]);
   }
 
   async function mapField(field: CanonicalField, column: string) {
@@ -109,6 +118,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       sourceKey,
       displayName,
       separator,
+      encoding,
       columns: columnsOf(mapping),
       membershipTypes: Object.fromEntries(
         Object.entries(categories).filter(([, typeId]) => typeId)),
@@ -134,15 +144,14 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       <label className="font-semibold" htmlFor={`${group}-separator`}>{t("admin.import.separator")}</label>
       <input data-testid="source-separator" id={`${group}-separator`} className="form-control rounded-lg border px-3 py-3" maxLength={1} disabled={disabled} value={separator} onChange={(event) => void readWith(encoding, chosen, event.target.value)} />
       <p className="text-sm">{t("admin.import.separatorHint")}</p>
-      {asksEncoding && <>
-        <p data-testid="source-not-utf8">{t("admin.import.notUtf8")}</p>
-        <label className="font-semibold" htmlFor={`${group}-encoding`}>{t("admin.import.encoding")}</label>
-        <input data-testid="source-encoding" id={`${group}-encoding`} list={`${group}-encodings`} className="form-control rounded-lg border px-3 py-3" disabled={disabled} value={encoding} onChange={(event) => void readWith(event.target.value)} />
-        <datalist id={`${group}-encodings`}>
-          {encodings.map((name) => <option key={name} value={name} />)}
-        </datalist>
-        {unreadableHere && <p data-testid="source-encoding-unreadable">{t("admin.import.encodingUnreadableHere")}</p>}
-      </>}
+      {asksEncoding && <p data-testid="source-not-utf8">{t("admin.import.notUtf8")}</p>}
+      <label className="font-semibold" htmlFor={`${group}-encoding`}>{t("admin.import.encoding")}</label>
+      <input data-testid="source-encoding" id={`${group}-encoding`} list={`${group}-encodings`} className="form-control rounded-lg border px-3 py-3" disabled={disabled} value={encoding} onChange={(event) => void readWith(event.target.value)} />
+      <datalist id={`${group}-encodings`}>
+        {encodings.map((name) => <option key={name} value={name} />)}
+      </datalist>
+      <p className="text-sm">{t("admin.import.encodingHint")}</p>
+      {unreadableHere && <p data-testid="source-encoding-unreadable">{t("admin.import.encodingUnreadableHere")}</p>}
     </div>
 
     <div className="grid gap-3">

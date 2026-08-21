@@ -27,9 +27,10 @@ const preview: ImportPreview = {
   expiresAt: "2026-08-22T10:00:00Z"
 };
 
-function show(current: ImportPreview | undefined, previewed = vi.fn()) {
+function show(current: ImportPreview | undefined, previewed = vi.fn(), sourceEncoding = "UTF-8") {
   render(<ImportPreviewPanel
     sourceId="source-1"
+    sourceEncoding={sourceEncoding}
     preview={current}
     disabled={false}
     previewed={previewed}
@@ -85,6 +86,22 @@ describe("ImportPreviewPanel", () => {
     await userEvent.clear(screen.getByTestId("snapshot-encoding"));
     await userEvent.type(screen.getByTestId("snapshot-encoding"), "windows-1252");
     await userEvent.click(screen.getByTestId("upload-snapshot"));
+    expect(uploading).toHaveBeenCalledWith("source-1", expect.any(File), "UPDATE_ONLY", "windows-1252");
+  });
+
+  it("given a source that stores a character set, when a file in it is uploaded, then it is read by that", async () => {
+    // given — the source has already been told what its export tool writes
+    const uploading = vi.spyOn(api, "createImportPreview").mockResolvedValue(preview);
+    show(undefined, vi.fn(), "windows-1252");
+
+    // when — "Nr;Straße" as windows-1252, which strict UTF-8 cannot decode
+    await userEvent.upload(screen.getByTestId("snapshot-file"),
+      new File([Uint8Array.from([78, 114, 59, 83, 116, 114, 97, 223, 101, 10])],
+        "members.csv", { type: "text/csv" }));
+    await userEvent.click(screen.getByTestId("upload-snapshot"));
+
+    // then — the answer the club gave once is not asked for again
+    expect(screen.queryByTestId("snapshot-not-utf8")).not.toBeInTheDocument();
     expect(uploading).toHaveBeenCalledWith("source-1", expect.any(File), "UPDATE_ONLY", "windows-1252");
   });
 

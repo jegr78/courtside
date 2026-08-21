@@ -56,7 +56,8 @@ public class PreviewService {
         SourceConfiguration configuration = sources.configurationForUpdate(sourceId);
         SnapshotMode requested = requiredMode(mode);
         CsvSnapshot snapshot = SnapshotParser.parse(requiredContent(content), configuration.columns(),
-                SupportedEncodings.resolve(encoding), configuration.separator());
+                SupportedEncodings.resolve(encodingInForce(encoding, configuration)),
+                configuration.separator());
         CurrentRoster roster = currentRosterFor(sourceId, snapshot);
         ResolvedChangeSet resolved = ChangeSetResolver.resolve(snapshot, configuration, requested, roster);
         Instant now = clock.instant();
@@ -68,6 +69,11 @@ public class PreviewService {
                 resolved.removals().percent(), configuration.removalWarningPercent(), now,
                 requiredAccountId(accountId), now.plus(properties.previewRetention())));
         return toSummary(preview);
+    }
+
+    // One file may come out differently; the source stays the answer for every other.
+    private static String encodingInForce(String requested, SourceConfiguration configuration) {
+        return requested == null || requested.isBlank() ? configuration.encoding() : requested;
     }
 
     public PreviewSummary read(UUID previewId) {

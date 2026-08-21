@@ -64,7 +64,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        source = sources.create("roster-system", "Membership system", ",",
+        source = sources.create("roster-system", "Membership system", ",", "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
@@ -212,7 +212,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     @Test
     void givenAMembershipTypeDeactivatedAfterThePreview_whenExecuting_thenNothingIsWrittenAtAll() {
         // given
-        UUID typed = sources.create("club-registry", "The other system", ",",
+        UUID typed = sources.create("club-registry", "The other system", ",", "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,

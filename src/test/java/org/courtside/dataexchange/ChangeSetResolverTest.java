@@ -279,12 +279,13 @@ class ChangeSetResolverTest {
     private static SourceConfiguration owningAddress() {
         SourceConfiguration base = configuration();
         return new SourceConfiguration(base.sourceId(), base.sourceKey(), base.displayName(),
-                base.separator(), base.columns(), base.membershipTypes(), base.defaultMembershipTypeId(),
+                base.separator(), base.encoding(), base.columns(), base.membershipTypes(),
+                base.defaultMembershipTypeId(),
                 Set.of(CanonicalField.EMAIL), base.removalWarningPercent());
     }
 
     private static SourceConfiguration configuration() {
-        return new SourceConfiguration(SOURCE, "roster-system", "Membership system", ',',
+        return new SourceConfiguration(SOURCE, "roster-system", "Membership system", ',', "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
@@ -321,7 +322,8 @@ class ChangeSetResolverTest {
     private static SourceConfiguration owningMembershipType() {
         SourceConfiguration base = configuration();
         return new SourceConfiguration(base.sourceId(), base.sourceKey(), base.displayName(),
-                base.separator(), base.columns(), base.membershipTypes(), base.defaultMembershipTypeId(),
+                base.separator(), base.encoding(), base.columns(), base.membershipTypes(),
+                base.defaultMembershipTypeId(),
                 Set.of(CanonicalField.MEMBERSHIP_TYPE), base.removalWarningPercent());
     }
 

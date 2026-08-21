@@ -41,8 +41,8 @@ class ImportSourceAdminController implements AdminImportApi {
     @Override
     public ResponseEntity<ApiImportSource> createImportSource(ApiImportSourceRequest request) {
         SourceConfiguration created = sources.create(request.getSourceKey(),
-                request.getDisplayName(), request.getSeparator(), columns(request),
-                request.getMembershipTypes(),
+                request.getDisplayName(), request.getSeparator(), request.getEncoding(),
+                columns(request), request.getMembershipTypes(),
                 request.getDefaultMembershipTypeId(), ownedFields(request),
                 request.getRemovalWarningPercent());
         return ResponseEntity
@@ -59,8 +59,8 @@ class ImportSourceAdminController implements AdminImportApi {
     public ResponseEntity<ApiImportSource> changeImportSource(UUID id,
                                                               ApiImportSourceRequest request) {
         return ResponseEntity.ok(toResponse(sources.change(id, request.getSourceKey(),
-                request.getDisplayName(), request.getSeparator(), columns(request),
-                request.getMembershipTypes(),
+                request.getDisplayName(), request.getSeparator(), request.getEncoding(),
+                columns(request), request.getMembershipTypes(),
                 request.getDefaultMembershipTypeId(), ownedFields(request),
                 request.getRemovalWarningPercent())));
     }
@@ -95,8 +95,8 @@ class ImportSourceAdminController implements AdminImportApi {
         configuration.ownedFields().stream().sorted()
                 .forEach(field -> owned.add(ApiCanonicalField.fromValue(field.name())));
         return new ApiImportSource(configuration.sourceId(), configuration.sourceKey(),
-                configuration.displayName(), String.valueOf(configuration.separator()), columns,
-                configuration.membershipTypes(),
+                configuration.displayName(), String.valueOf(configuration.separator()),
+                configuration.encoding(), columns, configuration.membershipTypes(),
                 configuration.defaultMembershipTypeId(), owned,
                 configuration.removalWarningPercent());
     }

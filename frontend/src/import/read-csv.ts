@@ -96,7 +96,7 @@ function decode(bytes: Uint8Array, encoding: string): string {
   }
 }
 
-const isUtf8 = (encoding: string) => encoding.trim().toLowerCase().replace("_", "-") === "utf-8";
+const isUtf8 = (encoding: string) => encoding.trim().toLowerCase() === "utf-8";
 
 function decoderFor(encoding: string): TextDecoder {
   try {

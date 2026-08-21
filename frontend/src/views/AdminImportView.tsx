@@ -115,6 +115,7 @@ export function AdminImportView() {
     {chosen && <ImportPreviewPanel
       key={`preview-${chosen.id}`}
       sourceId={chosen.id}
+      sourceEncoding={chosen.encoding}
       preview={preview}
       disabled={pending}
       previewed={setPreview}

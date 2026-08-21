@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NotUtf8Error, readCsvColumn, readCsvHeader } from "./read-csv";
+import { EncodingUnreadableHereError, NotUtf8Error, readCsvColumn, readCsvHeader } from "./read-csv";
 
 const csv = (content: string) => new File([content], "roster.csv", { type: "text/csv" });
 const legacy = (content: string) =>
@@ -49,6 +49,13 @@ describe("readCsvHeader", () => {
   it("given a file written in windows-1252, when that encoding is chosen, then its umlauts are not replaced", async () => {
     expect(await readCsvHeader(legacy("Nr;Straße\n1;Marketplace 9\n"), "windows-1252"))
       .toEqual(["Nr", "Straße"]);
+  });
+
+  it("given a character set this browser cannot decode, when reading a header, then it says so rather than failing opaquely", async () => {
+    // a server reads every character set its platform has and a browser reads the WHATWG set, so
+    // the two genuinely differ and the gap has to be named where it is noticed
+    await expect(readCsvHeader(legacy("Nr;Straße\n1;Marketplace 9\n"), "IBM930"))
+      .rejects.toBeInstanceOf(EncodingUnreadableHereError);
   });
 
   it("given a file that is not UTF-8, when no other encoding is chosen, then it says so instead of guessing", async () => {
