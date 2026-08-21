@@ -1,7 +1,4 @@
 {
-  "courtImpact": "A gap, not a decision: the facility view takes a court out of service without first showing what that would displace.",
-  "bookingCardImpact": "A gap, not a decision: the facility view retires a booking card without first showing what that would displace.",
-  "openingHoursImpact": "A gap, not a decision: the facility view closes a day without first showing what that would displace.",
   "previewSeries": "The series form arrives in this work; a series can be moved and cancelled from the browser today but never created.",
   "createSeries": "The series form arrives in this work; a series can be moved and cancelled from the browser today but never created.",
   "getApiDocument": "The contract serves itself to whoever consumes it. There is nothing for a member or a board to operate here.",

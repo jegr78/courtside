@@ -18,6 +18,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
+import { ImpactPanel } from "../components/ImpactPanel";
 
 const roles: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER"];
 // The server strips MEMBER before matching a managing role.
@@ -272,7 +273,7 @@ export function AdminFacilityView() {
         {success && <Alert tone="success">{success}</Alert>}
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.courts")}</h2>
-          {courts.map((court) => <CourtEditor key={court.id} court={court} disabled={pending.has(`court:${court.id}`)} changed={(changed) => setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCourt} toggle={toggleCourt} />)}
+          {courts.map((court) => <CourtEditor key={court.id} court={court} disabled={pending.has(`court:${court.id}`)} changed={(changed) => setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCourt} toggle={toggleCourt} reportError={reportError} />)}
           <form noValidate onSubmit={(event) => void createCourt(event)} className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
             <TextField data-testid="new-court-number" disabled={pending.has("court:new")} name="number" type="number" label={t("admin.facility.number")} />
             <TextField data-testid="new-court-name" disabled={pending.has("court:new")} name="name" label={t("admin.facility.name")} />
@@ -282,12 +283,12 @@ export function AdminFacilityView() {
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.openingHours")}</h2>
           <div className="grid gap-3 lg:grid-cols-2">
-            {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} />)}
+            {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} reportError={reportError} />)}
           </div>
         </section>
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.cards")}</h2>
-          {cards.map((card) => <CardEditor key={card.id} card={card} disabled={pending.has(`card:${card.id}`)} changed={(changed) => setCards((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCard} toggle={toggleCard} />)}
+          {cards.map((card) => <CardEditor key={card.id} card={card} disabled={pending.has(`card:${card.id}`)} changed={(changed) => setCards((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCard} toggle={toggleCard} reportError={reportError} />)}
           <CardCreateForm disabled={pending.has("card:new")} create={createCard} />
         </section>
         <section className="grid gap-4">
@@ -307,17 +308,20 @@ export function AdminFacilityView() {
   </section>;
 }
 
-function CourtEditor({ court, disabled, changed, save, toggle }: { court: AdminCourt; disabled: boolean; changed: (court: AdminCourt) => void; save: (court: AdminCourt) => Promise<void>; toggle: (court: AdminCourt) => Promise<void> }) {
+function CourtEditor({ court, disabled, changed, save, toggle, reportError }: { court: AdminCourt; disabled: boolean; changed: (court: AdminCourt) => void; save: (court: AdminCourt) => Promise<void>; toggle: (court: AdminCourt) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto_auto] sm:items-end">
     <TextField disabled={disabled} type="number" label={t("admin.facility.number")} value={court.number} onChange={(event) => changed({ ...court, number: Number(event.target.value) })} />
     <TextField disabled={disabled} data-testid={`court-name-${court.id}`} label={t("admin.facility.name")} value={court.name ?? ""} onChange={(event) => changed({ ...court, name: event.target.value || null })} />
     <Button disabled={disabled} type="button" onClick={() => void save(court)}>{t("admin.save")}</Button>
     <Button disabled={disabled} data-testid={`toggle-court-${court.id}`} type="button" onClick={() => void toggle(court)}>{t(court.active ? "admin.deactivate" : "admin.activate")}</Button>
+    <div className="sm:col-span-full">
+      <ImpactPanel kind="court" subject={court.id} ask={() => api.courtImpact(court.id)} reportError={reportError} />
+    </div>
   </article>;
 }
 
-function HoursEditor({ hours, disabled, changed, save, close }: { hours: OpeningHours; disabled: boolean; changed: (hours: OpeningHours) => void; save: (hours: OpeningHours) => Promise<void>; close: (day: DayOfWeek) => Promise<void> }) {
+function HoursEditor({ hours, disabled, changed, save, close, reportError }: { hours: OpeningHours; disabled: boolean; changed: (hours: OpeningHours) => void; save: (hours: OpeningHours) => Promise<void>; close: (day: DayOfWeek) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4">
     <h3 className="font-bold">{t(`weekday.${hours.dayOfWeek}`)}</h3>
@@ -329,10 +333,16 @@ function HoursEditor({ hours, disabled, changed, save, close }: { hours: Opening
       <Button data-testid={`save-hours-${hours.dayOfWeek}`} disabled={disabled || !hours.opensAt || !hours.closesAt} type="button" onClick={() => void save(hours)}>{t("admin.save")}</Button>
       <Button disabled={disabled} type="button" onClick={() => void close(hours.dayOfWeek)}>{t("admin.facility.closeDay")}</Button>
     </div>
+    <ImpactPanel
+      kind="opening-hours"
+      subject={hours.dayOfWeek}
+      ask={() => api.openingHoursImpact(hours.dayOfWeek, shortTime(hours.opensAt), shortTime(hours.closesAt))}
+      reportError={reportError}
+    />
   </article>;
 }
 
-function CardEditor({ card, disabled, changed, save, toggle }: { card: BookingCard; disabled: boolean; changed: (card: BookingCard) => void; save: (card: BookingCard) => Promise<void>; toggle: (card: BookingCard) => Promise<void> }) {
+function CardEditor({ card, disabled, changed, save, toggle, reportError }: { card: BookingCard; disabled: boolean; changed: (card: BookingCard) => void; save: (card: BookingCard) => Promise<void>; toggle: (card: BookingCard) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   const [counts, setCounts] = useState(card.allowedPlayerCounts.join(", "));
   const countsValue = playerCounts(counts);
@@ -351,6 +361,7 @@ function CardEditor({ card, disabled, changed, save, toggle }: { card: BookingCa
       <Button disabled={disabled} data-testid={`save-card-${card.id}`} type="button" onClick={() => void save({ ...card, allowedPlayerCounts: countsValue, tracksPlayers: countsValue.length > 0 })}>{t("admin.save")}</Button>
       <Button disabled={disabled} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
     </div>
+    <ImpactPanel kind="booking-card" subject={card.id} ask={() => api.bookingCardImpact(card.id)} reportError={reportError} />
   </article>;
 }
 

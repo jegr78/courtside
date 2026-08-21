@@ -3,6 +3,7 @@ import type { components } from "./schema";
 export type SessionStatus = components["schemas"]["SessionStatus"];
 export type ClubConfig = components["schemas"]["ClubConfig"];
 export type ClubConfigRequest = components["schemas"]["ClubConfigRequest"];
+export type Impact = components["schemas"]["Impact"];
 export type RuleSet = components["schemas"]["RuleSet"];
 export type RuleSetRequest = components["schemas"]["RuleSetRequest"];
 export type RuleType = components["schemas"]["RuleType"];
@@ -133,6 +134,14 @@ export const api = {
     `/api/admin/rule-sets/${ruleSetId}/rules/${ruleType}`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ params })
     }
+  ),
+  courtImpact: (courtId: string) => request<Impact>(`/api/admin/impact/courts/${courtId}`),
+  bookingCardImpact: (cardId: string) => request<Impact>(`/api/admin/impact/booking-cards/${cardId}`),
+  openingHoursImpact: (day: DayOfWeek, opensAt?: string, closesAt?: string) => request<Impact>(
+    `/api/admin/impact/opening-hours/${day}?${new URLSearchParams({
+      ...(opensAt ? { opensAt } : {}),
+      ...(closesAt ? { closesAt } : {})
+    }).toString()}`
   ),
   adminCourts: () => request<AdminCourt[]>("/api/admin/courts"),
   createAdminCourt: (court: CourtRequest) => request<AdminCourt>("/api/admin/courts", {

@@ -28,6 +28,99 @@ describe("AdminFacilityView", () => {
     ]);
   });
 
+  it("given a court in use, when its impact is asked for, then the bookings it would displace are named", async () => {
+    // given
+    vi.spyOn(api, "courtImpact").mockResolvedValue({
+      affectedCount: 2, truncated: false, nextCursor: null,
+      bookings: [
+        { bookingId: "booking-1", courtIds: ["court-1"], startsAt: "2026-09-01T08:00:00Z", endsAt: "2026-09-01T09:00:00Z" },
+        { bookingId: "booking-2", courtIds: ["court-1"], startsAt: "2026-09-02T10:00:00Z", endsAt: "2026-09-02T11:00:00Z" }
+      ]
+    });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+
+    // when
+    await userEvent.click(await screen.findByTestId("court-impact-court-1"));
+
+    // then
+    const impact = await screen.findByTestId("impact-court-1");
+    expect(impact).toHaveTextContent("2");
+    expect(screen.getAllByTestId(/^impact-booking-/)).toHaveLength(2);
+  });
+
+  it("given a court nothing is booked on, when its impact is asked for, then it says so plainly", async () => {
+    // given
+    vi.spyOn(api, "courtImpact")
+      .mockResolvedValue({ affectedCount: 0, truncated: false, nextCursor: null, bookings: [] });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+
+    // when
+    await userEvent.click(await screen.findByTestId("court-impact-court-1"));
+
+    // then
+    expect(await screen.findByTestId("impact-court-1")).toBeInTheDocument();
+    expect(screen.queryAllByTestId(/^impact-booking-/)).toHaveLength(0);
+  });
+
+  it("given an impact still loading, when a board wants to act anyway, then nothing is disabled", async () => {
+    // given — the panel informs, it does not gate; a slow answer must not stop a decision
+    let answer: (impact: { affectedCount: number; truncated: boolean; nextCursor: null; bookings: [] }) => void = () => undefined;
+    vi.spyOn(api, "courtImpact").mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    vi.spyOn(api, "setAdminCourtActive")
+      .mockResolvedValue({ id: "court-1", number: 1, name: "Centre Court", active: false });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId("court-impact-court-1"));
+
+    // when / then
+    expect(screen.getByTestId("toggle-court-court-1")).toBeEnabled();
+    expect(screen.getByTestId("court-impact-court-1")).toBeEnabled();
+    answer({ affectedCount: 0, truncated: false, nextCursor: null, bookings: [] });
+  });
+
+  it("given more affected bookings than one page holds, when the impact is read, then it says it is not the whole list", async () => {
+    // given
+    vi.spyOn(api, "courtImpact").mockResolvedValue({
+      affectedCount: 120, truncated: true, nextCursor: "booking-50",
+      bookings: [{ bookingId: "booking-1", courtIds: ["court-1"], startsAt: "2026-09-01T08:00:00Z", endsAt: "2026-09-01T09:00:00Z" }]
+    });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+
+    // when
+    await userEvent.click(await screen.findByTestId("court-impact-court-1"));
+
+    // then — a list that shows one of a hundred and twenty without saying so is what this refuses
+    expect(await screen.findByTestId("impact-truncated-court-1")).toBeInTheDocument();
+  });
+
+  it("given a booking card in use, when its impact is asked for, then the bookings it would displace are named", async () => {
+    // given
+    vi.spyOn(api, "bookingCardImpact").mockResolvedValue({
+      affectedCount: 1, truncated: false, nextCursor: null,
+      bookings: [{ bookingId: "booking-9", courtIds: ["court-1"], startsAt: "2026-09-01T08:00:00Z", endsAt: "2026-09-01T09:00:00Z" }]
+    });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+
+    // when
+    await userEvent.click(await screen.findByTestId("booking-card-impact-card-1"));
+
+    // then
+    expect(await screen.findByTestId("impact-card-1")).toHaveTextContent("1");
+  });
+
+  it("given hours a board is about to shorten, when the impact is asked for, then it is asked for the new hours", async () => {
+    // given
+    const asking = vi.spyOn(api, "openingHoursImpact")
+      .mockResolvedValue({ affectedCount: 0, truncated: false, nextCursor: null, bookings: [] });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    await screen.findByTestId("opening-hours-impact-MONDAY");
+
+    // when
+    await userEvent.click(screen.getByTestId("opening-hours-impact-MONDAY"));
+
+    // then — the question is about what the form holds now, not about what is stored
+    expect(asking).toHaveBeenCalledWith("MONDAY", "08:00", "22:00");
+  });
+
   it("given the club's participant cards, when the view loads, then each is listed with how many it owns", async () => {
     // when
     render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
