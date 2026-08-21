@@ -165,15 +165,19 @@ export async function executeSecurityPlan(plan, runtime = {}) {
       assertRunning(paths, startedAt, now(), plan.budgets);
       manifest.toolResults.push({ id: "openapi-fuzzer", version: plan.tools[2].version,
         outcome: fuzzEvidence.outcome });
-      const authorizationEvidence = await runAuthorizationAssessment(plan, { evidenceDirectory: paths.evidence,
-        stopFile: paths.stop, attempt, deadline, maxRequests: authorizationRequestLimit(plan) });
-      assertRunning(paths, startedAt, now(), plan.budgets);
-      manifest.toolResults.push({ id: "authorization-matrix", version: plan.tools[3].version,
-        outcome: authorizationEvidence.outcome });
+      let authorizationEvidence = { outcome: "passed", requestCount: 0 };
+      if (fuzzEvidence.outcome !== "failed") {
+        authorizationEvidence = await runAuthorizationAssessment(plan, { evidenceDirectory: paths.evidence,
+          stopFile: paths.stop, attempt, deadline, maxRequests: authorizationRequestLimit(plan) });
+        assertRunning(paths, startedAt, now(), plan.budgets);
+        manifest.toolResults.push({ id: "authorization-matrix", version: plan.tools[3].version,
+          outcome: authorizationEvidence.outcome });
+      }
       manifest.outcome = combinedOutcome(authorizationEvidence.outcome, zapEvidence.outcome, fuzzEvidence.outcome);
-      manifest.reason = manifest.outcome === "passed" ? null : "Active security checks did not pass";
-      manifest.usage = { requests: authorizationEvidence.requestCount + zapEvidence.requestCount
-          + fuzzEvidence.requestCount,
+      manifest.reason = fuzzEvidence.outcome === "failed" ? "OpenAPI fuzzing changed protected domain state"
+        : manifest.outcome === "passed" ? null : "Active security checks did not pass";
+      manifest.usage = { requests: zapEvidence.requestCount + fuzzEvidence.requestCount
+          + authorizationEvidence.requestCount,
         generatedDataMegabytes: (zapEvidence.generatedDataMegabytes ?? 0)
           + (fuzzEvidence.generatedDataMegabytes ?? 0),
         evidenceBytes: directoryBytes(paths.evidence) };

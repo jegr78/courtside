@@ -498,7 +498,8 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
     COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
     COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api,/manifest.webmanifest",
     COURTSIDE_SECURITY_CANARY_ENABLED: "false",
-    COURTSIDE_SECURITY_MAX_TARGET_BYTES: "8192" };
+    COURTSIDE_SECURITY_MAX_TARGET_BYTES: "8192",
+    COURTSIDE_SECURITY_MAX_GENERATED_BYTES: String(20 * 1024 * 1024) };
   const reservation = `courtside-security-assessment-${plan.runId}`;
   const gateway = `${securityProject(plan.runId)}-scanner-gateway-1`;
   const scanner = `${securityProject(plan.runId)}-schemathesis-1`;
@@ -542,7 +543,8 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
       const selected = limits.inventory.filter(({ modes }) => modes.includes(mode));
       const reportDirectory = `/tmp/courtside-schemathesis-${mode}`;
       const args = ["exec", scanner, "st", "--config-file", "/tmp/courtside-schemathesis.toml", "run",
-        "/schema/openapi.yaml", "--url", "http://scanner-gateway:8090", "--phases", "fuzzing", "--mode", mode,
+        "/schema/openapi.yaml", "--url", "http://scanner-gateway:8090", "--phases", limits.policy.phases.join(","),
+        "--mode", mode,
         "--max-examples", String(limits.policy.maxExamples), "--workers", String(limits.policy.workers),
         "--seed", String(limits.policy.seed), "--request-timeout", String(limits.policy.requestTimeoutSeconds),
         "--request-retries", "0", "--max-redirects", "0", "--max-failures", String(limits.policy.maxFailures),
@@ -560,14 +562,23 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
     const stateBefore = await limits.captureState();
     await runMode("negative");
     const importResult = await limits.runImportCases(fixture);
+    const inputResult = await limits.runInputCases(fixture);
     const stateAfter = await limits.captureState();
     const metrics = await scannerGatewayMetrics(gateway, command);
-    const requestCount = metrics.requests + fixture.requestCount + importResult.requestCount;
-    if (fixture.requestCount + importResult.requestCount > limits.policy.nativeRequestReserve
+    const scannerBytes = Number((await command(["exec", scanner, "sh", "-c",
+      "du -sb /tmp /app/.schemathesis /app/.hypothesis | awk '{ total += $1 } END { print total }'"])).stdout.trim());
+    if (!Number.isSafeInteger(scannerBytes) || scannerBytes < 0) {
+      throw new Error("Scanner writable-data metrics are invalid");
+    }
+    const requestCount = metrics.requests + fixture.requestCount + importResult.requestCount + inputResult.requestCount;
+    if (fixture.requestCount + importResult.requestCount + inputResult.requestCount > limits.policy.nativeRequestReserve
         || requestCount > limits.maxRequests) throw new Error("The OpenAPI fuzz request budget was exceeded");
-    return { events, importCases: importResult.cases, stateBefore, stateAfter, requestCount, runtimeHardened,
+    return { events, importCases: importResult.cases, inputCases: inputResult.cases,
+      observedRoutes: fixture.observedRoutes,
+      stateBefore, stateAfter, requestCount, runtimeHardened,
       specificationDigest: limits.specificationDigest,
-      generatedDataMegabytes: (generatedBytes + metrics.requestBytes) / (1024 * 1024) };
+      generatedDataMegabytes: (generatedBytes + metrics.requestBytes + scannerBytes
+        + importResult.generatedBytes + inputResult.generatedBytes) / (1024 * 1024) };
   } finally {
     fixture?.close();
     const cleanupFailures = [];

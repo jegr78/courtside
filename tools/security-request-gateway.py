@@ -17,6 +17,7 @@ ALLOWED_PATH_PREFIXES = tuple(filter(None, os.environ.get(
 CANARY_ENABLED = os.environ.get("COURTSIDE_SECURITY_CANARY_ENABLED", "false") == "true"
 CANARY_PATH = "/__security/zap-canary"
 MAX_TARGET_BYTES = int(os.environ.get("COURTSIDE_SECURITY_MAX_TARGET_BYTES", "8192"))
+MAX_GENERATED_BYTES = int(os.environ["COURTSIDE_SECURITY_MAX_GENERATED_BYTES"])
 counter_lock = threading.Lock()
 concurrency = threading.BoundedSemaphore(MAX_CONCURRENCY)
 request_count = 0
@@ -33,6 +34,15 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         self.forward()
 
     def do_POST(self):
+        self.forward()
+
+    def do_PUT(self):
+        self.forward()
+
+    def do_PATCH(self):
+        self.forward()
+
+    def do_DELETE(self):
         self.forward()
 
     def do_OPTIONS(self):
@@ -58,7 +68,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 self.reject(413)
                 return
             with counter_lock:
-                if request_count >= MAX_REQUESTS:
+                if request_count >= MAX_REQUESTS or request_bytes + content_length > MAX_GENERATED_BYTES:
                     self.reject(429)
                     return
                 request_count += 1

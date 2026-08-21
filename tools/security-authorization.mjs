@@ -543,6 +543,10 @@ export function authorizationRequest(origin, client, probe, options = {}) {
   }
   if (probe.body !== undefined) headers["content-length"] = Buffer.byteLength(probe.body);
   return new Promise((resolve, reject) => {
+    const maxResponseBytes = options.maxResponseBytes ?? 64 * 1024;
+    if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes < 1 || maxResponseBytes > 2 * 1024 * 1024) {
+      throw new Error("Authorization response limit is invalid");
+    }
     const startedAt = performance.now();
     const chunks = [];
     let bytes = 0;
@@ -551,14 +555,14 @@ export function authorizationRequest(origin, client, probe, options = {}) {
       timeout: Math.max(1, Math.min(10_000, options.timeoutMilliseconds ?? 10_000)) }, (response) => {
       response.on("data", (chunk) => {
         bytes += chunk.length;
-        if (bytes > 64 * 1024) call.destroy(new Error("Authorization response exceeded its size limit"));
+        if (bytes > maxResponseBytes) call.destroy(new Error("Authorization response exceeded its size limit"));
         else chunks.push(chunk);
       });
       response.once("end", () => {
         client.update(response.headers["set-cookie"] ?? []);
         const body = Buffer.concat(chunks).toString("utf8");
         let json;
-        if (body && /application\/(?:problem\+)?json/i.test(response.headers["content-type"] ?? "")) {
+        if (body && /application\/(?:[a-z0-9.-]+\+)?json/i.test(response.headers["content-type"] ?? "")) {
           try { json = JSON.parse(body); } catch { }
         }
         const problemType = /application\/problem\+json/i.test(response.headers["content-type"] ?? "")

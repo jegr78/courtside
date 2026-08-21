@@ -6,6 +6,20 @@
   "workers": 1,
   "requestTimeoutSeconds": 5,
   "maxFailures": 100,
+  "phases": ["examples", "coverage", "fuzzing"],
+  "inputClasses": [
+    "missing-fields",
+    "duplicate-fields",
+    "unknown-fields",
+    "unicode-normalization",
+    "control-characters",
+    "deep-json",
+    "oversized-body",
+    "numeric-boundary",
+    "cursor-boundary",
+    "date-time-boundary",
+    "malformed-idempotency-key"
+  ],
   "checks": [
     "not_a_server_error",
     "status_code_conformance",

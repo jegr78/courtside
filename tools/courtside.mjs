@@ -26,7 +26,7 @@ import { runPassiveDeploymentAssessment } from "./security-passive-deployment.mj
 import { runAuthorizationAssessment } from "./security-authorization.mjs";
 import { renderAuthenticatedZapPlan, runAuthenticatedZapAssessment } from "./security-authenticated-zap.mjs";
 import {
-  prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment, runOpenApiImportCases
+  prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment, runOpenApiImportCases, runOpenApiInputCases
 } from "./security-openapi-fuzz.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -650,6 +650,9 @@ async function execute(options) {
             ...context, ca, sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD
           }),
           runImportCases: (fixture) => runOpenApiImportCases(candidate, fixture, {
+            ca, timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
+          }),
+          runInputCases: (fixture) => runOpenApiInputCases(candidate, fixture, {
             ca, timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
           }),
           captureState: () => securityDomainStateFingerprint(candidate.runId, context.stopFile,

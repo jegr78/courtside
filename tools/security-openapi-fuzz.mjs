@@ -76,21 +76,31 @@ export function normalizeSchemathesisEvents(events, inventory, mode) {
       undocumentedRoutes.set(`${match[1]} ${match[2]}`, { method: match[1], pathTemplate: match[2] });
       continue;
     }
-    scenarios.set(entry.operationId, scenario);
+    const recorded = scenarios.get(entry.operationId) ?? [];
+    recorded.push(scenario);
+    scenarios.set(entry.operationId, recorded);
   }
   const counterexamples = [];
   const operationResults = expected.map((entry) => {
-    const scenario = scenarios.get(entry.operationId);
-    if (!scenario) throw new Error(`Schemathesis omitted operation ${entry.operationId}`);
-    const observedModes = new Set(Object.values(scenario.recorder?.cases ?? {})
-      .map(({ value }) => value?.meta?.generation?.mode).filter(Boolean));
-    if (!observedModes.has(mode)) throw new Error(`Schemathesis omitted ${mode} inputs for ${entry.operationId}`);
-    for (const [caseId, checks] of Object.entries(scenario.recorder?.checks ?? {})) {
-      for (const check of checks.filter(({ status }) => status === "failure")) {
-        counterexamples.push(safeCounterexample(entry, mode, caseId, check.name));
+    const operationScenarios = scenarios.get(entry.operationId) ?? [];
+    const matching = operationScenarios.flatMap((scenario) => {
+      const caseIds = Object.entries(scenario.recorder?.cases ?? {})
+        .filter(([, { value }]) => value?.meta?.generation?.mode === mode).map(([caseId]) => caseId);
+      return caseIds.length ? [{ scenario, caseIds }] : [];
+    });
+    if (!matching.length) throw new Error(`Schemathesis omitted ${mode} inputs for ${entry.operationId}`);
+    let failed = false;
+    for (const { scenario, caseIds } of matching) {
+      for (const caseId of caseIds) {
+        for (const check of (scenario.recorder?.checks?.[caseId] ?? []).filter(({ status }) => status === "failure")) {
+          const generatedCase = scenario.recorder.cases[caseId].value;
+          counterexamples.push(safeCounterexample(entry, mode, caseId, check.name, generatedCase));
+          failed = true;
+        }
       }
+      if (scenario.status !== "success") failed = true;
     }
-    const outcome = scenario.status === "success" ? "passed" : "incomplete";
+    const outcome = failed ? "incomplete" : "passed";
     return { operationId: entry.operationId, mode, outcome,
       observation: outcome === "passed" ? "generated-inputs-conform" : "candidate-requires-triage" };
   });
@@ -124,7 +134,8 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     normalizeSchemathesisEvents(scanner.events[mode], inventory, mode));
   const operationOutcomes = normalized.flatMap(({ operationResults }) => operationResults);
   const counterexamples = normalized.flatMap(({ counterexamples: values }) => values);
-  const undocumentedRoutes = normalized.flatMap(({ undocumentedRoutes: values }) => values)
+  const undocumentedRoutes = [...normalized.flatMap(({ undocumentedRoutes: values }) => values),
+    ...undocumentedRuntimeRoutes(scanner.observedRoutes, inventory)]
     .filter((value, index, values) => values.findIndex((candidate) =>
       candidate.method === value.method && candidate.pathTemplate === value.pathTemplate) === index);
   const operations = inventory.map((entry) => ({ ...entry,
@@ -132,12 +143,14 @@ export async function runOpenApiFuzzAssessment(plan, context) {
       .map(({ mode, outcome, observation }) => ({ mode, outcome, observation }))
   }));
   const observedAt = (context.now?.() ?? new Date()).toISOString();
-  const candidates = counterexamples.map((counterexample) => counterexampleCandidate(counterexample, plan, context,
-    observedAt));
-  candidates.push(...undocumentedRoutes.map((route) => undocumentedRouteCandidate(route, plan, context, observedAt)));
+  const candidates = mergeCandidates([
+    ...counterexamples.map((counterexample) => counterexampleCandidate(counterexample, plan, context, observedAt)),
+    ...undocumentedRoutes.map((route) => undocumentedRouteCandidate(route, plan, context, observedAt))
+  ]);
   const stateChanged = scanner.stateBefore !== scanner.stateAfter;
   const incomplete = counterexamples.length > 0 || undocumentedRoutes.length > 0
     || operationOutcomes.some(({ outcome }) => outcome === "incomplete")
+    || scanner.inputCases.some(({ outcome }) => outcome === "incomplete")
     || scanner.importCases.some(({ outcome }) => outcome === "incomplete");
   const evidence = {
     schemaVersion: 1,
@@ -150,6 +163,7 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     operations,
     counterexamples,
     undocumentedRoutes,
+    inputCases: scanner.inputCases,
     importCases: scanner.importCases,
     stateBefore: scanner.stateBefore,
     stateAfter: scanner.stateAfter,
@@ -193,7 +207,11 @@ export async function prepareOpenApiFuzzFixtures(plan, context) {
       removalWarningPercent: 10
     }) }, { csrf: true });
   if (source.status !== 201 || !source.json?.id) throw new Error("Synthetic import source setup failed");
-  return { client, sourceId: source.json.id, requestCount, close: () => control.close() };
+  const mappings = await request({ method: "GET", path: "/__security/runtime-mappings", headers: {} },
+    { maxResponseBytes: 2 * 1024 * 1024 });
+  if (mappings.status !== 200 || !mappings.json) throw new Error("Runtime route inventory is unavailable");
+  return { client, sourceId: source.json.id, observedRoutes: runtimeOperations(mappings.json), requestCount,
+    close: () => control.close() };
 }
 
 export async function runOpenApiImportCases(plan, fixture, context) {
@@ -213,9 +231,12 @@ export async function runOpenApiImportCases(plan, fixture, context) {
       status: 201, observation: "row-level-rejection" }
   ];
   const results = [];
+  let generatedBytes = 0;
   for (const entry of cases) {
+    const probe = multipartProbe(fixture.sourceId, entry.id, entry.content);
+    generatedBytes += probe.body.length;
     const response = await authorizationRequest(plan.target, fixture.client,
-      multipartProbe(fixture.sourceId, entry.id, entry.content), {
+      probe, {
         ca: context.ca, signal: context.signal, csrf: true,
         timeoutMilliseconds: context.timeoutMilliseconds
       });
@@ -226,7 +247,48 @@ export async function runOpenApiImportCases(plan, fixture, context) {
       ...(response.problemType ? { problemType: response.problemType } : {}),
       observation: entry.observation, outcome: passed ? "passed" : "incomplete" });
   }
-  return { cases: results, requestCount: cases.length };
+  return { cases: results, requestCount: cases.length, generatedBytes };
+}
+
+export async function runOpenApiInputCases(plan, fixture, context) {
+  const zero = "00000000-0000-0000-0000-000000000000";
+  const booking = JSON.stringify({ courtIds: [zero], cardId: zero,
+    startsAt: "2099-01-01T10:00:00Z", endsAt: "2099-01-01T11:00:00Z" });
+  const cases = [
+    inputCase("missing-fields", "POST", "/api/admin/courts", "{}"),
+    inputCase("duplicate-fields", "POST", "/api/admin/courts", '{"name":null,"name":null}'),
+    inputCase("unknown-fields", "POST", "/api/admin/courts", '{"name":null,"unknown":"value"}'),
+    inputCase("unicode-normalization", "POST", "/api/admin/courts", '{"name":null,"probe":"e\\u0301"}'),
+    inputCase("control-characters", "POST", "/api/admin/courts", '{"name":"\u0000"}'),
+    inputCase("deep-json", "POST", "/api/admin/courts",
+      JSON.stringify({ name: null, probe: nestedObject(64) })),
+    inputCase("oversized-body", "POST", "/api/admin/courts", "x".repeat(2 * 1024 * 1024 + 1), 413),
+    inputCase("numeric-boundary", "GET", "/api/admin/audit?limit=2147483648"),
+    inputCase("cursor-boundary", "GET", `/api/admin/audit?cursor=${"x".repeat(4096)}`),
+    inputCase("date-time-boundary", "GET", "/api/bookings?week=9999-99-99"),
+    { ...inputCase("malformed-idempotency-key", "POST", "/api/bookings", booking),
+      headers: { "idempotency-key": "x".repeat(129) } }
+  ];
+  const results = [];
+  let generatedBytes = 0;
+  for (const entry of cases) {
+    generatedBytes += Buffer.byteLength(entry.body ?? "") + Buffer.byteLength(entry.path);
+    const response = await authorizationRequest(plan.target, fixture.client, {
+      method: entry.method,
+      path: entry.path,
+      headers: { ...(entry.body !== undefined ? { "content-type": "application/json" } : {}),
+        ...(entry.headers ?? {}) },
+      ...(entry.body !== undefined ? { body: entry.body } : {})
+    }, { ca: context.ca, csrf: entry.method !== "GET", timeoutMilliseconds: context.timeoutMilliseconds });
+    const typed = response.status >= 400 && response.status < 500
+      && /^urn:courtside:error:[a-z0-9-]+$/.test(response.problemType ?? "");
+    const proxyRejected = entry.expectedStatus === 413 && response.status === 413;
+    results.push({ id: entry.id, status: response.status,
+      ...(response.problemType ? { problemType: response.problemType } : {}),
+      observation: proxyRejected ? "proxy-size-rejection" : "typed-input-rejection",
+      outcome: typed || proxyRejected ? "passed" : "incomplete" });
+  }
+  return { cases: results, requestCount: cases.length, generatedBytes };
 }
 
 export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFuzzInventory(api)) {
@@ -256,7 +318,20 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
     return operation == null || operation.method !== counterexample.method
       || operation.path !== counterexample.pathTemplate || !operation.modes.includes(counterexample.mode);
   })) throw new Error("OpenAPI fuzz evidence contains an unbound counterexample");
-  if (evidence.candidates.length !== evidence.counterexamples.length + evidence.undocumentedRoutes.length) {
+  const candidateFingerprints = evidence.candidates.map(({ fingerprint }) => fingerprint);
+  if (new Set(candidateFingerprints).size !== candidateFingerprints.length) {
+    throw new Error("OpenAPI fuzz evidence contains duplicate lifecycle candidates");
+  }
+  const expectedFingerprints = new Set([
+    ...evidence.counterexamples.map((counterexample) => counterexampleCandidate(counterexample,
+      { runId: "validation", targetFingerprint: evidence.targetFingerprint }, { attempt: 1 },
+      "2000-01-01T00:00:00.000Z").fingerprint),
+    ...evidence.undocumentedRoutes.map((route) => undocumentedRouteCandidate(route,
+      { runId: "validation", targetFingerprint: evidence.targetFingerprint }, { attempt: 1 },
+      "2000-01-01T00:00:00.000Z").fingerprint)
+  ]);
+  if (expectedFingerprints.size !== candidateFingerprints.length
+      || candidateFingerprints.some((fingerprint) => !expectedFingerprints.has(fingerprint))) {
     throw new Error("OpenAPI fuzz evidence omits a lifecycle candidate");
   }
   const expectedImportCases = ["invalid-utf8", "duplicate-columns", "oversized-cell", "conflicting-reference"];
@@ -264,9 +339,14 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
       !== JSON.stringify(expectedImportCases.toSorted())) {
     throw new Error("OpenAPI fuzz evidence omits a curated import case");
   }
+  if (JSON.stringify(evidence.inputCases.map(({ id }) => id).toSorted())
+      !== JSON.stringify(openApiFuzzPolicy.inputClasses.toSorted())) {
+    throw new Error("OpenAPI fuzz evidence omits a required input class");
+  }
   const derived = evidence.stateBefore !== evidence.stateAfter ? "failed"
     : evidence.counterexamples.length > 0 || evidence.undocumentedRoutes.length > 0
       || evidence.operations.some(({ outcomes }) => outcomes.some(({ outcome }) => outcome === "incomplete"))
+      || evidence.inputCases.some(({ outcome }) => outcome === "incomplete")
       || evidence.importCases.some(({ outcome }) => outcome === "incomplete") ? "incomplete" : "passed";
   if (evidence.outcome !== derived) throw new Error("OpenAPI fuzz evidence outcome is inconsistent");
 }
@@ -328,10 +408,44 @@ function operationCoverage(operationId, method, path, modes, excludedModes) {
   return { operationId, method: method.toUpperCase(), path, modes, excludedModes };
 }
 
-function safeCounterexample(operation, mode, caseId, check) {
+export function runtimeOperations(mappings) {
+  const operations = new Map();
+  const visit = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const conditions = value.details?.requestMappingConditions;
+    for (const path of conditions?.patterns ?? []) {
+      if (!path.startsWith("/api") && path !== "/manifest.webmanifest") continue;
+      for (const method of conditions?.methods ?? []) {
+        const normalizedMethod = String(method).toUpperCase();
+        if ([...methods].map((candidate) => candidate.toUpperCase()).includes(normalizedMethod)) {
+          operations.set(`${normalizedMethod} ${path}`, { method: normalizedMethod, pathTemplate: path });
+        }
+      }
+    }
+    Object.values(value).forEach(visit);
+  };
+  visit(mappings);
+  return [...operations.values()];
+}
+
+export function undocumentedRuntimeRoutes(observedRoutes, inventory) {
+  if (!Array.isArray(observedRoutes) || observedRoutes.length === 0) {
+    throw new Error("Runtime route inventory is empty");
+  }
+  const documented = new Set(inventory.map(({ method, path }) => `${method} ${path}`));
+  return observedRoutes.filter(({ method, pathTemplate }) => !documented.has(`${method} ${pathTemplate}`));
+}
+
+function safeCounterexample(operation, mode, caseId, check, generatedCase) {
   const normalizedCheck = String(check).replaceAll("_", "-").toLowerCase();
+  const minimizedRequest = minimizedRequestProjection(generatedCase);
   const reproductionDigest = `sha256:${createHash("sha256")
-    .update(JSON.stringify({ operationId: operation.operationId, mode, caseId, check: normalizedCheck }))
+    .update(JSON.stringify({ seed: openApiFuzzPolicy.seed, operationId: operation.operationId,
+      mode, check: normalizedCheck, minimizedRequest }))
     .digest("hex")}`;
   return {
     operationId: operation.operationId,
@@ -340,8 +454,49 @@ function safeCounterexample(operation, mode, caseId, check) {
     check: normalizedCheck.slice(0, 80),
     method: operation.method,
     pathTemplate: operation.path,
+    minimizedRequest,
     reproductionDigest
   };
+}
+
+function minimizedRequestProjection(generatedCase) {
+  const projected = structuredClone(generatedCase);
+  delete projected.meta;
+  delete projected.cookies;
+  if (projected.headers && typeof projected.headers === "object" && !Array.isArray(projected.headers)) {
+    for (const name of Object.keys(projected.headers)) {
+      if (["authorization", "cookie", "x-xsrf-token"].includes(name.toLowerCase())) delete projected.headers[name];
+    }
+  }
+  const serialized = JSON.stringify(projected);
+  if (!serialized || serialized.length > 1_048_576) {
+    throw new Error("The minimized request exceeds the protected evidence limit");
+  }
+  return serialized;
+}
+
+function mergeCandidates(candidates) {
+  const merged = new Map();
+  for (const candidate of candidates) {
+    const existing = merged.get(candidate.fingerprint);
+    if (!existing) {
+      merged.set(candidate.fingerprint, candidate);
+      continue;
+    }
+    const evidenceIds = new Set(existing.evidence.map(({ id }) => id));
+    existing.evidence.push(...candidate.evidence.filter(({ id }) => !evidenceIds.has(id)));
+  }
+  return [...merged.values()];
+}
+
+function inputCase(id, method, path, body, expectedStatus = 400) {
+  return { id, method, path, ...(body !== undefined ? { body } : {}), expectedStatus };
+}
+
+function nestedObject(depth) {
+  let value = "boundary";
+  for (let level = 0; level < depth; level++) value = { nested: value };
+  return value;
 }
 
 function requestControl(stopFile, deadline) {
