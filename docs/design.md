@@ -599,13 +599,18 @@ less restricted account than they had as members.
 Section 10 states the same thing from the session side and calls it the most permissive state the
 booking rules know; the roster reaches it in one step, because a person can be given an account
 without being given a membership, and such an account then books as far ahead and as often as the
-grid allows. It stays open because the alternative, reading "no membership" as "no booking",
-changes what every installation already permits and is a decision of its own rather than a
-correction. Three things bound it: the roster reports the membership on every entry, so a person
+grid allows. Three things bound it: the roster reports the membership on every entry, so a person
 without one is visible in the list rather than hidden in it; opening hours, the slot grid and every
 rule not scoped to a membership type still bind, because they describe the facility and not the
 person; and only an administrator can create an account, so nobody reaches the state without a
 board putting them there.
+
+**A default rule set closes it.** *Designed.* The obvious repair — reading "no membership" as "no
+booking" — stays rejected: it changes what every installation already permits and decides for the
+club rather than asking it. The configuration instead gains a rule set that applies when a person
+holds no membership type. The permissive state then stops being the *most* permissive one and
+becomes whatever each club says it is, which is the same answer this product gives everywhere else
+a board would plausibly disagree with us. Until it exists, the three bounds above are what hold.
 
 **Evaluation does not stop at the first violation.** All violations are collected —
 otherwise a member works through three error messages one at a time.
@@ -615,6 +620,15 @@ A `RuleViolation` carries an **i18n key plus parameters**, never rendered text:
 translatable and lets the frontend attach them to the right form field.
 
 Adding a rule type = one validator class + one configuration row.
+
+**A membership type may be barred from booking a court altogether.** *Designed.* Clubs carry
+categories that pay dues without playing — passive, supporting, honorary — and every rule type
+above answers *how much*, none of them *whether*. Forcing the question through a quantity would
+say the wrong thing out loud: a limit of zero reaches the member as "too many open bookings
+(limit 0, current 0)". The bar is therefore a rule type of its own, parameterless like the
+opening hours and the slot grid, present in a rule set or absent from it, and its violation
+carries its own key. A club builds a "passive" rule set, switches it on, and points the
+membership type at it — a row, not a release.
 
 ### Two kinds of rule: who may book, and what the grid is
 
@@ -919,12 +933,34 @@ Import and export:
   anybody it would touch changed between the preview and the run, it is refused rather than writing
   over a roster it no longer describes. Executions of one source serialise, and a successful one
   supersedes every preview of that source, so a stale change set cannot be applied afterwards.
+- **A synchronisation creates the accounts a club would otherwise create by hand.** *Designed.*
+  A club that imports 175 members and then opens 175 account forms has had the import's whole
+  purpose handed back to it, so an execution gives an account to every person it creates whose
+  membership type calls for one. The membership type carries two separate answers, because they
+  are separate questions: whether its holders get an account, and whether they may book. A passive
+  member may well want to see their own record without being able to reserve a court.
+
+  What such an account may be is bounded. It holds `MEMBER` and nothing else, because no snapshot
+  may hand out a role that administers the club. Its username is generated as `lastname.firstname`,
+  the same shape registration suggests, numbered on collision and correctable afterwards like every
+  other name a club enters. Its first password is generated, never displayed, and mailed to the
+  member — a board that could read 131 passwords is the outcome this exists to avoid. A person with
+  no address gets none, which follows from the identity model rather than from a special case, and
+  the preview says how many that is.
+
+  **It creates; it never overwrites.** A person who already holds an account is untouched, whatever
+  the file says, so a repeated import cannot reissue a password or rename a login somebody is
+  using. That also means the accounts a club has been missing appear on the next run rather than
+  only for people the import has yet to meet — the board reads the count in the preview before any
+  of it is sent.
+
 - **A synchronisation can take a membership away; it can never hand one out.** When a membership
   ends, an account that held `MEMBER` and nothing else is disabled and its sessions end; an account
   holding another role keeps it and loses `MEMBER` only, so a card requiring `MEMBER` refuses it.
-  No snapshot ever enables an account, because a board disabled it for a reason no membership
-  system knows, and none can disable the club's own administration: an account holding `ADMIN`
-  keeps that role and stays enabled. An import cannot lock a club out of its instance.
+  No snapshot ever *re*-enables an account, because a board disabled it for a reason no membership
+  system knows — creating one that never existed is the separate thing described above, and the two
+  must not be confused. None can disable the club's own administration either: an account holding
+  `ADMIN` keeps that role and stays enabled. An import cannot lock a club out of its instance.
 - **CSV export** for every list view in the admin backend, matching what existing booking
   systems offer today.
 - **Per-member JSON export** for subject access requests (section 11).
