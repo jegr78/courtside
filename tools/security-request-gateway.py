@@ -17,9 +17,11 @@ ALLOWED_PATH_PREFIXES = tuple(filter(None, os.environ.get(
 CANARY_ENABLED = os.environ.get("COURTSIDE_SECURITY_CANARY_ENABLED", "false") == "true"
 CANARY_PATH = "/__security/zap-canary"
 MAX_TARGET_BYTES = int(os.environ.get("COURTSIDE_SECURITY_MAX_TARGET_BYTES", "8192"))
+MAX_GENERATED_BYTES = int(os.environ["COURTSIDE_SECURITY_MAX_GENERATED_BYTES"])
 counter_lock = threading.Lock()
 concurrency = threading.BoundedSemaphore(MAX_CONCURRENCY)
 request_count = 0
+request_bytes = 0
 
 
 class RequestHandler(http.server.BaseHTTPRequestHandler):
@@ -34,11 +36,20 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         self.forward()
 
+    def do_PUT(self):
+        self.forward()
+
+    def do_PATCH(self):
+        self.forward()
+
+    def do_DELETE(self):
+        self.forward()
+
     def do_OPTIONS(self):
         self.forward()
 
     def forward(self):
-        global request_count
+        global request_count, request_bytes
         parsed = urllib.parse.urlsplit(self.path)
         canonical_path = canonical_target_path(parsed.path)
         if canonical_path is None or not target_allowed(parsed, self.command, canonical_path):
@@ -48,16 +59,6 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             self.reject(429)
             return
         try:
-            with counter_lock:
-                if request_count >= MAX_REQUESTS:
-                    self.reject(429)
-                    return
-                request_count += 1
-                self.write_count()
-            path = urllib.parse.urlunsplit(("", "", canonical_path, parsed.query, ""))
-            if CANARY_ENABLED and canonical_path == CANARY_PATH:
-                self.send_canary()
-                return
             try:
                 content_length = int(self.headers.get("Content-Length", "0"))
             except ValueError:
@@ -65,6 +66,17 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             if content_length < 0 or content_length > MAX_BODY_BYTES:
                 self.reject(413)
+                return
+            with counter_lock:
+                if request_count >= MAX_REQUESTS or request_bytes + content_length > MAX_GENERATED_BYTES:
+                    self.reject(429)
+                    return
+                request_count += 1
+                request_bytes += content_length
+                self.write_metrics()
+            path = urllib.parse.urlunsplit(("", "", canonical_path, parsed.query, ""))
+            if CANARY_ENABLED and canonical_path == CANARY_PATH:
+                self.send_canary()
                 return
             body = self.rfile.read(content_length) if content_length else None
             headers = {name: value for name, value in self.headers.items()
@@ -112,11 +124,11 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(payload)
 
-    def write_count(self):
-        temporary = "/tmp/security-gateway-count.next"
+    def write_metrics(self):
+        temporary = "/tmp/security-gateway-metrics.next"
         with open(temporary, "w", encoding="ascii") as output:
-            output.write(str(request_count))
-        os.replace(temporary, "/tmp/security-gateway-count")
+            output.write(f"{request_count} {request_bytes}")
+        os.replace(temporary, "/tmp/security-gateway-metrics")
 
     def log_message(self, format, *args):
         return

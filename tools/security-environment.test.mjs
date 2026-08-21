@@ -205,15 +205,17 @@ test("given the security Compose file, when inspecting boundaries, then resource
   // when / then
   assert.match(compose, /127\.0\.0\.1:\$\{COURTSIDE_SECURITY_HTTPS_PORT:\?required\}:443/);
   assert.equal((compose.match(/internal: true/g) ?? []).length, 4);
-  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 6);
-  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 11);
-  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 11);
+  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 7);
+  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 12);
+  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 12);
   assert.match(compose, /\/var\/lib\/postgresql\/data:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
   assert.match(compose, /zaproxy\/zap-stable:2\.16\.1@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /schemathesis\/schemathesis:4\.25\.0@sha256:[a-f0-9]{64}/);
   assert.match(compose, /profiles: \[assessment\]/);
   assert.match(compose, /\/zap\/wrk:uid=1000,gid=1000,mode=0700,size=25m/);
   assert.match(compose, /zap:[\s\S]*networks:[\s\S]*- scanner-client/);
+  assert.match(compose, /schemathesis:[\s\S]*read_only: true[\s\S]*cap_drop:[\s\S]*- ALL[\s\S]*- scanner-client/);
   assert.match(compose, /scanner-gateway:[\s\S]*- scanner-client[\s\S]*- scanner-upstream/);
   assert.match(compose, /proxy:[\s\S]*networks:[\s\S]*- scanner-upstream/);
   assert.doesNotMatch(compose, /zap:[\s\S]*networks:[\s\S]*- frontend/);
@@ -226,6 +228,10 @@ test("given the scanner gateway, when enforcing budgets, then target access is c
 
   // when / then
   assert.match(gateway, /request_count >= MAX_REQUESTS/);
+  assert.match(gateway, /request_bytes \+= content_length/);
+  assert.match(gateway, /request_bytes \+ content_length > MAX_GENERATED_BYTES/);
+  assert.match(gateway, /def do_PUT[\s\S]*def do_PATCH[\s\S]*def do_DELETE/);
+  assert.match(gateway, /security-gateway-metrics/);
   assert.match(gateway, /concurrency\.acquire\(blocking=False\)/);
   assert.match(gateway, /UPSTREAM_HOST = "proxy"/);
 });
@@ -259,6 +265,7 @@ assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards\\..\\admin")
     COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD",
     COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api/cards",
     COURTSIDE_SECURITY_MAX_TARGET_BYTES: "1024",
+    COURTSIDE_SECURITY_MAX_GENERATED_BYTES: "1048576",
     PYTHONDONTWRITEBYTECODE: "1"
   } });
 

@@ -122,7 +122,7 @@ export async function executeMutationBoundaryChecks(matrix, send) {
     checks.push(boundaryResult(operation.operationId, "cors", cors,
       cors.accessControlAllowed === false, "cross-origin-preflight-not-authorized"));
     const host = await send(operation, "host", {
-      ...probe, headers: { ...probe.headers, host: "attacker.example" }
+      method: "GET", path: "/__security/request-observation", headers: { host: "attacker.example" }
     });
     checks.push(boundaryResult(operation.operationId, "host", host,
       host.observedHost === "localhost", "host-header-canonicalized"));
@@ -426,16 +426,20 @@ export function validateAuthorizationEvidence(evidence, matrix) {
 
 export async function runAuthorizationAssessment(plan, context) {
   if (plan.profile !== "active" || plan.environment !== "SECURITY"
-      || JSON.stringify(plan.selectedTests) !== JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"])) {
+      || !["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"]
+        .every((testId) => plan.selectedTests.includes(testId))) {
     throw new Error("The authorization suite requires active authentication and authorization tests in SECURITY");
   }
   const api = yaml.load(readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
   const matrix = buildOperationAuthorizationMatrix(api);
   const control = createAssessmentControl(context.stopFile, context.deadline);
+  if (!Number.isSafeInteger(context.maxRequests) || context.maxRequests < 1) {
+    throw new Error("The authorization suite has no remaining request budget");
+  }
   let requestCount = 0;
   const request = async (client, probe, options = {}) => {
     control.beforeRequest();
-    if (++requestCount > plan.budgets.requests) throw new Error("The authorization request budget was exceeded");
+    if (++requestCount > context.maxRequests) throw new Error("The authorization request budget was exceeded");
     return authorizationRequest(plan.target, client, probe, {
       ca: context.ca,
       signal: control.signal,
@@ -451,16 +455,16 @@ export async function runAuthorizationAssessment(plan, context) {
     const secondMember = new SecurityCookieJar();
     await signInSecurityUsername(request, secondMember, "security.member.2", context.sharedPassword, "MEMBER");
     const identityChecks = await executeSecondaryIdentityChecks(request, context.sharedPassword);
-    const objectClients = { MEMBER_OWNER: clients.MEMBER, MEMBER_NON_OWNER: secondMember, ADMIN: clients.ADMIN };
-    const objectChecks = await executeObjectAuthorizationChecks((actor, probe) =>
-      request(objectClients[actor], probe, { csrf: probe.method !== "GET" }));
     const boundaryChecks = await executeMutationBoundaryChecks(matrix, async (operation, boundary, probe) => {
       const allowedActor = authorizationActors.find((actor) => actor !== "ANONYMOUS"
         && operation.expectations[actor] === "allow") ?? "ANONYMOUS";
       const csrfActor = operation.operationId === "logIn" ? "ANONYMOUS" : allowedActor;
-      const actor = boundary === "csrf" ? csrfActor : boundary === "host" ? allowedActor : "ANONYMOUS";
+      const actor = boundary === "csrf" ? csrfActor : "ANONYMOUS";
       return request(clients[actor], probe, { csrf: boundary === "host" });
     });
+    const objectClients = { MEMBER_OWNER: clients.MEMBER, MEMBER_NON_OWNER: secondMember, ADMIN: clients.ADMIN };
+    const objectChecks = await executeObjectAuthorizationChecks((actor, probe) =>
+      request(objectClients[actor], probe, { csrf: probe.method !== "GET" }));
     const results = await executeOperationMatrix(matrix, async (operation, actor, probe) => {
       if (operation.operationId === "logIn") {
         const client = actor === "ANONYMOUS" ? new SecurityCookieJar() : clients[actor];
@@ -539,6 +543,10 @@ export function authorizationRequest(origin, client, probe, options = {}) {
   }
   if (probe.body !== undefined) headers["content-length"] = Buffer.byteLength(probe.body);
   return new Promise((resolve, reject) => {
+    const maxResponseBytes = options.maxResponseBytes ?? 64 * 1024;
+    if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes < 1 || maxResponseBytes > 2 * 1024 * 1024) {
+      throw new Error("Authorization response limit is invalid");
+    }
     const startedAt = performance.now();
     const chunks = [];
     let bytes = 0;
@@ -547,14 +555,14 @@ export function authorizationRequest(origin, client, probe, options = {}) {
       timeout: Math.max(1, Math.min(10_000, options.timeoutMilliseconds ?? 10_000)) }, (response) => {
       response.on("data", (chunk) => {
         bytes += chunk.length;
-        if (bytes > 64 * 1024) call.destroy(new Error("Authorization response exceeded its size limit"));
+        if (bytes > maxResponseBytes) call.destroy(new Error("Authorization response exceeded its size limit"));
         else chunks.push(chunk);
       });
       response.once("end", () => {
         client.update(response.headers["set-cookie"] ?? []);
         const body = Buffer.concat(chunks).toString("utf8");
         let json;
-        if (body && /application\/(?:problem\+)?json/i.test(response.headers["content-type"] ?? "")) {
+        if (body && /application\/(?:[a-z0-9.-]+\+)?json/i.test(response.headers["content-type"] ?? "")) {
           try { json = JSON.parse(body); } catch { }
         }
         const problemType = /application\/problem\+json/i.test(response.headers["content-type"] ?? "")

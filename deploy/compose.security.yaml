@@ -52,6 +52,7 @@ services:
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: security.bootstrap
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,mappings
     networks:
       - backend
       - frontend
@@ -150,6 +151,7 @@ services:
       COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: ${COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES:-/}
       COURTSIDE_SECURITY_CANARY_ENABLED: ${COURTSIDE_SECURITY_CANARY_ENABLED:-false}
       COURTSIDE_SECURITY_MAX_TARGET_BYTES: ${COURTSIDE_SECURITY_MAX_TARGET_BYTES:-8192}
+      COURTSIDE_SECURITY_MAX_GENERATED_BYTES: ${COURTSIDE_SECURITY_MAX_GENERATED_BYTES:-20971520}
     healthcheck:
       test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 8090), 1).close()"]
       interval: 1s
@@ -182,6 +184,35 @@ services:
     cpus: 2.0
     mem_limit: 1g
     pids_limit: 256
+    networks:
+      - scanner-client
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+
+  schemathesis:
+    profiles: [assessment]
+    image: schemathesis/schemathesis:4.25.0@sha256:980d159d1211ed2ef1f571aa8c6876955c6699dfd6463b8b5f28e788aa61e25e
+    pull_policy: never
+    entrypoint: ["tail", "-f", "/dev/null"]
+    read_only: true
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=0700,size=64m
+      - /app/.schemathesis:uid=1000,gid=1000,mode=0700,size=4m
+      - /app/.hypothesis:uid=1000,gid=1000,mode=0700,size=4m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 2.0
+    mem_limit: 1g
+    pids_limit: 256
+    environment:
+      SCHEMATHESIS_HOOKS: ""
+    volumes:
+      - ../src/main/resources/api/openapi.yaml:/schema/openapi.yaml:ro
     networks:
       - scanner-client
     labels:

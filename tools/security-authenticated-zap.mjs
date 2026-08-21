@@ -241,7 +241,8 @@ export function validateAuthenticatedZapEvidence(evidence) {
 
 export async function runAuthenticatedZapAssessment(plan, context) {
   if (plan.profile !== "active" || plan.environment !== "SECURITY"
-      || JSON.stringify(plan.selectedTests) !== JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"])) {
+      || !["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"]
+        .every((testId) => plan.selectedTests.includes(testId))) {
     throw new Error("Authenticated ZAP requires the complete active SECURITY plan");
   }
   if (!Number.isSafeInteger(context.maxRequests) || context.maxRequests < 1

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:openapi-fuzz-evidence:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "testIds", "targetFingerprint", "image", "policyDigest", "specificationDigest", "seed", "operations", "counterexamples", "undocumentedRoutes", "inputCases", "importCases", "stateBefore", "stateAfter", "candidates", "requestCount", "generatedDataMegabytes", "outcome"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "testIds": { "const": ["CSA-API-001", "CSA-IMPORT-001"] },
+    "targetFingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "image": { "type": "string", "pattern": "^schemathesis/schemathesis:4\\.25\\.0@sha256:[a-f0-9]{64}$" },
+    "policyDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "specificationDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "seed": { "type": "integer", "minimum": 1 },
+    "operations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/operation" } },
+    "counterexamples": { "type": "array", "items": { "$ref": "#/$defs/counterexample" } },
+    "undocumentedRoutes": { "type": "array", "uniqueItems": true, "items": {
+      "type": "object", "additionalProperties": false, "required": ["method", "pathTemplate"],
+      "properties": {
+        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+        "pathTemplate": { "type": "string", "pattern": "^/", "maxLength": 200 }
+      }
+    } },
+    "inputCases": { "type": "array", "minItems": 11, "items": { "$ref": "#/$defs/inputCase" } },
+    "importCases": { "type": "array", "minItems": 4, "items": { "$ref": "#/$defs/importCase" } },
+    "stateBefore": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "stateAfter": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "candidates": { "type": "array", "items": { "$ref": "urn:courtside:security:finding-lifecycle:v1#/$defs/candidate" } },
+    "requestCount": { "type": "integer", "minimum": 1 },
+    "generatedDataMegabytes": { "type": "number", "minimum": 0 },
+    "outcome": { "enum": ["passed", "failed", "incomplete"] }
+  },
+  "$defs": {
+    "outcome": { "enum": ["passed", "incomplete"] },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "method", "path", "modes", "excludedModes", "outcomes"],
+      "properties": {
+        "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$", "maxLength": 100 },
+        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+        "path": { "type": "string", "pattern": "^/", "maxLength": 200 },
+        "modes": { "type": "array", "uniqueItems": true, "items": { "enum": ["positive", "negative"] } },
+        "excludedModes": { "type": "object", "additionalProperties": false, "properties": {
+          "all": { "type": "string", "minLength": 10, "maxLength": 300 },
+          "positive": { "type": "string", "minLength": 10, "maxLength": 300 },
+          "negative": { "type": "string", "minLength": 10, "maxLength": 300 }
+        } },
+        "outcomes": { "type": "array", "items": { "type": "object", "additionalProperties": false,
+          "required": ["mode", "outcome", "observation"], "properties": {
+            "mode": { "enum": ["positive", "negative"] },
+            "outcome": { "$ref": "#/$defs/outcome" },
+            "observation": { "enum": ["generated-inputs-conform", "candidate-requires-triage"] }
+          } } }
+      }
+    },
+    "counterexample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "mode", "caseId", "check", "method", "pathTemplate", "minimizedRequest", "reproductionDigest"],
+      "properties": {
+        "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+        "mode": { "enum": ["positive", "negative"] },
+        "caseId": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$", "maxLength": 32 },
+        "check": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
+        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+        "pathTemplate": { "type": "string", "pattern": "^/", "maxLength": 200 },
+        "minimizedRequest": { "type": "string", "minLength": 2, "maxLength": 1048576 },
+        "reproductionDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "inputCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "observation", "outcome"],
+      "properties": {
+        "id": { "enum": ["missing-fields", "duplicate-fields", "unknown-fields", "unicode-normalization", "control-characters", "deep-json", "oversized-body", "numeric-boundary", "cursor-boundary", "date-time-boundary", "malformed-idempotency-key"] },
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$" },
+        "observation": { "enum": ["typed-input-rejection", "proxy-size-rejection"] },
+        "outcome": { "$ref": "#/$defs/outcome" }
+      }
+    },
+    "importCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "observation", "outcome"],
+      "properties": {
+        "id": { "enum": ["invalid-utf8", "duplicate-columns", "oversized-cell", "conflicting-reference"] },
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$" },
+        "observation": { "enum": ["typed-upload-rejection", "row-level-rejection"] },
+        "outcome": { "$ref": "#/$defs/outcome" }
+      }
+    }
+  }
+}
