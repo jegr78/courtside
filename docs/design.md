@@ -69,16 +69,17 @@ the DNS a receiver looks at; nothing in the application sends through it yet.
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers — including creating a recurring
 series, which is previewed before anything is written and reports what it had to skip — and the
-browser admin surface for configuration, facilities and the club's people — adding somebody, correcting their name or address,
-giving them an account, changing its roles, correcting its username, handing out a new one-time
-password and disabling it. Membership types are administered there as well, each showing how many
-people hold it, and so is the whole import: describing a source, linking the people a file cannot
-match by number, uploading a member list, reading what it would change, and running it. The column
-mapping is offered from the club's own export, read in the browser and never uploaded for that
-purpose. Before a court, a booking card or a day goes out of service, the facility view says which
-bookings sit on it — information beside the control, never a gate in front of it. What a board
-still cannot reach from a browser is listed with the endpoints that have no surface, in
-`tools/surfaceless-endpoints.json`; every entry left in it now names a decision rather than a gap.
+browser admin surface for configuration, facilities and the club's people — adding somebody,
+correcting their name or address, giving them an account, changing its roles, correcting its
+username, handing out a new one-time password and disabling it. Membership types are administered
+there as well, each showing how many people hold it, and so is the whole import: describing a
+source, linking the people a file cannot match by number, uploading a member list, reading what it
+would change, and running it. The column mapping is offered from the club's own export, read in the
+browser and never uploaded for that purpose. Before a court, a booking card or a day goes out of
+service, the facility view says which bookings sit on it — information beside the control, never a
+gate in front of it. What a board still cannot reach from a browser is listed with the endpoints
+that have no surface, in `tools/surfaceless-endpoints.json`; every entry left in it now names a
+decision rather than a gap.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
 container image scanning, reports and exports, and the self-service password reset of section 4 — an administrator hands out a new one-time password

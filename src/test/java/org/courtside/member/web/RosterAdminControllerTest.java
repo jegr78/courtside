@@ -1452,11 +1452,12 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenNoSuchPerson_whenReadingIt_thenTheProblemSaysWhichPersonIsMissing() throws Exception {
+    void givenNoSuchPerson_whenReadingIt_thenTheAnswerIsATypedNotFoundProblem() throws Exception {
         // when / then
         mockMvc.perform(get("/api/admin/roster/{personId}", UUID.randomUUID()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:person-not-found"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:person-not-found"))
+                .andExpect(jsonPath("$.detail").value("No such person"));
     }
 
 }
