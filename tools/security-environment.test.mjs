@@ -8,9 +8,25 @@ import {
   assertSecurityIdentity, assertSecurityRecoveryOwnership, assertSecurityStartAvailable, availableLoopbackPort, recoveryEnvironment,
   isMissingDockerResource,
   mergeSecurityProcessEnvironment,
+  prometheusMetric,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
+
+test("given Hikari metrics, when sampling pool pressure, then active and pending connections remain distinct", () => {
+  // given
+  const metrics = `
+hikaricp_connections_active{pool="HikariPool-1"} 8.0
+hikaricp_connections_pending{pool="HikariPool-1"} 3.0
+hikaricp_connections_max{pool="HikariPool-1"} 10.0
+`;
+
+  // when / then
+  assert.equal(prometheusMetric(metrics, "hikaricp_connections_active"), 8);
+  assert.equal(prometheusMetric(metrics, "hikaricp_connections_pending"), 3);
+  assert.equal(prometheusMetric(metrics, "hikaricp_connections_max"), 10);
+  assert.throws(() => prometheusMetric(metrics, "hikaricp_connections_idle"), /is unavailable/);
+});
 
 test("given security state and a host toolchain, when launching owned commands, then PATH survives and run values win", () => {
   // when
@@ -213,6 +229,8 @@ test("given the security Compose file, when inspecting boundaries, then resource
   assert.match(compose, /zaproxy\/zap-stable:2\.16\.1@sha256:[a-f0-9]{64}/);
   assert.match(compose, /schemathesis\/schemathesis:4\.25\.0@sha256:[a-f0-9]{64}/);
   assert.match(compose, /grafana\/k6:2\.2\.0@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"/);
+  assert.match(compose, /MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"/);
   assert.match(compose, /profiles: \[assessment\]/);
   assert.match(compose, /\/zap\/wrk:uid=1000,gid=1000,mode=0700,size=25m/);
   assert.match(compose, /zap:[\s\S]*networks:[\s\S]*- scanner-client/);

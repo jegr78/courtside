@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { runOwnedProcess } from "./security-passive-deployment.mjs";
-import { evaluateResourceSignals } from "./security-resource-abuse.mjs";
+import { evaluateResourceSignals, evaluateSafetyLimits } from "./security-resource-abuse.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
@@ -629,6 +629,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
   const samples = [];
   let scannerStarted = false;
   let breaker = { tripped: false, reason: null, sampleSequence: null };
+  let safetyLimitViolation = { violated: false, reason: null, sampleSequence: null };
   try {
     await command(securityAssessmentReservationArgs(environment, limits.attempt));
     await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "up", "-d", "--wait",
@@ -638,13 +639,19 @@ export async function runResourceAbuse(plan, stopFile, limits) {
     scannerStarted = true;
     const scannerRuntime = JSON.parse((await command(["inspect", scanner, "--format", "{{json .}}"])).stdout);
     const gatewayRuntime = JSON.parse((await command(["inspect", gateway, "--format", "{{json .}}"])).stdout);
-    const runtimeHardened = scannerRuntimeHardened(scannerRuntime, {
+    const runtimeHardened = scannerRuntime.Config.Image === limits.policy.image
+      && scannerRuntimeOwned(scannerRuntime, environment) && scannerRuntimeOwned(gatewayRuntime, environment)
+      && scannerRuntimeHardened(scannerRuntime, {
       memory: 512 * 1024 * 1024, nanoCpus: 1_000_000_000, pids: 128,
       networks: [`${securityProject(plan.runId)}_scanner-client`]
     }) && scannerRuntimeHardened(gatewayRuntime, {
       memory: 128 * 1024 * 1024, nanoCpus: 500_000_000, pids: 64,
       networks: [`${securityProject(plan.runId)}_scanner-client`, `${securityProject(plan.runId)}_scanner-upstream`]
     });
+    const scannerDigests = await mountedFileDigests(scanner,
+      ["/scripts/resource-abuse.js", "/scripts/policy.json"], command);
+    const gatewayDigests = await mountedFileDigests(gateway,
+      ["/opt/courtside/security-request-gateway.py"], command);
     const stateBefore = await securityDomainStateFingerprint(plan.runId, stopFile, Math.max(1, deadline - Date.now()));
     let result;
     let failure;
@@ -652,20 +659,26 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       "-e", `COURTSIDE_SECURITY_RUN_ID=${plan.runId}`, scanner, "k6", "run", "/scripts/resource-abuse.js"],
     { acceptedExitCodes: [0, 99], outputLimitBytes: 4 * 1024 * 1024 })
       .then((value) => { result = value; }, (error) => { failure = error; });
-    while (!result && !failure && !breaker.tripped) {
+    while (!result && !failure && !breaker.tripped && !safetyLimitViolation.violated) {
       await new Promise((resolveWait) => setTimeout(resolveWait,
         limits.policy.circuitBreakers.sampleIntervalMilliseconds));
       samples.push(await resourceSample(plan.runId, gateway, samples.length + 1, command));
       breaker = evaluateResourceSignals(samples, limits.policy.circuitBreakers);
+      safetyLimitViolation = evaluateSafetyLimits(samples, limits.policy.circuitBreakers);
     }
-    if (breaker.tripped) {
-      await command(["kill", scanner]);
+    if (breaker.tripped || safetyLimitViolation.violated) {
+      await command(["exec", scanner, "sh", "-c", "kill -INT $(pidof k6)"]);
+      const graceDeadline = Date.now() + limits.policy.interruptGraceMilliseconds;
+      while (!result && !failure && Date.now() < graceDeadline) {
+        await new Promise((resolveWait) => setTimeout(resolveWait, 25));
+      }
+      if (!result && !failure) await command(["kill", scanner]);
     } else {
       while (!result && !failure) await new Promise((resolveWait) => setTimeout(resolveWait, 50));
       if (failure) throw failure;
     }
-    const summary = breaker.tripped ? null
-      : JSON.parse((await command(["exec", scanner, "cat", "/results/summary.json"])).stdout);
+    const summary = await containerFileExists(scanner, "/results/summary.json", command)
+      ? JSON.parse((await command(["exec", scanner, "cat", "/results/summary.json"])).stdout) : null;
     const occupancy = await bookingRaceResult(plan.runId, summary, command);
     await cleanupResourceAbuseBookings(plan.runId, command);
     const stateAfter = await securityDomainStateFingerprint(plan.runId, stopFile, Math.max(1, deadline - Date.now()));
@@ -688,10 +701,15 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       }),
       samples,
       circuitBreaker: breaker,
+      safetyLimitViolation,
       stateBefore,
       stateAfter,
       competingWrites: occupancy,
-      recovery
+      recovery,
+      scannerImage: scannerRuntime.Config.Image,
+      scriptDigest: scannerDigests["/scripts/resource-abuse.js"],
+      mountedPolicyDigest: scannerDigests["/scripts/policy.json"],
+      gatewayDigest: gatewayDigests["/opt/courtside/security-request-gateway.py"]
     };
   } finally {
     const cleanupFailures = [];
@@ -719,17 +737,44 @@ async function resourceSample(runId, gateway, sequence, command) {
   const [app, db] = await Promise.all([stats(`${project}-app-1`), stats(`${project}-db-1`)]);
   const database = (await command([...securityComposeArgs(runId), "exec", "-T", "db", "psql", "-At", "-F", "|",
     "-U", "courtside", "-d", "courtside_security", "-c",
-    "SELECT count(*), (SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND application_name='PostgreSQL JDBC Driver' AND state <> 'idle'), (SELECT count(*) FROM pg_locks WHERE NOT granted), (SELECT count(*) FROM spring_session), pg_database_size(current_database()) FROM pg_stat_activity WHERE datname=current_database()"])).stdout.trim();
-  const [activeConnections, activePoolConnections, waitingLocks, sessionRows, storageBytes]
+    "SELECT count(*), (SELECT count(*) FROM pg_locks WHERE NOT granted), (SELECT count(*) FROM spring_session), pg_database_size(current_database()) FROM pg_stat_activity WHERE datname=current_database()"])).stdout.trim();
+  const [activeConnections, waitingLocks, sessionRows, storageBytes]
     = database.split("|").map(Number);
+  const prometheus = (await command([...securityComposeArgs(runId), "exec", "-T", "app", "curl", "-fsS",
+    "http://127.0.0.1:8080/actuator/prometheus"], { outputLimitBytes: 4 * 1024 * 1024 })).stdout;
+  const activePoolConnections = prometheusMetric(prometheus, "hikaricp_connections_active");
+  const pendingPoolConnections = prometheusMetric(prometheus, "hikaricp_connections_pending");
+  const poolMaxConnections = prometheusMetric(prometheus, "hikaricp_connections_max");
   const gatewayMetrics = await scannerGatewayMetrics(gateway, command);
-  if (![app.cpu, app.memory, db.cpu, db.memory, activeConnections, activePoolConnections, waitingLocks,
+  if (![app.cpu, app.memory, db.cpu, db.memory, activeConnections, activePoolConnections,
+    pendingPoolConnections, poolMaxConnections, waitingLocks,
     sessionRows, storageBytes, gatewayMetrics.requestP95Milliseconds, gatewayMetrics.errorRate]
     .every(Number.isFinite)) throw new Error("Resource telemetry is incomplete");
   return { sequence, appCpuPercent: app.cpu, appMemoryMegabytes: app.memory,
     dbCpuPercent: db.cpu, dbMemoryMegabytes: db.memory, activeConnections, activePoolConnections,
+    pendingPoolConnections, poolMaxConnections,
     waitingLocks, sessionRows, storageMegabytes: storageBytes / (1024 * 1024),
     requestP95Milliseconds: gatewayMetrics.requestP95Milliseconds, errorRate: gatewayMetrics.errorRate };
+}
+
+export function prometheusMetric(output, name) {
+  const values = output.split("\n")
+    .filter((line) => line.startsWith(`${name}{`) || line.startsWith(`${name} `))
+    .map((line) => Number(line.trim().split(/\s+/).at(-1)));
+  if (!values.length || !values.every(Number.isFinite)) throw new Error(`Prometheus metric ${name} is unavailable`);
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
+async function mountedFileDigests(container, paths, command) {
+  const output = (await command(["exec", container, "sha256sum", ...paths])).stdout.trim();
+  const digests = Object.fromEntries(output.split("\n").map((line) => {
+    const [digest, path] = line.trim().split(/\s+/);
+    return [path, `sha256:${digest}`];
+  }));
+  if (paths.some((path) => !/^sha256:[a-f0-9]{64}$/.test(digests[path] ?? ""))) {
+    throw new Error("Mounted resource-abuse files could not be fingerprinted");
+  }
+  return digests;
 }
 
 function parseDockerMegabytes(value) {
@@ -740,18 +785,25 @@ function parseDockerMegabytes(value) {
 }
 
 async function bookingRaceResult(runId, summary, command) {
-  const value = (await command([...securityComposeArgs(runId), "exec", "-T", "db", "psql", "-At",
-    "-U", "courtside", "-d", "courtside_security", "-c",
-    `SELECT count(*) FROM booking WHERE note = 'Security occupancy ${runId}'`])).stdout.trim();
-  const successful = Number(value);
+  const value = (await command([...securityComposeArgs(runId), "exec", "-T", "db", "psql", "-At", "-F", "|",
+    "-U", "courtside", "-d", "courtside_security", "-c", `SELECT
+      (SELECT count(*) FROM booking WHERE note = 'Security occupancy ${runId}'),
+      (SELECT count(*) FROM booking WHERE idempotency_key = 'security-${runId}-duplicate'),
+      (SELECT count(*) FROM booking_series WHERE note = 'Security TOCTOU ${runId}')`])).stdout.trim();
+  const [successful, duplicateBookings, toctouCreated] = value.split("|").map(Number);
   return { successful, rejected: summary?.rejectedOccupancy ?? 0,
-    partialOperations: summary?.partialOperations ?? 0 };
+    partialOperations: summary?.partialOperations ?? 0,
+    duplicateBookings, duplicateResponses: summary?.duplicateResponses ?? 0,
+    duplicateFailures: summary?.duplicateFailures ?? 0,
+    toctouCreated, toctouSkipped: summary?.toctouSkipped ?? 0 };
 }
 
 async function cleanupResourceAbuseBookings(runId, command) {
   await command([...securityComposeArgs(runId), "exec", "-T", "db", "psql", "-v", "ON_ERROR_STOP=1", "-U",
     "courtside", "-d", "courtside_security", "-c",
-    `DELETE FROM booking WHERE note = 'Security occupancy ${runId}'`]);
+    `DELETE FROM booking WHERE note IN ('Security occupancy ${runId}', 'Security duplicate ${runId}',
+      'Security TOCTOU occupancy ${runId}');
+     DELETE FROM booking_series WHERE note = 'Security TOCTOU ${runId}'`]);
 }
 
 async function recoverAfterResourceAbuse(runId, stateBefore, stateAfter, command) {
