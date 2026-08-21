@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.1.0",
+  "catalogVersion": "1.2.0",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -222,193 +222,190 @@
       "controls": [
         {
           "id": "v5.0.0-1.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.2.1",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-PWA-001"
-          ],
-          "trackingIssue": 249
+          ]
         },
         {
           "id": "v5.0.0-1.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.2.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.2.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.2.6",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.2.7",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.2.8",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.2.9",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.6",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.7",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.8",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.9",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.10",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.3.11",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.5.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-1.5.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "v5.0.0-2.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-2.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-2.1.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-2.2.1",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-IMPORT-001",
             "CSA-API-001"
-          ],
-          "trackingIssue": 248
+          ]
         },
         {
           "id": "v5.0.0-2.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-2.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-2.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-2.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-2.3.3",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-IMPORT-001"
-          ],
-          "trackingIssue": 248
+          ]
         },
         {
           "id": "v5.0.0-2.3.4",
@@ -419,298 +416,293 @@
         },
         {
           "id": "v5.0.0-2.4.1",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-RES-001"
-          ],
-          "trackingIssue": 250
+          ]
         },
         {
           "id": "v5.0.0-3.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.3.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.3.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.4.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.4.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.4.6",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.5.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.5.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.5.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.5.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.5.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.7.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-3.7.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "v5.0.0-4.1.1",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-API-001"
-          ],
-          "trackingIssue": 248
+          ]
         },
         {
           "id": "v5.0.0-4.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-4.1.3",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-DEPLOY-001"
-          ],
-          "trackingIssue": 244
+          ]
         },
         {
           "id": "v5.0.0-4.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-4.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-4.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-4.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-4.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-4.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-4.4.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-5.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-5.2.1",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-IMPORT-001"
-          ],
-          "trackingIssue": 248
+          ]
         },
         {
           "id": "v5.0.0-5.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-5.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-5.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-5.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-5.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-5.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-5.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-6.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.1.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.6",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.7",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.8",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.9",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.10",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.11",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.2.12",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.3.1",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-AUTHN-001"
-          ],
-          "trackingIssue": 246
+          ]
         },
         {
           "id": "v5.0.0-6.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.3.3",
@@ -723,133 +715,133 @@
         },
         {
           "id": "v5.0.0-6.3.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.4.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.5.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.5.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.5.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.5.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.5.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.6.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.6.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.6.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.8.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.8.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.8.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-6.8.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "v5.0.0-7.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.1.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.2.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.4.1",
@@ -860,478 +852,474 @@
         },
         {
           "id": "v5.0.0-7.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.4.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.4.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.5.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.5.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.6.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-7.6.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "v5.0.0-8.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-AUTHZ-001"
         },
         {
           "id": "v5.0.0-8.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-AUTHZ-001"
         },
         {
           "id": "v5.0.0-8.2.1",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-AUTHZ-001",
             "CSA-ADMIN-001"
-          ],
-          "trackingIssue": 246
+          ]
         },
         {
           "id": "v5.0.0-8.2.2",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-AUTHZ-001",
             "CSA-PRIV-001",
             "CSA-MEMBER-001"
-          ],
-          "trackingIssue": 246
+          ]
         },
         {
           "id": "v5.0.0-8.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-AUTHZ-001"
         },
         {
           "id": "v5.0.0-8.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-AUTHZ-001"
         },
         {
           "id": "v5.0.0-8.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-AUTHZ-001"
         },
         {
           "id": "v5.0.0-9.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-9.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-9.1.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-9.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-9.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-9.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-9.2.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.3.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.3.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.6",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.7",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.8",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.9",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.10",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.4.11",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.5.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.5.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.5.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.5.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.5.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.6.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.6.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.7.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.7.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-10.7.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-DATA-001"
         },
         {
           "id": "v5.0.0-11.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.3.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.4.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.5.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-11.6.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "v5.0.0-12.1.1",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-DEPLOY-001"
-          ],
-          "trackingIssue": 244
+          ]
         },
         {
           "id": "v5.0.0-12.1.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-12.1.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-12.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-12.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-12.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-12.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-12.3.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-12.3.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "v5.0.0-13.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.2.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.2.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.4.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-13.4.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-14.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-14.1.2",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-OPS-001"
-          ],
-          "trackingIssue": 243
+          ]
         },
         {
           "id": "v5.0.0-14.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-14.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-14.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-14.2.4",
@@ -1349,212 +1337,207 @@
         },
         {
           "id": "v5.0.0-14.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-14.3.3",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-PWA-001"
-          ],
-          "trackingIssue": 249
+          ]
         },
         {
           "id": "v5.0.0-15.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-15.1.2",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-SUPPLY-001"
-          ],
-          "trackingIssue": 245
+          ]
         },
         {
           "id": "v5.0.0-15.1.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-15.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-15.2.2",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-RES-001"
-          ],
-          "trackingIssue": 250
+          ]
         },
         {
           "id": "v5.0.0-15.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-15.3.1",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-MEMBER-001"
-          ],
-          "trackingIssue": 246
+          ]
         },
         {
           "id": "v5.0.0-15.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-15.3.3",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-ADMIN-001",
             "CSA-API-001"
           ],
-          "trackingIssue": 251
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-15.3.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-15.3.5",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-15.3.6",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-15.3.7",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.2.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.2.5",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-OPS-001"
-          ],
-          "trackingIssue": 243
+          ]
         },
         {
           "id": "v5.0.0-16.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.3.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.3.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.4.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.4.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.4.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.5.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.5.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-16.5.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-17.1.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-17.2.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-17.2.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-17.2.3",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-17.2.4",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-17.3.1",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         },
         {
           "id": "v5.0.0-17.3.2",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-OPS-001"
         }
       ]
     },
@@ -1566,101 +1549,97 @@
       "controls": [
         {
           "id": "WSTG-v4.2-APIT-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-ATHN-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-ATHN-02",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-ATHN-03",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-AUTHN-001"
-          ],
-          "trackingIssue": 246
+          ]
         },
         {
           "id": "WSTG-v4.2-ATHN-04",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-ATHN-05",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-ATHN-06",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-ATHN-07",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-ATHN-08",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-ATHN-09",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-ATHN-10",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-ATHZ-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-AUTHZ-001"
         },
         {
           "id": "WSTG-v4.2-ATHZ-02",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-AUTHZ-001"
-          ],
-          "trackingIssue": 246
+          ]
         },
         {
           "id": "WSTG-v4.2-ATHZ-03",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-ADMIN-001"
-          ],
-          "trackingIssue": 246
+          ]
         },
         {
           "id": "WSTG-v4.2-ATHZ-04",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-PRIV-001",
             "CSA-MEMBER-001"
-          ],
-          "trackingIssue": 246
+          ]
         },
         {
           "id": "WSTG-v4.2-BUSL-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-BUSINESS-001"
         },
         {
           "id": "WSTG-v4.2-BUSL-02",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-BUSINESS-001"
         },
         {
           "id": "WSTG-v4.2-BUSL-03",
@@ -1671,372 +1650,366 @@
         },
         {
           "id": "WSTG-v4.2-BUSL-04",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-BUSINESS-001"
         },
         {
           "id": "WSTG-v4.2-BUSL-05",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-BUSINESS-001"
         },
         {
           "id": "WSTG-v4.2-BUSL-06",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-BUSINESS-001"
         },
         {
           "id": "WSTG-v4.2-BUSL-07",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-RES-001"
-          ],
-          "trackingIssue": 250
+          ]
         },
         {
           "id": "WSTG-v4.2-BUSL-08",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-BUSINESS-001"
         },
         {
           "id": "WSTG-v4.2-BUSL-09",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-BUSINESS-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-02",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-PWA-001"
-          ],
-          "trackingIssue": 249
+          ]
         },
         {
           "id": "WSTG-v4.2-CLNT-03",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-04",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-05",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-06",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-07",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-08",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-09",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-10",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-11",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-12",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CLNT-13",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CLIENT-001"
         },
         {
           "id": "WSTG-v4.2-CONF-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "WSTG-v4.2-CONF-02",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "WSTG-v4.2-CONF-03",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "WSTG-v4.2-CONF-04",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "WSTG-v4.2-CONF-05",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-SUPPLY-001"
-          ],
-          "trackingIssue": 245
+          ]
         },
         {
           "id": "WSTG-v4.2-CONF-06",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "WSTG-v4.2-CONF-07",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-DEPLOY-001"
-          ],
-          "trackingIssue": 244
+          ]
         },
         {
           "id": "WSTG-v4.2-CONF-08",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "WSTG-v4.2-CONF-09",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "WSTG-v4.2-CONF-10",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "WSTG-v4.2-CONF-11",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-COMMS-001"
         },
         {
           "id": "WSTG-v4.2-CRYP-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "WSTG-v4.2-CRYP-02",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "WSTG-v4.2-CRYP-03",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "WSTG-v4.2-CRYP-04",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-CRYPTO-001"
         },
         {
           "id": "WSTG-v4.2-ERRH-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-ERRH-02",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-OPS-001"
-          ],
-          "trackingIssue": 243
+          ]
         },
         {
           "id": "WSTG-v4.2-IDNT-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-IDNT-02",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-IDNT-03",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-IDNT-04",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-IDNT-05",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-IDENTITY-001"
         },
         {
           "id": "WSTG-v4.2-INFO-01",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INFO-02",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INFO-03",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INFO-04",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INFO-05",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INFO-06",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INFO-07",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INFO-08",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INFO-09",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INFO-10",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-ARCH-001"
         },
         {
           "id": "WSTG-v4.2-INPV-01",
-          "status": "planned",
+          "status": "implemented",
           "assessmentTestIds": [
             "CSA-IMPORT-001",
             "CSA-API-001"
-          ],
-          "trackingIssue": 248
+          ]
         },
         {
           "id": "WSTG-v4.2-INPV-02",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-03",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-04",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-05",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-06",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-07",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-08",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-09",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-10",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-11",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-12",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-13",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-14",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-15",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-16",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-17",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-18",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-INPV-19",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-INPUT-001"
         },
         {
           "id": "WSTG-v4.2-SESS-01",
@@ -2047,43 +2020,43 @@
         },
         {
           "id": "WSTG-v4.2-SESS-02",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "WSTG-v4.2-SESS-03",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "WSTG-v4.2-SESS-04",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "WSTG-v4.2-SESS-05",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "WSTG-v4.2-SESS-06",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "WSTG-v4.2-SESS-07",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "WSTG-v4.2-SESS-08",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         },
         {
           "id": "WSTG-v4.2-SESS-09",
-          "status": "planned",
-          "trackingIssue": 251
+          "status": "implemented",
+          "manualProcedureId": "MAN-SESSION-001"
         }
       ]
     }
@@ -2346,7 +2319,7 @@
     {
       "id": "CSA-ADMIN-001",
       "title": "Configuration administration boundaries",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-ATHZ-03"
@@ -2385,13 +2358,12 @@
       "qualityRiskIds": [
         "AD-1",
         "AD-2"
-      ],
-      "trackingIssue": 246
+      ]
     },
     {
       "id": "CSA-MEMBER-001",
       "title": "People, account and membership administration",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-ATHZ-04"
@@ -2429,8 +2401,7 @@
       ],
       "qualityRiskIds": [
         "MB-1"
-      ],
-      "trackingIssue": 246
+      ]
     },
     {
       "id": "CSA-IMPORT-001",
@@ -2573,7 +2544,7 @@
     {
       "id": "CSA-SUPPLY-001",
       "title": "Source, dependency and candidate-image evidence",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-CONF-05"
@@ -2608,8 +2579,7 @@
       "qualityRiskIds": [
         "ID-3",
         "OP-4"
-      ],
-      "trackingIssue": 245
+      ]
     },
     {
       "id": "CSA-API-001",
@@ -2713,7 +2683,7 @@
     {
       "id": "CSA-OPS-001",
       "title": "Sensitive operational data and recovery evidence",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-ERRH-02"
@@ -2751,8 +2721,7 @@
         "ID-3",
         "OP-3",
         "OP-4"
-      ],
-      "trackingIssue": 243
+      ]
     },
     {
       "id": "CSA-DAST-001",

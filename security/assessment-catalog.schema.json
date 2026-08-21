@@ -537,6 +537,10 @@
             "pattern": "^CSA-[A-Z]+-[0-9]{3}$"
           }
         },
+        "manualProcedureId": {
+          "type": "string",
+          "pattern": "^MAN-[A-Z]+-[0-9]{3}$"
+        },
         "trackingIssue": {
           "type": "integer",
           "minimum": 1
@@ -599,8 +603,9 @@
             ]
           },
           "then": {
-            "required": [
-              "assessmentTestIds"
+            "anyOf": [
+              { "required": ["assessmentTestIds"] },
+              { "required": ["manualProcedureId"] }
             ]
           }
         }

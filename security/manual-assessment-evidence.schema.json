@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:manual-assessment-evidence:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "catalogVersion",
+    "runId",
+    "tester",
+    "recordedAt",
+    "sourceCommit",
+    "targetImageDigest",
+    "targetFingerprint",
+    "targetOrigin",
+    "environment",
+    "profile",
+    "authorization",
+    "selectedControlIds",
+    "independentReview",
+    "procedures"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "catalogVersion": { "type": "string", "pattern": "^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$" },
+    "runId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$" },
+    "tester": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "recordedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+    "sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "targetImageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "targetFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "targetOrigin": { "type": "string", "pattern": "^https://[^/?#]+(?::[0-9]{1,5})?$" },
+    "environment": { "enum": ["SECURITY", "UAT", "EXPLICIT_PRODUCTION"] },
+    "profile": { "enum": ["safe", "active", "destructive"] },
+    "authorization": { "$ref": "#/$defs/authorization" },
+    "selectedControlIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/controlId" }
+    },
+    "independentReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["performed"],
+      "properties": {
+        "performed": { "type": "boolean" },
+        "reviewer": { "type": "string", "minLength": 1, "maxLength": 100 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "performed": { "const": true } }, "required": ["performed"] },
+          "then": { "required": ["reviewer"] }
+        },
+        {
+          "if": { "properties": { "performed": { "const": false } }, "required": ["performed"] },
+          "then": { "not": { "required": ["reviewer"] } }
+        }
+      ]
+    },
+    "procedures": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/procedure" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "profile": { "enum": ["active", "destructive"] } }, "required": ["profile"] },
+      "then": { "properties": { "environment": { "const": "SECURITY" } } }
+    },
+    {
+      "if": { "properties": { "environment": { "const": "EXPLICIT_PRODUCTION" } }, "required": ["environment"] },
+      "then": { "properties": { "profile": { "const": "safe" } } }
+    }
+  ],
+  "$defs": {
+    "controlId": {
+      "type": "string",
+      "pattern": "^(v5\\.0\\.0-[0-9]+\\.[0-9]+\\.[0-9]+|WSTG-v4\\.2-[A-Z]+-[0-9]{2})$"
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "origin", "targetFingerprint", "targetImageDigest", "profile", "procedureIds", "expiresAt"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,99}$" },
+        "origin": { "type": "string", "pattern": "^https://[^/?#]+(?::[0-9]{1,5})?$" },
+        "targetFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "targetImageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "profile": { "enum": ["safe", "active", "destructive"] },
+        "procedureIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^MAN-[A-Z]+-[0-9]{3}$" }
+        },
+        "expiresAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+        "destructiveConfirmation": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "budgets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maximumRequests", "maximumDurationSeconds"],
+          "properties": {
+            "maximumRequests": { "type": "integer", "minimum": 1 },
+            "maximumDurationSeconds": { "type": "integer", "minimum": 1 }
+          }
+        }
+      },
+      "allOf": [{
+        "if": { "properties": { "profile": { "const": "destructive" } }, "required": ["profile"] },
+        "then": { "required": ["destructiveConfirmation", "budgets"] }
+      }]
+    },
+    "evidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "digest", "classification", "expiresOn"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,99}$" },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "classification": { "const": "restricted-security-evidence" },
+        "expiresOn": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+      }
+    },
+    "procedure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "procedureId",
+        "controlIds",
+        "prerequisites",
+        "stepsPerformed",
+        "expectedSecureOutcome",
+        "observedResult",
+        "redactedEvidenceReferences",
+        "tester",
+        "recordedAt",
+        "targetImageDigest",
+        "outcome"
+      ],
+      "properties": {
+        "procedureId": { "type": "string", "pattern": "^MAN-[A-Z]+-[0-9]{3}$" },
+        "controlIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/controlId" }
+        },
+        "prerequisites": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "stepsPerformed": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "expectedSecureOutcome": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "observedResult": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "redactedEvidenceReferences": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceReference" }
+        },
+        "tester": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "recordedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+        "targetImageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "outcome": { "enum": ["pass", "fail", "not-applicable", "blocked"] },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "findingFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "trackingReference": { "type": "string", "minLength": 1, "maxLength": 200 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "enum": ["not-applicable", "blocked"] } }, "required": ["outcome"] },
+          "then": { "required": ["rationale", "owner"] }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "blocked" } }, "required": ["outcome"] },
+          "then": { "required": ["trackingReference"] }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "pass" } }, "required": ["outcome"] },
+          "then": { "properties": { "redactedEvidenceReferences": { "type": "array", "minItems": 1 } } }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "fail" } }, "required": ["outcome"] },
+          "then": { "required": ["rationale", "findingFingerprint"] }
+        }
+      ]
+    }
+  }
+}
