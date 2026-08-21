@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "image": "grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6",
+  "stages": [
+    { "duration": "15s", "target": 12 },
+    { "duration": "30s", "target": 12 },
+    { "duration": "15s", "target": 0 }
+  ],
+  "warmupSeconds": 5,
+  "interruptGraceMilliseconds": 1000,
+  "scenarios": [
+    { "id": "argon2-login-pressure", "checks": ["failed-login-rejected"] },
+    { "id": "login-rate-limit-boundary", "checks": ["failed-login-bounded"] },
+    { "id": "request-body-limit", "checks": ["gateway-rejects-oversized-body", "gateway-remains-available"] },
+    { "id": "competing-court-occupancy", "checks": ["fixtures-ready", "serialized"] },
+    { "id": "duplicate-delivery", "checks": ["fixtures-ready", "replay-returns-original"] },
+    { "id": "participant-capacity", "checks": ["fixtures-ready", "card-unavailable"] },
+    { "id": "series-and-rule-cost", "checks": ["fixtures-ready", "maximum-preview-controlled"] },
+    { "id": "preview-mutation-race", "checks": ["fixtures-ready", "preview-is-creatable", "stale-preview-fails-closed"] }
+  ],
+  "circuitBreakers": {
+    "tripThresholds": {
+      "appCpuPercent": 75,
+      "appMemoryMegabytes": 850,
+      "dbCpuPercent": 75,
+      "dbMemoryMegabytes": 800,
+      "activeConnections": 25,
+      "activePoolConnections": 8,
+      "pendingPoolConnections": 0,
+      "waitingLocks": 8,
+      "sessionRows": 150,
+      "storageMegabytes": 350,
+      "requestP95Milliseconds": 1500,
+      "errorRate": 0.03
+    },
+    "safetyLimits": {
+      "appCpuPercent": 110,
+      "appMemoryMegabytes": 980,
+      "dbCpuPercent": 110,
+      "dbMemoryMegabytes": 980,
+      "activeConnections": 35,
+      "activePoolConnections": 10,
+      "pendingPoolConnections": 5,
+      "waitingLocks": 15,
+      "sessionRows": 250,
+      "storageMegabytes": 450,
+      "requestP95Milliseconds": 3000,
+      "errorRate": 0.1
+    },
+    "consecutiveSamples": 2,
+    "sampleIntervalMilliseconds": 1000
+  }
+}

@@ -1,7 +1,10 @@
+import collections
 import http.client
 import http.server
+import json
 import os
 import threading
+import time
 import urllib.parse
 
 
@@ -22,6 +25,9 @@ counter_lock = threading.Lock()
 concurrency = threading.BoundedSemaphore(MAX_CONCURRENCY)
 request_count = 0
 request_bytes = 0
+upstream_errors = 0
+latencies = collections.deque(maxlen=2048)
+upstream_outcomes = collections.deque(maxlen=2048)
 
 
 class RequestHandler(http.server.BaseHTTPRequestHandler):
@@ -55,25 +61,28 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         if canonical_path is None or not target_allowed(parsed, self.command, canonical_path):
             self.reject(421)
             return
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            self.reject(400)
+            return
+        if content_length < 0:
+            self.reject(400)
+            return
+        with counter_lock:
+            if request_count >= MAX_REQUESTS or request_bytes + content_length > MAX_GENERATED_BYTES:
+                self.reject(429)
+                return
+            request_count += 1
+            request_bytes += content_length
+            self.write_metrics()
+        if content_length > MAX_BODY_BYTES:
+            self.reject(413)
+            return
         if not concurrency.acquire(blocking=False):
             self.reject(429)
             return
         try:
-            try:
-                content_length = int(self.headers.get("Content-Length", "0"))
-            except ValueError:
-                self.reject(400)
-                return
-            if content_length < 0 or content_length > MAX_BODY_BYTES:
-                self.reject(413)
-                return
-            with counter_lock:
-                if request_count >= MAX_REQUESTS or request_bytes + content_length > MAX_GENERATED_BYTES:
-                    self.reject(429)
-                    return
-                request_count += 1
-                request_bytes += content_length
-                self.write_metrics()
             path = urllib.parse.urlunsplit(("", "", canonical_path, parsed.query, ""))
             if CANARY_ENABLED and canonical_path == CANARY_PATH:
                 self.send_canary()
@@ -83,9 +92,12 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                        if name.lower() not in {"connection", "host", "proxy-connection", "transfer-encoding"}}
             headers["Host"] = "proxy"
             connection = http.client.HTTPConnection(UPSTREAM_HOST, UPSTREAM_PORT, timeout=10)
+            started = time.monotonic()
+            response_status = 502
             try:
                 connection.request(self.command, path, body=body, headers=headers)
                 response = connection.getresponse()
+                response_status = response.status
                 response_length = response.getheader("Content-Length")
                 if response_length is not None and int(response_length) > MAX_BODY_BYTES:
                     self.reject(502)
@@ -95,8 +107,10 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     self.reject(502)
                     return
             except (OSError, ValueError, http.client.HTTPException):
+                self.record_upstream(response_status, started)
                 self.reject(502)
                 return
+            self.record_upstream(response_status, started)
             self.send_response(response.status)
             for name, value in response.getheaders():
                 if name.lower() not in {"connection", "content-length", "transfer-encoding"}:
@@ -110,7 +124,9 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             concurrency.release()
 
     def reject(self, status):
+        self.close_connection = True
         self.send_response(status)
+        self.send_header("Connection", "close")
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -126,9 +142,25 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
 
     def write_metrics(self):
         temporary = "/tmp/security-gateway-metrics.next"
+        ordered = sorted(latencies)
+        percentile_index = max(0, (len(ordered) * 95 + 99) // 100 - 1)
+        p95 = ordered[percentile_index] if ordered else 0
+        error_rate = sum(upstream_outcomes) / len(upstream_outcomes) if upstream_outcomes else 0
         with open(temporary, "w", encoding="ascii") as output:
-            output.write(f"{request_count} {request_bytes}")
+            json.dump({"requests": request_count, "requestBytes": request_bytes,
+                       "upstreamErrors": upstream_errors, "requestP95Milliseconds": p95,
+                       "errorRate": error_rate}, output, separators=(",", ":"))
         os.replace(temporary, "/tmp/security-gateway-metrics")
+
+    def record_upstream(self, status, started):
+        global upstream_errors
+        with counter_lock:
+            latencies.append((time.monotonic() - started) * 1000)
+            failed = status >= 500
+            upstream_outcomes.append(1 if failed else 0)
+            if failed:
+                upstream_errors += 1
+            self.write_metrics()
 
     def log_message(self, format, *args):
         return

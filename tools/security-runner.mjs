@@ -130,6 +130,7 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   const runAuthorizationAssessment = runtime.runAuthorizationAssessment ?? missingAuthorizationAssessment;
   const runAuthenticatedZapAssessment = runtime.runAuthenticatedZapAssessment ?? missingAuthenticatedZapAssessment;
   const runOpenApiFuzzAssessment = runtime.runOpenApiFuzzAssessment ?? missingOpenApiFuzzAssessment;
+  const runResourceAbuseAssessment = runtime.runResourceAbuseAssessment ?? missingResourceAbuseAssessment;
   const { attempt, paths } = reserveAttempt(root, plan.runId);
   const startedAt = now();
   const manifest = createManifest(plan, attempt, startedAt);
@@ -182,6 +183,23 @@ export async function executeSecurityPlan(plan, runtime = {}) {
           + (fuzzEvidence.generatedDataMegabytes ?? 0),
         evidenceBytes: directoryBytes(paths.evidence) };
       assertUsage(manifest.usage, plan.budgets);
+    } else if (adapter === "resource-abuse") {
+      assertRunning(paths, startedAt, now(), plan.budgets);
+      const evidence = await runResourceAbuseAssessment(plan, {
+        evidenceDirectory: paths.evidence, stopFile: paths.stop, attempt, deadline,
+        maxRequests: plan.budgets.requests
+      });
+      assertRunning(paths, startedAt, now(), plan.budgets);
+      manifest.toolResults.push({ id: "resource-abuse", version: plan.tools[1].version,
+        outcome: evidence.outcome });
+      manifest.outcome = evidence.outcome;
+      manifest.reason = evidence.outcome === "passed" ? null
+        : evidence.outcome === "failed" ? "Resource abuse violated integrity or recovery guarantees"
+          : "Resource-abuse evidence is incomplete";
+      manifest.usage = { requests: evidence.requestCount,
+        generatedDataMegabytes: evidence.generatedDataMegabytes,
+        evidenceBytes: directoryBytes(paths.evidence) };
+      assertUsage(manifest.usage, plan.budgets);
     } else {
       manifest.outcome = "incomplete";
       manifest.reason = "No isolated assessment adapter is registered";
@@ -230,6 +248,12 @@ function assertSupportedPlan(plan) {
     && plan.tools[3]?.id === "authorization-matrix"
     && JSON.stringify(plan.tools[3].testIds) === JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001"]);
   if (authorization) return "active-security";
+  const resourceAbuse = plan.profile === "destructive" && plan.environment === "SECURITY"
+    && JSON.stringify(plan.selectedTests) === JSON.stringify(["CSA-RES-001"])
+    && plan.tools.length === 2 && identity?.id === "target-identity" && identity.testIds.length === 0
+    && plan.tools[1]?.id === "resource-abuse"
+    && JSON.stringify(plan.tools[1].testIds) === JSON.stringify(["CSA-RES-001"]);
+  if (resourceAbuse) return "resource-abuse";
   throw new Error("Assessment adapters require an isolated orchestrator-owned runner");
 }
 
@@ -257,6 +281,10 @@ function authorizationRequestLimit(plan) {
 
 async function missingOpenApiFuzzAssessment() {
   throw new Error("No OpenAPI fuzz assessment adapter is registered");
+}
+
+async function missingResourceAbuseAssessment() {
+  throw new Error("No resource-abuse assessment adapter is registered");
 }
 
 export function redactSecurityText(value) {

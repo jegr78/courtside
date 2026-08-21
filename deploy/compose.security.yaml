@@ -34,7 +34,7 @@ services:
     cap_drop:
       - ALL
     cpus: 1.0
-    mem_limit: 768m
+    mem_limit: 1g
     depends_on:
       db:
         condition: service_healthy
@@ -45,6 +45,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
       COURTSIDE_COOKIE_SECURE: "true"
       COURTSIDE_ENVIRONMENT: SECURITY
+      COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"
+      COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: "5"
+      COURTSIDE_LOGIN_GLOBAL_MAX_FAILURES: "20"
+      MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"
       COURTSIDE_SECURITY_CONFIRM_DISPOSABLE: "true"
       COURTSIDE_SECURITY_RUN_ID: ${COURTSIDE_SECURITY_RUN_ID:?required}
       COURTSIDE_SECURITY_SEED_FINGERPRINT: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
@@ -213,6 +217,33 @@ services:
       SCHEMATHESIS_HOOKS: ""
     volumes:
       - ../src/main/resources/api/openapi.yaml:/schema/openapi.yaml:ro
+    networks:
+      - scanner-client
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+
+  k6-abuse:
+    profiles: [assessment]
+    image: grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6
+    pull_policy: never
+    entrypoint: ["tail", "-f", "/dev/null"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,uid=12345,gid=12345,mode=0700
+      - /results:size=16m,uid=12345,gid=12345,mode=0700
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 1.0
+    mem_limit: 512m
+    pids_limit: 128
+    volumes:
+      - ../security/resource-abuse-policy.json:/scripts/policy.json:ro
+      - ../security/resource-abuse.js:/scripts/resource-abuse.js:ro
     networks:
       - scanner-client
     labels:

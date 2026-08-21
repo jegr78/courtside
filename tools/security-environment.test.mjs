@@ -8,9 +8,25 @@ import {
   assertSecurityIdentity, assertSecurityRecoveryOwnership, assertSecurityStartAvailable, availableLoopbackPort, recoveryEnvironment,
   isMissingDockerResource,
   mergeSecurityProcessEnvironment,
+  prometheusMetric,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
+
+test("given Hikari metrics, when sampling pool pressure, then active and pending connections remain distinct", () => {
+  // given
+  const metrics = `
+hikaricp_connections_active{pool="HikariPool-1"} 8.0
+hikaricp_connections_pending{pool="HikariPool-1"} 3.0
+hikaricp_connections_max{pool="HikariPool-1"} 10.0
+`;
+
+  // when / then
+  assert.equal(prometheusMetric(metrics, "hikaricp_connections_active"), 8);
+  assert.equal(prometheusMetric(metrics, "hikaricp_connections_pending"), 3);
+  assert.equal(prometheusMetric(metrics, "hikaricp_connections_max"), 10);
+  assert.throws(() => prometheusMetric(metrics, "hikaricp_connections_idle"), /is unavailable/);
+});
 
 test("given security state and a host toolchain, when launching owned commands, then PATH survives and run values win", () => {
   // when
@@ -205,17 +221,21 @@ test("given the security Compose file, when inspecting boundaries, then resource
   // when / then
   assert.match(compose, /127\.0\.0\.1:\$\{COURTSIDE_SECURITY_HTTPS_PORT:\?required\}:443/);
   assert.equal((compose.match(/internal: true/g) ?? []).length, 4);
-  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 7);
-  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 12);
-  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 12);
+  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 8);
+  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 13);
+  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 13);
   assert.match(compose, /\/var\/lib\/postgresql\/data:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
   assert.match(compose, /zaproxy\/zap-stable:2\.16\.1@sha256:[a-f0-9]{64}/);
   assert.match(compose, /schemathesis\/schemathesis:4\.25\.0@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /grafana\/k6:2\.2\.0@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"/);
+  assert.match(compose, /MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"/);
   assert.match(compose, /profiles: \[assessment\]/);
   assert.match(compose, /\/zap\/wrk:uid=1000,gid=1000,mode=0700,size=25m/);
   assert.match(compose, /zap:[\s\S]*networks:[\s\S]*- scanner-client/);
   assert.match(compose, /schemathesis:[\s\S]*read_only: true[\s\S]*cap_drop:[\s\S]*- ALL[\s\S]*- scanner-client/);
+  assert.match(compose, /k6-abuse:[\s\S]*read_only: true[\s\S]*pids_limit: 128[\s\S]*- scanner-client/);
   assert.match(compose, /scanner-gateway:[\s\S]*- scanner-client[\s\S]*- scanner-upstream/);
   assert.match(compose, /proxy:[\s\S]*networks:[\s\S]*- scanner-upstream/);
   assert.doesNotMatch(compose, /zap:[\s\S]*networks:[\s\S]*- frontend/);
@@ -232,7 +252,11 @@ test("given the scanner gateway, when enforcing budgets, then target access is c
   assert.match(gateway, /request_bytes \+ content_length > MAX_GENERATED_BYTES/);
   assert.match(gateway, /def do_PUT[\s\S]*def do_PATCH[\s\S]*def do_DELETE/);
   assert.match(gateway, /security-gateway-metrics/);
+  assert.match(gateway, /latencies = collections\.deque\(maxlen=2048\)/);
+  assert.match(gateway, /upstream_outcomes = collections\.deque\(maxlen=2048\)/);
+  assert.match(gateway, /upstream_errors/);
   assert.match(gateway, /concurrency\.acquire\(blocking=False\)/);
+  assert.match(gateway, /self\.close_connection = True/);
   assert.match(gateway, /UPSTREAM_HOST = "proxy"/);
 });
 

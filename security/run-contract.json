@@ -57,7 +57,12 @@
       "id": "authorization-matrix",
       "version": "1.0.0",
       "testIds": ["CSA-AUTHN-001", "CSA-AUTHZ-001"]
+    },
+    {
+      "id": "resource-abuse",
+      "version": "1.0.0",
+      "testIds": ["CSA-RES-001"]
     }
   ],
-  "selectedTests": ["CSA-DEPLOY-001", "CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001", "CSA-API-001", "CSA-IMPORT-001"]
+  "selectedTests": ["CSA-DEPLOY-001", "CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001", "CSA-API-001", "CSA-IMPORT-001", "CSA-RES-001"]
 }
