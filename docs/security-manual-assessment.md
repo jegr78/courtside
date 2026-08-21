@@ -11,6 +11,10 @@ source commit, target image digest, target fingerprint, environment, selected pr
 authorization. Record whether an independent reviewer participates; a single maintainer may
 authorize, execute, validate and accept risk.
 
+Use [`security/manual-assessment-evidence.schema.json`](../security/manual-assessment-evidence.schema.json)
+for the record and validate it with the repository contract tests. The authorization object binds
+the exact HTTPS origin, target fingerprint, image digest, profile, procedure set and expiry.
+
 For every procedure retain these fields:
 
 - Prerequisites
@@ -38,18 +42,30 @@ seed verification. `destructive` additionally requires its distinct confirmation
 budgets, telemetry, emergency stop and recovery proof. Never reinterpret a safe authorization as
 active or destructive authorization.
 
+`MAN-INPUT-001`, `MAN-IDENTITY-001`, `MAN-SESSION-001`, `MAN-AUTHZ-001` and
+`MAN-BUSINESS-001` require `active`; every other procedure is `safe`. No manual procedure currently
+requires `destructive`. A safe procedure may run against production only when its authorization
+names that exact origin and procedure.
+
 Perform a dry run first and compare the selected procedures, profile, target fingerprint, image
 digest and budgets with the assessment record. Stop if any value differs.
 
 ## Execution and emergency stop
 
+Prepare and verify the environment with the commands in
+[`security-environment.md`](security-environment.md). Use `node tools/courtside.mjs security-plan
+<run-id> <profile>` for the dry run and `node tools/courtside.mjs security-verify <run-id>` before
+the first active request.
+
 Keep the SECURITY state and STOP-file paths visible throughout active work. Stop immediately on a
 target mismatch, traffic outside the authorized origin, unexpected personal data, unavailable
 telemetry, a hard resource limit, unexplained state mutation or loss of evidence protection. Use
-the owned stop command, capture only redacted diagnostics, and do not retry over the first attempt.
+`node tools/courtside.mjs security-stop <run-id>`, capture only redacted diagnostics, and do not
+retry over the first attempt.
 Mark the procedure `blocked` or `fail` according to whether a secure outcome was actually violated.
 
-After active or destructive work, run cleanup and verify health, restart, database access, domain
+After active or destructive work, run `node tools/courtside.mjs security-cleanup <run-id>` and
+verify health, restart, database access, domain
 fingerprint restoration and absence of run-owned resources. A cleanup or recovery failure makes
 the assessment incomplete and must be resolved before another run uses the same identity.
 
@@ -67,7 +83,13 @@ Public regression tests and issues are created only after they no longer disclos
 
 ## Procedures
 
-Each procedure applies to every catalog control that names its identifier.
+Each procedure applies only to catalog controls that name its identifier. Before execution, create
+one worksheet row per selected control. Copy its exact requirement from the catalog's immutable,
+commit-pinned OWASP source, identify the concrete Courtside component and observable result, expand
+the procedure steps into actions for that requirement, and state the expected result in testable
+terms. A category-level observation never satisfies multiple controls by itself. The evidence
+record must reproduce the performed control-specific steps and expected result; a generic copy of
+the category procedure is incomplete.
 
 ### MAN-ARCH-001 Architecture and threat-boundary review
 
@@ -185,3 +207,8 @@ the record with the catalog, finding lifecycle and retained evidence digests. De
 evidence and synthetic credentials, reset the environment, and record whether an independent
 external tester or reviewer participated. The absence of independent review is recorded, not hidden
 and not used to prevent the single maintainer from acting.
+
+For risk acceptance, follow [`security-findings.md`](security-findings.md): validate and prioritize
+the finding first, refuse acceptance for P0, and create a matching exception with owner, rationale,
+compensating control, acceptance time and expiry. The `accepted-risk` transition references that
+exact exception. A single maintainer may create it; the independent-review field remains truthful.
