@@ -201,16 +201,92 @@ class SnapshotParserTest {
     }
 
     @Test
-    void givenAFileWrittenInWindows1252_whenParsing_thenItsUmlautsArriveIntact() {
+    void givenAFileWrittenInWindows1252_whenThatEncodingIsChosen_thenItsUmlautsArriveIntact() {
         // given
         byte[] windows1252 = "Member number,First name,Last name,Email\n4711,Janè,Doe,jane.doe@example.org\n"
                 .getBytes(Charset.forName("windows-1252"));
 
         // when
-        CsvSnapshot snapshot = SnapshotParser.parse(windows1252, COLUMNS);
+        CsvSnapshot snapshot = SnapshotParser.parse(windows1252, COLUMNS, Charset.forName("windows-1252"), ',');
 
         // then
         assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.values())
+                        .containsEntry(CanonicalField.FIRST_NAME, "Janè"));
+    }
+
+    @Test
+    void givenAFileWithATabBetweenItsCells_whenTheSourceSaysSo_thenItIsReadWithoutCountingColumns() {
+        // given
+        Map<String, CanonicalField> columns = columns();
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(fixture("tab-export.csv"), columns,
+                StandardCharsets.UTF_8, '\t');
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.externalId()).isEqualTo("4711"));
+    }
+
+    @Test
+    void givenACellHoldingTheSeparator_whenItIsQuoted_thenItStaysOneCell() {
+        // given
+        Map<String, CanonicalField> columns = columns();
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(fixture("comma-in-a-quoted-cell-export.csv"),
+                columns, StandardCharsets.UTF_8, ',');
+
+        // then
+        assertThat(snapshot.rows()).singleElement()
+                .satisfies(row -> assertThat(row.values())
+                        .containsEntry(CanonicalField.FIRST_NAME, "Doe, Jane"));
+    }
+
+    @Test
+    void givenAFileReadWithTheWrongSeparator_whenParsing_thenTheHeaderFailsRatherThanTheRows() {
+        // given — the club said comma and the file is semicolon-separated
+        Map<String, CanonicalField> columns = columns();
+
+        // when / then — one enormous column names none of the required fields, and a header that
+        // cannot be trusted fails the whole file instead of producing a row of nonsense
+        assertThatThrownBy(() -> SnapshotParser.parse(fixture("quoted-semicolon-export.csv"),
+                columns, StandardCharsets.UTF_8, ','))
+                .isInstanceOf(SnapshotHeaderInvalidException.class)
+                .hasFieldOrPropertyWithValue("code", "import.snapshot.header.missingField");
+    }
+
+    @Test
+    void givenAFileThatIsNotUtf8_whenNoOtherEncodingIsChosen_thenItIsRefusedRatherThanGuessedAt() {
+        // given
+        byte[] windows1252 = "Member number,First name,Last name,Email\n4711,Janè,Doe,jane.doe@example.org\n"
+                .getBytes(Charset.forName("windows-1252"));
+
+        // when / then — which 8-bit encoding a file uses cannot be read off its bytes, and a guess
+        // that lands on the wrong one imports mangled names without anybody being told
+        assertThatThrownBy(() -> SnapshotParser.parse(windows1252, COLUMNS, StandardCharsets.UTF_8, ','))
+                .isInstanceOf(SnapshotHeaderInvalidException.class)
+                .hasFieldOrPropertyWithValue("code", "import.snapshot.notEncoding");
+    }
+
+    @Test
+    void givenAFileWithAByteOrderMark_whenAnotherEncodingIsChosen_thenTheMarkStillWins() {
+        // given
+        byte[] utf8 = "Member number,First name,Last name,Email\n4711,Janè,Doe,jane.doe@example.org\n"
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] withMark = new byte[utf8.length + 3];
+        withMark[0] = (byte) 0xEF;
+        withMark[1] = (byte) 0xBB;
+        withMark[2] = (byte) 0xBF;
+        System.arraycopy(utf8, 0, withMark, 3, utf8.length);
+
+        // when — a mark is a fact about the bytes, the choice is only what to do without one
+        CsvSnapshot snapshot = SnapshotParser.parse(withMark, COLUMNS, Charset.forName("windows-1252"), ',');
+
+        // then
         assertThat(snapshot.rows()).singleElement()
                 .satisfies(row -> assertThat(row.values())
                         .containsEntry(CanonicalField.FIRST_NAME, "Janè"));
@@ -227,7 +303,7 @@ class SnapshotParserTest {
         System.arraycopy(utf16, 0, withMark, 2, utf16.length);
 
         // when
-        CsvSnapshot snapshot = SnapshotParser.parse(withMark, COLUMNS);
+        CsvSnapshot snapshot = SnapshotParser.parse(withMark, COLUMNS, StandardCharsets.UTF_8, ',');
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -236,12 +312,12 @@ class SnapshotParserTest {
     }
 
     @Test
-    void givenASemicolonSeparatedFile_whenParsing_thenTheSeparatorIsTakenFromTheHeader() {
+    void givenASemicolonSeparatedFile_whenTheSourceSaysSemicolon_thenItIsRead() {
         // given
         String content = "Member number;First name;Last name;Email\n4711;Jane;Doe;jane.doe@example.org\n";
 
         // when
-        CsvSnapshot snapshot = parse(content);
+        CsvSnapshot snapshot = parseWith(content, ';');
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -275,7 +351,7 @@ class SnapshotParserTest {
         String content = "Member number;First name;Last name;Email;\n4711;Jane;Doe;jane.doe@example.org;\n";
 
         // when
-        CsvSnapshot snapshot = parse(content);
+        CsvSnapshot snapshot = parseWith(content, ';');
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -296,7 +372,8 @@ class SnapshotParserTest {
         columns.put("Benutzerkonto - Typ", CanonicalField.MEMBERSHIP_TYPE);
 
         // when
-        CsvSnapshot snapshot = SnapshotParser.parse(fixture("quoted-semicolon-export.csv"), columns);
+        CsvSnapshot snapshot = SnapshotParser.parse(fixture("quoted-semicolon-export.csv"), columns,
+                StandardCharsets.UTF_8, ';');
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -318,7 +395,8 @@ class SnapshotParserTest {
         columns.put("Status", CanonicalField.MEMBERSHIP_TYPE);
 
         // when
-        CsvSnapshot snapshot = SnapshotParser.parse(fixture("windows-1252-semicolon-export.csv"), columns);
+        CsvSnapshot snapshot = SnapshotParser.parse(fixture("windows-1252-semicolon-export.csv"), columns,
+                Charset.forName("windows-1252"), ';');
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -370,7 +448,12 @@ class SnapshotParserTest {
     }
 
     private static CsvSnapshot parse(String content) {
-        return SnapshotParser.parse(content.getBytes(StandardCharsets.UTF_8), COLUMNS);
+        return parseWith(content, ',');
+    }
+
+    private static CsvSnapshot parseWith(String content, char separator) {
+        return SnapshotParser.parse(content.getBytes(StandardCharsets.UTF_8), COLUMNS,
+                StandardCharsets.UTF_8, separator);
     }
 
     private static Map<String, CanonicalField> columns() {

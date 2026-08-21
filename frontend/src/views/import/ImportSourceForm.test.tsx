@@ -11,7 +11,7 @@ const passive: MembershipType = { id: "type-2", name: "Passive", ruleSetId: null
 const existing: ImportSource = {
   id: "source-1",
   sourceKey: "roster-system",
-  displayName: "Membership system",
+  displayName: "Membership system", separator: ";",
   columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME", "Last name": "LAST_NAME" },
   membershipTypes: {},
   defaultMembershipTypeId: "type-1",
@@ -153,5 +153,49 @@ describe("ImportSourceForm", () => {
     const unmapped = await screen.findByTestId("unmapped-columns");
     expect(unmapped).toHaveTextContent("IBAN");
     expect(unmapped).toHaveTextContent("Phone");
+  });
+
+  it("given a chosen file, when its separator is suggested, then the club can correct it and the columns follow", async () => {
+    // given
+    show(undefined, vi.fn());
+    await userEvent.upload(screen.getByTestId("source-file"),
+      new File(["Nr|Vorname\n1|Jane\n"], "members.csv", { type: "text/csv" }));
+
+    // then — counting columns suggests a comma here, which is wrong, and the club says so
+    expect(screen.getByTestId("source-separator")).toHaveValue(",");
+
+    // when
+    await userEvent.clear(screen.getByTestId("source-separator"));
+    await userEvent.type(screen.getByTestId("source-separator"), "|");
+
+    // then — a character this product would never have guessed at reads the file correctly
+    expect([...screen.getByTestId("column-EXTERNAL_ID").querySelectorAll("option")]
+      .map((option) => option.getAttribute("value"))).toContain("Nr");
+  });
+
+  it("given a described source, when it is saved, then the separator travels with it", async () => {
+    // given
+    const save = vi.fn().mockResolvedValue(undefined);
+    show(existing, save);
+
+    // when
+    await userEvent.click(screen.getByTestId("save-source"));
+
+    // then
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ separator: ";" }));
+  });
+
+  it("given an export that is not UTF-8, when it is chosen, then its columns are offered rather than refused", async () => {
+    // given / when — "Nr;Straße" as windows-1252, which strict UTF-8 cannot decode
+    show(undefined, vi.fn());
+    await userEvent.upload(screen.getByTestId("source-file"),
+      new File([Uint8Array.from([78, 114, 59, 83, 116, 114, 97, 223, 101, 10, 49, 59, 88, 10])],
+        "members.csv", { type: "text/csv" }));
+
+    // then — the club's own export is the reference, so it has to arrive readable
+    expect(await screen.findByTestId("source-not-utf8")).toBeInTheDocument();
+    expect(screen.getByTestId("source-encoding")).toHaveValue("windows-1252");
+    expect([...screen.getByTestId("column-EXTERNAL_ID").querySelectorAll("option")]
+      .map((option) => option.getAttribute("value"))).toContain("Straße");
   });
 });

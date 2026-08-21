@@ -1,7 +1,7 @@
 import { useId, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { CanonicalField, ImportSource, ImportSourceRequest, MembershipType } from "../../api/client";
-import { readCsvColumn, readCsvHeader } from "../../import/read-csv";
+import { api, type CanonicalField, type ImportSource, type ImportSourceRequest, type MembershipType } from "../../api/client";
+import { EncodingUnreadableHereError, NotUtf8Error, readCsvColumn, readCsvHeader, suggestSeparator } from "../../import/read-csv";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 
@@ -30,6 +30,7 @@ function columnsOf(mapping: Mapping): Record<string, CanonicalField> {
   return columns;
 }
 
+
 export function ImportSourceForm({ source, types, disabled, save }: {
   source: ImportSource | undefined;
   types: MembershipType[];
@@ -48,6 +49,11 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   const [defaultType, setDefaultType] = useState(source?.defaultMembershipTypeId ?? "");
   const [owned, setOwned] = useState<CanonicalField[]>(source?.ownedFields ?? []);
   const [threshold, setThreshold] = useState(String(source?.removalWarningPercent ?? 10));
+  const [separator, setSeparator] = useState(source?.separator ?? ",");
+  const [encoding, setEncoding] = useState("UTF-8");
+  const [encodings, setEncodings] = useState<string[]>([]);
+  const [unreadableHere, setUnreadableHere] = useState(false);
+  const [asksEncoding, setAsksEncoding] = useState(false);
 
   const categoryColumn = mapping.MEMBERSHIP_TYPE;
   const knownValues = [...new Set([...Object.keys(categories), ...readValues])];
@@ -58,20 +64,51 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     const file = event.target.files?.[0];
     if (!file) return;
     setChosen(file);
-    setHeaders(await readCsvHeader(file));
-    if (categoryColumn) setReadValues(await readCsvColumn(file, categoryColumn));
+    setAsksEncoding(false);
+    setEncoding("UTF-8");
+    try {
+      const suggested = await suggestSeparator(file, "UTF-8");
+      setSeparator(suggested);
+      setHeaders(await readCsvHeader(file, "UTF-8", suggested));
+      if (categoryColumn) setReadValues(await readCsvColumn(file, categoryColumn, "UTF-8", suggested));
+    } catch (failure) {
+      if (!(failure instanceof NotUtf8Error)) throw failure;
+      setAsksEncoding(true);
+      void api.supportedEncodings().then(setEncodings).catch(() => setEncodings([]));
+      const legacy = "windows-1252";
+      await readWith(legacy, file, await suggestSeparator(file, legacy));
+    }
+  }
+
+  async function readWith(chosenEncoding: string, file = chosen, chosenSeparator = separator) {
+    setEncoding(chosenEncoding);
+    setSeparator(chosenSeparator);
+    setUnreadableHere(false);
+    if (!file) return;
+    try {
+      setHeaders(await readCsvHeader(file, chosenEncoding, chosenSeparator));
+      if (categoryColumn) {
+        setReadValues(await readCsvColumn(file, categoryColumn, chosenEncoding, chosenSeparator));
+      }
+    } catch (failure) {
+      if (!(failure instanceof EncodingUnreadableHereError)) throw failure;
+      setUnreadableHere(true);
+      setHeaders([]);
+      setReadValues([]);
+    }
   }
 
   async function mapField(field: CanonicalField, column: string) {
     setMapping((current) => ({ ...current, [field]: column }));
     if (field !== "MEMBERSHIP_TYPE") return;
-    setReadValues(chosen && column ? await readCsvColumn(chosen, column) : []);
+    setReadValues(chosen && column ? await readCsvColumn(chosen, column, encoding, separator) : []);
   }
 
   function submit() {
     void save({
       sourceKey,
       displayName,
+      separator,
       columns: columnsOf(mapping),
       membershipTypes: Object.fromEntries(
         Object.entries(categories).filter(([, typeId]) => typeId)),
@@ -94,6 +131,18 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       <label className="font-semibold" htmlFor={`${group}-file`}>{t("admin.import.file")}</label>
       <input data-testid="source-file" id={`${group}-file`} type="file" accept=".csv,text/csv" disabled={disabled} onChange={(event) => void chooseFile(event)} />
       <p className="text-sm">{t("admin.import.fileStaysHere")}</p>
+      <label className="font-semibold" htmlFor={`${group}-separator`}>{t("admin.import.separator")}</label>
+      <input data-testid="source-separator" id={`${group}-separator`} className="form-control rounded-lg border px-3 py-3" maxLength={1} disabled={disabled} value={separator} onChange={(event) => void readWith(encoding, chosen, event.target.value)} />
+      <p className="text-sm">{t("admin.import.separatorHint")}</p>
+      {asksEncoding && <>
+        <p data-testid="source-not-utf8">{t("admin.import.notUtf8")}</p>
+        <label className="font-semibold" htmlFor={`${group}-encoding`}>{t("admin.import.encoding")}</label>
+        <input data-testid="source-encoding" id={`${group}-encoding`} list={`${group}-encodings`} className="form-control rounded-lg border px-3 py-3" disabled={disabled} value={encoding} onChange={(event) => void readWith(event.target.value)} />
+        <datalist id={`${group}-encodings`}>
+          {encodings.map((name) => <option key={name} value={name} />)}
+        </datalist>
+        {unreadableHere && <p data-testid="source-encoding-unreadable">{t("admin.import.encodingUnreadableHere")}</p>}
+      </>}
     </div>
 
     <div className="grid gap-3">

@@ -548,12 +548,23 @@ components:
 
     ImportSource:
       type: object
-      required: [id, sourceKey, displayName, columns, membershipTypes, defaultMembershipTypeId,
+      required: [id, sourceKey, displayName, separator, columns, membershipTypes, defaultMembershipTypeId,
                  ownedFields, removalWarningPercent]
       properties:
         id: { type: string, format: uuid }
         sourceKey: { type: string }
         displayName: { type: string }
+        separator:
+          type: string
+          minLength: 1
+          maxLength: 1
+          description: |
+            The character between two cells of this source's export, given rather than detected.
+            Counting columns in a header row guesses well until it does not: an export need not
+            carry a header at all, a single-column file settles nothing, and a club whose file was
+            read with the wrong character sees one enormous column and no way to tell why. Which
+            character its own system writes is something a club can look at and answer, so it does.
+
         columns:
           type: object
           additionalProperties: { $ref: "#/components/schemas/CanonicalField" }
@@ -576,7 +587,7 @@ components:
         `membershipTypes` and `ownedFields` may be omitted, and the source then holds neither: no
         exported category maps to a type, and the source owns no field. `ImportSource` reports both
         as empty rather than absent, which is why it requires what this does not.
-      required: [sourceKey, displayName, columns, defaultMembershipTypeId, removalWarningPercent]
+      required: [sourceKey, displayName, separator, columns, defaultMembershipTypeId, removalWarningPercent]
       properties:
         sourceKey:
           type: string
@@ -596,6 +607,17 @@ components:
             Surrounding whitespace is removed before the name is stored, so a name pasted with
             padding is accepted; `maxLength` is measured on what was sent, and the stored name is
             never longer than it.
+        separator:
+          type: string
+          minLength: 1
+          maxLength: 1
+          description: |
+            The character between two cells of this source's export, given rather than detected.
+            Counting columns in a header row guesses well until it does not: an export need not
+            carry a header at all, a single-column file settles nothing, and a club whose file was
+            read with the wrong character sees one enormous column and no way to tell why. Which
+            character its own system writes is something a club can look at and answer, so it does.
+
         columns:
           type: object
           description: |
@@ -3359,6 +3381,31 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
+  /api/admin/import/encodings:
+    get:
+      tags: [admin-import]
+      operationId: listSupportedEncodings
+      summary: The character sets this instance can read a snapshot in.
+      description: |
+        Every character set the running platform supports, by canonical name, sorted. The list is
+        the platform's rather than this product's, so a club with an unusual export is limited by
+        what its instance can decode and not by what a release happened to enumerate.
+
+        A browser can decode fewer of these than the server can, so a name outside what the browser
+        knows still imports - only the local column preview cannot be offered for it.
+      responses:
+        "200":
+          description: The character sets, by canonical name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/admin/import/sources:
     get:
       tags: [admin-import]
@@ -3675,8 +3722,23 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: The club's export, as UTF-8 CSV. A byte order mark is tolerated.
+                  description: The club's export as CSV. A byte order mark is honoured.
                 mode: { $ref: "#/components/schemas/SnapshotMode" }
+                encoding:
+                  type: string
+                  maxLength: 60
+                  default: UTF-8
+                  description: |
+                    The name of a character set this instance supports, as reported by
+                    `GET /api/admin/import/encodings`. A byte order mark and valid UTF-8 are facts
+                    about the content and are used whatever this says; the name only settles a file
+                    that is neither. A file that is neither while this says `UTF-8` is refused
+                    rather than read as something nobody chose.
+
+                    This is a name and not an enumeration on purpose. Which character sets exist is
+                    a property of the platform the instance runs on, not a decision this product
+                    gets to freeze into a release: a club whose export tool writes a seventh one
+                    must not have to wait for a new image to import its own members.
       responses:
         "201":
           description: The preview.

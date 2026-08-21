@@ -2,12 +2,14 @@ CREATE TABLE import_source (
     id                      uuid PRIMARY KEY,
     source_key              text        NOT NULL,
     display_name            text        NOT NULL,
+    separator               text        NOT NULL,
     default_membership_type_id uuid   NOT NULL REFERENCES membership_type,
     removal_warning_percent integer     NOT NULL,
     created_at              timestamptz NOT NULL,
     CONSTRAINT import_source_unique_key UNIQUE (source_key),
     CONSTRAINT import_source_key_not_blank CHECK (length(btrim(source_key)) > 0),
     CONSTRAINT import_source_display_name_not_blank CHECK (length(btrim(display_name)) > 0),
+    CONSTRAINT import_source_separator_one_character CHECK (length(separator) = 1),
     CONSTRAINT import_source_removal_warning_percent_scale
         CHECK (removal_warning_percent BETWEEN 0 AND 100)
 );

@@ -276,10 +276,12 @@ export const api = {
     { method: "DELETE" }
   ),
   // No Content-Type: only the browser knows the boundary it is about to write.
-  createImportPreview: (sourceId: string, file: File, mode: SnapshotMode) => {
+  supportedEncodings: () => request<string[]>("/api/admin/import/encodings"),
+  createImportPreview: (sourceId: string, file: File, mode: SnapshotMode, encoding: string) => {
     const form = new FormData();
     form.append("file", file);
     form.append("mode", mode);
+    form.append("encoding", encoding);
     return request<ImportPreview>(
       `/api/admin/import/sources/${sourceId}/previews`, { method: "POST", body: form }
     );

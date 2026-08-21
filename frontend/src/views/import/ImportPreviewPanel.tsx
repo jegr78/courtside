@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type ImportPersonChange, type ImportPreview, type SnapshotMode } from "../../api/client";
+import { NotUtf8Error, readCsvHeader } from "../../import/read-csv";
 import { Button } from "../../components/Button";
 
 const MODES: SnapshotMode[] = ["UPDATE_ONLY", "FULL_SNAPSHOT"];
@@ -23,17 +24,32 @@ export function ImportPreviewPanel({ sourceId, preview, disabled, previewed, rep
   const { t } = useTranslation();
   const [chosen, setChosen] = useState<File>();
   const [mode, setMode] = useState<SnapshotMode>("UPDATE_ONLY");
+  const [encoding, setEncoding] = useState("UTF-8");
+  const [encodings, setEncodings] = useState<string[]>([]);
+  const [asksEncoding, setAsksEncoding] = useState(false);
   const [pending, setPending] = useState(false);
 
-  function chooseFile(event: ChangeEvent<HTMLInputElement>) {
-    setChosen(event.target.files?.[0]);
+  // The file is here in the browser, so whether it is UTF-8 is answerable before anybody uploads it.
+  async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    setChosen(file);
+    setEncoding("UTF-8");
+    setAsksEncoding(false);
+    if (!file) return;
+    try {
+      await readCsvHeader(file);
+    } catch (failure) {
+      if (!(failure instanceof NotUtf8Error)) return;
+      setAsksEncoding(true);
+      api.supportedEncodings().then(setEncodings).catch(reportError);
+    }
   }
 
   async function upload() {
     if (pending || !chosen) return;
     setPending(true);
     try {
-      previewed(await api.createImportPreview(sourceId, chosen, mode));
+      previewed(await api.createImportPreview(sourceId, chosen, mode, encoding));
     } catch (failure) {
       reportError(failure);
     } finally {
@@ -48,8 +64,17 @@ export function ImportPreviewPanel({ sourceId, preview, disabled, previewed, rep
 
     <div className="grid gap-2">
       <label className="font-semibold" htmlFor="snapshot-file">{t("admin.import.snapshotFile")}</label>
-      <input data-testid="snapshot-file" id="snapshot-file" type="file" accept=".csv,text/csv" disabled={busy} onChange={chooseFile} />
+      <input data-testid="snapshot-file" id="snapshot-file" type="file" accept=".csv,text/csv" disabled={busy} onChange={(event) => void chooseFile(event)} />
     </div>
+
+    {asksEncoding && <div className="grid gap-2">
+      <p data-testid="snapshot-not-utf8">{t("admin.import.notUtf8")}</p>
+      <label className="font-semibold" htmlFor="snapshot-encoding">{t("admin.import.encoding")}</label>
+      <input data-testid="snapshot-encoding" id="snapshot-encoding" list="snapshot-encodings" className="form-control rounded-lg border px-3 py-3" disabled={busy} value={encoding} onChange={(event) => setEncoding(event.target.value)} />
+      <datalist id="snapshot-encodings">
+        {encodings.map((name) => <option key={name} value={name} />)}
+      </datalist>
+    </div>}
 
     <div className="grid gap-2">
       <label className="font-semibold" htmlFor="snapshot-mode">{t("admin.import.mode")}</label>

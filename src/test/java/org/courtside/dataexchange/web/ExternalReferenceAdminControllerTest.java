@@ -57,7 +57,7 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-        source = sources.create("roster-system", "Membership system",
+        source = sources.create("roster-system", "Membership system", ",",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,

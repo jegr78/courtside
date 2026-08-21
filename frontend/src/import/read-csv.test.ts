@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readCsvColumn, readCsvHeader } from "./read-csv";
+import { NotUtf8Error, readCsvColumn, readCsvHeader } from "./read-csv";
 
 const csv = (content: string) => new File([content], "roster.csv", { type: "text/csv" });
 const legacy = (content: string) =>
@@ -46,9 +46,15 @@ describe("readCsvHeader", () => {
     expect(await readCsvHeader(csv("Nr;Vorname;\n1;Jane;\n"))).toEqual(["Nr", "Vorname"]);
   });
 
-  it("given a file written in windows-1252, when reading the header, then its umlauts are not replaced", async () => {
-    expect(await readCsvHeader(legacy("Nr;Straße\n1;Marketplace 9\n")))
+  it("given a file written in windows-1252, when that encoding is chosen, then its umlauts are not replaced", async () => {
+    expect(await readCsvHeader(legacy("Nr;Straße\n1;Marketplace 9\n"), "windows-1252"))
       .toEqual(["Nr", "Straße"]);
+  });
+
+  it("given a file that is not UTF-8, when no other encoding is chosen, then it says so instead of guessing", async () => {
+    // a guess that lands on the wrong 8-bit encoding offers column names nobody can recognise
+    await expect(readCsvHeader(legacy("Nr;Straße\n1;Marketplace 9\n")))
+      .rejects.toBeInstanceOf(NotUtf8Error);
   });
 
   it("given a file with no line break, when reading its header, then the whole content is the header", async () => {
@@ -127,8 +133,8 @@ describe("readCsvColumn", () => {
       .toEqual(["Aktive", "Jugend"]);
   });
 
-  it("given a file written in windows-1252, when reading a column, then its values keep their umlauts", async () => {
-    expect(await readCsvColumn(legacy("Nr;Status\n1;fördernd\n2;aktiv\n"), "Status"))
+  it("given a file written in windows-1252, when that encoding is chosen, then its values keep their umlauts", async () => {
+    expect(await readCsvColumn(legacy("Nr;Status\n1;fördernd\n2;aktiv\n"), "Status", "windows-1252"))
       .toEqual(["fördernd", "aktiv"]);
   });
 });

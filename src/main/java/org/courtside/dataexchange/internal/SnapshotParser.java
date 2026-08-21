@@ -28,20 +28,17 @@ public final class SnapshotParser {
 
     private static final Set<CanonicalField> REQUIRED_FIELDS = EnumSet.of(
             CanonicalField.EXTERNAL_ID, CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME);
-    private static final char[] DELIMITERS = {',', ';', '\t'};
     private static final byte[] UTF_8_MARK = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
     private static final byte[] UTF_16_LITTLE_ENDIAN_MARK = {(byte) 0xFF, (byte) 0xFE};
     private static final byte[] UTF_16_BIG_ENDIAN_MARK = {(byte) 0xFE, (byte) 0xFF};
-    // Windows-1252 maps every one of the 256 bytes, so decoding cannot fail once it is reached.
-    private static final Charset LEGACY_EXPORT = Charset.forName("windows-1252");
 
     private SnapshotParser() {
     }
 
-    public static CsvSnapshot parse(byte[] content, Map<String, CanonicalField> columns) {
-        String text = decoded(content);
-        CSVFormat format = format(delimiterOf(text));
-        try (CSVParser parser = format.parse(new StringReader(text))) {
+    public static CsvSnapshot parse(byte[] content, Map<String, CanonicalField> columns,
+                                    Charset chosen, char separator) {
+        String text = decoded(content, chosen);
+        try (CSVParser parser = format(separator).parse(new StringReader(text))) {
             List<String> headerNames = parser.getHeaderNames();
             return read(parser, headerOf(headerNames, columns), headerNames.size(),
                     ignoredColumns(headerNames, columns));
@@ -59,27 +56,6 @@ public final class SnapshotParser {
                 .setDuplicateHeaderMode(DuplicateHeaderMode.ALLOW_ALL)
                 .setTrim(true)
                 .get();
-    }
-
-    private static char delimiterOf(String text) {
-        char widestDelimiter = DELIMITERS[0];
-        int widestHeader = 0;
-        for (char candidate : DELIMITERS) {
-            int width = headerWidth(text, candidate);
-            if (width > widestHeader) {
-                widestHeader = width;
-                widestDelimiter = candidate;
-            }
-        }
-        return widestDelimiter;
-    }
-
-    private static int headerWidth(String text, char delimiter) {
-        try (CSVParser parser = format(delimiter).parse(new StringReader(text))) {
-            return parser.getHeaderNames().size();
-        } catch (IOException | IllegalArgumentException e) {
-            return 0;
-        }
     }
 
     private static CsvSnapshot read(CSVParser parser, Map<String, CanonicalField> header,
@@ -170,7 +146,9 @@ public final class SnapshotParser {
                 .toList();
     }
 
-    private static String decoded(byte[] content) {
+    // A byte order mark and valid UTF-8 are facts about the bytes and outrank the caller's choice.
+    // Which 8-bit encoding a file uses is not knowable from its content, so that one is chosen.
+    private static String decoded(byte[] content, Charset chosen) {
         if (startsWith(content, UTF_8_MARK)) {
             return new String(content, UTF_8_MARK.length, content.length - UTF_8_MARK.length,
                     StandardCharsets.UTF_8);
@@ -188,7 +166,10 @@ public final class SnapshotParser {
                     .decode(ByteBuffer.wrap(content));
             return decoded.toString();
         } catch (CharacterCodingException e) {
-            return new String(content, LEGACY_EXPORT);
+            if (chosen.equals(StandardCharsets.UTF_8)) {
+                throw new SnapshotHeaderInvalidException("import.snapshot.notEncoding", Map.of());
+            }
+            return new String(content, chosen);
         }
     }
 

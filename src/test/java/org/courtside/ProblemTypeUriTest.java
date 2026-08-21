@@ -51,6 +51,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:import-preview-superseded",
             "urn:courtside:error:import-removals-need-confirmation",
             "urn:courtside:error:import-snapshot-blocked",
+            "urn:courtside:error:snapshot-encoding-unsupported",
             "urn:courtside:error:import-snapshot-file-name-invalid",
             "urn:courtside:error:import-snapshot-unreadable",
             "urn:courtside:error:import-source-in-use",

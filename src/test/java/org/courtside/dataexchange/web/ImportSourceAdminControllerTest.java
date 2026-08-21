@@ -28,7 +28,7 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
     private static final String ACTIVE_TYPE = "cccccccc-0000-0000-0000-000000000001";
 
     private static final String COMPLETE = """
-            {"sourceKey":"roster-system","displayName":"Membership system",
+            {"sourceKey":"roster-system","displayName":"Membership system","separator":";",
              "columns":{"Member number":"EXTERNAL_ID","First name":"FIRST_NAME",
                         "Last name":"LAST_NAME","Email":"EMAIL"},
              "membershipTypes":{"A":"%s"},
@@ -55,6 +55,7 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().exists("Location"))
                 .andExpect(jsonPath("$.sourceKey").value("roster-system"))
+                .andExpect(jsonPath("$.separator").value(";"))
                 .andExpect(jsonPath("$.columns['Member number']").value("EXTERNAL_ID"))
                 .andExpect(jsonPath("$.membershipTypes.A").value(ACTIVE_TYPE))
                 .andExpect(jsonPath("$.ownedFields.length()").value(2))
@@ -65,7 +66,8 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
         String id = JsonPath.read(body, "$.id");
         mockMvc.perform(get("/api/admin/import/sources/{id}", id))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.displayName").value("Membership system"));
+                .andExpect(jsonPath("$.displayName").value("Membership system"))
+                .andExpect(jsonPath("$.separator").value(";"));
         mockMvc.perform(get("/api/admin/import/sources"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
@@ -83,7 +85,7 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(put("/api/admin/import/sources/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"sourceKey":"club-registry","displayName":"The other system",
+                                {"sourceKey":"club-registry","displayName":"The other system","separator":"\\t",
                                  "columns":{"No.":"EXTERNAL_ID","Given":"FIRST_NAME",
                                             "Family":"LAST_NAME","Mail":"EMAIL"},
                                  "membershipTypes":{},
@@ -94,6 +96,7 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sourceKey").value("club-registry"))
+                .andExpect(jsonPath("$.separator").value("\t"))
                 .andExpect(jsonPath("$.columns.Mail").value("EMAIL"))
                 .andExpect(jsonPath("$.membershipTypes.length()").value(0))
                 .andExpect(jsonPath("$.ownedFields[0]").value("EMAIL"))
@@ -106,7 +109,7 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // when / then
         mockMvc.perform(create("""
-                        {"sourceKey":"roster-system","displayName":"Membership system",
+                        {"sourceKey":"roster-system","displayName":"Membership system","separator":";",
                          "columns":{"First name":"FIRST_NAME","Last name":"LAST_NAME"},
                          "defaultMembershipTypeId":"cccccccc-0000-0000-0000-000000000001",
                          "removalWarningPercent":10}

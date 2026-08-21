@@ -62,7 +62,7 @@ public class ImportSourceService {
     }
 
     @Transactional
-    public SourceConfiguration create(String sourceKey, String displayName,
+    public SourceConfiguration create(String sourceKey, String displayName, String separator,
                                       Map<String, CanonicalField> columns,
                                       Map<String, UUID> membershipTypes,
                                       UUID defaultMembershipTypeId,
@@ -73,13 +73,13 @@ public class ImportSourceService {
                 removalWarningPercent);
         ImportSource source = new ImportSource(clock.instant());
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
-                storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
-                removalWarningPercent);
+                requiredSeparator(separator), storedColumns, storedTypes, defaultMembershipTypeId,
+                ownedFields, removalWarningPercent);
         return toConfiguration(saveOrRejectTakenKey(source));
     }
 
     @Transactional
-    public SourceConfiguration change(UUID sourceId, String sourceKey, String displayName,
+    public SourceConfiguration change(UUID sourceId, String sourceKey, String displayName, String separator,
                                       Map<String, CanonicalField> columns,
                                       Map<String, UUID> membershipTypes,
                                       UUID defaultMembershipTypeId,
@@ -90,8 +90,8 @@ public class ImportSourceService {
                 removalWarningPercent);
         ImportSource source = require(sourceId);
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
-                storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
-                removalWarningPercent);
+                requiredSeparator(separator), storedColumns, storedTypes, defaultMembershipTypeId,
+                ownedFields, removalWarningPercent);
         return toConfiguration(saveOrRejectTakenKey(source));
     }
 
@@ -286,9 +286,20 @@ public class ImportSourceService {
                 : printable.substring(0, MAX_REPORTED_LENGTH) + "…";
     }
 
+    // Only what cannot work is refused: a line break ends a record and a quote opens a cell, so
+    // neither can also divide one. Which of the rest a club's system writes is the club's to say.
+    private static String requiredSeparator(String separator) {
+        String given = separator == null ? "" : separator;
+        if (given.length() != 1 || "\n\r\"".indexOf(given.charAt(0)) >= 0) {
+            throw new ImportSourceInvalidException("import.source.separatorUnusable",
+                    Map.of("separator", given));
+        }
+        return given;
+    }
+
     private static SourceConfiguration toConfiguration(ImportSource source) {
         return new SourceConfiguration(source.getId(), source.getSourceKey(),
-                source.getDisplayName(), Map.copyOf(source.getColumns()),
+                source.getDisplayName(), source.getSeparator().charAt(0), Map.copyOf(source.getColumns()),
                 Map.copyOf(source.getMembershipTypes()), source.getDefaultMembershipTypeId(),
                 new HashSet<>(source.getOwnedFields()), source.getRemovalWarningPercent());
     }

@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public record SourceConfiguration(UUID sourceId, String sourceKey, String displayName,
+                                  char separator,
                                   Map<String, CanonicalField> columns,
                                   Map<String, UUID> membershipTypes,
                                   UUID defaultMembershipTypeId,

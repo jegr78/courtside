@@ -41,7 +41,9 @@ test("a board describes its membership system, reads what a member list would do
     await page.getByTestId("new-source").click();
     await chooseFile(page, "source-file");
 
-    // then the columns of that file are what it is offered
+    // then the columns of that file are what it is offered, read with the separator the form
+    // suggested from the file itself and the board is free to correct
+    await expect(page.getByTestId("source-separator")).toHaveValue(";");
     await expect(page.getByTestId("column-EXTERNAL_ID")).toContainText("Number");
 
     // when
@@ -113,6 +115,7 @@ test("a member number the file does not yet carry is linked by hand rather than 
     await page.getByTestId("column-EXTERNAL_ID").selectOption("Number");
     await page.getByTestId("column-FIRST_NAME").selectOption("Given");
     await page.getByTestId("column-LAST_NAME").selectOption("Family");
+    await expect(page.getByTestId("source-separator")).toHaveValue(";");
     await page.getByTestId("source-default-type").selectOption({ index: 1 });
     await page.getByTestId("save-source").click();
     await expect(page.getByTestId("no-references")).toBeVisible();

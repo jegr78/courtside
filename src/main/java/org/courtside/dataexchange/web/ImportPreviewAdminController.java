@@ -35,9 +35,11 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
 
     @Override
     public ResponseEntity<ApiImportPreview> createImportPreview(UUID sourceId, MultipartFile file,
-                                                                ApiSnapshotMode mode) {
+                                                                ApiSnapshotMode mode,
+                                                                String encoding) {
         PreviewSummary summary = previews.create(sourceId, SnapshotMode.valueOf(mode.getValue()),
-                file.getOriginalFilename(), bytesOf(file), currentUser.requireAccount().getId());
+                encoding, file.getOriginalFilename(), bytesOf(file),
+                currentUser.requireAccount().getId());
         return ResponseEntity
                 .created(java.net.URI.create("/api/admin/import/previews/" + summary.previewId()))
                 .body(toResponse(summary));

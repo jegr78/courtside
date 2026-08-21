@@ -931,15 +931,49 @@ Import and export:
   overwrites it — and above what share of the roster disappearing an execution needs confirming.
   Every part of it is correctable, and a change decides what the *next* snapshot means rather than
   touching the people an earlier one created.
-- **The file is read as the club's own system wrote it.** The separator is taken from the header
-  rather than assumed, and a file that is not UTF-8 is decoded as Windows-1252 rather than refused,
-  because the exports clubs actually hold are semicolon-separated and often neither. Nothing about
-  the dialect is configured on the source: it is a property of the file, not a decision a volunteer
-  can be expected to make about their own export.
+- **The file is read as the club's own system wrote it, and the club says how.** The separator is
+  part of the source: the browser suggests one from the chosen file, and what the club confirms is
+  what the server reads by. Detection alone was tried and is not enough — counting columns in a
+  header row settles nothing for a file with one column, and an export need not carry a header at
+  all. A file read with the wrong character produces one enormous column and no way to tell why,
+  so the answer belongs to the club rather than to a heuristic. Only what cannot work is refused:
+  a line break ends a record and a quotation mark opens a cell, so neither can also divide one.
+
+  The encoding is settled wherever the bytes settle it: a byte order mark and valid UTF-8 are facts
+  about the content and are used without asking anybody.
+
+  Beyond that it is asked, and the reason is that it cannot be answered. The 8-bit character sets
+  share their byte ranges and differ in a handful of code points, so no library detects them — it
+  guesses, and a guess that lands wrong imports mangled names with nothing said. The upload
+  therefore carries the *name* of a character set, defaulting to UTF-8, and a file that is neither
+  marked nor valid UTF-8 is refused while it says UTF-8 rather than being read as something nobody
+  chose.
+
+  **A name and not an enumeration**, because which character sets exist is a property of the
+  platform an instance runs on and not a decision this product may freeze into a release. The
+  instance reports what it can read — `Charset.availableCharsets()`, 173 of them on a current JVM —
+  and the browser offers that list. A club whose export tool writes a Central European or Cyrillic
+  one imports its members on the image it already runs; nobody waits for us. `StandardCharsets`
+  would not do: it is itself a fixed set of nine that does not contain Windows-1252.
+- **The roster filters by membership type across a module boundary.** `identity` owns the people
+  and `member` owns the memberships, and the dependency runs from `member` to `identity` — so the
+  filtered listing loads the type's current holders and passes their ids into the person query
+  rather than joining, because a join in that direction is the cycle the module rules forbid. The
+  cost is a parameter list that grows with the club, which PostgreSQL bounds at 65535 bindings per
+  statement; a membership type with more holders than that would fail, and no single club has one.
+  The alternative — a second paged query in `member` — would duplicate the cursor ordering, and two
+  places that must agree on an ordering exactly is the heavier risk of the two.
+
 - **An email address is optional, for a person and for a snapshot.** A real member list carries
   people a club has no address for, and a required column would have turned each of them into a
   rejected row. A person without one simply holds none; what that costs them is that nothing can be
   sent to them, which is a fact about the club's data and not a state Courtside invents.
+- **An export without a header row is not supported.** *Accepted, not closed.* A column mapping
+  names headers, so a file that carries none cannot be described at all: the club exports one with
+  headers or the import is not for them. Mapping by position instead would be the repair, and it is
+  a different feature rather than a correction — the position of a column is exactly the kind of
+  thing that changes silently between two versions of an export tool, which is what naming avoids.
+
 - **A record is matched by the source and the member number it carries**, never by a name and never
   by an email address: two members really are called John Roe, and a club enrols children under a
   parent's address. A member number a source does not yet know becomes a new person, and where a
@@ -952,9 +986,17 @@ Import and export:
   columns, and the distinct values of the category column once that column is named, because the
   categories a club exports live in its rows and not in its header. Nothing is sent. An endpoint
   that accepted a file of personal data in order to learn a handful of words would be the worst of
-  the options, and reading locally costs a club nothing. The separator and the encoding are detected
-  from the file rather than configured: a board can read its own member list but cannot be expected
-  to know what encoding its software wrote it in, and a wrong answer there is worse than no question.
+  the options, and reading locally costs a club nothing.
+
+  Reading it there is also what keeps the encoding question honest. A board cannot be expected to
+  know what its software wrote, and a blind wrong answer would be worse than no question — so the
+  question is only put when the file is not UTF-8, which the browser can tell before anything is
+  sent, and it is never blind: the columns on offer are re-read as the answer changes, so a wrong
+  one shows itself immediately as headers nobody recognises. The separator works the same way — the
+  browser suggests, the columns follow every correction, and the club sees the consequence of its
+  answer before it saves one. A browser decodes fewer character sets
+  than a server does, so where it cannot read one it says so and offers no columns — the import
+  itself still runs, because the instance knows the set even where the browser does not.
 - **A preview writes nothing and is never edited.** It resolves the whole file and answers with the
   change set a later execution would apply, so what a board approves is what runs. A header problem
   fails the file, because nothing in it can then be trusted; a cell problem fails one row and is

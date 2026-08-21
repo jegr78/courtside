@@ -64,6 +64,8 @@ public class RosterService {
     public CursorPage.Result<RosterEntry> list(String query, UUID membershipTypeId, UUID cursor, int limit) {
         validateLimit(limit);
         requireKnownCursor(cursor);
+        // The ids travel rather than a join because identity may not query member: the dependency
+        // runs the other way, and inverting it here would be the cycle ModularityTests rejects.
         List<UUID> holders = membershipTypeId == null
                 ? List.of()
                 : members.findCurrentHolderIds(membershipTypeId);

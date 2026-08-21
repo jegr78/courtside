@@ -64,7 +64,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        source = sources.create("roster-system", "Membership system",
+        source = sources.create("roster-system", "Membership system", ",",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
@@ -212,14 +212,14 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     @Test
     void givenAMembershipTypeDeactivatedAfterThePreview_whenExecuting_thenNothingIsWrittenAtAll() {
         // given
-        UUID typed = sources.create("club-registry", "The other system",
+        UUID typed = sources.create("club-registry", "The other system", ",",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL,
                         "Category", CanonicalField.MEMBERSHIP_TYPE),
                 Map.of("A", ACTIVE_TYPE), ACTIVE_TYPE, Set.of(CanonicalField.MEMBERSHIP_TYPE), 10).sourceId();
-        UUID previewId = previews.create(typed, SnapshotMode.FULL_SNAPSHOT, "roster.csv", """
+        UUID previewId = previews.create(typed, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv", """
                 Member number,First name,Last name,Email,Category
                 4711,Jane,Doe,jane.doe@example.org,A
                 4712,John,Roe,john.roe@example.org,A
@@ -253,7 +253,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     @Test
     void givenARowWhoseOwnedNameCellIsEmpty_whenPreviewing_thenItFailsThatRowRatherThanTheRun() {
         // when
-        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
+        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
                 """
                 Member number,First name,Last name,Email
                 4711,,Doe,jane.doe@example.org
@@ -271,7 +271,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     @Test
     void givenARowWhoseAddressIsNotOne_whenPreviewing_thenItFailsThatRow() {
         // when
-        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
+        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
                 """
                 Member number,First name,Last name,Email
                 4711,Jane,Doe,not-an-address
@@ -312,7 +312,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     }
 
     private UUID preview(String content, SnapshotMode mode) {
-        return previews.create(source, mode, "roster.csv",
+        return previews.create(source, mode, "UTF-8", "roster.csv",
                 content.getBytes(StandardCharsets.UTF_8), actor).previewId();
     }
 

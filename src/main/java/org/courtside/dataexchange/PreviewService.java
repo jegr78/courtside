@@ -51,11 +51,12 @@ public class PreviewService {
     private final Clock clock;
 
     @Transactional
-    public PreviewSummary create(UUID sourceId, SnapshotMode mode, String fileName, byte[] content,
-                                 UUID accountId) {
+    public PreviewSummary create(UUID sourceId, SnapshotMode mode, String encoding,
+                                 String fileName, byte[] content, UUID accountId) {
         SourceConfiguration configuration = sources.configurationForUpdate(sourceId);
         SnapshotMode requested = requiredMode(mode);
-        CsvSnapshot snapshot = SnapshotParser.parse(requiredContent(content), configuration.columns());
+        CsvSnapshot snapshot = SnapshotParser.parse(requiredContent(content), configuration.columns(),
+                SupportedEncodings.resolve(encoding), configuration.separator());
         CurrentRoster roster = currentRosterFor(sourceId, snapshot);
         ResolvedChangeSet resolved = ChangeSetResolver.resolve(snapshot, configuration, requested, roster);
         Instant now = clock.instant();

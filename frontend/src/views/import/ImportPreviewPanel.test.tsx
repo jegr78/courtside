@@ -41,6 +41,7 @@ describe("ImportPreviewPanel", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
+    vi.spyOn(api, "supportedEncodings").mockResolvedValue(["ISO-8859-15", "UTF-8", "windows-1252"]);
   });
 
   it("when nothing is uploaded yet, then a partial list is what an upload would mean", () => {
@@ -64,8 +65,37 @@ describe("ImportPreviewPanel", () => {
     await userEvent.click(screen.getByTestId("upload-snapshot"));
 
     // then
-    expect(uploading).toHaveBeenCalledWith("source-1", expect.any(File), "FULL_SNAPSHOT");
+    expect(uploading).toHaveBeenCalledWith("source-1", expect.any(File), "FULL_SNAPSHOT", "UTF-8");
     expect(previewed).toHaveBeenCalledWith(preview);
+  });
+
+  it("given a file that is not UTF-8, when it is chosen, then the encoding is asked for before it is sent", async () => {
+    // given
+    const uploading = vi.spyOn(api, "createImportPreview").mockResolvedValue(preview);
+    show(undefined);
+
+    // when — the file is in the browser, so it can be answered here rather than by the server
+    await userEvent.upload(screen.getByTestId("snapshot-file"),
+      new File([Uint8Array.from([78, 114, 59, 83, 116, 114, 97, 223, 101, 10])],
+        "members.csv", { type: "text/csv" }));
+
+    // then
+    expect(await screen.findByTestId("snapshot-not-utf8")).toBeInTheDocument();
+    expect(await screen.findByTestId("snapshot-encoding")).toHaveValue("UTF-8");
+    await userEvent.clear(screen.getByTestId("snapshot-encoding"));
+    await userEvent.type(screen.getByTestId("snapshot-encoding"), "windows-1252");
+    await userEvent.click(screen.getByTestId("upload-snapshot"));
+    expect(uploading).toHaveBeenCalledWith("source-1", expect.any(File), "UPDATE_ONLY", "windows-1252");
+  });
+
+  it("given a UTF-8 file, when it is chosen, then no encoding question is put to anybody", async () => {
+    // given / when
+    show(undefined);
+    await userEvent.upload(screen.getByTestId("snapshot-file"),
+      new File(["Nr;Straße\n1;Marketplace 9\n"], "members.csv", { type: "text/csv" }));
+
+    // then — a setting nobody needs is a setting nobody should be shown
+    expect(screen.queryByTestId("snapshot-encoding")).not.toBeInTheDocument();
   });
 
   it("given a preview, when it is read, then each section carries its count in the heading", () => {

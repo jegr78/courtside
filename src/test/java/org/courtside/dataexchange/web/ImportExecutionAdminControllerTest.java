@@ -71,7 +71,7 @@ class ImportExecutionAdminControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-        source = sources.create("roster-system", "Membership system",
+        source = sources.create("roster-system", "Membership system", ",",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
@@ -194,7 +194,7 @@ class ImportExecutionAdminControllerTest extends AbstractIntegrationTest {
     }
 
     private UUID preview(String content) {
-        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
+        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
                 content.getBytes(StandardCharsets.UTF_8), actor).previewId();
     }
 }

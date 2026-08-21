@@ -232,7 +232,7 @@ it("given a snapshot file, when creating a preview, then both parts go out under
   const file = new File(["externalId,firstName\n4711,Jane\n"], "roster.csv", { type: "text/csv" });
 
   // when
-  const preview = await api.createImportPreview("s1", file, "UPDATE_ONLY");
+  const preview = await api.createImportPreview("s1", file, "UPDATE_ONLY", "WINDOWS_1252");
 
   // then
   expect(preview.previewId).toBe("p1");
@@ -240,6 +240,8 @@ it("given a snapshot file, when creating a preview, then both parts go out under
   expect(body).toContain('name="file"');
   expect(body).toContain('name="mode"');
   expect(body).toContain("UPDATE_ONLY");
+  expect(body).toContain('name="encoding"');
+  expect(body).toContain("WINDOWS_1252");
 });
 
 it("given a membership type filter, when listing the roster, then it reaches the query string", async () => {
