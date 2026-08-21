@@ -11,7 +11,7 @@ const administrator: SessionStatus = { authenticated: true, roles: ["ADMIN"], pa
 
 const adminDestinations = [
   "admin-configuration-link", "admin-facility-link", "admin-roster-link",
-  "admin-membership-types-link", "admin-audit-link"
+  "admin-membership-types-link", "admin-import-link", "admin-audit-link"
 ];
 
 function show(session: SessionStatus, at = "/", signedOut = () => undefined) {

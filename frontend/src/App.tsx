@@ -17,6 +17,7 @@ import { AdminAuditView } from "./views/AdminAuditView";
 import { AdminConfigurationView } from "./views/AdminConfigurationView";
 import { AdminFacilityView } from "./views/AdminFacilityView";
 import { AdminMembershipTypesView } from "./views/AdminMembershipTypesView";
+import { AdminImportView } from "./views/AdminImportView";
 import { AdminPersonView } from "./views/AdminPersonView";
 import { AdminRosterView } from "./views/AdminRosterView";
 
@@ -61,6 +62,9 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <Navigate to="/" replace />} />
     <Route path="/admin/membership-types" element={session.roles.includes("ADMIN")
       ? <AdminMembershipTypesView />
+      : <Navigate to="/" replace />} />
+    <Route path="/admin/import" element={session.roles.includes("ADMIN")
+      ? <AdminImportView />
       : <Navigate to="/" replace />} />
     <Route path="/admin/audit" element={session.roles.includes("ADMIN")
       ? <AdminAuditView />
