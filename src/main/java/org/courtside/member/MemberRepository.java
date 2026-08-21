@@ -18,6 +18,9 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     @Query("SELECT m FROM Member m WHERE m.personId = :personId AND m.endedOn IS NULL")
     Optional<Member> findCurrentByPersonId(@Param("personId") UUID personId);
 
+    @Query("SELECT m.personId FROM Member m WHERE m.membershipTypeId = :membershipTypeId AND m.endedOn IS NULL")
+    List<UUID> findCurrentHolderIds(@Param("membershipTypeId") UUID membershipTypeId);
+
     @Query("""
             SELECT new org.courtside.member.MemberParticipant(p.id, concat(p.firstName, ' ', p.lastName))
             FROM Member m, org.courtside.identity.Person p

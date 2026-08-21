@@ -66,8 +66,15 @@ public final class ChangeSetResolver {
         CurrentRoster.RosterPerson current = roster.peopleById().get(personId);
         Map<CanonicalField, String> changed = new EnumMap<>(CanonicalField.class);
         row.values().forEach((field, value) -> {
-            if (field != CanonicalField.MEMBERSHIP_TYPE && configuration.ownedFields().contains(field)
-                    && !value.equals(heldValueOf(current, field))) {
+            if (field == CanonicalField.MEMBERSHIP_TYPE || !configuration.ownedFields().contains(field)) {
+                return;
+            }
+            // An empty cell in an export means "not kept here", not "delete it": clearing an
+            // address this way would leave an account nobody can send a reset to.
+            if (field == CanonicalField.EMAIL && value.isEmpty()) {
+                return;
+            }
+            if (!value.equals(heldValueOf(current, field))) {
                 changed.put(field, value);
             }
         });
@@ -210,7 +217,7 @@ public final class ChangeSetResolver {
             }
             String value = row.values().get(field);
             boolean usable = field == CanonicalField.EMAIL
-                    ? PersonFieldLimits.isUsableEmail(value)
+                    ? PersonFieldLimits.isUsableOrAbsentEmail(value)
                     : PersonFieldLimits.isUsableName(value);
             if (!usable) {
                 return new ResolvedChangeSet.RowError(row.rowNumber(),

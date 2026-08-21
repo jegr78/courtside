@@ -64,7 +64,7 @@ class PreviewExpiryTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        source = sources.create("roster-system", "Membership system",
+        source = sources.create("roster-system", "Membership system", ",", "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
@@ -125,7 +125,7 @@ class PreviewExpiryTest extends AbstractIntegrationTest {
         expiry.sweep(clock.instant().plus(Duration.ofDays(9)));
 
         // when
-        previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
+        previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
                 ONE_MEMBER.getBytes(StandardCharsets.UTF_8), actor);
 
         // then
@@ -157,7 +157,7 @@ class PreviewExpiryTest extends AbstractIntegrationTest {
     }
 
     private UUID preview() {
-        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
+        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
                 ONE_MEMBER.getBytes(StandardCharsets.UTF_8), actor).previewId();
     }
 }

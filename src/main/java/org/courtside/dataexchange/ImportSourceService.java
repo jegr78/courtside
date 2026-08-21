@@ -5,6 +5,7 @@ import org.courtside.dataexchange.internal.ExternalReferenceRepository;
 import org.courtside.dataexchange.internal.ImportSource;
 import org.courtside.dataexchange.internal.ImportRunRepository;
 import org.courtside.dataexchange.internal.ImportSourceRepository;
+import org.courtside.dataexchange.internal.ReportedValue;
 import org.courtside.member.MemberService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -26,13 +27,12 @@ public class ImportSourceService {
 
     private static final Set<CanonicalField> REQUIRED_COLUMNS =
             EnumSet.of(CanonicalField.EXTERNAL_ID, CanonicalField.FIRST_NAME,
-                    CanonicalField.LAST_NAME, CanonicalField.EMAIL);
+                    CanonicalField.LAST_NAME);
     private static final String UNIQUE_KEY_CONSTRAINT = "import_source_unique_key";
     private static final int MAX_KEY_LENGTH = 40;
     private static final int MAX_DISPLAY_NAME_LENGTH = 80;
     private static final int MAX_ENTRY_LENGTH = 120;
     private static final int MAX_MEMBERSHIP_TYPE_MAPPINGS = 200;
-    private static final int MAX_REPORTED_LENGTH = 60;
 
     private final ImportSourceRepository sources;
     private final ExternalReferenceRepository references;
@@ -62,8 +62,8 @@ public class ImportSourceService {
     }
 
     @Transactional
-    public SourceConfiguration create(String sourceKey, String displayName,
-                                      Map<String, CanonicalField> columns,
+    public SourceConfiguration create(String sourceKey, String displayName, String separator,
+                                      String encoding, Map<String, CanonicalField> columns,
                                       Map<String, UUID> membershipTypes,
                                       UUID defaultMembershipTypeId,
                                       Set<CanonicalField> ownedFields, int removalWarningPercent) {
@@ -73,13 +73,14 @@ public class ImportSourceService {
                 removalWarningPercent);
         ImportSource source = new ImportSource(clock.instant());
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
-                storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
-                removalWarningPercent);
+                requiredSeparator(separator), requiredEncoding(encoding), storedColumns, storedTypes,
+                defaultMembershipTypeId, ownedFields, removalWarningPercent);
         return toConfiguration(saveOrRejectTakenKey(source));
     }
 
     @Transactional
     public SourceConfiguration change(UUID sourceId, String sourceKey, String displayName,
+                                      String separator, String encoding,
                                       Map<String, CanonicalField> columns,
                                       Map<String, UUID> membershipTypes,
                                       UUID defaultMembershipTypeId,
@@ -90,8 +91,8 @@ public class ImportSourceService {
                 removalWarningPercent);
         ImportSource source = require(sourceId);
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
-                storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
-                removalWarningPercent);
+                requiredSeparator(separator), requiredEncoding(encoding), storedColumns, storedTypes,
+                defaultMembershipTypeId, ownedFields, removalWarningPercent);
         return toConfiguration(saveOrRejectTakenKey(source));
     }
 
@@ -163,7 +164,7 @@ public class ImportSourceService {
         requested.forEach((value, typeId) -> {
             if (typeId == null || !memberships.knowsMembershipType(typeId)) {
                 throw new ImportSourceInvalidException("import.source.membershipType.unknown",
-                        Map.of("field", "membershipTypes", "sourceValue", reportable(value)));
+                        Map.of("field", "membershipTypes", "sourceValue", ReportedValue.printable(value)));
             }
         });
     }
@@ -268,27 +269,34 @@ public class ImportSourceService {
         if (stripped.isEmpty() || stripped.length() > MAX_ENTRY_LENGTH
                 || stripped.codePoints().anyMatch(Character::isISOControl)) {
             throw new ImportSourceInvalidException(code,
-                    Map.of("field", field, "value", reportable(stripped),
+                    Map.of("field", field, "value", ReportedValue.printable(stripped),
                             "maxLength", MAX_ENTRY_LENGTH));
         }
         return stripped;
     }
 
-    // What is echoed back names which entry was refused; it is not the place to carry the whole
-    // submission back to the client, nor a control character into a log line.
-    private static String reportable(String value) {
-        String printable = value.codePoints()
-                .filter(codePoint -> !Character.isISOControl(codePoint))
-                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
-                .toString();
-        return printable.length() <= MAX_REPORTED_LENGTH
-                ? printable
-                : printable.substring(0, MAX_REPORTED_LENGTH) + "…";
+    // Only what cannot work is refused: a line break ends a record and a quote opens a cell, so
+    // neither can also divide one. Which of the rest a club's system writes is the club's to say.
+    private static String requiredSeparator(String separator) {
+        String given = separator == null ? "" : separator;
+        if (given.length() != 1 || "\n\r\"".indexOf(given.charAt(0)) >= 0
+                || Character.isSurrogate(given.charAt(0))) {
+            throw new ImportSourceInvalidException("import.source.separatorUnusable",
+                    Map.of("separator", ReportedValue.printable(given)));
+        }
+        return given;
+    }
+
+    // Resolving proves the platform has it; the canonical name is stored so a club's alias and
+    // the name the instance reports are never two different-looking answers to one question.
+    private static String requiredEncoding(String encoding) {
+        return SupportedEncodings.resolve(encoding).name();
     }
 
     private static SourceConfiguration toConfiguration(ImportSource source) {
         return new SourceConfiguration(source.getId(), source.getSourceKey(),
-                source.getDisplayName(), Map.copyOf(source.getColumns()),
+                source.getDisplayName(), source.getSeparator().charAt(0), source.getEncoding(),
+                Map.copyOf(source.getColumns()),
                 Map.copyOf(source.getMembershipTypes()), source.getDefaultMembershipTypeId(),
                 new HashSet<>(source.getOwnedFields()), source.getRemovalWarningPercent());
     }

@@ -38,6 +38,12 @@ public class ImportSource {
     @Column(name = "display_name", nullable = false)
     private String displayName;
 
+    @Column(name = "separator", nullable = false)
+    private String separator;
+
+    @Column(name = "encoding", nullable = false)
+    private String encoding;
+
     @Column(name = "default_membership_type_id", nullable = false)
     private UUID defaultMembershipTypeId;
 
@@ -71,11 +77,14 @@ public class ImportSource {
         this.createdAt = createdAt;
     }
 
-    public void changeTo(String sourceKey, String displayName, Map<String, CanonicalField> columns,
+    public void changeTo(String sourceKey, String displayName, String separator, String encoding,
+                         Map<String, CanonicalField> columns,
                          Map<String, UUID> membershipTypes, UUID defaultMembershipTypeId,
                          Set<CanonicalField> ownedFields, int removalWarningPercent) {
         this.sourceKey = sourceKey;
         this.displayName = displayName;
+        this.separator = separator;
+        this.encoding = encoding;
         this.defaultMembershipTypeId = defaultMembershipTypeId;
         this.removalWarningPercent = removalWarningPercent;
         this.columns.clear();

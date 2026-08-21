@@ -67,7 +67,7 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        source = sources.create("roster-system", "Membership system",
+        source = sources.create("roster-system", "Membership system", ",", "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
@@ -109,7 +109,7 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
     }
 
     private UUID takePreview() {
-        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "roster.csv",
+        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
                 TWO_ROWS.getBytes(StandardCharsets.UTF_8), account).previewId();
     }
 

@@ -5,6 +5,7 @@ import {
   api,
   type ClubConfig,
   type ClubConfigRequest,
+  type MembershipType,
   type RuleDefinition,
   type RuleSet,
   type RuleType,
@@ -14,6 +15,9 @@ import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { formString } from "../forms/formString";
+
+const RULE_SET_NAME_LENGTH = 60;
 
 function timeZones(current: string): string[] {
   const known = Intl.supportedValuesOf("timeZone");
@@ -29,18 +33,23 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   const selectedRuleSetIdRef = useRef("");
   const [loadedRuleSetId, setLoadedRuleSetId] = useState<string>();
   const [rules, setRules] = useState<RuleDefinition[]>([]);
+  const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
+  const [ruleSetName, setRuleSetName] = useState("");
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
 
   useEffect(() => {
     let active = true;
-    void Promise.all([api.adminConfig(), api.ruleSets(), api.ruleTypes()])
-      .then(([loadedConfig, loadedRuleSets, loadedRuleTypes]) => {
+    void Promise.all([api.adminConfig(), api.ruleSets(), api.ruleTypes(), api.membershipTypes()])
+      .then(([loadedConfig, loadedRuleSets, loadedRuleTypes, loadedMembershipTypes]) => {
         if (!active) return;
         setConfig((current) => current ?? loadedConfig);
         setRuleSets(loadedRuleSets);
         setRuleTypes(loadedRuleTypes);
+        setMembershipTypes(loadedMembershipTypes);
         selectRuleSet(loadedRuleSets[0]?.id ?? "");
+        setRuleSetName(loadedRuleSets[0]?.name ?? "");
       })
       .catch((failure) => {
         if (active) setError(problemMessage(failure, t));
@@ -72,9 +81,61 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     };
   }, [selectedRuleSetId, t]);
 
+  async function addRuleSet(formElement: HTMLFormElement) {
+    const name = formString(new FormData(formElement), "name");
+    await mutateRuleSet(() => api.createRuleSet({ name }));
+    formElement.reset();
+  }
+
+  const selectedRuleSet = ruleSets.find((ruleSet) => ruleSet.id === selectedRuleSetId);
+  // Retiring a rule set does not stop it binding: the rule query joins on rule_set_id without
+  // reading active, so what it prevents is a new membership type pointing at it.
+  const boundTypes = membershipTypes.filter((type) => type.ruleSetId === selectedRuleSetId);
+
   function selectRuleSet(ruleSetId: string) {
     selectedRuleSetIdRef.current = ruleSetId;
     setSelectedRuleSetId(ruleSetId);
+  }
+
+  function chooseRuleSet(ruleSetId: string) {
+    selectRuleSet(ruleSetId);
+    setRuleSetName(ruleSets.find((ruleSet) => ruleSet.id === ruleSetId)?.name ?? "");
+  }
+
+  async function mutateRuleSet(change: () => Promise<RuleSet>) {
+    if (pending) return;
+    setPending(true);
+    try {
+      const written = await change();
+      setRuleSets((current) => current.some((ruleSet) => ruleSet.id === written.id)
+        ? current.map((ruleSet) => ruleSet.id === written.id ? written : ruleSet)
+        : [...current, written]);
+      selectRuleSet(written.id);
+      setRuleSetName(written.name);
+      setError(undefined);
+      setSuccess(t("admin.rules.ruleSetSaved"));
+    } catch (failure) {
+      setSuccess(undefined);
+      setError(problemMessage(failure, t));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function removeRule(ruleType: RuleType) {
+    if (pending || !selectedRuleSetId) return;
+    setPending(true);
+    try {
+      await api.removeRule(selectedRuleSetId, ruleType);
+      setRules((current) => current.filter((rule) => rule.ruleType !== ruleType));
+      setError(undefined);
+      setSuccess(t("admin.rules.saved"));
+    } catch (failure) {
+      setSuccess(undefined);
+      setError(problemMessage(failure, t));
+    } finally {
+      setPending(false);
+    }
   }
 
   function changeConfig(changed: Partial<ClubConfigRequest>) {
@@ -155,19 +216,35 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
           <label className="grid gap-2 font-medium">
             {t("admin.rules.ruleSet")}
-            <select data-testid="rule-set" className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => selectRuleSet(event.target.value)}>
+            <select data-testid="rule-set" className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => chooseRuleSet(event.target.value)}>
               {ruleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
             </select>
           </label>
+          {selectedRuleSet && <div className="surface-subtle grid gap-3 rounded-xl border p-4">
+            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+              <TextField data-testid="rule-set-name" disabled={pending} maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.ruleSetName")} value={ruleSetName} onChange={(event) => setRuleSetName(event.target.value)} />
+              <Button data-testid="save-rule-set" disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.changeRuleSet(selectedRuleSet.id, { name: ruleSetName }))}>{t("admin.save")}</Button>
+              <Button data-testid="toggle-rule-set" disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.setRuleSetActive(selectedRuleSet.id, !selectedRuleSet.active))}>{t(selectedRuleSet.active ? "admin.deactivate" : "admin.activate")}</Button>
+            </div>
+            <p data-testid="rule-set-retire-note" className="text-muted text-sm">
+              {boundTypes.length === 0
+                ? t("admin.rules.retireUnused")
+                : t("admin.rules.retireInUse", { types: boundTypes.map((type) => type.name).join(", ") })}
+            </p>
+          </div>}
+          <form noValidate onSubmit={(event) => { event.preventDefault(); void addRuleSet(event.currentTarget); }} className="surface-subtle grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_auto] md:items-end">
+            <TextField data-testid="new-rule-set-name" disabled={pending} name="name" maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.newRuleSet")} />
+            <Button data-testid="create-rule-set" disabled={pending} type="submit">{t("admin.create")}</Button>
+          </form>
           <div className="grid gap-4">
-            {ruleTypes.map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} />)}
+            {ruleTypes.map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} remove={removeRule} />)}
           </div>
         </div>
       </>}
   </section>;
 }
 
-function RuleEditor({ type, definition, disabled, save }: { type: RuleTypeConfiguration; definition?: RuleDefinition; disabled: boolean; save: (ruleType: RuleType, params: Record<string, number>) => Promise<void> }) {
+function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTypeConfiguration; definition?: RuleDefinition; disabled: boolean; save: (ruleType: RuleType, params: Record<string, number>) => Promise<void>; remove: (ruleType: RuleType) => Promise<void> }) {
   const { t } = useTranslation();
   const [params, setParams] = useState<Record<string, number>>({});
   useEffect(() => setParams(definition?.params ?? {}), [definition]);
@@ -178,7 +255,10 @@ function RuleEditor({ type, definition, disabled, save }: { type: RuleTypeConfig
         <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setParams({ ...params, [parameter.name]: Number(event.target.value) })} />
         <p data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted text-sm">{t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}</p>
       </div>)}
-      <Button data-testid={`save-rule-${type.ruleType}`} className="justify-self-start" disabled={disabled} type="button" onClick={() => void save(type.ruleType, params)}>{t("admin.save")}</Button>
+      <div className="flex flex-wrap gap-3">
+        <Button data-testid={`save-rule-${type.ruleType}`} disabled={disabled} type="button" onClick={() => void save(type.ruleType, params)}>{t("admin.save")}</Button>
+        {definition && <Button data-testid={`remove-rule-${type.ruleType}`} disabled={disabled} type="button" onClick={() => void remove(type.ruleType)}>{t("admin.rules.remove")}</Button>}
+      </div>
     </>}
   </article>;
 }

@@ -548,12 +548,36 @@ components:
 
     ImportSource:
       type: object
-      required: [id, sourceKey, displayName, columns, membershipTypes, defaultMembershipTypeId,
-                 ownedFields, removalWarningPercent]
+      required: [id, sourceKey, displayName, separator, encoding, columns, membershipTypes,
+                 defaultMembershipTypeId, ownedFields, removalWarningPercent]
       properties:
         id: { type: string, format: uuid }
         sourceKey: { type: string }
         displayName: { type: string }
+        separator:
+          type: string
+          minLength: 1
+          maxLength: 1
+          description: |
+            The character between two cells of this source's export, given rather than detected.
+            Counting columns in a header row guesses well until it does not: an export need not
+            carry a header at all, a single-column file settles nothing, and a club whose file was
+            read with the wrong character sees one enormous column and no way to tell why. Which
+            character its own system writes is something a club can look at and answer, so it does.
+
+        encoding:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: |
+            The character set this source's export is written in, by the name
+            `GET /api/admin/import/encodings` reports. It sits beside the separator because both
+            are properties of the same export tool and a club should answer them once, not on
+            every upload. A single file may still deviate: the upload carries its own `encoding`
+            and overrides this one for that file alone.
+
+            A byte order mark and valid UTF-8 remain facts about the content and outrank both.
+
         columns:
           type: object
           additionalProperties: { $ref: "#/components/schemas/CanonicalField" }
@@ -572,7 +596,12 @@ components:
       description: |
         Every part of a source is given here and every part may be given again — this request is
         what a correction uses as much as a first description.
-      required: [sourceKey, displayName, columns, defaultMembershipTypeId, removalWarningPercent]
+
+        `membershipTypes` and `ownedFields` may be omitted, and the source then holds neither: no
+        exported category maps to a type, and the source owns no field. `ImportSource` reports both
+        as empty rather than absent, which is why it requires what this does not.
+      required: [sourceKey, displayName, separator, encoding, columns, defaultMembershipTypeId,
+                 removalWarningPercent]
       properties:
         sourceKey:
           type: string
@@ -592,17 +621,42 @@ components:
             Surrounding whitespace is removed before the name is stored, so a name pasted with
             padding is accepted; `maxLength` is measured on what was sent, and the stored name is
             never longer than it.
+        separator:
+          type: string
+          minLength: 1
+          maxLength: 1
+          description: |
+            The character between two cells of this source's export, given rather than detected.
+            Counting columns in a header row guesses well until it does not: an export need not
+            carry a header at all, a single-column file settles nothing, and a club whose file was
+            read with the wrong character sees one enormous column and no way to tell why. Which
+            character its own system writes is something a club can look at and answer, so it does.
+
+        encoding:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: |
+            The character set this source's export is written in, by the name
+            `GET /api/admin/import/encodings` reports. It sits beside the separator because both
+            are properties of the same export tool and a club should answer them once, not on
+            every upload. A single file may still deviate: the upload carries its own `encoding`
+            and overrides this one for that file alone.
+
+            A byte order mark and valid UTF-8 remain facts about the content and outrank both.
+
         columns:
           type: object
           description: |
             The header in the club's export, mapped to the field it holds. `EXTERNAL_ID`,
-            `FIRST_NAME`, `LAST_NAME` and `EMAIL` are required — a snapshot creates people, and this
-            product has no person without an address, so a source that cannot supply one could never
-            create anybody. `MEMBERSHIP_TYPE` is optional, because a club may not export a category
-            at all. Two headers may not name the same field.
+            `FIRST_NAME` and `LAST_NAME` are required — a snapshot creates people, and a record
+            with no name, or without the number that identifies it, describes nobody this product
+            could create. `EMAIL` and `MEMBERSHIP_TYPE` are optional, because a club's own member
+            list carries people it holds no address for, and may not export a category at all. Two
+            headers may not name the same field.
 
-            Requiring the column is not the same as requiring every cell: a row whose address is
-            empty fails on its own and the rest of the file resolves.
+            Requiring the column is not the same as requiring every cell: a row whose name is empty
+            fails on its own and the rest of the file resolves.
 
             A header is stored without its surrounding whitespace, because that is how it arrives
             from the file: a mapping kept with padding would name a column that never matches. Two
@@ -651,12 +705,19 @@ components:
 
     ExternalReference:
       type: object
-      required: [referenceId, sourceId, externalId, personId, linkedAt]
+      required: [referenceId, sourceId, externalId, personId, personName, linkedAt]
       properties:
         referenceId: { type: string, format: uuid }
         sourceId: { type: string, format: uuid }
         externalId: { type: string, minLength: 1, maxLength: 120 }
         personId: { type: string, format: uuid }
+        personName:
+          type: string
+          description: |
+            The name that person carries today, resolved when the reference is read rather than
+            stored with it. A link is a row identified by two ids, and a board asked to confirm one
+            has to see who it is about; a renamed person would otherwise keep the name they had when
+            somebody linked them.
         linkedAt: { type: string, format: date-time }
 
     ExternalReferencePage:
@@ -716,6 +777,13 @@ components:
             no row of its own — it follows from an absence — and reports `0`.
         externalId: { type: string }
         personId: { type: [string, "null"], format: uuid }
+        personName:
+          type: [string, "null"]
+          description: |
+            The name that person carries today, resolved when the preview is read. `null` on a
+            `CREATE`, which describes somebody who does not exist yet — their names are in `values`.
+            A board reviewing an `END_MEMBERSHIP` is reading the riskiest line of the whole preview
+            and has to see whose membership it is.
         values:
           type: object
           description: |
@@ -742,7 +810,7 @@ components:
 
     ImportPossibleDuplicate:
       type: object
-      required: [rowNumber, externalId, personId]
+      required: [rowNumber, externalId, personId, personName]
       description: |
         A row that would create somebody the roster appears to hold already. It is reported and not
         acted on: two members really are called John Roe, so only a board can tell a duplicate from
@@ -751,6 +819,9 @@ components:
         rowNumber: { type: integer }
         externalId: { type: string }
         personId: { type: string, format: uuid }
+        personName:
+          type: string
+          description: The name that person carries today, resolved when the preview is read.
 
     ImportRemovalCounts:
       type: object
@@ -860,8 +931,8 @@ components:
     PersonRequest:
       type: object
       description: |
-        None of the three values may be blank, and none may hold a control character — not a line
-        break, and not a NUL, which PostgreSQL refuses to store at all.
+        Neither name may be blank, and no value may hold a control character — not a line break,
+        and not a NUL, which PostgreSQL refuses to store at all.
 
         Surrounding whitespace is removed before the values are checked and stored, so a name or
         an address pasted with padding is accepted, `maxLength` counts what is left, and the
@@ -869,7 +940,7 @@ components:
 
         An email address is accepted whatever the rest of the roster already holds; see
         `POST /api/admin/roster`.
-      required: [firstName, lastName, email]
+      required: [firstName, lastName]
       properties:
         firstName:
           type: string
@@ -880,13 +951,18 @@ components:
           maxLength: 60
           pattern: "[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u009f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u0000-\\u001f\\u007f-\\u009f]*"
         email:
-          type: string
+          type: [string, "null"]
           format: email
           maxLength: 120
           description: |
             One `@` with something before it, and a dotted domain after it. The rule is spelled out
             here because the service enforces exactly it: a shape this pattern accepts and the
             service then refuses would reach a club board as a `500`.
+
+            Absent or `null` is a person the club has no address for, which a real member list
+            has plenty of. The empty string is not that: it is a blank field somebody left behind,
+            and it is refused. Leaving the field out of a correction is therefore how an address
+            entered by mistake is taken away again.
           pattern: "[^\\u0000-\\u0020\\u007f-\\u009f@]+@[^\\u0000-\\u0020\\u007f-\\u009f@.]+(\\.[^\\u0000-\\u0020\\u007f-\\u009f@.]+)+"
 
     RosterEntry:
@@ -896,7 +972,7 @@ components:
         personId: { type: string, format: uuid }
         firstName: { type: string }
         lastName: { type: string }
-        email: { type: string, format: email }
+        email: { type: [string, "null"], format: email }
         accountId: { type: [string, "null"], format: uuid }
         username: { type: [string, "null"] }
         enabled:
@@ -1493,6 +1569,12 @@ components:
           format: uuid
           description: Pass this entry id as `cursor` to continue after the current page.
 
+  headers:
+    Location:
+      description: Where the created resource can be read.
+      required: true
+      schema: { type: string, format: uri-reference }
+
   responses:
     Unauthenticated:
       description: No session, or a state-changing request without a CSRF token.
@@ -1849,6 +1931,8 @@ paths:
       responses:
         "201":
           description: Booked.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BookingCreated" }
@@ -2095,6 +2179,8 @@ paths:
       responses:
         "201":
           description: Created, with whatever was skipped.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SeriesCreated" }
@@ -2253,6 +2339,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Court" }
@@ -2395,6 +2483,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BookingCard" }
@@ -2537,6 +2627,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ParticipantCard" }
@@ -2679,6 +2771,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MembershipType" }
@@ -2807,6 +2901,17 @@ paths:
           required: false
           description: Matches against the person's full name, case-insensitively.
           schema: { type: string, maxLength: 60 }
+        - name: membershipTypeId
+          in: query
+          required: false
+          description: |
+            Only the people who hold this membership type **right now**. A membership that has
+            ended does not match, even though the entry still names the type its holder last held
+            — `membershipTypeId` on an entry answers "of what were they a member", and this
+            parameter answers "of what are they one". Combining it with `query` narrows by both.
+
+            An unknown type is not an error: nobody holds it, so the page is empty.
+          schema: { type: string, format: uuid }
         - name: cursor
           in: query
           required: false
@@ -2843,7 +2948,8 @@ paths:
         or an imported dormant record looks like.
 
         An email address is not unique across the roster: a club enrols children under a parent's
-        address, so a second person carrying an address the roster already holds is accepted.
+        address, so a second person carrying an address the roster already holds is accepted. It
+        may also be `null`, because a club's own member list carries people it has no address for.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2855,6 +2961,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RosterEntry" }
@@ -2866,13 +2974,45 @@ paths:
           $ref: "#/components/responses/Forbidden"
 
   /api/admin/roster/{personId}:
+    get:
+      tags: [admin-roster]
+      operationId: readPerson
+      summary: Read one person.
+      description: |
+        The entry the roster list carries, for one person. The list can already answer this by
+        paging to the right entry; naming a person directly is what lets an administrative surface
+        give them an address of their own, so that a reloaded page and a shared link both resolve.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The person.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     put:
       tags: [admin-roster]
       operationId: changePerson
       summary: Correct a person's name or email address.
       description: |
         The account and the membership the person holds are untouched; this changes the person
-        record alone.
+        record alone. Every field is written, so a request that leaves `email` out removes the
+        address the person carried - unless they hold an account, which is reached by mail and
+        would become unrecoverable. That is answered `400` with
+        `urn:courtside:error:account-needs-address`; correcting the address is always allowed.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2916,6 +3056,12 @@ paths:
         disabling the person would leave it signed in; a person who already holds one is answered
         `409`. A username the instance already holds is answered `409` too, and the two carry
         different problem types.
+
+        **The person needs an email address.** Everything that grants or restores access travels by
+        mail - the first password and both reset paths - so an account without one could never be
+        recovered. A person who holds none is answered `400` with
+        `urn:courtside:error:account-needs-address`, and for the same reason a correction may not
+        take the address away from a person who already holds an account.
 
         No `Location`: an account has no address of its own, and the roster entry in the response
         body is where its state is read.
@@ -3209,7 +3355,10 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
         "409":
-          description: The membership type is no longer offered.
+          description: |
+            The membership type is no longer offered
+            (`urn:courtside:error:membership-type-inactive`), or the person was changed while this
+            request was in flight (`urn:courtside:error:concurrent-modification`).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -3224,8 +3373,11 @@ paths:
         it ended, so a club can still see who was a member of what and until when. Nothing is
         deleted here.
 
-        Use `PUT` instead to end a membership on a different date, or to correct a date recorded
-        wrongly.
+        This is exactly `PUT` with the type unchanged and `endedOn` set to today — a shortcut for
+        the one date that needs no choosing, kept because it reads as what it does. Use `PUT`
+        instead to end a membership on a different date, or to correct a date recorded wrongly.
+        The browser uses `PUT` throughout: a board records a departure after the fact far more
+        often than on the day, and only `PUT` can correct the date afterwards.
 
         Ending a membership the person does not currently hold is the state the request asks for
         and answers the same way, and it leaves an already recorded end date where it is.
@@ -3255,6 +3407,31 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+
+  /api/admin/import/encodings:
+    get:
+      tags: [admin-import]
+      operationId: listSupportedEncodings
+      summary: The character sets this instance can read a snapshot in.
+      description: |
+        Every character set the running platform supports, by canonical name, sorted. The list is
+        the platform's rather than this product's, so a club with an unusual export is limited by
+        what its instance can decode and not by what a release happened to enumerate.
+
+        A browser can decode fewer of these than the server can, so a name outside what the browser
+        knows still imports - only the local column preview cannot be offered for it.
+      responses:
+        "200":
+          description: The character sets, by canonical name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/admin/import/sources:
     get:
@@ -3294,6 +3471,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImportSource" }
@@ -3479,6 +3658,8 @@ paths:
       responses:
         "201":
           description: Linked.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ExternalReference" }
@@ -3568,11 +3749,27 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: The club's export, as UTF-8 CSV. A byte order mark is tolerated.
+                  description: The club's export as CSV. A byte order mark is honoured.
                 mode: { $ref: "#/components/schemas/SnapshotMode" }
+                encoding:
+                  type: string
+                  maxLength: 60
+                  description: |
+                    Overrides the source's own encoding for this file alone, for the export that
+                    came out differently once. Omitted, the source's is used. A byte order mark and
+                    valid UTF-8 are facts about the content and are used whatever either says; the
+                    name only settles a file that is neither, and such a file is refused rather
+                    than read as something nobody chose when the name in force is `UTF-8`.
+
+                    This is a name and not an enumeration on purpose. Which character sets exist is
+                    a property of the platform the instance runs on, not a decision this product
+                    gets to freeze into a release: a club whose export tool writes a seventh one
+                    must not have to wait for a new image to import its own members.
       responses:
         "201":
           description: The preview.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImportPreview" }
@@ -3733,6 +3930,8 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RuleSet" }

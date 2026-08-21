@@ -219,3 +219,71 @@ it("given a name fragment, when searching participant members, then it is encode
   // then
   expect(members[0].displayName).toBe("Jane Doe");
 });
+
+it("given a snapshot file, when creating a preview, then both parts go out under a boundary the browser chose", async () => {
+  // given
+  let contentType: string | null = "unset";
+  let body = "";
+  server.use(http.post("/api/admin/import/sources/s1/previews", async ({ request }) => {
+    contentType = request.headers.get("Content-Type");
+    body = await request.text();
+    return HttpResponse.json({ previewId: "p1" }, { status: 201 });
+  }));
+  const file = new File(["externalId,firstName\n4711,Jane\n"], "roster.csv", { type: "text/csv" });
+
+  // when
+  const preview = await api.createImportPreview("s1", file, "UPDATE_ONLY", "WINDOWS_1252");
+
+  // then
+  expect(preview.previewId).toBe("p1");
+  expect(contentType).toMatch(/^multipart\/form-data; boundary=/);
+  expect(body).toContain('name="file"');
+  expect(body).toContain('name="mode"');
+  expect(body).toContain("UPDATE_ONLY");
+  expect(body).toContain('name="encoding"');
+  expect(body).toContain("WINDOWS_1252");
+});
+
+it("given a membership type filter, when listing the roster, then it reaches the query string", async () => {
+  // given
+  let seen: string | undefined;
+  server.use(http.get("/api/admin/roster", ({ request }) => {
+    seen = new URL(request.url).search;
+    return HttpResponse.json({ entries: [] });
+  }));
+
+  // when
+  await api.roster(undefined, undefined, 50, "type-1");
+
+  // then
+  expect(seen).toContain("membershipTypeId=type-1");
+});
+
+it("given a person, when reading them alone, then the entry is returned", async () => {
+  // given
+  server.use(http.get("/api/admin/roster/p1", () => HttpResponse.json({
+    personId: "p1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
+    enabled: true, roles: ["MEMBER"]
+  })));
+
+  // when
+  const person = await api.person("p1");
+
+  // then
+  expect(person.firstName).toBe("Jane");
+});
+
+it("given an external id with characters a path would swallow, when unlinking it, then it survives the url", async () => {
+  // given
+  let path: string | undefined;
+  server.use(http.delete("/api/admin/import/sources/s1/references/*", ({ request }) => {
+    path = new URL(request.url).pathname;
+    return new HttpResponse(null, { status: 204 });
+  }));
+
+  // when
+  await api.unlinkExternalReference("s1", "A/4711");
+
+  // then
+  expect(path).toBe("/api/admin/import/sources/s1/references/A%2F4711");
+});

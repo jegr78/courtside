@@ -184,6 +184,46 @@ describe("App build identity", () => {
     await i18n.changeLanguage("en");
   });
 
+  it("given an account that reads another language, when it signs in, then the navigation never appears in the language it is about to leave", async () => {
+    // given — the shell starts in the club's default language and the account reads English
+    await i18n.changeLanguage("de");
+    let applyLanguage: () => void = () => undefined;
+    vi.spyOn(i18n, "changeLanguage")
+      .mockImplementation(() => new Promise((resolve) => { applyLanguage = () => resolve(i18n.t); }) as never);
+    vi.spyOn(api, "session").mockResolvedValue({
+      authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false, locale: "en", displayName: "Jane Doe"
+    });
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+    await screen.findByTestId("environment-warning");
+
+    // then — publishing the session first paints the signed-in navigation twice, and the second
+    // painting moves every link out from under whoever was already reaching for one
+    expect(screen.queryByTestId("logout")).not.toBeInTheDocument();
+    applyLanguage();
+    expect(await screen.findByTestId("logout")).toBeInTheDocument();
+  });
+
+  it("given a language that cannot be applied, when an account signs in, then it is signed in anyway", async () => {
+    // given
+    await i18n.changeLanguage("de");
+    vi.spyOn(i18n, "changeLanguage").mockRejectedValue(new Error("no bundle"));
+    vi.spyOn(api, "session").mockResolvedValue({
+      authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false, locale: "en", displayName: "Jane Doe"
+    });
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    // then — a language is a preference, and no preference may cost somebody their session
+    expect(await screen.findByTestId("logout")).toBeInTheDocument();
+  });
+
   it("given the source endpoint fails, when the app loads, then an identity warning remains visible", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);

@@ -8,6 +8,8 @@ import {
   type BookingCardRequest,
   type DayOfWeek,
   type OpeningHours,
+  type ParticipantCard,
+  type ParticipantCardRequest,
   type Role
 } from "../api/client";
 import { problemMessage } from "../api/problem-message";
@@ -15,6 +17,8 @@ import { shortTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { formString } from "../forms/formString";
+import { ImpactPanel } from "../components/ImpactPanel";
 
 const roles: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER"];
 // The server strips MEMBER before matching a managing role.
@@ -25,17 +29,20 @@ export function AdminFacilityView() {
   const [courts, setCourts] = useState<AdminCourt[]>();
   const [hours, setHours] = useState<OpeningHours[]>();
   const [cards, setCards] = useState<BookingCard[]>();
+  const [fillers, setFillers] = useState<ParticipantCard[]>();
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const pendingRef = useRef(new Set<string>());
   const [pending, setPending] = useState(new Set<string>());
 
   useEffect(() => {
-    void Promise.all([api.adminCourts(), api.adminOpeningHours(), api.adminBookingCards()])
-      .then(([loadedCourts, loadedHours, loadedCards]) => {
+    void Promise.all([api.adminCourts(), api.adminOpeningHours(), api.adminBookingCards(),
+      api.adminParticipantCards()])
+      .then(([loadedCourts, loadedHours, loadedCards, loadedFillers]) => {
         setCourts(loadedCourts);
         setHours(loadedHours);
         setCards(loadedCards);
+        setFillers(loadedFillers);
       })
       .catch((failure) => setError(problemMessage(failure, t)));
   }, [t]);
@@ -178,6 +185,55 @@ export function AdminFacilityView() {
     }
   }
 
+  async function saveFiller(card: ParticipantCard) {
+    const key = `filler:${card.id}`;
+    if (!beginMutation(key)) return;
+    try {
+      const changed = await api.changeParticipantCard(card.id, fillerRequest(card));
+      setFillers((current) => current?.map((item) => item.id === changed.id ? changed : item));
+      reportSuccess();
+    } catch (failure) {
+      reportError(failure);
+    } finally {
+      endMutation(key);
+    }
+  }
+
+  async function toggleFiller(card: ParticipantCard) {
+    const key = `filler:${card.id}`;
+    if (!beginMutation(key)) return;
+    try {
+      const changed = await api.setParticipantCardActive(card.id, !card.active);
+      setFillers((current) => current?.map((item) => item.id === changed.id ? changed : item));
+      reportSuccess();
+    } catch (failure) {
+      reportError(failure);
+    } finally {
+      endMutation(key);
+    }
+  }
+
+  async function createFiller(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const key = "filler:new";
+    if (!beginMutation(key)) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    try {
+      const created = await api.createParticipantCard({
+        label: formString(form, "label"),
+        capacity: ownedCount(formString(form, "capacity"))
+      });
+      setFillers((current) => [...(current ?? []), created]);
+      formElement.reset();
+      reportSuccess();
+    } catch (failure) {
+      reportError(failure);
+    } finally {
+      endMutation(key);
+    }
+  }
+
   async function createCard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const key = "card:new";
@@ -217,7 +273,7 @@ export function AdminFacilityView() {
         {success && <Alert tone="success">{success}</Alert>}
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.courts")}</h2>
-          {courts.map((court) => <CourtEditor key={court.id} court={court} disabled={pending.has(`court:${court.id}`)} changed={(changed) => setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCourt} toggle={toggleCourt} />)}
+          {courts.map((court) => <CourtEditor key={court.id} court={court} disabled={pending.has(`court:${court.id}`)} changed={(changed) => setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCourt} toggle={toggleCourt} reportError={reportError} />)}
           <form noValidate onSubmit={(event) => void createCourt(event)} className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
             <TextField data-testid="new-court-number" disabled={pending.has("court:new")} name="number" type="number" label={t("admin.facility.number")} />
             <TextField data-testid="new-court-name" disabled={pending.has("court:new")} name="name" label={t("admin.facility.name")} />
@@ -227,29 +283,45 @@ export function AdminFacilityView() {
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.openingHours")}</h2>
           <div className="grid gap-3 lg:grid-cols-2">
-            {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} />)}
+            {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} reportError={reportError} />)}
           </div>
         </section>
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.cards")}</h2>
-          {cards.map((card) => <CardEditor key={card.id} card={card} disabled={pending.has(`card:${card.id}`)} changed={(changed) => setCards((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCard} toggle={toggleCard} />)}
+          {cards.map((card) => <CardEditor key={card.id} card={card} disabled={pending.has(`card:${card.id}`)} changed={(changed) => setCards((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCard} toggle={toggleCard} reportError={reportError} />)}
           <CardCreateForm disabled={pending.has("card:new")} create={createCard} />
+        </section>
+        <section className="grid gap-4">
+          <h2 className="text-2xl font-bold">{t("admin.facility.participantCards")}</h2>
+          <p className="text-sm">{t("admin.facility.participantCardsHint")}</p>
+          {(fillers ?? []).map((card) => <ParticipantCardEditor
+            key={card.id}
+            card={card}
+            disabled={pending.has(`filler:${card.id}`)}
+            changed={(changed) => setFillers((current) => current?.map((item) => item.id === changed.id ? changed : item))}
+            save={saveFiller}
+            toggle={toggleFiller}
+          />)}
+          <ParticipantCardCreateForm disabled={pending.has("filler:new")} create={createFiller} />
         </section>
       </>}
   </section>;
 }
 
-function CourtEditor({ court, disabled, changed, save, toggle }: { court: AdminCourt; disabled: boolean; changed: (court: AdminCourt) => void; save: (court: AdminCourt) => Promise<void>; toggle: (court: AdminCourt) => Promise<void> }) {
+function CourtEditor({ court, disabled, changed, save, toggle, reportError }: { court: AdminCourt; disabled: boolean; changed: (court: AdminCourt) => void; save: (court: AdminCourt) => Promise<void>; toggle: (court: AdminCourt) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto_auto] sm:items-end">
     <TextField disabled={disabled} type="number" label={t("admin.facility.number")} value={court.number} onChange={(event) => changed({ ...court, number: Number(event.target.value) })} />
     <TextField disabled={disabled} data-testid={`court-name-${court.id}`} label={t("admin.facility.name")} value={court.name ?? ""} onChange={(event) => changed({ ...court, name: event.target.value || null })} />
     <Button disabled={disabled} type="button" onClick={() => void save(court)}>{t("admin.save")}</Button>
     <Button disabled={disabled} data-testid={`toggle-court-${court.id}`} type="button" onClick={() => void toggle(court)}>{t(court.active ? "admin.deactivate" : "admin.activate")}</Button>
+    <div className="sm:col-span-full">
+      <ImpactPanel kind="court" subject={court.id} ask={() => api.courtImpact(court.id)} reportError={reportError} />
+    </div>
   </article>;
 }
 
-function HoursEditor({ hours, disabled, changed, save, close }: { hours: OpeningHours; disabled: boolean; changed: (hours: OpeningHours) => void; save: (hours: OpeningHours) => Promise<void>; close: (day: DayOfWeek) => Promise<void> }) {
+function HoursEditor({ hours, disabled, changed, save, close, reportError }: { hours: OpeningHours; disabled: boolean; changed: (hours: OpeningHours) => void; save: (hours: OpeningHours) => Promise<void>; close: (day: DayOfWeek) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4">
     <h3 className="font-bold">{t(`weekday.${hours.dayOfWeek}`)}</h3>
@@ -261,10 +333,16 @@ function HoursEditor({ hours, disabled, changed, save, close }: { hours: Opening
       <Button data-testid={`save-hours-${hours.dayOfWeek}`} disabled={disabled || !hours.opensAt || !hours.closesAt} type="button" onClick={() => void save(hours)}>{t("admin.save")}</Button>
       <Button disabled={disabled} type="button" onClick={() => void close(hours.dayOfWeek)}>{t("admin.facility.closeDay")}</Button>
     </div>
+    <ImpactPanel
+      kind="opening-hours"
+      subject={hours.dayOfWeek}
+      ask={() => api.openingHoursImpact(hours.dayOfWeek, shortTime(hours.opensAt), shortTime(hours.closesAt))}
+      reportError={reportError}
+    />
   </article>;
 }
 
-function CardEditor({ card, disabled, changed, save, toggle }: { card: BookingCard; disabled: boolean; changed: (card: BookingCard) => void; save: (card: BookingCard) => Promise<void>; toggle: (card: BookingCard) => Promise<void> }) {
+function CardEditor({ card, disabled, changed, save, toggle, reportError }: { card: BookingCard; disabled: boolean; changed: (card: BookingCard) => void; save: (card: BookingCard) => Promise<void>; toggle: (card: BookingCard) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   const [counts, setCounts] = useState(card.allowedPlayerCounts.join(", "));
   const countsValue = playerCounts(counts);
@@ -283,7 +361,43 @@ function CardEditor({ card, disabled, changed, save, toggle }: { card: BookingCa
       <Button disabled={disabled} data-testid={`save-card-${card.id}`} type="button" onClick={() => void save({ ...card, allowedPlayerCounts: countsValue, tracksPlayers: countsValue.length > 0 })}>{t("admin.save")}</Button>
       <Button disabled={disabled} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
     </div>
+    <ImpactPanel kind="booking-card" subject={card.id} ask={() => api.bookingCardImpact(card.id)} reportError={reportError} />
   </article>;
+}
+
+function ParticipantCardEditor({ card, disabled, changed, save, toggle }: { card: ParticipantCard; disabled: boolean; changed: (card: ParticipantCard) => void; save: (card: ParticipantCard) => Promise<void>; toggle: (card: ParticipantCard) => Promise<void> }) {
+  const { t } = useTranslation();
+  return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
+    <div className="grid gap-3 md:grid-cols-2">
+      <TextField disabled={disabled} data-testid={`participant-card-label-${card.id}`} label={t("admin.facility.label")} value={card.label} onChange={(event) => changed({ ...card, label: event.target.value })} />
+      <TextField disabled={disabled} data-testid={`participant-card-capacity-${card.id}`} type="number" min={1} max={99} label={t("admin.facility.owned")} value={card.capacity ?? ""} onChange={(event) => changed({ ...card, capacity: ownedCount(event.target.value) })} />
+    </div>
+    <div className="flex gap-3">
+      <Button disabled={disabled} data-testid={`save-participant-card-${card.id}`} type="button" onClick={() => void save(card)}>{t("admin.save")}</Button>
+      <Button disabled={disabled} data-testid={`toggle-participant-card-${card.id}`} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
+    </div>
+  </article>;
+}
+
+function ParticipantCardCreateForm({ disabled, create }: { disabled: boolean; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+  const { t } = useTranslation();
+  return <form noValidate onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
+    <h3 className="font-bold">{t("admin.facility.newParticipantCard")}</h3>
+    <div className="grid gap-3 md:grid-cols-2">
+      <TextField disabled={disabled} data-testid="new-participant-card-label" name="label" label={t("admin.facility.label")} />
+      <TextField disabled={disabled} data-testid="new-participant-card-capacity" name="capacity" type="number" min={1} max={99} label={t("admin.facility.owned")} />
+    </div>
+    <Button disabled={disabled} data-testid="create-participant-card" className="justify-self-start" type="submit">{t("admin.create")}</Button>
+  </form>;
+}
+
+// An empty field is how a board says "any number of them", which the contract spells as absent.
+function ownedCount(value: string): number | null {
+  return value.trim() === "" ? null : Number(value);
+}
+
+function fillerRequest(card: ParticipantCard): ParticipantCardRequest {
+  return { label: card.label, capacity: card.capacity ?? null };
 }
 
 function CardCreateForm({ disabled, create }: { disabled: boolean; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
@@ -343,7 +457,3 @@ function playerCounts(value: string): number[] {
   return value.split(",").map((count) => count.trim()).filter(Boolean).map(Number);
 }
 
-function formString(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === "string" ? value : "";
-}

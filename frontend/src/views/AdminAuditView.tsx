@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, type AuditEntry, type DayOfWeek } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { formatDateTime, shortTime } from "../time/clubZone";
@@ -83,6 +83,8 @@ function subjectLabel(entry: AuditEntry, t: TFunction): string {
 export function AdminAuditView() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage ?? i18n.language;
+  const [search] = useSearchParams();
+  const subjectId = search.get("subjectId") ?? undefined;
   const [entries, setEntries] = useState<AuditEntry[]>();
   const [cursor, setCursor] = useState<string>();
   const [timeZone, setTimeZone] = useState("UTC");
@@ -96,20 +98,20 @@ export function AdminAuditView() {
   }, [reportError]);
 
   useEffect(() => {
-    void Promise.all([api.audit(), api.config()])
+    void Promise.all([api.audit(undefined, 50, subjectId), api.config()])
       .then(([page, config]) => {
         setEntries(page.entries);
         setCursor(page.nextCursor ?? undefined);
         setTimeZone(config.timeZone);
       })
       .catch((failure: unknown) => reportErrorRef.current(failure));
-  }, []);
+  }, [subjectId]);
 
   async function readNextPage() {
     if (pending) return;
     setPending(true);
     try {
-      const page = await api.audit(cursor);
+      const page = await api.audit(cursor, 50, subjectId);
       setEntries((current) => [...(current ?? []), ...page.entries]);
       setCursor(page.nextCursor ?? undefined);
       setError(undefined);

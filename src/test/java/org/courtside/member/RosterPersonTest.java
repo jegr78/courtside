@@ -67,7 +67,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
                 roster.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // then
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
         assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(created.personId());
     }
@@ -202,5 +202,49 @@ class RosterPersonTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> roster.createPerson(blank, "Doe", "jane.doe@example.org"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("first name");
+    }
+
+    @Test
+    void givenAClubWithNoAddressForSomebody_whenCreatingThatPerson_thenTheyJoinTheRosterAnyway() {
+        // when
+        RosterService.RosterEntry created = roster.createPerson("Mary", "Major", null);
+
+        // then
+        assertThat(created.firstName()).isEqualTo("Mary");
+        assertThat(created.email()).isEmpty();
+    }
+
+    @Test
+    void givenAnAddressEnteredByMistake_whenCorrectingThePersonWithoutOne_thenItIsGone() {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "typo.doe@example.org");
+
+        // when
+        RosterService.RosterEntry changed = roster.changePerson(jane, "Jane", "Doe", null);
+
+        // then
+        assertThat(changed.email()).isEmpty();
+        assertThat(roster.person(jane).email()).isEmpty();
+    }
+
+    @Test
+    void givenAPersonWithoutAnAddress_whenGivingThemOne_thenTheRosterCarriesIt() {
+        // given
+        RosterService.RosterEntry created = roster.createPerson("Mary", "Major", null);
+
+        // when
+        RosterService.RosterEntry changed =
+                roster.changePerson(created.personId(), "Mary", "Major", "mary.major@example.org");
+
+        // then
+        assertThat(changed.email()).isEqualTo("mary.major@example.org");
+    }
+
+    @Test
+    void givenAnAddressThatIsNotOne_whenCreatingAPerson_thenTheServiceStillRefusesItsOwnCaller() {
+        // when / then
+        assertThatThrownBy(() -> roster.createPerson("Jane", "Doe", "jane.doe.example.org"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("email address");
     }
 }

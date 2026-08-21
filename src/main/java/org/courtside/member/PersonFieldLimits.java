@@ -26,6 +26,10 @@ public final class PersonFieldLimits {
                 && stripped.chars().noneMatch(Character::isWhitespace);
     }
 
+    public static boolean isUsableOrAbsentEmail(String value) {
+        return value == null || value.strip().isEmpty() || isUsableEmail(value);
+    }
+
     private static boolean isUsable(String value, int maxLength) {
         if (value == null) {
             return false;

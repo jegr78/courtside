@@ -1,0 +1,9 @@
+{
+  "getApiDocument": "The contract serves itself to whoever consumes it. There is nothing for a member or a board to operate here.",
+  "getWebManifest": "The browser fetches this through <link rel=\"manifest\"> when it installs the app, so no view calls it and none should.",
+  "listOpeningHours": "BookingGrid already carries the opening hours and WeekView reads them from there, so a second call would fetch what the page already holds.",
+  "getCourt": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
+  "getBookingCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
+  "getParticipantCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
+  "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding."
+}

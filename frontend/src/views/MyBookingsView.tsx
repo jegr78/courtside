@@ -6,6 +6,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { formatDateTime } from "../time/clubZone";
+import { SeriesForm } from "./SeriesForm";
 
 type Appointment = PersonalBooking | ManagedAppointment;
 
@@ -116,11 +117,12 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
       <BookingSection testId="past-bookings" title={t("myBookings.past")} empty={t("myBookings.noPast")} bookings={sections.past} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={setAction} t={t} />
     </div>}
     {nextCursor && <Button data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
-    {showManaged && !loading && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
+    {showManaged && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
       <h2 id="managed-appointments-title" data-testid="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h2>
       <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
       <div className="mt-4"><BookingSection testId="managed-bookings" title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={setAction} t={t} /></div>
       {managedNextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
+      <SeriesForm timeZone={grid.timeZone} courts={courts} created={load} reportError={(failure) => setError(problemMessage(failure, t))} />
     </section>}
     {!loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={load} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={(action.managed ? managed : bookings).filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={(action.managed ? managedNextCursor : nextCursor) !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}

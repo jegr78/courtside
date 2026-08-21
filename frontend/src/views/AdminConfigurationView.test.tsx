@@ -26,6 +26,105 @@ describe("AdminConfigurationView", () => {
     vi.spyOn(api, "rules").mockResolvedValue([
       { ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }
     ]);
+    vi.spyOn(api, "membershipTypes").mockResolvedValue([
+      { id: "type-1", name: "Adults", ruleSetId: "rule-set", active: true },
+      { id: "type-2", name: "Juniors", ruleSetId: null, active: true }
+    ]);
+  });
+
+  it("given a mistyped rule set name, when it is corrected, then the correction is written", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeRuleSet")
+      .mockResolvedValue({ id: "rule-set", name: "Standard rules", active: true });
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("rule-set-name");
+
+    // when
+    await userEvent.clear(screen.getByTestId("rule-set-name"));
+    await userEvent.type(screen.getByTestId("rule-set-name"), "Standard rules");
+    await userEvent.click(screen.getByTestId("save-rule-set"));
+
+    // then
+    expect(changing).toHaveBeenCalledWith("rule-set", { name: "Standard rules" });
+  });
+
+  it("when a rule set is added, then it is created and becomes the one being edited", async () => {
+    // given
+    const creating = vi.spyOn(api, "createRuleSet")
+      .mockResolvedValue({ id: "rule-set-2", name: "Juniors", active: true });
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("new-rule-set-name");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-rule-set-name"), "Juniors");
+    await userEvent.click(screen.getByTestId("create-rule-set"));
+
+    // then
+    expect(creating).toHaveBeenCalledWith({ name: "Juniors" });
+    expect(await screen.findByTestId("rule-set")).toHaveValue("rule-set-2");
+  });
+
+  it("given membership types pointing at a rule set, when it is read, then retiring it says what that does not change", async () => {
+    // given / when
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // then — a retired set still binds whoever already points at it, which is the whole surprise
+    const note = await screen.findByTestId("rule-set-retire-note");
+    expect(note).toHaveTextContent("Adults");
+  });
+
+  it("given a rule set nothing points at, when it is read, then the note says nothing is affected", async () => {
+    // given
+    vi.spyOn(api, "membershipTypes").mockResolvedValue([
+      { id: "type-2", name: "Juniors", ruleSetId: null, active: true }
+    ]);
+
+    // when
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("rule-set-retire-note")).toBeInTheDocument();
+  });
+
+  it("given a rule set in use, when it is retired, then no dialog stands in the way", async () => {
+    // given
+    const toggling = vi.spyOn(api, "setRuleSetActive")
+      .mockResolvedValue({ id: "rule-set", name: "Standard", active: false });
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("toggle-rule-set");
+
+    // when — activating it again restores it, so by this project's rule it is not confirmed
+    await userEvent.click(screen.getByTestId("toggle-rule-set"));
+
+    // then
+    expect(toggling).toHaveBeenCalledWith("rule-set", false);
+  });
+
+  it("given a rule the club no longer wants, when it is removed, then the set stops carrying it", async () => {
+    // given
+    const removing = vi.spyOn(api, "removeRule").mockResolvedValue(undefined);
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("remove-rule-ADVANCE_WINDOW");
+
+    // when
+    await userEvent.click(screen.getByTestId("remove-rule-ADVANCE_WINDOW"));
+
+    // then
+    expect(removing).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW");
+    await vi.waitFor(() =>
+      expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(null));
+  });
+
+  it("given a rule type the set does not carry, when it is read, then there is nothing to remove", async () => {
+    // given
+    vi.spyOn(api, "rules").mockResolvedValue([]);
+
+    // when
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
+
+    // then
+    expect(screen.queryByTestId("remove-rule-ADVANCE_WINDOW")).not.toBeInTheDocument();
   });
 
   it("given an admin, when configuration loads, then club settings and every rule type are visible", async () => {

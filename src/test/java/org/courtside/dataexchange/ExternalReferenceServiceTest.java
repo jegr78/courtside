@@ -42,6 +42,36 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenALinkedRecord_whenTheReferencesAreListed_thenEachCarriesThePersonsName() {
+        // given
+        UUID source = source("roster-system");
+        UUID jane = person("Jane", "Doe");
+        references.link(source, "4711", jane);
+
+        // when
+        var page = references.list(source, null, 50);
+
+        // then
+        assertThat(page.items()).singleElement().satisfies(link -> {
+            assertThat(link.externalId()).isEqualTo("4711");
+            assertThat(link.personName()).isEqualTo("Jane Doe");
+        });
+    }
+
+    @Test
+    void whenARecordIsLinked_thenTheAnswerAlreadyNamesThePerson() {
+        // given
+        UUID source = source("roster-system");
+        UUID john = person("John", "Roe");
+
+        // when
+        ExternalLink link = references.link(source, "4712", john);
+
+        // then
+        assertThat(link.personName()).isEqualTo("John Roe");
+    }
+
+    @Test
     void givenAMemberNumberWithPadding_whenLinking_thenItIsStoredWithoutIt() {
         // given
         UUID source = source("roster-system");
@@ -175,7 +205,7 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
     }
 
     private UUID source(String sourceKey) {
-        return sources.create(sourceKey, "Membership system",
+        return sources.create(sourceKey, "Membership system", ",", "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,

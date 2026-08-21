@@ -238,11 +238,54 @@ class ChangeSetResolverTest {
 
     private static ResolvedChangeSet resolve(CsvSnapshot snapshot, SnapshotMode mode,
                                              CurrentRoster roster) {
-        return ChangeSetResolver.resolve(snapshot, configuration(), mode, roster);
+        return resolve(snapshot, mode, roster, configuration());
+    }
+
+    private static ResolvedChangeSet resolve(CsvSnapshot snapshot, SnapshotMode mode,
+                                             CurrentRoster roster, SourceConfiguration source) {
+        return ChangeSetResolver.resolve(snapshot, source, mode, roster);
+    }
+
+    @Test
+    void givenAnOwnedAddressCellLeftEmpty_whenResolving_thenTheStoredAddressIsNotCleared() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe",
+                Map.of(CanonicalField.EMAIL, "")));
+
+        // when — the source owns the address, so an empty cell would otherwise be written through
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT,
+                rosterHolding(JANE, "4711", "Jane", "Doe"), owningAddress());
+
+        // then
+        assertThat(resolved.changes()).isEmpty();
+    }
+
+    @Test
+    void givenAnOwnedAddressCellCarryingANewAddress_whenResolving_thenItIsStillWritten() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe",
+                Map.of(CanonicalField.EMAIL, "jane.major@example.org")));
+
+        // when
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT,
+                rosterHolding(JANE, "4711", "Jane", "Doe"), owningAddress());
+
+        // then
+        assertThat(resolved.changes()).singleElement().satisfies(change ->
+                assertThat(change.values()).containsExactly(
+                        Map.entry(CanonicalField.EMAIL, "jane.major@example.org")));
+    }
+
+    private static SourceConfiguration owningAddress() {
+        SourceConfiguration base = configuration();
+        return new SourceConfiguration(base.sourceId(), base.sourceKey(), base.displayName(),
+                base.separator(), base.encoding(), base.columns(), base.membershipTypes(),
+                base.defaultMembershipTypeId(),
+                Set.of(CanonicalField.EMAIL), base.removalWarningPercent());
     }
 
     private static SourceConfiguration configuration() {
-        return new SourceConfiguration(SOURCE, "roster-system", "Membership system",
+        return new SourceConfiguration(SOURCE, "roster-system", "Membership system", ',', "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
@@ -279,7 +322,8 @@ class ChangeSetResolverTest {
     private static SourceConfiguration owningMembershipType() {
         SourceConfiguration base = configuration();
         return new SourceConfiguration(base.sourceId(), base.sourceKey(), base.displayName(),
-                base.columns(), base.membershipTypes(), base.defaultMembershipTypeId(),
+                base.separator(), base.encoding(), base.columns(), base.membershipTypes(),
+                base.defaultMembershipTypeId(),
                 Set.of(CanonicalField.MEMBERSHIP_TYPE), base.removalWarningPercent());
     }
 

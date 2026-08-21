@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./api/client";
 import { Alert } from "./components/Alert";
 import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
 import { Preferences } from "./components/Preferences";
+import { PrimaryNavigation } from "./components/PrimaryNavigation";
 import { PwaLifecycle } from "./components/PwaLifecycle";
 import { applyAccountLocale, supportedLocale } from "./i18n";
 import { HomeView } from "./views/HomeView";
@@ -14,6 +16,9 @@ import { MyBookingsPage } from "./views/MyBookingsPage";
 import { AdminAuditView } from "./views/AdminAuditView";
 import { AdminConfigurationView } from "./views/AdminConfigurationView";
 import { AdminFacilityView } from "./views/AdminFacilityView";
+import { AdminMembershipTypesView } from "./views/AdminMembershipTypesView";
+import { AdminImportView } from "./views/AdminImportView";
+import { AdminPersonView } from "./views/AdminPersonView";
 import { AdminRosterView } from "./views/AdminRosterView";
 
 interface AppRoutesProps {
@@ -32,15 +37,17 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       <Route path="*" element={<Navigate to="/initial-password" replace />} />
     </Routes>;
   }
-  return <Routes>
-    <Route path="/" element={<HomeView session={session} signedOut={() => signedOut?.()} />} />
-    <Route path="/courts" element={<HomeView session={session} signedOut={() => signedOut?.()} />} />
+  return <div className="flex w-full flex-col items-center gap-4">
+    <PrimaryNavigation session={session} signedOut={() => signedOut?.()} />
+    <Routes>
+    <Route path="/" element={<HomeView session={session} />} />
+    <Route path="/courts" element={<HomeView session={session} />} />
     <Route path="/login" element={session.authenticated
       ? <Navigate to="/" replace />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="/my-bookings" element={session.authenticated
-      ? <MyBookingsPage session={session} signedOut={() => signedOut?.()} />
-      : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
+      ? <MyBookingsPage session={session} />
+      : <Navigate to="/login" replace />} />
     <Route path="/admin/configuration" element={session.roles.includes("ADMIN")
       ? <AdminConfigurationView configurationChanged={(changed) => configurationChanged?.(changed)} />
       : <Navigate to="/" replace />} />
@@ -50,11 +57,21 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/admin/roster" element={session.roles.includes("ADMIN")
       ? <AdminRosterView />
       : <Navigate to="/" replace />} />
+    <Route path="/admin/roster/:personId" element={session.roles.includes("ADMIN")
+      ? <AdminPersonView />
+      : <Navigate to="/" replace />} />
+    <Route path="/admin/membership-types" element={session.roles.includes("ADMIN")
+      ? <AdminMembershipTypesView />
+      : <Navigate to="/" replace />} />
+    <Route path="/admin/import" element={session.roles.includes("ADMIN")
+      ? <AdminImportView />
+      : <Navigate to="/" replace />} />
     <Route path="/admin/audit" element={session.roles.includes("ADMIN")
       ? <AdminAuditView />
       : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>;
+    </Routes>
+  </div>;
 }
 
 function applyBranding(config: ClubConfig) {
@@ -105,14 +122,16 @@ export function App() {
   const [offline, setOffline] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(false);
 
+  // The account's language is applied before the session is published, so the signed-in navigation
+  // is painted once instead of moving its links out from under whoever is already reaching for one.
   const refreshSession = useCallback(async () => {
     const current = await api.session();
-    setSession(current);
-    setOffline(false);
     const accountLocale = supportedLocale(current.locale);
     if (accountLocale) {
-      await applyAccountLocale(accountLocale);
+      await applyAccountLocale(accountLocale).catch(() => undefined);
     }
+    setSession(current);
+    setOffline(false);
   }, []);
 
   useEffect(() => {
@@ -146,13 +165,17 @@ export function App() {
   }, [refreshSession]);
 
   function initialPasswordChanged() {
-    setPasswordChanged(true);
-    setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
+    flushSync(() => {
+      setPasswordChanged(true);
+      setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
+    });
     void navigate("/login");
   }
 
+  // The session has to be gone before the route is chosen: signing out from a role-guarded page
+  // would otherwise be sent home by that page's own redirect before this one is applied.
   function signOut() {
-    setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
+    flushSync(() => setSession({ authenticated: false, roles: [], passwordChangeRequired: false }));
     void navigate("/login");
   }
 
