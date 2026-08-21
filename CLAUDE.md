@@ -105,6 +105,11 @@ fails on the missing `BuildProperties` bean.
 
 ## Development Approach
 
+* **Every implementation starts with a requirements matrix.** Map each acceptance criterion to
+  its production path, positive test, adversarial or failure-path test, and required runtime
+  evidence. A name, comment, schema or presence assertion is not evidence that behavior works.
+  Before review, reconcile the matrix against the complete branch diff, the executed tests and
+  any real-environment evidence; unresolved or unproven rows block review readiness.
 * **TDD:** Write the test first, watch it fail, then implement. Red → Green → Refactor.
 * **BDD test naming (Given-When-Then):**
   * Method name: `givenContext_whenAction_thenExpectedResult()`

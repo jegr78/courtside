@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:resource-abuse-evidence:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "testIds", "targetFingerprint", "image", "policyDigest", "policyFileDigest", "scriptDigest", "gatewayDigest", "attempt", "scenarios", "samples", "circuitBreaker", "safetyLimitViolation", "stateBefore", "stateAfter", "competingWrites", "recovery", "requestCount", "generatedDataMegabytes", "runtimeHardened", "outcome"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "testIds": { "const": ["CSA-RES-001"] },
+    "targetFingerprint": { "$ref": "#/$defs/digest" },
+    "image": { "type": "string", "pattern": "^grafana/k6:2\\.2\\.0@sha256:[a-f0-9]{64}$" },
+    "policyDigest": { "$ref": "#/$defs/digest" },
+    "policyFileDigest": { "$ref": "#/$defs/digest" },
+    "scriptDigest": { "$ref": "#/$defs/digest" },
+    "gatewayDigest": { "$ref": "#/$defs/digest" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "scenarios": { "type": "array", "minItems": 8, "maxItems": 8, "items": {
+      "type": "object", "additionalProperties": false, "required": ["id", "outcome"],
+      "properties": {
+        "id": { "enum": ["argon2-login-pressure", "login-rate-limit-boundary", "request-body-limit", "competing-court-occupancy", "duplicate-delivery", "participant-capacity", "series-and-rule-cost", "preview-mutation-race"] },
+        "outcome": { "enum": ["passed", "failed", "incomplete"] }
+      }
+    } },
+    "samples": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/sample" } },
+    "circuitBreaker": { "type": "object", "additionalProperties": false,
+      "required": ["tripped", "reason", "sampleSequence"], "properties": {
+        "tripped": { "type": "boolean" },
+        "reason": { "type": ["string", "null"], "enum": ["app-cpu", "app-memory", "db-cpu", "db-memory", "database-connections", "connection-pool-active", "connection-pool-pending", "database-locks", "session-growth", "storage-growth", "request-latency", "upstream-errors", null] },
+        "sampleSequence": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "safetyLimitViolation": { "type": "object", "additionalProperties": false,
+      "required": ["violated", "reason", "sampleSequence"], "properties": {
+        "violated": { "type": "boolean" },
+        "reason": { "type": ["string", "null"], "enum": ["app-cpu", "app-memory", "db-cpu", "db-memory", "database-connections", "connection-pool-active", "connection-pool-pending", "database-locks", "session-growth", "storage-growth", "request-latency", "upstream-errors", null] },
+        "sampleSequence": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "stateBefore": { "$ref": "#/$defs/digest" },
+    "stateAfter": { "$ref": "#/$defs/digest" },
+    "competingWrites": { "type": "object", "additionalProperties": false,
+      "required": ["successful", "rejected", "partialOperations", "duplicateBookings", "duplicateResponses", "duplicateFailures", "toctouCreated", "toctouSkipped"], "properties": {
+        "successful": { "type": "integer", "minimum": 0 },
+        "rejected": { "type": "integer", "minimum": 0 },
+        "partialOperations": { "type": "integer", "minimum": 0 },
+        "duplicateBookings": { "type": "integer", "minimum": 0 },
+        "duplicateResponses": { "type": "integer", "minimum": 0 },
+        "duplicateFailures": { "type": "integer", "minimum": 0 },
+        "toctouCreated": { "type": "integer", "minimum": 0 },
+        "toctouSkipped": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "recovery": { "type": "object", "additionalProperties": false,
+      "required": ["health", "restart", "database", "domainIntegrity"], "properties": {
+        "health": { "$ref": "#/$defs/outcome" },
+        "restart": { "$ref": "#/$defs/outcome" },
+        "database": { "$ref": "#/$defs/outcome" },
+        "domainIntegrity": { "$ref": "#/$defs/outcome" }
+      }
+    },
+    "requestCount": { "type": "integer", "minimum": 1 },
+    "generatedDataMegabytes": { "type": "number", "minimum": 0 },
+    "runtimeHardened": { "type": "boolean" },
+    "outcome": { "$ref": "#/$defs/outcome" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "outcome": { "enum": ["passed", "failed", "incomplete"] },
+    "sample": { "type": "object", "additionalProperties": false,
+      "required": ["sequence", "appCpuPercent", "appMemoryMegabytes", "dbCpuPercent", "dbMemoryMegabytes", "activeConnections", "activePoolConnections", "pendingPoolConnections", "poolMaxConnections", "waitingLocks", "sessionRows", "storageMegabytes", "requestP95Milliseconds", "errorRate"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "appCpuPercent": { "type": "number", "minimum": 0 },
+        "appMemoryMegabytes": { "type": "number", "minimum": 0 },
+        "dbCpuPercent": { "type": "number", "minimum": 0 },
+        "dbMemoryMegabytes": { "type": "number", "minimum": 0 },
+        "activeConnections": { "type": "integer", "minimum": 0 },
+        "activePoolConnections": { "type": "integer", "minimum": 0 },
+        "pendingPoolConnections": { "type": "integer", "minimum": 0 },
+        "poolMaxConnections": { "type": "integer", "minimum": 1 },
+        "waitingLocks": { "type": "integer", "minimum": 0 },
+        "sessionRows": { "type": "integer", "minimum": 0 },
+        "storageMegabytes": { "type": "number", "minimum": 0 },
+        "requestP95Milliseconds": { "type": "number", "minimum": 0 },
+        "errorRate": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

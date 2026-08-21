@@ -2,6 +2,14 @@
 
 <!-- Describe the externally observable outcome and link the issue. -->
 
+## Requirements matrix
+
+| Acceptance criterion | Production path | Positive test | Adversarial or failure-path test | Runtime evidence |
+| --- | --- | --- | --- | --- |
+|  |  |  |  |  |
+
+<!-- Every row must be resolved before review. Use “Not applicable” only with a concrete reason. -->
+
 ## Quality evidence
 
 See the maintained [quality strategy](https://github.com/jegr78/courtside/blob/main/docs/quality-strategy.md).

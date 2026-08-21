@@ -2665,7 +2665,7 @@
     {
       "id": "CSA-RES-001",
       "title": "Adversarial resource consumption and recovery",
-      "status": "planned",
+      "status": "implemented",
       "standardReferences": {
         "wstg": [
           "WSTG-v4.2-BUSL-07"

@@ -81,7 +81,25 @@ Automated scanner output begins as a candidate. It affects a release only after 
 
 ## Scope boundary
 
-The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. The active suite adds the OpenAPI authorization matrix, authenticated ZAP scans and the pinned Schemathesis boundary suite. Every destructive adapter remains disabled. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
+The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. The active suite adds the OpenAPI authorization matrix, authenticated ZAP scans and the pinned Schemathesis boundary suite. The destructive suite adds only the bounded resource-abuse adapter described below. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
+
+## Resource abuse and recovery
+
+The destructive suite requires the exact `authorize-destructive-<run-id>` confirmation. Its pinned
+k6 container ramps gradually through the request gateway and exercises login hashing and rate
+limits, request-body rejection, competing court occupancy, duplicate delivery, participant-card
+capacity, maximum series previews and stale-preview mutations. It has no host network, Docker
+socket or direct application network.
+
+The orchestrator samples application and PostgreSQL CPU and memory, active and pooled connections,
+waiting locks, session rows, database size, request p95 and upstream error rate. Two consecutive
+samples beyond a trip threshold stop attack traffic before a separate hard safety limit. Crossing
+a hard limit fails the run; reaching only the lower trip threshold makes it incomplete. Passing
+requires exactly one surviving competing booking, one stored result for duplicate delivery, a
+fail-closed stale preview, no partial operation, restoration of the domain-state fingerprint, a
+healthy database and a successful application restart. Evidence binds the mounted policy, k6 script,
+request gateway and scanner image by digest. Capacity latency and throughput remain performance
+evidence under `performance/`; safety-limit breaches belong to the security run.
 
 ## Authentication and authorization method
 
