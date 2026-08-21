@@ -1,18 +1,106 @@
 {
   "contexts": [
-    { "id": "club-name-text", "journey": "stored-member", "field": "clubName", "sink": "text" },
-    { "id": "club-name-title", "journey": "stored-member", "field": "clubName", "sink": "document-title" },
-    { "id": "court-name-text", "journey": "stored-member", "field": "court.name", "sink": "text" },
-    { "id": "booking-card-label", "journey": "stored-admin", "field": "bookingCard.label", "sink": "text-and-form-value" },
-    { "id": "participant-card-label", "journey": "stored-admin", "field": "participantCard.label", "sink": "option-text" },
-    { "id": "rule-set-name", "journey": "stored-admin", "field": "ruleSet.name", "sink": "option-text" },
-    { "id": "person-fields", "journey": "stored-admin", "field": "person", "sink": "text-form-value-and-aria-label" },
-    { "id": "account-username", "journey": "stored-admin", "field": "account.username", "sink": "text-and-form-value" },
-    { "id": "booking-note", "journey": "stored-admin", "field": "booking.note", "sink": "text" },
-    { "id": "guest-name", "journey": "stored-admin", "field": "bookingParticipant.guestName", "sink": "text" },
-    { "id": "audit-projection", "journey": "stored-admin", "field": "auditEntry", "sink": "translated-text" },
-    { "id": "logo-url", "journey": "url-attributes", "field": "logoUrl", "sink": "image-src" },
-    { "id": "imprint-url", "journey": "url-attributes", "field": "imprintUrl", "sink": "anchor-href" },
-    { "id": "location-input", "journey": "location-input", "field": "location.search-and-hash", "sink": "router-input" }
+    {
+      "id": "club-name-text",
+      "journey": "stored-member",
+      "field": "clubName",
+      "sink": "text"
+    },
+    {
+      "id": "club-name-title",
+      "journey": "stored-member",
+      "field": "clubName",
+      "sink": "document-title"
+    },
+    {
+      "id": "court-name-text",
+      "journey": "stored-member",
+      "field": "court.name",
+      "sink": "text"
+    },
+    {
+      "id": "booking-card-label",
+      "journey": "stored-admin",
+      "field": "bookingCard.label",
+      "sink": "text-and-form-value"
+    },
+    {
+      "id": "participant-card-label",
+      "journey": "stored-admin",
+      "field": "participantCard.label",
+      "sink": "option-text"
+    },
+    {
+      "id": "rule-set-name",
+      "journey": "stored-admin",
+      "field": "ruleSet.name",
+      "sink": "option-text"
+    },
+    {
+      "id": "person-fields",
+      "journey": "stored-admin",
+      "field": "person",
+      "sink": "text-form-value-and-aria-label"
+    },
+    {
+      "id": "account-username",
+      "journey": "stored-admin",
+      "field": "account.username",
+      "sink": "text-and-form-value"
+    },
+    {
+      "id": "membership-type-name",
+      "journey": "stored-admin",
+      "field": "membershipType.name",
+      "sink": "option-text-and-form-value"
+    },
+    {
+      "id": "import-source-name",
+      "journey": "stored-admin",
+      "field": "importSource.displayName",
+      "sink": "button-text"
+    },
+    {
+      "id": "external-reference-id",
+      "journey": "stored-admin",
+      "field": "externalReference.externalId",
+      "sink": "text"
+    },
+    {
+      "id": "booking-note",
+      "journey": "stored-admin",
+      "field": "booking.note",
+      "sink": "text"
+    },
+    {
+      "id": "guest-name",
+      "journey": "stored-admin",
+      "field": "bookingParticipant.guestName",
+      "sink": "text"
+    },
+    {
+      "id": "audit-projection",
+      "journey": "stored-admin",
+      "field": "auditEntry",
+      "sink": "translated-text"
+    },
+    {
+      "id": "logo-url",
+      "journey": "url-attributes",
+      "field": "logoUrl",
+      "sink": "image-src"
+    },
+    {
+      "id": "imprint-url",
+      "journey": "url-attributes",
+      "field": "imprintUrl",
+      "sink": "anchor-href"
+    },
+    {
+      "id": "location-input",
+      "journey": "location-input",
+      "field": "location.search-and-hash",
+      "sink": "router-input"
+    }
   ]
 }

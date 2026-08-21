@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -1295,9 +1296,168 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 """.formatted(username, oneTimePassword, named);
     }
 
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAClubWithNoAddressForSomebody_whenAddingThem_thenTheyJoinTheRosterWithoutOne()
+            throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/roster")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName": "Mary", "lastName": "Major"}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.firstName").value("Mary"))
+                .andExpect(jsonPath("$.email").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAddressEnteredByMistake_whenCorrectingThePersonWithoutOne_thenItIsGone()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "typo.doe@example.org");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}", jane)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName": "Jane", "lastName": "Doe", "email": null}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(org.hamcrest.Matchers.nullValue()));
+        assertThat(persons.findById(jane)).get()
+                .satisfies(person -> assertThat(person.getEmail()).isEmpty());
+    }
+
     private static String personBody(String firstName, String lastName, String email) {
         return """
                 {"firstName": "%s", "lastName": "%s", "email": "%s"}
                 """.formatted(firstName, lastName, email);
     }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnEndedAndACurrentMembershipOfOneType_whenFilteringByThatType_thenOnlyTheCurrentHolderIsListed()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        Member departed = memberSince(john, MEMBERSHIP_TYPE_ID);
+        departed.endOn(LocalDate.of(2026, 3, 31));
+        members.save(departed);
+
+        // when / then
+        mockMvc.perform(get("/api/admin/roster").queryParam("membershipTypeId", MEMBERSHIP_TYPE_ID.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries.length()").value(1))
+                .andExpect(jsonPath("$.entries[0].personId").value(jane.toString()));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenTwoMembershipTypes_whenFilteringByOne_thenTheOtherTypesHoldersAreLeftOut()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(mary, OTHER_MEMBERSHIP_TYPE_ID));
+
+        // when / then
+        mockMvc.perform(get("/api/admin/roster").queryParam("membershipTypeId", OTHER_MEMBERSHIP_TYPE_ID.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries.length()").value(1))
+                .andExpect(jsonPath("$.entries[0].personId").value(mary.toString()));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFilterAndASearch_whenListingTheRoster_thenBothNarrowTheResult() throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID richard = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(mary, OTHER_MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(richard, OTHER_MEMBERSHIP_TYPE_ID));
+
+        // when / then
+        mockMvc.perform(get("/api/admin/roster")
+                        .queryParam("membershipTypeId", OTHER_MEMBERSHIP_TYPE_ID.toString())
+                        .queryParam("query", "j"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries.length()").value(1))
+                .andExpect(jsonPath("$.entries[0].personId").value(mary.toString()));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenNobodyHoldsAType_whenFilteringByIt_thenTheRosterIsEmptyRatherThanUnfiltered()
+            throws Exception {
+        // given
+        identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createPerson("Mary", "Major", "mary.major@example.org");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/roster").queryParam("membershipTypeId", MEMBERSHIP_TYPE_ID.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries.length()").value(0))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWithAnAccountAndAMembership_whenReadingThatPersonAlone_thenTheListEntryIsReturned()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = identity.createEnabledAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER));
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+
+        // when / then
+        mockMvc.perform(get("/api/admin/roster/{personId}", jane))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.personId").value(jane.toString()))
+                .andExpect(jsonPath("$.firstName").value("Jane"))
+                .andExpect(jsonPath("$.lastName").value("Doe"))
+                .andExpect(jsonPath("$.email").value("jane.doe@example.org"))
+                .andExpect(jsonPath("$.accountId").value(account.toString()))
+                .andExpect(jsonPath("$.username").value("jane.doe"))
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.membershipTypeId").value(MEMBERSHIP_TYPE_ID.toString()))
+                .andExpect(jsonPath("$.membershipStartedOn").value(MEMBER_SINCE.toString()))
+                .andExpect(jsonPath("$.roles[0]").value("MEMBER"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWithoutAnAccount_whenReadingThatPersonAlone_thenTheAbsentAccountIsReported()
+            throws Exception {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/roster/{personId}", mary))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.personId").value(mary.toString()))
+                .andExpect(jsonPath("$.accountId").doesNotExist())
+                .andExpect(jsonPath("$.username").doesNotExist())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.roles.length()").value(0));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenNoSuchPerson_whenReadingIt_thenTheAnswerIsATypedNotFoundProblem() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/roster/{personId}", UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:person-not-found"))
+                .andExpect(jsonPath("$.detail").value("No such person"));
+    }
+
 }

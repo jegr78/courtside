@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RosterListTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+    private static final UUID OTHER_MEMBERSHIP_TYPE_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000002");
 
     private static final String LOWEST_IDS = "01234";
     private static final String MIDDLE_IDS = "56789a";
@@ -52,7 +53,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID child = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items())
@@ -76,7 +77,7 @@ class RosterListTest extends AbstractIntegrationTest {
         members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items())
@@ -101,7 +102,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID other = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list("mile", null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list("mile", null, null, 50);
 
         // then
         assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
@@ -114,7 +115,7 @@ class RosterListTest extends AbstractIntegrationTest {
         identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list("%", null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list("%", null, null, 50);
 
         // then
         assertThat(page.items()).isEmpty();
@@ -128,7 +129,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
@@ -145,8 +146,8 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID richard = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, null, first.nextCursor(), 2);
 
         // then
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
@@ -155,6 +156,75 @@ class RosterListTest extends AbstractIntegrationTest {
         assertThat(second.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(richard, john);
         assertThat(second.nextCursor()).isNull();
+    }
+
+    @Test
+    void givenAMembershipType_whenFilteringTheRosterByIt_thenOnlyItsCurrentHoldersAreReturned() {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        identity.createPerson("Mary", "Major", "mary.major@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(john, OTHER_MEMBERSHIP_TYPE_ID));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, MEMBERSHIP_TYPE_ID, null, 50);
+
+        // then — somebody holding another type and somebody holding none are both outside the answer
+        assertThat(page.items()).extracting(RosterService.RosterEntry::personId).containsExactly(jane);
+    }
+
+    @Test
+    void givenAMembershipTypeNobodyHolds_whenFilteringTheRosterByIt_thenTheAnswerIsEmpty() {
+        // given
+        identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, OTHER_MEMBERSHIP_TYPE_ID, null, 50);
+
+        // then
+        assertThat(page.items()).isEmpty();
+        assertThat(page.nextCursor()).isNull();
+    }
+
+    @Test
+    void givenMoreHoldersThanTheLimit_whenFollowingTheCursorWithAFilter_thenEveryHolderIsSeenExactlyOnce() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID richard = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        members.save(memberSince(mary, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(richard, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(john, OTHER_MEMBERSHIP_TYPE_ID));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, MEMBERSHIP_TYPE_ID, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second =
+                roster.list(null, MEMBERSHIP_TYPE_ID, first.nextCursor(), 2);
+
+        // then — the filter travels as a list of ids while the cursor orders by name, and the two
+        // meeting in one query is the part nothing had proven until now
+        assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(jane, mary);
+        assertThat(second.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(richard);
+        assertThat(second.nextCursor()).isNull();
+    }
+
+    @Test
+    void givenAMembershipThatEnded_whenFilteringTheRosterByItsType_thenThePersonIsNoLongerAHolder() {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        roster.endMembership(jane);
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, MEMBERSHIP_TYPE_ID, null, 50);
+
+        // then
+        assertThat(page.items()).isEmpty();
     }
 
     @Test
@@ -168,8 +238,8 @@ class RosterListTest extends AbstractIntegrationTest {
                 "John", "Roe", "john.roe@example.org", LOWEST_IDS);
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, null, first.nextCursor(), 2);
 
         // then
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
@@ -191,8 +261,8 @@ class RosterListTest extends AbstractIntegrationTest {
                 .toList();
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, null, first.nextCursor(), 2);
 
         // then
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
@@ -207,7 +277,7 @@ class RosterListTest extends AbstractIntegrationTest {
         identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        assertThatThrownBy(() -> roster.list(null, UUID.randomUUID(), 50))
+        assertThatThrownBy(() -> roster.list(null, null, UUID.randomUUID(), 50))
                 .isInstanceOf(RosterCursorUnknownException.class)
                 .satisfies(failure -> assertThat(((RosterCursorUnknownException) failure).getCode())
                         .isEqualTo("roster.cursor.unknown"));
@@ -221,7 +291,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID current = identity.createEnabledAccount(jane, "jane.doe", Set.of(Role.TRAINER));
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items())
@@ -250,7 +320,7 @@ class RosterListTest extends AbstractIntegrationTest {
                 .update();
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items())

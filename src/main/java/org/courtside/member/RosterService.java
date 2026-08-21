@@ -61,13 +61,26 @@ public class RosterService {
     private final ClubTimeZone clubTimeZone;
     private final ApplicationEventPublisher events;
 
-    public CursorPage.Result<RosterEntry> list(String query, UUID cursor, int limit) {
+    public CursorPage.Result<RosterEntry> list(String query, UUID membershipTypeId, UUID cursor, int limit) {
         validateLimit(limit);
         requireKnownCursor(cursor);
-        String normalized = normalize(query);
+        // The ids travel rather than a join because identity may not query member: the dependency
+        // runs the other way, and inverting it here would be the cycle ModularityTests rejects.
+        List<UUID> holders = membershipTypeId == null
+                ? List.of()
+                : members.findCurrentHolderIds(membershipTypeId);
+        if (membershipTypeId != null && holders.isEmpty()) {
+            return new CursorPage.Result<>(List.of(), null);
+        }
         List<UUID> ids = persons.findIdsByNameFragmentAfter(
-                normalized, cursor, PageRequest.of(0, limit + 1));
+                normalize(query), membershipTypeId != null, holders, cursor, PageRequest.of(0, limit + 1));
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
+    }
+
+    public RosterEntry person(UUID personId) {
+        UUID id = requiredPersonId(personId);
+        return load(List.of(id)).stream().findFirst()
+                .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
     }
 
     @Transactional
@@ -88,6 +101,7 @@ public class RosterService {
         String address = strippedAddress(email);
         Person person = persons.findById(id)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        requireAddressWhereAnAccountNeedsOne(id, address);
         Set<String> changed = changedFields(person, first, last, address);
         person.rename(first, last);
         person.changeEmail(address);
@@ -126,6 +140,9 @@ public class RosterService {
         Set<Role> requested = requiredRoles(roles);
         requireUsablePassword(oneTimePassword);
         Person person = requireLockedPerson(id);
+        if (person.getEmail().isEmpty()) {
+            throw new AccountAddressRequiredException("roster.account.addressMissing", Map.of());
+        }
         if (!accounts.findByPersonIdIn(List.of(id)).isEmpty()) {
             throw new PersonAccountExistsException("Person " + id + " already holds an account");
         }
@@ -348,7 +365,7 @@ public class RosterService {
 
     private static UUID requiredPersonId(UUID personId) {
         if (personId == null) {
-            throw new IllegalStateException("A person to change must be named by an id");
+            throw new IllegalStateException("A person must be named by an id");
         }
         return personId;
     }
@@ -384,11 +401,17 @@ public class RosterService {
         return stripped;
     }
 
+    private void requireAddressWhereAnAccountNeedsOne(UUID personId, String address) {
+        if (address.isEmpty() && !accounts.findByPersonIdIn(List.of(personId)).isEmpty()) {
+            throw new AccountAddressRequiredException("roster.person.addressHeldByAccount", Map.of());
+        }
+    }
+
     private static String strippedAddress(String value) {
         String stripped = value == null ? "" : PersonText.stripped(value);
-        if (!PersonFieldLimits.isUsableEmail(stripped)) {
-            throw new IllegalStateException("A person's email address must be a usable address of "
-                    + "at most " + PersonFieldLimits.MAX_EMAIL_LENGTH + " characters");
+        if (!PersonFieldLimits.isUsableOrAbsentEmail(stripped)) {
+            throw new IllegalStateException("A person's email address must be absent or a usable "
+                    + "address of at most " + PersonFieldLimits.MAX_EMAIL_LENGTH + " characters");
         }
         return stripped;
     }

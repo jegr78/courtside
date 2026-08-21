@@ -3,7 +3,9 @@ import type { components } from "./schema";
 export type SessionStatus = components["schemas"]["SessionStatus"];
 export type ClubConfig = components["schemas"]["ClubConfig"];
 export type ClubConfigRequest = components["schemas"]["ClubConfigRequest"];
+export type Impact = components["schemas"]["Impact"];
 export type RuleSet = components["schemas"]["RuleSet"];
+export type RuleSetRequest = components["schemas"]["RuleSetRequest"];
 export type RuleType = components["schemas"]["RuleType"];
 export type RuleTypeConfiguration = components["schemas"]["RuleTypeConfiguration"];
 export type RuleDefinition = components["schemas"]["RuleDefinition"];
@@ -20,6 +22,23 @@ export type RosterPage = components["schemas"]["RosterPage"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
 export type AuditPage = components["schemas"]["AuditPage"];
 export type PersonRequest = components["schemas"]["PersonRequest"];
+export type MembershipRequest = components["schemas"]["MembershipRequest"];
+export type MembershipType = components["schemas"]["MembershipType"];
+export type MembershipTypeRequest = components["schemas"]["MembershipTypeRequest"];
+export type ImportSource = components["schemas"]["ImportSource"];
+export type ImportSourceRequest = components["schemas"]["ImportSourceRequest"];
+export type CanonicalField = components["schemas"]["CanonicalField"];
+export type SnapshotMode = components["schemas"]["SnapshotMode"];
+export type ImportChangeKind = components["schemas"]["ImportChangeKind"];
+export type ImportPersonChange = components["schemas"]["ImportPersonChange"];
+export type ImportRowError = components["schemas"]["ImportRowError"];
+export type ImportPossibleDuplicate = components["schemas"]["ImportPossibleDuplicate"];
+export type ImportRemovalCounts = components["schemas"]["ImportRemovalCounts"];
+export type ImportPreview = components["schemas"]["ImportPreview"];
+export type ImportRun = components["schemas"]["ImportRun"];
+export type ExternalReference = components["schemas"]["ExternalReference"];
+export type ExternalReferencePage = components["schemas"]["ExternalReferencePage"];
+export type ExternalReferenceRequest = components["schemas"]["ExternalReferenceRequest"];
 export type AccountRequest = components["schemas"]["AccountRequest"];
 export type SourceOffer = components["schemas"]["SourceOffer"];
 export type Problem = components["schemas"]["Problem"];
@@ -27,7 +46,14 @@ export type PublicCourt = components["schemas"]["PublicCourt"];
 export type Allocation = components["schemas"]["Allocation"];
 export type BookingGrid = components["schemas"]["BookingGrid"];
 export type PublicBookingCard = components["schemas"]["PublicBookingCard"];
+export type SeriesRuleRequest = components["schemas"]["SeriesRuleRequest"];
+export type CreateSeriesRequest = components["schemas"]["CreateSeriesRequest"];
+export type SeriesPreview = components["schemas"]["SeriesPreview"];
+export type SeriesCreated = components["schemas"]["SeriesCreated"];
+export type Occurrence = components["schemas"]["Occurrence"];
 export type PublicParticipantCard = components["schemas"]["PublicParticipantCard"];
+export type ParticipantCard = components["schemas"]["ParticipantCard"];
+export type ParticipantCardRequest = components["schemas"]["ParticipantCardRequest"];
 export type PublicParticipantMember = components["schemas"]["PublicParticipantMember"];
 export type CreateBookingRequest = components["schemas"]["CreateBookingRequest"];
 export type BookingCreated = components["schemas"]["BookingCreated"];
@@ -91,12 +117,36 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config)
   }),
   ruleSets: () => request<RuleSet[]>("/api/admin/rule-sets"),
+  createRuleSet: (ruleSet: RuleSetRequest) => request<RuleSet>("/api/admin/rule-sets", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ruleSet)
+  }),
+  changeRuleSet: (ruleSetId: string, ruleSet: RuleSetRequest) => request<RuleSet>(
+    `/api/admin/rule-sets/${ruleSetId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ruleSet)
+    }
+  ),
+  setRuleSetActive: (ruleSetId: string, active: boolean) => request<RuleSet>(
+    `/api/admin/rule-sets/${ruleSetId}/active`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+    }
+  ),
+  removeRule: (ruleSetId: string, ruleType: RuleType) => request<void>(
+    `/api/admin/rule-sets/${ruleSetId}/rules/${ruleType}`, { method: "DELETE" }
+  ),
   ruleTypes: () => request<RuleTypeConfiguration[]>("/api/admin/rule-types"),
   rules: (ruleSetId: string) => request<RuleDefinition[]>(`/api/admin/rule-sets/${ruleSetId}/rules`),
   setRule: (ruleSetId: string, ruleType: RuleType, params: Record<string, number>) => request<RuleDefinition>(
     `/api/admin/rule-sets/${ruleSetId}/rules/${ruleType}`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ params })
     }
+  ),
+  courtImpact: (courtId: string) => request<Impact>(`/api/admin/impact/courts/${courtId}`),
+  bookingCardImpact: (cardId: string) => request<Impact>(`/api/admin/impact/booking-cards/${cardId}`),
+  openingHoursImpact: (day: DayOfWeek, opensAt?: string, closesAt?: string) => request<Impact>(
+    `/api/admin/impact/opening-hours/${day}?${new URLSearchParams({
+      ...(opensAt ? { opensAt } : {}),
+      ...(closesAt ? { closesAt } : {})
+    }).toString()}`
   ),
   adminCourts: () => request<AdminCourt[]>("/api/admin/courts"),
   createAdminCourt: (court: CourtRequest) => request<AdminCourt>("/api/admin/courts", {
@@ -125,11 +175,25 @@ export const api = {
   setAdminBookingCardActive: (id: string, active: boolean) => request<BookingCard>(`/api/admin/booking-cards/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
-  roster: (query?: string, cursor?: string, limit = 50) => request<RosterPage>(
+  adminParticipantCards: () => request<ParticipantCard[]>("/api/admin/participant-cards"),
+  createParticipantCard: (card: ParticipantCardRequest) => request<ParticipantCard>("/api/admin/participant-cards", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card)
+  }),
+  changeParticipantCard: (id: string, card: ParticipantCardRequest) => request<ParticipantCard>(`/api/admin/participant-cards/${id}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card)
+  }),
+  setParticipantCardActive: (id: string, active: boolean) => request<ParticipantCard>(`/api/admin/participant-cards/${id}/active`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+  }),
+  roster: (query?: string, cursor?: string, limit = 50, membershipTypeId?: string) => request<RosterPage>(
     `/api/admin/roster?${new URLSearchParams({
-      limit: String(limit), ...(query ? { query } : {}), ...(cursor ? { cursor } : {})
+      limit: String(limit),
+      ...(query ? { query } : {}),
+      ...(cursor ? { cursor } : {}),
+      ...(membershipTypeId ? { membershipTypeId } : {})
     })}`
   ),
+  person: (personId: string) => request<RosterEntry>(`/api/admin/roster/${personId}`),
   createPerson: (person: PersonRequest) => request<RosterEntry>("/api/admin/roster", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(person)
   }),
@@ -161,8 +225,81 @@ export const api = {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
     }
   ),
-  audit: (cursor?: string, limit = 50) => request<AuditPage>(
-    `/api/admin/audit?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  assignMembership: (personId: string, membership: MembershipRequest) => request<RosterEntry>(
+    `/api/admin/roster/${personId}/membership`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(membership)
+    }
+  ),
+  endMembership: (personId: string) => request<void>(
+    `/api/admin/roster/${personId}/membership`, { method: "DELETE" }
+  ),
+  membershipTypes: () => request<MembershipType[]>("/api/admin/membership-types"),
+  membershipType: (id: string) => request<MembershipType>(`/api/admin/membership-types/${id}`),
+  createMembershipType: (type: MembershipTypeRequest) => request<MembershipType>("/api/admin/membership-types", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(type)
+  }),
+  changeMembershipType: (id: string, type: MembershipTypeRequest) => request<MembershipType>(
+    `/api/admin/membership-types/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(type)
+    }
+  ),
+  setMembershipTypeActive: (id: string, active: boolean) => request<MembershipType>(
+    `/api/admin/membership-types/${id}/active`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+    }
+  ),
+  importSources: () => request<ImportSource[]>("/api/admin/import/sources"),
+  importSource: (sourceId: string) => request<ImportSource>(`/api/admin/import/sources/${sourceId}`),
+  createImportSource: (source: ImportSourceRequest) => request<ImportSource>("/api/admin/import/sources", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(source)
+  }),
+  changeImportSource: (sourceId: string, source: ImportSourceRequest) => request<ImportSource>(
+    `/api/admin/import/sources/${sourceId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(source)
+    }
+  ),
+  deleteImportSource: (sourceId: string) => request<void>(
+    `/api/admin/import/sources/${sourceId}`, { method: "DELETE" }
+  ),
+  externalReferences: (sourceId: string, cursor?: string, limit = 50) => request<ExternalReferencePage>(
+    `/api/admin/import/sources/${sourceId}/references?${new URLSearchParams({
+      limit: String(limit), ...(cursor ? { cursor } : {})
+    })}`
+  ),
+  linkExternalReference: (sourceId: string, reference: ExternalReferenceRequest) => request<ExternalReference>(
+    `/api/admin/import/sources/${sourceId}/references`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(reference)
+    }
+  ),
+  unlinkExternalReference: (sourceId: string, externalId: string) => request<void>(
+    `/api/admin/import/sources/${sourceId}/references/${encodeURIComponent(externalId)}`,
+    { method: "DELETE" }
+  ),
+  // No Content-Type: only the browser knows the boundary it is about to write.
+  supportedEncodings: () => request<string[]>("/api/admin/import/encodings"),
+  createImportPreview: (sourceId: string, file: File, mode: SnapshotMode, encoding: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("mode", mode);
+    form.append("encoding", encoding);
+    return request<ImportPreview>(
+      `/api/admin/import/sources/${sourceId}/previews`, { method: "POST", body: form }
+    );
+  },
+  importPreview: (previewId: string) => request<ImportPreview>(`/api/admin/import/previews/${previewId}`),
+  executeImportPreview: (previewId: string, confirmRemovals: boolean) => request<ImportRun>(
+    `/api/admin/import/previews/${previewId}/execution`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmRemovals })
+    }
+  ),
+  importRuns: (sourceId: string) => request<ImportRun[]>(`/api/admin/import/sources/${sourceId}/runs`),
+  audit: (cursor?: string, limit = 50, subjectId?: string) => request<AuditPage>(
+    `/api/admin/audit?${new URLSearchParams({
+      limit: String(limit),
+      ...(cursor ? { cursor } : {}),
+      ...(subjectId ? { subjectId } : {})
+    })}`
   ),
   source: () => request<SourceOffer>("/api/source"),
   courts: () => request<PublicCourt[]>("/api/public/courts"),
@@ -196,6 +333,12 @@ export const api = {
   managedAppointment: (bookingId: string) => request<ManagedAppointmentDetail>(
     `/api/managed/bookings/${bookingId}`
   ),
+  previewSeries: (rule: SeriesRuleRequest) => request<SeriesPreview>("/api/booking-series/preview", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rule)
+  }),
+  createSeries: (series: CreateSeriesRequest) => request<SeriesCreated>("/api/booking-series", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(series)
+  }),
   cancelSeries: (seriesId: string, fromBookingId: string, scope: CancelScope) => request<void>(
     `/api/booking-series/${seriesId}?${new URLSearchParams({ fromBookingId, scope })}`,
     { method: "DELETE" }

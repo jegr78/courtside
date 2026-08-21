@@ -54,6 +54,21 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
+  test(`${locale} the series form meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await page.locator("#locale-preference").selectOption(locale);
+    await signIn(page, "sport.major");
+    await page.getByTestId("my-bookings-link").click();
+
+    // when
+    await page.getByTestId("new-series").click();
+    await expect(page.getByTestId("series-courts")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+  });
+
   test(`${locale} administration views meet automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
@@ -79,6 +94,17 @@ for (const locale of ["de", "en"]) {
     await page.goto("/admin/roster");
     await expect(page.getByTestId("admin-roster-view")).toBeVisible();
     await expect(page.getByTestId("create-person")).toBeVisible();
+    await expectNoWcagViolations(page);
+    await page.goto("/admin/membership-types");
+    await expect(page.getByTestId("admin-membership-types-view")).toBeVisible();
+    await expect(page.getByTestId("create-membership-type")).toBeVisible();
+    await expectNoWcagViolations(page);
+    // The import form is the one place this product asks for a file and renders selects and a
+    // fieldset built by hand, so it is checked with a source open rather than only listed.
+    await page.goto("/admin/import");
+    await expect(page.getByTestId("no-sources")).toBeVisible();
+    await page.getByTestId("new-source").click();
+    await expect(page.getByTestId("column-EXTERNAL_ID")).toBeVisible();
     await expectNoWcagViolations(page);
     await page.goto("/admin/audit");
     await expect(page.getByTestId("admin-audit-view")).toBeVisible();
@@ -125,7 +151,7 @@ test("initial password change is operable using only the keyboard", async ({ pag
   await page.keyboard.press("Enter");
 
   // then
-  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await expect(page.getByTestId("login-view")).toBeVisible();
 });
 
 test("booking dialog traps focus in both directions and restores its trigger", async ({ page, journeyService }) => {

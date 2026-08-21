@@ -52,6 +52,6 @@ class ExternalReferenceAdminController implements AdminImportReferencesApi {
 
     private static ApiExternalReference toResponse(ExternalLink link) {
         return new ApiExternalReference(link.referenceId(), link.sourceId(), link.externalId(),
-                link.personId(), WireTypes.toOffsetDateTime(link.linkedAt()));
+                link.personId(), link.personName(), WireTypes.toOffsetDateTime(link.linkedAt()));
     }
 }

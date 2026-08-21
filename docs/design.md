@@ -57,8 +57,8 @@ people. A club can upload a snapshot and see exactly what it would change — ev
 field of every update, every membership that would end, every row that could not be read and every
 creation that resembles somebody the roster already holds — and it can then execute exactly that
 reviewed change set, atomically, once per source at a time, refusing the run if anybody it would
-touch has changed in the meantime. What is still missing is the browser journey for it, accounts
-created from a snapshot, and export. `/actuator/health` is exposed. The
+touch has changed in the meantime. What is still missing is accounts created from a snapshot, and
+export. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -67,11 +67,19 @@ deployment carries the club's own mail server behind a profile, together with a 
 the DNS a receiver looks at; nothing in the application sends through it yet.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
-personal booking management, managed appointments for officers, and the browser admin surface for
-configuration, facilities and the club's people — adding somebody, correcting their name or address,
-giving them an account, changing its roles, correcting its username, handing out a new one-time
-password and disabling it. Memberships and the import sources are the exceptions: they are served by
-the API and have no browser surface yet, so a board reaches them through the API alone.
+personal booking management, managed appointments for officers — including creating a recurring
+series, which is previewed before anything is written and reports what it had to skip — and the
+browser admin surface for configuration, facilities and the club's people — adding somebody,
+correcting their name or address, giving them an account, changing its roles, correcting its
+username, handing out a new one-time password and disabling it. Membership types are administered
+there as well, each showing how many people hold it, and so is the whole import: describing a
+source, linking the people a file cannot match by number, uploading a member list, reading what it
+would change, and running it. The column mapping is offered from the club's own export, read in the
+browser and never uploaded for that purpose. Before a court, a booking card or a day goes out of
+service, the facility view says which bookings sit on it — information beside the control, never a
+gate in front of it. What a board still cannot reach from a browser is listed with the endpoints
+that have no surface, in `tools/surfaceless-endpoints.json`; every entry left in it now names a
+decision rather than a gap.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
 container image scanning, reports and exports, and the self-service password reset of section 4 — an administrator hands out a new one-time password
@@ -539,9 +547,16 @@ Deliberate decisions:
 `username` is the login identifier, unique per instance, freely chosen by the member
 (suggested at registration as `lastname.firstname`).
 
-`email` is **mandatory but not unique**, and changeable at any time. Clubs enrol children and
-juveniles under a parent's address, and a family with several children then shares one address
-across several accounts — so an email address cannot serve as the identifier.
+`email` is **optional on a person, mandatory on an account**, never unique, and changeable at any
+time. Clubs enrol children and juveniles under a parent's address, and a family with several
+children then shares one address across several accounts — so an email address cannot serve as the
+identifier.
+
+A person may hold none. A club's own member list carries people it has no address for, and a roster
+that refused to record them would be refusing the club's own data. An account may not: everything
+that grants or restores access travels by mail — the first password, and both reset paths below —
+so an account without an address is one nobody could ever recover. The roster therefore refuses to
+create one, and refuses to take the address away from a person who already holds an account.
 
 **Consequence for password reset.** The standard "enter your email" flow does not work. Two
 paths, both supported:
@@ -592,13 +607,18 @@ less restricted account than they had as members.
 Section 10 states the same thing from the session side and calls it the most permissive state the
 booking rules know; the roster reaches it in one step, because a person can be given an account
 without being given a membership, and such an account then books as far ahead and as often as the
-grid allows. It stays open because the alternative, reading "no membership" as "no booking",
-changes what every installation already permits and is a decision of its own rather than a
-correction. Three things bound it: the roster reports the membership on every entry, so a person
+grid allows. Three things bound it: the roster reports the membership on every entry, so a person
 without one is visible in the list rather than hidden in it; opening hours, the slot grid and every
 rule not scoped to a membership type still bind, because they describe the facility and not the
 person; and only an administrator can create an account, so nobody reaches the state without a
 board putting them there.
+
+**A default rule set closes it.** *Designed.* The obvious repair — reading "no membership" as "no
+booking" — stays rejected: it changes what every installation already permits and decides for the
+club rather than asking it. The configuration instead gains a rule set that applies when a person
+holds no membership type. The permissive state then stops being the *most* permissive one and
+becomes whatever each club says it is, which is the same answer this product gives everywhere else
+a board would plausibly disagree with us. Until it exists, the three bounds above are what hold.
 
 **Evaluation does not stop at the first violation.** All violations are collected —
 otherwise a member works through three error messages one at a time.
@@ -608,6 +628,15 @@ A `RuleViolation` carries an **i18n key plus parameters**, never rendered text:
 translatable and lets the frontend attach them to the right form field.
 
 Adding a rule type = one validator class + one configuration row.
+
+**A membership type may be barred from booking a court altogether.** *Designed.* Clubs carry
+categories that pay dues without playing — passive, supporting, honorary — and every rule type
+above answers *how much*, none of them *whether*. Forcing the question through a quantity would
+say the wrong thing out loud: a limit of zero reaches the member as "too many open bookings
+(limit 0, current 0)". The bar is therefore a rule type of its own, parameterless like the
+opening hours and the slot grid, present in a rule set or absent from it, and its violation
+carries its own key. A club builds a "passive" rule set, switches it on, and points the
+membership type at it — a row, not a release.
 
 ### Two kinds of rule: who may book, and what the grid is
 
@@ -808,6 +837,23 @@ back.
 
 ---
 
+### Where a confirmation belongs
+
+**A confirmation appears where the action cannot be undone by repeating it.**
+
+By that rule, executing an import and ending a membership are confirmed, and so is deleting an
+import source. The toggles are not — account, court, booking card, membership type — because
+clicking again restores exactly what the click removed. Unlinking an external reference is not
+confirmed either: linking it again puts back the same row.
+
+The rule exists so the dialog keeps meaning something. Confirming everything that takes something
+away trains people to click through, and then the dialog fails at the one place it was needed —
+which, for this product, is a board about to end forty memberships because an export was truncated.
+That is also why the confirmation there does not merely ask: it states how many memberships would
+end, out of how many, and names the ordinary accident it guards against.
+
+---
+
 ## 8. Configuration and Branding
 
 Three layers, separated by the question "who changes this?":
@@ -885,12 +931,76 @@ Import and export:
   overwrites it — and above what share of the roster disappearing an execution needs confirming.
   Every part of it is correctable, and a change decides what the *next* snapshot means rather than
   touching the people an earlier one created.
+- **The file is read as the club's own system wrote it, and the club says how.** The separator and
+  the character set are both part of the source, because both are properties of the export tool
+  rather than of one file: the club answers once, and every later upload is read by that answer.
+  A single file may still deviate, so an upload carries an override that holds for that file alone.
+
+  For a source nobody has described yet, the browser suggests a separator from the chosen file; once
+  the club has confirmed one it stands, and a later file does not quietly replace it with a guess.
+  Detection alone was tried and is not enough — counting columns in a header row settles nothing for
+  a file with one column, and an export need not carry a header at all. A file read with the wrong character produces one enormous column and no way to tell why,
+  so the answer belongs to the club rather than to a heuristic. Only what cannot work is refused:
+  a line break ends a record and a quotation mark opens a cell, so neither can also divide one.
+
+  The encoding is settled wherever the bytes settle it: a byte order mark and valid UTF-8 are facts
+  about the content and are used without asking anybody.
+
+  Beyond that it is the source's stored answer, and the reason it is stored rather than derived is
+  that it cannot be derived. The 8-bit character sets share their byte ranges and differ in a
+  handful of code points, so no library detects them — it guesses, and a guess that lands wrong
+  imports mangled names with nothing said. The source therefore carries the *name* of a character
+  set, defaulting to UTF-8, and a file that is neither marked nor valid UTF-8 is refused while the
+  name in force says UTF-8 rather than being read as something nobody chose.
+
+  **A name and not an enumeration**, because which character sets exist is a property of the
+  platform an instance runs on and not a decision this product may freeze into a release. The
+  instance reports what it can read — `Charset.availableCharsets()`, 173 of them on a current JVM —
+  and the browser offers that list. A club whose export tool writes a Central European or Cyrillic
+  one imports its members on the image it already runs; nobody waits for us. `StandardCharsets`
+  would not do: it is itself a fixed set of nine that does not contain Windows-1252.
+- **The roster filters by membership type across a module boundary.** `identity` owns the people
+  and `member` owns the memberships, and the dependency runs from `member` to `identity` — so the
+  filtered listing loads the type's current holders and passes their ids into the person query
+  rather than joining, because a join in that direction is the cycle the module rules forbid. The
+  cost is a parameter list that grows with the club, which PostgreSQL bounds at 65535 bindings per
+  statement; a membership type with more holders than that would fail, and no single club has one.
+  The alternative — a second paged query in `member` — would duplicate the cursor ordering, and two
+  places that must agree on an ordering exactly is the heavier risk of the two.
+
+- **An email address is optional, for a person and for a snapshot.** A real member list carries
+  people a club has no address for, and a required column would have turned each of them into a
+  rejected row. A person without one simply holds none; what that costs them is that nothing can be
+  sent to them, which is a fact about the club's data and not a state Courtside invents.
+- **An export without a header row is not supported.** *Accepted, not closed.* A column mapping
+  names headers, so a file that carries none cannot be described at all: the club exports one with
+  headers or the import is not for them. Mapping by position instead would be the repair, and it is
+  a different feature rather than a correction — the position of a column is exactly the kind of
+  thing that changes silently between two versions of an export tool, which is what naming avoids.
+
 - **A record is matched by the source and the member number it carries**, never by a name and never
   by an email address: two members really are called John Roe, and a club enrols children under a
   parent's address. A member number a source does not yet know becomes a new person, and where a
   board recognises the resemblance it links the two by hand instead. One person may hold a
   reference from each of several sources, which is what lets a club migrate between membership
   systems without the second one duplicating everybody.
+- **The column mapping is offered from the club's own file, and that file is not uploaded for it.**
+  A source has to be described before any snapshot is accepted, and no board knows its export's
+  headers by heart. The browser therefore reads the club's file locally — the header row for the
+  columns, and the distinct values of the category column once that column is named, because the
+  categories a club exports live in its rows and not in its header. Nothing is sent. An endpoint
+  that accepted a file of personal data in order to learn a handful of words would be the worst of
+  the options, and reading locally costs a club nothing.
+
+  Reading it there is also what keeps the encoding answer honest. A board cannot be expected to know
+  what its software wrote, and a blind answer would be worse than none — so the field stands beside
+  the separator carrying what the source already says, an explanation appears when the chosen file
+  turns out not to be UTF-8, which the browser can tell before anything is sent, and neither answer
+  is ever blind: the columns on offer are re-read as each changes, so a wrong one shows itself
+  immediately as headers nobody recognises. The club sees the consequence of both answers before it
+  saves either. A browser decodes fewer character sets
+  than a server does, so where it cannot read one it says so and offers no columns — the import
+  itself still runs, because the instance knows the set even where the browser does not.
 - **A preview writes nothing and is never edited.** It resolves the whole file and answers with the
   change set a later execution would apply, so what a board approves is what runs. A header problem
   fails the file, because nothing in it can then be trusted; a cell problem fails one row and is
@@ -903,12 +1013,34 @@ Import and export:
   anybody it would touch changed between the preview and the run, it is refused rather than writing
   over a roster it no longer describes. Executions of one source serialise, and a successful one
   supersedes every preview of that source, so a stale change set cannot be applied afterwards.
+- **A synchronisation creates the accounts a club would otherwise create by hand.** *Designed.*
+  A club that imports 175 members and then opens 175 account forms has had the import's whole
+  purpose handed back to it, so an execution gives an account to every person it creates whose
+  membership type calls for one. The membership type carries two separate answers, because they
+  are separate questions: whether its holders get an account, and whether they may book. A passive
+  member may well want to see their own record without being able to reserve a court.
+
+  What such an account may be is bounded. It holds `MEMBER` and nothing else, because no snapshot
+  may hand out a role that administers the club. Its username is generated as `lastname.firstname`,
+  the same shape registration suggests, numbered on collision and correctable afterwards like every
+  other name a club enters. Its first password is generated, never displayed, and mailed to the
+  member — a board that could read 131 passwords is the outcome this exists to avoid. A person with
+  no address gets none, which follows from the identity model rather than from a special case, and
+  the preview says how many that is.
+
+  **It creates; it never overwrites.** A person who already holds an account is untouched, whatever
+  the file says, so a repeated import cannot reissue a password or rename a login somebody is
+  using. That also means the accounts a club has been missing appear on the next run rather than
+  only for people the import has yet to meet — the board reads the count in the preview before any
+  of it is sent.
+
 - **A synchronisation can take a membership away; it can never hand one out.** When a membership
   ends, an account that held `MEMBER` and nothing else is disabled and its sessions end; an account
   holding another role keeps it and loses `MEMBER` only, so a card requiring `MEMBER` refuses it.
-  No snapshot ever enables an account, because a board disabled it for a reason no membership
-  system knows, and none can disable the club's own administration: an account holding `ADMIN`
-  keeps that role and stays enabled. An import cannot lock a club out of its instance.
+  No snapshot ever *re*-enables an account, because a board disabled it for a reason no membership
+  system knows — creating one that never existed is the separate thing described above, and the two
+  must not be confused. None can disable the club's own administration either: an account holding
+  `ADMIN` keeps that role and stays enabled. An import cannot lock a club out of its instance.
 - **CSV export** for every list view in the admin backend, matching what existing booking
   systems offer today.
 - **Per-member JSON export** for subject access requests (section 11).
@@ -1213,7 +1345,12 @@ deliver the implementation.
   past it is the row, the name of the uploaded file, its SHA-256 and the counts — what an audit of
   *what was executed* needs, and no member's name, address or number. A scheduled sweep enforces the
   bound, a preview past it answers without its change set, and a swept preview is refused rather
-  than executed against one that is no longer there.
+  than executed against one that is no longer there. **Built.**
+- **Describing a source uploads nothing at all.** The column mapping and the category values a
+  board picks from are read out of the club's file in the browser; no request carries it, and the
+  instance learns the headers only as the mapping the board saved. This is a stronger promise than
+  the one above and a separate one: the snapshot a club later uploads *is* sent, and is then bound
+  by the retention. Configuring the source that receives it is not. **Built.**
 - **Subject access and portability** (Art. 15/20) as self-service: every member can export
   their own data as JSON. The Release 1 export covers this.
 - **Documentation templates in the repository**: a pre-filled record of processing

@@ -50,6 +50,34 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await expect(page.getByTestId("admin-facility-view")).toBeVisible();
   await expect(page.getByTestId("create-court")).toBeVisible();
   await expectNoHorizontalOverflow(page);
+
+  // when — the roster is the widest table this product has, so it is where a phone gives out first
+  await page.goto("/admin/roster");
+
+  // then
+  await expect(page.locator('[data-testid^="roster-row-"]').first()).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  // when
+  await page.goto("/admin/membership-types");
+
+  // then
+  await expect(page.getByTestId("create-membership-type")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  // when
+  await page.goto("/admin/import");
+
+  // then
+  await expect(page.getByTestId("no-sources")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  // when
+  await page.goto("/admin/audit");
+
+  // then
+  await expect(page.getByTestId("audit-row").first()).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 });
 
 test("the initial-password form remains usable on a touch viewport", async ({ page }) => {

@@ -83,7 +83,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-        source = sources.create("roster-system", "Membership system",
+        source = sources.create("roster-system", "Membership system", ",", "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
@@ -156,7 +156,19 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].code")
                         .value("import.snapshot.header.missingField"))
                 .andExpect(jsonPath("$.violations[0].params.missing")
-                        .value(org.hamcrest.Matchers.containsInAnyOrder("EMAIL", "EXTERNAL_ID")));
+                        .value(org.hamcrest.Matchers.containsInAnyOrder("EXTERNAL_ID")));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnExportCarryingNoAddresses_whenPreviewing_thenTheFileIsStillResolved()
+            throws Exception {
+        // when / then
+        mockMvc.perform(upload("Member number,First name,Last name\n4711,Jane,Doe\n",
+                        "FULL_SNAPSHOT"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.rowErrors").isEmpty())
+                .andExpect(jsonPath("$.changes[0].externalId").value("4711"));
     }
 
     @Test
@@ -191,7 +203,21 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.removals.percent").value(100))
                 .andExpect(jsonPath("$.needsConfirmation").value(true))
                 .andExpect(jsonPath("$.changes[?(@.kind == 'END_MEMBERSHIP')].personId")
-                        .value(jane.toString()));
+                        .value(jane.toString()))
+                .andExpect(jsonPath("$.changes[?(@.kind == 'END_MEMBERSHIP')].personName")
+                        .value("Jane Doe"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenARowThatWouldCreateSomebody_whenPreviewing_thenItNamesNoPersonBecauseThereIsNoneYet()
+            throws Exception {
+        // when / then
+        mockMvc.perform(upload(THREE_ROWS, "UPDATE_ONLY"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.changes[0].kind").value("CREATE"))
+                .andExpect(jsonPath("$.changes[0].personName")
+                        .value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test
@@ -220,7 +246,8 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.changes[0].kind").value("CREATE"))
                 .andExpect(jsonPath("$.possibleDuplicates.length()").value(1))
-                .andExpect(jsonPath("$.possibleDuplicates[0].personId").value(jane.toString()));
+                .andExpect(jsonPath("$.possibleDuplicates[0].personId").value(jane.toString()))
+                .andExpect(jsonPath("$.possibleDuplicates[0].personName").value("Jane Doe"));
     }
 
     @Test
@@ -283,7 +310,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         // when
-        sources.change(source, "roster-system", "Membership system",
+        sources.change(source, "roster-system", "Membership system", ",", "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,

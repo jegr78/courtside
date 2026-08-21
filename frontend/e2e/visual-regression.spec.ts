@@ -62,6 +62,9 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   // given
   await signIn(page, "configuration-admin");
 
+  // then
+  await stableScreenshot(page.getByTestId("primary-navigation"), "primary-navigation.png");
+
   // when
   await page.getByTestId("admin-configuration-link").click();
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
@@ -75,6 +78,36 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // then
   await stableScreenshot(page.getByTestId("admin-facility-view"), "admin-facility.png");
+
+  // when — every gate below waits for something the view renders only once its data arrived,
+  // never for the section itself, which is on screen while the request is still in flight
+  await page.goto("/admin/roster");
+  await expect(page.locator('[data-testid^="roster-row-"]').first()).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-roster-view"), "admin-roster.png");
+
+  // when
+  await page.goto("/admin/membership-types");
+  await expect(page.getByTestId("create-membership-type")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-membership-types-view"), "admin-membership-types.png");
+
+  // when
+  await page.goto("/admin/import");
+  await expect(page.getByTestId("no-sources")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-import-view"), "admin-import.png");
+
+  // when — the journey world is reset between tests, so the empty log is the one state this
+  // surface reaches deterministically; a populated one would be masked down to its own chrome
+  await page.goto("/admin/audit");
+  await expect(page.getByTestId("audit-empty")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-audit-view"), "admin-audit.png");
 });
 
 async function signIn(page: Page, username: string): Promise<void> {

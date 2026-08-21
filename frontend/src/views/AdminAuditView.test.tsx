@@ -203,7 +203,7 @@ describe("AdminAuditView", () => {
     await user.click(await screen.findByTestId("audit-load-more"));
 
     // then
-    expect(audit).toHaveBeenNthCalledWith(2, courtAdded.id);
+    expect(audit).toHaveBeenNthCalledWith(2, courtAdded.id, 50, undefined);
     expect(await screen.findAllByTestId("audit-row")).toHaveLength(2);
     expect(within(row(second.id)).getByTestId("audit-message")).toBeInTheDocument();
     expect(screen.queryByTestId("audit-load-more")).not.toBeInTheDocument();
@@ -252,5 +252,31 @@ describe("AdminAuditView", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     expect(screen.getByRole("link")).toBeInTheDocument();
+  });
+
+  it("given a subject in the address, when the log is opened, then only that subject is asked for", async () => {
+    // given
+    const audit = vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/audit?subjectId=subject-1"]}><AdminAuditView /></MemoryRouter>);
+
+    // then
+    await waitFor(() => expect(audit).toHaveBeenCalledWith(undefined, 50, "subject-1"));
+  });
+
+  it("given a subject in the address, when a further page is read, then it stays narrowed to that subject", async () => {
+    // given
+    const audit = vi.spyOn(api, "audit")
+      .mockResolvedValueOnce({ entries: [courtAdded], nextCursor: "cursor-1" })
+      .mockResolvedValueOnce({ entries: [], nextCursor: null });
+    render(<MemoryRouter initialEntries={["/admin/audit?subjectId=subject-1"]}><AdminAuditView /></MemoryRouter>);
+    await screen.findByTestId("audit-load-more");
+
+    // when
+    await userEvent.click(screen.getByTestId("audit-load-more"));
+
+    // then
+    await waitFor(() => expect(audit).toHaveBeenLastCalledWith("cursor-1", 50, "subject-1"));
   });
 });

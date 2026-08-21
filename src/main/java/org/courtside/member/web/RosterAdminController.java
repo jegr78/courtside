@@ -36,8 +36,8 @@ class RosterAdminController implements AdminRosterApi {
     private final RosterService roster;
 
     @Override
-    public ResponseEntity<ApiRosterPage> listRoster(String query, UUID cursor, Integer limit) {
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(query, cursor, limit);
+    public ResponseEntity<ApiRosterPage> listRoster(String query, UUID membershipTypeId, UUID cursor, Integer limit) {
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(query, membershipTypeId, cursor, limit);
         return ResponseEntity.ok(new ApiRosterPage(page.items().stream()
                 .map(RosterAdminController::toResponse)
                 .toList())
@@ -51,6 +51,11 @@ class RosterAdminController implements AdminRosterApi {
         return ResponseEntity
                 .created(URI.create("/api/admin/roster/" + entry.personId()))
                 .body(toResponse(entry));
+    }
+
+    @Override
+    public ResponseEntity<ApiRosterEntry> readPerson(UUID personId) {
+        return ResponseEntity.ok(toResponse(roster.person(personId)));
     }
 
     @Override
@@ -120,12 +125,16 @@ class RosterAdminController implements AdminRosterApi {
 
     private static ApiRosterEntry toResponse(RosterService.RosterEntry entry) {
         return new ApiRosterEntry(entry.personId(), entry.firstName(), entry.lastName(),
-                entry.email(), entry.enabled(), roleNames(entry.roles()))
+                address(entry.email()), entry.enabled(), roleNames(entry.roles()))
                 .accountId(entry.accountId())
                 .username(entry.username())
                 .membershipTypeId(membershipTypeId(entry))
                 .membershipStartedOn(membershipDate(entry, RosterService.Membership::startedOn))
                 .membershipEndedOn(membershipDate(entry, RosterService.Membership::endedOn));
+    }
+
+    private static String address(String email) {
+        return email.isEmpty() ? null : email;
     }
 
     private static UUID membershipTypeId(RosterService.RosterEntry entry) {

@@ -28,6 +28,7 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
             SELECT person.id FROM Person person
             WHERE lower(concat(person.firstName, ' ', person.lastName))
                   LIKE concat('%', :nameFragment, '%') ESCAPE '!'
+              AND (:restricted = FALSE OR person.id IN :personIds)
               AND (:after IS NULL
                 OR lower(person.lastName) > (SELECT lower(c.lastName) FROM Person c WHERE c.id = :after)
                 OR (lower(person.lastName) = (SELECT lower(c.lastName) FROM Person c WHERE c.id = :after)
@@ -39,5 +40,7 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
             ORDER BY lower(person.lastName), lower(person.firstName), person.id
             """)
     List<UUID> findIdsByNameFragmentAfter(@Param("nameFragment") String nameFragment,
+                                          @Param("restricted") boolean restricted,
+                                          @Param("personIds") Collection<UUID> personIds,
                                           @Param("after") UUID after, Pageable pageable);
 }

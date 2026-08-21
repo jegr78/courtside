@@ -12,6 +12,18 @@ const ROUTER = `${repository}frontend/src/App.tsx`;
 const VIEW_CONTROLLERS = `${repository}src/main/java/org/courtside/shared/web/SpaConfiguration.java`;
 const SHELL_ACCESS = `${repository}src/main/java/org/courtside/identity/internal/SecurityConfiguration.java`;
 
+// React names a path parameter :personId and Spring names it {personId}, so the two sides say the
+// same route in different words and only comparing them in one of them can tell.
+const asServerPath = (route) => route.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
+
+test("given a route with a parameter, when comparing it with the server, then both spellings mean one route", () => {
+  // given
+  const source = 'const a = <Routes><Route path="/admin/roster/:personId" element={<X />} /></Routes>;';
+
+  // when / then
+  assert.deepEqual(clientRoutes(source).map(asServerPath), ["/admin/roster/{personId}"]);
+});
+
 test("given the router, when reading its routes, then the wildcard is not one of them", () => {
   // given
   const source = 'const a = <Routes><Route path="/courts" element={<X />} />'
@@ -24,7 +36,7 @@ test("given the router, when reading its routes, then the wildcard is not one of
 test("given a client route, when the server serves the shell, then it forwards to the application", () => {
   // when / then
   assert.deepEqual(
-    clientRoutes(readFileSync(ROUTER, "utf8")).toSorted(),
+    clientRoutes(readFileSync(ROUTER, "utf8")).map(asServerPath).toSorted(),
     forwardedRoutes(readFileSync(VIEW_CONTROLLERS, "utf8")).toSorted()
   );
 });
@@ -34,7 +46,9 @@ test("given a client route, when it is opened before signing in, then the shell 
   const permitted = new Set(permittedPaths(readFileSync(SHELL_ACCESS, "utf8")));
 
   // when
-  const unreachable = clientRoutes(readFileSync(ROUTER, "utf8")).filter((route) => !permitted.has(route));
+  const unreachable = clientRoutes(readFileSync(ROUTER, "utf8"))
+    .map(asServerPath)
+    .filter((route) => !permitted.has(route));
 
   // then
   assert.deepEqual(unreachable, []);

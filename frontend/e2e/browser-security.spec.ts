@@ -147,6 +147,17 @@ test("stored text projections remain inert on administrative and managed views",
     INSERT INTO booking_participant (id, booking_id, kind, guest_name, position)
       VALUES ('71000000-0000-0000-0000-000000000099',
         '70000000-0000-0000-0000-000000000004', 'GUEST', $payload$${payload}$payload$, 0);
+    UPDATE membership_type SET name = $payload$${payload}$payload$
+      WHERE id = 'cccccccc-0000-0000-0000-000000000001';
+    INSERT INTO import_source (id, source_key, display_name, separator, encoding,
+      default_membership_type_id, removal_warning_percent, created_at)
+      VALUES ('99000000-0000-0000-0000-000000000001', 'projection',
+        $payload$${payload}$payload$, ';', 'UTF-8', 'cccccccc-0000-0000-0000-000000000001', 10,
+        '2026-05-01T00:00:00Z');
+    INSERT INTO import_external_reference (id, source_id, external_id, person_id, linked_at)
+      VALUES ('99000000-0000-0000-0000-000000000002', '99000000-0000-0000-0000-000000000001',
+        $payload$${payload}$payload$, '00000000-0000-0000-0000-000000000103',
+        '2026-05-01T00:00:00Z');
     INSERT INTO domain_event (id, event_type, subject_id, actor_account_id, occurred_at, payload)
       VALUES ('72000000-0000-0000-0000-000000000099', 'facility.court.added',
         'dddddddd-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000110',
@@ -173,10 +184,20 @@ test("stored text projections remain inert on administrative and managed views",
   await page.goto("/admin/facility");
   await expect(page.getByTestId("card-label-33333333-3333-3333-3333-333333333333")).toHaveValue(payload);
   await page.goto("/admin/roster");
-  await expect(page.getByTestId("person-first-name-00000000-0000-0000-0000-000000000103")).toHaveValue(payload);
-  await expect(page.getByTestId("person-last-name-00000000-0000-0000-0000-000000000103")).toHaveAttribute("value", "Projection");
-  await expect(page.getByTestId("person-email-00000000-0000-0000-0000-000000000103")).toHaveValue(payload);
-  await expect(page.getByTestId("account-username-00000000-0000-0000-0000-000000000108")).toHaveValue(payload);
+  await expect(page.getByTestId("roster-filter").locator(
+    'option[value="cccccccc-0000-0000-0000-000000000001"]')).toHaveText(payload);
+  await page.goto("/admin/roster/00000000-0000-0000-0000-000000000103");
+  await expect(page.getByTestId("person-first-name")).toHaveValue(payload);
+  await expect(page.getByTestId("person-last-name")).toHaveAttribute("value", "Projection");
+  await expect(page.getByTestId("person-email")).toHaveValue(payload);
+  await page.goto("/admin/roster/00000000-0000-0000-0000-000000000108");
+  await expect(page.getByTestId("account-username")).toHaveValue(payload);
+  await page.goto("/admin/membership-types");
+  await expect(page.getByTestId("membership-type-name-cccccccc-0000-0000-0000-000000000001")).toHaveValue(payload);
+  await page.goto("/admin/import");
+  await expect(page.getByTestId("source-choice-99000000-0000-0000-0000-000000000001")).toHaveText(payload);
+  await page.getByTestId("source-choice-99000000-0000-0000-0000-000000000001").click();
+  await expect(page.getByTestId(`reference-${payload}`)).toContainText("Projection");
   await page.goto("/my-bookings");
   const appointment = page.getByTestId("booking-70000000-0000-0000-0000-000000000004");
   await appointment.getByTestId("managed-details").click();
@@ -192,7 +213,8 @@ test("stored text projections remain inert on administrative and managed views",
   expect(consoleDisclosures.some(Boolean)).toBe(false);
   await expectRenderingContexts("stored-admin", [
     "booking-card-label", "participant-card-label", "rule-set-name", "person-fields",
-    "account-username", "booking-note", "guest-name", "audit-projection"
+    "account-username", "membership-type-name", "import-source-name", "external-reference-id",
+    "booking-note", "guest-name", "audit-projection"
   ]);
 });
 
