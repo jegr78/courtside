@@ -5,6 +5,7 @@ import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./ap
 import { Alert } from "./components/Alert";
 import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
 import { Preferences } from "./components/Preferences";
+import { PrimaryNavigation } from "./components/PrimaryNavigation";
 import { PwaLifecycle } from "./components/PwaLifecycle";
 import { applyAccountLocale, supportedLocale } from "./i18n";
 import { HomeView } from "./views/HomeView";
@@ -32,14 +33,16 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       <Route path="*" element={<Navigate to="/initial-password" replace />} />
     </Routes>;
   }
-  return <Routes>
-    <Route path="/" element={<HomeView session={session} signedOut={() => signedOut?.()} />} />
-    <Route path="/courts" element={<HomeView session={session} signedOut={() => signedOut?.()} />} />
+  return <div className="flex w-full flex-col items-center gap-4">
+    <PrimaryNavigation session={session} signedOut={() => signedOut?.()} />
+    <Routes>
+    <Route path="/" element={<HomeView session={session} />} />
+    <Route path="/courts" element={<HomeView session={session} />} />
     <Route path="/login" element={session.authenticated
       ? <Navigate to="/" replace />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="/my-bookings" element={session.authenticated
-      ? <MyBookingsPage session={session} signedOut={() => signedOut?.()} />
+      ? <MyBookingsPage session={session} />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="/admin/configuration" element={session.roles.includes("ADMIN")
       ? <AdminConfigurationView configurationChanged={(changed) => configurationChanged?.(changed)} />
@@ -54,7 +57,8 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       ? <AdminAuditView />
       : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>;
+    </Routes>
+  </div>;
 }
 
 function applyBranding(config: ClubConfig) {
