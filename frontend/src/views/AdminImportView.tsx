@@ -6,6 +6,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { ExternalReferencePanel } from "./import/ExternalReferencePanel";
+import { ImportExecutionPanel } from "./import/ImportExecutionPanel";
 import { ImportPreviewPanel } from "./import/ImportPreviewPanel";
 import { ImportSourceForm } from "./import/ImportSourceForm";
 
@@ -116,6 +117,15 @@ export function AdminImportView() {
       preview={preview}
       disabled={pending}
       previewed={setPreview}
+      reportError={reportError}
+    />}
+
+    {chosen && <ImportExecutionPanel
+      key={`execution-${chosen.id}`}
+      sourceId={chosen.id}
+      preview={preview}
+      disabled={pending}
+      executed={() => setPreview(undefined)}
       reportError={reportError}
     />}
 

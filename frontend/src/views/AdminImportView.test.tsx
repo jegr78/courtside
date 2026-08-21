@@ -31,6 +31,7 @@ describe("AdminImportView", () => {
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    vi.spyOn(api, "importRuns").mockResolvedValue([]);
   });
 
   it("given a club with sources, when the view opens, then each one can be chosen", async () => {

@@ -1,0 +1,103 @@
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { api, type ImportPreview, type ImportRun } from "../../api/client";
+import { Button } from "../../components/Button";
+import { Modal } from "../../components/Modal";
+
+const NUMBERS = [
+  "created", "corrected", "membershipsEnded", "accountsDisabled", "rolesRemoved", "rowErrors"
+] as const;
+
+function isExecutable(preview: ImportPreview): boolean {
+  return !preview.superseded && Date.parse(preview.expiresAt) > Date.now();
+}
+
+export function ImportExecutionPanel({ sourceId, preview, disabled, executed, reportError }: {
+  sourceId: string;
+  preview: ImportPreview | undefined;
+  disabled: boolean;
+  executed: (run: ImportRun) => void;
+  reportError: (failure: unknown) => void;
+}) {
+  const { t } = useTranslation();
+  const [runs, setRuns] = useState<ImportRun[]>();
+  const [result, setResult] = useState<ImportRun>();
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  const read = useCallback(async () => setRuns(await api.importRuns(sourceId)), [sourceId]);
+
+  useEffect(() => {
+    void read().catch(reportError);
+  }, [read, reportError]);
+
+  async function execute(reviewed: ImportPreview) {
+    if (pending) return;
+    setPending(true);
+    try {
+      const run = await api.executeImportPreview(reviewed.previewId, reviewed.needsConfirmation);
+      setResult(run);
+      setRuns((current) => [run, ...(current ?? [])]);
+      setConfirming(false);
+      executed(run);
+    } catch (failure) {
+      setConfirming(false);
+      reportError(failure);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const busy = disabled || pending;
+
+  return <section className="surface-subtle grid gap-4 rounded-xl border p-4">
+    <h2 className="text-2xl font-bold">{t("admin.import.execution")}</h2>
+
+    {preview && (isExecutable(preview)
+      ? <Button data-testid="execute-preview" disabled={busy} className="justify-self-start" type="button" onClick={() => setConfirming(true)}>
+        {t("admin.import.execute")}
+      </Button>
+      : <p data-testid="not-executable">{t("admin.import.notExecutable")}</p>)}
+
+    {result && <div data-testid="run-result" className="grid gap-1 rounded-lg border p-3">
+      <h3 className="text-lg font-semibold">{t("admin.import.runResult")}</h3>
+      {NUMBERS.map((number) => <p key={number} data-testid={`run-result-${number}`}>
+        {t(`admin.import.run.${number}`, { value: result[number] })}
+      </p>)}
+    </div>}
+
+    <div className="grid gap-2 border-t pt-4">
+      <h3 className="text-lg font-semibold">{t("admin.import.runLog")}</h3>
+      {runs && (runs.length === 0
+        ? <p data-testid="no-runs">{t("admin.import.noRuns")}</p>
+        : <ul className="grid gap-2">
+          {runs.map((held) => <li key={held.runId} data-testid={`run-${held.runId}`} className="rounded-lg border p-2">
+            <p>{t("admin.import.runAt", { at: new Date(held.executedAt).toLocaleString() })}</p>
+            <p>{NUMBERS.map((number) => t(`admin.import.run.${number}`, { value: held[number] })).join(" · ")}</p>
+          </li>)}
+        </ul>)}
+    </div>
+
+    {confirming && preview && <Modal labelledBy="execute-title" closed={() => setConfirming(false)}>
+      <div className="grid gap-4">
+        <h2 id="execute-title" className="text-2xl font-bold">{t("admin.import.execute")}</h2>
+        <p>{t("admin.import.executeExplain", { fileName: preview.fileName, rowCount: preview.rowCount })}</p>
+        {preview.needsConfirmation && <p data-testid="confirm-removals-note">
+          {t("admin.import.confirmRemovals", {
+            ending: preview.removals.count,
+            linked: preview.removals.currentlyLinked,
+            percent: preview.removals.percent
+          })}
+        </p>}
+        <div className="flex flex-wrap gap-3">
+          <Button data-testid="confirm-execute" disabled={busy} type="button" onClick={() => void execute(preview)}>
+            {t("admin.import.execute")}
+          </Button>
+          <Button data-testid="cancel-execute" type="button" onClick={() => setConfirming(false)}>
+            {t("admin.cancel")}
+          </Button>
+        </div>
+      </div>
+    </Modal>}
+  </section>;
+}
