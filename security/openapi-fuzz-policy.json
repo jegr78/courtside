@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "image": "schemathesis/schemathesis:4.25.0@sha256:980d159d1211ed2ef1f571aa8c6876955c6699dfd6463b8b5f28e788aa61e25e",
+  "seed": 24820260821,
+  "maxExamples": 5,
+  "workers": 1,
+  "requestTimeoutSeconds": 5,
+  "maxFailures": 100,
+  "phases": ["examples", "coverage", "fuzzing"],
+  "inputClasses": [
+    "missing-fields",
+    "duplicate-fields",
+    "unknown-fields",
+    "unicode-normalization",
+    "control-characters",
+    "deep-json",
+    "oversized-body",
+    "numeric-boundary",
+    "cursor-boundary",
+    "date-time-boundary",
+    "malformed-idempotency-key"
+  ],
+  "checks": [
+    "not_a_server_error",
+    "status_code_conformance",
+    "content_type_conformance",
+    "response_headers_conformance",
+    "response_schema_conformance",
+    "negative_data_rejection",
+    "positive_data_acceptance",
+    "missing_required_header",
+    "unsupported_method",
+    "allow_header_conformance"
+  ],
+  "nativeRequestReserve": 50,
+  "excludedOperations": {
+    "logIn": "Authentication enumeration and rate limiting are covered by CSA-AUTHN-001.",
+    "logOut": "Session invalidation is covered by CSA-AUTHN-001 and browser security journeys.",
+    "changeInitialPassword": "The bootstrap-only transition is covered by packaged browser security journeys.",
+    "createImportPreview": "Multipart parser abuse is covered by the curated CSA-IMPORT-001 cases.",
+    "executeImportPreview": "Import execution is stateful and remains covered by deterministic import integration tests."
+  },
+  "positiveMutationRationale": "Valid mutations are covered by packaged journeys and the authorization matrix; generated mutation traffic is restricted to rejected inputs so state preservation remains attributable."
+}

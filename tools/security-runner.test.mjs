@@ -57,6 +57,20 @@ function input(overrides = {}) {
   };
 }
 
+function activePlan() {
+  const selectedTests = ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001", "CSA-API-001", "CSA-IMPORT-001"];
+  return buildSecurityPlan(input({
+    tools: [
+      { id: "target-identity", version: "1.0.0", testIds: [] },
+      { id: "authenticated-zap", version: "2.16.1", testIds: ["CSA-DAST-001"] },
+      { id: "openapi-fuzzer", version: "4.25.0", testIds: ["CSA-API-001", "CSA-IMPORT-001"] },
+      { id: "authorization-matrix", version: "1.0.0", testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"] }
+    ],
+    selectedTests,
+    catalogTests: selectedTests.map((id) => ({ id, status: "implemented", profile: "active" }))
+  }));
+}
+
 test("given every security profile, when reading its contract, then all resource and evidence budgets are bounded", () => {
   // given
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(runContractSchema);
@@ -261,36 +275,65 @@ test("given the bounded passive suite, when every check passes, then its evidenc
   });
 });
 
-test("given the bounded authorization suite, when every attack check passes, then its evidence governs the outcome", async () => {
+test("given the bounded active suites, when every attack check passes, then their evidence governs the outcome", async () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
-  const plan = buildSecurityPlan(input({
-    profile: "active",
-    authorization: "authorize-active-run-0001",
-    tools: [
-      { id: "target-identity", version: "1.0.0", testIds: [] },
-      { id: "authorization-matrix", version: "1.0.0", testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"] }
-    ],
-    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001"],
-    catalogTests: [
-      { id: "CSA-AUTHN-001", status: "implemented", profile: "active" },
-      { id: "CSA-AUTHZ-001", status: "implemented", profile: "active" }
-    ]
-  }));
+  const plan = activePlan();
+  const limits = {};
 
   // when
   const manifest = await executeSecurityPlan(plan, {
     root,
     verifyTarget: async () => input(),
-    runAuthorizationAssessment: async () => ({ outcome: "passed", requestCount: 900 })
+    runAuthorizationAssessment: async (_plan, context) => {
+      limits.authorization = context.maxRequests;
+      return { outcome: "passed", requestCount: 900 };
+    },
+    runAuthenticatedZapAssessment: async (_plan, context) => {
+      limits.zap = context.maxRequests;
+      return { outcome: "passed", requestCount: 100,
+        generatedDataMegabytes: 1 };
+    },
+    runOpenApiFuzzAssessment: async (_plan, context) => {
+      limits.fuzz = context.maxRequests;
+      return { outcome: "passed", requestCount: 200, generatedDataMegabytes: 2 };
+    }
   });
 
   // then
   assert.equal(manifest.outcome, "passed");
-  assert.equal(manifest.usage.requests, 900);
+  assert.equal(manifest.usage.requests, 1200);
+  assert.equal(manifest.usage.generatedDataMegabytes, 3);
+  assert.deepEqual(limits, { zap: 6000, fuzz: 2000, authorization: 2000 });
   assert.deepEqual(manifest.toolResults.at(-1), {
     id: "authorization-matrix", version: "1.0.0", outcome: "passed"
   });
+});
+
+test("given fuzzing changed domain state, when executing the active plan, then later probes are skipped", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  let authorizationCalled = false;
+
+  // when
+  const manifest = await executeSecurityPlan(activePlan(), {
+    root,
+    verifyTarget: async () => input(),
+    runAuthenticatedZapAssessment: async () => ({ outcome: "passed", requestCount: 100,
+      generatedDataMegabytes: 1 }),
+    runOpenApiFuzzAssessment: async () => ({ outcome: "failed", requestCount: 200,
+      generatedDataMegabytes: 2 }),
+    runAuthorizationAssessment: async () => {
+      authorizationCalled = true;
+      return { outcome: "passed", requestCount: 900 };
+    }
+  });
+
+  // then
+  assert.equal(authorizationCalled, false);
+  assert.equal(manifest.outcome, "failed");
+  assert.match(manifest.reason, /changed protected domain state/);
+  assert.equal(manifest.usage.requests, 300);
 });
 
 test("given sensitive diagnostics, when retaining them, then credentials and session material are redacted", () => {

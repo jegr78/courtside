@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    { "$ref": "#/$defs/storageEvidence" },
+    { "$ref": "#/$defs/cspEvidence" }
+  ],
+  "$defs": {
+    "cookie": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "httpOnly", "secure", "sameSite", "path"],
+      "properties": {
+        "name": { "enum": ["SESSION", "XSRF-TOKEN"] },
+        "httpOnly": { "type": "boolean" },
+        "secure": { "type": "boolean" },
+        "sameSite": { "enum": ["Lax", "Strict", "None"] },
+        "path": { "const": "/" }
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["localStorageKeys", "sessionStorageKeys", "cacheRequests", "storageContainsSensitiveData", "cookies"],
+      "properties": {
+        "localStorageKeys": { "type": "array", "items": { "const": "courtside.locale" }, "uniqueItems": true },
+        "sessionStorageKeys": { "type": "array", "maxItems": 0 },
+        "cacheRequests": { "type": "array", "items": { "type": "string", "pattern": "^/(?:index\\.html|assets/[A-Za-z0-9_.-]+\\.(?:css|js))$" }, "uniqueItems": true },
+        "storageContainsSensitiveData": { "const": false },
+        "cookies": { "type": "array", "items": { "$ref": "#/$defs/cookie" }, "uniqueItems": true }
+      }
+    },
+    "storageEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "authenticated", "postLogout", "consoleEventTypes"],
+      "properties": {
+        "kind": { "const": "browser-storage" },
+        "authenticated": { "$ref": "#/$defs/inventory" },
+        "postLogout": { "$ref": "#/$defs/inventory" },
+        "consoleEventTypes": {
+          "type": "array",
+          "items": {
+            "enum": ["log", "debug", "info", "error", "warning", "dir", "dirxml", "table", "trace", "clear", "startGroup", "startGroupCollapsed", "endGroup", "assert", "profile", "profileEnd", "count", "timeEnd"]
+          }
+        }
+      }
+    },
+    "cspEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "executed", "events"],
+      "properties": {
+        "kind": { "const": "browser-csp" },
+        "executed": { "const": false },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["directive", "blockedReason"],
+            "properties": {
+              "directive": { "const": "script-src-elem" },
+              "blockedReason": { "const": "inline" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

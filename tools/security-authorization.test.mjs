@@ -97,6 +97,7 @@ test("given mutating operations, when attacking request boundaries, then each op
   assert.ok(checks.every(({ outcome }) => outcome === "passed"));
   assert.equal(calls[1].probe.method, "OPTIONS");
   assert.equal(calls[1].probe.headers.origin, "https://attacker.example");
+  assert.equal(calls[2].probe.path, "/__security/request-observation");
   assert.equal(calls[2].probe.headers.host, "attacker.example");
   assert.equal(calls[3].probe.headers["x-forwarded-host"], "attacker.example");
 });

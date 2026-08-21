@@ -12,6 +12,30 @@ journey inspects Cache Storage after authenticated activity and offline reloads.
 English offline launch must show the connection state, reconnect without mixed assets and retain no
 personal API response. Logout plus Back and Forward must not reveal an authenticated view.
 
+The Chromium security journey stores a harmless inert markup payload in every current text shape
+that reaches the rendered PWA: club and court names, booking and participant-card labels, rule-set
+names, roster names, managed-booking notes and guest names. It then observes the public, member,
+administrative and managed-appointment projections. Execution markers must remain untouched, the
+payload must not enter console output, and only the locale preference may appear in Web Storage.
+Retained evidence contains storage key names, cached request paths, cookie attributes, console
+event types and normalized CSP events, never storage or cookie values, response bodies or
+credentials. Security journeys disable Playwright traces and screenshots. The build uploads only
+the two evidence documents after each has passed its closed JSON Schema.
+
+The shared browser world deliberately lowers the cookie `Secure` attribute because it also proves
+the documented plain-HTTP client boundary. It still inventories cookie names and the `HttpOnly`,
+`SameSite` and path attributes without retaining values. The default `Secure=true` contract is
+proved by the backend cookie test and by the passive SECURITY/UAT deployment checks; this browser
+journey does not replace or weaken those gates.
+
+A separate CSP probe creates a blocked inline script and requires an attributable
+`securitypolicyviolation` event. Chromium runs the complete projection, storage, cache and CSP
+suite. WebKit runs the CSP/clickjacking header smoke on every pull request; Firefox runs the same
+smoke in the periodic browser qualification. The existing service-worker transition journey also
+rechecks the CSP and API-cache boundary after activating the updated worker.
+`security/browser-rendering-contexts.json` is the maintained inventory of club-controlled browser
+contexts. Its policy test requires every entry to have a matching journey assertion.
+
 Vite registers updates in prompt mode. A waiting worker stays inactive until the localized update
 control is accepted, then activates and reloads the application as one asset version. Additive API
 changes remain compatible with an already open client. A breaking published API change follows the
