@@ -539,9 +539,11 @@ Deliberate decisions:
 `username` is the login identifier, unique per instance, freely chosen by the member
 (suggested at registration as `lastname.firstname`).
 
-`email` is **mandatory but not unique**, and changeable at any time. Clubs enrol children and
+`email` is **optional and not unique**, and changeable at any time. Clubs enrol children and
 juveniles under a parent's address, and a family with several children then shares one address
-across several accounts — so an email address cannot serve as the identifier.
+across several accounts — so an email address cannot serve as the identifier. It is optional
+because a club's own member list carries people it holds no address for; what that costs them is
+that nothing can be sent to them, and the paths below are exactly what they lose.
 
 **Consequence for password reset.** The standard "enter your email" flow does not work. Two
 paths, both supported:
