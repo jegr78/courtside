@@ -16,9 +16,9 @@ const contractRoles = api.components.schemas.Role.enum;
 // TypeScript cannot emit a runtime array from a generated union, so the values are written by hand
 // and this is what keeps them from drifting away from the contract that declares them.
 const offeredRoles = () => {
-  const source = readFileSync(join(root, "frontend/src/views/AdminRosterView.tsx"), "utf8");
+  const source = readFileSync(join(root, "frontend/src/views/AdminPersonView.tsx"), "utf8");
   const declared = source.match(/const roles: Role\[\] = \[([\s\S]*?)\];/);
-  assert.ok(declared, "could not locate the roles array in AdminRosterView.tsx");
+  assert.ok(declared, "could not locate the roles array in AdminPersonView.tsx");
   return [...declared[1].matchAll(/"([A-Z_]+)"/g)].map((match) => match[1]);
 };
 

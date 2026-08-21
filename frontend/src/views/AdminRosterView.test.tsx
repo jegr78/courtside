@@ -1,14 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
-import { api, ApiError, type RosterEntry } from "../api/client";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { api, type MembershipType, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
 import { AdminRosterView } from "./AdminRosterView";
 
 const withAccount: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
-  accountId: "account-1", username: "doe.jane", enabled: true, roles: ["MEMBER"]
+  accountId: "account-1", username: "doe.jane", enabled: true, roles: ["MEMBER"],
+  membershipTypeId: "type-1", membershipStartedOn: "2026-01-01", membershipEndedOn: null
 };
 
 const withoutAccount: RosterEntry = {
@@ -16,25 +17,32 @@ const withoutAccount: RosterEntry = {
   accountId: null, username: null, enabled: false, roles: []
 };
 
+const departed: RosterEntry = {
+  personId: "person-3", firstName: "Mary", lastName: "Major", email: "mary.major@example.org",
+  accountId: "account-3", username: "major.mary", enabled: true, roles: ["MEMBER"],
+  membershipTypeId: "type-1", membershipStartedOn: "2025-01-01", membershipEndedOn: "2026-03-31"
+};
+
+const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true };
+
+function row(personId: string): HTMLElement {
+  return screen.getByTestId(`roster-row-${personId}`);
+}
+
 describe("AdminRosterView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, withoutAccount], nextCursor: null });
+    vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
   });
 
-  it("given people with and without an account, when the view loads, then both are editable", async () => {
-    // when
+  it("given people with and without an account, when the view loads, then the list says which is which", async () => {
     render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
 
-    // then
-    expect(await screen.findByTestId("person-first-name-person-1")).toHaveValue("Jane");
-    expect(screen.getByTestId("person-email-person-1")).toHaveValue("jane.doe@example.org");
-    expect(screen.getByTestId("account-username-person-1")).toHaveValue("doe.jane");
-    expect(screen.getByTestId("account-roles-person-1-MEMBER")).toBeChecked();
-    expect(screen.getByTestId("account-roles-person-1-ADMIN")).not.toBeChecked();
-    expect(screen.getByTestId("new-account-username-person-2")).toHaveValue("");
-    expect(screen.queryByTestId("account-username-person-2")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("roster-row-person-1")).toBeInTheDocument();
+    expect(within(row("person-1")).getByTestId("roster-account-person-1")).toHaveTextContent("Active");
+    expect(within(row("person-2")).getByTestId("roster-account-person-2")).toHaveTextContent("No account");
   });
 
   it("given the roster cannot load, when opening the view, then the failure replaces the loading state", async () => {
@@ -48,249 +56,124 @@ describe("AdminRosterView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
-    expect(screen.getByRole("link")).toBeInTheDocument();
   });
 
-  it("given a mistyped name, when correcting it, then the correction is sent", async () => {
-    // given
-    const changePerson = vi.spyOn(api, "changePerson").mockResolvedValue({ ...withAccount, firstName: "Mary" });
+  it("given a person in the list, when reading their row, then their name links to their page", async () => {
     render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
+
+    expect(await screen.findByTestId("person-link-person-1"))
+      .toHaveAttribute("href", "/admin/roster/person-1");
+  });
+
+  it("given an ended membership, when the list is read, then it is not shown as a current one", async () => {
+    // given
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, departed], nextCursor: null });
 
     // when
-    await user.clear(await screen.findByTestId("person-first-name-person-1"));
-    await user.type(screen.getByTestId("person-first-name-person-1"), "Mary");
-    await user.click(screen.getByTestId("save-person-person-1"));
+    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
 
     // then
-    expect(changePerson).toHaveBeenCalledWith("person-1", {
-      firstName: "Mary", lastName: "Doe", email: "jane.doe@example.org"
-    });
-    expect(screen.getByTestId("person-first-name-person-1")).toHaveValue("Mary");
+    expect(await screen.findByTestId("roster-membership-person-1")).toHaveTextContent("Adults");
+    const ended = screen.getByTestId("roster-membership-person-3");
+    expect(ended).not.toHaveTextContent("Adults");
+    expect(ended).toHaveTextContent("2026-03-31");
+  });
+
+  it("given a membership type is chosen, when filtering, then the list asks the server for that type", async () => {
+    // given
+    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+
+    // when
+    await userEvent.selectOptions(await screen.findByTestId("roster-filter"), "type-1");
+
+    // then
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith(undefined, undefined, 50, "type-1"));
   });
 
   it("given a name to look for, when searching, then the roster is read again for that name", async () => {
     // given
-    const roster = vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount], nextCursor: null });
     render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
+    await screen.findByTestId("roster-row-person-1");
 
     // when
-    await user.type(await screen.findByTestId("roster-search"), "Roe");
-    await user.click(screen.getByTestId("roster-search-submit"));
+    await userEvent.type(screen.getByTestId("roster-search"), "Roe");
+    await userEvent.click(screen.getByTestId("roster-search-submit"));
 
     // then
-    expect(roster).toHaveBeenNthCalledWith(2, "Roe", undefined);
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith("Roe", undefined, 50, undefined));
   });
 
   it("given a further page, when reading it, then its people are appended", async () => {
     // given
-    const roster = vi.spyOn(api, "roster")
+    vi.spyOn(api, "roster")
       .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" })
       .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null });
     render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
+    await screen.findByTestId("roster-row-person-1");
 
     // when
-    await user.click(await screen.findByTestId("roster-load-more"));
+    await userEvent.click(screen.getByTestId("roster-load-more"));
 
     // then
-    expect(roster).toHaveBeenNthCalledWith(2, undefined, "person-1");
-    expect(await screen.findByTestId("person-first-name-person-2")).toHaveValue("John");
-    expect(screen.queryByTestId("roster-load-more")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("roster-row-person-2")).toBeInTheDocument();
+    expect(screen.getByTestId("roster-row-person-1")).toBeInTheDocument();
   });
 
-  it("given a search with a further page, when reading it, then the same name is asked for again", async () => {
+  it("given a search and a filter with a further page, when reading it, then both are asked for again", async () => {
     // given
-    const roster = vi.spyOn(api, "roster")
-      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: null })
-      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: "person-2" })
-      .mockResolvedValueOnce({ entries: [], nextCursor: null });
+    vi.spyOn(api, "roster")
+      .mockResolvedValueOnce({ entries: [withAccount, withoutAccount], nextCursor: null })
+      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" })
+      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null });
     render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
+    await screen.findByTestId("roster-row-person-1");
+    await userEvent.type(screen.getByTestId("roster-search"), "Doe");
+    await userEvent.click(screen.getByTestId("roster-search-submit"));
+    await screen.findByTestId("roster-load-more");
 
     // when
-    await user.type(await screen.findByTestId("roster-search"), "Roe");
-    await user.click(screen.getByTestId("roster-search-submit"));
-    await user.click(await screen.findByTestId("roster-load-more"));
+    await userEvent.click(screen.getByTestId("roster-load-more"));
 
     // then
-    expect(roster).toHaveBeenNthCalledWith(3, "Roe", "person-2");
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith("Doe", "person-1", 50, undefined));
   });
 
-  it("when adding a person, then they join the roster", async () => {
+  it("when adding a person, then they join the roster and their page opens", async () => {
     // given
     const created: RosterEntry = {
-      personId: "person-3", firstName: "Richard", lastName: "Miles", email: "richard.miles@example.org",
+      personId: "person-9", firstName: "Mary", lastName: "Major", email: "mary.major@example.org",
       accountId: null, username: null, enabled: false, roles: []
     };
-    const createPerson = vi.spyOn(api, "createPerson").mockResolvedValue(created);
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
+    vi.spyOn(api, "createPerson").mockResolvedValue(created);
+    render(<MemoryRouter initialEntries={["/admin/roster"]}>
+      <Routes>
+        <Route path="/admin/roster" element={<AdminRosterView />} />
+        <Route path="/admin/roster/:personId" element={<div data-testid="opened-person">opened</div>} />
+      </Routes>
+    </MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
 
     // when
-    await user.type(await screen.findByTestId("new-person-first-name"), "Richard");
-    await user.type(screen.getByTestId("new-person-last-name"), "Miles");
-    await user.type(screen.getByTestId("new-person-email"), "richard.miles@example.org");
-    await user.click(screen.getByTestId("create-person"));
+    await userEvent.type(screen.getByTestId("new-person-first-name"), "Mary");
+    await userEvent.type(screen.getByTestId("new-person-last-name"), "Major");
+    await userEvent.type(screen.getByTestId("new-person-email"), "mary.major@example.org");
+    await userEvent.click(screen.getByTestId("create-person"));
 
     // then
-    expect(createPerson).toHaveBeenCalledWith({
-      firstName: "Richard", lastName: "Miles", email: "richard.miles@example.org"
+    expect(api.createPerson).toHaveBeenCalledWith({
+      firstName: "Mary", lastName: "Major", email: "mary.major@example.org"
     });
-    expect(await screen.findByTestId("person-first-name-person-3")).toHaveValue("Richard");
-  });
-
-  it("given a person without an account, when giving them one, then it carries the chosen roles", async () => {
-    // given
-    const createAccount = vi.spyOn(api, "createAccount").mockResolvedValue({
-      ...withoutAccount, accountId: "account-2", username: "roe.john", enabled: true, roles: ["MEMBER", "TRAINER"]
-    });
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
-
-    // when
-    await user.type(await screen.findByTestId("new-account-username-person-2"), "roe.john");
-    await user.type(screen.getByTestId("new-account-password-person-2"), "one-time-secret");
-    await user.click(screen.getByTestId("new-account-role-person-2-MEMBER"));
-    await user.click(screen.getByTestId("new-account-role-person-2-TRAINER"));
-    await user.click(screen.getByTestId("create-account-person-2"));
-
-    // then
-    expect(createAccount).toHaveBeenCalledWith("person-2", {
-      username: "roe.john", oneTimePassword: "one-time-secret", roles: ["MEMBER", "TRAINER"]
-    });
-    expect(await screen.findByTestId("account-username-person-2")).toHaveValue("roe.john");
-  });
-
-  it("given an account, when appointing it to a further role, then the whole role set is sent", async () => {
-    // given
-    const changeAccountRoles = vi.spyOn(api, "changeAccountRoles")
-      .mockResolvedValue({ ...withAccount, roles: ["MEMBER", "ADMIN"] });
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
-
-    // when
-    await user.click(await screen.findByTestId("account-roles-person-1-ADMIN"));
-    await user.click(screen.getByTestId("save-roles-person-1"));
-
-    // then
-    expect(changeAccountRoles).toHaveBeenCalledWith("person-1", ["MEMBER", "ADMIN"]);
-  });
-
-  it("given a mistyped username, when correcting it, then the account keeps the corrected one", async () => {
-    // given
-    const changeAccountUsername = vi.spyOn(api, "changeAccountUsername")
-      .mockResolvedValue({ ...withAccount, username: "doe.mary" });
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
-
-    // when
-    await user.clear(await screen.findByTestId("account-username-person-1"));
-    await user.type(screen.getByTestId("account-username-person-1"), "doe.mary");
-    await user.click(screen.getByTestId("save-username-person-1"));
-
-    // then
-    expect(changeAccountUsername).toHaveBeenCalledWith("person-1", "doe.mary");
-    expect(screen.getByTestId("account-username-person-1")).toHaveValue("doe.mary");
-  });
-
-  it("given a member who forgot their password, when resetting it, then the new one-time password is sent", async () => {
-    // given
-    const resetAccountPassword = vi.spyOn(api, "resetAccountPassword").mockResolvedValue(withAccount);
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
-
-    // when
-    await user.type(await screen.findByTestId("account-password-person-1"), "another-secret");
-    await user.click(screen.getByTestId("reset-password-person-1"));
-
-    // then
-    expect(resetAccountPassword).toHaveBeenCalledWith("person-1", "another-secret");
-    expect(screen.getByTestId("account-password-person-1")).toHaveValue("");
-  });
-
-  it("given an enabled account, when disabling it, then the button offers to enable it again", async () => {
-    // given
-    const setAccountActive = vi.spyOn(api, "setAccountActive")
-      .mockResolvedValue({ ...withAccount, enabled: false });
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
-
-    // when
-    await user.click(await screen.findByTestId("toggle-account-person-1"));
-
-    // then
-    expect(setAccountActive).toHaveBeenCalledWith("person-1", false);
-    expect(screen.getByTestId("toggle-account-person-1")).toHaveAccessibleName("Activate");
-  });
-
-  it("given an unsaved correction, when the account is disabled, then the correction is not thrown away", async () => {
-    // given
-    vi.spyOn(api, "setAccountActive").mockResolvedValue({ ...withAccount, enabled: false });
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
-
-    // when
-    await user.clear(await screen.findByTestId("person-first-name-person-1"));
-    await user.type(screen.getByTestId("person-first-name-person-1"), "Mary");
-    await user.click(screen.getByTestId("toggle-account-person-1"));
-
-    // then
-    expect(screen.getByTestId("toggle-account-person-1")).toHaveAccessibleName("Activate");
-    expect(screen.getByTestId("person-first-name-person-1")).toHaveValue("Mary");
-  });
-
-  it("given an unsaved username, when the person is saved, then the username is not thrown away", async () => {
-    // given
-    vi.spyOn(api, "changePerson").mockResolvedValue(withAccount);
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
-
-    // when
-    await user.clear(await screen.findByTestId("account-username-person-1"));
-    await user.type(screen.getByTestId("account-username-person-1"), "doe.mary");
-    await user.click(screen.getByTestId("save-person-person-1"));
-
-    // then
-    expect(await screen.findByRole("status")).toBeInTheDocument();
-    expect(screen.getByTestId("account-username-person-1")).toHaveValue("doe.mary");
+    expect(await screen.findByTestId("opened-person")).toBeInTheDocument();
   });
 
   it("given nobody matches the search, when the roster is read, then the empty list says so", async () => {
     // given
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-
-    // then
-    expect(await screen.findByTestId("roster-empty")).toHaveTextContent("No person found.");
-    expect(screen.queryByTestId("roster-load-more")).not.toBeInTheDocument();
-  });
-
-  it("given a person without an account, when the view loads, then nothing offers to enable one", async () => {
-    // when
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-
-    // then
-    expect(await screen.findByTestId("toggle-account-person-1")).toBeInTheDocument();
-    expect(screen.queryByTestId("toggle-account-person-2")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("save-roles-person-2")).not.toBeInTheDocument();
-  });
-
-  it("given the last administrator, when their account is disabled, then the refusal is shown", async () => {
-    // given
-    vi.spyOn(api, "setAccountActive").mockRejectedValue(new ApiError(409, {
-      type: "urn:courtside:error:last-administrator", title: "Conflict", status: 409,
-      violations: [{ code: "roster.lastAdministrator", params: {} }]
-    }));
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
-    const user = userEvent.setup();
 
     // when
-    await user.click(await screen.findByTestId("toggle-account-person-1"));
+    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
 
     // then
-    expect(await screen.findByRole("alert"))
-      .toHaveTextContent("The instance must keep one enabled administrator, so this account can neither be disabled nor lose the role.");
+    expect(await screen.findByTestId("roster-empty")).toBeInTheDocument();
   });
 });
