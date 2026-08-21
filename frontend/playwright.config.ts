@@ -6,7 +6,7 @@ process.env.FORCE_COLOR = "0";
 const periodicProjects = process.env.COURTSIDE_PERIODIC_BROWSERS === "true" ? [
   // Firefox keeps its own certificate store, which neither the system store nor a Chromium
   // argument reaches, so it stays on the origin that needs no certificate at all.
-  { name: "firefox-periodic", testMatch: /supported-browser\.spec\.ts/, metadata: { plainOrigin: true }, use: { ...devices["Desktop Firefox"] } },
+  { name: "firefox-periodic", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, metadata: { plainOrigin: true }, use: { ...devices["Desktop Firefox"] } },
   { name: "iphone-periodic", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["iPhone 15"] } },
   { name: "android-periodic", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["Pixel 7"] } }
 ] : [];
@@ -20,7 +20,7 @@ const configuredProjects = [
   { name: "chromium", testIgnore: /responsive-mobile\.spec\.ts|visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" as const } },
-  { name: "webkit-core", testMatch: /supported-browser\.spec\.ts/, metadata: { plainOrigin: true }, use: { browserName: "webkit" as const } },
+  { name: "webkit-core", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, metadata: { plainOrigin: true }, use: { browserName: "webkit" as const } },
   ...periodicProjects
 ];
 

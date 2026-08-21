@@ -128,8 +128,8 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <div className="grid gap-5 sm:grid-cols-2">
             <TextField label={t("admin.config.primaryColor")} value={config.primaryColor} onChange={(event) => changeConfig({ primaryColor: event.target.value })} />
             <TextField label={t("admin.config.accentColor")} value={config.accentColor} onChange={(event) => changeConfig({ accentColor: event.target.value })} />
-            <TextField label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""} onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
-            <TextField label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
+            <TextField data-testid="logo-url" label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""} onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
+            <TextField data-testid="imprint-url" label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
           </div>
           <label className="grid gap-2 font-medium">
             {t("admin.config.defaultLocale")}
