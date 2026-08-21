@@ -62,3 +62,31 @@ test("an ordinary member has no managed-appointments area", async ({ page }) => 
   // then
   await expect(page.getByTestId("managed-appointments-title")).toHaveCount(0);
 });
+
+test("an officer creates a weekly series and finds its appointments in the managed list", async ({ page }) => {
+  // given — the clock is pinned to a Tuesday, so these three Mondays are the same ones every run
+  await signIn(page, "sport.major");
+  await page.getByTestId("new-series").click();
+  await page.getByTestId("series-courts").selectOption(["dddddddd-0000-0000-0000-000000000004"]);
+  await page.getByTestId("series-card").selectOption("33333333-3333-3333-3333-333333333333");
+  await page.getByTestId("series-starts-on").fill("2026-05-18");
+  await page.getByTestId("series-start-time").fill("18:00");
+  await page.getByTestId("series-weekday-MONDAY").check();
+  await page.getByTestId("series-occurrence-count").fill("3");
+
+  // when
+  await page.getByTestId("preview-series").click();
+  await expect(page.getByTestId("series-occurrence-2")).toBeVisible();
+  const created = page.waitForResponse((response) =>
+    response.url().endsWith("/api/booking-series") && response.request().method() === "POST");
+  await page.getByTestId("confirm-series").click();
+  const { bookingIds } = await (await created).json() as { bookingIds: string[] };
+
+  // then — the appointments are in the list the officer manages, without a reload
+  expect(bookingIds).toHaveLength(3);
+  await expect(page.getByTestId("series-created")).toBeVisible();
+  const managedList = page.getByTestId("managed-bookings");
+  for (const bookingId of bookingIds) {
+    await expect(managedList.getByTestId(`booking-${bookingId}`)).toBeVisible();
+  }
+});

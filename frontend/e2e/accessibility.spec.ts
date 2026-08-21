@@ -54,6 +54,21 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
+  test(`${locale} the series form meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await page.locator("#locale-preference").selectOption(locale);
+    await signIn(page, "sport.major");
+    await page.getByTestId("my-bookings-link").click();
+
+    // when
+    await page.getByTestId("new-series").click();
+    await expect(page.getByTestId("series-courts")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+  });
+
   test(`${locale} administration views meet automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");

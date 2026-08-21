@@ -356,3 +356,62 @@ it("given more participations than one page, when the member asks for more, then
   expect(screen.getByTestId(`participation-${participationId}`)).toBeInTheDocument();
   expect(screen.queryByTestId("load-more-participations")).not.toBeInTheDocument();
 });
+
+it("given an ordinary member, when their bookings are read, then no series can be started there", async () => {
+  // given / when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await screen.findByTestId("my-bookings-title");
+
+  // then — creating a series belongs to the managed section, which an ordinary member has none of
+  expect(screen.queryByTestId("new-series")).not.toBeInTheDocument();
+});
+
+it("given a manager, when the managed section is read, then a series can be started there", async () => {
+  // given
+  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [] });
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
+
+  // then
+  expect(await screen.findByTestId("new-series")).toBeInTheDocument();
+});
+
+it("given a series that was just created, when the managed list reloads, then its result stays on screen", async () => {
+  // given
+  let releaseReload: () => void = () => undefined;
+  vi.spyOn(api, "managedAppointments")
+    .mockResolvedValueOnce({ items: [] })
+    .mockImplementationOnce(() => new Promise((resolve) => {
+      releaseReload = () => resolve({ items: [] });
+    }));
+  vi.spyOn(api, "bookingCards").mockResolvedValue([
+    { id: "card-1", label: "League match", color: "#3a4a5c", allowedPlayerCounts: [], guestAllowed: false }
+  ]);
+  vi.spyOn(api, "previewSeries").mockResolvedValue({
+    creatableCount: 1, truncatedByHorizon: false, horizonLimit: null,
+    occurrences: [{
+      startsAt: "2026-09-07T16:00:00Z", endsAt: "2026-09-07T17:00:00Z",
+      blockedCourtIds: [], violations: [], creatable: true
+    }]
+  });
+  vi.spyOn(api, "createSeries")
+    .mockResolvedValue({ seriesId: "series-1", bookingIds: ["booking-1"], skipped: ["2026-09-14T16:00:00Z"] });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
+  await userEvent.click(await screen.findByTestId("new-series"));
+  await userEvent.selectOptions(await screen.findByTestId("series-courts"), ["33333333-3333-3333-3333-333333333333"]);
+  await userEvent.selectOptions(screen.getByTestId("series-card"), ["card-1"]);
+  await userEvent.type(screen.getByTestId("series-starts-on"), "2026-09-07");
+  await userEvent.type(screen.getByTestId("series-start-time"), "18:00");
+  await userEvent.click(screen.getByTestId("series-weekday-MONDAY"));
+  await userEvent.click(screen.getByTestId("preview-series"));
+
+  // when — creating reloads the list this section holds
+  await userEvent.click(await screen.findByTestId("confirm-series"));
+
+  // then — a reload that takes the run's own result off the screen with it hides what was skipped
+  expect(await screen.findByTestId("series-created")).toBeInTheDocument();
+  expect(screen.getByTestId("series-skipped")).toBeInTheDocument();
+  releaseReload();
+  await waitFor(() => expect(screen.getByTestId("series-created")).toBeInTheDocument());
+});

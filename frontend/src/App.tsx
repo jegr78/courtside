@@ -122,14 +122,16 @@ export function App() {
   const [offline, setOffline] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(false);
 
+  // The account's language is applied before the session is published, so the signed-in navigation
+  // is painted once instead of moving its links out from under whoever is already reaching for one.
   const refreshSession = useCallback(async () => {
     const current = await api.session();
-    setSession(current);
-    setOffline(false);
     const accountLocale = supportedLocale(current.locale);
     if (accountLocale) {
-      await applyAccountLocale(accountLocale);
+      await applyAccountLocale(accountLocale).catch(() => undefined);
     }
+    setSession(current);
+    setOffline(false);
   }, []);
 
   useEffect(() => {

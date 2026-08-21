@@ -1,6 +1,4 @@
 {
-  "previewSeries": "The series form arrives in this work; a series can be moved and cancelled from the browser today but never created.",
-  "createSeries": "The series form arrives in this work; a series can be moved and cancelled from the browser today but never created.",
   "getApiDocument": "The contract serves itself to whoever consumes it. There is nothing for a member or a board to operate here.",
   "getWebManifest": "The browser fetches this through <link rel=\"manifest\"> when it installs the app, so no view calls it and none should.",
   "listOpeningHours": "BookingGrid already carries the opening hours and WeekView reads them from there, so a second call would fetch what the page already holds.",

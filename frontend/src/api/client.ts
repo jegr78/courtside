@@ -46,6 +46,11 @@ export type PublicCourt = components["schemas"]["PublicCourt"];
 export type Allocation = components["schemas"]["Allocation"];
 export type BookingGrid = components["schemas"]["BookingGrid"];
 export type PublicBookingCard = components["schemas"]["PublicBookingCard"];
+export type SeriesRuleRequest = components["schemas"]["SeriesRuleRequest"];
+export type CreateSeriesRequest = components["schemas"]["CreateSeriesRequest"];
+export type SeriesPreview = components["schemas"]["SeriesPreview"];
+export type SeriesCreated = components["schemas"]["SeriesCreated"];
+export type Occurrence = components["schemas"]["Occurrence"];
 export type PublicParticipantCard = components["schemas"]["PublicParticipantCard"];
 export type ParticipantCard = components["schemas"]["ParticipantCard"];
 export type ParticipantCardRequest = components["schemas"]["ParticipantCardRequest"];
@@ -326,6 +331,12 @@ export const api = {
   managedAppointment: (bookingId: string) => request<ManagedAppointmentDetail>(
     `/api/managed/bookings/${bookingId}`
   ),
+  previewSeries: (rule: SeriesRuleRequest) => request<SeriesPreview>("/api/booking-series/preview", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rule)
+  }),
+  createSeries: (series: CreateSeriesRequest) => request<SeriesCreated>("/api/booking-series", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(series)
+  }),
   cancelSeries: (seriesId: string, fromBookingId: string, scope: CancelScope) => request<void>(
     `/api/booking-series/${seriesId}?${new URLSearchParams({ fromBookingId, scope })}`,
     { method: "DELETE" }
