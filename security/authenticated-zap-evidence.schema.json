@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:authenticated-zap-evidence:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "testId", "targetFingerprint", "image", "policyDigest", "roles", "activeRuleIds", "passiveEvidence", "canaryDetected", "candidates", "requestCount", "generatedDataMegabytes", "outcome"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "testId": { "const": "CSA-DAST-001" },
+    "targetFingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "image": { "type": "string", "pattern": "^zaproxy/zap-stable:2\\.16\\.1@sha256:[a-f0-9]{64}$" },
+    "policyDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "roles": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "outcome"],
+        "properties": {
+          "role": { "enum": ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"] },
+          "outcome": { "const": "passed" }
+        }
+      }
+    },
+    "activeRuleIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "integer", "minimum": 1 }
+    },
+    "passiveEvidence": { "const": "separate-csa-deploy-001" },
+    "canaryDetected": { "const": true },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "urn:courtside:security:finding-lifecycle:v1#/$defs/candidate" }
+    },
+    "requestCount": { "type": "integer", "minimum": 1 },
+    "generatedDataMegabytes": { "type": "number", "minimum": 0 },
+    "outcome": { "enum": ["passed", "incomplete"] }
+  }
+}

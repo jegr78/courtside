@@ -10,6 +10,13 @@ MAX_CONCURRENCY = int(os.environ["COURTSIDE_SECURITY_MAX_CONCURRENCY"])
 MAX_BODY_BYTES = 2_000_000
 UPSTREAM_HOST = "proxy"
 UPSTREAM_PORT = 8080
+ALLOWED_METHODS = frozenset(filter(None, os.environ.get(
+    "COURTSIDE_SECURITY_ALLOWED_METHODS", "GET,HEAD,POST,OPTIONS").split(",")))
+ALLOWED_PATH_PREFIXES = tuple(filter(None, os.environ.get(
+    "COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES", "/").split(",")))
+CANARY_ENABLED = os.environ.get("COURTSIDE_SECURITY_CANARY_ENABLED", "false") == "true"
+CANARY_PATH = "/__security/zap-canary"
+MAX_TARGET_BYTES = int(os.environ.get("COURTSIDE_SECURITY_MAX_TARGET_BYTES", "8192"))
 counter_lock = threading.Lock()
 concurrency = threading.BoundedSemaphore(MAX_CONCURRENCY)
 request_count = 0
@@ -32,6 +39,10 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
 
     def forward(self):
         global request_count
+        parsed = urllib.parse.urlsplit(self.path)
+        if not target_allowed(parsed, self.command):
+            self.reject(421)
+            return
         if not concurrency.acquire(blocking=False):
             self.reject(429)
             return
@@ -42,8 +53,10 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     return
                 request_count += 1
                 self.write_count()
-            parsed = urllib.parse.urlsplit(self.path)
             path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+            if CANARY_ENABLED and parsed.path == CANARY_PATH:
+                self.send_canary()
+                return
             try:
                 content_length = int(self.headers.get("Content-Length", "0"))
             except ValueError:
@@ -88,6 +101,16 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def send_canary(self):
+        payload = b"Courtside scanner canary"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("X-Powered-By", "Courtside-ZAP-Canary/1.0")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(payload)
+
     def write_count(self):
         temporary = "/tmp/security-gateway-count.next"
         with open(temporary, "w", encoding="ascii") as output:
@@ -98,5 +121,19 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         return
 
 
-server = http.server.ThreadingHTTPServer(("0.0.0.0", 8090), RequestHandler)
-server.serve_forever()
+def target_allowed(parsed, method):
+    if method not in ALLOWED_METHODS:
+        return False
+    if len(parsed.geturl().encode("utf-8")) > MAX_TARGET_BYTES or parsed.username or parsed.password:
+        return False
+    if parsed.scheme or parsed.netloc:
+        if parsed.scheme != "http" or parsed.hostname != "scanner-gateway" or parsed.port != 8090:
+            return False
+    path = parsed.path or "/"
+    return any(path == prefix or path.startswith(f"{prefix.rstrip('/')}/")
+               for prefix in ALLOWED_PATH_PREFIXES)
+
+
+if __name__ == "__main__":
+    server = http.server.ThreadingHTTPServer(("0.0.0.0", 8090), RequestHandler)
+    server.serve_forever()

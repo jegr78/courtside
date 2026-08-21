@@ -81,7 +81,7 @@ Automated scanner output begins as a candidate. It affects a release only after 
 
 ## Scope boundary
 
-The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. The active authentication and authorization suite is also enabled for `SECURITY`; all other active adapters and every destructive adapter remain disabled. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
+The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. The active suite adds the OpenAPI authorization matrix and authenticated ZAP scans. Every destructive adapter remains disabled. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
 
 ## Authentication and authorization method
 
@@ -92,6 +92,8 @@ Every mutation receives a missing-CSRF request, a hostile-origin preflight, a ho
 Login enumeration uses twelve paired samples for an existing synthetic account and a missing account. The request order alternates between pairs, and a successful synthetic login clears the address counter before the next pair. The suite compares the two medians and fails when their relative difference exceeds 0.5. It retains the sample count and aggregate medians, not usernames, passwords or individual timings. A separate sequence sends twenty failed requests through the encoded login path and requires the next canonical request to return the typed `login-rate-limited` problem.
 
 Session invalidation remains part of the packaged-browser regression suite. Login rotates the session identifier; logout invalidates it; password, username, role, account-status and membership changes advance the account security epoch. The server compares that durable epoch on every authenticated request, so an already loaded session cannot restore stale authority after a concurrent response saves it.
+
+Authenticated ZAP uses a separate synthetic session for each role. The scanner receives the cookie only through a mode-`0600` file in its container tmpfs. It spiders read-only routes for all roles and runs the two curated query-only active rules for `MEMBER` and `ADMIN`. The gateway rejects other methods, paths and origins before the request reaches Caddy. A scanner-only response exposes a harmless header that the pinned passive rule must detect; absence of that canary, a lost session, missing role coverage or an unexpected rule makes the attempt incomplete. Raw ZAP reports and cookies are discarded with the container. Retained evidence contains normalized candidate fingerprints but no URLs, payloads, response bodies or authentication material.
 
 The disposable target is described in [`security-environment.md`](security-environment.md). Its run-specific marker, synthetic role matrix, network isolation and cleanup are prerequisites for every `active` or `destructive` assessment.
 
