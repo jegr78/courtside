@@ -57,8 +57,8 @@ people. A club can upload a snapshot and see exactly what it would change — ev
 field of every update, every membership that would end, every row that could not be read and every
 creation that resembles somebody the roster already holds — and it can then execute exactly that
 reviewed change set, atomically, once per source at a time, refusing the run if anybody it would
-touch has changed in the meantime. What is still missing is the browser journey for it, accounts
-created from a snapshot, and export. `/actuator/health` is exposed. The
+touch has changed in the meantime. What is still missing is accounts created from a snapshot, and
+export. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -70,8 +70,13 @@ The web client is built and covered by tests too: the court plan as the public l
 personal booking management, managed appointments for officers, and the browser admin surface for
 configuration, facilities and the club's people — adding somebody, correcting their name or address,
 giving them an account, changing its roles, correcting its username, handing out a new one-time
-password and disabling it. Memberships and the import sources are the exceptions: they are served by
-the API and have no browser surface yet, so a board reaches them through the API alone.
+password and disabling it. Membership types are administered there as well, each showing how many
+people hold it, and so is the whole import: describing a source, linking the people a file cannot
+match by number, uploading a member list, reading what it would change, and running it. The column
+mapping is offered from the club's own export, read in the browser and never uploaded for that
+purpose. What a board still cannot reach from a browser is listed with the endpoints that have no
+surface, in `tools/surfaceless-endpoints.json`, where each entry says whether it is a gap or a
+decision.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
 container image scanning, reports and exports, and the self-service password reset of section 4 — an administrator hands out a new one-time password
@@ -829,6 +834,23 @@ back.
 
 ---
 
+### Where a confirmation belongs
+
+**A confirmation appears where the action cannot be undone by repeating it.**
+
+By that rule, executing an import and ending a membership are confirmed, and so is deleting an
+import source. The toggles are not — account, court, booking card, membership type — because
+clicking again restores exactly what the click removed. Unlinking an external reference is not
+confirmed either: linking it again puts back the same row.
+
+The rule exists so the dialog keeps meaning something. Confirming everything that takes something
+away trains people to click through, and then the dialog fails at the one place it was needed —
+which, for this product, is a board about to end forty memberships because an export was truncated.
+That is also why the confirmation there does not merely ask: it states how many memberships would
+end, out of how many, and names the ordinary accident it guards against.
+
+---
+
 ## 8. Configuration and Branding
 
 Three layers, separated by the question "who changes this?":
@@ -921,6 +943,15 @@ Import and export:
   board recognises the resemblance it links the two by hand instead. One person may hold a
   reference from each of several sources, which is what lets a club migrate between membership
   systems without the second one duplicating everybody.
+- **The column mapping is offered from the club's own file, and that file is not uploaded for it.**
+  A source has to be described before any snapshot is accepted, and no board knows its export's
+  headers by heart. The browser therefore reads the club's file locally — the header row for the
+  columns, and the distinct values of the category column once that column is named, because the
+  categories a club exports live in its rows and not in its header. Nothing is sent. An endpoint
+  that accepted a file of personal data in order to learn a handful of words would be the worst of
+  the options, and reading locally costs a club nothing. The separator and the encoding are detected
+  from the file rather than configured: a board can read its own member list but cannot be expected
+  to know what encoding its software wrote it in, and a wrong answer there is worse than no question.
 - **A preview writes nothing and is never edited.** It resolves the whole file and answers with the
   change set a later execution would apply, so what a board approves is what runs. A header problem
   fails the file, because nothing in it can then be trusted; a cell problem fails one row and is
@@ -1265,7 +1296,12 @@ deliver the implementation.
   past it is the row, the name of the uploaded file, its SHA-256 and the counts — what an audit of
   *what was executed* needs, and no member's name, address or number. A scheduled sweep enforces the
   bound, a preview past it answers without its change set, and a swept preview is refused rather
-  than executed against one that is no longer there.
+  than executed against one that is no longer there. **Built.**
+- **Describing a source uploads nothing at all.** The column mapping and the category values a
+  board picks from are read out of the club's file in the browser; no request carries it, and the
+  instance learns the headers only as the mapping the board saved. This is a stronger promise than
+  the one above and a separate one: the snapshot a club later uploads *is* sent, and is then bound
+  by the retention. Configuring the source that receives it is not. **Built.**
 - **Subject access and portability** (Art. 15/20) as self-service: every member can export
   their own data as JSON. The Release 1 export covers this.
 - **Documentation templates in the repository**: a pre-filled record of processing
