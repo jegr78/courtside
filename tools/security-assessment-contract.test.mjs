@@ -9,6 +9,9 @@ const Ajv = require("ajv/dist/2020").default;
 const catalog = JSON.parse(readFileSync(new URL("../security/assessment-catalog.json", import.meta.url), "utf8"));
 const schema = JSON.parse(readFileSync(new URL("../security/assessment-catalog.schema.json", import.meta.url), "utf8"));
 const contract = readFileSync(new URL("../docs/security-assessment.md", import.meta.url), "utf8");
+const manualRunbook = readFileSync(new URL("../docs/security-manual-assessment.md", import.meta.url), "utf8");
+const manualEvidenceSchema = JSON.parse(readFileSync(
+  new URL("../security/manual-assessment-evidence.schema.json", import.meta.url), "utf8"));
 
 test("given the security catalog, when validating it, then every entry satisfies the documented schema", () => {
   // given
@@ -25,7 +28,7 @@ test("given an unresolved catalog entry, when validation runs, then ownership an
   // given
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
   const blocked = catalog.tests.find(({ status }) => status === "blocked");
-  const planned = catalog.tests.find(({ status }) => status === "planned");
+  const planned = { ...catalog.tests.find(({ status }) => status === "implemented"), status: "planned" };
   const missingControlRationale = structuredClone(catalog);
   const blockedControl = missingControlRationale.controlCoverage.flatMap(({ controls }) => controls)
     .find(({ status }) => status === "blocked");
@@ -71,7 +74,8 @@ test("given stable catalog identities, when maintaining coverage, then identifie
   assert.deepEqual(severityLevels, ["P0", "P1", "P2", "P3"]);
   assert.equal(catalog.tests.some(({ status }) => status === "blocked"), true);
   assert.equal(catalog.tests.some(({ status }) => status === "implemented"), true);
-  assert.equal(catalog.tests.some(({ status }) => status === "planned"), true);
+  assert.equal(catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .some(({ status }) => status === "planned"), true);
 });
 
 test("given pinned standards, when referencing controls, then identifiers are version-qualified", () => {
@@ -151,4 +155,72 @@ test("given a single maintainer, when recording a security decision, then indepe
   assert.equal(catalog.governance.singleMaintainerMayApprove, true);
   assert.equal(catalog.governance.independentReviewRecorded, true);
   assert.equal(catalog.governance.missingIndependentReviewBlocks, false);
+});
+
+test("given non-automated controls, when maintaining the catalog, then each links to a concrete manual procedure", () => {
+  // given
+  const controls = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ status, trackingIssue }) => status === "planned" && trackingIssue === 251);
+
+  // when / then
+  assert.ok(controls.length > 0);
+  for (const control of controls) {
+    assert.match(control.manualProcedureId, /^MAN-[A-Z]+-[0-9]{3}$/);
+    assert.match(manualRunbook, new RegExp(`^### ${control.manualProcedureId}\\b`, "m"));
+  }
+});
+
+test("given the manual runbook, when an assessment is recorded, then method evidence and outcomes are closed", () => {
+  // when / then
+  for (const field of ["Prerequisites", "Steps", "Expected secure outcome", "Observed result",
+    "Redacted evidence", "Tester", "Timestamp", "Target image digest", "Outcome"]) {
+    assert.match(manualRunbook, new RegExp(`\\b${field}\\b`));
+  }
+  assert.match(manualRunbook, /pass.*fail.*not-applicable.*blocked/is);
+  assert.match(manualRunbook, /safe.*active.*destructive/is);
+  assert.match(manualRunbook, /private vulnerability reporting/i);
+  assert.match(manualRunbook, /independent external tester/i);
+});
+
+test("given manual evidence, when its outcome needs action, then rationale and finding provenance fail closed", () => {
+  // given
+  const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true })
+    .compile(manualEvidenceSchema);
+  const digest = `sha256:${"a".repeat(64)}`;
+  const procedure = {
+    procedureId: "MAN-ARCH-001",
+    controlIds: ["v5.0.0-1.1.1"],
+    prerequisites: ["Qualified target"],
+    stepsPerformed: ["Reviewed the boundary"],
+    expectedSecureOutcome: "No undocumented boundary exists.",
+    observedResult: "The documented and deployed boundaries agree.",
+    redactedEvidenceReferences: [digest],
+    tester: "Maintainer",
+    recordedAt: "2026-08-21T20:00:00Z",
+    targetImageDigest: digest,
+    outcome: "pass"
+  };
+  const evidence = {
+    schemaVersion: 1,
+    catalogVersion: catalog.catalogVersion,
+    runId: "manual-baseline-1",
+    tester: "Maintainer",
+    recordedAt: "2026-08-21T20:00:00Z",
+    sourceCommit: "a".repeat(40),
+    targetImageDigest: digest,
+    targetFingerprint: digest,
+    environment: "SECURITY",
+    profile: "safe",
+    authorizationReference: "protected-record-1",
+    independentReview: { performed: false },
+    procedures: [procedure]
+  };
+
+  // when / then
+  assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
+  assert.equal(validate({ ...evidence, procedures: [{ ...procedure, outcome: "blocked" }] }), false);
+  assert.equal(validate({ ...evidence, procedures: [{ ...procedure, outcome: "fail", rationale: "Mismatch" }] }), false);
+  assert.equal(validate({ ...evidence, profile: "active", environment: "UAT" }), false);
+  assert.equal(validate({ ...evidence, profile: "destructive", environment: "EXPLICIT_PRODUCTION" }), false);
+  assert.equal(validate({ ...evidence, unexpectedRawTraffic: "secret" }), false);
 });

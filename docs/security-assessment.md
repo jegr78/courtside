@@ -49,7 +49,7 @@ The four catalog states mean:
 - `blocked`: execution needs a missing capability or external state, with rationale and tracking issue; and
 - `not-applicable`: the control does not apply to the shipped architecture, with a concrete rationale.
 
-An implemented entry can still be incomplete in a particular run. Catalog state describes capability; run outcome describes execution.
+An implemented entry can still be incomplete in a particular run. Catalog state describes capability; run outcome describes execution. Controls that require human judgment link to the concrete procedures in the [manual assessment runbook](security-manual-assessment.md). Their retained record is constrained by the closed [`manual-assessment-evidence.schema.json`](../security/manual-assessment-evidence.schema.json) rather than an unaudited checklist.
 
 ## Evidence and outcomes
 
