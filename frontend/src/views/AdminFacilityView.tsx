@@ -8,6 +8,8 @@ import {
   type BookingCardRequest,
   type DayOfWeek,
   type OpeningHours,
+  type ParticipantCard,
+  type ParticipantCardRequest,
   type Role
 } from "../api/client";
 import { problemMessage } from "../api/problem-message";
@@ -25,17 +27,20 @@ export function AdminFacilityView() {
   const [courts, setCourts] = useState<AdminCourt[]>();
   const [hours, setHours] = useState<OpeningHours[]>();
   const [cards, setCards] = useState<BookingCard[]>();
+  const [fillers, setFillers] = useState<ParticipantCard[]>();
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const pendingRef = useRef(new Set<string>());
   const [pending, setPending] = useState(new Set<string>());
 
   useEffect(() => {
-    void Promise.all([api.adminCourts(), api.adminOpeningHours(), api.adminBookingCards()])
-      .then(([loadedCourts, loadedHours, loadedCards]) => {
+    void Promise.all([api.adminCourts(), api.adminOpeningHours(), api.adminBookingCards(),
+      api.adminParticipantCards()])
+      .then(([loadedCourts, loadedHours, loadedCards, loadedFillers]) => {
         setCourts(loadedCourts);
         setHours(loadedHours);
         setCards(loadedCards);
+        setFillers(loadedFillers);
       })
       .catch((failure) => setError(problemMessage(failure, t)));
   }, [t]);
@@ -178,6 +183,55 @@ export function AdminFacilityView() {
     }
   }
 
+  async function saveFiller(card: ParticipantCard) {
+    const key = `filler:${card.id}`;
+    if (!beginMutation(key)) return;
+    try {
+      const changed = await api.changeParticipantCard(card.id, fillerRequest(card));
+      setFillers((current) => current?.map((item) => item.id === changed.id ? changed : item));
+      reportSuccess();
+    } catch (failure) {
+      reportError(failure);
+    } finally {
+      endMutation(key);
+    }
+  }
+
+  async function toggleFiller(card: ParticipantCard) {
+    const key = `filler:${card.id}`;
+    if (!beginMutation(key)) return;
+    try {
+      const changed = await api.setParticipantCardActive(card.id, !card.active);
+      setFillers((current) => current?.map((item) => item.id === changed.id ? changed : item));
+      reportSuccess();
+    } catch (failure) {
+      reportError(failure);
+    } finally {
+      endMutation(key);
+    }
+  }
+
+  async function createFiller(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const key = "filler:new";
+    if (!beginMutation(key)) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    try {
+      const created = await api.createParticipantCard({
+        label: formString(form, "label"),
+        capacity: ownedCount(formString(form, "capacity"))
+      });
+      setFillers((current) => [...(current ?? []), created]);
+      formElement.reset();
+      reportSuccess();
+    } catch (failure) {
+      reportError(failure);
+    } finally {
+      endMutation(key);
+    }
+  }
+
   async function createCard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const key = "card:new";
@@ -235,6 +289,19 @@ export function AdminFacilityView() {
           {cards.map((card) => <CardEditor key={card.id} card={card} disabled={pending.has(`card:${card.id}`)} changed={(changed) => setCards((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCard} toggle={toggleCard} />)}
           <CardCreateForm disabled={pending.has("card:new")} create={createCard} />
         </section>
+        <section className="grid gap-4">
+          <h2 className="text-2xl font-bold">{t("admin.facility.participantCards")}</h2>
+          <p className="text-sm">{t("admin.facility.participantCardsHint")}</p>
+          {(fillers ?? []).map((card) => <ParticipantCardEditor
+            key={card.id}
+            card={card}
+            disabled={pending.has(`filler:${card.id}`)}
+            changed={(changed) => setFillers((current) => current?.map((item) => item.id === changed.id ? changed : item))}
+            save={saveFiller}
+            toggle={toggleFiller}
+          />)}
+          <ParticipantCardCreateForm disabled={pending.has("filler:new")} create={createFiller} />
+        </section>
       </>}
   </section>;
 }
@@ -284,6 +351,41 @@ function CardEditor({ card, disabled, changed, save, toggle }: { card: BookingCa
       <Button disabled={disabled} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
     </div>
   </article>;
+}
+
+function ParticipantCardEditor({ card, disabled, changed, save, toggle }: { card: ParticipantCard; disabled: boolean; changed: (card: ParticipantCard) => void; save: (card: ParticipantCard) => Promise<void>; toggle: (card: ParticipantCard) => Promise<void> }) {
+  const { t } = useTranslation();
+  return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
+    <div className="grid gap-3 md:grid-cols-2">
+      <TextField disabled={disabled} data-testid={`participant-card-label-${card.id}`} label={t("admin.facility.label")} value={card.label} onChange={(event) => changed({ ...card, label: event.target.value })} />
+      <TextField disabled={disabled} data-testid={`participant-card-capacity-${card.id}`} type="number" min={1} max={99} label={t("admin.facility.owned")} value={card.capacity ?? ""} onChange={(event) => changed({ ...card, capacity: ownedCount(event.target.value) })} />
+    </div>
+    <div className="flex gap-3">
+      <Button disabled={disabled} data-testid={`save-participant-card-${card.id}`} type="button" onClick={() => void save(card)}>{t("admin.save")}</Button>
+      <Button disabled={disabled} data-testid={`toggle-participant-card-${card.id}`} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
+    </div>
+  </article>;
+}
+
+function ParticipantCardCreateForm({ disabled, create }: { disabled: boolean; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+  const { t } = useTranslation();
+  return <form noValidate onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
+    <h3 className="font-bold">{t("admin.facility.newParticipantCard")}</h3>
+    <div className="grid gap-3 md:grid-cols-2">
+      <TextField disabled={disabled} data-testid="new-participant-card-label" name="label" label={t("admin.facility.label")} />
+      <TextField disabled={disabled} data-testid="new-participant-card-capacity" name="capacity" type="number" min={1} max={99} label={t("admin.facility.owned")} />
+    </div>
+    <Button disabled={disabled} data-testid="create-participant-card" className="justify-self-start" type="submit">{t("admin.create")}</Button>
+  </form>;
+}
+
+// An empty field is how a board says "any number of them", which the contract spells as absent.
+function ownedCount(value: string): number | null {
+  return value.trim() === "" ? null : Number(value);
+}
+
+function fillerRequest(card: ParticipantCard): ParticipantCardRequest {
+  return { label: card.label, capacity: card.capacity ?? null };
 }
 
 function CardCreateForm({ disabled, create }: { disabled: boolean; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {

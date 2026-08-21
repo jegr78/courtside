@@ -23,6 +23,79 @@ describe("AdminFacilityView", () => {
         guestAllowed: true, showGenericOccupancy: true, active: true
       }
     ]);
+    vi.spyOn(api, "adminParticipantCards").mockResolvedValue([
+      { id: "filler-1", label: "Ball machine", capacity: 1, active: true }
+    ]);
+  });
+
+  it("given the club's participant cards, when the view loads, then each is listed with how many it owns", async () => {
+    // when
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("participant-card-label-filler-1")).toHaveValue("Ball machine");
+    expect(screen.getByTestId("participant-card-capacity-filler-1")).toHaveValue(1);
+  });
+
+  it("given a club that bought a second ball machine, when the count is corrected, then it is written", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeParticipantCard")
+      .mockResolvedValue({ id: "filler-1", label: "Ball machine", capacity: 2, active: true });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    await screen.findByTestId("participant-card-capacity-filler-1");
+
+    // when
+    await userEvent.clear(screen.getByTestId("participant-card-capacity-filler-1"));
+    await userEvent.type(screen.getByTestId("participant-card-capacity-filler-1"), "2");
+    await userEvent.click(screen.getByTestId("save-participant-card-filler-1"));
+
+    // then
+    expect(changing).toHaveBeenCalledWith("filler-1", { label: "Ball machine", capacity: 2 });
+  });
+
+  it("given a card the club owns any number of, when the count is cleared, then it is sent as unlimited", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeParticipantCard")
+      .mockResolvedValue({ id: "filler-1", label: "Looking for a partner", capacity: null, active: true });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    await screen.findByTestId("participant-card-capacity-filler-1");
+
+    // when
+    await userEvent.clear(screen.getByTestId("participant-card-capacity-filler-1"));
+    await userEvent.click(screen.getByTestId("save-participant-card-filler-1"));
+
+    // then — absent means unlimited, and an empty field is how a board says that
+    expect(changing).toHaveBeenCalledWith("filler-1", { label: "Ball machine", capacity: null });
+  });
+
+  it("when a participant card is added, then it is created and joins the list", async () => {
+    // given
+    const creating = vi.spyOn(api, "createParticipantCard")
+      .mockResolvedValue({ id: "filler-2", label: "Looking for a partner", capacity: null, active: true });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    await screen.findByTestId("new-participant-card-label");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-participant-card-label"), "Looking for a partner");
+    await userEvent.click(screen.getByTestId("create-participant-card"));
+
+    // then
+    expect(creating).toHaveBeenCalledWith({ label: "Looking for a partner", capacity: null });
+    expect(await screen.findByTestId("participant-card-label-filler-2")).toBeInTheDocument();
+  });
+
+  it("given a card taken out of service, when it is toggled, then no dialog stands in the way", async () => {
+    // given
+    const toggling = vi.spyOn(api, "setParticipantCardActive")
+      .mockResolvedValue({ id: "filler-1", label: "Ball machine", capacity: 1, active: false });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    await screen.findByTestId("toggle-participant-card-filler-1");
+
+    // when — clicking again restores it, so by this project's rule it is not confirmed
+    await userEvent.click(screen.getByTestId("toggle-participant-card-filler-1"));
+
+    // then
+    expect(toggling).toHaveBeenCalledWith("filler-1", false);
   });
 
   it("given facility data, when the view loads, then courts, hours, and card access are visible", async () => {

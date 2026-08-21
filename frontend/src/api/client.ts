@@ -45,6 +45,8 @@ export type Allocation = components["schemas"]["Allocation"];
 export type BookingGrid = components["schemas"]["BookingGrid"];
 export type PublicBookingCard = components["schemas"]["PublicBookingCard"];
 export type PublicParticipantCard = components["schemas"]["PublicParticipantCard"];
+export type ParticipantCard = components["schemas"]["ParticipantCard"];
+export type ParticipantCardRequest = components["schemas"]["ParticipantCardRequest"];
 export type PublicParticipantMember = components["schemas"]["PublicParticipantMember"];
 export type CreateBookingRequest = components["schemas"]["CreateBookingRequest"];
 export type BookingCreated = components["schemas"]["BookingCreated"];
@@ -140,6 +142,16 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card)
   }),
   setAdminBookingCardActive: (id: string, active: boolean) => request<BookingCard>(`/api/admin/booking-cards/${id}/active`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+  }),
+  adminParticipantCards: () => request<ParticipantCard[]>("/api/admin/participant-cards"),
+  createParticipantCard: (card: ParticipantCardRequest) => request<ParticipantCard>("/api/admin/participant-cards", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card)
+  }),
+  changeParticipantCard: (id: string, card: ParticipantCardRequest) => request<ParticipantCard>(`/api/admin/participant-cards/${id}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card)
+  }),
+  setParticipantCardActive: (id: string, active: boolean) => request<ParticipantCard>(`/api/admin/participant-cards/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
   roster: (query?: string, cursor?: string, limit = 50, membershipTypeId?: string) => request<RosterPage>(
