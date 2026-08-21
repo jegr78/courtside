@@ -2513,8 +2513,8 @@
       "expectedSecureOutcome": "Untrusted values remain data, CSP violations are observable and personal data is unavailable from browser storage after session termination.",
       "executionMode": "automated",
       "evidenceRequirements": [
-        "Browser trace",
-        "CSP events",
+        "Redacted browser observations",
+        "Normalized CSP events",
         "Storage and cache inventory"
       ],
       "qualityRiskIds": [

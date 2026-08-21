@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
+const frontendRequire = createRequire(join(repository, "frontend", "package.json"));
+const Ajv2020 = frontendRequire("ajv/dist/2020").default;
 const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync(join(repository, "frontend/playwright.config.ts"), "utf8");
 const pom = readFileSync(join(repository, "pom.xml"), "utf8");
@@ -15,6 +18,8 @@ const supported = readFileSync(join(repository, "frontend/e2e/supported-browser.
 const browserSecurity = readFileSync(join(repository, "frontend/e2e/browser-security.spec.ts"), "utf8");
 const browserSecuritySmoke = readFileSync(join(repository, "frontend/e2e/browser-security-smoke.spec.ts"), "utf8");
 const catalog = JSON.parse(readFileSync(join(repository, "security/assessment-catalog.json"), "utf8"));
+const browserEvidenceSchema = JSON.parse(readFileSync(join(repository, "security/browser-security-evidence.schema.json"), "utf8"));
+const renderingContexts = JSON.parse(readFileSync(join(repository, "security/browser-rendering-contexts.json"), "utf8"));
 const documentation = readFileSync(join(repository, "docs/browser-pwa-testing.md"), "utf8");
 
 test("given supported desktop browsers, when qualifying a pull request, then Chromium and WebKit run core smoke journeys", () => {
@@ -63,6 +68,34 @@ test("given browser-controlled and stored values, when qualifying the PWA, then 
   assert.match(browserSecuritySmoke, /content-security-policy/);
   assert.match(playwright, /browser-security-smoke\\\.spec\\\.ts/);
   assert.match(stability, /--project=firefox-periodic/);
-  assert.match(buildWorkflow, /browser-security\/browser-security-inventory\.json/);
+  assert.match(browserSecurity, /test\.use\(\{ trace: "off", screenshot: "off", video: "off" \}\)/);
+  assert.match(buildWorkflow, /browser-security\/browser-storage-evidence\.json/);
+  assert.match(buildWorkflow, /browser-security\/browser-csp-evidence\.json/);
+  assert.match(buildWorkflow, /!frontend\/test-results\/browser-security-\*\/trace\.zip/);
   assert.equal(catalog.tests.find(({ id }) => id === "CSA-PWA-001")?.status, "implemented");
+});
+
+test("given retained browser security evidence, when validating it, then only closed redacted records are accepted", () => {
+  const validate = new Ajv2020({ strict: true, allErrors: true }).compile(browserEvidenceSchema);
+  assert.equal(validate({
+    kind: "browser-csp", executed: false,
+    events: [{ directive: "script-src-elem", blockedReason: "inline" }]
+  }), true);
+  assert.equal(validate({
+    kind: "browser-csp", executed: false,
+    events: [{ directive: "script-src-elem", blockedReason: "inline", cookie: "secret" }]
+  }), false);
+});
+
+test("given club-controlled rendering contexts, when checking the security journey, then every inventoried sink is bound to a test", () => {
+  const expectedIds = [
+    "club-name-text", "club-name-title", "court-name-text", "booking-card-label",
+    "participant-card-label", "rule-set-name", "person-fields", "account-username",
+    "booking-note", "guest-name", "audit-projection", "logo-url", "imprint-url", "location-input"
+  ];
+  assert.deepEqual(renderingContexts.contexts.map(({ id }) => id).toSorted(), expectedIds.toSorted());
+  for (const context of renderingContexts.contexts) {
+    assert.deepEqual(Object.keys(context).toSorted(), ["field", "id", "journey", "sink"]);
+    assert.match(browserSecurity, new RegExp(`"${context.id}"`));
+  }
 });

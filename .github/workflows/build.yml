@@ -103,8 +103,10 @@ jobs:
             frontend/coverage
             build/coverage/changed.md
             frontend/test-results/visual-journeys
-            frontend/test-results/browser-security/browser-security-inventory.json
+            frontend/test-results/browser-security/browser-storage-evidence.json
+            frontend/test-results/browser-security/browser-csp-evidence.json
             frontend/test-results/**/trace.zip
+            !frontend/test-results/browser-security-*/trace.zip
             frontend/test-results/**/*.png
             build/security/summary.json
           if-no-files-found: warn

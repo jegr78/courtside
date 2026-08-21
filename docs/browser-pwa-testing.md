@@ -17,8 +17,10 @@ that reaches the rendered PWA: club and court names, booking and participant-car
 names, roster names, managed-booking notes and guest names. It then observes the public, member,
 administrative and managed-appointment projections. Execution markers must remain untouched, the
 payload must not enter console output, and only the locale preference may appear in Web Storage.
-Retained evidence contains storage key names, cached request paths, cookie attributes and console
-event types, never storage or cookie values, response bodies or credentials.
+Retained evidence contains storage key names, cached request paths, cookie attributes, console
+event types and normalized CSP events, never storage or cookie values, response bodies or
+credentials. Security journeys disable Playwright traces and screenshots. The build uploads only
+the two evidence documents after each has passed its closed JSON Schema.
 
 The shared browser world deliberately lowers the cookie `Secure` attribute because it also proves
 the documented plain-HTTP client boundary. It still inventories cookie names and the `HttpOnly`,
@@ -31,6 +33,8 @@ A separate CSP probe creates a blocked inline script and requires an attributabl
 suite. WebKit runs the CSP/clickjacking header smoke on every pull request; Firefox runs the same
 smoke in the periodic browser qualification. The existing service-worker transition journey also
 rechecks the CSP and API-cache boundary after activating the updated worker.
+`security/browser-rendering-contexts.json` is the maintained inventory of club-controlled browser
+contexts. Its policy test requires every entry to have a matching journey assertion.
 
 Vite registers updates in prompt mode. A waiting worker stays inactive until the localized update
 control is accepted, then activates and reloads the application as one asset version. Additive API
