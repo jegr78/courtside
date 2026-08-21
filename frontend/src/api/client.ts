@@ -249,8 +249,12 @@ export const api = {
     }
   ),
   importRuns: (sourceId: string) => request<ImportRun[]>(`/api/admin/import/sources/${sourceId}/runs`),
-  audit: (cursor?: string, limit = 50) => request<AuditPage>(
-    `/api/admin/audit?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  audit: (cursor?: string, limit = 50, subjectId?: string) => request<AuditPage>(
+    `/api/admin/audit?${new URLSearchParams({
+      limit: String(limit),
+      ...(cursor ? { cursor } : {}),
+      ...(subjectId ? { subjectId } : {})
+    })}`
   ),
   source: () => request<SourceOffer>("/api/source"),
   courts: () => request<PublicCourt[]>("/api/public/courts"),
