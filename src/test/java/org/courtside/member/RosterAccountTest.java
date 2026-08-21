@@ -127,6 +127,60 @@ class RosterAccountTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPersonTheClubHasNoAddressFor_whenCreatingAnAccount_thenItIsRefusedWithItsReason() {
+        // given
+        RosterService.RosterEntry mary = roster.createPerson("Mary", "Major", null);
+
+        // when / then
+        assertThatThrownBy(() -> roster.createAccount(
+                mary.personId(), "major.mary", "one-time-password", Set.of(Role.MEMBER)))
+                .isInstanceOf(AccountAddressRequiredException.class)
+                .extracting("code").isEqualTo("roster.account.addressMissing");
+        assertThat(accounts.findByPersonIdIn(List.of(mary.personId()))).isEmpty();
+    }
+
+    @Test
+    void givenAPersonWhoJustGainedAnAddress_whenCreatingAnAccount_thenItIsCreated() {
+        // given
+        RosterService.RosterEntry mary = roster.createPerson("Mary", "Major", null);
+        roster.changePerson(mary.personId(), "Mary", "Major", "mary.major@example.org");
+
+        // when
+        RosterService.RosterEntry entry = roster.createAccount(
+                mary.personId(), "major.mary", "one-time-password", Set.of(Role.MEMBER));
+
+        // then
+        assertThat(entry.username()).isEqualTo("major.mary");
+    }
+
+    @Test
+    void givenAPersonHoldingAnAccount_whenTakingTheirAddressAway_thenItIsRefusedWithItsReason() {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+
+        // when / then
+        assertThatThrownBy(() -> roster.changePerson(jane, "Jane", "Doe", null))
+                .isInstanceOf(AccountAddressRequiredException.class)
+                .extracting("code").isEqualTo("roster.person.addressHeldByAccount");
+        assertThat(roster.person(jane).email()).isEqualTo("jane.doe@example.org");
+    }
+
+    @Test
+    void givenAPersonHoldingAnAccount_whenCorrectingTheirAddress_thenTheChangeIsAllowed() {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+
+        // when
+        RosterService.RosterEntry changed =
+                roster.changePerson(jane, "Jane", "Doe", "jane.major@example.org");
+
+        // then
+        assertThat(changed.email()).isEqualTo("jane.major@example.org");
+    }
+
+    @Test
     void givenAnUnknownPerson_whenCreatingAnAccount_thenTheFailureNamesWhatWasNotFound() {
         // given
         UUID absent = UUID.fromString("00000000-0000-0000-0000-0000000000ff");

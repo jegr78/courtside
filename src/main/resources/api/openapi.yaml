@@ -2944,7 +2944,9 @@ paths:
       description: |
         The account and the membership the person holds are untouched; this changes the person
         record alone. Every field is written, so a request that leaves `email` out removes the
-        address the person carried.
+        address the person carried - unless they hold an account, which is reached by mail and
+        would become unrecoverable. That is answered `400` with
+        `urn:courtside:error:account-needs-address`; correcting the address is always allowed.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2988,6 +2990,12 @@ paths:
         disabling the person would leave it signed in; a person who already holds one is answered
         `409`. A username the instance already holds is answered `409` too, and the two carry
         different problem types.
+
+        **The person needs an email address.** Everything that grants or restores access travels by
+        mail - the first password and both reset paths - so an account without one could never be
+        recovered. A person who holds none is answered `400` with
+        `urn:courtside:error:account-needs-address`, and for the same reason a correction may not
+        take the address away from a person who already holds an account.
 
         No `Location`: an account has no address of its own, and the roster entry in the response
         body is where its state is read.

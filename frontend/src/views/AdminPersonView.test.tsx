@@ -92,6 +92,24 @@ describe("AdminPersonView", () => {
     expect(await screen.findByTestId("person-email")).toHaveValue("");
   });
 
+  it("given a person with no address, when their page opens, then the account form explains itself instead of failing later", async () => {
+    // when
+    showPerson({ ...withoutAccount, email: null });
+
+    // then
+    expect(await screen.findByTestId("account-needs-address")).toBeInTheDocument();
+    expect(screen.queryByTestId("create-account")).not.toBeInTheDocument();
+  });
+
+  it("given a person with an address but no account, when their page opens, then an account can be created", async () => {
+    // when
+    showPerson(withoutAccount);
+
+    // then
+    expect(await screen.findByTestId("create-account")).toBeInTheDocument();
+    expect(screen.queryByTestId("account-needs-address")).not.toBeInTheDocument();
+  });
+
   it("given a person, when their membership is saved, then it is written with its dates", async () => {
     // given
     vi.spyOn(api, "assignMembership").mockResolvedValue(jane);

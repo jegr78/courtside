@@ -84,6 +84,7 @@ export function AdminPersonView() {
             toggleAccount={() => mutate(() => api.setAccountActive(personId, !entry.enabled))}
           />
           : <AccountCreateSection
+            entry={entry}
             disabled={pending}
             create={(request) => mutate(() => api.createAccount(personId, request))}
           />}
@@ -204,11 +205,18 @@ function AccountSection({ entry, disabled, saveRoles, saveUsername, resetPasswor
   </section>;
 }
 
-function AccountCreateSection({ disabled, create }: {
+function AccountCreateSection({ entry, disabled, create }: {
+  entry: RosterEntry;
   disabled: boolean;
   create: (request: { username: string; oneTimePassword: string; roles: Role[] }) => Saved;
 }) {
   const { t } = useTranslation();
+  if (!entry.email) {
+    return <section className="surface-subtle grid gap-3 rounded-xl border p-4">
+      <h2 className="text-2xl font-bold">{t("admin.roster.newAccount")}</h2>
+      <p data-testid="account-needs-address">{t("admin.person.accountNeedsAddress")}</p>
+    </section>;
+  }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);

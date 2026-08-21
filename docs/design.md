@@ -539,11 +539,16 @@ Deliberate decisions:
 `username` is the login identifier, unique per instance, freely chosen by the member
 (suggested at registration as `lastname.firstname`).
 
-`email` is **optional and not unique**, and changeable at any time. Clubs enrol children and
-juveniles under a parent's address, and a family with several children then shares one address
-across several accounts — so an email address cannot serve as the identifier. It is optional
-because a club's own member list carries people it holds no address for; what that costs them is
-that nothing can be sent to them, and the paths below are exactly what they lose.
+`email` is **optional on a person, mandatory on an account**, never unique, and changeable at any
+time. Clubs enrol children and juveniles under a parent's address, and a family with several
+children then shares one address across several accounts — so an email address cannot serve as the
+identifier.
+
+A person may hold none. A club's own member list carries people it has no address for, and a roster
+that refused to record them would be refusing the club's own data. An account may not: everything
+that grants or restores access travels by mail — the first password, and both reset paths below —
+so an account without an address is one nobody could ever recover. The roster therefore refuses to
+create one, and refuses to take the address away from a person who already holds an account.
 
 **Consequence for password reset.** The standard "enter your email" flow does not work. Two
 paths, both supported:

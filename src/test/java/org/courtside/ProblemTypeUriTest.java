@@ -72,6 +72,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:person-not-found",
             "urn:courtside:error:roster-cursor-unknown",
             "urn:courtside:error:rule-parameter-invalid",
+            "urn:courtside:error:account-needs-address",
             "urn:courtside:error:rule-set-inactive",
             "urn:courtside:error:rule-set-name-taken",
             "urn:courtside:error:rule-set-not-found",

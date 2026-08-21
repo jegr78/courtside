@@ -99,6 +99,7 @@ public class RosterService {
         String address = strippedAddress(email);
         Person person = persons.findById(id)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        requireAddressWhereAnAccountNeedsOne(id, address);
         Set<String> changed = changedFields(person, first, last, address);
         person.rename(first, last);
         person.changeEmail(address);
@@ -137,6 +138,9 @@ public class RosterService {
         Set<Role> requested = requiredRoles(roles);
         requireUsablePassword(oneTimePassword);
         Person person = requireLockedPerson(id);
+        if (person.getEmail().isEmpty()) {
+            throw new AccountAddressRequiredException("roster.account.addressMissing", Map.of());
+        }
         if (!accounts.findByPersonIdIn(List.of(id)).isEmpty()) {
             throw new PersonAccountExistsException("Person " + id + " already holds an account");
         }
@@ -393,6 +397,12 @@ public class RosterService {
                     + PersonFieldLimits.MAX_NAME_LENGTH + " characters");
         }
         return stripped;
+    }
+
+    private void requireAddressWhereAnAccountNeedsOne(UUID personId, String address) {
+        if (address.isEmpty() && !accounts.findByPersonIdIn(List.of(personId)).isEmpty()) {
+            throw new AccountAddressRequiredException("roster.person.addressHeldByAccount", Map.of());
+        }
     }
 
     private static String strippedAddress(String value) {
