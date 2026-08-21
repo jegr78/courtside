@@ -21,6 +21,7 @@ const destinations: Destination[] = [
   { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration", visible: isAdmin },
   { to: "/admin/facility", testId: "admin-facility-link", label: "nav.adminFacility", visible: isAdmin },
   { to: "/admin/roster", testId: "admin-roster-link", label: "nav.adminRoster", visible: isAdmin },
+  { to: "/admin/membership-types", testId: "admin-membership-types-link", label: "nav.adminMembershipTypes", visible: isAdmin },
   { to: "/admin/audit", testId: "admin-audit-link", label: "nav.adminAudit", visible: isAdmin }
 ];
 

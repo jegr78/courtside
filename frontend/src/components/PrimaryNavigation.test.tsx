@@ -10,7 +10,8 @@ const member: SessionStatus = { authenticated: true, roles: ["MEMBER"], password
 const administrator: SessionStatus = { authenticated: true, roles: ["ADMIN"], passwordChangeRequired: false };
 
 const adminDestinations = [
-  "admin-configuration-link", "admin-facility-link", "admin-roster-link", "admin-audit-link"
+  "admin-configuration-link", "admin-facility-link", "admin-roster-link",
+  "admin-membership-types-link", "admin-audit-link"
 ];
 
 function show(session: SessionStatus, at = "/", signedOut = () => undefined) {
