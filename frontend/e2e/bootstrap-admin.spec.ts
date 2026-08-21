@@ -60,8 +60,6 @@ test("the bootstrap admin can replace the initial password and maintain a sessio
   await page.getByTestId("confirm-password").fill("permanent-password");
   await page.getByTestId("password-submit").click();
 
-  await expect(page.getByTestId("sign-in-link")).toBeVisible();
-  await page.getByTestId("sign-in-link").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("bootstrap-admin");
   await page.getByTestId("password").fill("permanent-password");
@@ -299,24 +297,24 @@ test("an admin adds a person, gives them an account, and that person signs in an
   const { personId } = await (await personCreated).json() as { personId: string };
 
   // then
-  await expect(page.getByTestId(`person-email-${personId}`)).toHaveValue("mary.roe@example.org");
+  await expect(page).toHaveURL(new RegExp(`/admin/roster/${personId}$`));
+  await expect(page.getByTestId("person-email")).toHaveValue("mary.roe@example.org");
 
   // when
-  await page.getByTestId(`new-account-username-${personId}`).fill("roe.mary");
-  await page.getByTestId(`new-account-password-${personId}`).fill("handover-password");
-  await page.getByTestId(`new-account-role-${personId}-MEMBER`).check();
+  await page.getByTestId("new-account-username").fill("roe.mary");
+  await page.getByTestId("new-account-password").fill("handover-password");
+  await page.getByTestId("new-account-role-MEMBER").check();
   const accountCreated = page.waitForResponse((response) =>
     response.url().endsWith(`/api/admin/roster/${personId}/account`) && response.request().method() === "POST"
   );
-  await page.getByTestId(`create-account-${personId}`).click();
+  await page.getByTestId("create-account").click();
   expect((await accountCreated).status()).toBe(201);
 
   // then
-  await expect(page.getByTestId(`account-username-${personId}`)).toHaveValue("roe.mary");
-  await expect(page.getByTestId(`account-roles-${personId}-MEMBER`)).toBeChecked();
+  await expect(page.getByTestId("account-username")).toHaveValue("roe.mary");
+  await expect(page.getByTestId("account-roles-MEMBER")).toBeChecked();
 
   // when
-  await page.goto("/");
   await page.getByTestId("logout").click();
   await page.getByTestId("username").fill("roe.mary");
   await page.getByTestId("password").fill("handover-password");
@@ -325,8 +323,7 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await page.getByTestId("new-password").fill("her-own-password");
   await page.getByTestId("confirm-password").fill("her-own-password");
   await page.getByTestId("password-submit").click();
-  await expect(page.getByTestId("sign-in-link")).toBeVisible();
-  await page.getByTestId("sign-in-link").click();
+  await expect(page.getByTestId("login-submit")).toBeVisible();
   await page.getByTestId("username").fill("roe.mary");
   await page.getByTestId("password").fill("her-own-password");
   await page.getByTestId("login-submit").click();

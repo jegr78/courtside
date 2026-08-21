@@ -46,7 +46,7 @@ export function PrimaryNavigation({ session, signedOut }: { session: SessionStat
     }
   }
 
-  return <div className="grid w-full max-w-7xl gap-3">
+  return <div data-testid="primary-navigation" className="grid w-full max-w-7xl gap-3">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <nav aria-label={t("nav.primary")} className="flex flex-wrap items-center gap-4">
         {destinations.filter((destination) => destination.visible(session)).map((destination) =>
@@ -58,9 +58,8 @@ export function PrimaryNavigation({ session, signedOut }: { session: SessionStat
             className="font-semibold underline-offset-4"
           >{t(destination.label)}</Link>)}
       </nav>
-      {session.authenticated
-        ? <Button type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>
-        : <Link to="/login" data-testid="sign-in-link" className="rounded-lg bg-(--club-primary) px-4 py-3 font-semibold text-(--club-primary-text)">{t("auth.submit")}</Link>}
+      {session.authenticated && <Button type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>}
+      {!session.authenticated && pathname !== "/login" && <Link to="/login" data-testid="sign-in-link" className="rounded-lg bg-(--club-primary) px-4 py-3 font-semibold text-(--club-primary-text)">{t("auth.submit")}</Link>}
     </div>
     {error && <Alert>{error}</Alert>}
   </div>;

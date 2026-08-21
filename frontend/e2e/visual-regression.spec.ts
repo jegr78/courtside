@@ -62,6 +62,9 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   // given
   await signIn(page, "configuration-admin");
 
+  // then
+  await stableScreenshot(page.getByTestId("primary-navigation"), "primary-navigation.png");
+
   // when
   await page.getByTestId("admin-configuration-link").click();
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();

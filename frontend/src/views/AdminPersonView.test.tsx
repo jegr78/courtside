@@ -225,6 +225,8 @@ describe("AdminPersonView", () => {
     // given
     vi.spyOn(api, "setAccountActive").mockRejectedValue(new ApiError(409, {
       type: "urn:courtside:error:last-administrator",
+      title: "Conflict",
+      status: 409,
       violations: [{ code: "account.lastAdministrator", params: {} }]
     }));
     showPerson();

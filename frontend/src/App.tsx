@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./api/client";
@@ -44,7 +45,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="/my-bookings" element={session.authenticated
       ? <MyBookingsPage session={session} />
-      : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
+      : <Navigate to="/login" replace />} />
     <Route path="/admin/configuration" element={session.roles.includes("ADMIN")
       ? <AdminConfigurationView configurationChanged={(changed) => configurationChanged?.(changed)} />
       : <Navigate to="/" replace />} />
@@ -154,13 +155,17 @@ export function App() {
   }, [refreshSession]);
 
   function initialPasswordChanged() {
-    setPasswordChanged(true);
-    setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
+    flushSync(() => {
+      setPasswordChanged(true);
+      setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
+    });
     void navigate("/login");
   }
 
+  // The session has to be gone before the route is chosen: signing out from a role-guarded page
+  // would otherwise be sent home by that page's own redirect before this one is applied.
   function signOut() {
-    setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
+    flushSync(() => setSession({ authenticated: false, roles: [], passwordChangeRequired: false }));
     void navigate("/login");
   }
 

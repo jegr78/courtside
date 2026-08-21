@@ -80,4 +80,10 @@ describe("PrimaryNavigation", () => {
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(signedOut).not.toHaveBeenCalled();
   });
+
+  it("givenTheSignInPageIsOpen_whenRendered_thenNothingOffersToSignInASecondTime", () => {
+    show(anonymous, "/login");
+    expect(screen.getByTestId("court-plan-link")).toBeInTheDocument();
+    expect(screen.queryByTestId("sign-in-link")).not.toBeInTheDocument();
+  });
 });

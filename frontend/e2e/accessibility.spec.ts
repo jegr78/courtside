@@ -125,7 +125,7 @@ test("initial password change is operable using only the keyboard", async ({ pag
   await page.keyboard.press("Enter");
 
   // then
-  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await expect(page.getByTestId("login-view")).toBeVisible();
 });
 
 test("booking dialog traps focus in both directions and restores its trigger", async ({ page, journeyService }) => {
