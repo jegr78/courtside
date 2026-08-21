@@ -61,12 +61,17 @@ public class RosterService {
     private final ClubTimeZone clubTimeZone;
     private final ApplicationEventPublisher events;
 
-    public CursorPage.Result<RosterEntry> list(String query, UUID cursor, int limit) {
+    public CursorPage.Result<RosterEntry> list(String query, UUID membershipTypeId, UUID cursor, int limit) {
         validateLimit(limit);
         requireKnownCursor(cursor);
-        String normalized = normalize(query);
+        List<UUID> holders = membershipTypeId == null
+                ? List.of()
+                : members.findCurrentHolderIds(membershipTypeId);
+        if (membershipTypeId != null && holders.isEmpty()) {
+            return new CursorPage.Result<>(List.of(), null);
+        }
         List<UUID> ids = persons.findIdsByNameFragmentAfter(
-                normalized, cursor, PageRequest.of(0, limit + 1));
+                normalize(query), membershipTypeId != null, holders, cursor, PageRequest.of(0, limit + 1));
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
     }
 

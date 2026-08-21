@@ -2829,6 +2829,17 @@ paths:
           required: false
           description: Matches against the person's full name, case-insensitively.
           schema: { type: string, maxLength: 60 }
+        - name: membershipTypeId
+          in: query
+          required: false
+          description: |
+            Only the people who hold this membership type **right now**. A membership that has
+            ended does not match, even though the entry still names the type its holder last held
+            — `membershipTypeId` on an entry answers "of what were they a member", and this
+            parameter answers "of what are they one". Combining it with `query` narrows by both.
+
+            An unknown type is not an error: nobody holds it, so the page is empty.
+          schema: { type: string, format: uuid }
         - name: cursor
           in: query
           required: false

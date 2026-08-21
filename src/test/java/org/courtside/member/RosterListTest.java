@@ -52,7 +52,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID child = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items())
@@ -76,7 +76,7 @@ class RosterListTest extends AbstractIntegrationTest {
         members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items())
@@ -101,7 +101,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID other = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list("mile", null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list("mile", null, null, 50);
 
         // then
         assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
@@ -114,7 +114,7 @@ class RosterListTest extends AbstractIntegrationTest {
         identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list("%", null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list("%", null, null, 50);
 
         // then
         assertThat(page.items()).isEmpty();
@@ -128,7 +128,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
@@ -145,8 +145,8 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID richard = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, null, first.nextCursor(), 2);
 
         // then
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
@@ -168,8 +168,8 @@ class RosterListTest extends AbstractIntegrationTest {
                 "John", "Roe", "john.roe@example.org", LOWEST_IDS);
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, null, first.nextCursor(), 2);
 
         // then
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
@@ -191,8 +191,8 @@ class RosterListTest extends AbstractIntegrationTest {
                 .toList();
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, first.nextCursor(), 2);
+        CursorPage.Result<RosterService.RosterEntry> first = roster.list(null, null, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.list(null, null, first.nextCursor(), 2);
 
         // then
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
@@ -207,7 +207,7 @@ class RosterListTest extends AbstractIntegrationTest {
         identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        assertThatThrownBy(() -> roster.list(null, UUID.randomUUID(), 50))
+        assertThatThrownBy(() -> roster.list(null, null, UUID.randomUUID(), 50))
                 .isInstanceOf(RosterCursorUnknownException.class)
                 .satisfies(failure -> assertThat(((RosterCursorUnknownException) failure).getCode())
                         .isEqualTo("roster.cursor.unknown"));
@@ -221,7 +221,7 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID current = identity.createEnabledAccount(jane, "jane.doe", Set.of(Role.TRAINER));
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items())
@@ -250,7 +250,7 @@ class RosterListTest extends AbstractIntegrationTest {
                 .update();
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
 
         // then
         assertThat(page.items())

@@ -67,7 +67,7 @@ class RosterPersonTest extends AbstractIntegrationTest {
                 roster.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // then
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
         assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(created.personId());
     }

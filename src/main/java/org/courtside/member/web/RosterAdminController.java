@@ -36,8 +36,8 @@ class RosterAdminController implements AdminRosterApi {
     private final RosterService roster;
 
     @Override
-    public ResponseEntity<ApiRosterPage> listRoster(String query, UUID cursor, Integer limit) {
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(query, cursor, limit);
+    public ResponseEntity<ApiRosterPage> listRoster(String query, UUID membershipTypeId, UUID cursor, Integer limit) {
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(query, membershipTypeId, cursor, limit);
         return ResponseEntity.ok(new ApiRosterPage(page.items().stream()
                 .map(RosterAdminController::toResponse)
                 .toList())
