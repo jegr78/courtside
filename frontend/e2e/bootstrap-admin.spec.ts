@@ -248,6 +248,37 @@ test("an admin takes a court out of service and restores it through the browser"
   await expect(page.getByTestId("court-column-4")).toBeVisible();
 });
 
+test("an admin changes a court and finds that change in the log", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("admin-facility-link").click();
+  await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+  const court = "dddddddd-0000-0000-0000-000000000003";
+
+  // when
+  const courtDeactivated = page.waitForResponse((response) =>
+    response.url().endsWith(`/api/admin/courts/${court}/active`)
+      && response.request().method() === "PUT"
+  );
+  await page.getByTestId(`toggle-court-${court}`).click();
+  expect((await courtDeactivated).status()).toBe(200);
+  await page.goto("/");
+  await page.getByTestId("admin-audit-link").click();
+  await expect(page.getByTestId("admin-audit-view")).toBeVisible();
+
+  // then
+  const entry = page.locator(
+    `[data-testid="audit-row"][data-subject-id="${court}"][data-event-type="facility.court.availabilityChanged"]`
+  );
+  await expect(entry).toBeVisible();
+  await expect(entry.getByTestId("audit-message")).toHaveText("Court deactivated");
+  await expect(entry.getByTestId("audit-subject")).toHaveText("3");
+  await expect(entry.getByTestId("audit-actor")).toHaveText("configuration-admin");
+});
+
 test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");

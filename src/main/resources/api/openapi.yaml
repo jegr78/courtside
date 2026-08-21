@@ -94,6 +94,8 @@ tags:
     description: What an uploaded roster snapshot would change, before anything is written.
   - name: admin-import-runs
     description: Executing a reviewed snapshot, and the log of what was executed.
+  - name: admin-audit
+    description: The configuration changes this instance recorded.
 
 security:
   - sessionCookie: []
@@ -122,11 +124,14 @@ components:
         token is indistinguishable from a missing session.
 
   parameters:
-    ImpactCursor:
+    PageCursor:
       name: cursor
       in: query
       required: false
-      description: The opaque `nextCursor` returned by the preceding page.
+      description: |
+        The opaque `nextCursor` returned by the preceding page. This is the plain variant: a paging
+        endpoint whose cursor needs prose of its own declares that cursor inline instead of sharing
+        this one, so not every paging endpoint refers to it.
       schema: { type: string, format: uuid }
     PageLimit:
       name: limit
@@ -1448,6 +1453,45 @@ components:
         bookings:
           type: array
           items: { $ref: "#/components/schemas/AffectedBooking" }
+
+    AuditEntry:
+      type: object
+      required: [id, occurredAt, eventType, parameters, subjectId]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        eventType:
+          type: string
+          description: |
+            The client resolves its message from this: `audit.event.${eventType}`. The key is
+            derived rather than stored, so it never joins the contract that keeps stored rows
+            readable.
+        parameters:
+          type: object
+          additionalProperties: true
+          description: The recorded payload, as the message's parameters.
+        subjectId: { type: string, format: uuid }
+        subjectName:
+          type: [string, "null"]
+          description: What the entity is called today, or `null` once the entity is gone.
+        actorAccountId: { type: [string, "null"], format: uuid }
+        actorUsername:
+          type: [string, "null"]
+          description: |
+            The acting account's username, or `null` when no account acted, and when the account
+            that acted was erased.
+
+    AuditPage:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/AuditEntry" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: Pass this entry id as `cursor` to continue after the current page.
 
   responses:
     Unauthenticated:
@@ -4036,7 +4080,7 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
-        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageCursor"
         - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
@@ -4061,7 +4105,7 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
-        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageCursor"
         - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
@@ -4096,7 +4140,7 @@ paths:
           in: query
           required: false
           schema: { type: string, format: time }
-        - $ref: "#/components/parameters/ImpactCursor"
+        - $ref: "#/components/parameters/PageCursor"
         - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
@@ -4104,6 +4148,60 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Impact" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/audit:
+    get:
+      tags: [admin-audit]
+      operationId: readAuditLog
+      summary: The configuration changes this instance recorded, newest first.
+      description: |
+        Every entry names the account that made the change, or no account at all when the change
+        had no signed-in person behind it. An account id that resolves to nothing is an account
+        that has been erased; the id stands in its place.
+
+        The page is ordered by `occurredAt` descending, and by `id` descending where several
+        entries share one `occurredAt` — which happens whenever one administrative call records
+        more than one change — so the order is total and a page boundary never drops or repeats a
+        row. `cursor` continues after the entry it names in that same order.
+      parameters:
+        - name: subjectId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: Restrict the page to one configuration entity.
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Include only entries recorded at or after this instant.
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: |
+            Exclude entries recorded at or after this instant. A boundary of midnight excludes
+            anything recorded exactly at midnight; ask for the following instant to include it.
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor that does not name an
+            entry of this log is answered `400` rather than silently starting the page over, because
+            a restarted page is the one wrong answer a client cannot detect.
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/PageLimit"
+      responses:
+        "200":
+          description: A page of the log.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditPage" }
         "400":
           $ref: "#/components/responses/Invalid"
         "401":

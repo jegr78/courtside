@@ -2,6 +2,7 @@ package org.courtside.rules.internal;
 
 import org.courtside.rules.BookingCounter;
 import org.courtside.rules.RuleContext;
+import org.courtside.rules.RuleType;
 import org.courtside.rules.RuleViolation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

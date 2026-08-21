@@ -1,4 +1,4 @@
-package org.courtside.rules.internal;
+package org.courtside.rules;
 
 public enum RuleType {
     OPENING_HOURS,

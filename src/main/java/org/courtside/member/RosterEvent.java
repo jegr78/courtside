@@ -1,13 +1,15 @@
 package org.courtside.member;
 
-import org.courtside.shared.DomainEventRecord;
-
 import org.courtside.identity.Role;
+import org.courtside.shared.DomainEventRecord;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 
+@NullMarked
 public sealed interface RosterEvent extends DomainEventRecord {
 
     UUID personId();
@@ -94,8 +96,8 @@ public sealed interface RosterEvent extends DomainEventRecord {
 
     }
 
-    record MembershipWritten(UUID personId, UUID membershipTypeId, LocalDate startedOn,
-                             LocalDate endedOn) implements RosterEvent {
+    record MembershipWritten(UUID personId, UUID membershipTypeId, @Nullable LocalDate startedOn,
+                             @Nullable LocalDate endedOn) implements RosterEvent {
 
         static final String TYPE = "roster.membership.written";
 

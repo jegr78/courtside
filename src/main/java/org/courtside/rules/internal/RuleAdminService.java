@@ -1,12 +1,17 @@
 package org.courtside.rules.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.rules.RuleType;
+import org.courtside.rules.RulesEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -18,6 +23,7 @@ public class RuleAdminService {
 
     private final RuleSetRepository ruleSets;
     private final RuleDefinitionRepository definitions;
+    private final ApplicationEventPublisher events;
 
     public List<RuleSet> allRuleSets() {
         return ruleSets.findAllByOrderByNameAsc();
@@ -25,24 +31,35 @@ public class RuleAdminService {
 
     @Transactional
     public RuleSet createRuleSet(String name) {
-        return saveOrRejectTakenName(new RuleSet(name));
+        RuleSet ruleSet = saveOrRejectTakenName(new RuleSet(name));
+        events.publishEvent(new RulesEvent.RuleSetAdded(ruleSet.getId()));
+        return ruleSet;
     }
 
     @Transactional
     public RuleSet changeRuleSet(UUID ruleSetId, String name) {
         RuleSet ruleSet = requireRuleSet(ruleSetId);
+        boolean nameChanged = !Objects.equals(ruleSet.getName(), name);
         ruleSet.rename(name);
-        return saveOrRejectTakenName(ruleSet);
+        RuleSet saved = saveOrRejectTakenName(ruleSet);
+        if (nameChanged) {
+            events.publishEvent(new RulesEvent.RuleSetChanged(saved.getId(), List.of("name")));
+        }
+        return saved;
     }
 
     @Transactional
     public RuleSet setRuleSetActive(UUID ruleSetId, boolean active) {
         RuleSet ruleSet = requireRuleSet(ruleSetId);
+        if (ruleSet.isActive() == active) {
+            return ruleSet;
+        }
         if (active) {
             ruleSet.activate();
         } else {
             ruleSet.deactivate();
         }
+        events.publishEvent(new RulesEvent.RuleSetAvailabilityChanged(ruleSet.getId(), active));
         return ruleSet;
     }
 
@@ -60,20 +77,31 @@ public class RuleAdminService {
     public RuleDefinition setRule(UUID ruleSetId, RuleType type, Map<String, Integer> params) {
         requireRuleSet(ruleSetId);
         Map<String, Integer> validated = RuleParameters.validated(type, params);
-        return definitions.findByRuleSetIdAndRuleType(ruleSetId, type)
-                .map(definition -> {
-                    definition.changeTo(validated);
-                    return definition;
-                })
-                .orElseGet(() -> definitions.save(
-                        new RuleDefinition(ruleSetId, type, validated)));
+        Optional<RuleDefinition> existing = definitions.findByRuleSetIdAndRuleType(ruleSetId, type);
+        RuleDefinition definition;
+        boolean changed;
+        if (existing.isPresent()) {
+            definition = existing.get();
+            changed = !definition.getParams().equals(validated);
+            definition.changeTo(validated);
+        } else {
+            definition = definitions.save(new RuleDefinition(ruleSetId, type, validated));
+            changed = true;
+        }
+        if (changed) {
+            events.publishEvent(new RulesEvent.RuleDefinitionSet(ruleSetId, type, validated));
+        }
+        return definition;
     }
 
     @Transactional
     public void removeRule(UUID ruleSetId, RuleType type) {
         requireRuleSet(ruleSetId);
         definitions.findByRuleSetIdAndRuleType(ruleSetId, type)
-                .ifPresent(definitions::delete);
+                .ifPresent(definition -> {
+                    events.publishEvent(new RulesEvent.RuleDefinitionRemoved(ruleSetId, type));
+                    definitions.delete(definition);
+                });
     }
 
     private RuleSet saveOrRejectTakenName(RuleSet ruleSet) {

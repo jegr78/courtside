@@ -14,17 +14,34 @@
 
 ## 0. What is built today
 
-Twelve modules exist: `api`, `booking`, `card`, `config`, `dataexchange`, `demo`, `facility`,
-`identity`, `member`, `performance`, `rules`, `shared`. `api` holds the OpenAPI-generated request, response and
+Fourteen modules exist: `api`, `audit`, `booking`, `card`, `config`, `dataexchange`, `demo`, `facility`,
+`identity`, `member`, `performance`, `rules`, `securityassessment`, `shared`. `api` holds the OpenAPI-generated request, response and
 controller-interface types and carries no logic of its own, which is why it is declared shared
 alongside `shared` rather than given `allowedDependencies` of its own. `demo` and `performance`
 seed disposable environments — a walkthrough dataset and a synthetic load-test dataset — and each
 refuses to start unless its environment guard confirms the database it is about to fill is the
 disposable one it names (`courtside_dev` for `demo`, `courtside_perf` for `performance`), not
 whatever the deployment happens to point at. The `notification`, `reporting` and `integration`
-modules of section 3 are designed and not built. `audit` is built: every administrative change on
-the roster is recorded in the append-only `domain_event` table, written in the transaction that made
-the change. No port interface has been introduced, because no second adapter has needed one.
+modules of section 3 are designed and not built. `audit` is built: every configuration change made
+through the admin API — facility, cards, config, rule sets and the roster — is recorded in the
+append-only `domain_event` table before the commit that makes it: actor, time, entity, and, except
+for free text, the values. A free-text field never carries its value — a create event omits it, a
+change event names it in `changedFields` (`fields` for `roster.person.corrected`) — which is what
+keeps section 11's erasure working, since the log then holds nothing personal to remove. Bookings
+are not included; they carry their own status history. Coverage is enforced by a test, not by
+memory: it inventories every public method of the seven administrative services against an event
+type or an explicit `none`. The log is read back through `GET /api/admin/audit`, a cursor-paged,
+administrator-only endpoint that resolves the subject and the acting account to the names they
+carry today. `ConfigurationSubjectNames` is the port interface that resolution uses: an adapter
+beside each of the five publishing modules, plus one in `identity` that resolves a roster event's
+subject — a person id — to that person's display name, since `member` publishes the event but
+`identity` owns the person. `audit` depends on none of the five directly. Three gaps are accepted
+rather than closed: the bootstrap administrator's own account is created by writing `Person` and
+`UserAccount` straight to their repositories, bypassing the roster service, so that one write is
+never recorded at all; the demo seed does the same for its own two demo members — `Person`,
+`UserAccount` and `Member` written straight to their repositories — so those writes are not
+recorded either; and the demo seed's court changes, which do go through `FacilityService`, are
+recorded with no actor, because the seed runs as an `ApplicationRunner` before any session exists.
 
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
@@ -237,7 +254,10 @@ nothing about payment. Adding a new consumer is additive.
 
 The two consumers want different guarantees, and both are served from one publication. `audit`
 listens **before the commit** and writes its row in the same transaction: no commit without a row,
-which is the property that makes a log an audit log. Everything else listens **after** it, through
+which is the property that makes a log an audit log. That guarantee rests on the transaction, not
+on where a publish sits in a method — the one `@TransactionalEventListener` is registered at
+`BEFORE_COMMIT`, and a `RuntimeException` rolls the transaction back before it ever runs, so a
+change that never commits is a change never recorded. Everything else listens **after** it, through
 the event publication registry, which stores the publication in that same transaction and therefore
 delivers again after a restart that interrupted it — at least once, never never. A producer knows
 neither consumer.

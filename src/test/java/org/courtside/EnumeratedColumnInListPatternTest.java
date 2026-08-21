@@ -20,7 +20,7 @@ class EnumeratedColumnInListPatternTest {
     void whenReadingTheRuleDefinitionRuleTypeInList_thenItAcceptsExactlyTheRuleTypeEnumConstants()
             throws IOException, ReflectiveOperationException {
         // given
-        String expected = enumValuesOf("org.courtside.rules.internal.RuleType");
+        String expected = enumValuesOf("org.courtside.rules.RuleType");
 
         // when
         String actual = sqlInListValues(
@@ -28,7 +28,7 @@ class EnumeratedColumnInListPatternTest {
 
         // then
         assertThat(actual)
-                .as("rule_definition_rule_type_known has drifted from org.courtside.rules.internal.RuleType")
+                .as("rule_definition_rule_type_known has drifted from org.courtside.rules.RuleType")
                 .isEqualTo(expected);
     }
 

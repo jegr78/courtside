@@ -40,6 +40,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
 
   // then
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
+  await expect(page.getByTestId("save-club-config")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   // when
@@ -47,6 +48,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
 
   // then
   await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+  await expect(page.getByTestId("create-court")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 

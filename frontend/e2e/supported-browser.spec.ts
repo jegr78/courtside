@@ -40,12 +40,14 @@ test("an administrator can open both core administration views", async ({ page }
 
   // then
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
+  await expect(page.getByTestId("save-club-config")).toBeVisible();
 
   // when
   await page.goto("/admin/facility");
 
   // then
   await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+  await expect(page.getByTestId("create-court")).toBeVisible();
 });
 
 test("a member books a court with an idempotency key the browser could generate", async ({ page, journeyService }, testInfo) => {

@@ -17,6 +17,8 @@ export type BookingCardRequest = components["schemas"]["BookingCardRequest"];
 export type Role = components["schemas"]["Role"];
 export type RosterEntry = components["schemas"]["RosterEntry"];
 export type RosterPage = components["schemas"]["RosterPage"];
+export type AuditEntry = components["schemas"]["AuditEntry"];
+export type AuditPage = components["schemas"]["AuditPage"];
 export type PersonRequest = components["schemas"]["PersonRequest"];
 export type AccountRequest = components["schemas"]["AccountRequest"];
 export type SourceOffer = components["schemas"]["SourceOffer"];
@@ -158,6 +160,9 @@ export const api = {
     `/api/admin/roster/${personId}/account/active`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
     }
+  ),
+  audit: (cursor?: string, limit = 50) => request<AuditPage>(
+    `/api/admin/audit?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
   ),
   source: () => request<SourceOffer>("/api/source"),
   courts: () => request<PublicCourt[]>("/api/public/courts"),

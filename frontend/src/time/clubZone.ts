@@ -69,6 +69,10 @@ export function dateInTimeZoneValue(instant: Date, timeZone?: string): string | 
   return timeZone ? formatDate(dateInTimeZone(instant, timeZone)) : undefined;
 }
 
+export function shortTime(value: string | null | undefined): string {
+  return value?.slice(0, 5) ?? "";
+}
+
 export function formatTime(timestamp: string, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23"

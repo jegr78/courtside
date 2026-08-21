@@ -1,0 +1,201 @@
+package org.courtside.card;
+
+import org.courtside.AbstractIntegrationTest;
+import org.courtside.audit.testfixture.AuditTestFixture;
+import org.courtside.identity.Role;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@Import(AuditTestFixture.class)
+class CardAuditTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private CardService cards;
+
+    @Autowired
+    private AuditTestFixture audit;
+
+    @Test
+    void givenABookingCard_whenItIsCreated_thenTheLogCarriesItsRolesAndNotItsLabel() {
+        // when
+        BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
+
+        // then
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
+                .containsEntry("guestAllowed", false)
+                .containsEntry("countsAgainstLimits", true)
+                .doesNotContainKey("label")
+                .doesNotContainKey("color");
+    }
+
+    @Test
+    void givenABookingCard_whenItsLabelAndColourChange_thenBothAreNamedWithoutTheirValues() {
+        // given
+        BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
+
+        // when
+        cards.changeCard(card.getId(), "Squad", "#445566", Set.of(Role.MEMBER),
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
+
+        // then
+        Map<String, Object> payload = audit.latestPayload(card.getId(), CardEvent.BookingCardChanged.TYPE);
+        assertThat(payload).containsEntry("changedFields", List.of("label", "color"));
+        assertThat(payload.toString()).doesNotContain("Squad").doesNotContain("#445566");
+    }
+
+    @Test
+    void givenABookingCardWithMultipleRoles_whenItIsCreated_thenTheLogListsThemInAscendingNameOrder() {
+        // when
+        BookingCard card = cards.createCard("Team", "#112233",
+                Set.of(Role.TRAINER, Role.ADMIN, Role.MEMBER),
+                Set.of(Role.YOUTH_DIRECTOR, Role.ADMIN),
+                new short[]{2, 4}, true, false, false);
+
+        // then
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
+                .containsEntry("allowedRoles", List.of("ADMIN", "MEMBER", "TRAINER"))
+                .containsEntry("managingRoles", List.of("ADMIN", "YOUTH_DIRECTOR"));
+    }
+
+    @Test
+    void givenABookingCard_whenChangedWithIdenticalValues_thenNothingIsRecorded() {
+        // given
+        BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
+
+        // when
+        cards.changeCard(card.getId(), "Team", "#112233", Set.of(Role.MEMBER),
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
+
+        // then
+        assertThat(audit.eventsAbout(card.getId(), CardEvent.BookingCardChanged.TYPE)).isEmpty();
+    }
+
+    @Test
+    void givenAParticipantCardWithNoCapacityLimit_whenItIsCreated_thenTheLogCarriesTheNullCapacity() {
+        // when
+        ParticipantCard card = cards.createParticipantCard("Guests", null);
+
+        // then
+        Map<String, Object> payload = audit.latestPayload(card.getId(), CardEvent.ParticipantCardAdded.TYPE);
+        assertThat(payload).containsKey("capacity");
+        assertThat(payload.get("capacity")).isNull();
+    }
+
+    @Test
+    void givenAParticipantCard_whenItsCapacityChanges_thenTheLogCarriesTheNewCapacity() {
+        // given
+        ParticipantCard card = cards.createParticipantCard("Guests", 2);
+
+        // when
+        cards.changeParticipantCard(card.getId(), "Guests", 4);
+
+        // then
+        assertThat(audit.latestPayload(card.getId(), CardEvent.ParticipantCardChanged.TYPE))
+                .containsEntry("capacity", 4)
+                .containsEntry("changedFields", List.of());
+    }
+
+    @Test
+    void givenAParticipantCard_whenChangedWithIdenticalValues_thenNothingIsRecorded() {
+        // given
+        ParticipantCard card = cards.createParticipantCard("Guests", 2);
+
+        // when
+        cards.changeParticipantCard(card.getId(), "Guests", 2);
+
+        // then
+        assertThat(audit.eventsAbout(card.getId(), CardEvent.ParticipantCardChanged.TYPE)).isEmpty();
+    }
+
+    @Test
+    void givenAParticipantCard_whenOnlyItsLabelChanges_thenTheFieldIsNamedWithoutItsValue() {
+        // given
+        ParticipantCard card = cards.createParticipantCard("Guests", 2);
+
+        // when
+        cards.changeParticipantCard(card.getId(), "Visitors", 2);
+
+        // then
+        Map<String, Object> payload = audit.latestPayload(card.getId(), CardEvent.ParticipantCardChanged.TYPE);
+        assertThat(payload).containsEntry("changedFields", List.of("label"));
+        assertThat(payload.toString()).doesNotContain("Visitors");
+    }
+
+    @Test
+    void givenAnInactiveCard_whenItIsDeactivatedAgain_thenNothingIsRecorded() {
+        // given
+        BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
+        cards.setCardActive(card.getId(), false);
+
+        // when
+        cards.setCardActive(card.getId(), false);
+
+        // then
+        assertThat(audit.eventsAbout(card.getId(), CardEvent.BookingCardAvailabilityChanged.TYPE))
+                .hasSize(1);
+    }
+
+    @Test
+    void givenAnActiveCard_whenItIsDeactivated_thenTheLogCarriesTheFlag() {
+        // given
+        BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
+
+        // when
+        cards.setCardActive(card.getId(), false);
+
+        // then
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAvailabilityChanged.TYPE))
+                .containsEntry("active", false);
+    }
+
+    @Test
+    void givenAnInactiveParticipantCard_whenItIsDeactivatedAgain_thenNothingIsRecorded() {
+        // given
+        ParticipantCard card = cards.createParticipantCard("Guests", 2);
+        cards.setParticipantCardActive(card.getId(), false);
+
+        // when
+        cards.setParticipantCardActive(card.getId(), false);
+
+        // then
+        assertThat(audit.eventsAbout(card.getId(), CardEvent.ParticipantCardAvailabilityChanged.TYPE))
+                .hasSize(1);
+    }
+
+    @Test
+    void givenAnActiveParticipantCard_whenItIsDeactivated_thenTheLogCarriesTheFlag() {
+        // given
+        ParticipantCard card = cards.createParticipantCard("Guests", 2);
+
+        // when
+        cards.setParticipantCardActive(card.getId(), false);
+
+        // then
+        assertThat(audit.latestPayload(card.getId(), CardEvent.ParticipantCardAvailabilityChanged.TYPE))
+                .containsEntry("active", false);
+    }
+
+    @Test
+    void givenTwoCardKinds_whenTheLogNamesThem_thenEachResolvesToItsOwnLabel() {
+        // given
+        BookingCard booking = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false);
+        ParticipantCard participant = cards.createParticipantCard("Guests", 2);
+
+        // when / then
+        assertThat(audit.nameOf(booking.getId())).isEqualTo("Team");
+        assertThat(audit.nameOf(participant.getId())).isEqualTo("Guests");
+    }
+}

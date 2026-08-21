@@ -2,6 +2,7 @@ package org.courtside.rules.internal;
 
 import org.courtside.config.ClubTimeZone;
 import org.courtside.rules.RuleContext;
+import org.courtside.rules.RuleType;
 import org.courtside.rules.RuleViolation;
 import org.springframework.stereotype.Component;
 
