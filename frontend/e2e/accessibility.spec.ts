@@ -80,6 +80,17 @@ for (const locale of ["de", "en"]) {
     await expect(page.getByTestId("admin-roster-view")).toBeVisible();
     await expect(page.getByTestId("create-person")).toBeVisible();
     await expectNoWcagViolations(page);
+    await page.goto("/admin/membership-types");
+    await expect(page.getByTestId("admin-membership-types-view")).toBeVisible();
+    await expect(page.getByTestId("create-membership-type")).toBeVisible();
+    await expectNoWcagViolations(page);
+    // The import form is the one place this product asks for a file and renders selects and a
+    // fieldset built by hand, so it is checked with a source open rather than only listed.
+    await page.goto("/admin/import");
+    await expect(page.getByTestId("no-sources")).toBeVisible();
+    await page.getByTestId("new-source").click();
+    await expect(page.getByTestId("column-EXTERNAL_ID")).toBeVisible();
+    await expectNoWcagViolations(page);
     await page.goto("/admin/audit");
     await expect(page.getByTestId("admin-audit-view")).toBeVisible();
     await expect(page.getByTestId("audit-row").first()).toBeVisible();

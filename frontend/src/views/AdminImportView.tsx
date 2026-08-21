@@ -19,6 +19,7 @@ export function AdminImportView() {
   const [editing, setEditing] = useState<Editing>();
   const [removing, setRemoving] = useState(false);
   const [preview, setPreview] = useState<ImportPreview>();
+  const [runCount, setRunCount] = useState(0);
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -82,7 +83,7 @@ export function AdminImportView() {
 
   const chosen = editing?.source;
 
-  return <section className="grid w-full max-w-5xl gap-6">
+  return <section data-testid="admin-import-view" className="surface-panel grid w-full max-w-5xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.import.title")}</h1>
     {error && <Alert>{error}</Alert>}
     {success && <Alert tone="success">{success}</Alert>}
@@ -125,12 +126,15 @@ export function AdminImportView() {
       sourceId={chosen.id}
       preview={preview}
       disabled={pending}
-      executed={() => setPreview(undefined)}
+      executed={() => {
+        setPreview(undefined);
+        setRunCount((runs) => runs + 1);
+      }}
       reportError={reportError}
     />}
 
     {chosen && <ExternalReferencePanel
-      key={`references-${chosen.id}`}
+      key={`references-${chosen.id}-${runCount}`}
       sourceId={chosen.id}
       disabled={pending}
       reportError={reportError}

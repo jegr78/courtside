@@ -133,7 +133,7 @@ describe("ImportExecutionPanel", () => {
     show(undefined);
 
     // then
-    expect(await screen.findByTestId("run-run-1")).toHaveTextContent("12");
+    expect(await screen.findByTestId("import-run-run-1")).toHaveTextContent("12");
   });
 
   it("given a source that has never been run, when the panel opens, then it says so", async () => {
@@ -155,6 +155,6 @@ describe("ImportExecutionPanel", () => {
     await userEvent.click(await screen.findByTestId("confirm-execute"));
 
     // then
-    expect(await screen.findByTestId("run-run-1")).toBeInTheDocument();
+    expect(await screen.findByTestId("import-run-run-1")).toBeInTheDocument();
   });
 });

@@ -71,7 +71,7 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, executed, re
       {runs && (runs.length === 0
         ? <p data-testid="no-runs">{t("admin.import.noRuns")}</p>
         : <ul className="grid gap-2">
-          {runs.map((held) => <li key={held.runId} data-testid={`run-${held.runId}`} className="rounded-lg border p-2">
+          {runs.map((held) => <li key={held.runId} data-testid={`import-run-${held.runId}`} className="rounded-lg border p-2">
             <p>{t("admin.import.runAt", { at: new Date(held.executedAt).toLocaleString() })}</p>
             <p>{NUMBERS.map((number) => t(`admin.import.run.${number}`, { value: held[number] })).join(" · ")}</p>
           </li>)}

@@ -121,6 +121,39 @@ describe("AdminImportView", () => {
     expect(await screen.findByTestId("no-references")).toBeInTheDocument();
   });
 
+  it("given a finished run, when it created people, then the linked numbers are read again", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    const reading = vi.spyOn(api, "externalReferences")
+      .mockResolvedValue({ references: [], nextCursor: null });
+    vi.spyOn(api, "createImportPreview").mockResolvedValue({
+      previewId: "preview-1", sourceId: "source-1", mode: "UPDATE_ONLY", fileName: "members.csv",
+      fileHash: "abc", rowCount: 1, ignoredColumns: [], changes: [], rowErrors: [],
+      possibleDuplicates: [], removals: { count: 0, currentlyLinked: 0, percent: 0 },
+      needsConfirmation: false, superseded: false,
+      createdAt: "2026-08-21T10:00:00Z", expiresAt: "2126-08-22T10:00:00Z"
+    });
+    vi.spyOn(api, "executeImportPreview").mockResolvedValue({
+      runId: "run-1", sourceId: "source-1", previewId: "preview-1", mode: "UPDATE_ONLY",
+      fileHash: "abc", created: 4, corrected: 0, membershipsEnded: 0, accountsDisabled: 0,
+      rolesRemoved: 0, rowErrors: 0, removalsConfirmed: false, executedAt: "2026-08-21T10:05:00Z"
+    });
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await screen.findByTestId("no-references");
+    const before = reading.mock.calls.length;
+
+    // when
+    await userEvent.upload(screen.getByTestId("snapshot-file"),
+      new File(["Number;Name\n1;Jane\n"], "members.csv", { type: "text/csv" }));
+    await userEvent.click(screen.getByTestId("upload-snapshot"));
+    await userEvent.click(await screen.findByTestId("execute-preview"));
+    await userEvent.click(await screen.findByTestId("confirm-execute"));
+
+    // then — a run links everybody it created, so the panel beside it is stale the moment it ends
+    await vi.waitFor(() => expect(reading.mock.calls.length).toBeGreaterThan(before));
+  });
+
   it("given the sources cannot be read, when the view opens, then the failure replaces the loading state", async () => {
     // given
     vi.spyOn(api, "importSources").mockRejectedValue(new Error("unavailable"));
