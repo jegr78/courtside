@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "image": "zaproxy/zap-stable:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab",
+  "requestLimit": 8000,
+  "maxTargetBytes": 4096,
+  "roles": [
+    "MEMBER",
+    "TRAINER",
+    "SPORT_DIRECTOR",
+    "YOUTH_DIRECTOR",
+    "GROUNDSKEEPER",
+    "TREASURER",
+    "ADMIN"
+  ],
+  "spider": {
+    "methods": ["GET", "HEAD", "OPTIONS"],
+    "pathPrefixes": ["/api", "/courts", "/my-bookings"],
+    "maxDurationMinutes": 2,
+    "maxDepth": 3,
+    "maxChildren": 50,
+    "minimumUrlsPerRole": 1
+  },
+  "active": {
+    "roles": ["MEMBER", "ADMIN"],
+    "ruleIds": [40012, 40018],
+    "strength": "Low",
+    "threshold": "Medium",
+    "maxRuleDurationMinutes": 1,
+    "maxScanDurationMinutes": 5,
+    "maxAlertsPerRule": 10,
+    "threadsPerHost": 2,
+    "queryParametersOnly": true
+  },
+  "canary": {
+    "path": "/__security/zap-canary",
+    "passiveRuleId": 10037
+  }
+}

@@ -366,10 +366,11 @@ function pathId(path) {
 
 export function runOwnedProcess(command, args, {
   timeoutMilliseconds, stopFile, cleanup = async () => {}, environment = process.env, acceptedExitCodes = [0], guard,
-  guardFailure = "Owned security process exceeded a safety limit", outputLimitBytes = 1024 * 1024
+  guardFailure = "Owned security process exceeded a safety limit", outputLimitBytes = 1024 * 1024, input
 }) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], env: environment });
+    const child = spawn(command, args, { stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"], env: environment });
+    if (input !== undefined) child.stdin.end(input);
     const output = [];
     const errors = [];
     let outputBytes = 0;

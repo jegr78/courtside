@@ -401,6 +401,103 @@ export async function runPassiveZap(plan, stopFile, limits) {
   }
 }
 
+export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan) {
+  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
+    COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests),
+    COURTSIDE_SECURITY_MAX_CONCURRENCY: String(plan.budgets.concurrency),
+    COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD,OPTIONS",
+    COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api,/courts,/my-bookings,/__security/zap-canary",
+    COURTSIDE_SECURITY_CANARY_ENABLED: "true",
+    COURTSIDE_SECURITY_MAX_TARGET_BYTES: String(limits.policy.maxTargetBytes) };
+  const reservation = `courtside-security-assessment-${plan.runId}`;
+  const gateway = `${securityProject(plan.runId)}-scanner-gateway-1`;
+  const deadline = Date.now() + limits.timeoutMilliseconds;
+  const command = async (args, options = {}) => {
+    if (existsSync(stopFile)) throw new Error("Emergency stop requested");
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error("Owned security process exceeded its duration limit");
+    return runOwnedProcess("docker", args, {
+      timeoutMilliseconds: remaining, stopFile, environment,
+      acceptedExitCodes: options.acceptedExitCodes ?? [0], input: options.input,
+      outputLimitBytes: options.outputLimitBytes ?? 1024 * 1024
+    });
+  };
+  const containers = [];
+  const reports = [];
+  const executedPlans = [];
+  let generatedBytes = 0;
+  try {
+    await command(securityAssessmentReservationArgs(environment, limits.attempt));
+    await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "up", "-d", "--wait",
+      "scanner-gateway"]);
+    for (const role of Object.keys(limits.sessions)) {
+      const name = `courtside-security-zap-${plan.runId}-${limits.attempt}-${role.toLowerCase().replaceAll("_", "-")}`;
+      containers.push(name);
+      await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "-d", "--no-deps",
+        "--name", name, "zap", "tail", "-f", "/dev/null"]);
+      const runtime = JSON.parse((await command(["inspect", name, "--format", "{{json .}}"])).stdout);
+      if (!scannerRuntimeHardened(runtime, {
+        memory: 1024 * 1024 * 1024, nanoCpus: 2_000_000_000, pids: 256,
+        networks: [`${securityProject(plan.runId)}_scanner-client`]
+      })) throw new Error("Authenticated ZAP runtime controls are incomplete");
+      const rendered = renderPlan(role, limits.sessions[role]);
+      executedPlans.push({ role, plan: rendered.replaceAll(limits.sessions[role], limits.planSessionPlaceholder) });
+      await command(["exec", "-i", name, "sh", "-c", "umask 077; cat > /tmp/courtside-plan.yaml"], {
+        input: rendered
+      });
+      const zap = await command(["exec", name, "zap.sh", "-cmd", "-autorun", "/tmp/courtside-plan.yaml"], {
+        acceptedExitCodes: [0, 2], outputLimitBytes: 4 * 1024 * 1024
+      });
+      if (zap.code !== 0) {
+        throw new Error(`ZAP assessment failed: ${authenticatedZapDiagnostic(
+          `${zap.stdout}\n${zap.stderr}`, Object.values(limits.sessions))}`);
+      }
+      const report = (await command(["exec", name, "cat", `/zap/wrk/report-${role.toLowerCase()}.json`], {
+        outputLimitBytes: 10 * 1024 * 1024
+      })).stdout;
+      generatedBytes += Buffer.byteLength(report);
+      reports.push(JSON.parse(report));
+      await command(["rm", "-f", name]);
+      containers.pop();
+    }
+    const gatewayRuntime = JSON.parse((await command(["inspect", gateway, "--format", "{{json .}}"])).stdout);
+    const runtimeHardened = scannerRuntimeHardened(gatewayRuntime, {
+      memory: 128 * 1024 * 1024, nanoCpus: 500_000_000, pids: 64,
+      networks: [`${securityProject(plan.runId)}_scanner-client`, `${securityProject(plan.runId)}_scanner-upstream`]
+    });
+    const requestCount = await zapRequestCount(gateway, command);
+    if (!Number.isSafeInteger(requestCount) || requestCount < 1 || requestCount > limits.maxRequests) {
+      throw new Error("Authenticated ZAP exceeded its request budget");
+    }
+    const planDigest = `sha256:${createHash("sha256").update(JSON.stringify(executedPlans)).digest("hex")}`;
+    if (planDigest !== limits.planDigest) throw new Error("Authenticated ZAP plan digest changed during execution");
+    return { reports, requestCount, runtimeHardened, roles: Object.keys(limits.sessions), planDigest,
+      generatedDataMegabytes: generatedBytes / (1024 * 1024) };
+  } finally {
+    const cleanupFailures = [];
+    for (const resource of [...containers, gateway, reservation]) {
+      try {
+        await runOwnedProcess("docker", ["rm", "-f", resource], {
+          timeoutMilliseconds: 10_000, stopFile: "/dev/null/courtside-cleanup-stop-disabled", environment
+        });
+      } catch (failure) {
+        if (await containerExistsForCleanup(resource, environment)) cleanupFailures.push(`${resource}: ${failure.message}`);
+      }
+    }
+    if (cleanupFailures.length) throw new Error(`Scanner cleanup was incomplete: ${cleanupFailures.join("; ")}`);
+  }
+}
+
+export function authenticatedZapDiagnostic(output, sessionCookies) {
+  let safe = String(output);
+  for (const cookie of sessionCookies) safe = safe.replaceAll(cookie, "[REDACTED]");
+  return safe.replace(/http:\/\/scanner-gateway:8090\S*/g, "[SCANNER_ROUTE]")
+    .replace(/(cookie|authorization|password|token)\s*[:=][^\r\n]+/gi, "$1=[REDACTED]")
+    .replace(/SESSION=[^;\s]+/gi, "SESSION=[REDACTED]")
+    .slice(-8192)
+    .trim();
+}
+
 function scannerRuntimeHardened(container, expected) {
   const host = container.HostConfig;
   const networks = Object.keys(container.NetworkSettings.Networks ?? {}).toSorted();

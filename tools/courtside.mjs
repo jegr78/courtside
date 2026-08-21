@@ -13,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import {
   inspectPassiveSecurityRuntime, readSecurityEnvironment, readSecurityIdentity, readSecurityProxyCa,
-  recoverSecurityEnvironment, runPassiveZap,
+  recoverSecurityEnvironment, runAuthenticatedZap, runPassiveZap,
   securityProject, securityStateRoot,
   startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment, verifySecurityEnvironmentForAssessment
 } from "./security-environment.mjs";
@@ -23,6 +23,7 @@ import {
 } from "./security-runner.mjs";
 import { runPassiveDeploymentAssessment } from "./security-passive-deployment.mjs";
 import { runAuthorizationAssessment } from "./security-authorization.mjs";
+import { renderAuthenticatedZapPlan, runAuthenticatedZapAssessment } from "./security-authenticated-zap.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devComposeFile = join(root, "deploy", "compose.dev.yaml");
@@ -629,6 +630,13 @@ async function execute(options) {
         ...context,
         ca,
         sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD
+      }),
+      runAuthenticatedZapAssessment: async (selectedPlan, context) => runAuthenticatedZapAssessment(selectedPlan, {
+        ...context,
+        ca,
+        sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
+        runZap: (candidate, limits) => runAuthenticatedZap(candidate, context.stopFile, limits,
+          renderAuthenticatedZapPlan)
       })
     });
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);

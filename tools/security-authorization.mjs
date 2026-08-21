@@ -426,7 +426,7 @@ export function validateAuthorizationEvidence(evidence, matrix) {
 
 export async function runAuthorizationAssessment(plan, context) {
   if (plan.profile !== "active" || plan.environment !== "SECURITY"
-      || JSON.stringify(plan.selectedTests) !== JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001"])) {
+      || JSON.stringify(plan.selectedTests) !== JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"])) {
     throw new Error("The authorization suite requires active authentication and authorization tests in SECURITY");
   }
   const api = yaml.load(readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));

@@ -44,10 +44,15 @@
       "testIds": ["CSA-DEPLOY-001"]
     },
     {
+      "id": "authenticated-zap",
+      "version": "2.16.1",
+      "testIds": ["CSA-DAST-001"]
+    },
+    {
       "id": "authorization-matrix",
       "version": "1.0.0",
       "testIds": ["CSA-AUTHN-001", "CSA-AUTHZ-001"]
     }
   ],
-  "selectedTests": ["CSA-DEPLOY-001", "CSA-AUTHN-001", "CSA-AUTHZ-001"]
+  "selectedTests": ["CSA-DEPLOY-001", "CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"]
 }

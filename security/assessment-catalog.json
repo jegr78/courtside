@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.0.0",
+  "catalogVersion": "1.1.0",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -2753,6 +2753,59 @@
         "OP-4"
       ],
       "trackingIssue": 243
+    },
+    {
+      "id": "CSA-DAST-001",
+      "title": "Bounded authenticated dynamic application scan",
+      "status": "implemented",
+      "standardReferences": {
+        "wstg": [
+          "WSTG-v4.2-ATHN-03",
+          "WSTG-v4.2-ATHZ-02"
+        ],
+        "asvs": [
+          "v5.0.0-1.2.2",
+          "v5.0.0-8.2.1"
+        ],
+        "apiSecurityTop10": [
+          "API1:2023",
+          "API2:2023",
+          "API8:2023"
+        ],
+        "owaspTop10": [
+          "A01:2025",
+          "A05:2025",
+          "A07:2025"
+        ]
+      },
+      "roles": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "surface": "rest-api",
+      "profile": "active",
+      "prerequisites": [
+        "Disposable security environment",
+        "Pinned ZAP image and rule policy",
+        "Isolated synthetic role sessions"
+      ],
+      "expectedSecureOutcome": "Authenticated discovery and curated active rules remain inside the approved read-only routes, retain every scanner alert as an untriaged candidate and fail closed on lost authentication or coverage.",
+      "executionMode": "automated",
+      "evidenceRequirements": [
+        "Pinned plan digest",
+        "Role-session coverage",
+        "Rule and request counts",
+        "Redacted finding candidates"
+      ],
+      "qualityRiskIds": [
+        "ID-1",
+        "ID-2"
+      ]
     }
   ]
 }

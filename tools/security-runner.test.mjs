@@ -261,7 +261,7 @@ test("given the bounded passive suite, when every check passes, then its evidenc
   });
 });
 
-test("given the bounded authorization suite, when every attack check passes, then its evidence governs the outcome", async () => {
+test("given the bounded active suites, when every attack check passes, then their evidence governs the outcome", async () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
   const plan = buildSecurityPlan(input({
@@ -269,12 +269,14 @@ test("given the bounded authorization suite, when every attack check passes, the
     authorization: "authorize-active-run-0001",
     tools: [
       { id: "target-identity", version: "1.0.0", testIds: [] },
+      { id: "authenticated-zap", version: "2.16.1", testIds: ["CSA-DAST-001"] },
       { id: "authorization-matrix", version: "1.0.0", testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"] }
     ],
-    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001"],
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"],
     catalogTests: [
       { id: "CSA-AUTHN-001", status: "implemented", profile: "active" },
-      { id: "CSA-AUTHZ-001", status: "implemented", profile: "active" }
+      { id: "CSA-AUTHZ-001", status: "implemented", profile: "active" },
+      { id: "CSA-DAST-001", status: "implemented", profile: "active" }
     ]
   }));
 
@@ -282,12 +284,15 @@ test("given the bounded authorization suite, when every attack check passes, the
   const manifest = await executeSecurityPlan(plan, {
     root,
     verifyTarget: async () => input(),
-    runAuthorizationAssessment: async () => ({ outcome: "passed", requestCount: 900 })
+    runAuthorizationAssessment: async () => ({ outcome: "passed", requestCount: 900 }),
+    runAuthenticatedZapAssessment: async () => ({ outcome: "passed", requestCount: 100,
+      generatedDataMegabytes: 1 })
   });
 
   // then
   assert.equal(manifest.outcome, "passed");
-  assert.equal(manifest.usage.requests, 900);
+  assert.equal(manifest.usage.requests, 1000);
+  assert.equal(manifest.usage.generatedDataMegabytes, 1);
   assert.deepEqual(manifest.toolResults.at(-1), {
     id: "authorization-matrix", version: "1.0.0", outcome: "passed"
   });

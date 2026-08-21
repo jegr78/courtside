@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
+  authenticatedZapDiagnostic,
   assertSecurityIdentity, assertSecurityRecoveryOwnership, assertSecurityStartAvailable, availableLoopbackPort, recoveryEnvironment,
   isMissingDockerResource,
   mergeSecurityProcessEnvironment,
@@ -226,4 +228,54 @@ test("given the scanner gateway, when enforcing budgets, then target access is c
   assert.match(gateway, /request_count >= MAX_REQUESTS/);
   assert.match(gateway, /concurrency\.acquire\(blocking=False\)/);
   assert.match(gateway, /UPSTREAM_HOST = "proxy"/);
+});
+
+test("given an active scanner boundary, when checking targets, then methods paths and origins fail closed", () => {
+  // given
+  const gateway = fileURLToPath(new URL("./security-request-gateway.py", import.meta.url));
+  const script = `
+import importlib.util
+import urllib.parse
+spec = importlib.util.spec_from_file_location("gateway", ${JSON.stringify(gateway)})
+gateway = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gateway)
+assert gateway.target_allowed(urllib.parse.urlsplit("http://scanner-gateway:8090/api/cards"), "GET")
+assert not gateway.target_allowed(urllib.parse.urlsplit("http://foreign.example/api/cards"), "GET")
+assert not gateway.target_allowed(urllib.parse.urlsplit("http://secret@scanner-gateway:8090/api/cards"), "GET")
+assert not gateway.target_allowed(urllib.parse.urlsplit("http://scanner-gateway:8090/api/admin/courts"), "GET")
+assert not gateway.target_allowed(urllib.parse.urlsplit("http://scanner-gateway:8090/api/cards"), "POST")
+assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards?value=" + "x" * 4096), "GET")
+assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards/../admin"), "GET")
+assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards/%2e%2e/admin"), "GET")
+assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards/%252e%252e/admin"), "GET")
+assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards\\..\\admin"), "GET")
+`;
+
+  // when
+  const result = spawnSync("python3", ["-c", script], { encoding: "utf8", env: {
+    ...process.env,
+    COURTSIDE_SECURITY_MAX_REQUESTS: "100",
+    COURTSIDE_SECURITY_MAX_CONCURRENCY: "1",
+    COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD",
+    COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api/cards",
+    COURTSIDE_SECURITY_MAX_TARGET_BYTES: "1024",
+    PYTHONDONTWRITEBYTECODE: "1"
+  } });
+
+  // then
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("given scanner diagnostics, when reporting a failed run, then session material is removed", () => {
+  // given
+  const cookie = "SESSION=opaque-session; XSRF-TOKEN=opaque-csrf";
+
+  // when
+  const diagnostic = authenticatedZapDiagnostic(
+    `Automation failed http://scanner-gateway:8090/api/reset/opaque-path?token=opaque-query\n`
+      + `Cookie: ${cookie}\nAuthorization: Bearer opaque-token\npassword=opaque-password`, [cookie]);
+
+  // then
+  assert.doesNotMatch(diagnostic, /opaque-session|opaque-csrf|opaque-token|opaque-password|opaque-path|opaque-query/);
+  assert.match(diagnostic, /\[REDACTED]/);
 });

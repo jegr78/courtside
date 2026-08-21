@@ -128,6 +128,7 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   const verifyTarget = runtime.verifyTarget ?? missingTargetVerifier;
   const runPassiveAssessment = runtime.runPassiveAssessment ?? missingPassiveAssessment;
   const runAuthorizationAssessment = runtime.runAuthorizationAssessment ?? missingAuthorizationAssessment;
+  const runAuthenticatedZapAssessment = runtime.runAuthenticatedZapAssessment ?? missingAuthenticatedZapAssessment;
   const { attempt, paths } = reserveAttempt(root, plan.runId);
   const startedAt = now();
   const manifest = createManifest(plan, attempt, startedAt);
@@ -150,16 +151,23 @@ export async function executeSecurityPlan(plan, runtime = {}) {
       manifest.usage = { requests: evidence.requestCount, generatedDataMegabytes: 0,
         evidenceBytes: directoryBytes(paths.evidence) };
       assertUsage(manifest.usage, plan.budgets);
-    } else if (adapter === "authorization-matrix") {
+    } else if (adapter === "active-security") {
       assertRunning(paths, startedAt, now(), plan.budgets);
-      const evidence = await runAuthorizationAssessment(plan, { evidenceDirectory: paths.evidence,
+      const zapEvidence = await runAuthenticatedZapAssessment(plan, { evidenceDirectory: paths.evidence,
+        stopFile: paths.stop, attempt, deadline,
+        maxRequests: Math.min(plan.budgets.requests, authenticatedZapRequestLimit(plan)) });
+      assertRunning(paths, startedAt, now(), plan.budgets);
+      manifest.toolResults.push({ id: "authenticated-zap", version: plan.tools[1].version,
+        outcome: zapEvidence.outcome });
+      const authorizationEvidence = await runAuthorizationAssessment(plan, { evidenceDirectory: paths.evidence,
         stopFile: paths.stop, attempt, deadline });
       assertRunning(paths, startedAt, now(), plan.budgets);
-      manifest.toolResults.push({ id: "authorization-matrix", version: plan.tools[1].version,
-        outcome: evidence.outcome });
-      manifest.outcome = evidence.outcome;
-      manifest.reason = evidence.outcome === "passed" ? null : "Authorization security checks did not pass";
-      manifest.usage = { requests: evidence.requestCount, generatedDataMegabytes: 0,
+      manifest.toolResults.push({ id: "authorization-matrix", version: plan.tools[2].version,
+        outcome: authorizationEvidence.outcome });
+      manifest.outcome = combinedOutcome(authorizationEvidence.outcome, zapEvidence.outcome);
+      manifest.reason = manifest.outcome === "passed" ? null : "Active security checks did not pass";
+      manifest.usage = { requests: authorizationEvidence.requestCount + zapEvidence.requestCount,
+        generatedDataMegabytes: zapEvidence.generatedDataMegabytes ?? 0,
         evidenceBytes: directoryBytes(paths.evidence) };
       assertUsage(manifest.usage, plan.budgets);
     } else {
@@ -200,12 +208,28 @@ function assertSupportedPlan(plan) {
     && plan.tools[1].testIds.length === 1 && plan.tools[1].testIds[0] === "CSA-DEPLOY-001";
   if (passive) return "passive-deployment";
   const authorization = plan.profile === "active" && plan.environment === "SECURITY"
-    && JSON.stringify(plan.selectedTests) === JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001"])
-    && plan.tools.length === 2 && identity?.id === "target-identity" && identity.testIds.length === 0
-    && plan.tools[1]?.id === "authorization-matrix"
-    && JSON.stringify(plan.tools[1].testIds) === JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001"]);
-  if (authorization) return "authorization-matrix";
+    && JSON.stringify(plan.selectedTests) === JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"])
+    && plan.tools.length === 3 && identity?.id === "target-identity" && identity.testIds.length === 0
+    && plan.tools[1]?.id === "authenticated-zap"
+    && JSON.stringify(plan.tools[1].testIds) === JSON.stringify(["CSA-DAST-001"])
+    && plan.tools[2]?.id === "authorization-matrix"
+    && JSON.stringify(plan.tools[2].testIds) === JSON.stringify(["CSA-AUTHN-001", "CSA-AUTHZ-001"]);
+  if (authorization) return "active-security";
   throw new Error("Assessment adapters require an isolated orchestrator-owned runner");
+}
+
+function combinedOutcome(...outcomes) {
+  if (outcomes.includes("failed")) return "failed";
+  if (outcomes.includes("incomplete")) return "incomplete";
+  return "passed";
+}
+
+function authenticatedZapRequestLimit(plan) {
+  const reservedForAuthorization = 2000;
+  if (plan.budgets.requests <= reservedForAuthorization) {
+    throw new Error("The active request budget cannot reserve authorization coverage");
+  }
+  return plan.budgets.requests - reservedForAuthorization;
 }
 
 export function redactSecurityText(value) {
@@ -356,6 +380,10 @@ function missingPassiveAssessment() {
 
 function missingAuthorizationAssessment() {
   throw new Error("No orchestrator-owned authorization assessment is configured");
+}
+
+function missingAuthenticatedZapAssessment() {
+  throw new Error("No orchestrator-owned authenticated ZAP assessment is configured");
 }
 
 export function fingerprintSecurityTarget(identity) {
