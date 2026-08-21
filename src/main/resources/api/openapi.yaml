@@ -2890,6 +2890,35 @@ paths:
           $ref: "#/components/responses/Forbidden"
 
   /api/admin/roster/{personId}:
+    get:
+      tags: [admin-roster]
+      operationId: readPerson
+      summary: Read one person.
+      description: |
+        The entry the roster list carries, for one person. The list can already answer this by
+        paging to the right entry; naming a person directly is what lets an administrative surface
+        give them an address of their own, so that a reloaded page and a shared link both resolve.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The person.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     put:
       tags: [admin-roster]
       operationId: changePerson

@@ -1300,4 +1300,55 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 {"firstName": "%s", "lastName": "%s", "email": "%s"}
                 """.formatted(firstName, lastName, email);
     }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWithAnAccountAndAMembership_whenReadingThatPersonAlone_thenTheListEntryIsReturned()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = identity.createEnabledAccount(jane, "jane.doe", "hash", Set.of(Role.MEMBER));
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+
+        // when / then
+        mockMvc.perform(get("/api/admin/roster/{personId}", jane))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.personId").value(jane.toString()))
+                .andExpect(jsonPath("$.firstName").value("Jane"))
+                .andExpect(jsonPath("$.lastName").value("Doe"))
+                .andExpect(jsonPath("$.email").value("jane.doe@example.org"))
+                .andExpect(jsonPath("$.accountId").value(account.toString()))
+                .andExpect(jsonPath("$.username").value("jane.doe"))
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.membershipTypeId").value(MEMBERSHIP_TYPE_ID.toString()))
+                .andExpect(jsonPath("$.membershipStartedOn").value(MEMBER_SINCE.toString()))
+                .andExpect(jsonPath("$.roles[0]").value("MEMBER"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWithoutAnAccount_whenReadingThatPersonAlone_thenTheAbsentAccountIsReported()
+            throws Exception {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/roster/{personId}", mary))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.personId").value(mary.toString()))
+                .andExpect(jsonPath("$.accountId").doesNotExist())
+                .andExpect(jsonPath("$.username").doesNotExist())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.roles.length()").value(0));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenNoSuchPerson_whenReadingIt_thenTheProblemSaysWhichPersonIsMissing() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/roster/{personId}", UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:person-not-found"));
+    }
+
 }

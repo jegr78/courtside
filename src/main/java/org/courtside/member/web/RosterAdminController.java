@@ -54,6 +54,11 @@ class RosterAdminController implements AdminRosterApi {
     }
 
     @Override
+    public ResponseEntity<ApiRosterEntry> readPerson(UUID personId) {
+        return ResponseEntity.ok(toResponse(roster.person(personId)));
+    }
+
+    @Override
     public ResponseEntity<ApiRosterEntry> changePerson(UUID personId, ApiPersonRequest request) {
         return ResponseEntity.ok(toResponse(roster.changePerson(
                 personId, request.getFirstName(), request.getLastName(), request.getEmail())));

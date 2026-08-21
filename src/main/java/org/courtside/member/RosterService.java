@@ -70,6 +70,12 @@ public class RosterService {
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
     }
 
+    public RosterEntry person(UUID personId) {
+        UUID id = requiredPersonId(personId);
+        return load(List.of(id)).stream().findFirst()
+                .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+    }
+
     @Transactional
     public RosterEntry createPerson(String firstName, String lastName, String email) {
         Person person = new Person(strippedNonBlank(firstName, "first name"),
@@ -348,7 +354,7 @@ public class RosterService {
 
     private static UUID requiredPersonId(UUID personId) {
         if (personId == null) {
-            throw new IllegalStateException("A person to change must be named by an id");
+            throw new IllegalStateException("A person must be named by an id");
         }
         return personId;
     }
