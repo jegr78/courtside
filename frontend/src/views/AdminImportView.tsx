@@ -5,6 +5,7 @@ import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
+import { ExternalReferencePanel } from "./import/ExternalReferencePanel";
 import { ImportSourceForm } from "./import/ImportSourceForm";
 
 type Editing = { source: ImportSource } | { source: undefined } | undefined;
@@ -104,6 +105,13 @@ export function AdminImportView() {
       types={types}
       disabled={pending}
       save={save}
+    />}
+
+    {chosen && <ExternalReferencePanel
+      key={`references-${chosen.id}`}
+      sourceId={chosen.id}
+      disabled={pending}
+      reportError={reportError}
     />}
 
     {chosen && <Button data-testid="remove-source" disabled={pending} className="justify-self-start" type="button" onClick={() => setRemoving(true)}>

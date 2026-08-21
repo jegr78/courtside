@@ -656,12 +656,19 @@ components:
 
     ExternalReference:
       type: object
-      required: [referenceId, sourceId, externalId, personId, linkedAt]
+      required: [referenceId, sourceId, externalId, personId, personName, linkedAt]
       properties:
         referenceId: { type: string, format: uuid }
         sourceId: { type: string, format: uuid }
         externalId: { type: string, minLength: 1, maxLength: 120 }
         personId: { type: string, format: uuid }
+        personName:
+          type: string
+          description: |
+            The name that person carries today, resolved when the reference is read rather than
+            stored with it. A link is a row identified by two ids, and a board asked to confirm one
+            has to see who it is about; a renamed person would otherwise keep the name they had when
+            somebody linked them.
         linkedAt: { type: string, format: date-time }
 
     ExternalReferencePage:

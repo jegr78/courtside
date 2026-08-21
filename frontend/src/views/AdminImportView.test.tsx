@@ -30,6 +30,7 @@ describe("AdminImportView", () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
   });
 
   it("given a club with sources, when the view opens, then each one can be chosen", async () => {
@@ -105,6 +106,18 @@ describe("AdminImportView", () => {
     await userEvent.click(await screen.findByTestId("confirm-remove-source"));
     expect(removing).toHaveBeenCalledWith("source-1");
     expect(screen.queryByTestId("source-choice-source-1")).not.toBeInTheDocument();
+  });
+
+  it("given a chosen source, when it is opened, then its linked member numbers are shown with it", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+
+    // when
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+
+    // then
+    expect(await screen.findByTestId("no-references")).toBeInTheDocument();
   });
 
   it("given the sources cannot be read, when the view opens, then the failure replaces the loading state", async () => {

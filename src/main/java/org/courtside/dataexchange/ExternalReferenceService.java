@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.dataexchange.internal.ExternalReference;
 import org.courtside.dataexchange.internal.ExternalReferenceRepository;
 import org.courtside.dataexchange.internal.MemberNumber;
+import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.shared.CursorPage;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,8 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -115,15 +118,28 @@ public class ExternalReferenceService {
     }
 
     private List<ExternalLink> load(List<UUID> ids) {
-        return references.findAllById(ids).stream().map(ExternalReferenceService::toLink).toList();
+        List<ExternalReference> found = references.findAllById(ids);
+        Map<UUID, String> names = namesOf(found.stream().map(ExternalReference::getPersonId).toList());
+        return found.stream().map(reference -> toLink(reference, names)).toList();
+    }
+
+    // A reference names a row; a board reads names. Resolving here keeps the list one query per
+    // page rather than one per row.
+    private Map<UUID, String> namesOf(List<UUID> personIds) {
+        return persons.findAllById(personIds).stream()
+                .collect(Collectors.toMap(Person::getId, Person::getDisplayName));
     }
 
     private static UUID idOf(ExternalLink link) {
         return link.referenceId();
     }
 
-    private static ExternalLink toLink(ExternalReference reference) {
+    private ExternalLink toLink(ExternalReference reference) {
+        return toLink(reference, namesOf(List.of(reference.getPersonId())));
+    }
+
+    private static ExternalLink toLink(ExternalReference reference, Map<UUID, String> names) {
         return new ExternalLink(reference.getId(), reference.getSourceId(), reference.getExternalId(),
-                reference.getPersonId(), reference.getLinkedAt());
+                reference.getPersonId(), names.get(reference.getPersonId()), reference.getLinkedAt());
     }
 }
