@@ -18,9 +18,17 @@ import { classifyCandidate, createCandidate } from "./security-triage.mjs";
 
 export const authenticatedZapPolicy = Object.freeze(JSON.parse(readFileSync(
   new URL("../security/zap-authenticated-policy.json", import.meta.url), "utf8")));
+export const authenticatedZapPlanSessionPlaceholder = "SESSION=[SYNTHETIC]; XSRF-TOKEN=[SYNTHETIC]";
 
 export function authenticatedZapPolicyDigest(policy = authenticatedZapPolicy) {
   return `sha256:${createHash("sha256").update(JSON.stringify(policy)).digest("hex")}`;
+}
+
+export function authenticatedZapPlanDigest(plans = authenticatedZapPolicy.roles.map((role) => ({
+  role,
+  plan: renderAuthenticatedZapPlan(role, authenticatedZapPlanSessionPlaceholder)
+}))) {
+  return `sha256:${createHash("sha256").update(JSON.stringify(plans)).digest("hex")}`;
 }
 
 export function renderAuthenticatedZapPlan(role, cookieHeader) {
@@ -149,7 +157,13 @@ ${rules}
       context: courtside-${role.toLowerCase()}
       policy: courtside-curated
       url: http://scanner-gateway:8090/api/my/bookings?limit=1
-` : ""}  - type: report
+` : ""}  - type: requestor
+    requests:
+      - url: http://scanner-gateway:8090/api/my/bookings?limit=1
+        name: authenticated-session-retention-proof
+        method: GET
+        responseCode: 200
+  - type: report
     parameters:
       template: traditional-json
       reportDir: /zap/wrk
@@ -217,6 +231,7 @@ export function validateAuthenticatedZapEvidence(evidence) {
   if (JSON.stringify(actualRoles) !== JSON.stringify(expectedRoles)
       || JSON.stringify(evidence.activeRuleIds) !== JSON.stringify(authenticatedZapPolicy.active.ruleIds)
       || evidence.policyDigest !== authenticatedZapPolicyDigest()
+      || evidence.planDigest !== authenticatedZapPlanDigest()
       || evidence.requestCount > authenticatedZapPolicy.requestLimit + authenticatedZapPolicy.roles.length * 3) {
     throw new Error("Authenticated ZAP evidence contradicts its pinned policy");
   }
@@ -252,15 +267,19 @@ export async function runAuthenticatedZapAssessment(plan, context) {
       sessions,
       policy: authenticatedZapPolicy,
       policyDigest: authenticatedZapPolicyDigest(),
+      planDigest: authenticatedZapPlanDigest(),
+      planSessionPlaceholder: authenticatedZapPlanSessionPlaceholder,
       attempt: context.attempt,
       maxRequests: context.maxRequests - nativeRequests,
       timeoutMilliseconds: control.remainingMilliseconds()
     });
     const requestCount = nativeRequests + scanner.requestCount;
     if (!scanner.runtimeHardened || !Number.isSafeInteger(scanner.requestCount) || scanner.requestCount < 1
-        || requestCount > context.maxRequests
+        || requestCount > context.maxRequests || scanner.planDigest !== authenticatedZapPlanDigest()
         || JSON.stringify(scanner.roles?.toSorted()) !== JSON.stringify(authenticatedZapPolicy.roles.toSorted())) {
-      throw new Error("Authenticated ZAP coverage or runtime controls are incomplete");
+      throw new Error(scanner.planDigest !== authenticatedZapPlanDigest()
+        ? "Authenticated ZAP plan digest does not match the executed plans"
+        : "Authenticated ZAP coverage or runtime controls are incomplete");
     }
     const observedAt = (context.now?.() ?? new Date()).toISOString();
     const normalized = normalizeAuthenticatedZapAlerts(scanner.reports, {
@@ -278,6 +297,7 @@ export async function runAuthenticatedZapAssessment(plan, context) {
       targetFingerprint: plan.targetFingerprint,
       image: authenticatedZapPolicy.image,
       policyDigest: authenticatedZapPolicyDigest(),
+      planDigest: scanner.planDigest,
       roles: authenticatedZapPolicy.roles.map((role) => ({ role, outcome: "passed" })),
       activeRuleIds: authenticatedZapPolicy.active.ruleIds,
       passiveEvidence: "separate-csa-deploy-001",

@@ -424,6 +424,7 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan) {
   };
   const containers = [];
   const reports = [];
+  const executedPlans = [];
   let generatedBytes = 0;
   try {
     await command(securityAssessmentReservationArgs(environment, limits.attempt));
@@ -440,6 +441,7 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan) {
         networks: [`${securityProject(plan.runId)}_scanner-client`]
       })) throw new Error("Authenticated ZAP runtime controls are incomplete");
       const rendered = renderPlan(role, limits.sessions[role]);
+      executedPlans.push({ role, plan: rendered.replaceAll(limits.sessions[role], limits.planSessionPlaceholder) });
       await command(["exec", "-i", name, "sh", "-c", "umask 077; cat > /tmp/courtside-plan.yaml"], {
         input: rendered
       });
@@ -467,7 +469,9 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan) {
     if (!Number.isSafeInteger(requestCount) || requestCount < 1 || requestCount > limits.maxRequests) {
       throw new Error("Authenticated ZAP exceeded its request budget");
     }
-    return { reports, requestCount, runtimeHardened, roles: Object.keys(limits.sessions),
+    const planDigest = `sha256:${createHash("sha256").update(JSON.stringify(executedPlans)).digest("hex")}`;
+    if (planDigest !== limits.planDigest) throw new Error("Authenticated ZAP plan digest changed during execution");
+    return { reports, requestCount, runtimeHardened, roles: Object.keys(limits.sessions), planDigest,
       generatedDataMegabytes: generatedBytes / (1024 * 1024) };
   } finally {
     const cleanupFailures = [];

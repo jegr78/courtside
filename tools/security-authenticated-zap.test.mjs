@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   authenticatedZapPolicy,
   authenticatedZapPolicyDigest,
+  authenticatedZapPlanDigest,
   normalizeAuthenticatedZapAlerts,
   renderAuthenticatedZapPlan,
   runAuthenticatedZapAssessment
@@ -28,11 +29,17 @@ test("given the pinned authenticated policy, when rendering role plans, then act
   // then
   assert.match(authenticatedZapPolicy.image, /zaproxy\/zap-stable:2\.16\.1@sha256:[a-f0-9]{64}/);
   assert.match(authenticatedZapPolicyDigest(), /^sha256:[a-f0-9]{64}$/);
+  assert.match(authenticatedZapPlanDigest(), /^sha256:[a-f0-9]{64}$/);
   assert.match(member, /defaultThreshold: "Off"/);
   for (const ruleId of authenticatedZapPolicy.active.ruleIds) assert.match(member, new RegExp(`id: ${ruleId}`));
   assert.doesNotMatch(trainer, /type: activeScan$/m);
   assert.match(trainer, /authenticated-session-proof/);
+  assert.match(trainer, /authenticated-session-retention-proof/);
   assert.match(trainer, /postForm: false/);
+  assert.ok(trainer.indexOf("authenticated-session-retention-proof") > trainer.indexOf("type: spider"));
+  assert.ok(member.indexOf("authenticated-session-retention-proof") > member.lastIndexOf("type: activeScan"));
+  assert.ok(member.indexOf("type: report") > member.indexOf("authenticated-session-retention-proof"));
+  assert.match(member, /authenticated-session-retention-proof\n\s+method: GET\n\s+responseCode: 200/);
 });
 
 test("given ZAP output, when normalizing alerts, then the canary is proven and findings become candidates", () => {
@@ -95,7 +102,8 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
     authenticateRole: async (role) => ({ cookieHeader: `SESSION=secret-${role}`, requestCount: 3 }),
     runZap: async (_selectedPlan, input) => ({
       reports: [report], requestCount: 70, runtimeHardened: true,
-      roles: Object.keys(input.sessions), generatedDataMegabytes: 0
+      roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
+      planDigest: authenticatedZapPlanDigest()
     })
   });
 
@@ -104,6 +112,30 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
   assert.equal(evidence.requestCount, 91);
   assert.equal(evidence.candidates[0].state, "false-positive");
   assert.doesNotMatch(readFileSync(join(evidenceDirectory, "authenticated-zap.json"), "utf8"), /secret-/);
+});
+
+test("given a changed executed plan, when assessing, then the evidence fails closed", async () => {
+  // given
+  const plan = {
+    profile: "active", environment: "SECURITY", runId: "run-0001",
+    target: "https://localhost:9443", targetFingerprint: run.targetFingerprint,
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"]
+  };
+
+  // when / then
+  await assert.rejects(runAuthenticatedZapAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-zap-evidence-")),
+    stopFile: join(tmpdir(), "courtside-zap-stop"),
+    deadline: new Date(Date.now() + 60_000),
+    attempt: 1,
+    maxRequests: 1000,
+    authenticateRole: async (role) => ({ cookieHeader: `SESSION=secret-${role}`, requestCount: 3 }),
+    runZap: async (_selectedPlan, input) => ({
+      reports: [], requestCount: 70, runtimeHardened: true,
+      roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
+      planDigest: `sha256:${"b".repeat(64)}`
+    })
+  }), /plan digest/);
 });
 
 test("given a scanner budget above policy, when assessing, then execution is rejected", async () => {

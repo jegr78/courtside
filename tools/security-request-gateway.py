@@ -40,7 +40,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     def forward(self):
         global request_count
         parsed = urllib.parse.urlsplit(self.path)
-        if not target_allowed(parsed, self.command):
+        canonical_path = canonical_target_path(parsed.path)
+        if canonical_path is None or not target_allowed(parsed, self.command, canonical_path):
             self.reject(421)
             return
         if not concurrency.acquire(blocking=False):
@@ -53,8 +54,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     return
                 request_count += 1
                 self.write_count()
-            path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
-            if CANARY_ENABLED and parsed.path == CANARY_PATH:
+            path = urllib.parse.urlunsplit(("", "", canonical_path, parsed.query, ""))
+            if CANARY_ENABLED and canonical_path == CANARY_PATH:
                 self.send_canary()
                 return
             try:
@@ -121,7 +122,20 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         return
 
 
-def target_allowed(parsed, method):
+def canonical_target_path(path):
+    candidate = path or "/"
+    if not candidate.startswith("/") or "%" in candidate or "\\" in candidate:
+        return None
+    try:
+        candidate.encode("ascii")
+    except UnicodeEncodeError:
+        return None
+    if "//" in candidate or any(segment in {".", ".."} for segment in candidate.split("/")):
+        return None
+    return candidate
+
+
+def target_allowed(parsed, method, canonical_path=None):
     if method not in ALLOWED_METHODS:
         return False
     if len(parsed.geturl().encode("utf-8")) > MAX_TARGET_BYTES or parsed.username or parsed.password:
@@ -129,7 +143,9 @@ def target_allowed(parsed, method):
     if parsed.scheme or parsed.netloc:
         if parsed.scheme != "http" or parsed.hostname != "scanner-gateway" or parsed.port != 8090:
             return False
-    path = parsed.path or "/"
+    path = canonical_path if canonical_path is not None else canonical_target_path(parsed.path)
+    if path is None:
+        return False
     return any(path == prefix or path.startswith(f"{prefix.rstrip('/')}/")
                for prefix in ALLOWED_PATH_PREFIXES)
 
