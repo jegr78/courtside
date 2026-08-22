@@ -26,17 +26,30 @@ class MailHandover {
         run(messageId, handover, givenUp, 1, FIRST_GAP);
     }
 
+    // The types and nothing else: a rejected recipient reports the address it rejected, and an
+    // operator diagnosing a relay needs the failure, not the member.
+    private static String diagnosis(Throwable failure) {
+        StringBuilder chain = new StringBuilder();
+        for (Throwable cause = failure; cause != null && cause != cause.getCause();
+             cause = cause.getCause()) {
+            chain.append(chain.isEmpty() ? "" : " <- ").append(cause.getClass().getSimpleName());
+        }
+        return chain.toString();
+    }
+
     private void run(String messageId, Runnable handover, Consumer<Exception> givenUp,
                      int attempt, Duration gap) {
         try {
             handover.run();
         } catch (RuntimeException failure) {
             if (attempt >= ATTEMPTS) {
-                log.warn("Gave up handing over {} after {} attempts", messageId, attempt);
+                log.warn("Gave up handing over {} after {} attempts: {}", messageId, attempt,
+                        diagnosis(failure));
                 givenUp.accept(failure);
                 return;
             }
-            log.info("Handing over {} failed on attempt {}, retrying in {}", messageId, attempt, gap);
+            log.info("Handing over {} failed on attempt {} ({}), retrying in {}", messageId, attempt,
+                    diagnosis(failure), gap);
             scheduler.schedule(() -> run(messageId, handover, givenUp, attempt + 1,
                     gap.multipliedBy(GROWTH)), Instant.now().plus(gap));
         }
