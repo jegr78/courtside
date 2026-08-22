@@ -9,6 +9,7 @@ import org.courtside.api.ApiPasswordResetRequest;
 import org.courtside.api.ApiPersonRequest;
 import org.courtside.api.ApiRole;
 import org.courtside.api.ApiRolesRequest;
+import org.courtside.api.ApiAccountLocaleRequest;
 import org.courtside.api.ApiRosterEntry;
 import org.courtside.api.ApiRosterPage;
 import org.courtside.api.ApiUsernameRequest;
@@ -85,6 +86,12 @@ class RosterAdminController implements AdminRosterApi {
     }
 
     @Override
+    public ResponseEntity<ApiRosterEntry> changeAccountLocale(UUID personId,
+                                                              ApiAccountLocaleRequest request) {
+        return ResponseEntity.ok(toResponse(roster.changeLocale(personId, request.getLocale())));
+    }
+
+    @Override
     public ResponseEntity<ApiRosterEntry> resetAccountPassword(UUID personId,
                                                                ApiPasswordResetRequest request) {
         return ResponseEntity.ok(toResponse(
@@ -128,6 +135,7 @@ class RosterAdminController implements AdminRosterApi {
                 address(entry.email()), entry.enabled(), roleNames(entry.roles()))
                 .accountId(entry.accountId())
                 .username(entry.username())
+                .locale(entry.locale())
                 .membershipTypeId(membershipTypeId(entry))
                 .membershipStartedOn(membershipDate(entry, RosterService.Membership::startedOn))
                 .membershipEndedOn(membershipDate(entry, RosterService.Membership::endedOn));

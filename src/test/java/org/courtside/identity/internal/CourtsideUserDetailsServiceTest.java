@@ -70,7 +70,7 @@ class CourtsideUserDetailsServiceTest {
     void givenAnAccountWithAPasswordOfItsOwn_whenLoadingIt_thenNoOneTimeExpiryApplies() {
         // given
         UserAccount account = new UserAccount(new Person("John", "Roe", "john.roe@example.org"),
-                "roe.john", "own-hash", Set.of(Role.MEMBER));
+                "roe.john", "own-hash", Set.of(Role.MEMBER), "de");
         when(accounts.findByUsername("roe.john")).thenReturn(Optional.of(account));
 
         // when
@@ -82,7 +82,7 @@ class CourtsideUserDetailsServiceTest {
 
     private static UserAccount anAccountAwaitingItsCredential() {
         return UserAccount.awaitingCredentials(new Person("Jane", "Doe", "jane.doe@example.org"),
-                "doe.jane", "placeholder-hash", Set.of(Role.MEMBER));
+                "doe.jane", "placeholder-hash", Set.of(Role.MEMBER), "de");
     }
 
     private CourtsideUserDetailsService serviceAtNow() {
@@ -94,7 +94,7 @@ class CourtsideUserDetailsServiceTest {
     void givenTheRehashWriteFails_whenUpdatingThePassword_thenTheUserIsStillReturned() {
         // given
         UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
-                "doe.jane", "old-hash", Set.of(Role.MEMBER));
+                "doe.jane", "old-hash", Set.of(Role.MEMBER), "de");
         UserDetails user = User.withUsername("doe.jane")
                 .password("old-hash")
                 .authorities("ROLE_MEMBER")
@@ -133,7 +133,7 @@ class CourtsideUserDetailsServiceTest {
     void givenTheRehashWriteFails_whenUpdatingThePassword_thenTheSwallowedFailureIsCounted() {
         // given
         UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
-                "doe.jane", "old-hash", Set.of(Role.MEMBER));
+                "doe.jane", "old-hash", Set.of(Role.MEMBER), "de");
         UserDetails user = User.withUsername("doe.jane")
                 .password("old-hash")
                 .authorities("ROLE_MEMBER")
@@ -178,7 +178,7 @@ class CourtsideUserDetailsServiceTest {
     void givenTheCollaboratorFailsAtTransactionBegin_whenUpdatingThePassword_thenTheUserIsStillReturned() {
         // given
         UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
-                "doe.jane", "old-hash", Set.of(Role.MEMBER));
+                "doe.jane", "old-hash", Set.of(Role.MEMBER), "de");
         UserDetails user = User.withUsername("doe.jane")
                 .password("old-hash")
                 .authorities("ROLE_MEMBER")

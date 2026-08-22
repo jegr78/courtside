@@ -81,6 +81,7 @@ export function AdminPersonView() {
             disabled={pending}
             saveRoles={(chosen) => mutate(() => api.changeAccountRoles(personId, chosen))}
             saveUsername={(username) => mutate(() => api.changeAccountUsername(personId, username))}
+            saveLocale={(locale) => mutate(() => api.changeAccountLocale(personId, locale))}
             resetPassword={(password) => mutate(() => api.resetAccountPassword(personId, password))}
             toggleAccount={() => mutate(() => api.setAccountActive(personId, !entry.enabled))}
           />
@@ -173,16 +174,18 @@ function MembershipSection({ entry, types, disabled, save }: {
   </section>;
 }
 
-function AccountSection({ entry, disabled, saveRoles, saveUsername, resetPassword, toggleAccount }: {
+function AccountSection({ entry, disabled, saveRoles, saveUsername, saveLocale, resetPassword, toggleAccount }: {
   entry: RosterEntry;
   disabled: boolean;
   saveRoles: (roles: Role[]) => Saved;
   saveUsername: (username: string) => Saved;
+  saveLocale: (locale: string) => Saved;
   resetPassword: (oneTimePassword: string) => Saved;
   toggleAccount: () => Saved;
 }) {
   const { t } = useTranslation();
   const [username, setUsername] = useState(entry.username ?? "");
+  const [locale, setLocale] = useState(entry.locale ?? "de");
   const [chosenRoles, setChosenRoles] = useState(entry.roles);
   const [oneTimePassword, setOneTimePassword] = useState("");
 
@@ -195,6 +198,16 @@ function AccountSection({ entry, disabled, saveRoles, saveUsername, resetPasswor
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <TextField data-testid="account-username" disabled={disabled} autoComplete="off" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} value={username} onChange={(event) => setUsername(event.target.value)} />
       <Button data-testid="save-username" disabled={disabled} className="self-end" type="button" onClick={() => void saveUsername(username)}>{t("admin.save")}</Button>
+    </div>
+    <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+      <label className="grid gap-2 font-medium">
+        {t("admin.person.accountLocale")}
+        <select data-testid="account-locale" disabled={disabled} className="form-control rounded-lg border px-3 py-2" value={locale} onChange={(event) => setLocale(event.target.value)}>
+          <option value="de">Deutsch</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <Button data-testid="save-locale" disabled={disabled} className="self-end" type="button" onClick={() => void saveLocale(locale)}>{t("admin.save")}</Button>
     </div>
     <RoleCheckboxes testIdPrefix="account-roles" disabled={disabled} selected={chosenRoles} changed={setChosenRoles} />
     <Button data-testid="save-roles" disabled={disabled} className="justify-self-start" type="button" onClick={() => void saveRoles(chosenRoles)}>{t("admin.save")}</Button>

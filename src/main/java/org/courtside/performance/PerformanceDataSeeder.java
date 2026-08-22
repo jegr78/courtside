@@ -7,6 +7,7 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.HistoricalBookingImporter;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.facility.Court;
+import org.courtside.config.ClubIdentity;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Person;
@@ -53,6 +54,7 @@ class PerformanceDataSeeder implements ApplicationRunner {
     private static final UUID MEMBER_BOOKING_CARD =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
 
+    private final ClubIdentity club;
     private final PersonRepository persons;
     private final UserAccountRepository accounts;
     private final MemberRepository members;
@@ -102,7 +104,8 @@ class PerformanceDataSeeder implements ApplicationRunner {
         for (int index = 1; index <= MEMBER_COUNT; index++) {
             String number = "%04d".formatted(index);
             Person person = persons.save(new Person("Member", number, "member" + number + "@example.org"));
-            UserAccount account = new UserAccount(person, "member" + number, passwordHash, Set.of(Role.MEMBER));
+            UserAccount account = new UserAccount(person, "member" + number, passwordHash,
+                    Set.of(Role.MEMBER), club.defaultLocale());
             account.enable();
             accounts.save(account);
             members.save(new Member(person.getId(), ACTIVE_MEMBERSHIP_TYPE,

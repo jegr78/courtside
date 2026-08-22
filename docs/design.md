@@ -65,9 +65,9 @@ tagged release builds a multi-arch container image, publishes it to GHCR signed 
 carrying an SBOM attestation, and attaches the OpenAPI document to the release. The reference
 deployment carries the club's own mail server behind a profile, together with a check that resolves
 the DNS a receiver looks at, and the application sends through it: the `notification` module reacts
-to an event and generates the credential at the moment it is sent. Both message bundles ship, but an
-account's language is a literal nothing writes, so every message goes out in German until
-[#434](https://github.com/jegr78/courtside/issues/434) makes the other one reachable. Mail
+to an event and generates the credential at the moment it is sent. Both message bundles ship, and
+which one an account is written to in is the club's configured default at creation, the member's
+own choice afterwards, and an administrator's correction where a member cannot reach it. Mail
 configuration is mandatory — an instance without it refuses to start and names
 the variables it is missing — and `/actuator/health/mail` reports the sending path to an
 administrator without ever opening it. The message names the date its password stops working, and

@@ -50,7 +50,7 @@ public class IdentityTestFixture {
 
     public UUID createAccount(UUID personId, String username, String passwordHash, Set<Role> roles) {
         Person person = persons.findById(personId).orElseThrow();
-        return accounts.save(new UserAccount(person, username, passwordHash, roles)).getId();
+        return accounts.save(new UserAccount(person, username, passwordHash, roles, "de")).getId();
     }
 
     // What a person holds after a board member adds them and before the message reaches them: a hash
@@ -58,7 +58,7 @@ public class IdentityTestFixture {
     public UUID createAccountAwaitingCredentials(UUID personId, String username, Set<Role> roles) {
         Person person = persons.findById(personId).orElseThrow();
         UserAccount account = UserAccount.awaitingCredentials(person, username,
-                "synthetic-test-placeholder-hash", roles);
+                "synthetic-test-placeholder-hash", roles, "de");
         account.enable();
         return accounts.save(account).getId();
     }
