@@ -96,6 +96,10 @@ test("given a job that only needs the artefact, when it builds one, then the sui
   assert.doesNotMatch(comparison, /mvnw -B verify/,
     "quality already runs the full suite on the same commit in the same workflow. A second run "
     + "buys nothing and gives every flake a second chance to fail a job about tool comparison.");
+  assert.match(comparison, /mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci/,
+    "the CLI these steps launch requires ajv and js-yaml at module load, out of the frontend's "
+    + "node_modules, so the job installs the pinned node and those modules before it runs one — "
+    + "dropping either turns the step into an import error seconds in");
 });
 
 test("given a release candidate, when publishing it, then its exact digest passes the active gate first", () => {
