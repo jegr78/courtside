@@ -237,12 +237,14 @@ test("given authorization evidence, when one operation actor pair is absent, the
   // when / then
   assert.doesNotThrow(() => validateAuthorizationEvidence({
     schemaVersion: 1, testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"], targetFingerprint: `sha256:${"a".repeat(64)}`,
+    specificationDigest: `sha256:${"b".repeat(64)}`,
     results, identityChecks, objectChecks, boundaryChecks: [], timing: { outcome: "passed", samplesPerClass: 12,
       medianKnownMilliseconds: 20, medianUnknownMilliseconds: 21, medianRelativeDifference: 0.05 },
     bruteForce, requestCount: 100, outcome: "passed"
   }, matrix));
   assert.throws(() => validateAuthorizationEvidence({
     schemaVersion: 1, testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"], targetFingerprint: `sha256:${"a".repeat(64)}`,
+    specificationDigest: `sha256:${"b".repeat(64)}`,
     results: results.slice(1), identityChecks, objectChecks, boundaryChecks: [], timing: { outcome: "passed", samplesPerClass: 12,
       medianKnownMilliseconds: 20, medianUnknownMilliseconds: 21, medianRelativeDifference: 0.05 },
     bruteForce, requestCount: 100, outcome: "passed"

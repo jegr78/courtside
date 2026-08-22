@@ -14,10 +14,11 @@ function workspace() {
   return mkdtempSync(join(tmpdir(), "courtside-acknowledgement-"));
 }
 
-function evidenceDirectory(root, name, candidates) {
+function evidenceDirectory(root, name, candidates, specificationDigest) {
   const directory = join(root, name);
   mkdirSync(directory, { recursive: true });
-  writeFileSync(join(directory, "openapi-fuzz.json"), JSON.stringify({ outcome: "passed", candidates }));
+  writeFileSync(join(directory, "openapi-fuzz.json"),
+    JSON.stringify({ outcome: "passed", candidates, ...(specificationDigest ? { specificationDigest } : {}) }));
   return directory;
 }
 
@@ -145,11 +146,11 @@ test("given every difference acknowledged, when writing the report, then it name
   assert.match(report, /Unacknowledged: none/);
 });
 
-function runCli(acknowledged) {
+function runCli(acknowledged, contracts = {}) {
   const root = workspace();
   const directories = {
-    candidate: evidenceDirectory(root, "candidate", [finding]),
-    base: evidenceDirectory(root, "base", [])
+    candidate: evidenceDirectory(root, "candidate", [finding], contracts.candidate),
+    base: evidenceDirectory(root, "base", [], contracts.base)
   };
   const comparisonFile = join(root, "runtime.json");
   const acknowledgementFile = join(root, "acknowledgement.json");
@@ -190,4 +191,25 @@ test("given an option used where a value belongs, when the command runs, then it
     [cli, "--comparison", "--acknowledgement", "--summary", "a",
       "--candidate-evidence", "b", "--base-evidence", "c", "--extra", "d"],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }), /Usage:/);
+});
+
+// The workflow points both runs at one document. Without this the property is wiring nobody checks,
+// and a difference caused by a contract change reads exactly like one caused by the tools.
+test("given two runs that read different contracts, when the command runs, then it refuses to attribute anything", () => {
+  // when
+  const result = runCli([finding.fingerprint],
+    { candidate: `sha256:${"1".repeat(64)}`, base: `sha256:${"2".repeat(64)}` });
+
+  // then
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /read different API documents/);
+});
+
+test("given two runs that read one contract, when the command runs, then it judges the findings", () => {
+  // when
+  const result = runCli([finding.fingerprint],
+    { candidate: `sha256:${"1".repeat(64)}`, base: `sha256:${"1".repeat(64)}` });
+
+  // then
+  assert.equal(result.status, 0);
 });

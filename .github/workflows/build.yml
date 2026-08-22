@@ -72,6 +72,7 @@ jobs:
         env:
           BASE_RUN_ID: compare-base-${{ github.run_id }}-${{ github.run_attempt }}
           CANDIDATE_RUN_ID: compare-head-${{ github.run_id }}-${{ github.run_attempt }}
+          COURTSIDE_SECURITY_API_DOCUMENT: ${{ runner.temp }}/courtside-security-base/src/main/resources/api/openapi.yaml
         run: |
           BASE_ROOT="$RUNNER_TEMP/courtside-security-base"
           (

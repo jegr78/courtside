@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
+import { apiDocumentPath } from "./security-api-document.mjs";
 import { createCandidate } from "./security-triage.mjs";
 import { authorizationRequest, SecurityCookieJar } from "./security-authorization.mjs";
 
@@ -9,7 +10,7 @@ const methods = new Set(["get", "post", "put", "patch", "delete"]);
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
 const Ajv = require("ajv/dist/2020").default;
-const specification = readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url));
+const specification = readFileSync(apiDocumentPath());
 const api = yaml.load(specification.toString("utf8"));
 const evidenceSchema = JSON.parse(readFileSync(
   new URL("../security/openapi-fuzz-evidence.schema.json", import.meta.url), "utf8"));
