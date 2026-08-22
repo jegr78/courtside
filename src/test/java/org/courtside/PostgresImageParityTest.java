@@ -18,6 +18,7 @@ class PostgresImageParityTest {
     private static final Path TESTCONTAINERS =
             Path.of("src/test/java/org/courtside/TestcontainersConfiguration.java");
     private static final Path BROWSER_JOURNEY_SETUP = Path.of("frontend/e2e/global-setup.ts");
+    private static final Path DEPLOYMENT_READ_BY_THE_SUITE = Path.of("deploy/compose.yaml");
 
     private static final Pattern POSTGRES_IMAGE =
             Pattern.compile("postgres:[\\w.-]+@sha256:[a-f0-9]{64}");
@@ -34,18 +35,26 @@ class PostgresImageParityTest {
                 .containsOnly(references.getFirst());
     }
 
+    // A second literal cannot be updated by whatever bumps the first, so the suite reads the
+    // deployment instead and this asserts that it stays the only place the digest is written.
     @Test
-    void whenTheSuiteStartsPostgres_thenItUsesTheImageTheDeploymentNames() throws IOException {
-        // given
-        String deployed = deploymentReferences().getFirst();
-
+    void whenTheSuiteStartsPostgres_thenItReadsTheDeploymentRatherThanRepeatingIt() throws IOException {
         // then
-        assertThat(reference(TESTCONTAINERS))
-                .as("the database the integration tests qualify must be the one a club runs")
-                .isEqualTo(deployed);
-        assertThat(reference(BROWSER_JOURNEY_SETUP))
-                .as("the database the browser journeys qualify must be the one a club runs")
-                .isEqualTo(deployed);
+        assertThat(matches(Files.readString(TESTCONTAINERS)))
+                .as("%s reads the image the deployment names; it does not carry its own", TESTCONTAINERS)
+                .isEmpty();
+        assertThat(matches(Files.readString(BROWSER_JOURNEY_SETUP)))
+                .as("%s reads the image the deployment names; it does not carry its own",
+                        BROWSER_JOURNEY_SETUP)
+                .isEmpty();
+    }
+
+    @Test
+    void whenTheSuiteReadsTheDeployment_thenItFindsTheFileItReads() {
+        // then
+        assertThat(DEPLOYMENT_READ_BY_THE_SUITE)
+                .as("both readers name this file; a rename here breaks them silently")
+                .exists();
     }
 
     private static List<String> deploymentReferences() throws IOException {
@@ -57,14 +66,6 @@ class PostgresImageParityTest {
             }
         }
         return references;
-    }
-
-    private static String reference(Path source) throws IOException {
-        List<String> found = matches(Files.readString(source));
-        assertThat(found)
-                .as("%s names exactly one PostgreSQL image, pinned by digest", source)
-                .hasSize(1);
-        return found.getFirst();
     }
 
     private static List<String> matches(String source) {
