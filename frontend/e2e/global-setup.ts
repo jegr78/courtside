@@ -10,6 +10,7 @@ import { GenericContainer, Network, Wait,
   type StartedNetwork, type StartedTestContainer } from "testcontainers";
 import type { FullConfig } from "@playwright/test";
 import { requireBuiltAfterItsSources } from "./build-freshness";
+import { collectBrowserDiagnostics, retainBrowserDiagnostics, type BrowserDiagnostics } from "./browser-diagnostics";
 import { startJourneyControl } from "./journey-control";
 
 const PINNED_BROWSER_IMAGE =
@@ -230,6 +231,8 @@ export interface JourneyService {
   plainBaseURL: string;
   visualDate: string;
   pinnedBrowser(browserName: string): Promise<string>;
+  releasePinnedBrowser(browserName: string): Promise<void>;
+  browserDiagnostics(browserName: string, reason: string): Promise<BrowserDiagnostics>;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): Promise<void>;
@@ -467,11 +470,25 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       browserServers.set(browserName, { container, endpoint });
       return endpoint;
     };
+    const releasePinnedBrowser = async (browserName: string): Promise<void> => {
+      const browser = browserServers.get(browserName);
+      if (!browser) return;
+      await browser.container.stop();
+      browserServers.delete(browserName);
+    };
     return {
       baseURL: `https://${CLUB_HOST}`,
       plainBaseURL: `http://${CLUB_HOST}:${CLUB_PLAIN_PORT}`,
       visualDate,
       pinnedBrowser: startPinnedBrowser,
+      releasePinnedBrowser,
+      browserDiagnostics: async (browserName, reason) => {
+        const browser = browserServers.get(browserName);
+        if (!browser) throw new Error(`No pinned ${browserName} browser exists`);
+        const diagnostics = await collectBrowserDiagnostics(browser.container.getId(), browserName, reason);
+        retainBrowserDiagnostics(diagnostics);
+        return diagnostics;
+      },
       executeSql,
       holdDatabaseLock,
       publishServiceWorkerUpdate: () => {
@@ -508,10 +525,6 @@ export default async function globalSetup(config: FullConfig): Promise<() => Pro
   rmSync(resolve("test-results", "visual-journeys"), { recursive: true, force: true });
   const service = await startJourneyService();
   try {
-    const browserNames = new Set(config.projects.map((project) => project.use.browserName ?? "chromium"));
-    for (const browserName of browserNames) {
-      await service.pinnedBrowser(browserName);
-    }
     const control = await startJourneyControl(service);
     process.env.COURTSIDE_JOURNEY_CONTROL = JSON.stringify(control.reference);
     return async () => {
