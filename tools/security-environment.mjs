@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { dirname, join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
-import { runOwnedProcess } from "./security-passive-deployment.mjs";
+import { passiveScannerOrigin, runOwnedProcess } from "./security-passive-deployment.mjs";
 import { evaluateResourceSignals, evaluateSafetyLimits } from "./security-resource-abuse.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -333,7 +333,7 @@ export async function runPassiveZap(plan, stopFile, limits) {
   };
   await command(securityAssessmentReservationArgs(environment, attempt));
   const args = [...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "--no-deps",
-    "--name", name, "zap", "sh", "-c", "/zap/zap-baseline.py -t http://scanner-gateway:8090 -m 0 -I -J zap.json; "
+    "--name", name, "zap", "sh", "-c", `/zap/zap-baseline.py -t ${passiveScannerOrigin} -m 0 -I -J zap.json; `
       + "printf '%s' $? >/tmp/zap-exit; test -f /zap/wrk/zap.json || exit 3; touch /tmp/zap-complete; "
       + "while [ ! -e /tmp/zap-collected ]; do sleep 0.1; done; exit \"$(cat /tmp/zap-exit)\""];
   try {
