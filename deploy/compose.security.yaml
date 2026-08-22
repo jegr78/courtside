@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     pull_policy: never
     environment:
       POSTGRES_DB: courtside_security
@@ -135,7 +135,7 @@ services:
 
   scanner-gateway:
     profiles: [assessment]
-    image: zaproxy/zap-stable:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab
+    image: zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
     pull_policy: never
     command: ["python3", "/opt/courtside/security-request-gateway.py"]
     read_only: true
@@ -174,7 +174,7 @@ services:
 
   zap:
     profiles: [assessment]
-    image: zaproxy/zap-stable:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab
+    image: zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
     pull_policy: never
     read_only: true
     tmpfs:

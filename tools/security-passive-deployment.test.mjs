@@ -47,7 +47,7 @@ test("given passing layer observations, when building passive evidence, then onl
   // when
   const evidence = buildPassiveDeploymentEvidence({
     targetFingerprint: digest, imageDigest: digest, observations,
-    zapReport: { version: "2.16.1", site: [{ alerts: [] }] }, requestCount: 24
+    zapReport: { version: "2.17.0", site: [{ alerts: [] }] }, requestCount: 24
   });
 
   // then
@@ -63,7 +63,7 @@ test("given a failed required observation, when building passive evidence, then 
     targetFingerprint: digest, imageDigest: digest,
     observations: passingObservations().map((observation) => observation.id === "body-limit"
       ? { ...observation, passed: false, observation: "proxy-body-limit-not-proven" } : observation),
-    zapReport: { version: "2.16.1", site: [{ alerts: [] }] }, requestCount: 1
+    zapReport: { version: "2.17.0", site: [{ alerts: [] }] }, requestCount: 1
   });
 
   // then
@@ -88,7 +88,7 @@ test("given an untriaged ZAP candidate, when building evidence, then the assessm
   const evidence = buildPassiveDeploymentEvidence({
     targetFingerprint: digest, imageDigest: digest,
     observations: passingObservations(),
-    zapReport: { version: "2.16.1", site: [{ alerts: [{ pluginid: "10010", riskcode: "1",
+    zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10010", riskcode: "1",
       confidence: "2", instances: [{ uri: "http://proxy:8080" }] }] }] }, requestCount: 1
   });
 
@@ -101,7 +101,7 @@ test("given a request count above the safe budget, when building evidence, then 
   // when / then
   assert.throws(() => buildPassiveDeploymentEvidence({
     targetFingerprint: digest, imageDigest: digest, observations: [],
-    zapReport: { version: "2.16.1", site: [{ alerts: [] }] }, requestCount: 1001
+    zapReport: { version: "2.17.0", site: [{ alerts: [] }] }, requestCount: 1001
   }), /request budget/);
 });
 
@@ -111,10 +111,10 @@ test("given missing or duplicate checks, when building evidence, then the run fa
 
   // when / then
   assert.throws(() => buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
-    observations: observations.slice(1), zapReport: { version: "2.16.1", site: [] }, requestCount: 1
+    observations: observations.slice(1), zapReport: { version: "2.17.0", site: [] }, requestCount: 1
   }), /missing required checks/);
   assert.throws(() => buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
-    observations: [...observations, observations[0]], zapReport: { version: "2.16.1", site: [] }, requestCount: 1
+    observations: [...observations, observations[0]], zapReport: { version: "2.17.0", site: [] }, requestCount: 1
   }), /missing required checks/);
 });
 

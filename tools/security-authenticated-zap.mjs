@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { authorizationRequest, SecurityCookieJar } from "./security-authorization.mjs";
-import { createAssessmentControl } from "./security-passive-deployment.mjs";
+import { createAssessmentControl, zapVersion } from "./security-passive-deployment.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = require("ajv/dist/2020").default;
@@ -370,7 +370,7 @@ function zapCandidate(alert, instance, run) {
     parameter,
     attackClass,
     provenance: {
-      tool: "owasp-zap", version: "2.16.1", runId: run.runId, attempt: run.attempt,
+      tool: "owasp-zap", version: zapVersion, runId: run.runId, attempt: run.attempt,
       targetFingerprint: run.targetFingerprint, observedAt: run.observedAt
     },
     evidence: [{

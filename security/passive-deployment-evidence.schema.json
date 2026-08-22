@@ -38,7 +38,7 @@
       "required": ["image", "version", "status", "alerts"],
       "properties": {
         "image": { "type": "string", "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$" },
-        "version": { "const": "2.16.1" },
+        "version": { "const": "2.17.0" },
         "status": { "enum": ["completed", "failed"] },
         "alerts": {
           "type": "array",

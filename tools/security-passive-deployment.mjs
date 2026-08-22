@@ -12,7 +12,17 @@ const evidenceSchema = JSON.parse(readFileSync(new URL(
   "../security/passive-deployment-evidence.schema.json", import.meta.url)));
 const validateEvidence = new Ajv({ strict: true, allErrors: true }).compile(evidenceSchema);
 
-export const zapImage = "zaproxy/zap-stable:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab";
+// Dependabot bumps the deployment and nothing beside it, so the scanner's version and digest are
+// read from there rather than repeated here, where nothing would keep them in step.
+export const zapImage = deployedZapImage();
+export const zapVersion = zapImage.slice(zapImage.indexOf(":") + 1, zapImage.indexOf("@"));
+
+function deployedZapImage() {
+  const compose = new URL("../deploy/compose.security.yaml", import.meta.url);
+  const found = /zaproxy\/zap-stable:[\w.]+@sha256:[a-f0-9]{64}/.exec(readFileSync(compose, "utf8"));
+  if (!found) throw new Error(`${compose.pathname} names no ZAP image pinned by digest`);
+  return found[0];
+}
 const securityHeaders = [
   "content-security-policy", "x-content-type-options", "x-frame-options", "referrer-policy", "permissions-policy"
 ];
@@ -211,7 +221,7 @@ export async function runPassiveDeploymentAssessment(plan, context) {
       : "scanner-runtime-controls-incomplete" });
   const evidence = buildPassiveDeploymentEvidence({
     targetFingerprint: plan.targetFingerprint, imageDigest: plan.imageDigest,
-    observations, zapReport: { ...zapReport, version: "2.16.1" }, requestCount
+    observations, zapReport: { ...zapReport, version: zapVersion }, requestCount
   });
   const serializedEvidence = `${JSON.stringify(evidence, null, 2)}\n`;
   const renderedSummary = passiveDeploymentSummary(evidence);

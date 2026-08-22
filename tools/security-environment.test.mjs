@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { zapVersion } from "./security-passive-deployment.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -228,7 +229,7 @@ test("given the security Compose file, when inspecting boundaries, then resource
   assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 13);
   assert.match(compose, /\/var\/lib\/postgresql\/data:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
-  assert.match(compose, /zaproxy\/zap-stable:2\.16\.1@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /zaproxy\/zap-stable:[\w.]+@sha256:[a-f0-9]{64}/);
   assert.match(compose, /schemathesis\/schemathesis:4\.25\.0@sha256:[a-f0-9]{64}/);
   assert.match(compose, /grafana\/k6:2\.2\.0@sha256:[a-f0-9]{64}/);
   assert.match(compose, /COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"/);
@@ -311,4 +312,17 @@ test("given scanner diagnostics, when reporting a failed run, then session mater
   // then
   assert.doesNotMatch(diagnostic, /opaque-session|opaque-csrf|opaque-token|opaque-password|opaque-path|opaque-query/);
   assert.match(diagnostic, /\[REDACTED]/);
+});
+
+// A JSON schema and a run contract cannot read the deployment, so nothing would carry a scanner
+// bump into them. This is what notices when one is left behind.
+test("given the scanner version, when a static file names it, then it is the deployed one", () => {
+  // given
+  const read = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8"));
+
+  // then
+  assert.equal(read("../security/passive-deployment-evidence.schema.json")
+    .properties.zap.properties.version.const, zapVersion);
+  assert.equal(read("../security/run-contract.json").tools
+    .find((tool) => tool.id === "authenticated-zap").version, zapVersion);
 });
