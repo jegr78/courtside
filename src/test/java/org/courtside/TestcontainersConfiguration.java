@@ -8,12 +8,21 @@ import org.springframework.core.env.Profiles;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @TestConfiguration(proxyBeanMethods = false)
 class TestcontainersConfiguration {
+
+    private static final Path DEPLOYMENT = Path.of("deploy", "compose.yaml");
+    private static final Pattern POSTGRES_IMAGE =
+            Pattern.compile("postgres:[\\w.-]+@sha256:[a-f0-9]{64}");
 
     @Bean
     JdbcConnectionDetails postgresConnectionDetails(Environment environment) {
@@ -47,10 +56,25 @@ class TestcontainersConfiguration {
 
         private static PostgreSQLContainer startPostgres() {
             PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName
-                    .parse("postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                    .parse(deployedImage())
                     .asCompatibleSubstituteFor("postgres"));
             postgres.start();
             return postgres;
+        }
+
+        // Qualifying against a database a club does not run proves nothing about the one it does,
+        // so the reference is read from the deployment rather than repeated beside it.
+        private static String deployedImage() {
+            try {
+                Matcher found = POSTGRES_IMAGE.matcher(Files.readString(DEPLOYMENT));
+                if (!found.find()) {
+                    throw new IllegalStateException(
+                            DEPLOYMENT + " names no PostgreSQL image pinned by digest");
+                }
+                return found.group();
+            } catch (IOException e) {
+                throw new IllegalStateException("Could not read " + DEPLOYMENT, e);
+            }
         }
     }
 

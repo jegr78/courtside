@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
-import { appendFileSync, cpSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { appendFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { createHash, randomUUID, X509Certificate } from "node:crypto";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -18,6 +18,15 @@ const PINNED_PROXY_IMAGE =
   "caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648";
 // The name the certificate is issued for, so browsers reach the proxy the way a member reaches a club.
 const CLUB_HOST = "courtside.test";
+
+// Qualifying against a database a club does not run proves nothing about the one it does, so the
+// reference is read from the deployment rather than repeated beside it.
+function deployedPostgresImage(): string {
+  const compose = resolve("../deploy/compose.yaml");
+  const found = /postgres:[\w.-]+@sha256:[a-f0-9]{64}/.exec(readFileSync(compose, "utf8"));
+  if (!found) throw new Error(`${compose} names no PostgreSQL image pinned by digest`);
+  return found[0];
+}
 const CLUB_PLAIN_PORT = 8081;
 const CADDY_LOCAL_AUTHORITY = "/data/caddy/pki/authorities/local";
 const CADDY_ISSUED_CERTIFICATES = "/data/caddy/certificates";
@@ -298,8 +307,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   };
   try {
     const visualDate = journeyDate;
-    postgres = await new GenericContainer(
-      "postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+    postgres = await new GenericContainer(deployedPostgresImage())
       .withEnvironment({
         POSTGRES_DB: "courtside",
         POSTGRES_USER: "courtside",
