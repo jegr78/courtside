@@ -100,6 +100,50 @@ test("given the base plan, when it starts submission, then compose keeps that po
     + "puts an authenticating SMTP port on the host for no one who needs it");
 });
 
+test("given the mail server's admin interface, when compose publishes it, then it stays on loopback", () => {
+  // given
+  const mail = compose.slice(compose.indexOf("\n  mail:"), compose.indexOf("\n  mail-plan:"));
+
+  // when
+  const published = [...mail.matchAll(/^ {6}- "(?<bind>.*)"$/gm)].map((match) => match.groups.bind);
+
+  // then
+  assert.ok(published.some((bind) => bind.endsWith(":8080")),
+    "the plan starts an admin listener the club has no way to reach");
+  for (const bind of published.filter((entry) => entry.endsWith(":8080"))) {
+    assert.match(bind, /^127\.0\.0\.1:/,
+      `${bind} puts full control of the mail server on a public address; it belongs behind an SSH `
+      + "tunnel and nowhere else");
+  }
+});
+
+test("given the base plan, when a service takes a password, then it refuses to take it in the clear", () => {
+  // given
+  const settings = plan("base").find((operation) => operation.object === "SystemSettings");
+
+  // when
+  const cleartext = Object.entries(settings.value.services)
+    .filter(([, service]) => service.cleartext !== false)
+    .map(([name]) => name);
+
+  // then
+  assert.deepEqual(cleartext, [],
+    "the instance authenticates to this server, and a service that accepts a credential before "
+    + "TLS lets anyone on the path read it");
+});
+
+test("given the shipped setup check, when it runs, then it still asks this server to relay", () => {
+  // given
+  const check = readFileSync(fileURLToPath(new URL("../deploy/mail-check.sh", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(check, /RCPT TO:<probe@%s>/,
+    "port 25 is published, so the one thing standing between this instance and an open relay is "
+    + "that it refuses a foreign recipient. Nothing else proves it.");
+  assert.match(check, /accepts unauthenticated mail for/,
+    "the relay probe no longer reports what it found");
+});
+
 function render(name, environment) {
   const target = mkdtempSync(join(tmpdir(), "courtside-mail-plan-"));
   try {
