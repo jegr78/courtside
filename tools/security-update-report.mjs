@@ -13,6 +13,7 @@ const securityToolFiles = readdirSync(new URL("../tools", import.meta.url))
 // side reads, and the lockfile the tools resolve against. pom.xml and frontend/package.json describe
 // the application, and each side now builds its own — a dependency bump is not a tool update.
 export const securityRuntimeFiles = [
+  ".github/workflows/build.yml",
   "deploy/compose.security.yaml",
   "deploy/Caddyfile.security",
   "frontend/package-lock.json",

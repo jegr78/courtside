@@ -1,4 +1,5 @@
 import https from "node:https";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -433,7 +434,9 @@ export async function runAuthorizationAssessment(plan, context) {
         .every((testId) => plan.selectedTests.includes(testId))) {
     throw new Error("The authorization suite requires active authentication and authorization tests in SECURITY");
   }
-  const api = yaml.load(readFileSync(apiDocumentPath(), "utf8"));
+  const document = readFileSync(apiDocumentPath());
+  const specificationDigest = `sha256:${createHash("sha256").update(document).digest("hex")}`;
+  const api = yaml.load(document.toString("utf8"));
   const matrix = buildOperationAuthorizationMatrix(api);
   const control = createAssessmentControl(context.stopFile, context.deadline);
   if (!Number.isSafeInteger(context.maxRequests) || context.maxRequests < 1) {
@@ -490,6 +493,7 @@ export async function runAuthorizationAssessment(plan, context) {
       schemaVersion: 1,
       testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"],
       targetFingerprint: plan.targetFingerprint,
+      specificationDigest,
       results,
       identityChecks,
       objectChecks,

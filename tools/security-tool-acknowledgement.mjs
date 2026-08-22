@@ -47,6 +47,19 @@ export function describeFindings(fingerprints, directories) {
   });
 }
 
+// The workflow points both runs at one contract, and this is what turns that wiring into something
+// the run proves: each side's fuzz evidence records the document it actually read.
+export function assessedContracts(directories) {
+  const digestIn = (directory) => {
+    try {
+      return JSON.parse(readFileSync(join(directory, "openapi-fuzz.json"), "utf8")).specificationDigest;
+    } catch {
+      return undefined;
+    }
+  };
+  return { candidate: digestIn(directories.candidate), base: digestIn(directories.base) };
+}
+
 export function findingReport(comparison, acknowledgement, directories) {
   const unacknowledged = unacknowledgedFindings(comparison, acknowledgement);
   const lines = [comparisonSummary(comparison), "### Differences nobody has recorded", ""];
@@ -82,9 +95,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       + " --candidate-evidence <directory> --base-evidence <directory>\n");
     process.exit(1);
   }
+  const directories = { candidate: values["candidate-evidence"], base: values["base-evidence"] };
+  const contracts = assessedContracts(directories);
+  if (contracts.candidate !== undefined && contracts.base !== undefined
+      && contracts.candidate !== contracts.base) {
+    process.stderr.write("The two runs read different API documents, so a finding difference cannot be "
+      + `attributed to the tools: candidate ${contracts.candidate}, base ${contracts.base}.\n`);
+    process.exit(1);
+  }
   const comparison = JSON.parse(readFileSync(values.comparison, "utf8"));
   const acknowledgement = JSON.parse(readFileSync(values.acknowledgement, "utf8"));
-  const directories = { candidate: values["candidate-evidence"], base: values["base-evidence"] };
   writeFileSync(values.summary, findingReport(comparison, acknowledgement, directories), { mode: 0o600 });
   const unacknowledged = unacknowledgedFindings(comparison, acknowledgement);
   if (unacknowledged.length > 0) {

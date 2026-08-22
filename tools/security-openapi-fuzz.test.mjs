@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { copyFileSync, mkdtempSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import {
   buildOpenApiFuzzInventory,
@@ -199,4 +202,23 @@ test("given every state-changing operation, when building negative probes, then 
   assert.equal(responses.find(({ path }) => path === "/api/bookings")?.headers["Idempotency-Key"],
     "security-invalid");
   assert.equal(result.cases.every(({ outcome }) => outcome === "passed"), true);
+});
+
+// The mount and the digest the run plans against are one decision. If a reader ever goes back to a
+// fixed path, a paired comparison silently assesses two contracts against one application again.
+test("given a contract chosen for the run, when the fuzzer loads, then it is the one it plans against", () => {
+  // given
+  const source = fileURLToPath(new URL("../src/main/resources/api/openapi.yaml", import.meta.url));
+  const chosen = join(mkdtempSync(join(tmpdir(), "courtside-contract-")), "openapi.yaml");
+  copyFileSync(source, chosen);
+
+  // when
+  const printed = execFileSync(process.execPath, ["--input-type=module", "-e",
+    "import { openApiSpecificationDigest } from "
+    + JSON.stringify(new URL("./security-openapi-fuzz.mjs", import.meta.url).href)
+    + "; process.stdout.write(openApiSpecificationDigest());"],
+  { encoding: "utf8", env: { ...process.env, COURTSIDE_SECURITY_API_DOCUMENT: chosen } }).trim();
+
+  // then
+  assert.equal(printed, `sha256:${createHash("sha256").update(readFileSync(chosen)).digest("hex")}`);
 });

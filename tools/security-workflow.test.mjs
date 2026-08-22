@@ -141,8 +141,10 @@ test("given a paired assessment, when both runs start, then they are driven by t
   // when / then
   assert.match(paired,
     /COURTSIDE_SECURITY_API_DOCUMENT: \$\{\{ runner\.temp \}\}\/courtside-security-base\/src\/main\/resources\/api\/openapi\.yaml/);
-  assert.ok(paired.indexOf("COURTSIDE_SECURITY_API_DOCUMENT") < paired.indexOf("courtside.mjs security "),
-    "the document is chosen before either environment is created, so both mount the same one");
+  assert.equal((paired.match(/COURTSIDE_SECURITY_API_DOCUMENT/g) ?? []).length, 1,
+    "one setting on the step, not one per command — a second spelling is how the legs drift apart");
+  assert.equal((paired.match(/courtside\.mjs security /g) ?? []).length, 2,
+    "both legs create their environment inside the step that setting covers");
 });
 
 // A fingerprint is a hash of the finding, not a description of it. Asking somebody to record one
