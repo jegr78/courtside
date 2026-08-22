@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { rmSync, writeFileSync } from "node:fs";
 import { runtimeComparisonRequired, securityRuntimeFiles, securityUpdateReport, semanticChanges,
   semanticJsonChanges } from "./security-update-report.mjs";
 
@@ -27,19 +26,21 @@ test("given two runtime digests, when they are compared, then only a difference 
   assert.equal(runtimeComparisonRequired({ baseRuntimeDigest: "a", candidateRuntimeDigest: "a" }), false);
 });
 
-// The first commit predates security/run-contract.json, so a base that lacks a file the working
-// tree has is a fixed fact rather than a property of whichever branch runs this.
-test("given a file the base never had, when it is compared, then it reads as added and not removed", () => {
+// A file this test writes itself, so no commit reachable from any base can hold it. Reading the
+// direction off the repository's own history needs a checkout deep enough to reach a commit that
+// predates the file, which a shallow one is not.
+test("given a file no base can hold, when it is compared, then it reads as added and not removed", () => {
   // given
-  const repository = fileURLToPath(new URL("..", import.meta.url));
-  const firstCommit = execFileSync("git", ["rev-list", "--max-parents=0", "HEAD"],
-    { cwd: repository, encoding: "utf8" }).trim();
+  const probe = `tools/comparison-direction-probe-${process.pid}.json`;
+  const location = new URL(`../${probe}`, import.meta.url);
+  writeFileSync(location, "{}");
 
-  // when
-  const changes = semanticChanges("security/run-contract.json", firstCommit);
-
-  // then — swapped arguments would report the club's own rules as deleted
-  assert.deepEqual(changes, { added: ["/"], removed: [], modified: [] });
+  // when / then — swapped arguments would report the club's own rules as deleted
+  try {
+    assert.deepEqual(semanticChanges(probe, "HEAD"), { added: ["/"], removed: [], modified: [] });
+  } finally {
+    rmSync(location);
+  }
 });
 
 test("given a changed rule file, when its JSON paths are compared, then each kind of change is named", () => {
