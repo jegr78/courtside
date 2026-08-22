@@ -8,6 +8,8 @@ const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const build = readFileSync(join(repository, ".github/workflows/build.yml"), "utf8");
 const codeql = readFileSync(join(repository, ".github/codeql/codeql-config.yml"), "utf8");
 const release = readFileSync(join(repository, ".github/workflows/release.yml"), "utf8");
+const scheduled = readFileSync(join(repository, ".github/workflows/security-assessment.yml"), "utf8");
+const destructive = readFileSync(join(repository, ".github/workflows/security-destructive.yml"), "utf8");
 const policy = readFileSync(join(repository, "docs/security-scanning.md"), "utf8");
 
 test("given a pull request, when the required build runs, then dependency, source and built Java surfaces are scanned", () => {
@@ -28,8 +30,43 @@ test("given a pull request, when the required build runs, then dependency, sourc
   assert.match(build, /--scope required-build/);
 });
 
+test("given stable assessment suites, when scheduling them, then safe traffic is bounded and evidence fails closed", () => {
+  // when / then
+  assert.match(scheduled, /schedule:[\s\S]+cron:/);
+  assert.match(scheduled, /timeout-minutes: 45/);
+  assert.match(scheduled, /security-run "\$RUN_ID" safe/);
+  assert.match(scheduled, /security-assessment-gate\.mjs/);
+  assert.match(scheduled, /--subject "\$IMAGE_DIGEST"/);
+  assert.match(scheduled, /security-cleanup "\$RUN_ID"/);
+  assert.match(scheduled, /retention-days: 14/);
+  assert.match(build, /security-update-report\.mjs[\s\S]+github\.event\.pull_request\.base\.sha/);
+});
+
+test("given a release candidate, when publishing it, then its exact digest passes the active gate first", () => {
+  // when / then
+  assert.match(release, /\n  active-security:\n    needs: \[image, qualify\]/);
+  assert.match(release, /security-run "\$RUN_ID" active/);
+  assert.match(release, /--authorize "authorize-active-\$RUN_ID"/);
+  assert.match(release, /--subject "\$\{IMAGE##\*@\}"/);
+  assert.match(release, /--assessment-gate build\/security-input\/active-security-summary\.json/);
+  assert.match(release, /security-record:\n    needs: \[build, image, qualify, active-security\]/);
+});
+
+test("given destructive assessment capability, when exposing it manually, then only a dedicated runner and exact confirmation can execute it", () => {
+  // when / then
+  assert.doesNotMatch(destructive, /schedule:/);
+  assert.match(destructive, /workflow_dispatch:/);
+  assert.match(destructive, /runs-on: \[self-hosted, courtside-security\]/);
+  assert.match(destructive, /test "\$CONFIRMATION" = "authorize-destructive-\$RUN_ID"/);
+  assert.match(destructive, /security-run "\$RUN_ID" destructive/);
+  assert.match(destructive, /retention-days: 7/);
+});
+
 test("given security evidence, when workflows retain it, then only normalized reports become artifacts", () => {
   // when / then
+  assert.match(scheduled, /umask 077/);
+  assert.match(release, /umask 077/);
+  assert.match(destructive, /umask 077/);
   assert.match(build, /build\/security\/summary\.json/);
   assert.doesNotMatch(build, /path: build\/security\s*$/m);
   assert.match(build, /rm -rf build\/security\/trivy-runtime\.json build\/security\/trivy-source\.json build\/security\/codeql/);

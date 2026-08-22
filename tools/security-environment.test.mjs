@@ -45,6 +45,8 @@ test("given Docker cleanup inspection failures, when classifying absence, then o
   assert.equal(isMissingDockerResource(
     new Error("Owned security process failed (1): Error: No such object: scanner-one\n"), "scanner-one"), true);
   assert.equal(isMissingDockerResource(
+    new Error("Owned security process failed (1): error: no such object: scanner-one\n"), "scanner-one"), true);
+  assert.equal(isMissingDockerResource(
     new Error("Owned security process exceeded its duration limit: "), "scanner-one"), false);
   assert.equal(isMissingDockerResource(
     new Error("Owned security process failed (1): permission denied"), "scanner-one"), false);

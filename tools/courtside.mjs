@@ -1533,7 +1533,7 @@ export function restoreDatabase(input, composeArgs, environment, execute = runIn
 function resetUat(all) {
   cleanupUatFunnel();
   const plans = uatResetPlans(all);
-  plans.forEach(runInteractive);
+  runLifecyclePlans(plans);
   if (all) {
     rmSync(uatStateFile, { force: true });
     process.stdout.write("UAT database and local certificate authority removed.\n");
@@ -1541,6 +1541,10 @@ function resetUat(all) {
   }
   rmSync(uatStateFile, { force: true });
   process.stdout.write("UAT database removed; the local certificate authority was retained.\n");
+}
+
+export function runLifecyclePlans(plans, run = runInteractive) {
+  plans.forEach((plan) => run(plan));
 }
 
 export function uatResetPlans(all) {

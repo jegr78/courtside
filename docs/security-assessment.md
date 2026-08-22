@@ -83,6 +83,29 @@ Automated scanner output begins as a candidate. It affects a release only after 
 
 The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. The active suite adds the OpenAPI authorization matrix, authenticated ZAP scans and the pinned Schemathesis boundary suite. The destructive suite adds only the bounded resource-abuse adapter described below. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
 
+## Workflow gates
+
+The required pull-request build runs contract, schema, safety and secret checks without active
+assessment traffic. It retains a comparison of security contracts, policies, report schemas and
+pinned tool versions against the pull-request base.
+
+[`security-assessment.yml`](../.github/workflows/security-assessment.yml) runs the bounded `safe`
+profile weekly and on manual dispatch. It builds and qualifies one local candidate, resolves its
+immutable Docker image ID, runs the assessment once and retains only the redacted gate record and
+run manifest for 14 days. Missing scanners, missing evidence and incomplete outcomes fail the job;
+they are never normalized as a clean run.
+
+The release workflow runs the complete `active` profile after both architectures qualify the
+candidate and before the security record can be assembled. The active manifest, normalized gate,
+image-security summaries and final release record all name the same candidate digest. Publication
+depends on that record, so another image or a second successful attempt cannot replace the required
+first attempt.
+
+[`security-destructive.yml`](../.github/workflows/security-destructive.yml) has no schedule and runs
+only on a self-hosted runner carrying the `courtside-security` label. It requires the repository's
+exact GHCR digest, embedded source commit and run-specific destructive confirmation. Its shorter
+retention does not make it release evidence.
+
 ## Resource abuse and recovery
 
 The destructive suite requires the exact `authorize-destructive-<run-id>` confirmation. Its pinned

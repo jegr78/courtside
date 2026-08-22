@@ -863,7 +863,7 @@ async function containerExistsForCleanup(name, environment) {
 
 export function isMissingDockerResource(failure, name) {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:Error:|Error response from daemon:) No such (?:object|container): ${escapedName}\\s*$`)
+  return new RegExp(`(?:Error:|Error response from daemon:) No such (?:object|container): ${escapedName}\\s*$`, "i")
     .test(failure?.message ?? "");
 }
 

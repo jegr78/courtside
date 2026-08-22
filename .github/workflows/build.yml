@@ -46,6 +46,12 @@ jobs:
           --java target/site/jacoco/jacoco.xml
           --frontend frontend/coverage/lcov.info
           --output build/coverage/changed.md
+      - name: Compare security contracts and tool versions
+        if: github.event_name == 'pull_request'
+        run: >
+          node tools/security-update-report.mjs
+          --base ${{ github.event.pull_request.base.sha }}
+          --output build/security-update.md
       - name: Prepare security evidence
         run: |
           mkdir -p build/security/codeql
@@ -109,5 +115,6 @@ jobs:
             !frontend/test-results/browser-security-*/trace.zip
             frontend/test-results/**/*.png
             build/security/summary.json
+            build/security-update.md
           if-no-files-found: warn
           retention-days: 14

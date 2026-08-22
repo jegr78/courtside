@@ -12,6 +12,35 @@ import {
 
 const today = "2026-08-15";
 const toolsDirectory = dirname(fileURLToPath(import.meta.url));
+const releaseDigest = `sha256:${"d".repeat(64)}`;
+const releaseCommit = "c".repeat(40);
+
+function activeAssessmentGate(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    generatedAt: "2026-08-15T00:00:00.000Z",
+    runId: "release-active-0001",
+    attempt: 1,
+    profile: "active",
+    status: "passed",
+    subject: releaseDigest,
+    sourceCommit: releaseCommit,
+    targetFingerprint: `sha256:${"f".repeat(64)}`,
+    catalogVersion: "1.0.0",
+    tools: [{ id: "target-identity", version: "1.0.0" }],
+    selectedTests: [],
+    budgets: {
+      durationSeconds: 1800, requests: 10000, concurrency: 10, generatedDataMegabytes: 100,
+      cpu: 4, memoryMegabytes: 4096, evidenceMegabytes: 100, expectedDuration: "up to 30 minutes"
+    },
+    startedAt: "2026-08-15T00:00:00.000Z",
+    finishedAt: "2026-08-15T00:01:00.000Z",
+    toolResults: [{ id: "target-identity", version: "1.0.0", outcome: "passed" }],
+    usage: { requests: 1, generatedDataMegabytes: 0, evidenceBytes: 512 },
+    manifestDigest: `sha256:${"a".repeat(64)}`,
+    ...overrides
+  };
+}
 
 test("given actionable Trivy and CodeQL findings, when evaluating reports, then both block the gate", () => {
   // given
@@ -281,23 +310,24 @@ test("given a release record and verified supply-chain outputs, when finalizing 
 test("given normalized build and image evidence, when combining a release record, then all findings remain visible", () => {
   // given
   const summaries = [
-    { schemaVersion: 1, scope: "release-build", subject: "commit", assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
-      status: "passed", evidenceSources: [{ scanner: "npm", subject: "commit" }], blockingFindings: [], acceptedFindings: [], informationalFindings: [{
+    { schemaVersion: 1, scope: "release-build", subject: releaseCommit, assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
+      status: "passed", evidenceSources: [{ scanner: "npm", subject: releaseCommit }], blockingFindings: [], acceptedFindings: [], informationalFindings: [{
         scanner: "npm", id: "NPM-1", severity: "LOW", target: "example@1", component: "example",
         aliases: ["GHSA-XXXX-YYYY-ZZZZ"]
       }] },
-    { schemaVersion: 1, scope: "release-image-amd64", subject: "digest", assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
-      status: "passed", evidenceSources: [{ scanner: "trivy", subject: "digest" }], blockingFindings: [], acceptedFindings: [], informationalFindings: [{
+    { schemaVersion: 1, scope: "release-image-amd64", subject: releaseDigest, assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
+      status: "passed", evidenceSources: [{ scanner: "trivy", subject: releaseDigest }], blockingFindings: [], acceptedFindings: [], informationalFindings: [{
         scanner: "trivy", id: "CVE-1", severity: "MEDIUM", target: "image", component: "example",
         aliases: ["CVE-1", "GHSA-XXXX-YYYY-ZZZZ"]
       }] },
-    { schemaVersion: 1, scope: "release-image-arm64", subject: "digest", assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
-      status: "passed", evidenceSources: [{ scanner: "trivy", subject: "digest" }], blockingFindings: [], acceptedFindings: [], informationalFindings: [] }
+    { schemaVersion: 1, scope: "release-image-arm64", subject: releaseDigest, assessmentPolicy: "not-applicable", generatedAt: "2026-08-15T00:00:00.000Z",
+      status: "passed", evidenceSources: [{ scanner: "trivy", subject: releaseDigest }], blockingFindings: [], acceptedFindings: [], informationalFindings: [] }
   ];
 
   // when
   const result = combineSecuritySummaries({
-    summaries, scope: "release", subject: "digest", sourceSubject: "commit", today
+    summaries, scope: "release", subject: releaseDigest, sourceSubject: releaseCommit, today,
+    assessmentGates: [activeAssessmentGate()]
   });
 
   // then
@@ -306,6 +336,7 @@ test("given normalized build and image evidence, when combining a release record
   assert.deepEqual(result.informationalFindings[0].observations.map((finding) => finding.scanner), ["npm", "trivy"]);
   assert.deepEqual(result.sources.map((source) => source.scope),
     ["release-build", "release-image-amd64", "release-image-arm64"]);
+  assert.equal(result.assessmentGates[0].profile, "active");
 });
 
 test("given stale or digest-mismatched inputs, when combining release evidence, then publication fails closed", () => {
@@ -316,21 +347,44 @@ test("given stale or digest-mismatched inputs, when combining release evidence, 
     blockingFindings: [], acceptedFindings: [], informationalFindings: []
   });
   const summaries = [
-    source("release-build", "commit"), source("release-image-amd64", "digest"),
-    source("release-image-arm64", "digest")
+    source("release-build", releaseCommit), source("release-image-amd64", releaseDigest),
+    source("release-image-arm64", releaseDigest)
   ];
+  const assessmentGates = [activeAssessmentGate()];
 
   // when / then
   assert.throws(() => combineSecuritySummaries({
     summaries: summaries.map((summary, index) => index === 1 ? { ...summary, subject: "other-digest" } : summary),
-    scope: "release", subject: "digest", sourceSubject: "commit", today
+    scope: "release", subject: releaseDigest, sourceSubject: releaseCommit, today, assessmentGates
   }), /subject mismatch/);
   assert.throws(() => combineSecuritySummaries({
     summaries: summaries.map((summary, index) => index === 0
       ? { ...summary, generatedAt: "2026-08-01T00:00:00.000Z" }
       : summary),
-    scope: "release", subject: "digest", sourceSubject: "commit", today
+    scope: "release", subject: releaseDigest, sourceSubject: releaseCommit, today, assessmentGates
   }), /stale/);
+});
+
+test("given missing or mismatched active assessment evidence, when combining a release, then publication fails closed", () => {
+  // given
+  const source = (scope, subject) => ({
+    schemaVersion: 1, scope, subject, assessmentPolicy: "not-applicable",
+    generatedAt: "2026-08-15T00:00:00.000Z", status: "passed",
+    evidenceSources: [{ scanner: "trivy", subject }],
+    blockingFindings: [], acceptedFindings: [], informationalFindings: []
+  });
+  const summaries = [source("release-build", releaseCommit), source("release-image-amd64", releaseDigest),
+    source("release-image-arm64", releaseDigest)];
+  const gate = activeAssessmentGate();
+
+  // when / then
+  for (const assessmentGates of [[], [{ ...gate, status: "incomplete", reason: "Scanner unavailable" }],
+    [{ ...gate, subject: "other" }],
+    [{ ...gate, sourceCommit: "other" }], [{ ...gate, profile: "safe" }]]) {
+    assert.throws(() => combineSecuritySummaries({
+      summaries, scope: "release", subject: releaseDigest, sourceSubject: releaseCommit, today, assessmentGates
+    }), /assessment gate|active-assessment evidence|exactly one active/);
+  }
 });
 
 test("given an incomplete dynamic assessment, when combining release evidence, then release creation fails closed", () => {

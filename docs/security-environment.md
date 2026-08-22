@@ -104,3 +104,10 @@ The emergency stop is local and immediate. The current prerequisite checks it be
 ```bash
 node tools/courtside.mjs security-stop run-0001
 ```
+
+Scheduled safe assessments and release-active assessments are defined in
+[`security-assessment.yml`](../.github/workflows/security-assessment.yml) and
+[`release.yml`](../.github/workflows/release.yml). Destructive execution is never scheduled. The
+optional [`security-destructive.yml`](../.github/workflows/security-destructive.yml) dispatch runs
+only on a dedicated self-hosted runner with the exact digest, source commit and confirmation shown
+by `security-plan`. Local execution remains the reference path when no such runner is configured.

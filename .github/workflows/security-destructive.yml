@@ -1,0 +1,92 @@
+name: destructive security assessment
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Candidate image pinned by sha256 digest
+        required: true
+        type: string
+      source_commit:
+        description: Full source commit embedded in the candidate image
+        required: true
+        type: string
+      confirmation:
+        description: Exact value authorize-destructive-<run-id>
+        required: true
+        type: string
+
+concurrency:
+  group: destructive-security-assessment
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  destructive:
+    runs-on: [self-hosted, courtside-security]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source_commit }}
+      - name: Validate the immutable candidate and exact authorization
+        env:
+          RUN_ID: destructive-${{ github.run_id }}-${{ github.run_attempt }}
+          IMAGE: ${{ inputs.image }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          [[ "$IMAGE" =~ ^ghcr\.io/[^[:space:]@]+@sha256:[a-f0-9]{64}$ ]]
+          test "$IMAGE" = "ghcr.io/$GITHUB_REPOSITORY@${IMAGE##*@}"
+          [[ "${{ inputs.source_commit }}" =~ ^[a-f0-9]{40}$ ]]
+          test "$CONFIRMATION" = "authorize-destructive-$RUN_ID"
+      - name: Pull and qualify the candidate
+        run: |
+          docker pull "${{ inputs.image }}"
+          docker pull postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+          docker pull caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5cda4cf95ab7c14d58648
+          docker pull zaproxy/zap-stable:2.16.1@sha256:7840969c7c9fead565bf9734b12f49f6886db90b1d35b1f74d79710bbd081dab
+          docker pull schemathesis/schemathesis:4.25.0@sha256:980d159d1211ed2ef1f571aa8c6876955c6699dfd6463b8b5f28e788aa61e25e
+          IMAGE="${{ inputs.image }}"
+          COURTSIDE_UAT_VERSION="security-candidate@${IMAGE##*@}" \
+            node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+      - name: Start the disposable security target
+        env:
+          RUN_ID: destructive-${{ github.run_id }}-${{ github.run_attempt }}
+        run: node tools/courtside.mjs security "$RUN_ID" "${{ inputs.image }}"
+      - name: Execute the bounded destructive assessment
+        env:
+          RUN_ID: destructive-${{ github.run_id }}-${{ github.run_attempt }}
+        run: >
+          node tools/courtside.mjs security-run "$RUN_ID" destructive
+          --qualification build/uat-smoke/qualification.json
+          --authorize "${{ inputs.confirmation }}"
+      - name: Capture and enforce the first-attempt manifest
+        if: always()
+        env:
+          RUN_ID: destructive-${{ github.run_id }}-${{ github.run_attempt }}
+          IMAGE: ${{ inputs.image }}
+        run: |
+          umask 077
+          mkdir -p build/security-gate
+          node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest.json
+          node tools/security-assessment-gate.mjs \
+            --manifest build/security-gate/manifest.json --profile destructive \
+            --subject "${IMAGE##*@}" --source-commit "${{ inputs.source_commit }}" \
+            --output build/security-gate/summary.json
+      - name: Remove the disposable security target
+        if: always()
+        env:
+          RUN_ID: destructive-${{ github.run_id }}-${{ github.run_attempt }}
+        run: node tools/courtside.mjs security-cleanup "$RUN_ID"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: destructive-security-assessment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/security-gate/manifest.json
+            build/security-gate/summary.json
+          retention-days: 7
+          if-no-files-found: error

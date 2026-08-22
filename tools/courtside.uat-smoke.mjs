@@ -89,11 +89,12 @@ try {
   const appStartedBefore = JSON.parse(run("docker", ["inspect", appBefore]))[0].State.StartedAt;
   const image = composeRun("images", "app", "--format", "json");
   const accountCount = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from user_account");
+  const localCa = composeRun("exec", "-T", "proxy", "cat", "/data/caddy/pki/authorities/local/root.crt");
   const redirect = await localRequest({ secure: false, port: 8081, path: "/api/session" });
-  const session = await localRequest({ secure: true, port: 8443, path: "/api/session" });
-  const frontend = await localRequest({ secure: true, port: 8443, path: "/" });
-  const apiUi = await localRequest({ secure: true, port: 8443, path: "/api-ui/" });
-  const apiDocument = await localRequest({ secure: true, port: 8443, path: "/api/openapi.yaml" });
+  const session = await localRequest({ secure: true, port: 8443, path: "/api/session", ca: localCa });
+  const frontend = await localRequest({ secure: true, port: 8443, path: "/", ca: localCa });
+  const apiUi = await localRequest({ secure: true, port: 8443, path: "/api-ui/", ca: localCa });
+  const apiDocument = await localRequest({ secure: true, port: 8443, path: "/api/openapi.yaml", ca: localCa });
   const sharedSession = await localRequest({ secure: false, port: 8083, path: "/api/session" });
   const sharedApiUi = await localRequest({ secure: false, port: 8083, path: "/api-ui/" });
   const sharedApiDocument = await localRequest({ secure: false, port: 8083, path: "/api/openapi.yaml" });
@@ -217,7 +218,7 @@ try {
     schemaVersion: 1,
     status: "passed",
     image: JSON.parse(image),
-    manifestDigest: version?.split("@")[1] ?? null,
+    manifestDigest: version?.split("@")[1] ?? appInspection.Image,
     architecture: process.arch === "x64" ? "amd64" : process.arch,
     checks: { deployment: true, authentication: true, bookingPersistence: true, hardening: true }
   }, null, 2)}\n`);
