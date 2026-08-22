@@ -114,11 +114,17 @@ jobs:
             --output build/security-update/runtime.json
       - if: steps.runtime.outputs.changed == 'true'
         name: Read what the comparison found
+        env:
+          BASE_RUN_ID: compare-base-${{ github.run_id }}-${{ github.run_attempt }}
+          CANDIDATE_RUN_ID: compare-head-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
+          BASE_ROOT="$RUNNER_TEMP/courtside-security-base"
           frontend/node/node tools/security-tool-acknowledgement.mjs \
             --comparison build/security-update/runtime.json \
             --acknowledgement security/tool-update-acknowledgement.json \
-            --summary build/security-update/summary.md
+            --summary build/security-update/summary.md \
+            --candidate-evidence "build/security/$CANDIDATE_RUN_ID/assessment/attempt-1/evidence" \
+            --base-evidence "$BASE_ROOT/build/security/$BASE_RUN_ID/assessment/attempt-1/evidence"
           cat build/security-update/summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Remove comparison environments
         if: always() && steps.runtime.outputs.changed == 'true'
@@ -142,6 +148,7 @@ jobs:
           path: |
             build/security-update/source.md
             build/security-update/runtime.json
+            build/security-update/summary.md
           retention-days: 14
           if-no-files-found: error
 

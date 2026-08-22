@@ -130,6 +130,19 @@ test("given a produced comparison, when the job ends, then its difference is rea
     "the difference belongs where a reviewer already looks, not in an artifact they have to fetch");
 });
 
+// A fingerprint is a hash of the finding, not a description of it. Asking somebody to record one
+// they cannot read is the rubber stamp the acknowledgement exists to prevent.
+test("given a difference to acknowledge, when the job reports it, then both runs' findings are there to name it", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when / then
+  assert.match(comparison, /--candidate-evidence "build\/security\/\$CANDIDATE_RUN_ID\/assessment\/attempt-1\/evidence"/);
+  assert.match(comparison, /--base-evidence "\$BASE_ROOT\/build\/security\/\$BASE_RUN_ID\/assessment\/attempt-1\/evidence"/);
+  assert.ok(comparison.indexOf("security-tool-acknowledgement.mjs") < comparison.indexOf("Remove comparison environments"),
+    "the evidence is read while it still exists, not after the cleanup step has removed it");
+});
+
 // The runner's own node is older than courtside.mjs requires, and the failure surfaces minutes
 // into a job as a comparison that never ran rather than as a missing tool.
 test("given a workflow step reaching the CLI, when it runs node, then it is the version the build pins", () => {
