@@ -38,20 +38,54 @@ export const requiredPassiveCheckIds = Object.freeze([
 ].toSorted());
 
 export function normalizeZapAlerts(report) {
-  return (report?.site ?? []).flatMap((site) => site.alerts ?? []).map((alert) => {
-    const normalized = {
-      pluginId: String(alert.pluginid),
-      riskCode: Number(alert.riskcode),
-      confidence: Number(alert.confidence),
-      count: Math.max(1, alert.instances?.length ?? 0)
-    };
-    if (!/^\d+$/.test(normalized.pluginId) || !Number.isInteger(normalized.riskCode)
-        || normalized.riskCode < 0 || normalized.riskCode > 3 || !Number.isInteger(normalized.confidence)
-        || normalized.confidence < 0 || normalized.confidence > 4) {
+  const normalized = new Map();
+  for (const alert of (report?.site ?? []).flatMap((site) => site.alerts ?? [])) {
+    const pluginId = String(alert.pluginid);
+    const riskCode = Number(alert.riskcode);
+    const confidence = Number(alert.confidence);
+    if (!/^\d+$/.test(pluginId) || !Number.isInteger(riskCode) || riskCode < 0 || riskCode > 3
+        || !Number.isInteger(confidence) || confidence < 0 || confidence > 4
+        || !Array.isArray(alert.instances) || alert.instances.length === 0) {
       throw new Error("ZAP produced an invalid alert record");
     }
-    return normalized;
-  }).toSorted((left, right) => left.pluginId.localeCompare(right.pluginId));
+    for (const instance of alert.instances) {
+      const method = String(instance.method ?? "").toUpperCase();
+      if (!["GET", "HEAD"].includes(method)) throw new Error("ZAP produced an invalid alert record");
+      const routeTemplate = passiveRouteTemplate(instance.uri);
+      const key = `${pluginId}\0${riskCode}\0${confidence}\0${method}\0${routeTemplate}`;
+      const existing = normalized.get(key);
+      if (existing) existing.count++;
+      else normalized.set(key, { pluginId, riskCode, confidence, method, routeTemplate,
+        fingerprint: passiveAlertFingerprint(pluginId, method, routeTemplate), count: 1 });
+    }
+  }
+  return [...normalized.values()].toSorted((left, right) =>
+    left.pluginId.localeCompare(right.pluginId) || left.method.localeCompare(right.method)
+      || left.routeTemplate.localeCompare(right.routeTemplate));
+}
+
+function passiveAlertFingerprint(pluginId, method, routeTemplate) {
+  const identity = [pluginId, `${method} ${routeTemplate}`, "response", "passive-web"]
+    .map((value) => value.toLowerCase()).join("\0");
+  return `sha256:${createHash("sha256").update(identity).digest("hex")}`;
+}
+
+function passiveRouteTemplate(uri) {
+  let path;
+  try {
+    const parsed = new URL(uri);
+    if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
+    if (parsed.search) throw new Error();
+    path = parsed.pathname;
+  } catch {
+    throw new Error("ZAP produced an unclassified route");
+  }
+  if (path === "/index.html") return "/";
+  if (["/", "/api/source", "/login", "/does-not-exist", "/icon.svg", "/manifest.webmanifest",
+    "/registerSW.js", "/sw.js", "/font-licenses.txt", "/robots.txt", "/sitemap.xml"].includes(path)) return path;
+  if (/^\/assets\/[A-Za-z0-9._-]+\.(?:css|js|png|svg|woff2?)$/.test(path)) return "/assets/{asset}";
+  if (/^\/workbox-[A-Za-z0-9._-]+\.js$/.test(path)) return "/workbox-{asset}.js";
+  throw new Error("ZAP produced an unclassified route");
 }
 
 export function assertQualifiedImageEvidence(qualification, imageDigest, imageArchitecture) {

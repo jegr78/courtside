@@ -45,11 +45,18 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["pluginId", "riskCode", "confidence", "count"],
+            "required": ["pluginId", "riskCode", "confidence", "method", "routeTemplate", "fingerprint", "count"],
             "properties": {
               "pluginId": { "type": "string", "pattern": "^[0-9]+$" },
               "riskCode": { "type": "integer", "minimum": 0, "maximum": 3 },
               "confidence": { "type": "integer", "minimum": 0, "maximum": 4 },
+              "method": { "enum": ["GET", "HEAD"] },
+              "routeTemplate": {
+                "enum": ["/", "/api/source", "/login", "/does-not-exist", "/icon.svg", "/font-licenses.txt",
+                  "/manifest.webmanifest", "/registerSW.js", "/robots.txt", "/sitemap.xml", "/sw.js", "/assets/{asset}",
+                  "/workbox-{asset}.js"]
+              },
+              "fingerprint": { "$ref": "#/$defs/digest" },
               "count": { "type": "integer", "minimum": 1 }
             }
           }

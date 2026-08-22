@@ -70,17 +70,45 @@ test("given a failed required observation, when building passive evidence, then 
   assert.equal(evidence.outcome, "failed");
 });
 
-test("given ZAP output, when normalizing it, then URLs and evidence are discarded", () => {
+test("given ZAP output on separate routes, when normalizing it, then safe route identities remain distinct", () => {
   // given
   const report = { site: [{ alerts: [{ pluginid: "10020", riskcode: "1", confidence: "2",
-    instances: [{ uri: "https://localhost/private?token=secret", evidence: "SESSION=secret" }] }] }] };
+    instances: [
+      { uri: "https://localhost/api/source", method: "GET", evidence: "SESSION=secret" },
+      { uri: "https://localhost/api/source", method: "GET", evidence: "SESSION=secret" },
+      { uri: "https://localhost/assets/index-a1b2c3.js", method: "GET", evidence: "SESSION=secret" }
+    ] }] }] };
 
   // when
   const alerts = normalizeZapAlerts(report);
 
   // then
-  assert.deepEqual(alerts, [{ pluginId: "10020", riskCode: 1, confidence: 2, count: 1 }]);
+  assert.deepEqual(alerts.map(({ fingerprint, ...alert }) => alert), [
+    { pluginId: "10020", riskCode: 1, confidence: 2, method: "GET", routeTemplate: "/api/source", count: 2 },
+    { pluginId: "10020", riskCode: 1, confidence: 2, method: "GET", routeTemplate: "/assets/{asset}", count: 1 }
+  ]);
+  assert.match(alerts[0].fingerprint, /^sha256:[a-f0-9]{64}$/);
+  assert.notEqual(alerts[0].fingerprint, alerts[1].fingerprint);
   assert.doesNotMatch(JSON.stringify(alerts), /localhost|secret|SESSION/);
+});
+
+test("given a passive alert on an unclassified dynamic route, when normalizing it, then evidence fails closed", () => {
+  // given
+  const report = { site: [{ alerts: [{ pluginid: "10020", riskcode: "1", confidence: "2",
+    instances: [{ uri: "https://localhost/api/admin/roster/00000000-0000-0000-0000-000000000101",
+      method: "GET" }] }] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), /unclassified route/);
+});
+
+test("given a passive alert tied to a query value, when normalizing it, then the value is neither dropped nor retained", () => {
+  // given
+  const report = { site: [{ alerts: [{ pluginid: "10020", riskcode: "1", confidence: "2",
+    instances: [{ uri: "https://localhost/api/source?probe=opaque", method: "GET" }] }] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), /unclassified route/);
 });
 
 test("given an untriaged ZAP candidate, when building evidence, then the assessment is incomplete", () => {
@@ -89,7 +117,7 @@ test("given an untriaged ZAP candidate, when building evidence, then the assessm
     targetFingerprint: digest, imageDigest: digest,
     observations: passingObservations(),
     zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10010", riskcode: "1",
-      confidence: "2", instances: [{ uri: "http://proxy:8080" }] }] }] }, requestCount: 1
+      confidence: "2", instances: [{ uri: "http://proxy:8080/", method: "GET" }] }] }] }, requestCount: 1
   });
 
   // then
