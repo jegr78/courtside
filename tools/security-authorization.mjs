@@ -543,6 +543,8 @@ export class SecurityCookieJar {
   }
 }
 
+const peerClosedTheConnection = new Set(["ECONNRESET", "EPIPE"]);
+
 export function authorizationRequest(origin, client, probe, options = {}) {
   const target = new URL(probe.path, origin);
   if (target.origin !== origin) throw new Error("The authorization probe left the target origin");
@@ -590,7 +592,7 @@ export function authorizationRequest(origin, client, probe, options = {}) {
     });
     call.once("timeout", () => call.destroy(new Error("Authorization request timed out")));
     call.once("error", (failure) => {
-      if (options.acceptConnectionReset && failure.code === "ECONNRESET") {
+      if (options.acceptConnectionReset && peerClosedTheConnection.has(failure.code)) {
         resolve({ transportError: "connection-reset", elapsedMilliseconds: performance.now() - startedAt });
         return;
       }

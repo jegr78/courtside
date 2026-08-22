@@ -46,7 +46,7 @@ test("given stable assessment suites, when scheduling them, then safe traffic is
 test("given changed assessment bytes, when the required build runs, then paired immutable evidence is compared", () => {
   // when / then
   assert.match(build, /tool-update-comparison:/);
-  assert.match(build, /git cat-file -e "\$BASE_REF:tools\/security-tool-comparison\.mjs"/);
+  assert.doesNotMatch(build, /git cat-file -e "\$BASE_REF:tools\/security-tool-comparison\.mjs"/);
   assert.match(build, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
   assert.match(build, /git worktree add --detach/);
   assert.match(build, /courtside-security-base\/mvnw" -B[\s\S]+courtside-security-base\/pom\.xml" frontend:install-node-and-npm/);
@@ -64,6 +64,42 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /security-cleanup "\$CANDIDATE_RUN_ID" \|\| CANDIDATE_CLEANUP=\$\?/);
   assert.match(build, /needs: \[quality, tool-update-comparison\]/);
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
+});
+
+// The runner's own node is older than courtside.mjs requires, and the failure surfaces minutes
+// into a job as a comparison that never ran rather than as a missing tool.
+test("given a workflow step reaching the CLI, when it runs node, then it is the version the build pins", () => {
+  // when
+  const unpinned = build.split("\n")
+    .map((line, index) => ({ line: line.trim(), number: index + 1 }))
+    .filter(({ line }) => /(?:^|[|(\s])node\s+(?:"?\$\w+"?\/)?tools\/courtside(?:\.|-)/.test(line)
+      && !/frontend\/node\/node/.test(line));
+
+  // then
+  assert.deepEqual(unpinned.map(({ number, line }) => `${number}: ${line}`), [],
+    "courtside.mjs refuses a node older than 24 and the runner ships one. Every step that "
+    + "reaches it — directly or through a script that spawns it — uses frontend/node/node, "
+    + "which the maven build downloads at the version pom.xml pins.");
+});
+
+// Packaging is packaging. Whoever needs the artefact — the uat smoke, a security run, a release —
+// gets it without the frontend suite running again, and the suite still runs where it belongs.
+test("given a job that only needs the artefact, when it builds one, then the suite does not run again", () => {
+  // given
+  const pom = readFileSync(join(repository, "pom.xml"), "utf8");
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when / then
+  assert.match(pom, /<id>npm-test<\/id>[\s\S]*?<skip>\$\{skipTests}<\/skip>/,
+    "mvn package -DskipTests skips surefire and nothing else unless npm-test is told to, so every "
+    + "tool that packages the application drags the whole frontend suite along with it");
+  assert.doesNotMatch(comparison, /mvnw -B verify/,
+    "quality already runs the full suite on the same commit in the same workflow. A second run "
+    + "buys nothing and gives every flake a second chance to fail a job about tool comparison.");
+  assert.match(comparison, /mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci/,
+    "the CLI these steps launch requires ajv and js-yaml at module load, out of the frontend's "
+    + "node_modules, so the job installs the pinned node and those modules before it runs one — "
+    + "dropping either turns the step into an import error seconds in");
 });
 
 test("given a release candidate, when publishing it, then its exact digest passes the active gate first", () => {

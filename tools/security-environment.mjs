@@ -124,9 +124,10 @@ export function assertSecurityIdentity({ source, labels, image }, expected, expe
   }
 }
 
+// Every docker command here ends when its process ends; the job's timeout-minutes bounds the rest.
 function execute(command, args, environment = process.env) {
   return execFileSync(command, args, {
-    cwd: root, env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000
+    cwd: root, env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
   });
 }
 
@@ -177,7 +178,8 @@ export async function startSecurityEnvironment(runId, image) {
     reserveSecurityEnvironment(environment);
     writeState(runId, environment);
     try {
-      execute("docker", [...securityComposeArgs(runId), "up", "-d", "--wait"], { ...process.env, ...environment });
+      execute("docker", [...securityComposeArgs(runId), "up", "-d", "--wait"],
+        { ...process.env, ...environment });
       break;
     } catch (failure) {
       const output = `${failure.stderr ?? ""}`;

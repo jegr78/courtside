@@ -34,6 +34,7 @@
         <spring-modulith.version>2.1.0</spring-modulith.version>
         <lombok.version>1.18.46</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
+        <skipTests>false</skipTests>
         <openapi-generator.version>7.24.0</openapi-generator.version>
         <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
         <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
@@ -217,7 +218,10 @@
                         <id>npm-test</id>
                         <phase>prepare-package</phase>
                         <goals><goal>npm</goal></goals>
-                        <configuration><arguments>run test</arguments></configuration>
+                        <configuration>
+                            <arguments>run test</arguments>
+                            <skip>${skipTests}</skip>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>npm-build</id>
