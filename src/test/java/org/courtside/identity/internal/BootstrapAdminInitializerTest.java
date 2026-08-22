@@ -101,6 +101,23 @@ class BootstrapAdminInitializerTest {
     }
 
     private BootstrapAdminInitializer initializer(BootstrapAdminProperties properties) {
-        return new BootstrapAdminInitializer(lock, persons, accounts, encoder, properties);
+        return new BootstrapAdminInitializer(lock, persons, accounts, encoder, properties, GERMAN_CLUB);
     }
+
+    private static final org.courtside.config.ClubIdentity GERMAN_CLUB = new org.courtside.config.ClubIdentity() {
+        @Override
+        public String clubName() {
+            return "Example Tennis Club";
+        }
+
+        @Override
+        public String defaultLocale() {
+            return "de";
+        }
+
+        @Override
+        public java.time.ZoneId zoneId() {
+            return java.time.ZoneId.of("Europe/Berlin");
+        }
+    };
 }

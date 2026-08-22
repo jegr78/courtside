@@ -71,8 +71,9 @@ public class UserAccount {
     // Between creation and delivery the hash is of a value nobody kept, so no input matches it and
     // the encoder never warns about a broken one; the absent expiry is what says nothing is out yet.
     public static UserAccount awaitingCredentials(Person person, String username,
-                                                  String placeholderHash, Set<Role> roles) {
-        UserAccount account = new UserAccount(person, username, placeholderHash, roles);
+                                                  String placeholderHash, Set<Role> roles,
+                                                  String locale) {
+        UserAccount account = new UserAccount(person, username, placeholderHash, roles, locale);
         account.requirePasswordChange();
         return account;
     }
@@ -84,13 +85,14 @@ public class UserAccount {
         revokeSessions();
     }
 
-    public UserAccount(Person person, String username, String passwordHash, Set<Role> roles) {
+    public UserAccount(Person person, String username, String passwordHash, Set<Role> roles,
+                       String locale) {
         this.id = UUID.randomUUID();
         this.person = person;
         this.username = username;
         this.passwordHash = passwordHash;
         this.roles = Set.copyOf(roles);
-        this.locale = "de";
+        this.locale = locale;
         this.enabled = false;
         this.passwordChangeRequired = false;
         this.createdAt = Instant.now();
@@ -119,6 +121,12 @@ public class UserAccount {
         }
         this.username = username;
         revokeSessions();
+    }
+
+    // Not a security attribute: it decides what a message says, not what the account may do, so a
+    // session signed in under the old language stays valid.
+    public void changeLocale(String locale) {
+        this.locale = locale;
     }
 
     public void resetPassword(String passwordHash) {

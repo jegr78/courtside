@@ -134,7 +134,7 @@ class PasswordRehashGuardTest extends AbstractIntegrationTest {
     }
 
     private UserAccount member(String username, Person person) {
-        UserAccount account = new UserAccount(person, username, weaklyHashedPassword(), Set.of(Role.MEMBER));
+        UserAccount account = new UserAccount(person, username, weaklyHashedPassword(), Set.of(Role.MEMBER), "de");
         account.enable();
         return account;
     }

@@ -80,6 +80,6 @@ class CredentialIssueTest extends AbstractIntegrationTest {
         return accounts.save(UserAccount.awaitingCredentials(person,
                 "doe.jane." + UUID.randomUUID().toString().substring(0, 8),
                 passwordEncoder.encode(UUID.randomUUID().toString()),
-                java.util.Set.of(Role.MEMBER))).getId();
+                java.util.Set.of(Role.MEMBER), "de")).getId();
     }
 }

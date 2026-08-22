@@ -50,7 +50,7 @@ class PerformanceDataSeederTest {
         when(accounts.findByUsername(PerformanceDataSeeder.CONTENTION_USERNAME))
                 .thenReturn(Optional.of(mock(org.courtside.identity.UserAccount.class)));
         PerformanceDataSeeder seeder = new PerformanceDataSeeder(
-                persons, accounts, members, facility, mock(BookingService.class),
+                GERMAN_CLUB, persons, accounts, members, facility, mock(BookingService.class),
                 mock(HistoricalBookingImporter.class), bookings, mock(PasswordEncoder.class),
                 new PerformanceProperties(true, "performance-password"), Clock.systemUTC(),
                 () -> java.time.ZoneId.of("Europe/Berlin"));
@@ -85,7 +85,7 @@ class PerformanceDataSeederTest {
             when(facility.createCourt(number, "Court " + number)).thenAnswer(invocation -> court(courtNumber));
         }
         PerformanceDataSeeder seeder = new PerformanceDataSeeder(
-                persons, accounts, members, facility, bookingService, historicalBookings, bookings, passwordEncoder,
+                GERMAN_CLUB, persons, accounts, members, facility, bookingService, historicalBookings, bookings, passwordEncoder,
                 new PerformanceProperties(true, "performance-password"),
                 Clock.fixed(Instant.parse("2026-08-10T12:00:00Z"), ZoneOffset.UTC),
                 () -> java.time.ZoneId.of("Europe/Berlin"));
@@ -131,7 +131,7 @@ class PerformanceDataSeederTest {
         }
         Instant halfwayThroughTheEveningSlot = Instant.parse("2026-08-10T16:30:00Z");
         PerformanceDataSeeder seeder = new PerformanceDataSeeder(
-                persons, accounts, members, facility, bookingService, historicalBookings, bookings, passwordEncoder,
+                GERMAN_CLUB, persons, accounts, members, facility, bookingService, historicalBookings, bookings, passwordEncoder,
                 new PerformanceProperties(true, "performance-password"),
                 Clock.fixed(halfwayThroughTheEveningSlot, ZoneOffset.UTC),
                 () -> java.time.ZoneId.of("Europe/Berlin"));
@@ -160,4 +160,21 @@ class PerformanceDataSeederTest {
         when(court.getNumber()).thenReturn(number);
         return court;
     }
+
+    private static final org.courtside.config.ClubIdentity GERMAN_CLUB = new org.courtside.config.ClubIdentity() {
+        @Override
+        public String clubName() {
+            return "Example Tennis Club";
+        }
+
+        @Override
+        public String defaultLocale() {
+            return "de";
+        }
+
+        @Override
+        public java.time.ZoneId zoneId() {
+            return java.time.ZoneId.of("Europe/Berlin");
+        }
+    };
 }

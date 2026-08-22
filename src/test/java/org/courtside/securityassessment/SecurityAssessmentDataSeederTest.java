@@ -57,7 +57,7 @@ class SecurityAssessmentDataSeederTest {
         when(inactiveCard.getId()).thenReturn(java.util.UUID.randomUUID());
         when(cards.createParticipantCard("Inactive assessment card", 1)).thenReturn(inactiveCard);
         SecurityAssessmentDataSeeder seeder = new SecurityAssessmentDataSeeder(
-                persons, accounts, members, facility, cards, bookings, jdbc, encoder,
+                GERMAN_CLUB, persons, accounts, members, facility, cards, bookings, jdbc, encoder,
                 new SecurityAssessmentProperties(true, "run-0001", SecurityAssessmentDataset.fingerprint(),
                         "synthetic-password-value"),
                 Clock.fixed(Instant.parse("2026-08-19T10:00:00Z"), ZoneOffset.UTC),
@@ -98,4 +98,21 @@ class SecurityAssessmentDataSeederTest {
         when(court.getNumber()).thenReturn(number);
         return court;
     }
+
+    private static final org.courtside.config.ClubIdentity GERMAN_CLUB = new org.courtside.config.ClubIdentity() {
+        @Override
+        public String clubName() {
+            return "Example Tennis Club";
+        }
+
+        @Override
+        public String defaultLocale() {
+            return "de";
+        }
+
+        @Override
+        public java.time.ZoneId zoneId() {
+            return java.time.ZoneId.of("Europe/Berlin");
+        }
+    };
 }
