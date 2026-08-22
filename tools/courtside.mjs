@@ -14,7 +14,7 @@ import { createRequire } from "node:module";
 import {
   inspectPassiveSecurityRuntime, readSecurityEnvironment, readSecurityIdentity, readSecurityProxyCa,
   recoverSecurityEnvironment, runAuthenticatedZap, runOpenApiFuzzer, runPassiveZap, runResourceAbuse,
-  securityDomainStateFingerprint,
+  resetSecurityLoginAttempts, securityDomainStateFingerprint,
   securityProject, securityStateRoot,
   startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment, verifySecurityEnvironmentForAssessment
 } from "./security-environment.mjs";
@@ -634,8 +634,11 @@ async function execute(options) {
       runAuthorizationAssessment: async (selectedPlan, context) => runAuthorizationAssessment(selectedPlan, {
         ...context,
         ca,
-        sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD
+        sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
+        maxAddressFailures: Number(securityEnvironment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES)
       }),
+      resetLoginAttempts: async (selectedPlan, context) => resetSecurityLoginAttempts(selectedPlan.runId,
+        context.stopFile, Math.max(1, context.deadline.getTime() - Date.now())),
       runAuthenticatedZapAssessment: async (selectedPlan, context) => runAuthenticatedZapAssessment(selectedPlan, {
         ...context,
         ca,

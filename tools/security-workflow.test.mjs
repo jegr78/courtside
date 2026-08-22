@@ -35,6 +35,7 @@ test("given stable assessment suites, when scheduling them, then safe traffic is
   assert.match(scheduled, /schedule:[\s\S]+cron:/);
   assert.match(scheduled, /timeout-minutes: 45/);
   assert.match(scheduled, /security-run "\$RUN_ID" safe/);
+  assert.match(scheduled, /security-image-inventory\.mjs safe \| xargs -n1 docker pull/);
   assert.match(scheduled, /security-assessment-gate\.mjs/);
   assert.match(scheduled, /--subject "\$IMAGE_DIGEST"/);
   assert.match(scheduled, /security-cleanup "\$RUN_ID"/);
@@ -45,6 +46,7 @@ test("given stable assessment suites, when scheduling them, then safe traffic is
 test("given changed assessment bytes, when the required build runs, then paired immutable evidence is compared", () => {
   // when / then
   assert.match(build, /tool-update-comparison:/);
+  assert.match(build, /git cat-file -e "\$BASE_REF:tools\/security-tool-comparison\.mjs"/);
   assert.match(build, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
   assert.match(build, /git worktree add --detach/);
   assert.match(build, /courtside-security-base\/mvnw" -B[\s\S]+courtside-security-base\/pom\.xml" frontend:install-node-and-npm/);
@@ -53,11 +55,12 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.doesNotMatch(build, /courtside-security-base\/frontend\/node_modules/);
   assert.match(build, /security-run "\$BASE_RUN_ID" active/);
   assert.match(build, /security-run "\$CANDIDATE_RUN_ID" active/);
+  assert.match(build, /security-image-inventory\.mjs active \| xargs -n1 docker pull/);
   assert.match(build, /security-tool-comparison\.mjs/);
   assert.match(build, /COMPARATOR_ROOT="\$BASE_ROOT"/);
   assert.match(build, /--base-contract "\$BASE_ROOT\/security\/run-contract\.json"/);
   assert.match(build, /--candidate-contract security\/run-contract\.json/);
-  assert.match(build, /security-cleanup "\$BASE_RUN_ID" \|\| BASE_CLEANUP=\$\?/);
+  assert.match(build, /security-cleanup "\$BASE_RUN_ID"[\s\S]+\) \|\| BASE_CLEANUP=\$\?/);
   assert.match(build, /security-cleanup "\$CANDIDATE_RUN_ID" \|\| CANDIDATE_CLEANUP=\$\?/);
   assert.match(build, /needs: \[quality, tool-update-comparison\]/);
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
@@ -67,6 +70,7 @@ test("given a release candidate, when publishing it, then its exact digest passe
   // when / then
   assert.match(release, /\n  active-security:\n    needs: \[image, qualify\]/);
   assert.match(release, /security-run "\$RUN_ID" active/);
+  assert.match(release, /security-image-inventory\.mjs active \| xargs -n1 docker pull/);
   assert.match(release, /--authorize "authorize-active-\$RUN_ID"/);
   assert.match(release, /--subject "\$\{IMAGE##\*@\}"/);
   assert.match(release, /--assessment-gate build\/security-input\/active-security-summary\.json/);

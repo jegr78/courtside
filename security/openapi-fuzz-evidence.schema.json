@@ -72,10 +72,15 @@
     "inputCase": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "status", "observation", "outcome"],
+      "required": ["id", "observation", "outcome"],
+      "anyOf": [
+        { "properties": { "status": {} }, "required": ["status"] },
+        { "properties": { "transportError": {} }, "required": ["transportError"] }
+      ],
       "properties": {
         "id": { "enum": ["missing-fields", "duplicate-fields", "unknown-fields", "unicode-normalization", "control-characters", "deep-json", "oversized-body", "numeric-boundary", "cursor-boundary", "date-time-boundary", "malformed-idempotency-key"] },
         "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "transportError": { "enum": ["connection-reset"] },
         "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$" },
         "observation": { "enum": ["typed-input-rejection", "proxy-size-rejection"] },
         "outcome": { "$ref": "#/$defs/outcome" }

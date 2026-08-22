@@ -216,7 +216,7 @@ test("given authorization evidence, when one operation actor pair is absent, the
   const objectChecks = ["horizontal-booking-cancel", "horizontal-managed-detail", "horizontal-series-cancel",
     "identifier-substitution", "vertical-admin-management", "mass-assignment", "rejected-attacks-preserve-bookings"]
     .map((id) => ({ id, status: 200, outcome: "passed", observation: "boundary-proven" }));
-  const bruteForce = { outcome: "passed", attemptsBeforeLimit: 20, status: 429,
+  const bruteForce = { outcome: "passed", attemptsBeforeLimit: 5, status: 429,
     problemType: "urn:courtside:error:login-rate-limited",
     observation: "encoded-and-canonical-login-share-rate-limit" };
   const identityChecks = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER",

@@ -75,6 +75,7 @@ test("given a security run, when deriving its identity, then secrets and seed id
   assert.equal(environment.COURTSIDE_SECURITY_IMAGE, image);
   assert.equal(environment.COURTSIDE_SECURITY_SHARED_PASSWORD, "synthetic-password-value");
   assert.equal(environment.COURTSIDE_SECURITY_HTTPS_PORT, "23456");
+  assert.equal(environment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES, "5");
   assert.match(environment.COURTSIDE_SECURITY_SEED_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
   assert.match(environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
 });

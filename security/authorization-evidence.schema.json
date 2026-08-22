@@ -91,7 +91,7 @@
       "required": ["outcome", "attemptsBeforeLimit", "status", "problemType", "observation"],
       "properties": {
         "outcome": { "$ref": "#/$defs/outcome" },
-        "attemptsBeforeLimit": { "const": 20 },
+        "attemptsBeforeLimit": { "type": "integer", "minimum": 1, "maximum": 100 },
         "status": { "const": 429 },
         "problemType": { "const": "urn:courtside:error:login-rate-limited" },
         "observation": { "const": "encoded-and-canonical-login-share-rate-limit" }

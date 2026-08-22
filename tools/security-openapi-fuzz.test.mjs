@@ -29,9 +29,9 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 89);
   assert.equal(inventory.find(({ operationId }) => operationId === "listRoster").modes.join(","),
     "positive,negative");
-  assert.deepEqual(inventory.find(({ operationId }) => operationId === "createCourt").modes, ["negative"]);
-  assert.match(inventory.find(({ operationId }) => operationId === "createCourt").excludedModes.positive,
-    /Valid mutations/);
+  assert.deepEqual(inventory.find(({ operationId }) => operationId === "createCourt").modes, []);
+  assert.match(inventory.find(({ operationId }) => operationId === "createCourt").excludedModes.all,
+    /Generated mutation/);
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "logOut").modes, []);
   assert.match(inventory.find(({ operationId }) => operationId === "logOut").excludedModes.all,
     /Session invalidation/);

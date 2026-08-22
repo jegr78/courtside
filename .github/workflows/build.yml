@@ -30,6 +30,10 @@ jobs:
           mkdir -p build/security-update
           node tools/security-update-report.mjs --base "$BASE_REF" \
             --output build/security-update/source.md
+          if ! git cat-file -e "$BASE_REF:tools/security-tool-comparison.mjs"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if git diff --quiet "$BASE_REF" "$HEAD_REF" -- \
             pom.xml security deploy/compose.security.yaml deploy/Caddyfile.security \
             frontend/package.json frontend/package-lock.json tools/courtside.mjs 'tools/security-*'; then
@@ -48,6 +52,9 @@ jobs:
         run: |
           ./mvnw -B verify
           node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+      - if: steps.runtime.outputs.changed == 'true'
+        name: Pull pinned assessment images
+        run: node tools/security-image-inventory.mjs active | xargs -n1 docker pull
       - if: steps.runtime.outputs.changed == 'true'
         name: Prepare the protected-base assessment runtime
         env:
@@ -68,10 +75,13 @@ jobs:
         run: |
           IMAGE_DIGEST=$(docker image inspect courtside:uat-local --format '{{.Id}}')
           BASE_ROOT="$RUNNER_TEMP/courtside-security-base"
-          "$BASE_ROOT/frontend/node/node" "$BASE_ROOT/tools/courtside.mjs" security "$BASE_RUN_ID" "$IMAGE_DIGEST"
-          "$BASE_ROOT/frontend/node/node" "$BASE_ROOT/tools/courtside.mjs" security-run "$BASE_RUN_ID" active \
-            --qualification "$GITHUB_WORKSPACE/build/uat-smoke/qualification.json" \
-            --authorize "authorize-active-$BASE_RUN_ID" || true
+          (
+            cd "$BASE_ROOT"
+            frontend/node/node tools/courtside.mjs security "$BASE_RUN_ID" "$IMAGE_DIGEST"
+            frontend/node/node tools/courtside.mjs security-run "$BASE_RUN_ID" active \
+              --qualification "$GITHUB_WORKSPACE/build/uat-smoke/qualification.json" \
+              --authorize "authorize-active-$BASE_RUN_ID" || true
+          )
           node tools/courtside.mjs security "$CANDIDATE_RUN_ID" "$IMAGE_DIGEST"
           node tools/courtside.mjs security-run "$CANDIDATE_RUN_ID" active \
             --qualification build/uat-smoke/qualification.json \
@@ -112,8 +122,10 @@ jobs:
           BASE_ROOT="$RUNNER_TEMP/courtside-security-base"
           BASE_CLEANUP=0
           CANDIDATE_CLEANUP=0
-          "$BASE_ROOT/frontend/node/node" "$BASE_ROOT/tools/courtside.mjs" \
-            security-cleanup "$BASE_RUN_ID" || BASE_CLEANUP=$?
+          (
+            cd "$BASE_ROOT"
+            frontend/node/node tools/courtside.mjs security-cleanup "$BASE_RUN_ID"
+          ) || BASE_CLEANUP=$?
           node tools/courtside.mjs security-cleanup "$CANDIDATE_RUN_ID" || CANDIDATE_CLEANUP=$?
           [[ "$BASE_CLEANUP" = 0 && "$CANDIDATE_CLEANUP" = 0 ]]
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

@@ -38,6 +38,7 @@ export function securityEnvironment(runId, image, password = randomBytes(24).toS
     COURTSIDE_SECURITY_SHARED_PASSWORD: password,
     COURTSIDE_SECURITY_SEED_FINGERPRINT: seedFingerprint,
     COURTSIDE_SECURITY_INSTANCE_FINGERPRINT: instanceFingerprint,
+    COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: "5",
     COURTSIDE_SECURITY_MAX_REQUESTS: "1",
     COURTSIDE_SECURITY_MAX_CONCURRENCY: "1"
   };
@@ -608,6 +609,14 @@ export async function securityDomainStateFingerprint(runId, stopFile, timeoutMil
   });
   const stable = dump.stdout.split("\n").filter((line) => !line.startsWith("SELECT pg_catalog.setval")).join("\n");
   return `sha256:${createHash("sha256").update(stable).digest("hex")}`;
+}
+
+export async function resetSecurityLoginAttempts(runId, stopFile, timeoutMilliseconds) {
+  const environment = { ...process.env, ...readSecurityEnvironment(runId) };
+  await verifySecurityEnvironment(runId);
+  await runOwnedProcess("docker", [...securityComposeArgs(runId), "exec", "-T", "db", "psql",
+    "-v", "ON_ERROR_STOP=1", "-U", "courtside", "courtside_security", "-c",
+    "TRUNCATE TABLE login_attempt_limit"], { timeoutMilliseconds, stopFile, environment });
 }
 
 export async function runResourceAbuse(plan, stopFile, limits) {

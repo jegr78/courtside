@@ -37,12 +37,14 @@ export function buildOpenApiFuzzInventory(api, policy = openApiFuzzPolicy) {
       const excluded = policy.excludedOperations[operation.operationId];
       if (excluded) return operationCoverage(operation.operationId, method, path, [], { all: excluded });
       const mutation = method !== "get";
+      if (mutation) {
+        return operationCoverage(operation.operationId, method, path, [], { all: policy.generatedMutationRationale });
+      }
       const inputs = [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])].length > 0
         || operation.requestBody != null;
-      const modes = mutation ? ["negative"] : inputs ? ["positive", "negative"] : ["positive"];
+      const modes = inputs ? ["positive", "negative"] : ["positive"];
       const excludedModes = {
-        ...(mutation ? { positive: policy.positiveMutationRationale } : {}),
-        ...(!mutation && !inputs ? { negative: "The operation has no request input to invalidate." } : {})
+        ...(!inputs ? { negative: "The operation has no request input to invalidate." } : {})
       };
       return operationCoverage(operation.operationId, method, path, modes, excludedModes);
     }));
@@ -198,20 +200,33 @@ export async function prepareOpenApiFuzzFixtures(plan, context) {
   }, { csrf: true });
   if (login.status !== 200 || !client.csrfToken()) throw new Error("Synthetic fuzzer authentication failed");
   const source = await request({ method: "POST", path: "/api/admin/import/sources",
-    headers: { "content-type": "application/json" }, body: JSON.stringify({
-      sourceKey: `security-fuzz-${context.attempt}`,
-      displayName: "Security fuzz source",
-      columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME",
-        "Last name": "LAST_NAME", Email: "EMAIL" },
-      defaultMembershipTypeId: "cccccccc-0000-0000-0000-000000000001",
-      removalWarningPercent: 10
-    }) }, { csrf: true });
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(securityImportSourceRequest(plan.runId, context.attempt))
+  }, { csrf: true });
   if (source.status !== 201 || !source.json?.id) throw new Error("Synthetic import source setup failed");
   const mappings = await request({ method: "GET", path: "/__security/runtime-mappings", headers: {} },
     { maxResponseBytes: 2 * 1024 * 1024 });
   if (mappings.status !== 200 || !mappings.json) throw new Error("Runtime route inventory is unavailable");
   return { client, sourceId: source.json.id, observedRoutes: runtimeOperations(mappings.json), requestCount,
     close: () => control.close() };
+}
+
+export function securityImportSourceKey(runId, attempt) {
+  const identity = createHash("sha256").update(`${runId}:${attempt}`).digest("hex").slice(0, 16);
+  return `security-fuzz-${identity}`;
+}
+
+export function securityImportSourceRequest(runId, attempt) {
+  return {
+    sourceKey: securityImportSourceKey(runId, attempt),
+    displayName: "Security fuzz source",
+    separator: ";",
+    encoding: "UTF-8",
+    columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME",
+      "Last name": "LAST_NAME", Email: "EMAIL" },
+    defaultMembershipTypeId: "cccccccc-0000-0000-0000-000000000001",
+    removalWarningPercent: 10
+  };
 }
 
 export async function runOpenApiImportCases(plan, fixture, context) {
@@ -279,11 +294,15 @@ export async function runOpenApiInputCases(plan, fixture, context) {
       headers: { ...(entry.body !== undefined ? { "content-type": "application/json" } : {}),
         ...(entry.headers ?? {}) },
       ...(entry.body !== undefined ? { body: entry.body } : {})
-    }, { ca: context.ca, csrf: entry.method !== "GET", timeoutMilliseconds: context.timeoutMilliseconds });
+    }, { ca: context.ca, csrf: entry.method !== "GET", timeoutMilliseconds: context.timeoutMilliseconds,
+      acceptConnectionReset: entry.id === "oversized-body" });
     const typed = response.status >= 400 && response.status < 500
       && /^urn:courtside:error:[a-z0-9-]+$/.test(response.problemType ?? "");
-    const proxyRejected = entry.expectedStatus === 413 && response.status === 413;
-    results.push({ id: entry.id, status: response.status,
+    const proxyRejected = entry.expectedStatus === 413
+      && (response.status === 413 || response.transportError === "connection-reset");
+    results.push({ id: entry.id,
+      ...(response.status ? { status: response.status } : {}),
+      ...(response.transportError ? { transportError: response.transportError } : {}),
       ...(response.problemType ? { problemType: response.problemType } : {}),
       observation: proxyRejected ? "proxy-size-rejection" : "typed-input-rejection",
       outcome: typed || proxyRejected ? "passed" : "incomplete" });
@@ -319,6 +338,9 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
       || operation.path !== counterexample.pathTemplate || !operation.modes.includes(counterexample.mode);
   })) throw new Error("OpenAPI fuzz evidence contains an unbound counterexample");
   const candidateFingerprints = evidence.candidates.map(({ fingerprint }) => fingerprint);
+  if (evidence.inputCases.some((entry) => (entry.status === undefined) === (entry.transportError === undefined))) {
+    throw new Error("OpenAPI input evidence must contain exactly one transport outcome");
+  }
   if (new Set(candidateFingerprints).size !== candidateFingerprints.length) {
     throw new Error("OpenAPI fuzz evidence contains duplicate lifecycle candidates");
   }

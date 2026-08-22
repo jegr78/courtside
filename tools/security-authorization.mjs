@@ -274,7 +274,7 @@ export function evaluateLoginTiming(knownSamples, unknownSamples) {
   };
 }
 
-export async function executeAuthenticationChecks(send, password) {
+export async function executeAuthenticationChecks(send, password, beforeLogin, attemptsBeforeLimit) {
   const client = new SecurityCookieJar();
   await send(client, { method: "GET", path: "/api/session", headers: {} });
   const knownSamples = [];
@@ -292,12 +292,12 @@ export async function executeAuthenticationChecks(send, password) {
     }
     knownSamples.push(known.elapsedMilliseconds);
     unknownSamples.push(unknown.elapsedMilliseconds);
-    await signInSecurityUsername(send, client, "security.member.1", password, "MEMBER");
+    await signInSecurityUsername(send, client, "security.member.1", password, "MEMBER", beforeLogin);
     await send(client, { method: "POST", path: "/api/session/logout", headers: {} }, { csrf: true });
     await send(client, { method: "GET", path: "/api/session", headers: {} });
   }
   const timing = evaluateLoginTiming(knownSamples, unknownSamples);
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < attemptsBeforeLimit; attempt += 1) {
     const response = await failedLogin(send, client, "/api/sessio%6E", "security.member.1", `${password}-wrong`);
     if (!typedResponse(response, 401, "urn:courtside:error:unauthenticated")) {
       throw new Error(`Encoded login attempt ${attempt + 1} did not reach the shared limiter`);
@@ -306,7 +306,7 @@ export async function executeAuthenticationChecks(send, password) {
   const limited = await failedLogin(send, client, "/api/session", "security.member.1", `${password}-wrong`);
   const bruteForce = {
     outcome: typedResponse(limited, 429, "urn:courtside:error:login-rate-limited") ? "passed" : "failed",
-    attemptsBeforeLimit: 20,
+    attemptsBeforeLimit,
     status: limited.status,
     ...(limited.problemType ? { problemType: limited.problemType } : {}),
     observation: "encoded-and-canonical-login-share-rate-limit"
@@ -318,12 +318,12 @@ export function loginTimingSampleOrder(sample) {
   return sample % 2 === 0 ? ["known", "unknown"] : ["unknown", "known"];
 }
 
-export async function executeSecondaryIdentityChecks(send, password) {
+export async function executeSecondaryIdentityChecks(send, password, beforeLogin) {
   const checks = [];
   for (const role of roles) {
     const client = new SecurityCookieJar();
     const username = `security.${role.toLowerCase().replaceAll("_", ".")}.2`;
-    await signInSecurityUsername(send, client, username, password, role);
+    await signInSecurityUsername(send, client, username, password, role, beforeLogin);
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
     const admin = await send(client, { method: "GET", path: "/api/admin/roster?limit=1", headers: {} });
     const expectedAdminStatus = role === "ADMIN" ? 200 : 403;
@@ -337,7 +337,8 @@ export async function executeSecondaryIdentityChecks(send, password) {
   const managerRoles = ["MEMBER", "SPORT_DIRECTOR", "TRAINER", "YOUTH_DIRECTOR"];
   for (let index = 1; index <= 2; index += 1) {
     const client = new SecurityCookieJar();
-    await signInSecurityUsername(send, client, `security.manager.${index}`, password, "MANAGER_COMBINATION");
+    await signInSecurityUsername(send, client, `security.manager.${index}`, password, "MANAGER_COMBINATION",
+      beforeLogin);
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
     const managed = await send(client, { method: "GET", path: "/api/managed/bookings?limit=1", headers: {} });
     const admin = await send(client, { method: "GET", path: "/api/admin/roster?limit=1", headers: {} });
@@ -436,6 +437,12 @@ export async function runAuthorizationAssessment(plan, context) {
   if (!Number.isSafeInteger(context.maxRequests) || context.maxRequests < 1) {
     throw new Error("The authorization suite has no remaining request budget");
   }
+  if (typeof context.resetLoginAttempts !== "function") {
+    throw new Error("The authorization suite requires isolated login-attempt budgets");
+  }
+  if (!Number.isSafeInteger(context.maxAddressFailures) || context.maxAddressFailures < 1) {
+    throw new Error("The authorization suite requires the configured address failure limit");
+  }
   let requestCount = 0;
   const request = async (client, probe, options = {}) => {
     control.beforeRequest();
@@ -450,11 +457,13 @@ export async function runAuthorizationAssessment(plan, context) {
   try {
     const clients = Object.fromEntries(authorizationActors.map((actor) => [actor, new SecurityCookieJar()]));
     for (const actor of authorizationActors.filter((candidate) => candidate !== "ANONYMOUS")) {
-      await signInSecurityActor(request, clients[actor], actor, context.sharedPassword);
+      await signInSecurityActor(request, clients[actor], actor, context.sharedPassword, context.resetLoginAttempts);
     }
     const secondMember = new SecurityCookieJar();
-    await signInSecurityUsername(request, secondMember, "security.member.2", context.sharedPassword, "MEMBER");
-    const identityChecks = await executeSecondaryIdentityChecks(request, context.sharedPassword);
+    await signInSecurityUsername(request, secondMember, "security.member.2", context.sharedPassword, "MEMBER",
+      context.resetLoginAttempts);
+    const identityChecks = await executeSecondaryIdentityChecks(request, context.sharedPassword,
+      context.resetLoginAttempts);
     const boundaryChecks = await executeMutationBoundaryChecks(matrix, async (operation, boundary, probe) => {
       const allowedActor = authorizationActors.find((actor) => actor !== "ANONYMOUS"
         && operation.expectations[actor] === "allow") ?? "ANONYMOUS";
@@ -469,11 +478,12 @@ export async function runAuthorizationAssessment(plan, context) {
       if (operation.operationId === "logIn") {
         const client = actor === "ANONYMOUS" ? new SecurityCookieJar() : clients[actor];
         const loginActor = actor === "ANONYMOUS" ? "MEMBER" : actor;
-        return signInSecurityActor(request, client, loginActor, context.sharedPassword);
+        return signInSecurityActor(request, client, loginActor, context.sharedPassword, context.resetLoginAttempts);
       }
       return request(clients[actor], probe, { csrf: operation.mutation });
     });
-    const authentication = await executeAuthenticationChecks(request, context.sharedPassword);
+    const authentication = await executeAuthenticationChecks(request, context.sharedPassword,
+      context.resetLoginAttempts, context.maxAddressFailures);
     const evidence = {
       schemaVersion: 1,
       testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"],
@@ -496,11 +506,12 @@ export async function runAuthorizationAssessment(plan, context) {
   }
 }
 
-async function signInSecurityActor(request, client, actor, password) {
-  return signInSecurityUsername(request, client, actorUsernames[actor], password, actor);
+async function signInSecurityActor(request, client, actor, password, beforeLogin) {
+  return signInSecurityUsername(request, client, actorUsernames[actor], password, actor, beforeLogin);
 }
 
-async function signInSecurityUsername(request, client, username, password, actor) {
+async function signInSecurityUsername(request, client, username, password, actor, beforeLogin) {
+  await beforeLogin?.();
   await request(client, { method: "GET", path: "/api/session", headers: {} });
   const body = new URLSearchParams({ username, password }).toString();
   const response = await request(client, { method: "POST", path: "/api/session",
@@ -577,8 +588,13 @@ export function authorizationRequest(origin, client, probe, options = {}) {
       });
     });
     call.once("timeout", () => call.destroy(new Error("Authorization request timed out")));
-    call.once("error", (failure) => reject(new Error(
-      `Authorization ${probe.method} ${target.pathname} failed: ${failure.message}`)));
+    call.once("error", (failure) => {
+      if (options.acceptConnectionReset && failure.code === "ECONNRESET") {
+        resolve({ transportError: "connection-reset", elapsedMilliseconds: performance.now() - startedAt });
+        return;
+      }
+      reject(new Error(`Authorization ${probe.method} ${target.pathname} failed: ${failure.message}`));
+    });
     if (probe.body !== undefined) call.write(probe.body);
     call.end();
   });
