@@ -46,7 +46,7 @@ jobs:
       - if: steps.runtime.outputs.changed == 'true'
         name: Build and qualify one comparison target
         run: |
-          ./mvnw -B verify
+          ./mvnw -B frontend:install-node-and-npm
           frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
       - if: steps.runtime.outputs.changed == 'true'
         name: Pull pinned assessment images

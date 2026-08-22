@@ -82,6 +82,22 @@ test("given a workflow step reaching the CLI, when it runs node, then it is the 
     + "which the maven build downloads at the version pom.xml pins.");
 });
 
+// Packaging is packaging. Whoever needs the artefact — the uat smoke, a security run, a release —
+// gets it without the frontend suite running again, and the suite still runs where it belongs.
+test("given a job that only needs the artefact, when it builds one, then the suite does not run again", () => {
+  // given
+  const pom = readFileSync(join(repository, "pom.xml"), "utf8");
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when / then
+  assert.match(pom, /<id>npm-test<\/id>[\s\S]*?<skip>\$\{skipTests}<\/skip>/,
+    "mvn package -DskipTests skips surefire and nothing else unless npm-test is told to, so every "
+    + "tool that packages the application drags the whole frontend suite along with it");
+  assert.doesNotMatch(comparison, /mvnw -B verify/,
+    "quality already runs the full suite on the same commit in the same workflow. A second run "
+    + "buys nothing and gives every flake a second chance to fail a job about tool comparison.");
+});
+
 test("given a release candidate, when publishing it, then its exact digest passes the active gate first", () => {
   // when / then
   assert.match(release, /\n  active-security:\n    needs: \[image, qualify\]/);
