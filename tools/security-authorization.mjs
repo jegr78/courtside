@@ -2,6 +2,7 @@ import https from "node:https";
 import { createRequire } from "node:module";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { apiDocumentPath } from "./security-api-document.mjs";
 import { createAssessmentControl } from "./security-passive-deployment.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -432,7 +433,7 @@ export async function runAuthorizationAssessment(plan, context) {
         .every((testId) => plan.selectedTests.includes(testId))) {
     throw new Error("The authorization suite requires active authentication and authorization tests in SECURITY");
   }
-  const api = yaml.load(readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
+  const api = yaml.load(readFileSync(apiDocumentPath(), "utf8"));
   const matrix = buildOperationAuthorizationMatrix(api);
   const control = createAssessmentControl(context.stopFile, context.deadline);
   if (!Number.isSafeInteger(context.maxRequests) || context.maxRequests < 1) {

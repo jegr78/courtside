@@ -130,6 +130,21 @@ test("given a produced comparison, when the job ends, then its difference is rea
     "the difference belongs where a reviewer already looks, not in an artifact they have to fetch");
 });
 
+// Both runs assess the base revision's application, so both must be driven by the base revision's
+// contract; a candidate's own document turns its API change into a finding blamed on the tools.
+test("given a paired assessment, when both runs start, then they are driven by the base revision's contract", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const paired = comparison.slice(comparison.indexOf("Run paired active assessments"),
+    comparison.indexOf("Compare immutable run evidence"));
+
+  // when / then
+  assert.match(paired,
+    /COURTSIDE_SECURITY_API_DOCUMENT: \$\{\{ runner\.temp \}\}\/courtside-security-base\/src\/main\/resources\/api\/openapi\.yaml/);
+  assert.ok(paired.indexOf("COURTSIDE_SECURITY_API_DOCUMENT") < paired.indexOf("courtside.mjs security "),
+    "the document is chosen before either environment is created, so both mount the same one");
+});
+
 // A fingerprint is a hash of the finding, not a description of it. Asking somebody to record one
 // they cannot read is the rubber stamp the acknowledgement exists to prevent.
 test("given a difference to acknowledge, when the job reports it, then both runs' findings are there to name it", () => {

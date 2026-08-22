@@ -218,6 +218,17 @@ test("given parallel attempts for one run, when reserving scanner access, then o
   assert.ok(second.includes("org.courtside.security.attempt=2"));
 });
 
+// The scanner's contract and the digest the run plans against come from one path. Pinning the mount
+// to the checkout would make a paired comparison assess two different contracts against one target.
+test("given the security Compose file, when mounting the contract, then the run may point it at another revision", () => {
+  // given
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.security.yaml", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(compose,
+    /\$\{COURTSIDE_SECURITY_API_DOCUMENT:-\.\.\/src\/main\/resources\/api\/openapi\.yaml\}:\/schema\/openapi\.yaml:ro/);
+});
+
 test("given the security Compose file, when inspecting boundaries, then resources are bounded and internal", () => {
   // given
   const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.security.yaml", import.meta.url)), "utf8");

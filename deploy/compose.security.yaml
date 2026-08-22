@@ -216,7 +216,7 @@ services:
     environment:
       SCHEMATHESIS_HOOKS: ""
     volumes:
-      - ../src/main/resources/api/openapi.yaml:/schema/openapi.yaml:ro
+      - ${COURTSIDE_SECURITY_API_DOCUMENT:-../src/main/resources/api/openapi.yaml}:/schema/openapi.yaml:ro
     networks:
       - scanner-client
     labels:
