@@ -19,10 +19,6 @@ export const securityRuntimeFiles = [
   "tools/courtside.mjs",
   ...securityToolFiles
 ].toSorted();
-// What the paired runs can actually differ in. The target they share — the image, its compose
-// file, its Caddyfile, its API document — is the candidate's on both sides and cannot diverge.
-const comparisonInputFiles = ["frontend/package-lock.json", ...securityFiles, "tools/courtside.mjs",
-  ...securityToolFiles].toSorted();
 const currentSchemaFiles = securityFiles.filter((path) => path.endsWith(".schema.json")).toSorted();
 
 function digest(bytes) {
@@ -52,20 +48,6 @@ function baseFiles(base, directory, predicate) {
   } catch {
     return [];
   }
-}
-
-function comparisonInputs(base) {
-  const baseSecurity = baseFiles(base, "security", () => true);
-  const baseTools = baseFiles(base, "tools", (path) => /\/security-[^/]+\.(?:mjs|py)$/.test(path)
-    && !path.includes(".test."));
-  return [...new Set([...comparisonInputFiles, ...baseSecurity, ...baseTools])].toSorted();
-}
-
-// Only the pinned version, because the tools run on it. Every other line of pom.xml belongs to the
-// application, which is one image on both sides.
-function pinnedNodeVersion(bytes) {
-  const pinned = /<node\.version>([^<]+)<\/node\.version>/.exec(bytes ?? "");
-  return pinned === null ? "unset" : pinned[1];
 }
 
 function runtimeFiles(base) {
@@ -122,16 +104,11 @@ export function runtimeComparisonRequired(identity) {
   return identity.baseRuntimeDigest !== identity.candidateRuntimeDigest;
 }
 
-export function securityRuntimeIdentity(base, readers = {}) {
-  const previous = readers.previous ?? ((path) => baseFile(base, path));
-  const current = readers.current ?? currentFile;
-  const files = comparisonInputs(base);
-  const withNode = (reader) => (path) =>
-    path === "node.version" ? pinnedNodeVersion(reader("pom.xml")) : reader(path);
-  const inputs = [...files, "node.version"];
+export function securityRuntimeIdentity(base) {
+  const files = runtimeFiles(base);
   return {
-    baseRuntimeDigest: combinedDigest(inputs, withNode(previous)),
-    candidateRuntimeDigest: combinedDigest(inputs, withNode(current))
+    baseRuntimeDigest: combinedDigest(files, (path) => baseFile(base, path)),
+    candidateRuntimeDigest: combinedDigest(files, currentFile)
   };
 }
 
@@ -191,9 +168,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   writeFileSync(output, securityUpdateReport(base), { mode: 0o600 });
   if (identityOutput) {
-    const identity = securityRuntimeIdentity(base);
-    writeFileSync(identityOutput, `${JSON.stringify(
-      { ...identity, comparisonRequired: runtimeComparisonRequired(identity) }, null, 2)}\n`,
-    { mode: 0o600 });
+    writeFileSync(identityOutput, `${JSON.stringify(securityRuntimeIdentity(base), null, 2)}\n`, { mode: 0o600 });
   }
 }

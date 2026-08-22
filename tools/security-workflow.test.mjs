@@ -66,39 +66,24 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
-// The report already decides this from the digest of what the two runs vary. A second path list in
-// the workflow is a second definition, and the one that stood here fired ninety minutes for a line
-// in a compose file that both sides now share.
-test("given one definition of the assessment runtime, when the job decides whether to run, then it asks for that decision", () => {
+// One image on both sides meant one side always ran an environment that was not its own: the
+// candidate's image with the base's compose file cannot start once a setting becomes mandatory,
+// and taking the base's compose file from the candidate would hand a pull request the mounts and
+// scanner bounds of the run that exists to be independent of it.
+test("given a paired comparison, when each side is prepared, then it builds and qualifies its own target", () => {
   // given
   const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
 
   // when / then
-  assert.match(comparison, /--identity-output build\/security-update\/identity\.json/);
-  assert.match(comparison, /comparisonRequired/);
-  assert.doesNotMatch(comparison, /git diff --quiet/,
-    "the decision belongs to runtimeComparisonRequired in security-update-report.mjs, which the "
-    + "report already prints. Deriving it a second time here lets the two drift apart.");
-});
-
-// Both runs start the one image the candidate built, so the files that define what that image is
-// running as have to be the candidate's too — a base copy describes an application it is not.
-test("given one image on both sides, when the base runtime is prepared, then it gets the target that image belongs to", () => {
-  // given
-  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
-
-  // when / then
-  for (const path of ["deploy/compose.security.yaml deploy/Caddyfile.security",
-    "src/main/resources/api/openapi.yaml"]) {
-    assert.match(comparison, new RegExp(`git worktree add --detach[\\s\\S]*?cp ${path
-      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?courtside-security-base/`),
-    "the job builds one image, from the candidate, and starts it on both sides. The compose file "
-    + "and the Caddyfile say what that image needs to run, and the API document says what it "
-    + "answers to — a base copy describes an application this is not. A mandatory setting the "
-    + "pull request adds is missing from the base copy and the container never starts; an "
-    + "endpoint it adds is missing from the base matrix and reads as a new finding. What the "
-    + "comparison varies is the assessment: security/ and tools/security-*.");
+  for (const pattern of [/CANDIDATE_IMAGE=/, /BASE_IMAGE=/,
+    /security "\$BASE_RUN_ID" "\$BASE_IMAGE"/, /security "\$CANDIDATE_RUN_ID" "\$CANDIDATE_IMAGE"/,
+    /--qualification "\$BASE_ROOT\/build\/uat-smoke\/qualification\.json"/]) {
+    assert.match(comparison, pattern);
   }
+  assert.doesNotMatch(comparison, /cp deploy\/compose\.security\.yaml/,
+    "the base run reads its own compose file. It declares the mounts that supply the assessment "
+    + "code and the bounds the scanners keep, so a copy from the candidate hands a pull request "
+    + "the run that exists to be independent of it.");
 });
 
 // The runner's own node is older than courtside.mjs requires, and the failure surfaces minutes

@@ -25,13 +25,18 @@ jobs:
         name: Identify assessment-runtime changes
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.sha }}
         run: |
           mkdir -p build/security-update
           node tools/security-update-report.mjs --base "$BASE_REF" \
-            --output build/security-update/source.md \
-            --identity-output build/security-update/identity.json
-          REQUIRED=$(node -p "require('./build/security-update/identity.json').comparisonRequired")
-          echo "changed=$REQUIRED" >> "$GITHUB_OUTPUT"
+            --output build/security-update/source.md
+          if git diff --quiet "$BASE_REF" "$HEAD_REF" -- \
+            pom.xml security deploy/compose.security.yaml deploy/Caddyfile.security \
+            frontend/package.json frontend/package-lock.json tools/courtside.mjs 'tools/security-*'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
       - if: steps.runtime.outputs.changed == 'true'
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
@@ -39,10 +44,12 @@ jobs:
           distribution: temurin
           cache: maven
       - if: steps.runtime.outputs.changed == 'true'
-        name: Build and qualify one comparison target
+        name: Build and qualify the candidate target
         run: |
           ./mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci
           frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+          echo "CANDIDATE_IMAGE=$(docker image inspect courtside:uat-local --format '{{.Id}}')" \
+            >> "$GITHUB_ENV"
       - if: steps.runtime.outputs.changed == 'true'
         name: Pull pinned assessment images
         run: node tools/security-image-inventory.mjs active | xargs -n1 docker pull
@@ -52,11 +59,6 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: |
           git worktree add --detach "$RUNNER_TEMP/courtside-security-base" "$BASE_REF"
-          # One image runs on both sides, so what describes that target comes with it.
-          cp deploy/compose.security.yaml deploy/Caddyfile.security \
-            "$RUNNER_TEMP/courtside-security-base/deploy/"
-          cp src/main/resources/api/openapi.yaml \
-            "$RUNNER_TEMP/courtside-security-base/src/main/resources/api/"
           "$RUNNER_TEMP/courtside-security-base/mvnw" -B \
             -f "$RUNNER_TEMP/courtside-security-base/pom.xml" frontend:install-node-and-npm
       - if: steps.runtime.outputs.changed == 'true'
@@ -64,21 +66,27 @@ jobs:
         working-directory: ${{ runner.temp }}/courtside-security-base/frontend
         run: ./node/node ./node/node_modules/npm/bin/npm-cli.js ci --ignore-scripts
       - if: steps.runtime.outputs.changed == 'true'
+        name: Build and qualify the protected-base target
+        run: |
+          cd "$RUNNER_TEMP/courtside-security-base"
+          frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+          echo "BASE_IMAGE=$(docker image inspect courtside:uat-local --format '{{.Id}}')" \
+            >> "$GITHUB_ENV"
+      - if: steps.runtime.outputs.changed == 'true'
         name: Run paired active assessments
         env:
           BASE_RUN_ID: compare-base-${{ github.run_id }}-${{ github.run_attempt }}
           CANDIDATE_RUN_ID: compare-head-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
-          IMAGE_DIGEST=$(docker image inspect courtside:uat-local --format '{{.Id}}')
           BASE_ROOT="$RUNNER_TEMP/courtside-security-base"
           (
             cd "$BASE_ROOT"
-            frontend/node/node tools/courtside.mjs security "$BASE_RUN_ID" "$IMAGE_DIGEST"
+            frontend/node/node tools/courtside.mjs security "$BASE_RUN_ID" "$BASE_IMAGE"
             frontend/node/node tools/courtside.mjs security-run "$BASE_RUN_ID" active \
-              --qualification "$GITHUB_WORKSPACE/build/uat-smoke/qualification.json" \
+              --qualification "$BASE_ROOT/build/uat-smoke/qualification.json" \
               --authorize "authorize-active-$BASE_RUN_ID" || true
           )
-          frontend/node/node tools/courtside.mjs security "$CANDIDATE_RUN_ID" "$IMAGE_DIGEST"
+          frontend/node/node tools/courtside.mjs security "$CANDIDATE_RUN_ID" "$CANDIDATE_IMAGE"
           frontend/node/node tools/courtside.mjs security-run "$CANDIDATE_RUN_ID" active \
             --qualification build/uat-smoke/qualification.json \
             --authorize "authorize-active-$CANDIDATE_RUN_ID" || true

@@ -167,12 +167,15 @@ export function compareSecurityToolRuns(input) {
   if (!["active", "destructive"].includes(base.identity.profile) || base.identity.profile !== candidate.identity.profile) {
     fail("paired runs must use the same active or destructive profile");
   }
-  if (JSON.stringify(base.identity.application) !== JSON.stringify(candidate.identity.application)
-      || base.identity.seedFingerprint !== candidate.identity.seedFingerprint) {
-    fail("paired runs must assess the same application and synthetic fixture");
+  if (base.identity.seedFingerprint !== candidate.identity.seedFingerprint) {
+    fail("paired runs must assess the same synthetic fixture");
   }
+  // Each side runs the application of its own revision, so each side's image has to prove it.
   if (candidate.identity.application.commit !== input.candidateRef) {
     fail("the assessed application commit differs from the candidate revision");
+  }
+  if (base.identity.application.commit !== input.baseRef) {
+    fail("the assessed application commit differs from the base revision");
   }
   if (candidate.result.outcome === "failed") fail("the candidate runtime produced a failed assessment");
   const comparison = {
@@ -181,7 +184,8 @@ export function compareSecurityToolRuns(input) {
     baseRef: input.baseRef,
     candidateRef: input.candidateRef,
     profile: base.identity.profile,
-    application: base.identity.application,
+    application: candidate.identity.application,
+    baseApplication: base.identity.application,
     seedFingerprint: base.identity.seedFingerprint,
     base: base.result,
     candidate: candidate.result,
