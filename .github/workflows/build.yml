@@ -30,10 +30,6 @@ jobs:
           mkdir -p build/security-update
           node tools/security-update-report.mjs --base "$BASE_REF" \
             --output build/security-update/source.md
-          if ! git cat-file -e "$BASE_REF:tools/security-tool-comparison.mjs"; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           if git diff --quiet "$BASE_REF" "$HEAD_REF" -- \
             pom.xml security deploy/compose.security.yaml deploy/Caddyfile.security \
             frontend/package.json frontend/package-lock.json tools/courtside.mjs 'tools/security-*'; then

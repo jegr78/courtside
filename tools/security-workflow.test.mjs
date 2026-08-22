@@ -46,7 +46,7 @@ test("given stable assessment suites, when scheduling them, then safe traffic is
 test("given changed assessment bytes, when the required build runs, then paired immutable evidence is compared", () => {
   // when / then
   assert.match(build, /tool-update-comparison:/);
-  assert.match(build, /git cat-file -e "\$BASE_REF:tools\/security-tool-comparison\.mjs"/);
+  assert.doesNotMatch(build, /git cat-file -e "\$BASE_REF:tools\/security-tool-comparison\.mjs"/);
   assert.match(build, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
   assert.match(build, /git worktree add --detach/);
   assert.match(build, /courtside-security-base\/mvnw" -B[\s\S]+courtside-security-base\/pom\.xml" frontend:install-node-and-npm/);
