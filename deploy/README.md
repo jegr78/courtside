@@ -278,6 +278,12 @@ default.
 | `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. |
 | `COURTSIDE_MAIL_ADMIN_USERNAME` | `postmaster` | Local part of the mail administrator's address. |
 | `COURTSIDE_MAIL_RECOVERY_MODE` | *unset* | Set to `1` to force recovery mode without a recovery credential. Mail stops while it is set. |
+| `COURTSIDE_MAIL_PASSWORD` | *required with the mail server* | Password the instance authenticates with when it hands a message in. Written into its sending account by `mail-configure`; the instance is not an administrator of the mail server. |
+| `COURTSIDE_MAIL_REPLY_TO` | *required with the mail server* | The club's real mailbox, so a member who answers a message reaches somebody. |
+| `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from and authenticates as, in `COURTSIDE_MAIL_DOMAIN`. |
+| `COURTSIDE_MAIL_RELAY_HOST` | `mail` | Where the instance hands its messages in. The mail server on the compose network by default; point it at the club's provider instead if this deployment runs without one. |
+| `COURTSIDE_MAIL_RELAY_PORT` | `587` | Submission port on that host. |
+| `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `true` in this deployment, `false` in the application | Accept the certificate the relay presents without validating it. Set because Caddy issues for `COURTSIDE_DOMAIN` and not for the mail server, which therefore serves a self-signed certificate on the private compose network. Clear it when you point `COURTSIDE_MAIL_RELAY_HOST` at a provider that has a real one. |
 | `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
 | `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`. Needed for the initial setup, and a way back in afterwards. **The server serves no mail while it is set.** |
 | `COURTSIDE_MAIL_OUTBOUND_PROBE` | `gmail-smtp-in.l.google.com` | The host `mail-check` opens port 25 to when testing whether outbound mail leaves at all. A third party by default; point it at a server of your own if you would rather not tell one. |

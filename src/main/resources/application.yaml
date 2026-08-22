@@ -61,6 +61,7 @@ courtside:
     reply-to: ${COURTSIDE_MAIL_REPLY_TO:}
     username: ${COURTSIDE_MAIL_USERNAME:}
     password: ${COURTSIDE_MAIL_PASSWORD:}
+    trust-relay-certificate: ${COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE:false}
   bootstrap-admin:
     username: ${COURTSIDE_BOOTSTRAP_ADMIN_USERNAME:}
     password: ${COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD:}

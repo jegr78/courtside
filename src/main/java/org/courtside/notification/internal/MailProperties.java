@@ -6,5 +6,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 // account, so an instance without these does not start rather than failing at the first message.
 @ConfigurationProperties(prefix = "courtside.mail")
 public record MailProperties(String host, int port, String from, String replyTo,
-                             String username, String password) {
+                             String username, String password, boolean trustRelayCertificate) {
 }

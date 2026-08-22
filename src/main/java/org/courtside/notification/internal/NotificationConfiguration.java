@@ -29,6 +29,10 @@ class NotificationConfiguration {
         Properties mail = sender.getJavaMailProperties();
         mail.put("mail.smtp.auth", String.valueOf(MailSettings.isSet(properties.username())));
         mail.put("mail.smtp.starttls.enable", "true");
+        mail.put("mail.smtp.starttls.required", "true");
+        if (properties.trustRelayCertificate()) {
+            mail.put("mail.smtp.ssl.trust", properties.host());
+        }
         mail.put("mail.smtp.timeout", "10000");
         mail.put("mail.smtp.connectiontimeout", "10000");
         sender.setJavaMailProperties(mail);

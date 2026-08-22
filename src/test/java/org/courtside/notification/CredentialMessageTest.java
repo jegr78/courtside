@@ -55,7 +55,7 @@ class CredentialMessageTest extends AbstractIntegrationTest {
     void givenAnAccountAwaitingItsFirstCredential_whenTheEventIsRaised_thenTheMemberIsWrittenTo()
             throws Exception {
         // given
-        UUID accountId = accountFor("de");
+        UUID accountId = anAccountAwaitingItsCredential();
 
         // when
         transactions.executeWithoutResult(status ->
@@ -75,7 +75,7 @@ class CredentialMessageTest extends AbstractIntegrationTest {
     void givenAPasswordReset_whenTheEventIsRaised_thenTheMessageSaysSoRatherThanWelcoming()
             throws Exception {
         // given
-        UUID accountId = accountFor("de");
+        UUID accountId = anAccountAwaitingItsCredential();
 
         // when
         transactions.executeWithoutResult(status ->
@@ -91,7 +91,7 @@ class CredentialMessageTest extends AbstractIntegrationTest {
     @Test
     void whenAMemberIsWrittenTo_thenTheCredentialIsInTheMessageAndNowhereElse() throws Exception {
         // given
-        UUID accountId = accountFor("de");
+        UUID accountId = anAccountAwaitingItsCredential();
 
         // when
         transactions.executeWithoutResult(status ->
@@ -117,8 +117,7 @@ class CredentialMessageTest extends AbstractIntegrationTest {
         return body.substring(start, body.indexOf('\n', start)).trim();
     }
 
-    private UUID accountFor(String locale) {
-        assertThat(locale).isEqualTo("de");
+    private UUID anAccountAwaitingItsCredential() {
         return transactions.execute(status -> {
             Person person = people.save(new Person("Jane", "Doe", "jane.doe@example.org"));
             UserAccount account = UserAccount.awaitingCredentials(person,

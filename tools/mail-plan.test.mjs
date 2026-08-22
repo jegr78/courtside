@@ -112,6 +112,7 @@ function render(name, environment) {
         COURTSIDE_MAIL_HOSTNAME: "mail.courts.example.org",
         COURTSIDE_MAIL_DOMAIN: "courts.example.org",
         COURTSIDE_MAIL_ADMIN_PASSWORD: "unused",
+        COURTSIDE_MAIL_PASSWORD: "unused",
         ...environment
       }
     });
@@ -124,9 +125,24 @@ function render(name, environment) {
 function renderedSecret(password) {
   const rendered = render("base", { COURTSIDE_MAIL_ADMIN_PASSWORD: password });
   const account = rendered.split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line))
-    .find((operation) => operation.object === "Account");
+    .find((operation) => operation.value?.["account-administrator"]);
   return account.value["account-administrator"].credentials["0"].secret;
 }
+
+test("given the base plan, when the application submits, then it does so as no administrator", () => {
+  // given
+  const accounts = plan("base").filter((operation) => operation.object === "Account")
+    .flatMap((operation) => Object.values(operation.value));
+
+  // when
+  const application = accounts.find((account) => account.name === "{{appuser}}");
+
+  // then
+  assert.ok(application, "the plan creates no account for the instance to authenticate as");
+  assert.notDeepEqual(application.roles, { "@type": "Admin" },
+    "the instance would own the mail server the moment anything owns the instance; it needs to "
+    + "submit and nothing else");
+});
 
 test("given a password holding an ampersand, when the base plan is rendered, then the account carries it verbatim", () => {
   // given
