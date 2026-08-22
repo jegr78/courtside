@@ -2,6 +2,7 @@ import type { components } from "./schema";
 
 export type SessionStatus = components["schemas"]["SessionStatus"];
 export type ClubConfig = components["schemas"]["ClubConfig"];
+export type AdminClubConfig = components["schemas"]["AdminClubConfig"];
 export type ClubConfigRequest = components["schemas"]["ClubConfigRequest"];
 export type Impact = components["schemas"]["Impact"];
 export type RuleSet = components["schemas"]["RuleSet"];
@@ -112,8 +113,8 @@ function csrfToken(): string | undefined {
 export const api = {
   session: () => request<SessionStatus>("/api/session"),
   config: () => request<ClubConfig>("/api/public/config"),
-  adminConfig: () => request<ClubConfig>("/api/admin/config"),
-  changeAdminConfig: (config: ClubConfigRequest) => request<ClubConfig>("/api/admin/config", {
+  adminConfig: () => request<AdminClubConfig>("/api/admin/config"),
+  changeAdminConfig: (config: ClubConfigRequest) => request<AdminClubConfig>("/api/admin/config", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config)
   }),
   ruleSets: () => request<RuleSet[]>("/api/admin/rule-sets"),

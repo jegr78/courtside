@@ -20,6 +20,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             UPDATE VERSIONED UserAccount account
             SET account.passwordHash = :passwordHash,
                 account.passwordChangeRequired = false,
+                account.credentialsExpireAt = null,
                 account.securityEpoch = account.securityEpoch + 1
             WHERE account.id = :id AND account.passwordChangeRequired = true
             """)

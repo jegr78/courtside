@@ -96,6 +96,34 @@ class ReferenceDeploymentSecurityTest {
         assertThat(compose).contains("127.0.0.1:${COURTSIDE_PORT:-8080}:8080");
     }
 
+    // An instance without mail configuration refuses to start, so a world that runs the image and
+    // forgets it is a world that will not come up — in a workflow that may only run weekly.
+    @Test
+    void whenAComposeFileRunsTheApplication_thenItConfiguresTheMailItCannotStartWithout()
+            throws IOException {
+        // given
+        List<Path> sources;
+        try (var deploymentFiles = Files.list(Path.of("deploy"))) {
+            sources = deploymentFiles
+                    .filter(path -> path.getFileName().toString().matches("compose(?:\\..+)?\\.yaml"))
+                    .sorted()
+                    .toList();
+        }
+
+        // when / then
+        for (Path source : sources) {
+            String compose = Files.readString(source);
+            if (OWN_IMAGE_REFERENCES.stream().noneMatch(compose::contains)) {
+                continue;
+            }
+            assertThat(compose)
+                    .as("%s runs the application", source)
+                    .contains("COURTSIDE_MAIL_RELAY_HOST")
+                    .contains("COURTSIDE_MAIL_FROM")
+                    .contains("COURTSIDE_MAIL_REPLY_TO");
+        }
+    }
+
     @Test
     void whenReadingCaddyfile_thenForwardedHeadersAreReplacedAtTrustBoundary() throws IOException {
         // when

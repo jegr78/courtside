@@ -2,6 +2,9 @@ package org.courtside.config.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.BookingGridSettings;
+import org.courtside.config.ClubIdentity;
+import org.courtside.config.CredentialValidity;
+import org.courtside.shared.CredentialsRequested;
 import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.BookingGridCoordination;
@@ -21,7 +24,8 @@ import java.time.ZoneId;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone {
+public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone,
+        CredentialValidity, ClubIdentity {
 
     private final ClubConfigurationRepository configurations;
     private final List<BookingGridConstraint> bookingGridConstraints;
@@ -43,6 +47,24 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     }
 
     @Override
+    public String clubName() {
+        return current().clubName();
+    }
+
+    @Override
+    public String defaultLocale() {
+        return current().defaultLocale();
+    }
+
+    @Override
+    public java.time.Duration validFor(CredentialsRequested.Reason reason) {
+        ClubConfigurationSnapshot configuration = current();
+        return java.time.Duration.ofHours(reason == CredentialsRequested.Reason.NEW_ACCOUNT
+                ? configuration.newAccountCredentialHours()
+                : configuration.passwordResetCredentialHours());
+    }
+
+    @Override
     public ZoneId zoneId() {
         return ZoneId.of(current().timeZone());
     }
@@ -57,7 +79,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     @Transactional
     public ClubConfigurationSnapshot update(String clubName, String primaryColor, String accentColor,
                                             String logoUrl, String imprintUrl, String defaultLocale,
-                                            int slotMinutes, String timeZone) {
+                                            int slotMinutes, String timeZone,
+                                            int newAccountCredentialHours,
+                                            int passwordResetCredentialHours) {
         BookingSlotDuration slotDuration = new BookingSlotDuration(slotMinutes);
         ZoneId zoneId = ZoneId.of(timeZone);
         lock();
@@ -92,12 +116,19 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         if (!Objects.equals(configuration.getImprintUrl(), imprintUrl)) {
             changedFields.add("imprintUrl");
         }
+        if (configuration.getNewAccountCredentialHours() != newAccountCredentialHours) {
+            changedFields.add("newAccountCredentialHours");
+        }
+        if (configuration.getPasswordResetCredentialHours() != passwordResetCredentialHours) {
+            changedFields.add("passwordResetCredentialHours");
+        }
         boolean localeChanged = !Objects.equals(configuration.getDefaultLocale(), defaultLocale);
         boolean slotMinutesChanged = configuration.getSlotMinutes() != slotMinutes;
         boolean timeZoneChanged = !configuration.getTimeZone().equals(timeZone);
 
         configuration.changeTo(clubName, primaryColor, accentColor,
                 logoUrl, imprintUrl, defaultLocale, slotMinutes, timeZone);
+        configuration.changeCredentialValidity(newAccountCredentialHours, passwordResetCredentialHours);
 
         if (!changedFields.isEmpty()) {
             events.publishEvent(new ConfigEvent.ClubChanged(configuration.getId(), List.copyOf(changedFields)));

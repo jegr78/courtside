@@ -64,7 +64,20 @@ it, and an instance serves the document it actually answers to at `GET /api/open
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
 carrying an SBOM attestation, and attaches the OpenAPI document to the release. The reference
 deployment carries the club's own mail server behind a profile, together with a check that resolves
-the DNS a receiver looks at; nothing in the application sends through it yet.
+the DNS a receiver looks at, and the application sends through it: the `notification` module reacts
+to an event and generates the credential at the moment it is sent. Both message bundles ship, but an
+account's language is a literal nothing writes, so every message goes out in German until
+[#434](https://github.com/jegr78/courtside/issues/434) makes the other one reachable. Mail
+configuration is mandatory — an instance without it refuses to start and names
+the variables it is missing — and `/actuator/health/mail` reports the sending path to an
+administrator without ever opening it. The message names the date its password stops working, and
+sign-in enforces that date: once it has passed the credential no longer authenticates, and the
+board issues a new one. How long an invitation and a reset last is a club setting, one figure for
+each, so a board that knows its own members decides it rather than inheriting ours. The date binds
+the issued credential only, so a member who has since chosen their own password keeps it. A message
+the relay refuses is retried, and if it is still refused the event stays outstanding rather than
+being recorded as delivered, so a restart republishes it instead of losing it. What raises that
+event is still to come: the roster continues to ask an administrator for a one-time password.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers — including creating a recurring
@@ -268,11 +281,13 @@ nothing about payment. Adding a new consumer is additive.
 The two consumers want different guarantees, and both are served from one publication. `audit`
 listens **before the commit** and writes its row in the same transaction: no commit without a row,
 which is the property that makes a log an audit log. That guarantee rests on the transaction, not
-on where a publish sits in a method — the one `@TransactionalEventListener` is registered at
-`BEFORE_COMMIT`, and a `RuntimeException` rolls the transaction back before it ever runs, so a
-change that never commits is a change never recorded. Everything else listens **after** it, through
-the event publication registry, which stores the publication in that same transaction and therefore
-delivers again after a restart that interrupted it — at least once, never never. A producer knows
+on where a publish sits in a method — exactly one listener is registered at `BEFORE_COMMIT`, the
+audit writer, and a `RuntimeException` rolls the transaction back before it ever runs, so a change
+that never commits is a change never recorded. Everything else listens **after** it, through the
+event publication registry, which stores the publication in that same transaction and therefore
+delivers again after a restart that interrupted it — at least once, never never. A consumer that
+waits on something outside the instance, as sending a message does, takes its own executor, so a
+mail server nothing can reach does not hold up the audit trail behind it. A producer knows
 neither consumer.
 
 An event carries ids and values that are not personal. A correction to a name or an address records
@@ -1210,6 +1225,19 @@ whether it is built or designed. **Designed means absent today.**
   vendoring an interface this product does not maintain. What bounds it: the admin port is bound
   to the loopback interface, nothing else in the deployment reads that interface, and it is
   reached only during setup and recovery. *Built, as described.*
+- **Accepted: the instance does not validate the bundled mail server's certificate.** Everything
+  that grants access travels by mail, so the credential and the password the instance authenticates
+  with both cross the hop to the mail server. That hop is required to be encrypted — STARTTLS is
+  required and not merely enabled, so a relay that stops offering it fails the handover rather than
+  carrying a password in the clear — but its certificate is not checked, because Caddy issues for
+  `COURTSIDE_DOMAIN` and not for the mail hostname and the submission listener therefore presents a
+  self-signed one. An observer needs to be on the private compose network *and* able to redirect the
+  application's connection to a server of their own. What bounds it: the exception is off by default
+  in the application and switched on in `compose.yaml`, where a reader sees it; it names one host,
+  the configured relay; and a club pointing `COURTSIDE_MAIL_RELAY_HOST` at a provider with a real
+  certificate clears `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` and is validated again. It closes when
+  the mail server has a certificate of its own, which
+  [#342](https://github.com/jegr78/courtside/issues/342) covers. *Built, as described.*
 
 ### Roles
 

@@ -49,6 +49,16 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenReadingThePublicConfig_thenItDoesNotPublishHowLongAnIssuedCredentialLasts()
+            throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.newAccountCredentialHours").doesNotExist())
+                .andExpect(jsonPath("$.passwordResetCredentialHours").doesNotExist());
+    }
+
+    @Test
     void whenReadingTheManifestWithoutAuthentication_thenItUsesTheClubBranding() throws Exception {
         // when / then
         mockMvc.perform(get("/manifest.webmanifest"))
@@ -253,7 +263,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#1f6feb",
                                  "accentColor": "#f78166", "defaultLocale": "en",
-                                 "timeZone": "Pacific/Auckland", "slotMinutes": 45}
+                                 "timeZone": "Pacific/Auckland", "slotMinutes": 45,
+                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isConflict())
@@ -304,7 +315,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "blue",
-                                 "accentColor": "#f78166", "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                                 "accentColor": "#f78166", "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -321,7 +333,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "accentColor": "#f78166",
-                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -339,7 +352,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
-                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -357,7 +371,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
-                                 "accentColor": "#f78166", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                                 "accentColor": "#f78166", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -376,7 +391,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "logoUrl": "javascript:alert(1)",
-                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -398,7 +414,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "%s", "primaryColor": "#004f2d",
-                                 "accentColor": "#f78166", "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                                 "accentColor": "#f78166", "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """.formatted("A".repeat(101)))
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -419,7 +436,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "logoUrl": "//evil.example/x.png",
-                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -434,7 +452,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
-                                 "accentColor": "#f78166", "defaultLocale": "fr", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                                 "accentColor": "#f78166", "defaultLocale": "fr", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -452,7 +471,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "logoUrl": "/\\\\evil.example",
-                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -481,11 +501,49 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .update();
     }
 
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAdmin_whenChangingHowLongACredentialLasts_thenTheClubIsNotStuckWithTheDefault()
+            throws Exception {
+        // when
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club")
+                                .replace("\"newAccountCredentialHours\": 168",
+                                        "\"newAccountCredentialHours\": 72"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.newAccountCredentialHours").value(72));
+
+        // then — a board that knows its own members can say so, and it survives the round trip
+        mockMvc.perform(get("/api/admin/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.newAccountCredentialHours").value(72))
+                .andExpect(jsonPath("$.passwordResetCredentialHours").value(24));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAdmin_whenAskingForAValidityOutsideTheAllowedRange_thenItIsRefusedByTheField()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club")
+                                .replace("\"newAccountCredentialHours\": 168",
+                                        "\"newAccountCredentialHours\": 0"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("newAccountCredentialHours"));
+    }
+
     private static String configJson(String clubName) {
         return """
                 {"clubName": "%s", "primaryColor": "#004f2d", "accentColor": "#c8a415",
                  "logoUrl": "/branding/logo.svg", "imprintUrl": "https://example-tennis-club.example/imprint",
-                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30}
+                 "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
                 """.formatted(clubName);
     }
 }

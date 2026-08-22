@@ -35,7 +35,7 @@ class ConfigServiceTest {
 
         // when
         service.update("Example Tennis Club", "#004f2d", "#c8a415", null, null,
-                "en", 45, "Pacific/Auckland");
+                "en", 45, "Pacific/Auckland", 168, 24);
 
         // then
         var slotDuration = org.mockito.ArgumentCaptor.forClass(BookingSlotDuration.class);

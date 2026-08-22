@@ -40,6 +40,9 @@ services:
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: admin
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_UAT_ADMIN_PASSWORD:-}
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
+      COURTSIDE_MAIL_RELAY_HOST: mail.invalid
+      COURTSIDE_MAIL_FROM: no-reply@example.org
+      COURTSIDE_MAIL_REPLY_TO: board@example.org
     networks:
       - backend
       - frontend

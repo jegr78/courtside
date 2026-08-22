@@ -45,6 +45,12 @@ public class ClubConfiguration {
     @Column(name = "time_zone", nullable = false)
     private String timeZone;
 
+    @Column(name = "new_account_credential_hours", nullable = false)
+    private int newAccountCredentialHours;
+
+    @Column(name = "password_reset_credential_hours", nullable = false)
+    private int passwordResetCredentialHours;
+
     public void changeTo(String clubName, String primaryColor, String accentColor,
                          String logoUrl, String imprintUrl, String defaultLocale, int slotMinutes,
                          String timeZone) {
@@ -56,5 +62,10 @@ public class ClubConfiguration {
         this.defaultLocale = defaultLocale;
         this.slotMinutes = slotMinutes;
         this.timeZone = timeZone;
+    }
+
+    public void changeCredentialValidity(int newAccountHours, int passwordResetHours) {
+        this.newAccountCredentialHours = newAccountHours;
+        this.passwordResetCredentialHours = passwordResetHours;
     }
 }

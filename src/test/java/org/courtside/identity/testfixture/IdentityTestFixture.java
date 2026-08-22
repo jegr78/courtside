@@ -6,6 +6,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,6 +23,7 @@ public class IdentityTestFixture {
     private final PersonRepository persons;
     private final UserAccountRepository accounts;
     private final UserDetailsService userDetails;
+    private final PasswordEncoder passwordEncoder;
 
     public void signInAs(String username) {
         UserDetails details = userDetails.loadUserByUsername(username);
@@ -49,6 +51,16 @@ public class IdentityTestFixture {
     public UUID createAccount(UUID personId, String username, String passwordHash, Set<Role> roles) {
         Person person = persons.findById(personId).orElseThrow();
         return accounts.save(new UserAccount(person, username, passwordHash, roles)).getId();
+    }
+
+    // What a person holds after a board member adds them and before the message reaches them: a hash
+    // of a value nobody kept, and no expiry, which is what says nothing has been issued yet.
+    public UUID createAccountAwaitingCredentials(UUID personId, String username, Set<Role> roles) {
+        Person person = persons.findById(personId).orElseThrow();
+        UserAccount account = UserAccount.awaitingCredentials(person, username,
+                "synthetic-test-placeholder-hash", roles);
+        account.enable();
+        return accounts.save(account).getId();
     }
 
     public UUID createEnabledAccount(UUID personId, String username, Set<Role> roles) {
@@ -110,6 +122,14 @@ public class IdentityTestFixture {
 
     public boolean isPasswordChangeRequired(String username) {
         return accounts.findByUsername(username).orElseThrow().isPasswordChangeRequired();
+    }
+
+    public boolean credentialSignsIn(UUID accountId, String credential) {
+        return passwordEncoder.matches(credential, storedCredentialHash(accountId));
+    }
+
+    public String storedCredentialHash(UUID accountId) {
+        return accounts.findById(accountId).orElseThrow().getPasswordHash();
     }
 
     public UUID personIdForUsername(String username) {

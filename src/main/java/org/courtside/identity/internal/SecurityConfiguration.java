@@ -72,6 +72,11 @@ public class SecurityConfiguration {
                                         && !hasAuthority(authentication.get(),
                                         CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
                         .requestMatchers("/api/public/**", "/actuator/health").permitAll()
+                        .requestMatchers("/actuator/health/**").access((authentication, context) ->
+                                new AuthorizationDecision(hasAuthority(authentication.get(),
+                                        "ROLE_" + Role.ADMIN.name())
+                                        && !hasAuthority(authentication.get(),
+                                        CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
                         .requestMatchers(HttpMethod.GET, "/api/bookings").permitAll()
                         .requestMatchers("/actuator/prometheus").access((authentication, context) ->
                                 new AuthorizationDecision(performanceTelemetryEnabled))

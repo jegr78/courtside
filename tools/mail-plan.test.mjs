@@ -100,6 +100,50 @@ test("given the base plan, when it starts submission, then compose keeps that po
     + "puts an authenticating SMTP port on the host for no one who needs it");
 });
 
+test("given the mail server's admin interface, when compose publishes it, then it stays on loopback", () => {
+  // given
+  const mail = compose.slice(compose.indexOf("\n  mail:"), compose.indexOf("\n  mail-plan:"));
+
+  // when
+  const published = [...mail.matchAll(/^ {6}- "(?<bind>.*)"$/gm)].map((match) => match.groups.bind);
+
+  // then
+  assert.ok(published.some((bind) => bind.endsWith(":8080")),
+    "the plan starts an admin listener the club has no way to reach");
+  for (const bind of published.filter((entry) => entry.endsWith(":8080"))) {
+    assert.match(bind, /^127\.0\.0\.1:/,
+      `${bind} puts full control of the mail server on a public address; it belongs behind an SSH `
+      + "tunnel and nowhere else");
+  }
+});
+
+test("given the base plan, when a service takes a password, then it refuses to take it in the clear", () => {
+  // given
+  const settings = plan("base").find((operation) => operation.object === "SystemSettings");
+
+  // when
+  const cleartext = Object.entries(settings.value.services)
+    .filter(([, service]) => service.cleartext !== false)
+    .map(([name]) => name);
+
+  // then
+  assert.deepEqual(cleartext, [],
+    "the instance authenticates to this server, and a service that accepts a credential before "
+    + "TLS lets anyone on the path read it");
+});
+
+test("given the shipped setup check, when it runs, then it still asks this server to relay", () => {
+  // given
+  const check = readFileSync(fileURLToPath(new URL("../deploy/mail-check.sh", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(check, /RCPT TO:<probe@%s>/,
+    "port 25 is published, so the one thing standing between this instance and an open relay is "
+    + "that it refuses a foreign recipient. Nothing else proves it.");
+  assert.match(check, /accepts unauthenticated mail for/,
+    "the relay probe no longer reports what it found");
+});
+
 function render(name, environment) {
   const target = mkdtempSync(join(tmpdir(), "courtside-mail-plan-"));
   try {
@@ -112,6 +156,7 @@ function render(name, environment) {
         COURTSIDE_MAIL_HOSTNAME: "mail.courts.example.org",
         COURTSIDE_MAIL_DOMAIN: "courts.example.org",
         COURTSIDE_MAIL_ADMIN_PASSWORD: "unused",
+        COURTSIDE_MAIL_PASSWORD: "unused",
         ...environment
       }
     });
@@ -124,9 +169,24 @@ function render(name, environment) {
 function renderedSecret(password) {
   const rendered = render("base", { COURTSIDE_MAIL_ADMIN_PASSWORD: password });
   const account = rendered.split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line))
-    .find((operation) => operation.object === "Account");
+    .find((operation) => operation.value?.["account-administrator"]);
   return account.value["account-administrator"].credentials["0"].secret;
 }
+
+test("given the base plan, when the application submits, then it does so as no administrator", () => {
+  // given
+  const accounts = plan("base").filter((operation) => operation.object === "Account")
+    .flatMap((operation) => Object.values(operation.value));
+
+  // when
+  const application = accounts.find((account) => account.name === "{{appuser}}");
+
+  // then
+  assert.ok(application, "the plan creates no account for the instance to authenticate as");
+  assert.notDeepEqual(application.roles, { "@type": "Admin" },
+    "the instance would own the mail server the moment anything owns the instance; it needs to "
+    + "submit and nothing else");
+});
 
 test("given a password holding an ampersand, when the base plan is rendered, then the account carries it verbatim", () => {
   // given
@@ -156,4 +216,27 @@ test("given a value holding a line break, when a plan is rendered, then renderin
   // when / then
   assert.throws(() => render("base", { COURTSIDE_MAIL_ADMIN_PASSWORD: "two\nlines" }),
     /line break/);
+});
+
+test("given the account the app and the plan share, when the plan service is declared, then it is given the same values", () => {
+  // given
+  const script = readFileSync(new URL("../deploy/mail/render.sh", import.meta.url), "utf8");
+  const compose = readFileSync(new URL("../deploy/compose.yaml", import.meta.url), "utf8");
+  const section = (name, next) =>
+    compose.slice(compose.indexOf(`\n  ${name}:`), compose.indexOf(`\n  ${next}:`));
+  const declared = (text) => new Set([...text.matchAll(/^\s{6}([A-Z_]+):/gm)].map(([, name]) => name));
+  const referenced = (text) => new Set([...text.matchAll(/\$\{(COURTSIDE_MAIL_[A-Z_]+)/g)]
+    .map(([, name]) => name));
+  const rendererReads = referenced(script);
+  const appUses = referenced(section("app", "mail"));
+  const planIsGiven = declared(section("mail-plan", "mail-bootstrap"));
+
+  // when
+  const shared = [...rendererReads].filter((name) => appUses.has(name)).toSorted();
+
+  // then
+  assert.deepEqual(shared.filter((name) => !planIsGiven.has(name)), [],
+    "the app authenticates against the account the plan creates. A value the app reads from .env "
+    + "but the plan service is never given makes the two disagree, and the sender account the "
+    + "bootstrap creates is not the one the application signs in as.");
 });

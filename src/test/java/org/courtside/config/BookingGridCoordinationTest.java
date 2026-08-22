@@ -72,7 +72,7 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> config.update(
                 "Example Tennis Club", "#b85c38", "#d7e24b", null, null, "de", 7,
-                "Europe/Berlin"))
+                "Europe/Berlin", 168, 24))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("five-minute steps");
     }

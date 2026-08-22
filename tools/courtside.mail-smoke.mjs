@@ -16,6 +16,7 @@ const domain = "courts.example.org";
 const hostname = `mail.${domain}`;
 const setupPassword = randomBytes(18).toString("base64url");
 const adminPassword = randomBytes(18).toString("base64url");
+const applicationPassword = randomBytes(18).toString("base64url");
 const runtime = mkdtempSync(join(tmpdir(), "courtside-mail-smoke-"));
 
 function openssl(args) {
@@ -59,6 +60,7 @@ function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure 
       COURTSIDE_MAIL_HOSTNAME: hostname,
       COURTSIDE_MAIL_DOMAIN: domain,
       COURTSIDE_MAIL_ADMIN_PASSWORD: adminPassword,
+      COURTSIDE_MAIL_PASSWORD: applicationPassword,
       COURTSIDE_MAIL_SETUP_PASSWORD: setupPassword,
       COURTSIDE_MAIL_RECOVERY_ADMIN: recoveryAdmin,
       COURTSIDE_MAIL_RUNTIME_PLAN: runtime
@@ -177,7 +179,9 @@ async function main() {
 
     const submission = publishedPort("mail", 587);
     const sink = publishedPort("sink", 8025);
-    const sender = `postmaster@${domain}`;
+    // The account the shipped plan gives the instance, not the mail administrator's: what a club
+    // runs has to let the application in as itself.
+    const sender = `courtside@${domain}`;
     // A member is somewhere else entirely, so the message leaves through the relay route
     // rather than being filed into a local mailbox.
     const recipient = "jane.doe@example.org";
@@ -188,8 +192,8 @@ async function main() {
       return true;
     });
 
-    console.log("Submitting a message the way the application will");
-    await submit(submission, sender, recipient, adminPassword, authority);
+    console.log("Submitting as the instance, with the account the shipped plan gave it");
+    await submit(submission, sender, recipient, applicationPassword, authority);
 
     await until("the message to arrive in the sink", async () => {
       const response = await fetch(`http://127.0.0.1:${sink}/api/v1/messages`);
