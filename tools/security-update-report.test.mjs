@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { rmSync, writeFileSync } from "node:fs";
-import { runtimeComparisonRequired, securityRuntimeFiles, securityUpdateReport, semanticChanges,
+import { runtimeComparisonRequired, securityRuntimeFiles, securityRuntimeIdentity,
+  securityUpdateReport, semanticChanges,
   semanticJsonChanges } from "./security-update-report.mjs";
 
 test("given a proposed security-tool update, when comparing it with the base, then versions policies and schemas are visible", () => {
@@ -73,4 +74,44 @@ test("given the assessment runtime, when identifying a candidate, then execution
     "tools/security-request-gateway.py", "deploy/compose.security.yaml", "frontend/package-lock.json",
     "pom.xml", "security/run-contract.json", "security/resource-abuse.js"
   ]) assert.equal(files.has(path), true, path);
+});
+
+test("given a change outside what the two runs vary, when deciding, then no paired assessment is required", () => {
+  // given — the compose file and the Caddyfile describe the target both runs share
+  const only = (path, previous, current) => ({
+    previous: (candidate) => candidate === path ? previous : "same",
+    current: (candidate) => candidate === path ? current : "same"
+  });
+
+  // when / then
+  for (const path of ["deploy/compose.security.yaml", "deploy/Caddyfile.security"]) {
+    assert.equal(runtimeComparisonRequired(
+      securityRuntimeIdentity("HEAD", only(path, "before", "after"))), false,
+    `${path} is the same on both sides by construction, so it cannot change what either run sees`);
+  }
+});
+
+test("given a changed assessment file, when deciding, then a paired assessment is required", () => {
+  // given
+  const contract = {
+    previous: (path) => path === "security/run-contract.json" ? "before" : "same",
+    current: (path) => path === "security/run-contract.json" ? "after" : "same"
+  };
+
+  // when / then
+  assert.equal(runtimeComparisonRequired(securityRuntimeIdentity("HEAD", contract)), true);
+});
+
+test("given the pinned node version, when it moves, then a paired assessment is required", () => {
+  // given
+  const pom = (version) => (path) =>
+    path === "pom.xml" ? `<node.version>${version}</node.version>` : "same";
+
+  // when / then
+  assert.equal(runtimeComparisonRequired(securityRuntimeIdentity("HEAD",
+    { previous: pom("v24.0.0"), current: pom("v26.5.1") })), true,
+  "the tools run on the node the build pins, so moving it can change what they see");
+  assert.equal(runtimeComparisonRequired(securityRuntimeIdentity("HEAD",
+    { previous: pom("v26.5.1"), current: pom("v26.5.1") })), false,
+  "and a pom.xml change that leaves that version alone must not spend ninety minutes");
 });
