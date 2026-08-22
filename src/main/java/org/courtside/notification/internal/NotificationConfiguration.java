@@ -17,17 +17,17 @@ class NotificationConfiguration {
     // and what is validated at startup are the same six values and not two overlapping sets.
     @Bean
     JavaMailSender courtsideMailSender(MailProperties properties) {
+        MailSettings.verify(properties);
         JavaMailSenderImpl sender = new JavaMailSenderImpl();
         sender.setHost(properties.host());
         sender.setPort(properties.port());
         sender.setDefaultEncoding(StandardCharsets.UTF_8.name());
-        if (properties.username() != null && !properties.username().isBlank()) {
+        if (MailSettings.isSet(properties.username())) {
             sender.setUsername(properties.username());
             sender.setPassword(properties.password());
         }
         Properties mail = sender.getJavaMailProperties();
-        mail.put("mail.smtp.auth", String.valueOf(properties.username() != null
-                && !properties.username().isBlank()));
+        mail.put("mail.smtp.auth", String.valueOf(MailSettings.isSet(properties.username())));
         mail.put("mail.smtp.starttls.enable", "true");
         mail.put("mail.smtp.timeout", "10000");
         mail.put("mail.smtp.connectiontimeout", "10000");
