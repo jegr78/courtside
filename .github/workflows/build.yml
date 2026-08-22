@@ -51,7 +51,7 @@ jobs:
         name: Build and qualify one comparison target
         run: |
           ./mvnw -B verify
-          node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+          frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
       - if: steps.runtime.outputs.changed == 'true'
         name: Pull pinned assessment images
         run: node tools/security-image-inventory.mjs active | xargs -n1 docker pull
@@ -82,8 +82,8 @@ jobs:
               --qualification "$GITHUB_WORKSPACE/build/uat-smoke/qualification.json" \
               --authorize "authorize-active-$BASE_RUN_ID" || true
           )
-          node tools/courtside.mjs security "$CANDIDATE_RUN_ID" "$IMAGE_DIGEST"
-          node tools/courtside.mjs security-run "$CANDIDATE_RUN_ID" active \
+          frontend/node/node tools/courtside.mjs security "$CANDIDATE_RUN_ID" "$IMAGE_DIGEST"
+          frontend/node/node tools/courtside.mjs security-run "$CANDIDATE_RUN_ID" active \
             --qualification build/uat-smoke/qualification.json \
             --authorize "authorize-active-$CANDIDATE_RUN_ID" || true
       - if: steps.runtime.outputs.changed == 'true'
@@ -126,7 +126,7 @@ jobs:
             cd "$BASE_ROOT"
             frontend/node/node tools/courtside.mjs security-cleanup "$BASE_RUN_ID"
           ) || BASE_CLEANUP=$?
-          node tools/courtside.mjs security-cleanup "$CANDIDATE_RUN_ID" || CANDIDATE_CLEANUP=$?
+          frontend/node/node tools/courtside.mjs security-cleanup "$CANDIDATE_RUN_ID" || CANDIDATE_CLEANUP=$?
           [[ "$BASE_CLEANUP" = 0 && "$CANDIDATE_CLEANUP" = 0 ]]
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

@@ -66,6 +66,22 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
+// The runner's own node is older than courtside.mjs requires, and the failure surfaces minutes
+// into a job as a comparison that never ran rather than as a missing tool.
+test("given a workflow step reaching the CLI, when it runs node, then it is the version the build pins", () => {
+  // when
+  const unpinned = build.split("\n")
+    .map((line, index) => ({ line: line.trim(), number: index + 1 }))
+    .filter(({ line }) => /(?:^|[|(\s])node\s+(?:"?\$\w+"?\/)?tools\/courtside(?:\.|-)/.test(line)
+      && !/frontend\/node\/node/.test(line));
+
+  // then
+  assert.deepEqual(unpinned.map(({ number, line }) => `${number}: ${line}`), [],
+    "courtside.mjs refuses a node older than 24 and the runner ships one. Every step that "
+    + "reaches it — directly or through a script that spawns it — uses frontend/node/node, "
+    + "which the maven build downloads at the version pom.xml pins.");
+});
+
 test("given a release candidate, when publishing it, then its exact digest passes the active gate first", () => {
   // when / then
   assert.match(release, /\n  active-security:\n    needs: \[image, qualify\]/);
