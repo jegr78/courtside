@@ -50,7 +50,7 @@ services:
       retries: 30
 
   api-ui:
-    image: swaggerapi/swagger-ui:v5.32.13@sha256:8f9f47436478cd8520191148a8afb7f934826d95bead1ae00898a0aa44dcdf41
+    image: swaggerapi/swagger-ui:v5.32.14@sha256:3d93169968848d371a6a56ca1ab18b47a8906ba461b8eba0688866354f5431d5
     user: "101:101"
     security_opt:
       - no-new-privileges:true
