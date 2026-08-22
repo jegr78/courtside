@@ -52,7 +52,7 @@ function runFixture(root, name, overrides = {}) {
     profile: "active",
     target: "https://127.0.0.1:8443",
     environment: "SECURITY",
-    application: { imageDigest: fingerprint("a"), commit: "b".repeat(40) },
+    application: { imageDigest: fingerprint("a"), commit: "2".repeat(40) },
     targetFingerprint: fingerprint("c"),
     seedFingerprint: fingerprint("d"),
     instanceFingerprint: fingerprint("e"),
@@ -76,14 +76,12 @@ function runFixture(root, name, overrides = {}) {
   return { manifest: manifestPath, evidence };
 }
 
-const baseApplication = { imageDigest: fingerprint("a"), commit: "2".repeat(40) };
-
 test("given paired immutable runs, when comparing a tool update, then new findings and provenance remain bound", () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
   const baseRoot = runtimeRoot(root, "base-runtime");
   const candidateRoot = runtimeRoot(root, "candidate-runtime");
-  const base = runFixture(root, "base", { application: baseApplication });
+  const base = runFixture(root, "base");
   const candidate = runFixture(root, "candidate");
   writeFileSync(join(base.evidence, "authenticated-zap.json"),
     JSON.stringify({ outcome: "incomplete", candidates: [{ fingerprint: fingerprint("f") }] }));
@@ -104,27 +102,6 @@ test("given paired immutable runs, when comparing a tool update, then new findin
   assert.deepEqual(comparison.resolvedFindings, [fingerprint("f")]);
   assert.equal(comparison.baseRef, "2".repeat(40));
   assert.match(comparison.candidate.runtimeDigest, /^[a-f0-9]{64}$/);
-  // Each side ran its own revision, and the report says which — the findings are read beside it
-  assert.equal(comparison.application.commit, "b".repeat(40));
-  assert.equal(comparison.baseApplication.commit, "2".repeat(40));
-});
-
-test("given a base run from a revision that is not the base, when comparing, then the report fails closed", () => {
-  // given
-  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
-  const baseRoot = runtimeRoot(root, "base-runtime");
-  const candidateRoot = runtimeRoot(root, "candidate-runtime");
-  const base = runFixture(root, "base");
-  const candidate = runFixture(root, "candidate");
-
-  // when / then — the base image has to prove it carries the protected revision
-  assert.throws(() => compareSecurityToolRuns({
-    baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
-    baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
-    candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
-    candidateRef: "b".repeat(40),
-    candidateContract: contractPath, candidateCatalog: catalogPath
-  }), /differs from the base revision/);
 });
 
 test("given runs for different fixtures or incomplete tool evidence, when comparing them, then the report fails closed", () => {
@@ -132,7 +109,7 @@ test("given runs for different fixtures or incomplete tool evidence, when compar
   const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
   const baseRoot = runtimeRoot(root, "base-runtime");
   const candidateRoot = runtimeRoot(root, "candidate-runtime");
-  const base = runFixture(root, "base", { application: baseApplication });
+  const base = runFixture(root, "base");
   const otherFixture = runFixture(root, "other", { seedFingerprint: fingerprint("8") });
   const missingTool = runFixture(root, "missing", { toolResults: [] });
   const wrongTool = runFixture(root, "wrong", {
@@ -171,6 +148,25 @@ test("given runs for different fixtures or incomplete tool evidence, when compar
   }));
 });
 
+test("given a run that assessed another revision's application, when comparing, then the report fails closed", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const baseRoot = runtimeRoot(root, "base-runtime");
+  const candidateRoot = runtimeRoot(root, "candidate-runtime");
+  const elsewhere = { imageDigest: fingerprint("a"), commit: "7".repeat(40) };
+  const base = runFixture(root, "base", { application: elsewhere });
+  const candidate = runFixture(root, "candidate", { application: elsewhere });
+
+  // when / then — the constant both runs share has to be the protected revision, not just equal
+  assert.throws(() => compareSecurityToolRuns({
+    baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
+    baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
+    candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
+    candidateRef: "b".repeat(40),
+    candidateContract: contractPath, candidateCatalog: catalogPath
+  }), /application of the base revision/);
+});
+
 test("given a finding difference the acknowledgement does not name, when comparing, then it is reported", () => {
   // given
   const comparison = { newFindings: [fingerprint("9")], resolvedFindings: [fingerprint("f")] };
@@ -184,22 +180,16 @@ test("given a finding difference the acknowledgement does not name, when compari
     { newFindings: [], resolvedFindings: [] }, { acknowledged: [] }), []);
 });
 
-test("given a comparison, when summarising it, then both revisions and both differences are named", () => {
-  // given
-  const comparison = {
-    baseRef: "2".repeat(40), candidateRef: "b".repeat(40),
-    application: { imageDigest: fingerprint("a"), commit: "b".repeat(40) },
-    baseApplication: { imageDigest: fingerprint("a"), commit: "2".repeat(40) },
-    newFindings: [fingerprint("9")], resolvedFindings: []
-  };
-
+test("given a comparison, when summarising it, then the constant and both toolchains are named", () => {
   // when
-  const summary = comparisonSummary(comparison);
+  const summary = comparisonSummary({
+    baseRef: "2".repeat(40), candidateRef: "b".repeat(40),
+    newFindings: [fingerprint("9")], resolvedFindings: []
+  });
 
   // then — the artifact nobody downloads is why this exists
-  assert.match(summary, /New findings/);
-  assert.match(summary, new RegExp(fingerprint("9")));
-  assert.match(summary, /Resolved findings.*none/s);
-  assert.match(summary, new RegExp("2".repeat(40)));
+  assert.match(summary, new RegExp(`assessed the application of .${"2".repeat(40)}`));
   assert.match(summary, new RegExp("b".repeat(40)));
+  assert.match(summary, new RegExp(`New findings: .${fingerprint("9")}`));
+  assert.match(summary, /Resolved findings: none/);
 });

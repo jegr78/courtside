@@ -89,12 +89,14 @@ The required pull-request build runs contract, schema, safety and secret checks 
 assessment traffic. It retains a comparison of security contracts, policies, report schemas and
 pinned tool versions against the pull-request base. The comparison includes the images and adapters
 that actually execute. When those bytes change, the required build runs the protected-base and
-candidate assessment runtimes, each against the image its own revision builds and qualifies, and
-against the same synthetic fixture. Each side reads its own deployment description, so a pull
-request cannot reach the run that exists to be independent of it, and a setting the candidate makes
-mandatory cannot stop the protected base from starting. The comparator refuses a run whose image
-does not carry the revision that side stands for, and records both application identities so a
-finding difference is read beside whatever else moved. The workflow
+candidate assessment runtimes against one target: the image the **base** revision builds and
+qualifies, and the same synthetic fixture. The application is the constant, which is what makes a
+finding difference attributable to the tools rather than to anything else that moved, and the base
+environment can always start the base image — a setting the candidate makes mandatory cannot stop
+the run. The comparator refuses a pair whose application is not the base revision's. Each side
+reads its own deployment description; the base worktree is created and its image built before any
+candidate code runs, though both still share the workspace's git directory, so the independence of
+the base run rests on that ordering rather than on isolation. The workflow
 uses the comparator from the protected base revision after its initial bootstrap. It computes both
 runtime digests itself rather than trusting run input. The introductory comparator change requires
 the normal whole-branch review because no earlier trusted comparator exists. The workflow, not a

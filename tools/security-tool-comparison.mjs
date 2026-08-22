@@ -167,15 +167,15 @@ export function compareSecurityToolRuns(input) {
   if (!["active", "destructive"].includes(base.identity.profile) || base.identity.profile !== candidate.identity.profile) {
     fail("paired runs must use the same active or destructive profile");
   }
-  if (base.identity.seedFingerprint !== candidate.identity.seedFingerprint) {
-    fail("paired runs must assess the same synthetic fixture");
+  if (JSON.stringify(base.identity.application) !== JSON.stringify(candidate.identity.application)
+      || base.identity.seedFingerprint !== candidate.identity.seedFingerprint) {
+    fail("paired runs must assess the same application and synthetic fixture");
   }
-  // Each side runs the application of its own revision, so each side's image has to prove it.
-  if (candidate.identity.application.commit !== input.candidateRef) {
-    fail("the assessed application commit differs from the candidate revision");
-  }
-  if (base.identity.application.commit !== input.baseRef) {
-    fail("the assessed application commit differs from the base revision");
+  // Both runs assess the base revision's application on purpose: it is the constant that makes a
+  // finding difference attributable to the tools, and the base environment can always start it.
+  if (base.identity.application.commit !== input.baseRef
+      || candidate.identity.application.commit !== input.baseRef) {
+    fail("both runs must assess the application of the base revision");
   }
   if (candidate.result.outcome === "failed") fail("the candidate runtime produced a failed assessment");
   const comparison = {
@@ -184,8 +184,7 @@ export function compareSecurityToolRuns(input) {
     baseRef: input.baseRef,
     candidateRef: input.candidateRef,
     profile: base.identity.profile,
-    application: candidate.identity.application,
-    baseApplication: base.identity.application,
+    application: base.identity.application,
     seedFingerprint: base.identity.seedFingerprint,
     base: base.result,
     candidate: candidate.result,
@@ -210,8 +209,8 @@ export function comparisonSummary(comparison) {
   return [
     "## Security tool update comparison",
     "",
-    `Base \`${comparison.baseRef}\` assessed application \`${comparison.baseApplication.commit}\`.`,
-    `Candidate \`${comparison.candidateRef}\` assessed application \`${comparison.application.commit}\`.`,
+    `Both runs assessed the application of \`${comparison.baseRef}\`.`,
+    `The tools came from \`${comparison.baseRef}\` and from \`${comparison.candidateRef}\`.`,
     "",
     `New findings: ${named(comparison.newFindings)}`,
     `Resolved findings: ${named(comparison.resolvedFindings)}`,

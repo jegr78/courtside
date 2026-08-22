@@ -66,24 +66,38 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
-// One image on both sides meant one side always ran an environment that was not its own: the
-// candidate's image with the base's compose file cannot start once a setting becomes mandatory,
-// and taking the base's compose file from the candidate would hand a pull request the mounts and
-// scanner bounds of the run that exists to be independent of it.
-test("given a paired comparison, when each side is prepared, then it builds and qualifies its own target", () => {
+// A finding difference is only attributable to the tools while the application is the constant, so
+// both runs assess the base revision's image. The base environment can always start it, which is
+// what a candidate image took away: a setting the pull request makes mandatory stopped it dead.
+test("given a paired comparison, when both sides run, then they assess the base revision's target", () => {
   // given
   const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
 
   // when / then
-  for (const pattern of [/CANDIDATE_IMAGE=/, /BASE_IMAGE=/,
-    /security "\$BASE_RUN_ID" "\$BASE_IMAGE"/, /security "\$CANDIDATE_RUN_ID" "\$CANDIDATE_IMAGE"/,
-    /--qualification "\$BASE_ROOT\/build\/uat-smoke\/qualification\.json"/]) {
-    assert.match(comparison, pattern);
-  }
+  assert.match(comparison, /BASE_IMAGE=\$\(docker image inspect courtside:uat-local/);
+  assert.match(comparison, /security "\$BASE_RUN_ID" "\$BASE_IMAGE"/);
+  assert.match(comparison, /security "\$CANDIDATE_RUN_ID" "\$BASE_IMAGE"/);
+  assert.equal(comparison.match(/--qualification "\$BASE_ROOT\/build\/uat-smoke/g)?.length, 2);
   assert.doesNotMatch(comparison, /cp deploy\/compose\.security\.yaml/,
     "the base run reads its own compose file. It declares the mounts that supply the assessment "
     + "code and the bounds the scanners keep, so a copy from the candidate hands a pull request "
     + "the run that exists to be independent of it.");
+});
+
+// The base worktree comes out of the workspace's own .git, so anything the candidate has already
+// run could have left something behind for its checkout to pick up.
+test("given a protected base, when it is prepared, then no candidate code has run yet", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when
+  const prepared = comparison.indexOf("Prepare the protected-base assessment runtime");
+  const candidateRan = comparison.indexOf("Install candidate assessment dependencies");
+
+  // then
+  assert.ok(prepared > 0 && candidateRan > prepared,
+    "npm ci runs the candidate's lifecycle scripts and mvnw runs its wrapper. Both come after the "
+    + "base worktree exists and after the image both runs assess has been built from it.");
 });
 
 // The report already decides this from the digest of what a paired run varies. A second path list in
