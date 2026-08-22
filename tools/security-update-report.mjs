@@ -82,9 +82,7 @@ function jsonLeaves(value, path = "") {
   return [[path || "/", JSON.stringify(value)]];
 }
 
-function semanticChanges(path, base) {
-  const previous = baseFile(base, path);
-  const current = currentFile(path);
+export function semanticJsonChanges(previous, current) {
   if (previous === null) return { added: current === null ? [] : ["/"], removed: [], modified: [] };
   if (current === null) return { added: [], removed: ["/"], modified: [] };
   const before = new Map(jsonLeaves(JSON.parse(previous)));
@@ -94,6 +92,10 @@ function semanticChanges(path, base) {
     removed: [...before.keys()].filter((key) => !after.has(key)).toSorted(),
     modified: [...after.keys()].filter((key) => before.has(key) && before.get(key) !== after.get(key)).toSorted()
   };
+}
+
+function semanticChanges(path, base) {
+  return semanticJsonChanges(baseFile(base, path), currentFile(path));
 }
 
 export function securityRuntimeIdentity(base) {
