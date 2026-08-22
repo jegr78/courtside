@@ -56,6 +56,9 @@ services:
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: security.bootstrap
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
+      COURTSIDE_MAIL_RELAY_HOST: mail.invalid
+      COURTSIDE_MAIL_FROM: no-reply@example.org
+      COURTSIDE_MAIL_REPLY_TO: board@example.org
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,mappings
     networks:
       - backend

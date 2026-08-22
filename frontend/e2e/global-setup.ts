@@ -341,6 +341,9 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: "bootstrap-admin",
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: "temporary-password",
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "Bootstrap Administrator",
+      COURTSIDE_MAIL_RELAY_HOST: "mail.invalid",
+      COURTSIDE_MAIL_FROM: "no-reply@example.org",
+      COURTSIDE_MAIL_REPLY_TO: "board@example.org",
       SPRING_WEB_RESOURCES_STATIC_LOCATIONS: `file:${staticDirectory}/,classpath:/static/`
     };
     const startApplication = async () => {
