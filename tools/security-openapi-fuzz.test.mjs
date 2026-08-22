@@ -10,6 +10,7 @@ import {
   openApiFuzzPolicy,
   openApiFuzzPolicyDigest,
   openApiSpecificationDigest,
+  runOpenApiMutationCases,
   runOpenApiFuzzAssessment,
   runtimeOperations,
   undocumentedRuntimeRoutes
@@ -29,9 +30,9 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 89);
   assert.equal(inventory.find(({ operationId }) => operationId === "listRoster").modes.join(","),
     "positive,negative");
-  assert.deepEqual(inventory.find(({ operationId }) => operationId === "createCourt").modes, []);
-  assert.match(inventory.find(({ operationId }) => operationId === "createCourt").excludedModes.all,
-    /Generated mutation/);
+  assert.deepEqual(inventory.find(({ operationId }) => operationId === "createCourt").modes, ["negative"]);
+  assert.match(inventory.find(({ operationId }) => operationId === "createCourt").excludedModes.positive,
+    /Valid mutations/);
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "logOut").modes, []);
   assert.match(inventory.find(({ operationId }) => operationId === "logOut").excludedModes.all,
     /Session invalidation/);
@@ -126,10 +127,11 @@ test("given runtime handler mappings, when comparing them with OpenAPI, then und
 test("given repeated minimized failures, when retaining lifecycle evidence, then one candidate owns both requests", async () => {
   // given
   const inventory = buildOpenApiFuzzInventory(api);
+  const generatedInventory = inventory.filter(({ method }) => method === "GET");
   const events = (mode) => [
     { LoadingFinished: { statistic: { operations: { total: inventory.length,
-      selected: inventory.filter(({ modes }) => modes.includes(mode)).length } } } },
-    ...inventory.filter(({ modes }) => modes.includes(mode)).map((entry, index) => {
+      selected: generatedInventory.filter(({ modes }) => modes.includes(mode)).length } } } },
+    ...generatedInventory.filter(({ modes }) => modes.includes(mode)).map((entry) => {
       const failing = entry.operationId === "listRoster" && mode === "negative";
       const cases = failing ? ["one", "two"] : ["one"];
       return { ScenarioFinished: { status: failing ? "failure" : "success", recorder: {
@@ -151,6 +153,10 @@ test("given repeated minimized failures, when retaining lifecycle evidence, then
     problemType: "urn:courtside:error:import-snapshot-unreadable", observation: "typed-upload-rejection",
     outcome: "passed" })).concat(["oversized-cell", "conflicting-reference"].map((id) => ({ id, status: 201,
     observation: "row-level-rejection", outcome: "passed" })));
+  const mutationCases = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"))
+    .map(({ operationId, method, path }) => ({ operationId, method, path, status: 400,
+      problemType: "urn:courtside:error:validation-failed", observation: "invalid-mutation-rejected",
+      outcome: "passed" }));
 
   // when
   const evidence = await runOpenApiFuzzAssessment({ profile: "active", environment: "SECURITY",
@@ -162,6 +168,7 @@ test("given repeated minimized failures, when retaining lifecycle evidence, then
     runFuzzer: async () => ({ runtimeHardened: true, requestCount: 100,
       specificationDigest: openApiSpecificationDigest(),
       events: { positive: events("positive"), negative: events("negative") }, inputCases, importCases,
+      mutationCases,
       observedRoutes: inventory.map(({ method, path }) => ({ method, pathTemplate: path })),
       stateBefore: fingerprint, stateAfter: fingerprint, generatedDataMegabytes: 1 })
   });
@@ -170,4 +177,26 @@ test("given repeated minimized failures, when retaining lifecycle evidence, then
   assert.equal(evidence.counterexamples.length, 2);
   assert.equal(evidence.candidates.length, 1);
   assert.equal(evidence.candidates[0].evidence.length, 2);
+});
+
+test("given every state-changing operation, when building negative probes, then each is rejected", async () => {
+  // given
+  const responses = [];
+  const fixture = { client: {} };
+
+  // when
+  const result = await runOpenApiMutationCases({ target: "https://127.0.0.1:9443" }, fixture, {
+    ca: "certificate", timeoutMilliseconds: 1_000,
+    request: async (probe) => {
+      responses.push(probe);
+      return { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    }
+  });
+
+  // then
+  assert.ok(result.cases.length > 30);
+  assert.equal(responses.length, result.cases.length);
+  assert.equal(responses.find(({ path }) => path === "/api/bookings")?.headers["Idempotency-Key"],
+    "security-invalid");
+  assert.equal(result.cases.every(({ outcome }) => outcome === "passed"), true);
 });

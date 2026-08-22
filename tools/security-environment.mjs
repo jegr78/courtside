@@ -565,6 +565,7 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
     await runMode("negative");
     const importResult = await limits.runImportCases(fixture);
     const inputResult = await limits.runInputCases(fixture);
+    const mutationResult = await limits.runMutationCases(fixture);
     const stateAfter = await limits.captureState();
     const metrics = await scannerGatewayMetrics(gateway, command);
     const scannerBytes = Number((await command(["exec", scanner, "sh", "-c",
@@ -572,15 +573,18 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
     if (!Number.isSafeInteger(scannerBytes) || scannerBytes < 0) {
       throw new Error("Scanner writable-data metrics are invalid");
     }
-    const requestCount = metrics.requests + fixture.requestCount + importResult.requestCount + inputResult.requestCount;
-    if (fixture.requestCount + importResult.requestCount + inputResult.requestCount > limits.policy.nativeRequestReserve
+    const requestCount = metrics.requests + fixture.requestCount + importResult.requestCount + inputResult.requestCount
+      + mutationResult.requestCount;
+    if (fixture.requestCount + importResult.requestCount + inputResult.requestCount + mutationResult.requestCount
+        > limits.policy.nativeRequestReserve
         || requestCount > limits.maxRequests) throw new Error("The OpenAPI fuzz request budget was exceeded");
     return { events, importCases: importResult.cases, inputCases: inputResult.cases,
+      mutationCases: mutationResult.cases,
       observedRoutes: fixture.observedRoutes,
       stateBefore, stateAfter, requestCount, runtimeHardened,
       specificationDigest: limits.specificationDigest,
       generatedDataMegabytes: (generatedBytes + metrics.requestBytes + scannerBytes
-        + importResult.generatedBytes + inputResult.generatedBytes) / (1024 * 1024) };
+        + importResult.generatedBytes + inputResult.generatedBytes + mutationResult.generatedBytes) / (1024 * 1024) };
   } finally {
     fixture?.close();
     const cleanupFailures = [];

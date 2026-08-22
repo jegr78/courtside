@@ -73,6 +73,26 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnUnknownProperty_whenChangingTheConfig_thenTheRequestIsRejectedWithoutMutation()
+            throws Exception {
+        // given
+        String request = configJson("Example Tennis Club").replace("\"clubName\":",
+                "\"unexpectedRole\": \"ADMIN\", \"clubName\":");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"));
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clubName").value("Courtside"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnAdmin_whenChangingTheConfig_thenThePublicEndpointServesTheNewValues()
             throws Exception {
         // given

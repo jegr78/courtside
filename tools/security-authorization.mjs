@@ -188,13 +188,14 @@ export async function executeObjectAuthorizationChecks(send) {
     }) });
   const rosterAfter = await send("ADMIN", { method: "GET", path: "/api/admin/roster?limit=200", headers: {} });
   const memberAfter = rosterAfter.json?.entries?.find(({ personId }) => personId === member.personId);
-  const assignmentIgnored = massAssignment.status === 200 && rosterAfter.status === 200
+  const assignmentRejected = typedResponse(massAssignment, 400, "urn:courtside:error:validation-failed")
+    && rosterAfter.status === 200
     && memberAfter?.enabled === member.enabled
     && memberAfter?.accountId === member.accountId
     && memberAfter?.membershipTypeId === member.membershipTypeId
     && JSON.stringify(memberAfter?.roles) === JSON.stringify(member.roles);
-  checks.push(objectCheck("mass-assignment", massAssignment, assignmentIgnored,
-    "unbound-account-fields-ignored"));
+  checks.push(objectCheck("mass-assignment", massAssignment, assignmentRejected,
+    "unbound-account-fields-rejected"));
   const bookingsAfter = await send("MEMBER_OWNER", { method: "GET", path: "/api/my/bookings?limit=100", headers: {} });
   checks.push(objectCheck("rejected-attacks-preserve-bookings", bookingsAfter,
     bookingsAfter.status === 200 && bookingState(bookingsAfter.json?.items) === bookingSnapshot,

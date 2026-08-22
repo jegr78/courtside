@@ -26,7 +26,8 @@ import { runPassiveDeploymentAssessment } from "./security-passive-deployment.mj
 import { runAuthorizationAssessment } from "./security-authorization.mjs";
 import { renderAuthenticatedZapPlan, runAuthenticatedZapAssessment } from "./security-authenticated-zap.mjs";
 import {
-  prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment, runOpenApiImportCases, runOpenApiInputCases
+  prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment, runOpenApiImportCases, runOpenApiInputCases,
+  runOpenApiMutationCases
 } from "./security-openapi-fuzz.mjs";
 import { runResourceAbuseAssessment } from "./security-resource-abuse.mjs";
 
@@ -657,6 +658,9 @@ async function execute(options) {
             ca, timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
           }),
           runInputCases: (fixture) => runOpenApiInputCases(candidate, fixture, {
+            ca, timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
+          }),
+          runMutationCases: (fixture) => runOpenApiMutationCases(candidate, fixture, {
             ca, timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
           }),
           captureState: () => securityDomainStateFingerprint(candidate.runId, context.stopFile,

@@ -52,7 +52,9 @@ test("given two members and an administrator, when substituting owned identifier
     calls.push({ actor, probe });
     if (probe.path === "/api/my/bookings?limit=100") return { status: 200, json: bookings };
     if (probe.path === "/api/admin/roster?limit=200" && probe.method === "GET") return { status: 200, json: roster };
-    if (probe.path === `/api/admin/roster/${personId}` && probe.method === "PUT") return { status: 200, json: roster.entries[0] };
+    if (probe.path === `/api/admin/roster/${personId}` && probe.method === "PUT") {
+      return { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    }
     if (actor === "ADMIN") return { status: 200 };
     if (probe.path.includes("00000000-0000-0000-0000-000000000000")) {
       return { status: 404, problemType: "urn:courtside:error:booking-not-found" };

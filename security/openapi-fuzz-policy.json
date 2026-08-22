@@ -32,7 +32,7 @@
     "unsupported_method",
     "allow_header_conformance"
   ],
-  "nativeRequestReserve": 50,
+  "nativeRequestReserve": 80,
   "excludedOperations": {
     "logIn": "Authentication enumeration and rate limiting are covered by CSA-AUTHN-001.",
     "logOut": "Session invalidation is covered by CSA-AUTHN-001 and browser security journeys.",
@@ -40,5 +40,5 @@
     "createImportPreview": "Multipart parser abuse is covered by the curated CSA-IMPORT-001 cases.",
     "executeImportPreview": "Import execution is stateful and remains covered by deterministic import integration tests."
   },
-  "generatedMutationRationale": "Generated mutations cannot guarantee rejection and are excluded so state preservation remains attributable; curated rejected-input cases, packaged journeys and the authorization matrix cover mutations."
+  "positiveMutationRationale": "Valid mutations are covered by packaged journeys and the authorization matrix; generated mutation traffic is restricted to rejected inputs so state preservation remains attributable."
 }
