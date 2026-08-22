@@ -94,8 +94,14 @@ export function semanticJsonChanges(previous, current) {
   };
 }
 
-function semanticChanges(path, base) {
+export function semanticChanges(path, base) {
   return semanticJsonChanges(baseFile(base, path), currentFile(path));
+}
+
+// Whether the paired assessments have to run at all. A branch that touches none of the runtime
+// files answers no, which is why no test may hardwire either answer against the working tree.
+export function runtimeComparisonRequired(identity) {
+  return identity.baseRuntimeDigest !== identity.candidateRuntimeDigest;
 }
 
 export function securityRuntimeIdentity(base) {
@@ -134,7 +140,7 @@ export function securityUpdateReport(base) {
     `Current runtime tools: ${currentVersions}`,
     `Base runtime digest: \`${identity.baseRuntimeDigest}\``,
     `Candidate runtime digest: \`${identity.candidateRuntimeDigest}\``,
-    `Runtime comparison required: ${identity.baseRuntimeDigest === identity.candidateRuntimeDigest ? "no" : "yes"}`,
+    `Runtime comparison required: ${runtimeComparisonRequired(identity) ? "yes" : "no"}`,
     "",
     "| Runtime, policy or report schema | Previous SHA-256 | Current SHA-256 | Changed |",
     "| --- | --- | --- | --- |",

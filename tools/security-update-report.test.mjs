@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { securityRuntimeFiles, securityUpdateReport, semanticJsonChanges }
-  from "./security-update-report.mjs";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { runtimeComparisonRequired, securityRuntimeFiles, securityUpdateReport, semanticChanges,
+  semanticJsonChanges } from "./security-update-report.mjs";
 
 test("given a proposed security-tool update, when comparing it with the base, then versions policies and schemas are visible", () => {
   // when
@@ -14,9 +16,30 @@ test("given a proposed security-tool update, when comparing it with the base, th
   assert.match(report, /security\/assessment-catalog\.json/);
   assert.match(report, /security\/assessment-gate\.schema\.json/);
   assert.match(report, /deploy\/compose\.security\.yaml/);
-  assert.match(report, /Runtime comparison required: yes/);
+  assert.match(report, /Runtime comparison required: (?:yes|no)/);
   assert.match(report, /Previous SHA-256.*Current SHA-256.*Changed/);
   assert.match(report, /Rule and report-schema changes/);
+});
+
+test("given two runtime digests, when they are compared, then only a difference demands a run", () => {
+  // when / then
+  assert.equal(runtimeComparisonRequired({ baseRuntimeDigest: "a", candidateRuntimeDigest: "b" }), true);
+  assert.equal(runtimeComparisonRequired({ baseRuntimeDigest: "a", candidateRuntimeDigest: "a" }), false);
+});
+
+// The first commit predates security/run-contract.json, so a base that lacks a file the working
+// tree has is a fixed fact rather than a property of whichever branch runs this.
+test("given a file the base never had, when it is compared, then it reads as added and not removed", () => {
+  // given
+  const repository = fileURLToPath(new URL("..", import.meta.url));
+  const firstCommit = execFileSync("git", ["rev-list", "--max-parents=0", "HEAD"],
+    { cwd: repository, encoding: "utf8" }).trim();
+
+  // when
+  const changes = semanticChanges("security/run-contract.json", firstCommit);
+
+  // then — swapped arguments would report the club's own rules as deleted
+  assert.deepEqual(changes, { added: ["/"], removed: [], modified: [] });
 });
 
 test("given a changed rule file, when its JSON paths are compared, then each kind of change is named", () => {
