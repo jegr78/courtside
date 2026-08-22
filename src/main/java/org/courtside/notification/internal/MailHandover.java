@@ -5,8 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.function.Consumer;
 
 // The mail server is a neighbour in the same network: if it cannot be reached it is restarting, and
@@ -21,6 +21,7 @@ class MailHandover {
     private static final int GROWTH = 3;
 
     private final TaskScheduler scheduler;
+    private final Clock clock;
 
     void attempt(String messageId, Runnable handover, Consumer<Exception> givenUp) {
         run(messageId, handover, givenUp, 1, FIRST_GAP);
@@ -51,7 +52,7 @@ class MailHandover {
             log.info("Handing over {} failed on attempt {} ({}), retrying in {}", messageId, attempt,
                     diagnosis(failure), gap);
             scheduler.schedule(() -> run(messageId, handover, givenUp, attempt + 1,
-                    gap.multipliedBy(GROWTH)), Instant.now().plus(gap));
+                    gap.multipliedBy(GROWTH)), clock.instant().plus(gap));
         }
     }
 }
