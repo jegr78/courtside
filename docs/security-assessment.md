@@ -101,7 +101,12 @@ the normal whole-branch review because no earlier trusted comparator exists. The
 committed self-attestation, creates the closed comparison record. It binds both commits,
 runtime digests, original manifest digests, image identity, catalog and tool versions, elapsed time
 and normalized finding fingerprints. Missing tools, tests or evidence files, mismatched fixtures and
-a failed candidate assessment fail the pull-request build. An incomplete result remains comparable
+a failed candidate assessment fail the pull-request build. So does a finding the comparison gained
+or lost that `security/tool-update-acknowledgement.json` does not name: the difference is what the
+run exists to produce, so it is written to the job summary and has to be recorded in the pull
+request before the branch passes. The run itself is triggered by the digest of what a paired run
+varies — the assessment's code and contract, the deployment description each side reads, and the
+lockfile the tools resolve against. A dependency bump of the application is not a tool update. An incomplete result remains comparable
 only when every planned tool produced its result and the incompleteness comes from retained finding
 candidates awaiting triage.
 

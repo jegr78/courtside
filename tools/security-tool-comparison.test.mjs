@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { compareSecurityToolRuns } from "./security-tool-comparison.mjs";
+import { compareSecurityToolRuns, comparisonSummary, unacknowledgedFindings } from "./security-tool-comparison.mjs";
 
 const fingerprint = (character) => `sha256:${character.repeat(64)}`;
 const contractPath = new URL("../security/run-contract.json", import.meta.url);
@@ -169,4 +169,37 @@ test("given runs for different fixtures or incomplete tool evidence, when compar
   assert.throws(() => compareSecurityToolRuns({
     ...input, candidateManifest: invalidEvidence.manifest, candidateEvidence: invalidEvidence.evidence
   }));
+});
+
+test("given a finding difference the acknowledgement does not name, when comparing, then it is reported", () => {
+  // given
+  const comparison = { newFindings: [fingerprint("9")], resolvedFindings: [fingerprint("f")] };
+
+  // when / then — a difference is the point of the run, so it has to be seen before it passes
+  assert.deepEqual(unacknowledgedFindings(comparison, { acknowledged: [fingerprint("9")] }),
+    [fingerprint("f")]);
+  assert.deepEqual(unacknowledgedFindings(comparison,
+    { acknowledged: [fingerprint("f"), fingerprint("9")] }), []);
+  assert.deepEqual(unacknowledgedFindings(
+    { newFindings: [], resolvedFindings: [] }, { acknowledged: [] }), []);
+});
+
+test("given a comparison, when summarising it, then both revisions and both differences are named", () => {
+  // given
+  const comparison = {
+    baseRef: "2".repeat(40), candidateRef: "b".repeat(40),
+    application: { imageDigest: fingerprint("a"), commit: "b".repeat(40) },
+    baseApplication: { imageDigest: fingerprint("a"), commit: "2".repeat(40) },
+    newFindings: [fingerprint("9")], resolvedFindings: []
+  };
+
+  // when
+  const summary = comparisonSummary(comparison);
+
+  // then — the artifact nobody downloads is why this exists
+  assert.match(summary, /New findings/);
+  assert.match(summary, new RegExp(fingerprint("9")));
+  assert.match(summary, /Resolved findings.*none/s);
+  assert.match(summary, new RegExp("2".repeat(40)));
+  assert.match(summary, new RegExp("b".repeat(40)));
 });

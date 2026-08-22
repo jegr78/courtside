@@ -25,18 +25,17 @@ jobs:
         name: Identify assessment-runtime changes
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
-          HEAD_REF: ${{ github.event.pull_request.head.sha }}
         run: |
           mkdir -p build/security-update
           node tools/security-update-report.mjs --base "$BASE_REF" \
-            --output build/security-update/source.md
-          if git diff --quiet "$BASE_REF" "$HEAD_REF" -- \
-            pom.xml security deploy/compose.security.yaml deploy/Caddyfile.security \
-            frontend/package.json frontend/package-lock.json tools/courtside.mjs 'tools/security-*'; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
+            --output build/security-update/source.md \
+            --identity-output build/security-update/identity.json
+          REQUIRED=$(node -p "require('./build/security-update/identity.json').comparisonRequired")
+          case "$REQUIRED" in
+            true|false) ;;
+            *) echo "the runtime decision was $REQUIRED, which is neither" >&2; exit 1 ;;
+          esac
+          echo "changed=$REQUIRED" >> "$GITHUB_OUTPUT"
       - if: steps.runtime.outputs.changed == 'true'
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
@@ -117,6 +116,14 @@ jobs:
             --candidate-contract security/run-contract.json \
             --candidate-catalog security/assessment-catalog.json \
             --output build/security-update/runtime.json
+      - if: steps.runtime.outputs.changed == 'true'
+        name: Read what the comparison found
+        run: |
+          frontend/node/node tools/security-tool-acknowledgement.mjs \
+            --comparison build/security-update/runtime.json \
+            --acknowledgement security/tool-update-acknowledgement.json \
+            --summary build/security-update/summary.md
+          cat build/security-update/summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Remove comparison environments
         if: always() && steps.runtime.outputs.changed == 'true'
         env:

@@ -86,6 +86,36 @@ test("given a paired comparison, when each side is prepared, then it builds and 
     + "the run that exists to be independent of it.");
 });
 
+// The report already decides this from the digest of what a paired run varies. A second path list in
+// the workflow is a second definition, and the one that stood here started two stacks for a compose
+// line and for every dependency bump.
+test("given one definition of the assessment runtime, when the job decides whether to run, then it asks for that decision", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when / then
+  assert.match(comparison, /--identity-output build\/security-update\/identity\.json/);
+  assert.match(comparison, /comparisonRequired/);
+  assert.match(comparison, /case "\$REQUIRED" in[\s\S]*?true\|false\)[\s\S]*?exit 1/,
+    "a value that is neither skips every later step while the job still reports success");
+  assert.doesNotMatch(comparison, /git diff --quiet/,
+    "the decision belongs to runtimeComparisonRequired in security-update-report.mjs, which the "
+    + "report already prints. Deriving it a second time here lets the two drift apart.");
+});
+
+// Ninety minutes of paired assessment used to end in an artifact nobody had to open: no step read
+// newFindings, and the job blocked a merge on whether the comparison could be produced at all.
+test("given a produced comparison, when the job ends, then its difference is read and has to be acknowledged", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when / then
+  assert.match(comparison, /security-tool-acknowledgement\.mjs/);
+  assert.match(comparison, /--acknowledgement security\/tool-update-acknowledgement\.json/);
+  assert.match(comparison, /GITHUB_STEP_SUMMARY/,
+    "the difference belongs where a reviewer already looks, not in an artifact they have to fetch");
+});
+
 // The runner's own node is older than courtside.mjs requires, and the failure surfaces minutes
 // into a job as a comparison that never ran rather than as a missing tool.
 test("given a workflow step reaching the CLI, when it runs node, then it is the version the build pins", () => {

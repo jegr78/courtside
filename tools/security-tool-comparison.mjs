@@ -196,6 +196,29 @@ export function compareSecurityToolRuns(input) {
   return comparison;
 }
 
+// The run exists to produce this difference, so it has to be seen before the branch passes. An
+// acknowledgement names the fingerprints somebody looked at, and it is read in the pull request.
+export function unacknowledgedFindings(comparison, acknowledgement) {
+  const acknowledged = new Set(acknowledgement?.acknowledged ?? []);
+  return [...comparison.newFindings, ...comparison.resolvedFindings]
+    .filter((finding) => !acknowledged.has(finding)).toSorted();
+}
+
+export function comparisonSummary(comparison) {
+  const named = (findings) => findings.length === 0
+    ? "none" : findings.map((finding) => `\`${finding}\``).join(", ");
+  return [
+    "## Security tool update comparison",
+    "",
+    `Base \`${comparison.baseRef}\` assessed application \`${comparison.baseApplication.commit}\`.`,
+    `Candidate \`${comparison.candidateRef}\` assessed application \`${comparison.application.commit}\`.`,
+    "",
+    `New findings: ${named(comparison.newFindings)}`,
+    `Resolved findings: ${named(comparison.resolvedFindings)}`,
+    ""
+  ].join("\n");
+}
+
 function parseArguments(args) {
   const values = {};
   for (let index = 0; index < args.length; index += 2) values[args[index].slice(2)] = args[index + 1];
