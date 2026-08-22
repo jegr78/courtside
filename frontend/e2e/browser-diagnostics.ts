@@ -23,7 +23,7 @@ export interface BrowserDiagnostics {
   };
 }
 
-export type DockerDiagnosticCommand = (args: string[]) => Promise<string>;
+export type DockerDiagnosticCommand = (args: string[], signal: AbortSignal) => Promise<string>;
 
 interface DisconnectSource {
   on(event: "disconnected", listener: () => void): unknown;
@@ -31,33 +31,43 @@ interface DisconnectSource {
 }
 
 export function observeBrowserDisconnect(browser: DisconnectSource, diagnose: () => Promise<unknown>): () => Promise<void> {
-  let diagnostics: Promise<unknown> | undefined;
+  let diagnostics: Promise<{ error?: Error }> | undefined;
   const disconnected = () => {
-    diagnostics = diagnose();
+    diagnostics ??= diagnose().then(
+      () => ({}),
+      (error: unknown) => ({ error: error instanceof Error ? error : new Error("Browser diagnosis failed") })
+    );
   };
   browser.on("disconnected", disconnected);
   return async () => {
     browser.removeListener("disconnected", disconnected);
-    await diagnostics;
+    const result = await diagnostics;
+    if (result?.error !== undefined) throw result.error;
   };
 }
 
-const dockerCommand: DockerDiagnosticCommand = async (args) =>
-  (await executeFile("docker", args, { maxBuffer: 1024 * 1024 })).stdout;
+const dockerCommand: DockerDiagnosticCommand = async (args, signal) =>
+  (await executeFile("docker", args, { maxBuffer: 1024 * 1024, signal })).stdout;
 
 function safeLogs(value: string): string {
   return value.slice(-16_384)
     .replaceAll(/((?:https?|wss?):\/\/[^\s/?#]+)[^\s]*/gi, "$1/<redacted>")
-    .replaceAll(/(authorization|cookie|password|csrf)[=:]\s*[^\r\n]+/gi, "$1=<redacted>")
+    .replaceAll(/(["']?(?:authorization|proxy-authorization|cookie|set-cookie|password|passwd|csrf(?:-token)?|xsrf(?:-token)?|token|secret|api[-_]?key)["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^,}\r\n]+)/gi,
+      "$1\"<redacted>\"")
     .replaceAll(/\b[A-Za-z0-9_-]{24,}\b/g, "<redacted>");
 }
 
-async function capture(command: DockerDiagnosticCommand, args: string[], errors: string[]): Promise<string | undefined> {
+async function capture(command: DockerDiagnosticCommand, args: string[], errors: string[], timeoutMs: number): Promise<string | undefined> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error(`Docker diagnostic command timed out after ${timeoutMs} ms`)), timeoutMs);
   try {
-    return await command(args);
+    return await command(args, controller.signal);
   } catch (error) {
-    errors.push(error instanceof Error ? error.message : "Docker diagnostic command failed");
+    const failure: unknown = controller.signal.aborted ? controller.signal.reason as unknown : error;
+    errors.push(failure instanceof Error ? failure.message : "Docker diagnostic command failed");
     return undefined;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -72,12 +82,12 @@ function json(value: string | undefined, errors: string[]): Record<string, unkno
 }
 
 export async function collectBrowserDiagnostics(containerId: string, browserName: string, reason: string,
-  command: DockerDiagnosticCommand = dockerCommand): Promise<BrowserDiagnostics> {
+  command: DockerDiagnosticCommand = dockerCommand, timeoutMs = 5_000): Promise<BrowserDiagnostics> {
   const diagnosticErrors: string[] = [];
   const [state, stats, logs] = await Promise.all([
-    capture(command, ["inspect", "--format", "{{json .State}}", containerId], diagnosticErrors),
-    capture(command, ["stats", "--no-stream", "--format", "{{json .}}", containerId], diagnosticErrors),
-    capture(command, ["logs", "--tail", "200", containerId], diagnosticErrors)
+    capture(command, ["inspect", "--format", "{{json .State}}", containerId], diagnosticErrors, timeoutMs),
+    capture(command, ["stats", "--no-stream", "--format", "{{json .}}", containerId], diagnosticErrors, timeoutMs),
+    capture(command, ["logs", "--tail", "200", containerId], diagnosticErrors, timeoutMs)
   ]);
   return {
     browserName,

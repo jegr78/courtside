@@ -24,6 +24,8 @@ test("given a required build failure, when collecting evidence, then backend and
   assert.match(build, /frontend\/test-results\/visual-journeys/);
   assert.match(build, /frontend\/test-results\/\*\*\/trace\.zip/);
   assert.match(build, /frontend\/test-results\/\*\*\/\*\.png/);
+  assert.match(build, /frontend\/test-results\/browser-diagnostics\/\*\.json/);
+  assert.match(workflow, /frontend\/test-results\/browser-diagnostics\/\*\.json/);
   assert.doesNotMatch(build, /frontend\/playwright-report/);
   assert.doesNotMatch(workflow, /frontend\/playwright-report/);
 });

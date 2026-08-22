@@ -258,6 +258,7 @@ jobs:
             frontend/test-results/**/trace.zip
             !frontend/test-results/browser-security-*/trace.zip
             frontend/test-results/**/*.png
+            frontend/test-results/browser-diagnostics/*.json
             build/security/summary.json
             build/security-update.md
           if-no-files-found: warn
