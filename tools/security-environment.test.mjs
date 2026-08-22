@@ -327,3 +327,16 @@ test("given the scanner version, when a static file names it, then it is the dep
   assert.equal(read("../security/run-contract.json").tools
     .find((tool) => tool.id === "authenticated-zap").version, zapVersion);
 });
+
+test("given a wait the health checks end, when the stack is started, then no clock is put over it", () => {
+  // given
+  const source = readFileSync(fileURLToPath(new URL("./security-environment.mjs", import.meta.url)), "utf8");
+  const start = source.slice(source.indexOf("export async function startSecurityEnvironment"));
+  const call = start.slice(0, start.indexOf("\n}"));
+
+  // when / then
+  assert.match(call, /"up", "-d", "--wait"\][^;]*WAIT_FOR_THE_HEALTH_CHECKS/,
+    "docker compose --wait returns when the stack's health checks pass and fails when their "
+    + "retries are spent. A process timeout over it does not measure that condition; it only "
+    + "kills a valid wait on a slow machine, and raising the number is not a fix.");
+});

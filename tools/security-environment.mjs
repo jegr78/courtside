@@ -124,9 +124,14 @@ export function assertSecurityIdentity({ source, labels, image }, expected, expe
   }
 }
 
-function execute(command, args, environment = process.env) {
+// A command that should answer at once, so a clock is a sanity bound rather than the condition.
+const ANSWERS_AT_ONCE = 30_000;
+const WAIT_FOR_THE_HEALTH_CHECKS = undefined;
+
+function execute(command, args, environment = process.env, timeoutMilliseconds = ANSWERS_AT_ONCE) {
   return execFileSync(command, args, {
-    cwd: root, env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000
+    cwd: root, env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+    timeout: timeoutMilliseconds
   });
 }
 
@@ -177,7 +182,10 @@ export async function startSecurityEnvironment(runId, image) {
     reserveSecurityEnvironment(environment);
     writeState(runId, environment);
     try {
-      execute("docker", [...securityComposeArgs(runId), "up", "-d", "--wait"], { ...process.env, ...environment });
+      // No clock on this one: --wait returns when the stack's health checks pass and fails when
+      // their retries are spent, so what ends it is the compose file rather than a chosen number.
+      execute("docker", [...securityComposeArgs(runId), "up", "-d", "--wait"],
+        { ...process.env, ...environment }, WAIT_FOR_THE_HEALTH_CHECKS);
       break;
     } catch (failure) {
       const output = `${failure.stderr ?? ""}`;
