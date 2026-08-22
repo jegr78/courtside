@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { compareSecurityToolRuns, comparisonSummary, unacknowledgedFindings } from "./security-tool-comparison.mjs";
 
@@ -192,4 +193,21 @@ test("given a comparison, when summarising it, then the constant and both toolch
   assert.match(summary, new RegExp("b".repeat(40)));
   assert.match(summary, new RegExp(`New findings: .${fingerprint("9")}`));
   assert.match(summary, /Resolved findings: none/);
+});
+
+// The parser pairs tokens positionally, so an argument whose value is missing silently takes the
+// next option as its value and the comparison runs against a path nobody passed.
+test("given an option where a value belongs, when the comparator starts, then it refuses the run", () => {
+  // given
+  const names = ["base-root", "base-manifest", "base-evidence", "base-ref", "base-contract", "base-catalog",
+    "candidate-root", "candidate-manifest", "candidate-evidence",
+    "candidate-ref", "candidate-contract", "candidate-catalog", "output"];
+  const args = names.flatMap((name) => [`--${name}`, name === "output" ? "--sneaky" : name]);
+
+  // when / then
+  const failure = spawnSync(process.execPath,
+    [new URL("./security-tool-comparison.mjs", import.meta.url).pathname, ...args],
+    { encoding: "utf8" });
+  assert.equal(failure.status, 1);
+  assert.match(failure.stderr, /required arguments are missing/);
 });

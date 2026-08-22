@@ -220,11 +220,16 @@ export function comparisonSummary(comparison) {
 
 function parseArguments(args) {
   const values = {};
-  for (let index = 0; index < args.length; index += 2) values[args[index].slice(2)] = args[index + 1];
+  for (let index = 0; index < args.length; index += 2) {
+    if (String(args[index]).startsWith("--")) values[String(args[index]).slice(2)] = args[index + 1];
+  }
   const required = ["base-root", "base-manifest", "base-evidence", "base-ref", "base-contract", "base-catalog",
     "candidate-root", "candidate-manifest", "candidate-evidence",
     "candidate-ref", "candidate-contract", "candidate-catalog", "output"];
-  if (args.length !== required.length * 2 || required.some((name) => !values[name])) fail("required arguments are missing");
+  if (args.length !== required.length * 2
+      || required.some((name) => !values[name] || String(values[name]).startsWith("--"))) {
+    fail("required arguments are missing");
+  }
   return values;
 }
 

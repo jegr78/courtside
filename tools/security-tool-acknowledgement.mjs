@@ -4,11 +4,17 @@ import { fileURLToPath } from "node:url";
 
 import { comparisonSummary, unacknowledgedFindings } from "./security-tool-comparison.mjs";
 
-const described = ["scanner", "ruleId", "normalizedSurface", "parameter", "attackClass"];
+const namingFields = ["scanner", "ruleId", "normalizedSurface", "parameter", "attackClass"];
 
 function findingsIn(directory) {
   const byFingerprint = new Map();
-  for (const name of readdirSync(directory).filter((entry) => entry.endsWith(".json"))) {
+  let names;
+  try {
+    names = readdirSync(directory).filter((entry) => entry.endsWith(".json"));
+  } catch {
+    return null;
+  }
+  for (const name of names) {
     const evidence = JSON.parse(readFileSync(join(directory, name), "utf8"));
     for (const candidate of evidence.candidates ?? []) {
       if (typeof candidate?.fingerprint === "string") byFingerprint.set(candidate.fingerprint, candidate);
@@ -17,15 +23,24 @@ function findingsIn(directory) {
   return byFingerprint;
 }
 
-// Only the naming fields travel. A candidate's own evidence holds requests and responses the
-// assessment captured, and an artifact of a public repository is not where those belong.
+function readEvidence(directories) {
+  const sides = [["candidate", directories.candidate], ["base", directories.base]]
+    .map(([side, directory]) => [side, directory, findingsIn(directory)]);
+  return {
+    readable: sides.filter(([, , found]) => found !== null).map(([side, , found]) => [side, found]),
+    unreadable: sides.filter(([, , found]) => found === null).map(([side, directory]) => `${side}: ${directory}`)
+  };
+}
+
+// Copied by name, so a field added to the finding schema later stays out of a public artifact by
+// default instead of travelling because nobody thought to exclude it.
 export function describeFindings(fingerprints, directories) {
-  const sides = [["candidate", findingsIn(directories.candidate)], ["base", findingsIn(directories.base)]];
+  const { readable } = readEvidence(directories);
   return fingerprints.map((fingerprint) => {
-    for (const [side, found] of sides) {
+    for (const [side, found] of readable) {
       const finding = found.get(fingerprint);
       if (finding) {
-        return { fingerprint, side, ...Object.fromEntries(described.map((key) => [key, finding[key]])) };
+        return { fingerprint, side, ...Object.fromEntries(namingFields.map((key) => [key, finding[key]])) };
       }
     }
     return { fingerprint, side: "unresolved" };
@@ -44,6 +59,10 @@ export function findingReport(comparison, acknowledgement, directories) {
       + `| ${cell(finding.ruleId)} | ${cell(finding.normalizedSurface)} | ${cell(finding.parameter)} `
       + `| ${cell(finding.attackClass)} |`);
   }
+  const { unreadable } = readEvidence(directories);
+  if (unreadable.length > 0) {
+    lines.push("", `Evidence that could not be read, so a finding of that run stays unnamed: ${unreadable.join(", ")}.`);
+  }
   return [...lines, ""].join("\n");
 }
 
@@ -51,10 +70,13 @@ export function findingReport(comparison, acknowledgement, directories) {
 // not change. Reading its output afterwards is what turns a difference into something somebody saw.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  const values = {};
-  for (let index = 0; index < args.length; index += 2) values[String(args[index]).slice(2)] = args[index + 1];
   const required = ["comparison", "acknowledgement", "summary", "candidate-evidence", "base-evidence"];
-  if (args.length !== required.length * 2 || required.some((name) => !values[name])) {
+  const values = {};
+  for (let index = 0; index < args.length; index += 2) {
+    if (String(args[index]).startsWith("--")) values[String(args[index]).slice(2)] = args[index + 1];
+  }
+  if (args.length !== required.length * 2
+      || required.some((name) => !values[name] || String(values[name]).startsWith("--"))) {
     process.stderr.write("Usage: security-tool-acknowledgement.mjs --comparison <file>"
       + " --acknowledgement <file> --summary <file>"
       + " --candidate-evidence <directory> --base-evidence <directory>\n");
@@ -69,7 +91,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.stderr.write("The comparison changed findings nobody recorded. What they are:\n"
       + describeFindings(unacknowledged, directories)
         .map((finding) => `  ${finding.fingerprint} (${finding.side}): `
-          + described.map((key) => finding[key] ?? "—").join(" / ")).join("\n")
+          + namingFields.map((key) => finding[key] ?? "—").join(" / ")).join("\n")
       + `\nRead the run summary, then record them in ${values.acknowledgement}.\n`);
     process.exit(1);
   }
