@@ -171,8 +171,11 @@ export function compareSecurityToolRuns(input) {
       || base.identity.seedFingerprint !== candidate.identity.seedFingerprint) {
     fail("paired runs must assess the same application and synthetic fixture");
   }
-  if (candidate.identity.application.commit !== input.candidateRef) {
-    fail("the assessed application commit differs from the candidate revision");
+  // Both runs assess the base revision's application on purpose: it is the constant that makes a
+  // finding difference attributable to the tools, and the base environment can always start it.
+  if (base.identity.application.commit !== input.baseRef
+      || candidate.identity.application.commit !== input.baseRef) {
+    fail("both runs must assess the application of the base revision");
   }
   if (candidate.result.outcome === "failed") fail("the candidate runtime produced a failed assessment");
   const comparison = {
@@ -190,6 +193,29 @@ export function compareSecurityToolRuns(input) {
   };
   if (!validateComparison(comparison)) fail(JSON.stringify(validateComparison.errors));
   return comparison;
+}
+
+// The run exists to produce this difference, so it has to be seen before the branch passes. An
+// acknowledgement names the fingerprints somebody looked at, and it is read in the pull request.
+export function unacknowledgedFindings(comparison, acknowledgement) {
+  const acknowledged = new Set(acknowledgement?.acknowledged ?? []);
+  return [...comparison.newFindings, ...comparison.resolvedFindings]
+    .filter((finding) => !acknowledged.has(finding)).toSorted();
+}
+
+export function comparisonSummary(comparison) {
+  const named = (findings) => findings.length === 0
+    ? "none" : findings.map((finding) => `\`${finding}\``).join(", ");
+  return [
+    "## Security tool update comparison",
+    "",
+    `Both runs assessed the application of \`${comparison.baseRef}\`.`,
+    `The tools came from \`${comparison.baseRef}\` and from \`${comparison.candidateRef}\`.`,
+    "",
+    `New findings: ${named(comparison.newFindings)}`,
+    `Resolved findings: ${named(comparison.resolvedFindings)}`,
+    ""
+  ].join("\n");
 }
 
 function parseArguments(args) {

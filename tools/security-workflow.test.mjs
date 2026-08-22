@@ -66,6 +66,70 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
+// A finding difference is only attributable to the tools while the application is the constant, so
+// both runs assess the base revision's image. The base environment can always start it, which is
+// what a candidate image took away: a setting the pull request makes mandatory stopped it dead.
+test("given a paired comparison, when both sides run, then they assess the base revision's target", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when / then
+  assert.match(comparison, /BASE_IMAGE=\$\(docker image inspect courtside:uat-local/);
+  assert.match(comparison, /security "\$BASE_RUN_ID" "\$BASE_IMAGE"/);
+  assert.match(comparison, /security "\$CANDIDATE_RUN_ID" "\$BASE_IMAGE"/);
+  assert.equal(comparison.match(/--qualification "\$BASE_ROOT\/build\/uat-smoke/g)?.length, 2);
+  assert.doesNotMatch(comparison, /cp deploy\/compose\.security\.yaml/,
+    "the base run reads its own compose file. It declares the mounts that supply the assessment "
+    + "code and the bounds the scanners keep, so a copy from the candidate hands a pull request "
+    + "the run that exists to be independent of it.");
+});
+
+// The base worktree comes out of the workspace's own .git, so anything the candidate has already
+// run could have left something behind for its checkout to pick up.
+test("given a protected base, when it is prepared, then no candidate code has run yet", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when
+  const prepared = comparison.indexOf("Prepare the protected-base assessment runtime");
+  const candidateRan = comparison.indexOf("Install candidate assessment dependencies");
+
+  // then
+  assert.ok(prepared > 0 && candidateRan > prepared,
+    "npm ci runs the candidate's lifecycle scripts and mvnw runs its wrapper. Both come after the "
+    + "base worktree exists and after the image both runs assess has been built from it.");
+});
+
+// The report already decides this from the digest of what a paired run varies. A second path list in
+// the workflow is a second definition, and the one that stood here started two stacks for a compose
+// line and for every dependency bump.
+test("given one definition of the assessment runtime, when the job decides whether to run, then it asks for that decision", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when / then
+  assert.match(comparison, /--identity-output build\/security-update\/identity\.json/);
+  assert.match(comparison, /comparisonRequired/);
+  assert.match(comparison, /case "\$REQUIRED" in[\s\S]*?true\|false\)[\s\S]*?exit 1/,
+    "a value that is neither skips every later step while the job still reports success");
+  assert.doesNotMatch(comparison, /git diff --quiet/,
+    "the decision belongs to runtimeComparisonRequired in security-update-report.mjs, which the "
+    + "report already prints. Deriving it a second time here lets the two drift apart.");
+});
+
+// Ninety minutes of paired assessment used to end in an artifact nobody had to open: no step read
+// newFindings, and the job blocked a merge on whether the comparison could be produced at all.
+test("given a produced comparison, when the job ends, then its difference is read and has to be acknowledged", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+
+  // when / then
+  assert.match(comparison, /security-tool-acknowledgement\.mjs/);
+  assert.match(comparison, /--acknowledgement security\/tool-update-acknowledgement\.json/);
+  assert.match(comparison, /GITHUB_STEP_SUMMARY/,
+    "the difference belongs where a reviewer already looks, not in an artifact they have to fetch");
+});
+
 // The runner's own node is older than courtside.mjs requires, and the failure surfaces minutes
 // into a job as a comparison that never ran rather than as a missing tool.
 test("given a workflow step reaching the CLI, when it runs node, then it is the version the build pins", () => {

@@ -89,14 +89,26 @@ The required pull-request build runs contract, schema, safety and secret checks 
 assessment traffic. It retains a comparison of security contracts, policies, report schemas and
 pinned tool versions against the pull-request base. The comparison includes the images and adapters
 that actually execute. When those bytes change, the required build runs the protected-base and
-candidate assessment runtimes against the same qualified image and synthetic fixture. The workflow
+candidate assessment runtimes against one target: the image the **base** revision builds and
+qualifies, and the same synthetic fixture. The application is the constant, which is what makes a
+finding difference attributable to the tools rather than to anything else that moved, and the base
+environment can always start the base image — a setting the candidate makes mandatory cannot stop
+the run. The comparator refuses a pair whose application is not the base revision's. Each side
+reads its own deployment description; the base worktree is created and its image built before any
+candidate code runs, though both still share the workspace's git directory, so the independence of
+the base run rests on that ordering rather than on isolation. The workflow
 uses the comparator from the protected base revision after its initial bootstrap. It computes both
 runtime digests itself rather than trusting run input. The introductory comparator change requires
 the normal whole-branch review because no earlier trusted comparator exists. The workflow, not a
 committed self-attestation, creates the closed comparison record. It binds both commits,
 runtime digests, original manifest digests, image identity, catalog and tool versions, elapsed time
 and normalized finding fingerprints. Missing tools, tests or evidence files, mismatched fixtures and
-a failed candidate assessment fail the pull-request build. An incomplete result remains comparable
+a failed candidate assessment fail the pull-request build. So does a finding the comparison gained
+or lost that `security/tool-update-acknowledgement.json` does not name: the difference is what the
+run exists to produce, so it is written to the job summary and has to be recorded in the pull
+request before the branch passes. The run itself is triggered by the digest of what a paired run
+varies — the assessment's code and contract, the deployment description each side reads, and the
+lockfile the tools resolve against. A dependency bump of the application is not a tool update. An incomplete result remains comparable
 only when every planned tool produced its result and the incompleteness comes from retained finding
 candidates awaiting triage.
 

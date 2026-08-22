@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { compareSecurityToolRuns } from "./security-tool-comparison.mjs";
+import { compareSecurityToolRuns, comparisonSummary, unacknowledgedFindings } from "./security-tool-comparison.mjs";
 
 const fingerprint = (character) => `sha256:${character.repeat(64)}`;
 const contractPath = new URL("../security/run-contract.json", import.meta.url);
@@ -52,7 +52,7 @@ function runFixture(root, name, overrides = {}) {
     profile: "active",
     target: "https://127.0.0.1:8443",
     environment: "SECURITY",
-    application: { imageDigest: fingerprint("a"), commit: "b".repeat(40) },
+    application: { imageDigest: fingerprint("a"), commit: "2".repeat(40) },
     targetFingerprint: fingerprint("c"),
     seedFingerprint: fingerprint("d"),
     instanceFingerprint: fingerprint("e"),
@@ -146,4 +146,50 @@ test("given runs for different fixtures or incomplete tool evidence, when compar
   assert.throws(() => compareSecurityToolRuns({
     ...input, candidateManifest: invalidEvidence.manifest, candidateEvidence: invalidEvidence.evidence
   }));
+});
+
+test("given a run that assessed another revision's application, when comparing, then the report fails closed", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const baseRoot = runtimeRoot(root, "base-runtime");
+  const candidateRoot = runtimeRoot(root, "candidate-runtime");
+  const elsewhere = { imageDigest: fingerprint("a"), commit: "7".repeat(40) };
+  const base = runFixture(root, "base", { application: elsewhere });
+  const candidate = runFixture(root, "candidate", { application: elsewhere });
+
+  // when / then — the constant both runs share has to be the protected revision, not just equal
+  assert.throws(() => compareSecurityToolRuns({
+    baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
+    baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
+    candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
+    candidateRef: "b".repeat(40),
+    candidateContract: contractPath, candidateCatalog: catalogPath
+  }), /application of the base revision/);
+});
+
+test("given a finding difference the acknowledgement does not name, when comparing, then it is reported", () => {
+  // given
+  const comparison = { newFindings: [fingerprint("9")], resolvedFindings: [fingerprint("f")] };
+
+  // when / then — a difference is the point of the run, so it has to be seen before it passes
+  assert.deepEqual(unacknowledgedFindings(comparison, { acknowledged: [fingerprint("9")] }),
+    [fingerprint("f")]);
+  assert.deepEqual(unacknowledgedFindings(comparison,
+    { acknowledged: [fingerprint("f"), fingerprint("9")] }), []);
+  assert.deepEqual(unacknowledgedFindings(
+    { newFindings: [], resolvedFindings: [] }, { acknowledged: [] }), []);
+});
+
+test("given a comparison, when summarising it, then the constant and both toolchains are named", () => {
+  // when
+  const summary = comparisonSummary({
+    baseRef: "2".repeat(40), candidateRef: "b".repeat(40),
+    newFindings: [fingerprint("9")], resolvedFindings: []
+  });
+
+  // then — the artifact nobody downloads is why this exists
+  assert.match(summary, new RegExp(`assessed the application of .${"2".repeat(40)}`));
+  assert.match(summary, new RegExp("b".repeat(40)));
+  assert.match(summary, new RegExp(`New findings: .${fingerprint("9")}`));
+  assert.match(summary, /Resolved findings: none/);
 });

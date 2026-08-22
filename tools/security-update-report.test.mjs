@@ -70,7 +70,14 @@ test("given the assessment runtime, when identifying a candidate, then execution
   // then
   for (const path of [
     "tools/courtside.mjs", "tools/security-environment.mjs", "tools/security-triage.mjs",
-    "tools/security-request-gateway.py", "deploy/compose.security.yaml", "frontend/package-lock.json",
-    "pom.xml", "security/run-contract.json", "security/resource-abuse.js"
+    "tools/security-request-gateway.py", "deploy/compose.security.yaml",
+    "deploy/Caddyfile.security", "frontend/package-lock.json",
+    "security/run-contract.json", "security/resource-abuse.js"
   ]) assert.equal(files.has(path), true, path);
+  for (const path of ["pom.xml", "frontend/package.json"]) {
+    assert.equal(files.has(path), false,
+      `${path} describes the application, and each side of a paired run now builds its own. A `
+      + "dependency bump is not a tool update, and starting two stacks for one is why a branch that "
+      + "touched no scanner could hold up every other branch.");
+  }
 });

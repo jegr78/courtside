@@ -9,12 +9,13 @@ const securityFiles = readdirSync(new URL("../security", import.meta.url))
 const securityToolFiles = readdirSync(new URL("../tools", import.meta.url))
   .filter((name) => name.startsWith("security-") && !name.includes(".test.") && /\.(?:mjs|py)$/.test(name))
   .map((name) => `tools/${name}`);
+// What a paired run varies: the assessment's own code and contract, the deployment description each
+// side reads, and the lockfile the tools resolve against. pom.xml and frontend/package.json describe
+// the application, and each side now builds its own — a dependency bump is not a tool update.
 export const securityRuntimeFiles = [
   "deploy/compose.security.yaml",
   "deploy/Caddyfile.security",
-  "frontend/package.json",
   "frontend/package-lock.json",
-  "pom.xml",
   ...securityFiles,
   "tools/courtside.mjs",
   ...securityToolFiles
@@ -168,6 +169,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   writeFileSync(output, securityUpdateReport(base), { mode: 0o600 });
   if (identityOutput) {
-    writeFileSync(identityOutput, `${JSON.stringify(securityRuntimeIdentity(base), null, 2)}\n`, { mode: 0o600 });
+    const identity = securityRuntimeIdentity(base);
+    writeFileSync(identityOutput, `${JSON.stringify(
+      { ...identity, comparisonRequired: runtimeComparisonRequired(identity) }, null, 2)}\n`,
+    { mode: 0o600 });
   }
 }
