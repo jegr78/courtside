@@ -116,7 +116,12 @@ later is additive rather than invasive.
 | Access control: transponders, door and light automation | `AccessControlPort` |
 | Bidirectional sync with an external membership system | `MemberSyncPort` |
 
-CSV import and export **is** in Release 1. Only the live, bidirectional sync is deferred.
+CSV **import** is in Release 1; export is not. A club adopting Courtside has to bring its members
+in before it needs to take anything out, so the import is what Release 1 builds and the export
+follows in the release after it. The live, bidirectional sync stays deferred to its own project.
+
+The one export with a date attached to it is the per-member one that answers a subject access
+request. It is not a convenience, and section 8 marks it apart from the rest for that reason.
 
 ---
 
@@ -907,10 +912,10 @@ admin sees the diagnosis themselves.
 
 ---
 
-### Reporting and data exchange in Release 1
+### Reporting and data exchange
 
 Reports read from `domain_event` and the booking tables, and every one of them is also
-available as CSV:
+available as CSV. *Designed.*
 
 | Report | Purpose |
 |---|---|
@@ -1042,8 +1047,10 @@ Import and export:
   must not be confused. None can disable the club's own administration either: an account holding
   `ADMIN` keeps that role and stays enabled. An import cannot lock a club out of its instance.
 - **CSV export** for every list view in the admin backend, matching what existing booking
-  systems offer today.
-- **Per-member JSON export** for subject access requests (section 11).
+  systems offer today. *Designed.*
+- **Per-member JSON export** for subject access requests (section 11). *Designed.* This one is
+  not deferred by preference: a club is the controller, and a controller that cannot answer what
+  it holds about somebody is not compliant because its supplier ran out of release.
 
 ---
 
