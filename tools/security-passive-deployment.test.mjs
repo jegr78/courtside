@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
-  assertQualifiedImageEvidence, buildPassiveDeploymentEvidence, createAssessmentControl, normalizeZapAlerts, passiveDeploymentSummary,
-  requiredPassiveCheckIds,
+  assertPassiveDeploymentEvidence, assertQualifiedImageEvidence, buildPassiveDeploymentEvidence, createAssessmentControl,
+  normalizeZapAlerts, passiveDeploymentSummary, passiveScannerOrigin, requiredPassiveCheckIds,
   runOwnedProcess
 } from "./security-passive-deployment.mjs";
 
@@ -74,9 +74,9 @@ test("given ZAP output on separate routes, when normalizing it, then safe route 
   // given
   const report = { site: [{ alerts: [{ pluginid: "10020", riskcode: "1", confidence: "2",
     instances: [
-      { uri: "https://localhost/api/source", method: "GET", evidence: "SESSION=secret" },
-      { uri: "https://localhost/api/source", method: "GET", evidence: "SESSION=secret" },
-      { uri: "https://localhost/assets/index-a1b2c3.js", method: "GET", evidence: "SESSION=secret" }
+      { uri: `${passiveScannerOrigin}/api/source`, method: "GET", evidence: "SESSION=secret" },
+      { uri: `${passiveScannerOrigin}/api/source`, method: "GET", evidence: "SESSION=secret" },
+      { uri: `${passiveScannerOrigin}/assets/index-a1b2c3.js`, method: "GET", evidence: "SESSION=secret" }
     ] }] }] };
 
   // when
@@ -95,7 +95,7 @@ test("given ZAP output on separate routes, when normalizing it, then safe route 
 test("given a passive alert on an unclassified dynamic route, when normalizing it, then evidence fails closed", () => {
   // given
   const report = { site: [{ alerts: [{ pluginid: "10020", riskcode: "1", confidence: "2",
-    instances: [{ uri: "https://localhost/api/admin/roster/00000000-0000-0000-0000-000000000101",
+    instances: [{ uri: `${passiveScannerOrigin}/api/admin/roster/00000000-0000-0000-0000-000000000101`,
       method: "GET" }] }] }] };
 
   // when / then
@@ -105,10 +105,47 @@ test("given a passive alert on an unclassified dynamic route, when normalizing i
 test("given a passive alert tied to a query value, when normalizing it, then the value is neither dropped nor retained", () => {
   // given
   const report = { site: [{ alerts: [{ pluginid: "10020", riskcode: "1", confidence: "2",
-    instances: [{ uri: "https://localhost/api/source?probe=opaque", method: "GET" }] }] }] };
+    instances: [{ uri: `${passiveScannerOrigin}/api/source?probe=opaque`, method: "GET" }] }] }] };
 
   // when / then
   assert.throws(() => normalizeZapAlerts(report), /unclassified route/);
+});
+
+test("given missing scanner structure, when normalizing alerts, then absence cannot mean a clean scan", () => {
+  // when / then
+  assert.throws(() => normalizeZapAlerts({}), /invalid report/);
+  assert.throws(() => normalizeZapAlerts({ site: [] }), /invalid report/);
+  assert.throws(() => normalizeZapAlerts({ site: [{}] }), /invalid report/);
+});
+
+test("given a malformed alert or instance, when normalizing it, then parsing fails closed", () => {
+  // when / then
+  assert.throws(() => normalizeZapAlerts({ site: [{ alerts: [null] }] }), /invalid alert record/);
+  assert.throws(() => normalizeZapAlerts({ site: [{ alerts: [{ pluginid: "10020", riskcode: "1",
+    confidence: "2", instances: [null] }] }] }), /invalid alert record/);
+});
+
+test("given a foreign origin or URL credential, when normalizing alerts, then target attribution fails closed", () => {
+  // given
+  const alert = (uri) => ({ site: [{ alerts: [{ pluginid: "10020", riskcode: "1", confidence: "2",
+    instances: [{ uri, method: "GET" }] }] }] });
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(alert("https://foreign.example/api/source")), /unclassified route/);
+  assert.throws(() => normalizeZapAlerts(alert("http://user:secret@scanner-gateway:8090/api/source")),
+    /unclassified route/);
+});
+
+test("given contradictory ratings for one candidate, when normalizing alerts, then one fingerprint cannot mean both", () => {
+  // given
+  const instance = { uri: `${passiveScannerOrigin}/api/source`, method: "GET" };
+  const report = { site: [{ alerts: [
+    { pluginid: "10020", riskcode: "1", confidence: "2", instances: [instance] },
+    { pluginid: "10020", riskcode: "2", confidence: "3", instances: [instance] }
+  ] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), /contradictory alert/);
 });
 
 test("given an untriaged ZAP candidate, when building evidence, then the assessment is incomplete", () => {
@@ -117,12 +154,25 @@ test("given an untriaged ZAP candidate, when building evidence, then the assessm
     targetFingerprint: digest, imageDigest: digest,
     observations: passingObservations(),
     zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10010", riskcode: "1",
-      confidence: "2", instances: [{ uri: "http://proxy:8080/", method: "GET" }] }] }] }, requestCount: 1
+      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET" }] }] }] }, requestCount: 1
   });
 
   // then
   assert.equal(evidence.outcome, "incomplete");
   assert.doesNotMatch(passiveDeploymentSummary(evidence), /proxy:8080/);
+});
+
+test("given a forged retained fingerprint, when validating evidence, then its identity is recomputed", () => {
+  // given
+  const evidence = buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
+    observations: passingObservations(), requestCount: 1,
+    zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10010", riskcode: "1",
+      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET" }] }] }] }
+  });
+  evidence.zap.alerts[0].fingerprint = `sha256:${"b".repeat(64)}`;
+
+  // when / then
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /fingerprint/);
 });
 
 test("given a request count above the safe budget, when building evidence, then the run fails closed", () => {

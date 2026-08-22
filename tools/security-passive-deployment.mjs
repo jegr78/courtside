@@ -16,6 +16,7 @@ const validateEvidence = new Ajv({ strict: true, allErrors: true }).compile(evid
 // read from there rather than repeated here, where nothing would keep them in step.
 export const zapImage = deployedZapImage();
 export const zapVersion = zapImage.slice(zapImage.indexOf(":") + 1, zapImage.indexOf("@"));
+export const passiveScannerOrigin = "http://scanner-gateway:8090";
 
 function deployedZapImage() {
   const compose = new URL("../deploy/compose.security.yaml", import.meta.url);
@@ -38,22 +39,40 @@ export const requiredPassiveCheckIds = Object.freeze([
 ].toSorted());
 
 export function normalizeZapAlerts(report) {
+  if (report == null || typeof report !== "object" || Array.isArray(report)
+      || !Array.isArray(report.site) || report.site.length === 0
+      || report.site.some((site) => site == null || typeof site !== "object" || Array.isArray(site)
+        || !Array.isArray(site.alerts))) {
+    throw new Error("ZAP produced an invalid report structure");
+  }
   const normalized = new Map();
-  for (const alert of (report?.site ?? []).flatMap((site) => site.alerts ?? [])) {
-    const pluginId = String(alert.pluginid);
+  for (const alert of report.site.flatMap((site) => site.alerts)) {
+    if (alert == null || typeof alert !== "object" || Array.isArray(alert)) {
+      throw new Error("ZAP produced an invalid alert record");
+    }
+    const pluginId = alert.pluginid;
     const riskCode = Number(alert.riskcode);
     const confidence = Number(alert.confidence);
-    if (!/^\d+$/.test(pluginId) || !Number.isInteger(riskCode) || riskCode < 0 || riskCode > 3
-        || !Number.isInteger(confidence) || confidence < 0 || confidence > 4
+    if (typeof pluginId !== "string" || !/^\d+$/.test(pluginId)
+        || typeof alert.riskcode !== "string" || !/^[0-3]$/.test(alert.riskcode)
+        || typeof alert.confidence !== "string" || !/^[0-4]$/.test(alert.confidence)
+        || !Number.isInteger(riskCode) || !Number.isInteger(confidence)
         || !Array.isArray(alert.instances) || alert.instances.length === 0) {
       throw new Error("ZAP produced an invalid alert record");
     }
     for (const instance of alert.instances) {
-      const method = String(instance.method ?? "").toUpperCase();
+      if (instance == null || typeof instance !== "object" || Array.isArray(instance)
+          || typeof instance.method !== "string" || typeof instance.uri !== "string") {
+        throw new Error("ZAP produced an invalid alert record");
+      }
+      const method = instance.method.toUpperCase();
       if (!["GET", "HEAD"].includes(method)) throw new Error("ZAP produced an invalid alert record");
       const routeTemplate = passiveRouteTemplate(instance.uri);
-      const key = `${pluginId}\0${riskCode}\0${confidence}\0${method}\0${routeTemplate}`;
+      const key = `${pluginId}\0${method}\0${routeTemplate}`;
       const existing = normalized.get(key);
+      if (existing && (existing.riskCode !== riskCode || existing.confidence !== confidence)) {
+        throw new Error("ZAP produced a contradictory alert record");
+      }
       if (existing) existing.count++;
       else normalized.set(key, { pluginId, riskCode, confidence, method, routeTemplate,
         fingerprint: passiveAlertFingerprint(pluginId, method, routeTemplate), count: 1 });
@@ -74,8 +93,7 @@ function passiveRouteTemplate(uri) {
   let path;
   try {
     const parsed = new URL(uri);
-    if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
-    if (parsed.search) throw new Error();
+    if (parsed.origin !== passiveScannerOrigin || parsed.username || parsed.password || parsed.search) throw new Error();
     path = parsed.pathname;
   } catch {
     throw new Error("ZAP produced an unclassified route");
@@ -127,10 +145,24 @@ export function buildPassiveDeploymentEvidence({
     requestCount,
     outcome: failed ? "failed" : incomplete ? "incomplete" : "passed"
   };
+  assertPassiveDeploymentEvidence(evidence);
+  return evidence;
+}
+
+export function assertPassiveDeploymentEvidence(evidence) {
   if (!validateEvidence(evidence)) {
     throw new Error(`The passive assessment evidence is invalid: ${JSON.stringify(validateEvidence.errors)}`);
   }
-  return evidence;
+  const fingerprints = new Set();
+  for (const alert of evidence.zap.alerts) {
+    if (alert.fingerprint !== passiveAlertFingerprint(alert.pluginId, alert.method, alert.routeTemplate)) {
+      throw new Error("The passive assessment evidence contains a mismatched alert fingerprint");
+    }
+    if (fingerprints.has(alert.fingerprint)) {
+      throw new Error("The passive assessment evidence contains a duplicate alert fingerprint");
+    }
+    fingerprints.add(alert.fingerprint);
+  }
 }
 
 export async function runPassiveDeploymentAssessment(plan, context) {
