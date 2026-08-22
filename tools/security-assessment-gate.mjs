@@ -26,6 +26,7 @@ export function assessmentGateRecord(manifestBytes, expected) {
   if (!validateManifest(manifest)) fail(JSON.stringify(validateManifest.errors));
   const subject = manifest.application.imageDigest.split("@").at(-1);
   if (manifest.status !== "finished") fail("run is not finished");
+  if (manifest.catalogVersion !== catalog.catalogVersion) fail("catalog version differs from the current catalog");
   if (manifest.profile !== expected.profile) fail("profile differs from the required profile");
   if (subject !== expected.subject) fail("assessed image differs from the required digest");
   if (manifest.application.commit !== expected.sourceCommit) fail("source commit differs from the required commit");

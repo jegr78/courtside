@@ -87,7 +87,18 @@ The safe deployment suite runs native TLS, HTTP, proxy and container checks plus
 
 The required pull-request build runs contract, schema, safety and secret checks without active
 assessment traffic. It retains a comparison of security contracts, policies, report schemas and
-pinned tool versions against the pull-request base.
+pinned tool versions against the pull-request base. The comparison includes the images and adapters
+that actually execute. When those bytes change, the required build runs the protected-base and
+candidate assessment runtimes against the same qualified image and synthetic fixture. The workflow
+uses the comparator from the protected base revision after its initial bootstrap. It computes both
+runtime digests itself rather than trusting run input. The introductory comparator change requires
+the normal whole-branch review because no earlier trusted comparator exists. The workflow, not a
+committed self-attestation, creates the closed comparison record. It binds both commits,
+runtime digests, original manifest digests, image identity, catalog and tool versions, elapsed time
+and normalized finding fingerprints. Missing tools, tests or evidence files, mismatched fixtures and
+a failed candidate assessment fail the pull-request build. An incomplete result remains comparable
+only when every planned tool produced its result and the incompleteness comes from retained finding
+candidates awaiting triage.
 
 [`security-assessment.yml`](../.github/workflows/security-assessment.yml) runs the bounded `safe`
 profile weekly and on manual dispatch. It builds and qualifies one local candidate, resolves its
@@ -101,10 +112,11 @@ image-security summaries and final release record all name the same candidate di
 depends on that record, so another image or a second successful attempt cannot replace the required
 first attempt.
 
-[`security-destructive.yml`](../.github/workflows/security-destructive.yml) has no schedule and runs
-only on a self-hosted runner carrying the `courtside-security` label. It requires the repository's
-exact GHCR digest, embedded source commit and run-specific destructive confirmation. Its shorter
-retention does not make it release evidence.
+Destructive assessments use the local CLI only. They have no GitHub Actions workflow because a
+self-hosted runner label cannot prove that the host is ephemeral or guarantee cleanup after runner
+loss. The CLI still requires the exact image digest, target identity and run-specific
+`authorize-destructive-<run-id>` confirmation. A future remote path needs infrastructure that
+creates and destroys a one-job runner outside the assessment job.
 
 ## Resource abuse and recovery
 

@@ -19,7 +19,7 @@ function manifest(overrides = {}) {
     targetFingerprint: digest,
     seedFingerprint: digest,
     instanceFingerprint: digest,
-    catalogVersion: "1.0.0",
+    catalogVersion: "1.2.0",
     tools: [
       { id: "target-identity", version: "1.0.0", testIds: [] },
       { id: "passive-deployment", version: "1.0.0", testIds: ["CSA-DEPLOY-001"] }
@@ -69,6 +69,7 @@ test("given missing or mismatched assessment evidence, when gating it, then it c
     toolResults: [{ id: "target-identity", version: "1.0.0", outcome: "incomplete" }]
   }), expectations));
   assert.throws(() => assessmentGateRecord(manifest({ selectedTests: [] }), expectations));
+  assert.throws(() => assessmentGateRecord(manifest({ catalogVersion: "1.0.0" }), expectations));
   assert.throws(() => assessmentGateRecord(manifest({ tools: JSON.parse(manifest()).tools.slice(0, 1) }), expectations));
   assert.throws(() => assessmentGateRecord(manifest({ finishedAt: "2026-08-21T23:59:00.000Z" }), expectations));
   assert.throws(() => assessmentGateRecord("{}", expectations));

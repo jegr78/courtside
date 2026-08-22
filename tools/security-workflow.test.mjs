@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -9,8 +9,8 @@ const build = readFileSync(join(repository, ".github/workflows/build.yml"), "utf
 const codeql = readFileSync(join(repository, ".github/codeql/codeql-config.yml"), "utf8");
 const release = readFileSync(join(repository, ".github/workflows/release.yml"), "utf8");
 const scheduled = readFileSync(join(repository, ".github/workflows/security-assessment.yml"), "utf8");
-const destructive = readFileSync(join(repository, ".github/workflows/security-destructive.yml"), "utf8");
 const policy = readFileSync(join(repository, "docs/security-scanning.md"), "utf8");
+const assessment = readFileSync(join(repository, "docs/security-assessment.md"), "utf8");
 
 test("given a pull request, when the required build runs, then dependency, source and built Java surfaces are scanned", () => {
   // when / then
@@ -42,6 +42,27 @@ test("given stable assessment suites, when scheduling them, then safe traffic is
   assert.match(build, /security-update-report\.mjs[\s\S]+github\.event\.pull_request\.base\.sha/);
 });
 
+test("given changed assessment bytes, when the required build runs, then paired immutable evidence is compared", () => {
+  // when / then
+  assert.match(build, /tool-update-comparison:/);
+  assert.match(build, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(build, /git worktree add --detach/);
+  assert.match(build, /courtside-security-base\/mvnw" -B[\s\S]+courtside-security-base\/pom\.xml" frontend:install-node-and-npm/);
+  assert.match(build, /working-directory: \$\{\{ runner\.temp \}\}\/courtside-security-base\/frontend/);
+  assert.match(build, /npm-cli\.js ci --ignore-scripts/);
+  assert.doesNotMatch(build, /courtside-security-base\/frontend\/node_modules/);
+  assert.match(build, /security-run "\$BASE_RUN_ID" active/);
+  assert.match(build, /security-run "\$CANDIDATE_RUN_ID" active/);
+  assert.match(build, /security-tool-comparison\.mjs/);
+  assert.match(build, /COMPARATOR_ROOT="\$BASE_ROOT"/);
+  assert.match(build, /--base-contract "\$BASE_ROOT\/security\/run-contract\.json"/);
+  assert.match(build, /--candidate-contract security\/run-contract\.json/);
+  assert.match(build, /security-cleanup "\$BASE_RUN_ID" \|\| BASE_CLEANUP=\$\?/);
+  assert.match(build, /security-cleanup "\$CANDIDATE_RUN_ID" \|\| CANDIDATE_CLEANUP=\$\?/);
+  assert.match(build, /needs: \[quality, tool-update-comparison\]/);
+  assert.match(build, /candidate-ref "\$HEAD_REF"/);
+});
+
 test("given a release candidate, when publishing it, then its exact digest passes the active gate first", () => {
   // when / then
   assert.match(release, /\n  active-security:\n    needs: \[image, qualify\]/);
@@ -52,21 +73,17 @@ test("given a release candidate, when publishing it, then its exact digest passe
   assert.match(release, /security-record:\n    needs: \[build, image, qualify, active-security\]/);
 });
 
-test("given destructive assessment capability, when exposing it manually, then only a dedicated runner and exact confirmation can execute it", () => {
+test("given destructive assessment capability, when exposing it manually, then only the local CLI and exact confirmation can execute it", () => {
   // when / then
-  assert.doesNotMatch(destructive, /schedule:/);
-  assert.match(destructive, /workflow_dispatch:/);
-  assert.match(destructive, /runs-on: \[self-hosted, courtside-security\]/);
-  assert.match(destructive, /test "\$CONFIRMATION" = "authorize-destructive-\$RUN_ID"/);
-  assert.match(destructive, /security-run "\$RUN_ID" destructive/);
-  assert.match(destructive, /retention-days: 7/);
+  assert.equal(existsSync(join(repository, ".github/workflows/security-destructive.yml")), false);
+  assert.match(assessment, /Destructive assessments use the local CLI only/);
+  assert.match(assessment, /authorize-destructive-<run-id>/);
 });
 
 test("given security evidence, when workflows retain it, then only normalized reports become artifacts", () => {
   // when / then
   assert.match(scheduled, /umask 077/);
   assert.match(release, /umask 077/);
-  assert.match(destructive, /umask 077/);
   assert.match(build, /build\/security\/summary\.json/);
   assert.doesNotMatch(build, /path: build\/security\s*$/m);
   assert.match(build, /rm -rf build\/security\/trivy-runtime\.json build\/security\/trivy-source\.json build\/security\/codeql/);
