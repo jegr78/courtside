@@ -99,7 +99,9 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
       fail(`${property} differs from the runtime contract and catalog`);
     }
   }
-  if (manifest.toolResults.length !== manifest.tools.length) fail("both runs must retain every tool result");
+  if (manifest.toolResults.length !== manifest.tools.length) {
+    fail(`both runs must retain every tool result, and this run ended with: ${manifest.reason ?? "no reason"}`);
+  }
   for (const tool of manifest.tools) {
     const results = manifest.toolResults.filter((result) => result.id === tool.id && result.version === tool.version);
     if (results.length !== 1) fail("each planned tool must have one result with the planned version");

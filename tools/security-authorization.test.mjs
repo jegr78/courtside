@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { createServer } from "node:https";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
   authorizationActors,
@@ -13,6 +17,7 @@ import {
   executeObjectAuthorizationChecks,
   executeOperationMatrix,
   SecurityCookieJar,
+  authorizationRequest,
   validateAuthorizationEvidence
 } from "./security-authorization.mjs";
 
@@ -258,3 +263,48 @@ test("given paired login samples, when comparing medians, then account timing re
   assert.equal(evaluateLoginTiming(known, unknown.map((sample) => sample * 3)).outcome, "failed");
   assert.throws(() => evaluateLoginTiming(known.slice(1), unknown.slice(1)), /twelve positive paired/);
 });
+
+test("given a peer that closes while an oversized body is going out, when a reset is accepted, then the close is an observation", async (t) => {
+  // given
+  const server = await startSilentlyClosingServer();
+  t.after(server.close);
+
+  // when
+  const response = await authorizationRequest(server.origin, new SecurityCookieJar(),
+    oversizedProbe(), { ca: server.ca, acceptConnectionReset: true });
+
+  // then
+  assert.equal(response.transportError, "connection-reset");
+});
+
+test("given a peer that closes while an oversized body is going out, when no reset is accepted, then the probe fails", async (t) => {
+  // given
+  const server = await startSilentlyClosingServer();
+  t.after(server.close);
+
+  // when / then
+  await assert.rejects(() => authorizationRequest(server.origin, new SecurityCookieJar(),
+    oversizedProbe(), { ca: server.ca }), /Authorization POST \/api\/admin\/courts failed/);
+});
+
+function oversizedProbe() {
+  return { method: "POST", path: "/api/admin/courts", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "x".repeat(32 * 1024 * 1024) }) };
+}
+
+async function startSilentlyClosingServer() {
+  const directory = mkdtempSync(join(tmpdir(), "courtside-authorization-"));
+  const created = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+    "-keyout", "key.pem", "-out", "cert.pem", "-subj", "/CN=localhost",
+    "-addext", "subjectAltName=DNS:localhost"], { cwd: directory, encoding: "utf8" });
+  if (created.status !== 0) throw new Error(`openssl could not create a test certificate: ${created.stderr}`);
+  const certificate = readFileSync(join(directory, "cert.pem"));
+  const server = createServer({ key: readFileSync(join(directory, "key.pem")), cert: certificate },
+    (incoming) => incoming.socket.destroy());
+  await new Promise((ready) => server.listen(0, "127.0.0.1", ready));
+  return {
+    origin: `https://localhost:${server.address().port}`,
+    ca: certificate,
+    close: () => { server.closeAllConnections(); return new Promise((closed) => server.close(closed)); }
+  };
+}

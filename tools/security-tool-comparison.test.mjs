@@ -136,7 +136,7 @@ test("given runs for different fixtures or incomplete tool evidence, when compar
   assert.throws(() => compareSecurityToolRuns({ ...input, candidateManifest: otherFixture.manifest }));
   assert.throws(() => compareSecurityToolRuns({
     ...input, candidateManifest: missingTool.manifest, candidateEvidence: missingTool.evidence
-  }));
+  }), /Candidate findings require triage/);
   assert.throws(() => compareSecurityToolRuns({
     ...input, candidateManifest: wrongTool.manifest, candidateEvidence: wrongTool.evidence
   }));
