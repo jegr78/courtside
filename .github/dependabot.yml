@@ -19,6 +19,20 @@ updates:
     directory: "/frontend"
     schedule:
       interval: weekly
+    groups:
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      testing-library:
+        patterns:
+          - "@testing-library/*"
+      eslint:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "typescript-eslint"
 
   - package-ecosystem: docker
     directory: "/"
