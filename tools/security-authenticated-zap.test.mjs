@@ -8,6 +8,7 @@ import {
   renderAuthenticatedZapPlan,
   runAuthenticatedZapAssessment
 } from "./security-authenticated-zap.mjs";
+import { zapImage } from "./security-passive-deployment.mjs";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,7 +28,7 @@ test("given the pinned authenticated policy, when rendering role plans, then act
   const trainer = renderAuthenticatedZapPlan("TRAINER", "SESSION=synthetic; XSRF-TOKEN=synthetic");
 
   // then
-  assert.match(authenticatedZapPolicy.image, /zaproxy\/zap-stable:2\.16\.1@sha256:[a-f0-9]{64}/);
+  assert.equal(authenticatedZapPolicy.image, zapImage);
   assert.match(authenticatedZapPolicyDigest(), /^sha256:[a-f0-9]{64}$/);
   assert.match(authenticatedZapPlanDigest(), /^sha256:[a-f0-9]{64}$/);
   assert.match(member, /defaultThreshold: "Off"/);
