@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:tool-update-comparison:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "generatedAt", "baseRef", "candidateRef", "profile", "application",
+    "seedFingerprint", "base", "candidate", "newFindings", "resolvedFindings"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{3})?Z$" },
+    "baseRef": { "$ref": "#/$defs/commit" },
+    "candidateRef": { "$ref": "#/$defs/commit" },
+    "profile": { "enum": ["active", "destructive"] },
+    "application": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["imageDigest", "commit"],
+      "properties": {
+        "imageDigest": { "type": "string", "pattern": "^(?:sha256:[0-9a-f]{64}|[^\\s@]+@sha256:[0-9a-f]{64})$" },
+        "commit": { "$ref": "#/$defs/commit" }
+      }
+    },
+    "seedFingerprint": { "$ref": "#/$defs/fingerprint" },
+    "base": { "$ref": "#/$defs/run" },
+    "candidate": { "$ref": "#/$defs/run" },
+    "newFindings": { "$ref": "#/$defs/findings" },
+    "resolvedFindings": { "$ref": "#/$defs/findings" }
+  },
+  "$defs": {
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "findings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/fingerprint" }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "testIds"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "testIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^CSA-[A-Z]+-[0-9]{3}$" }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId", "attempt", "manifestDigest", "runtimeDigest", "catalogVersion", "tools",
+        "selectedTests", "outcome", "durationMilliseconds", "findingFingerprints"
+      ],
+      "properties": {
+        "runId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,47}$" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "manifestDigest": { "$ref": "#/$defs/fingerprint" },
+        "runtimeDigest": { "$ref": "#/$defs/digest" },
+        "catalogVersion": { "type": "string", "pattern": "^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$" },
+        "tools": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/tool" } },
+        "selectedTests": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^CSA-[A-Z]+-[0-9]{3}$" }
+        },
+        "outcome": { "enum": ["passed", "failed", "incomplete"] },
+        "durationMilliseconds": { "type": "integer", "minimum": 0 },
+        "findingFingerprints": { "$ref": "#/$defs/findings" }
+      }
+    }
+  }
+}

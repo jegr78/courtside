@@ -38,6 +38,7 @@ export function securityEnvironment(runId, image, password = randomBytes(24).toS
     COURTSIDE_SECURITY_SHARED_PASSWORD: password,
     COURTSIDE_SECURITY_SEED_FINGERPRINT: seedFingerprint,
     COURTSIDE_SECURITY_INSTANCE_FINGERPRINT: instanceFingerprint,
+    COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: "5",
     COURTSIDE_SECURITY_MAX_REQUESTS: "1",
     COURTSIDE_SECURITY_MAX_CONCURRENCY: "1"
   };
@@ -564,6 +565,7 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
     await runMode("negative");
     const importResult = await limits.runImportCases(fixture);
     const inputResult = await limits.runInputCases(fixture);
+    const mutationResult = await limits.runMutationCases(fixture);
     const stateAfter = await limits.captureState();
     const metrics = await scannerGatewayMetrics(gateway, command);
     const scannerBytes = Number((await command(["exec", scanner, "sh", "-c",
@@ -571,15 +573,18 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
     if (!Number.isSafeInteger(scannerBytes) || scannerBytes < 0) {
       throw new Error("Scanner writable-data metrics are invalid");
     }
-    const requestCount = metrics.requests + fixture.requestCount + importResult.requestCount + inputResult.requestCount;
-    if (fixture.requestCount + importResult.requestCount + inputResult.requestCount > limits.policy.nativeRequestReserve
+    const requestCount = metrics.requests + fixture.requestCount + importResult.requestCount + inputResult.requestCount
+      + mutationResult.requestCount;
+    if (fixture.requestCount + importResult.requestCount + inputResult.requestCount + mutationResult.requestCount
+        > limits.policy.nativeRequestReserve
         || requestCount > limits.maxRequests) throw new Error("The OpenAPI fuzz request budget was exceeded");
     return { events, importCases: importResult.cases, inputCases: inputResult.cases,
+      mutationCases: mutationResult.cases,
       observedRoutes: fixture.observedRoutes,
       stateBefore, stateAfter, requestCount, runtimeHardened,
       specificationDigest: limits.specificationDigest,
       generatedDataMegabytes: (generatedBytes + metrics.requestBytes + scannerBytes
-        + importResult.generatedBytes + inputResult.generatedBytes) / (1024 * 1024) };
+        + importResult.generatedBytes + inputResult.generatedBytes + mutationResult.generatedBytes) / (1024 * 1024) };
   } finally {
     fixture?.close();
     const cleanupFailures = [];
@@ -608,6 +613,14 @@ export async function securityDomainStateFingerprint(runId, stopFile, timeoutMil
   });
   const stable = dump.stdout.split("\n").filter((line) => !line.startsWith("SELECT pg_catalog.setval")).join("\n");
   return `sha256:${createHash("sha256").update(stable).digest("hex")}`;
+}
+
+export async function resetSecurityLoginAttempts(runId, stopFile, timeoutMilliseconds) {
+  const environment = { ...process.env, ...readSecurityEnvironment(runId) };
+  await verifySecurityEnvironment(runId);
+  await runOwnedProcess("docker", [...securityComposeArgs(runId), "exec", "-T", "db", "psql",
+    "-v", "ON_ERROR_STOP=1", "-U", "courtside", "courtside_security", "-c",
+    "TRUNCATE TABLE login_attempt_limit"], { timeoutMilliseconds, stopFile, environment });
 }
 
 export async function runResourceAbuse(plan, stopFile, limits) {
@@ -863,7 +876,7 @@ async function containerExistsForCleanup(name, environment) {
 
 export function isMissingDockerResource(failure, name) {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:Error:|Error response from daemon:) No such (?:object|container): ${escapedName}\\s*$`)
+  return new RegExp(`(?:Error:|Error response from daemon:) No such (?:object|container): ${escapedName}\\s*$`, "i")
     .test(failure?.message ?? "");
 }
 

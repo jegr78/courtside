@@ -30,7 +30,7 @@
 
     <properties>
         <java.version>25</java.version>
-        <git-commit-id.version>10.0.0</git-commit-id.version>
+        <maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
         <spring-modulith.version>2.1.0</spring-modulith.version>
         <lombok.version>1.18.46</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
@@ -279,23 +279,29 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>io.github.git-commit-id</groupId>
-                <artifactId>git-commit-id-maven-plugin</artifactId>
-                <version>${git-commit-id.version}</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>${maven-antrun-plugin.version}</version>
                 <executions>
                     <execution>
+                        <phase>generate-resources</phase>
                         <goals>
-                            <goal>revision</goal>
+                            <goal>run</goal>
                         </goals>
+                        <configuration>
+                            <target>
+                                <exec executable="git" dir="${project.basedir}"
+                                      outputproperty="courtside.git.commit" failonerror="true">
+                                    <arg value="rev-parse"/>
+                                    <arg value="HEAD"/>
+                                </exec>
+                                <mkdir dir="${project.build.outputDirectory}"/>
+                                <echo file="${project.build.outputDirectory}/git.properties"
+                                      message="git.commit.id=${courtside.git.commit}"/>
+                            </target>
+                        </configuration>
                     </execution>
                 </executions>
-                <configuration>
-                    <failOnNoGitDirectory>false</failOnNoGitDirectory>
-                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
-                    <includeOnlyProperties>
-                        <includeOnlyProperty>^git\.commit\.id$</includeOnlyProperty>
-                    </includeOnlyProperties>
-                </configuration>
             </plugin>
 
             <plugin>

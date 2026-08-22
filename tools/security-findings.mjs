@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { validateAssessmentGateRecord } from "./security-assessment-gate.mjs";
 import { summarizeFindingLifecycle, validateRiskAcceptances } from "./security-triage.mjs";
 
 const requiredExceptionFields = [
@@ -110,7 +111,7 @@ function deduplicateFindings(findings) {
 }
 
 export function combineSecuritySummaries({
-  summaries, scope, subject, sourceSubject, today = new Date().toISOString().slice(0, 10)
+  summaries, scope, subject, sourceSubject, assessmentGates = [], today = new Date().toISOString().slice(0, 10)
 }) {
   if (!scope || !subject || summaries.length === 0) throw new Error("Combined security evidence requires summaries, a scope and subject");
   for (const summary of summaries) validateSummary(summary, today);
@@ -122,7 +123,10 @@ export function combineSecuritySummaries({
   }
   const sourceScopes = new Set(summaries.map((summary) => summary.scope));
   if (sourceScopes.size !== summaries.length) throw new Error("Combined security evidence requires unique source scopes");
-  if (scope === "release") validateReleaseSources(summaries, subject, sourceSubject);
+  if (scope === "release") {
+    validateReleaseSources(summaries, subject, sourceSubject);
+    validateReleaseAssessmentGates(assessmentGates, subject, sourceSubject, today);
+  }
   const blockingFindings = deduplicateFindings(summaries.flatMap((summary) => summary.blockingFindings).toSorted(compareFinding));
   const acceptedFindings = deduplicateFindings(summaries.flatMap((summary) => summary.acceptedFindings).toSorted(compareFinding));
   const informationalFindings = deduplicateFindings(
@@ -137,8 +141,24 @@ export function combineSecuritySummaries({
       assessmentPolicy: summary.assessmentPolicy
     })),
     blockingFindings, acceptedFindings, informationalFindings,
-    ...(assessments.length > 0 ? { assessments } : {})
+    ...(assessments.length > 0 ? { assessments } : {}),
+    ...(assessmentGates.length > 0 ? { assessmentGates: structuredClone(assessmentGates) } : {})
   };
+}
+
+function validateReleaseAssessmentGates(gates, imageDigest, sourceSubject, today) {
+  if (gates.length !== 1) throw new Error("Release requires exactly one active assessment gate");
+  const [gate] = gates;
+  validateAssessmentGateRecord(gate);
+  const generatedAt = new Date(gate?.generatedAt);
+  const assessmentDate = new Date(`${today}T23:59:59.999Z`);
+  if (gate?.schemaVersion !== 1 || gate.profile !== "active" || gate.status !== "passed"
+      || gate.subject !== imageDigest || gate.sourceCommit !== sourceSubject
+      || !/^sha256:[a-f0-9]{64}$/.test(gate.manifestDigest ?? "")
+      || Number.isNaN(generatedAt.getTime()) || generatedAt > assessmentDate
+      || assessmentDate.getTime() - generatedAt.getTime() > 48 * 60 * 60 * 1000) {
+    throw new Error("Release active-assessment evidence is missing, stale, incomplete or bound to another subject");
+  }
 }
 
 function validateReleaseSources(summaries, imageDigest, sourceSubject) {
@@ -357,7 +377,7 @@ export function finalizeSupplyChainEvidence(summary, evidence) {
 
 function parseArguments(args) {
   const values = {
-    trivy: [], npm: [], codeql: [], summary: [], lifecycle: undefined,
+    trivy: [], npm: [], codeql: [], summary: [], assessmentGate: [], lifecycle: undefined,
     trivyVersion: undefined, npmVersion: undefined, assessmentPolicy: undefined,
     sourceSubject: undefined, exceptions: undefined, output: undefined, scope: undefined, subject: undefined
   };
@@ -371,6 +391,7 @@ function parseArguments(args) {
     else if (option === "--npm-version") values.npmVersion = value;
     else if (option === "--codeql") values.codeql.push(value);
     else if (option === "--summary") values.summary.push(value);
+    else if (option === "--assessment-gate") values.assessmentGate.push(value);
     else if (option === "--lifecycle") values.lifecycle = value;
     else if (option === "--assessment-policy") values.assessmentPolicy = value;
     else if (option === "--exceptions") values.exceptions = value;
@@ -404,7 +425,8 @@ function main(args) {
   if (values.summary.length > 0) {
     const summaries = values.summary.map((path) => JSON.parse(readFileSync(path, "utf8")));
     result = combineSecuritySummaries({
-      summaries, scope: values.scope, subject: values.subject, sourceSubject: values.sourceSubject
+      summaries, scope: values.scope, subject: values.subject, sourceSubject: values.sourceSubject,
+      assessmentGates: values.assessmentGate.map((path) => JSON.parse(readFileSync(path, "utf8")))
     });
   } else {
     const policy = JSON.parse(readFileSync(values.exceptions, "utf8"));

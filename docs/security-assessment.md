@@ -83,6 +83,41 @@ Automated scanner output begins as a candidate. It affects a release only after 
 
 The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. The active suite adds the OpenAPI authorization matrix, authenticated ZAP scans and the pinned Schemathesis boundary suite. The destructive suite adds only the bounded resource-abuse adapter described below. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
 
+## Workflow gates
+
+The required pull-request build runs contract, schema, safety and secret checks without active
+assessment traffic. It retains a comparison of security contracts, policies, report schemas and
+pinned tool versions against the pull-request base. The comparison includes the images and adapters
+that actually execute. When those bytes change, the required build runs the protected-base and
+candidate assessment runtimes against the same qualified image and synthetic fixture. The workflow
+uses the comparator from the protected base revision after its initial bootstrap. It computes both
+runtime digests itself rather than trusting run input. The introductory comparator change requires
+the normal whole-branch review because no earlier trusted comparator exists. The workflow, not a
+committed self-attestation, creates the closed comparison record. It binds both commits,
+runtime digests, original manifest digests, image identity, catalog and tool versions, elapsed time
+and normalized finding fingerprints. Missing tools, tests or evidence files, mismatched fixtures and
+a failed candidate assessment fail the pull-request build. An incomplete result remains comparable
+only when every planned tool produced its result and the incompleteness comes from retained finding
+candidates awaiting triage.
+
+[`security-assessment.yml`](../.github/workflows/security-assessment.yml) runs the bounded `safe`
+profile weekly and on manual dispatch. It builds and qualifies one local candidate, resolves its
+immutable Docker image ID, runs the assessment once and retains only the redacted gate record and
+run manifest for 14 days. Missing scanners, missing evidence and incomplete outcomes fail the job;
+they are never normalized as a clean run.
+
+The release workflow runs the complete `active` profile after both architectures qualify the
+candidate and before the security record can be assembled. The active manifest, normalized gate,
+image-security summaries and final release record all name the same candidate digest. Publication
+depends on that record, so another image or a second successful attempt cannot replace the required
+first attempt.
+
+Destructive assessments use the local CLI only. They have no GitHub Actions workflow because a
+self-hosted runner label cannot prove that the host is ephemeral or guarantee cleanup after runner
+loss. The CLI still requires the exact image digest, target identity and run-specific
+`authorize-destructive-<run-id>` confirmation. A future remote path needs infrastructure that
+creates and destroys a one-job runner outside the assessment job.
+
 ## Resource abuse and recovery
 
 The destructive suite requires the exact `authorize-destructive-<run-id>` confirmation. Its pinned
@@ -115,7 +150,9 @@ Browser security reuses that packaged PWA suite rather than starting a second br
 
 Authenticated ZAP uses a separate synthetic session for each role. The scanner receives the cookie only through a mode-`0600` file in its container tmpfs. It spiders read-only routes for all roles and runs the two curated query-only active rules for `MEMBER` and `ADMIN`. The gateway rejects non-canonical paths, other methods and foreign origins before the request reaches Caddy. Every role proves its session again after its scan jobs. A scanner-only response exposes a harmless header that the pinned passive rule must detect; absence of that canary, a lost session, missing role coverage or an unexpected rule makes the attempt incomplete. Raw ZAP reports and cookies are discarded with the container. Retained evidence binds both the policy and the executed role plans by digest and contains normalized candidate fingerprints but no URLs, payloads, response bodies or authentication material.
 
-Schemathesis inventories every OpenAPI operation under a fixed seed. Its examples, coverage and fuzzing phases exercise read-only operations with valid and invalid requests. Mutations receive invalid requests only; valid mutations remain in the packaged journeys and authorization suite so the state comparison has one meaning. Authentication transitions and import execution have explicit exclusions. Deterministic HTTP cases cover missing, duplicate and unknown fields, Unicode normalization, control characters, nested JSON, body size, numeric, cursor, date-time and idempotency-key boundaries. Four multipart cases cover invalid UTF-8, duplicate columns, an oversized cell and a conflicting external reference. The runner fingerprints roster, booking and configuration state immediately before and after the rejected-input phase. It excludes session counters and immutable preview records from that comparison.
+Schemathesis inventories every OpenAPI operation under a fixed seed. Its examples, coverage and fuzzing phases exercise read-only operations with valid and invalid requests. Every included mutation receives a deterministic malformed body or path value while authenticated, so invalid authentication cannot turn into a valid write when the scanner supplies credentials. Valid mutations remain in the packaged journeys and authorization suite so the state comparison has one meaning. Authentication transitions and import execution have explicit exclusions. Deterministic HTTP cases cover missing, duplicate and unknown fields, Unicode normalization, control characters, nested JSON, body size, numeric, cursor, date-time and idempotency-key boundaries. Four multipart cases cover invalid UTF-8, duplicate columns, an oversized cell and a conflicting external reference. The runner fingerprints roster, booking and configuration state immediately before and after the rejected-input phase. It excludes session counters and immutable preview records from that comparison.
+
+Each active adapter receives an isolated authentication budget. Before the authorization matrix starts, the environment owner clears only the synthetic login-attempt counters after revalidating the exact run identity; domain fixtures and sessions remain unchanged.
 
 The scanner runs with one worker and an in-memory generation database. Its image, policy and OpenAPI bytes are digest-bound. Raw responses and authentication data stay in container tmpfs and are deleted with the container. Retained evidence contains operation IDs, path templates, modes, the seed and redacted minimized requests. Reproduction digests bind those fields together. The runner compares Spring Boot's live handler mappings with OpenAPI, so a registered API operation absent from the document becomes a finding candidate. Repeated failures for one rule and operation become evidence entries on one candidate instead of duplicate lifecycle records. A missing operation, changed state or incomplete boundary case prevents a pass. Domain property tests remain separate because they exercise Java value spaces without HTTP, proxy, authentication or serialization behavior.
 

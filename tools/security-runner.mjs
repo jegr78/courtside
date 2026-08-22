@@ -128,6 +128,7 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   const verifyTarget = runtime.verifyTarget ?? missingTargetVerifier;
   const runPassiveAssessment = runtime.runPassiveAssessment ?? missingPassiveAssessment;
   const runAuthorizationAssessment = runtime.runAuthorizationAssessment ?? missingAuthorizationAssessment;
+  const resetLoginAttempts = runtime.resetLoginAttempts ?? missingLoginAttemptReset;
   const runAuthenticatedZapAssessment = runtime.runAuthenticatedZapAssessment ?? missingAuthenticatedZapAssessment;
   const runOpenApiFuzzAssessment = runtime.runOpenApiFuzzAssessment ?? missingOpenApiFuzzAssessment;
   const runResourceAbuseAssessment = runtime.runResourceAbuseAssessment ?? missingResourceAbuseAssessment;
@@ -169,7 +170,8 @@ export async function executeSecurityPlan(plan, runtime = {}) {
       let authorizationEvidence = { outcome: "passed", requestCount: 0 };
       if (fuzzEvidence.outcome !== "failed") {
         authorizationEvidence = await runAuthorizationAssessment(plan, { evidenceDirectory: paths.evidence,
-          stopFile: paths.stop, attempt, deadline, maxRequests: authorizationRequestLimit(plan) });
+          stopFile: paths.stop, attempt, deadline, maxRequests: authorizationRequestLimit(plan),
+          resetLoginAttempts: () => resetLoginAttempts(plan, { stopFile: paths.stop, deadline }) });
         assertRunning(paths, startedAt, now(), plan.budgets);
         manifest.toolResults.push({ id: "authorization-matrix", version: plan.tools[3].version,
           outcome: authorizationEvidence.outcome });
@@ -214,6 +216,10 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   manifest.usage ??= { requests: 0, generatedDataMegabytes: 0, evidenceBytes: directoryBytes(paths.evidence) };
   writeManifest(paths.manifest, manifest);
   return manifest;
+}
+
+async function missingLoginAttemptReset() {
+  throw new Error("The login-attempt reset adapter is not configured");
 }
 
 function assertUsage(usage, budgets) {

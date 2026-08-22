@@ -16,7 +16,7 @@ test("given a release image, when publishing it, then the same digest is qualifi
   assert.match(workflow, /architecture: arm64[\s\S]+runs-on: ubuntu-24\.04-arm/);
   assert.match(workflow, /COURTSIDE_UAT_VERSION: release-candidate-\$\{\{ github\.sha \}\}@\$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(workflow, /node tools\/courtside\.uat-smoke\.mjs --confirm courtside-uat/);
-  assert.match(workflow, /\n  security-record:\n    needs: \[build, image, qualify\]/);
+  assert.match(workflow, /\n  security-record:\n    needs: \[build, image, qualify, active-security\]/);
   assert.match(workflow, /\n  publish:\n    needs: \[build, image, qualify, security-record, upgrade, restore\]/);
 });
 

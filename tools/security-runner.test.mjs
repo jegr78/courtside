@@ -287,8 +287,10 @@ test("given the bounded active suites, when every attack check passes, then thei
     verifyTarget: async () => input(),
     runAuthorizationAssessment: async (_plan, context) => {
       limits.authorization = context.maxRequests;
+      await context.resetLoginAttempts();
       return { outcome: "passed", requestCount: 900 };
     },
+    resetLoginAttempts: async () => { limits.loginAttemptsReset = true; },
     runAuthenticatedZapAssessment: async (_plan, context) => {
       limits.zap = context.maxRequests;
       return { outcome: "passed", requestCount: 100,
@@ -304,7 +306,7 @@ test("given the bounded active suites, when every attack check passes, then thei
   assert.equal(manifest.outcome, "passed");
   assert.equal(manifest.usage.requests, 1200);
   assert.equal(manifest.usage.generatedDataMegabytes, 3);
-  assert.deepEqual(limits, { zap: 6000, fuzz: 2000, authorization: 2000 });
+  assert.deepEqual(limits, { zap: 6000, fuzz: 2000, loginAttemptsReset: true, authorization: 2000 });
   assert.deepEqual(manifest.toolResults.at(-1), {
     id: "authorization-matrix", version: "1.0.0", outcome: "passed"
   });

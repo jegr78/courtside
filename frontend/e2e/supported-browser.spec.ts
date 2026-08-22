@@ -9,6 +9,7 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.getByTestId("login-submit").click();
   expect((await sessionResponse).status()).toBe(200);
   await expect(page.getByTestId("logout")).toBeVisible();
+  await expect(page.getByTestId("court-plan-legend")).toBeVisible();
 }
 
 test("a member can navigate the core signed-in journey", async ({ page }) => {

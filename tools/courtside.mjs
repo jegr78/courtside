@@ -14,7 +14,7 @@ import { createRequire } from "node:module";
 import {
   inspectPassiveSecurityRuntime, readSecurityEnvironment, readSecurityIdentity, readSecurityProxyCa,
   recoverSecurityEnvironment, runAuthenticatedZap, runOpenApiFuzzer, runPassiveZap, runResourceAbuse,
-  securityDomainStateFingerprint,
+  resetSecurityLoginAttempts, securityDomainStateFingerprint,
   securityProject, securityStateRoot,
   startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment, verifySecurityEnvironmentForAssessment
 } from "./security-environment.mjs";
@@ -26,7 +26,8 @@ import { runPassiveDeploymentAssessment } from "./security-passive-deployment.mj
 import { runAuthorizationAssessment } from "./security-authorization.mjs";
 import { renderAuthenticatedZapPlan, runAuthenticatedZapAssessment } from "./security-authenticated-zap.mjs";
 import {
-  prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment, runOpenApiImportCases, runOpenApiInputCases
+  prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment, runOpenApiImportCases, runOpenApiInputCases,
+  runOpenApiMutationCases
 } from "./security-openapi-fuzz.mjs";
 import { runResourceAbuseAssessment } from "./security-resource-abuse.mjs";
 
@@ -634,8 +635,11 @@ async function execute(options) {
       runAuthorizationAssessment: async (selectedPlan, context) => runAuthorizationAssessment(selectedPlan, {
         ...context,
         ca,
-        sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD
+        sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
+        maxAddressFailures: Number(securityEnvironment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES)
       }),
+      resetLoginAttempts: async (selectedPlan, context) => resetSecurityLoginAttempts(selectedPlan.runId,
+        context.stopFile, Math.max(1, context.deadline.getTime() - Date.now())),
       runAuthenticatedZapAssessment: async (selectedPlan, context) => runAuthenticatedZapAssessment(selectedPlan, {
         ...context,
         ca,
@@ -654,6 +658,9 @@ async function execute(options) {
             ca, timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
           }),
           runInputCases: (fixture) => runOpenApiInputCases(candidate, fixture, {
+            ca, timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
+          }),
+          runMutationCases: (fixture) => runOpenApiMutationCases(candidate, fixture, {
             ca, timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
           }),
           captureState: () => securityDomainStateFingerprint(candidate.runId, context.stopFile,
@@ -1533,7 +1540,7 @@ export function restoreDatabase(input, composeArgs, environment, execute = runIn
 function resetUat(all) {
   cleanupUatFunnel();
   const plans = uatResetPlans(all);
-  plans.forEach(runInteractive);
+  runLifecyclePlans(plans);
   if (all) {
     rmSync(uatStateFile, { force: true });
     process.stdout.write("UAT database and local certificate authority removed.\n");
@@ -1541,6 +1548,10 @@ function resetUat(all) {
   }
   rmSync(uatStateFile, { force: true });
   process.stdout.write("UAT database removed; the local certificate authority was retained.\n");
+}
+
+export function runLifecyclePlans(plans, run = runInteractive) {
+  plans.forEach((plan) => run(plan));
 }
 
 export function uatResetPlans(all) {

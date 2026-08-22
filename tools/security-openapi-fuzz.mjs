@@ -51,10 +51,10 @@ export function buildOpenApiFuzzInventory(api, policy = openApiFuzzPolicy) {
   return inventory;
 }
 
-export function normalizeSchemathesisEvents(events, inventory, mode) {
+export function normalizeSchemathesisEvents(events, inventory, mode, contractOperationCount = inventory.length) {
   if (!events.length) throw new Error("Schemathesis produced no operation inventory");
   const loading = events.find(({ LoadingFinished }) => LoadingFinished)?.LoadingFinished;
-  if (loading?.statistic?.operations?.total !== inventory.length) {
+  if (loading?.statistic?.operations?.total !== contractOperationCount) {
     throw new Error("Schemathesis contract operation count differs from the pinned inventory");
   }
   const expected = inventory.filter(({ modes }) => modes.includes(mode));
@@ -117,8 +117,9 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     throw new Error("OpenAPI fuzzing has no remaining request budget");
   }
   const inventory = buildOpenApiFuzzInventory(api);
+  const generatedInventory = inventory.filter(({ method }) => method === "GET");
   const scanner = await context.runFuzzer(plan, {
-    inventory,
+    inventory: generatedInventory,
     policy: openApiFuzzPolicy,
     policyDigest: openApiFuzzPolicyDigest(),
     specificationDigest: openApiSpecificationDigest(),
@@ -131,8 +132,10 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     throw new Error("OpenAPI fuzzer runtime, request or specification evidence is incomplete");
   }
   const normalized = ["positive", "negative"].map((mode) =>
-    normalizeSchemathesisEvents(scanner.events[mode], inventory, mode));
-  const operationOutcomes = normalized.flatMap(({ operationResults }) => operationResults);
+    normalizeSchemathesisEvents(scanner.events[mode], generatedInventory, mode, inventory.length));
+  const operationOutcomes = [...normalized.flatMap(({ operationResults }) => operationResults),
+    ...scanner.mutationCases.map(({ operationId, outcome }) => ({ operationId, mode: "negative", outcome,
+      observation: outcome === "passed" ? "curated-invalid-input-rejected" : "candidate-requires-triage" }))];
   const counterexamples = normalized.flatMap(({ counterexamples: values }) => values);
   const undocumentedRoutes = [...normalized.flatMap(({ undocumentedRoutes: values }) => values),
     ...undocumentedRuntimeRoutes(scanner.observedRoutes, inventory)]
@@ -151,7 +154,8 @@ export async function runOpenApiFuzzAssessment(plan, context) {
   const incomplete = counterexamples.length > 0 || undocumentedRoutes.length > 0
     || operationOutcomes.some(({ outcome }) => outcome === "incomplete")
     || scanner.inputCases.some(({ outcome }) => outcome === "incomplete")
-    || scanner.importCases.some(({ outcome }) => outcome === "incomplete");
+    || scanner.importCases.some(({ outcome }) => outcome === "incomplete")
+    || scanner.mutationCases.some(({ outcome }) => outcome === "incomplete");
   const evidence = {
     schemaVersion: 1,
     testIds: ["CSA-API-001", "CSA-IMPORT-001"],
@@ -165,6 +169,7 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     undocumentedRoutes,
     inputCases: scanner.inputCases,
     importCases: scanner.importCases,
+    mutationCases: scanner.mutationCases,
     stateBefore: scanner.stateBefore,
     stateAfter: scanner.stateAfter,
     candidates,
@@ -198,20 +203,33 @@ export async function prepareOpenApiFuzzFixtures(plan, context) {
   }, { csrf: true });
   if (login.status !== 200 || !client.csrfToken()) throw new Error("Synthetic fuzzer authentication failed");
   const source = await request({ method: "POST", path: "/api/admin/import/sources",
-    headers: { "content-type": "application/json" }, body: JSON.stringify({
-      sourceKey: `security-fuzz-${context.attempt}`,
-      displayName: "Security fuzz source",
-      columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME",
-        "Last name": "LAST_NAME", Email: "EMAIL" },
-      defaultMembershipTypeId: "cccccccc-0000-0000-0000-000000000001",
-      removalWarningPercent: 10
-    }) }, { csrf: true });
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(securityImportSourceRequest(plan.runId, context.attempt))
+  }, { csrf: true });
   if (source.status !== 201 || !source.json?.id) throw new Error("Synthetic import source setup failed");
   const mappings = await request({ method: "GET", path: "/__security/runtime-mappings", headers: {} },
     { maxResponseBytes: 2 * 1024 * 1024 });
   if (mappings.status !== 200 || !mappings.json) throw new Error("Runtime route inventory is unavailable");
   return { client, sourceId: source.json.id, observedRoutes: runtimeOperations(mappings.json), requestCount,
     close: () => control.close() };
+}
+
+export function securityImportSourceKey(runId, attempt) {
+  const identity = createHash("sha256").update(`${runId}:${attempt}`).digest("hex").slice(0, 16);
+  return `security-fuzz-${identity}`;
+}
+
+export function securityImportSourceRequest(runId, attempt) {
+  return {
+    sourceKey: securityImportSourceKey(runId, attempt),
+    displayName: "Security fuzz source",
+    separator: ";",
+    encoding: "UTF-8",
+    columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME",
+      "Last name": "LAST_NAME", Email: "EMAIL" },
+    defaultMembershipTypeId: "cccccccc-0000-0000-0000-000000000001",
+    removalWarningPercent: 10
+  };
 }
 
 export async function runOpenApiImportCases(plan, fixture, context) {
@@ -279,16 +297,62 @@ export async function runOpenApiInputCases(plan, fixture, context) {
       headers: { ...(entry.body !== undefined ? { "content-type": "application/json" } : {}),
         ...(entry.headers ?? {}) },
       ...(entry.body !== undefined ? { body: entry.body } : {})
-    }, { ca: context.ca, csrf: entry.method !== "GET", timeoutMilliseconds: context.timeoutMilliseconds });
+    }, { ca: context.ca, csrf: entry.method !== "GET", timeoutMilliseconds: context.timeoutMilliseconds,
+      acceptConnectionReset: entry.id === "oversized-body" });
     const typed = response.status >= 400 && response.status < 500
       && /^urn:courtside:error:[a-z0-9-]+$/.test(response.problemType ?? "");
-    const proxyRejected = entry.expectedStatus === 413 && response.status === 413;
-    results.push({ id: entry.id, status: response.status,
+    const proxyRejected = entry.expectedStatus === 413
+      && (response.status === 413 || response.transportError === "connection-reset");
+    results.push({ id: entry.id,
+      ...(response.status ? { status: response.status } : {}),
+      ...(response.transportError ? { transportError: response.transportError } : {}),
       ...(response.problemType ? { problemType: response.problemType } : {}),
       observation: proxyRejected ? "proxy-size-rejection" : "typed-input-rejection",
       outcome: typed || proxyRejected ? "passed" : "incomplete" });
   }
   return { cases: results, requestCount: cases.length, generatedBytes };
+}
+
+export async function runOpenApiMutationCases(plan, fixture, context) {
+  const operations = buildOpenApiFuzzInventory(api)
+    .filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
+  const results = [];
+  let generatedBytes = 0;
+  const send = context.request ?? ((probe) => authorizationRequest(plan.target, fixture.client, probe, {
+    ca: context.ca,
+    signal: context.signal,
+    csrf: true,
+    timeoutMilliseconds: context.timeoutMilliseconds
+  }));
+  for (const operation of operations) {
+    const definition = api.paths[operation.path][operation.method.toLowerCase()];
+    const parameters = [...(api.paths[operation.path].parameters ?? []), ...(definition.parameters ?? [])];
+    const path = operation.path.replaceAll(/\{[^}]+\}/g, "invalid");
+    const contentTypes = Object.keys(definition.requestBody?.content ?? {});
+    const contentType = contentTypes[0];
+    const probe = { method: operation.method, path, headers: {} };
+    for (const parameter of parameters.filter(({ in: location, required }) => location === "header" && required)) {
+      probe.headers[parameter.name] = "security-invalid";
+    }
+    if (contentType === "application/json") {
+      probe.headers["content-type"] = contentType;
+      probe.body = "{";
+    } else if (contentType === "application/x-www-form-urlencoded") {
+      probe.headers["content-type"] = contentType;
+      probe.body = "";
+    } else if (contentType === "multipart/form-data") {
+      probe.headers["content-type"] = "multipart/form-data; boundary=courtside-invalid";
+      probe.body = "--courtside-invalid--\r\n";
+    }
+    generatedBytes += Buffer.byteLength(path) + Buffer.byteLength(probe.body ?? "");
+    const response = await send(probe);
+    const passed = response.status >= 400 && response.status < 500
+      && /^urn:courtside:error:[a-z0-9-]+$/.test(response.problemType ?? "");
+    results.push({ operationId: operation.operationId, method: operation.method, path: operation.path,
+      status: response.status, ...(response.problemType ? { problemType: response.problemType } : {}),
+      observation: "invalid-mutation-rejected", outcome: passed ? "passed" : "incomplete" });
+  }
+  return { cases: results, requestCount: results.length, generatedBytes };
 }
 
 export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFuzzInventory(api)) {
@@ -319,6 +383,9 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
       || operation.path !== counterexample.pathTemplate || !operation.modes.includes(counterexample.mode);
   })) throw new Error("OpenAPI fuzz evidence contains an unbound counterexample");
   const candidateFingerprints = evidence.candidates.map(({ fingerprint }) => fingerprint);
+  if (evidence.inputCases.some((entry) => (entry.status === undefined) === (entry.transportError === undefined))) {
+    throw new Error("OpenAPI input evidence must contain exactly one transport outcome");
+  }
   if (new Set(candidateFingerprints).size !== candidateFingerprints.length) {
     throw new Error("OpenAPI fuzz evidence contains duplicate lifecycle candidates");
   }
@@ -343,11 +410,19 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
       !== JSON.stringify(openApiFuzzPolicy.inputClasses.toSorted())) {
     throw new Error("OpenAPI fuzz evidence omits a required input class");
   }
+  const expectedMutations = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"))
+    .map(({ operationId, method, path }) => JSON.stringify({ operationId, method, path })).toSorted();
+  if (JSON.stringify(evidence.mutationCases.map(({ operationId, method, path }) =>
+    JSON.stringify({ operationId, method, path })).toSorted())
+      !== JSON.stringify(expectedMutations)) {
+    throw new Error("OpenAPI fuzz evidence omits a negative mutation case");
+  }
   const derived = evidence.stateBefore !== evidence.stateAfter ? "failed"
     : evidence.counterexamples.length > 0 || evidence.undocumentedRoutes.length > 0
       || evidence.operations.some(({ outcomes }) => outcomes.some(({ outcome }) => outcome === "incomplete"))
       || evidence.inputCases.some(({ outcome }) => outcome === "incomplete")
-      || evidence.importCases.some(({ outcome }) => outcome === "incomplete") ? "incomplete" : "passed";
+      || evidence.importCases.some(({ outcome }) => outcome === "incomplete")
+      || evidence.mutationCases.some(({ outcome }) => outcome === "incomplete") ? "incomplete" : "passed";
   if (evidence.outcome !== derived) throw new Error("OpenAPI fuzz evidence outcome is inconsistent");
 }
 

@@ -7,7 +7,7 @@ import { test } from "node:test";
 import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
-  openBackupForRestore, processPlans, requiredPorts, restoreDatabase, runInteractive, startProcesses,
+  openBackupForRestore, processPlans, requiredPorts, restoreDatabase, runInteractive, runLifecyclePlans, startProcesses,
   superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
@@ -1079,6 +1079,9 @@ test("given the release qualification smoke, when starting UAT, then credential 
 
   // when / then
   assert.match(smoke, /startArguments = \["uat", "--no-credential-output"/);
+  assert.match(smoke, /localCa = composeRun\("exec", "-T", "proxy", "cat"/);
+  assert.ok(smoke.split("\n").filter((line) => line.includes("secure: true"))
+    .every((line) => line.includes("ca: localCa")));
 });
 
 test("given UAT status, when parsing output options, then the environment is retained", () => {
@@ -1205,6 +1208,18 @@ test("given an execution plan, when running it, then only trusted commands run w
   assert.equal(failure.message, "Unsupported command: untrusted");
   assert.equal(calls[0].command, "docker");
   assert.equal(calls[0].options.shell, false);
+});
+
+test("given lifecycle plans, when running them, then array indexes never replace the command executor", () => {
+  // given
+  const plans = [{ command: "docker", args: ["first"] }, { command: "docker", args: ["second"] }];
+  const calls = [];
+
+  // when
+  runLifecyclePlans(plans, (...arguments_) => calls.push(arguments_));
+
+  // then
+  assert.deepEqual(calls, [[plans[0]], [plans[1]]]);
 });
 
 test("given a restore failure, when restoring UAT, then changes are atomic and the application restarts", () => {
