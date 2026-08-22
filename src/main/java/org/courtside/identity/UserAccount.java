@@ -51,6 +51,9 @@ public class UserAccount {
     @Column(name = "password_change_required", nullable = false)
     private boolean passwordChangeRequired;
 
+    @Column(name = "credentials_expire_at")
+    private Instant credentialsExpireAt;
+
     @Column(name = "security_epoch", nullable = false)
     private long securityEpoch;
 
@@ -64,6 +67,22 @@ public class UserAccount {
     @Column(name = "role", nullable = false)
     @Enumerated(EnumType.STRING)
     private Set<Role> roles;
+
+    // Between creation and delivery the hash is of a value nobody kept, so no input matches it and
+    // the encoder never warns about a broken one; the absent expiry is what says nothing is out yet.
+    public static UserAccount awaitingCredentials(Person person, String username,
+                                                  String placeholderHash, Set<Role> roles) {
+        UserAccount account = new UserAccount(person, username, placeholderHash, roles);
+        account.requirePasswordChange();
+        return account;
+    }
+
+    public void credentialsIssued(String passwordHash, Instant expiresAt) {
+        this.passwordHash = passwordHash;
+        this.credentialsExpireAt = expiresAt;
+        requirePasswordChange();
+        revokeSessions();
+    }
 
     public UserAccount(Person person, String username, String passwordHash, Set<Role> roles) {
         this.id = UUID.randomUUID();

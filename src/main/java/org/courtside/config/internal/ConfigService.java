@@ -2,6 +2,9 @@ package org.courtside.config.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.BookingGridSettings;
+import org.courtside.config.ClubIdentity;
+import org.courtside.config.CredentialValidity;
+import org.courtside.shared.CredentialsRequested;
 import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.BookingGridCoordination;
@@ -21,7 +24,8 @@ import java.time.ZoneId;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone {
+public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone,
+        CredentialValidity, ClubIdentity {
 
     private final ClubConfigurationRepository configurations;
     private final List<BookingGridConstraint> bookingGridConstraints;
@@ -40,6 +44,24 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     @Override
     public BookingSlotDuration slotDuration() {
         return new BookingSlotDuration(current().slotMinutes());
+    }
+
+    @Override
+    public String clubName() {
+        return current().clubName();
+    }
+
+    @Override
+    public String defaultLocale() {
+        return current().defaultLocale();
+    }
+
+    @Override
+    public java.time.Duration validFor(CredentialsRequested.Reason reason) {
+        ClubConfigurationSnapshot configuration = current();
+        return java.time.Duration.ofHours(reason == CredentialsRequested.Reason.NEW_ACCOUNT
+                ? configuration.newAccountCredentialHours()
+                : configuration.passwordResetCredentialHours());
     }
 
     @Override

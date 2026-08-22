@@ -1,4 +1,9 @@
 courtside:
+  mail:
+    host: localhost
+    port: 2525
+    from: no-reply@courtside.test
+    reply-to: board@courtside.test
   bootstrap-admin:
     username: bootstrap-admin
     password: temporary-password
