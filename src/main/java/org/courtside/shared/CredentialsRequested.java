@@ -1,10 +1,15 @@
 package org.courtside.shared;
 
+import org.jspecify.annotations.NullMarked;
+
 import java.util.UUID;
 
 // The event says which account needs a credential and why; it never carries one. The credential is
 // generated when the message is sent, so nothing that outlives this record has ever held it.
+@NullMarked
 public record CredentialsRequested(UUID accountId, Reason reason) implements DomainEventRecord {
+
+    static final String TYPE = "identity.account.credentialsRequested";
 
     public enum Reason {
         NEW_ACCOUNT,
@@ -13,7 +18,7 @@ public record CredentialsRequested(UUID accountId, Reason reason) implements Dom
 
     @Override
     public String eventType() {
-        return "identity.account.credentialsRequested";
+        return TYPE;
     }
 
     @Override

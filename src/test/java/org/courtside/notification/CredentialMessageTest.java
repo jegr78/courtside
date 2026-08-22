@@ -1,18 +1,15 @@
 package org.courtside.notification;
 
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.identity.Person;
-import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
-import org.courtside.identity.UserAccountRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.CredentialsRequested;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Import;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -22,10 +19,12 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
+@Import(IdentityTestFixture.class)
 class CredentialMessageTest extends AbstractIntegrationTest {
 
     @MockitoSpyBean
@@ -35,20 +34,14 @@ class CredentialMessageTest extends AbstractIntegrationTest {
     private ApplicationEventPublisher events;
 
     @Autowired
-    private UserAccountRepository accounts;
-
-    @Autowired
-    private PersonRepository people;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private IdentityTestFixture identity;
 
     @Autowired
     private TransactionTemplate transactions;
 
     @BeforeEach
     void captureInsteadOfSending() {
-        doNothing().when(sender).send(org.mockito.ArgumentMatchers.any(MimeMessage.class));
+        doNothing().when(sender).send(any(MimeMessage.class));
     }
 
     @Test
@@ -58,14 +51,10 @@ class CredentialMessageTest extends AbstractIntegrationTest {
         UUID accountId = anAccountAwaitingItsCredential();
 
         // when
-        transactions.executeWithoutResult(status ->
-                events.publishEvent(new CredentialsRequested(accountId,
-                        CredentialsRequested.Reason.NEW_ACCOUNT)));
+        raise(accountId, CredentialsRequested.Reason.NEW_ACCOUNT);
 
         // then
-        var message = forClass(MimeMessage.class);
-        verify(sender, timeout(10_000)).send(message.capture());
-        MimeMessage sent = message.getValue();
+        MimeMessage sent = theMessageHandedOver();
         assertThat(sent.getAllRecipients()[0].toString()).isEqualTo("jane.doe@example.org");
         assertThat(sent.getHeader("Message-ID")[0]).contains("@courtside.test");
         assertThat(body(sent)).contains("Benutzername:").doesNotContain("User name:");
@@ -78,14 +67,10 @@ class CredentialMessageTest extends AbstractIntegrationTest {
         UUID accountId = anAccountAwaitingItsCredential();
 
         // when
-        transactions.executeWithoutResult(status ->
-                events.publishEvent(new CredentialsRequested(accountId,
-                        CredentialsRequested.Reason.PASSWORD_RESET)));
+        raise(accountId, CredentialsRequested.Reason.PASSWORD_RESET);
 
         // then
-        var message = forClass(MimeMessage.class);
-        verify(sender, timeout(10_000)).send(message.capture());
-        assertThat(body(message.getValue())).contains("neues Passwort ausgestellt");
+        assertThat(body(theMessageHandedOver())).contains("neues Passwort ausgestellt");
     }
 
     @Test
@@ -94,17 +79,23 @@ class CredentialMessageTest extends AbstractIntegrationTest {
         UUID accountId = anAccountAwaitingItsCredential();
 
         // when
-        transactions.executeWithoutResult(status ->
-                events.publishEvent(new CredentialsRequested(accountId,
-                        CredentialsRequested.Reason.NEW_ACCOUNT)));
-        var message = forClass(MimeMessage.class);
-        verify(sender, timeout(10_000)).send(message.capture());
+        raise(accountId, CredentialsRequested.Reason.NEW_ACCOUNT);
 
         // then — what the member reads signs them in, and the store holds only its hash
-        String credential = credentialIn(body(message.getValue()));
-        UserAccount account = accounts.findById(accountId).orElseThrow();
-        assertThat(passwordEncoder.matches(credential, account.getPasswordHash())).isTrue();
-        assertThat(account.getPasswordHash()).doesNotContain(credential);
+        String credential = credentialIn(body(theMessageHandedOver()));
+        assertThat(identity.credentialSignsIn(accountId, credential)).isTrue();
+        assertThat(identity.storedCredentialHash(accountId)).doesNotContain(credential);
+    }
+
+    private void raise(UUID accountId, CredentialsRequested.Reason reason) {
+        transactions.executeWithoutResult(status ->
+                events.publishEvent(new CredentialsRequested(accountId, reason)));
+    }
+
+    private MimeMessage theMessageHandedOver() {
+        var message = forClass(MimeMessage.class);
+        verify(sender, timeout(10_000)).send(message.capture());
+        return message.getValue();
     }
 
     private static String body(MimeMessage message) throws Exception {
@@ -118,13 +109,8 @@ class CredentialMessageTest extends AbstractIntegrationTest {
     }
 
     private UUID anAccountAwaitingItsCredential() {
-        return transactions.execute(status -> {
-            Person person = people.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-            UserAccount account = UserAccount.awaitingCredentials(person,
-                    "doe.jane." + UUID.randomUUID().toString().substring(0, 8),
-                    passwordEncoder.encode(UUID.randomUUID().toString()), Set.of(Role.MEMBER));
-            return accounts.save(account).getId();
-        });
+        UUID personId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        return identity.createAccountAwaitingCredentials(personId,
+                "doe.jane." + UUID.randomUUID().toString().substring(0, 8), Set.of(Role.MEMBER));
     }
-
 }
