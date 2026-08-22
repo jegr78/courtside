@@ -72,11 +72,12 @@ configuration is mandatory — an instance without it refuses to start and names
 the variables it is missing — and `/actuator/health/mail` reports the sending path to an
 administrator without ever opening it. The message names the date its password stops working, and
 sign-in enforces that date: once it has passed the credential no longer authenticates, and the
-board issues a new one. The date binds the issued credential only, so a member who has since
-chosen their own password keeps it. A message the relay refuses is retried, and if it is still
-refused the event stays outstanding rather than being recorded as delivered, so a restart
-republishes it instead of losing it. What raises that event is still to come: the roster continues
-to ask an administrator for a one-time password.
+board issues a new one. How long an invitation and a reset last is a club setting, one figure for
+each, so a board that knows its own members decides it rather than inheriting ours. The date binds
+the issued credential only, so a member who has since chosen their own password keeps it. A message
+the relay refuses is retried, and if it is still refused the event stays outstanding rather than
+being recorded as delivered, so a restart republishes it instead of losing it. What raises that
+event is still to come: the roster continues to ask an administrator for a one-time password.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers — including creating a recurring
@@ -280,11 +281,13 @@ nothing about payment. Adding a new consumer is additive.
 The two consumers want different guarantees, and both are served from one publication. `audit`
 listens **before the commit** and writes its row in the same transaction: no commit without a row,
 which is the property that makes a log an audit log. That guarantee rests on the transaction, not
-on where a publish sits in a method — the one `@TransactionalEventListener` is registered at
-`BEFORE_COMMIT`, and a `RuntimeException` rolls the transaction back before it ever runs, so a
-change that never commits is a change never recorded. Everything else listens **after** it, through
-the event publication registry, which stores the publication in that same transaction and therefore
-delivers again after a restart that interrupted it — at least once, never never. A producer knows
+on where a publish sits in a method — exactly one listener is registered at `BEFORE_COMMIT`, the
+audit writer, and a `RuntimeException` rolls the transaction back before it ever runs, so a change
+that never commits is a change never recorded. Everything else listens **after** it, through the
+event publication registry, which stores the publication in that same transaction and therefore
+delivers again after a restart that interrupted it — at least once, never never. A consumer that
+waits on something outside the instance, as sending a message does, takes its own executor, so a
+mail server nothing can reach does not hold up the audit trail behind it. A producer knows
 neither consumer.
 
 An event carries ids and values that are not personal. A correction to a name or an address records

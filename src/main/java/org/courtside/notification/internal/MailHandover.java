@@ -29,9 +29,12 @@ class MailHandover {
                 return;
             } catch (RuntimeException failure) {
                 if (attempt >= ATTEMPTS) {
+                    String diagnosis = diagnosis(failure);
                     log.warn("Gave up handing over {} after {} attempts: {}", messageId, attempt,
-                            diagnosis(failure));
-                    throw failure;
+                            diagnosis);
+                    // Without the cause: it escapes into the async handler, which logs the chain,
+                    // and a rejected recipient reports the address it rejected.
+                    throw new MailHandoverFailedException(messageId, diagnosis);
                 }
                 log.info("Handing over {} failed on attempt {} ({}), retrying in {}", messageId,
                         attempt, diagnosis(failure), gap);

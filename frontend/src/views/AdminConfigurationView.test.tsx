@@ -16,7 +16,9 @@ describe("AdminConfigurationView", () => {
       accentColor: "#d7e24b",
       defaultLocale: "en",
       slotMinutes: 30,
-      timeZone: "Europe/Berlin"
+      timeZone: "Europe/Berlin",
+      newAccountCredentialHours: 168,
+      passwordResetCredentialHours: 24
     });
     vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
     vi.spyOn(api, "ruleTypes").mockResolvedValue([
@@ -164,7 +166,9 @@ describe("AdminConfigurationView", () => {
       accentColor: "#d7e24b",
       defaultLocale: "en",
       slotMinutes: 15,
-      timeZone: "Pacific/Auckland"
+      timeZone: "Pacific/Auckland",
+      newAccountCredentialHours: 168,
+      passwordResetCredentialHours: 24
     });
     const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
       ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
@@ -179,6 +183,8 @@ describe("AdminConfigurationView", () => {
     await user.type(screen.getByTestId("club-name"), "Example Racquet Club");
     await user.clear(screen.getByTestId("slot-minutes"));
     await user.type(screen.getByTestId("slot-minutes"), "15");
+    await user.clear(screen.getByTestId("new-account-credential-hours"));
+    await user.type(screen.getByTestId("new-account-credential-hours"), "72");
     await user.selectOptions(screen.getByTestId("time-zone"), "Pacific/Auckland");
     await user.click(screen.getByTestId("save-club-config"));
     await user.clear(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"));
@@ -187,7 +193,8 @@ describe("AdminConfigurationView", () => {
 
     // then
     expect(changeConfig).toHaveBeenCalledWith(expect.objectContaining({
-      clubName: "Example Racquet Club", slotMinutes: 15, timeZone: "Pacific/Auckland"
+      clubName: "Example Racquet Club", slotMinutes: 15, timeZone: "Pacific/Auckland",
+      newAccountCredentialHours: 72
     }));
     expect(configurationChanged).toHaveBeenCalled();
     expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 });
@@ -203,7 +210,9 @@ describe("AdminConfigurationView", () => {
       accentColor: "#d7e24b",
       defaultLocale: "en",
       slotMinutes: 30,
-      timeZone: "Europe/Berlin"
+      timeZone: "Europe/Berlin",
+      newAccountCredentialHours: 168,
+      passwordResetCredentialHours: 24
     })).mockReturnValueOnce(reload.promise);
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
     const user = userEvent.setup();
@@ -221,7 +230,9 @@ describe("AdminConfigurationView", () => {
         accentColor: "#d7e24b",
         defaultLocale: "en",
         slotMinutes: 30,
-        timeZone: "Europe/Berlin"
+        timeZone: "Europe/Berlin",
+        newAccountCredentialHours: 168,
+        passwordResetCredentialHours: 24
       });
       return reload.promise;
     });
@@ -266,7 +277,9 @@ describe("AdminConfigurationView", () => {
       accentColor: "#d7e24b",
       defaultLocale: "en",
       slotMinutes: 30,
-      timeZone: "US/Eastern"
+      timeZone: "US/Eastern",
+      newAccountCredentialHours: 168,
+      passwordResetCredentialHours: 24
     });
 
     // when

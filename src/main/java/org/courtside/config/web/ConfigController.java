@@ -1,6 +1,7 @@
 package org.courtside.config.web;
 
 import org.courtside.api.AdminConfigApi;
+import org.courtside.api.ApiAdminClubConfig;
 import org.courtside.api.ApiClubConfig;
 import org.courtside.api.ApiClubConfigRequest;
 import org.courtside.api.ClubConfigApi;
@@ -33,16 +34,17 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
     }
 
     @Override
-    public ResponseEntity<ApiClubConfig> getClubConfigForAdmin() {
-        return ResponseEntity.ok(toResponse(config.current()));
+    public ResponseEntity<ApiAdminClubConfig> getClubConfigForAdmin() {
+        return ResponseEntity.ok(toAdminResponse(config.current()));
     }
 
     @Override
-    public ResponseEntity<ApiClubConfig> changeClubConfig(ApiClubConfigRequest request) {
-        return ResponseEntity.ok(toResponse(config.update(
+    public ResponseEntity<ApiAdminClubConfig> changeClubConfig(ApiClubConfigRequest request) {
+        return ResponseEntity.ok(toAdminResponse(config.update(
                 request.getClubName(), request.getPrimaryColor(), request.getAccentColor(),
                 request.getLogoUrl(), request.getImprintUrl(), request.getDefaultLocale(),
-                request.getSlotMinutes(), request.getTimeZone())));
+                request.getSlotMinutes(), request.getTimeZone(),
+                request.getNewAccountCredentialHours(), request.getPasswordResetCredentialHours())));
     }
 
     @Override
@@ -64,6 +66,17 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.clubName(), configuration.primaryColor(),
                 configuration.accentColor(), configuration.defaultLocale(),
                 configuration.slotMinutes(), configuration.timeZone())
+                .logoUrl(configuration.logoUrl())
+                .imprintUrl(configuration.imprintUrl());
+    }
+
+    private static ApiAdminClubConfig toAdminResponse(ClubConfigurationSnapshot configuration) {
+        return new ApiAdminClubConfig(
+                configuration.clubName(), configuration.primaryColor(),
+                configuration.accentColor(), configuration.defaultLocale(),
+                configuration.slotMinutes(), configuration.timeZone(),
+                configuration.newAccountCredentialHours(),
+                configuration.passwordResetCredentialHours())
                 .logoUrl(configuration.logoUrl())
                 .imprintUrl(configuration.imprintUrl());
     }

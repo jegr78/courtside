@@ -199,6 +199,8 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             </select>
           </label>
           <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
+          <TextField data-testid="new-account-credential-hours" type="number" min={1} max={8760} label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => changeConfig({ newAccountCredentialHours: Number(event.target.value) })} />
+          <TextField data-testid="password-reset-credential-hours" type="number" min={1} max={8760} label={t("admin.config.passwordResetCredentialHours")} value={config.passwordResetCredentialHours} onChange={(event) => changeConfig({ passwordResetCredentialHours: Number(event.target.value) })} />
           <div className="grid gap-1">
             <label className="grid gap-2 font-medium">
               {t("admin.config.timeZone")}

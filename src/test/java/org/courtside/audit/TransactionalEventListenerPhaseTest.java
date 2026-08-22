@@ -26,14 +26,28 @@ class TransactionalEventListenerPhaseTest {
         }
 
         // then
-        assertThat(annotated).as(
-                        "Section 3 of docs/design.md states the audit guarantee rests on there being "
-                                + "exactly one " + ANNOTATION + ", registered at BEFORE_COMMIT. A second "
-                                + "listener, or a phase moved off BEFORE_COMMIT, makes that sentence false; "
-                                + "update the design specification in the same change that adds or moves one.")
+        List<String> beforeCommit = annotated.stream()
+                .filter(TransactionalEventListenerPhaseTest::listensBeforeCommit).toList();
+        assertThat(beforeCommit).as(
+                        "Section 3 of docs/design.md states the audit guarantee rests on exactly one "
+                                + ANNOTATION + " registered at BEFORE_COMMIT: no commit without a row. A "
+                                + "second one there, or that phase moved off the audit writer, makes that "
+                                + "sentence false; update the design specification in the same change.")
                 .containsExactly("org/courtside/audit/internal/DomainEventWriter.java");
-        assertThat(Files.readString(Path.of("src/main/java", annotated.getFirst())))
+        assertThat(Files.readString(Path.of("src/main/java", beforeCommit.getFirst())))
                 .contains(ANNOTATION + "(phase = TransactionPhase.BEFORE_COMMIT)");
+    }
+
+    private static boolean listensBeforeCommit(String relative) {
+        return read(Path.of("src/main/java", relative)).contains("TransactionPhase.BEFORE_COMMIT");
+    }
+
+    private static String read(Path source) {
+        try {
+            return Files.readString(source);
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot read " + source, e);
+        }
     }
 
     private static boolean declaresListener(Path source) {

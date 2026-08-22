@@ -3,6 +3,8 @@ package org.courtside.notification.internal;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
@@ -12,6 +14,18 @@ import java.util.Properties;
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(MailProperties.class)
 class NotificationConfiguration {
+
+    // Handing a message over waits for the relay, and the shared executor also carries the audit
+    // trail and every other module's listeners, which must not queue behind a mail server.
+    @Bean
+    TaskExecutor credentialMailExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setThreadNamePrefix("credential-mail-");
+        executor.initialize();
+        return executor;
+    }
 
     @Bean
     JavaMailSender courtsideMailSender(MailProperties properties) {

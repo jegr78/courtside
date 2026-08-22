@@ -2,6 +2,8 @@ package org.courtside.notification.internal;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,7 +58,7 @@ class MailHandoverTest {
         assertThatThrownBy(() -> handover.attempt(MESSAGE_ID, () -> {
             attempts.incrementAndGet();
             throw new IllegalStateException("nothing is listening");
-        })).isInstanceOf(IllegalStateException.class);
+        })).isInstanceOf(MailHandoverFailedException.class);
 
         // then — four tries inside a minute, because a neighbour that is restarting is back by then
         assertThat(attempts).hasValue(4);
@@ -65,4 +67,27 @@ class MailHandoverTest {
         assertThat(gaps.stream().reduce(Duration.ZERO, Duration::plus))
                 .isLessThan(Duration.ofMinutes(2));
     }
+
+    @Test
+    void givenARelayThatNamesTheRecipient_whenGivingUp_thenWhatEscapesDoesNotCarryTheAddress() {
+        // given — a rejected recipient is reported with the address it rejected
+        Runnable rejecting = () -> {
+            throw new IllegalStateException("550 5.1.1 <jane.doe@example.org> recipient unknown");
+        };
+
+        // when / then — the listener is async, so whatever escapes is logged with its whole chain
+        assertThatThrownBy(() -> handover.attempt(MESSAGE_ID, rejecting))
+                .satisfies(failure -> assertThat(fullTrace(failure))
+                        .as("no log line may carry a member's address")
+                        .doesNotContain("jane.doe@example.org")
+                        .contains(MESSAGE_ID)
+                        .contains("IllegalStateException"));
+    }
+
+    private static String fullTrace(Throwable failure) {
+        StringWriter rendered = new StringWriter();
+        failure.printStackTrace(new PrintWriter(rendered));
+        return rendered.toString();
+    }
+
 }

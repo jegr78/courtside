@@ -79,7 +79,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     @Transactional
     public ClubConfigurationSnapshot update(String clubName, String primaryColor, String accentColor,
                                             String logoUrl, String imprintUrl, String defaultLocale,
-                                            int slotMinutes, String timeZone) {
+                                            int slotMinutes, String timeZone,
+                                            int newAccountCredentialHours,
+                                            int passwordResetCredentialHours) {
         BookingSlotDuration slotDuration = new BookingSlotDuration(slotMinutes);
         ZoneId zoneId = ZoneId.of(timeZone);
         lock();
@@ -114,12 +116,19 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         if (!Objects.equals(configuration.getImprintUrl(), imprintUrl)) {
             changedFields.add("imprintUrl");
         }
+        if (configuration.getNewAccountCredentialHours() != newAccountCredentialHours) {
+            changedFields.add("newAccountCredentialHours");
+        }
+        if (configuration.getPasswordResetCredentialHours() != passwordResetCredentialHours) {
+            changedFields.add("passwordResetCredentialHours");
+        }
         boolean localeChanged = !Objects.equals(configuration.getDefaultLocale(), defaultLocale);
         boolean slotMinutesChanged = configuration.getSlotMinutes() != slotMinutes;
         boolean timeZoneChanged = !configuration.getTimeZone().equals(timeZone);
 
         configuration.changeTo(clubName, primaryColor, accentColor,
                 logoUrl, imprintUrl, defaultLocale, slotMinutes, timeZone);
+        configuration.changeCredentialValidity(newAccountCredentialHours, passwordResetCredentialHours);
 
         if (!changedFields.isEmpty()) {
             events.publishEvent(new ConfigEvent.ClubChanged(configuration.getId(), List.copyOf(changedFields)));

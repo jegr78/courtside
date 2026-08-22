@@ -32,7 +32,8 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         // when
         config.update("Example Tennis Club", current.primaryColor(), current.accentColor(),
                 current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                current.slotMinutes(), current.timeZone());
+                current.slotMinutes(), current.timeZone(),
+                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
 
         // then
         Map<String, Object> payload = latestPayloadOf(ConfigEvent.ClubChanged.TYPE);
@@ -52,7 +53,8 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         // when
         config.update(current.clubName(), current.primaryColor(), current.accentColor(),
                 current.logoUrl(), current.imprintUrl(), "en",
-                current.slotMinutes(), current.timeZone());
+                current.slotMinutes(), current.timeZone(),
+                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
 
         // then
         assertThat(latestPayloadOf(ConfigEvent.LocaleChanged.TYPE)).containsEntry("defaultLocale", "en");
@@ -69,7 +71,8 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         // when
         config.update(current.clubName(), current.primaryColor(), current.accentColor(),
                 current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                60, current.timeZone());
+                60, current.timeZone(),
+                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
 
         // then
         assertThat(latestPayloadOf(ConfigEvent.SlotDurationChanged.TYPE)).containsEntry("slotMinutes", 60);
@@ -86,7 +89,8 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         // when
         config.update(current.clubName(), current.primaryColor(), current.accentColor(),
                 current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                current.slotMinutes(), "UTC");
+                current.slotMinutes(), "UTC",
+                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
 
         // then
         assertThat(latestPayloadOf(ConfigEvent.TimeZoneChanged.TYPE)).containsEntry("timeZone", "UTC");
@@ -104,7 +108,8 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         // when
         config.update(current.clubName(), current.primaryColor(), current.accentColor(),
                 current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                current.slotMinutes(), current.timeZone());
+                current.slotMinutes(), current.timeZone(),
+                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
 
         // then
         assertThat(countOf(ConfigEvent.ClubChanged.TYPE)).isEqualTo(before);
@@ -121,7 +126,8 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         // when
         config.update("Example Tennis Club", current.primaryColor(), current.accentColor(),
                 current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                current.slotMinutes(), current.timeZone());
+                current.slotMinutes(), current.timeZone(),
+                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
 
         // then
         UUID configId = UUID.fromString((String) latestPayloadOf(ConfigEvent.ClubChanged.TYPE).get("configId"));

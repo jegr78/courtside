@@ -7,7 +7,10 @@ import org.courtside.config.CredentialValidity;
 import org.courtside.shared.CredentialIssuer;
 import org.courtside.shared.CredentialsRequested;
 import org.courtside.shared.IssuedCredential;
-import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -33,7 +36,9 @@ class CredentialMailer {
     private final MailProperties properties;
     private final Clock clock;
 
-    @ApplicationModuleListener
+    @Async("credentialMailExecutor")
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener
     void on(CredentialsRequested requested) {
         Instant expiresAt = clock.instant().plus(validity.validFor(requested.reason()));
         IssuedCredential issued = credentials.issueFor(requested.accountId(), expiresAt);

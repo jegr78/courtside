@@ -57,6 +57,7 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
         UUID personId = identity.createPerson("John", "Roe", "john.roe@example.org");
         UUID accountId = identity.createAccountAwaitingCredentials(personId,
                 "roe.john." + UUID.randomUUID().toString().substring(0, 8), Set.of(Role.MEMBER));
+        String hashBefore = identity.storedCredentialHash(accountId);
 
         // when
         transactions.executeWithoutResult(status ->
@@ -64,6 +65,10 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
 
         // then — every attempt was spent, and nothing recorded a delivery that never happened
         verify(sender, timeout(10_000).times(4)).send(any(MimeMessage.class));
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(identity.storedCredentialHash(accountId))
+                        .as("a credential nobody received must not have replaced the one on file")
+                        .isEqualTo(hashBefore));
         await().atMost(Duration.ofSeconds(10))
                 .untilAsserted(() -> assertThat(undeliveredPublications()).isEqualTo(outstandingBefore + 1));
     }

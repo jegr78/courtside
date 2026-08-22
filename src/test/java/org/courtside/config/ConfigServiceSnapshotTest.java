@@ -32,7 +32,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
         // when
         ClubConfigurationSnapshot snapshot = config.update(
                 "Example Tennis Club", "#34584A", "#D7E24B",
-                "/logo.svg", "/imprint", "en", 15, "Pacific/Auckland");
+                "/logo.svg", "/imprint", "en", 15, "Pacific/Auckland", 72, 12);
 
         // then
         assertThat(snapshot.getClass().isRecord()).isTrue();

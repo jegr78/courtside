@@ -324,9 +324,22 @@ components:
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone: { type: string, example: Europe/Berlin }
 
+    AdminClubConfig:
+      description: |
+        What an administrator sees. It carries the settings the public configuration deliberately
+        leaves out, so a visitor is never told how long an issued credential stays usable.
+      allOf:
+        - $ref: "#/components/schemas/ClubConfig"
+        - type: object
+          required: [newAccountCredentialHours, passwordResetCredentialHours]
+          properties:
+            newAccountCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
+            passwordResetCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
+
     ClubConfigRequest:
       type: object
-      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes, timeZone]
+      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes, timeZone,
+                 newAccountCredentialHours, passwordResetCredentialHours]
       properties:
         clubName: { type: string, maxLength: 100, pattern: ".*\\S.*" }
         primaryColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
@@ -351,6 +364,20 @@ components:
             refused: the club grid has to follow daylight saving. It can only be changed while
             no confirmed future booking exists.
           example: Europe/Berlin
+        newAccountCredentialHours:
+          type: integer
+          minimum: 1
+          maximum: 8760
+          description: |
+            How long the one-time password in a new member's invitation stays usable. The message
+            names the date, and sign-in enforces it.
+          example: 168
+        passwordResetCredentialHours:
+          type: integer
+          minimum: 1
+          maximum: 8760
+          description: How long a password a board hands out after a reset stays usable.
+          example: 24
 
     WebManifest:
       type: object
@@ -4143,7 +4170,7 @@ paths:
           description: The configuration.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ClubConfig" }
+              schema: { $ref: "#/components/schemas/AdminClubConfig" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -4165,7 +4192,7 @@ paths:
           description: Changed.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ClubConfig" }
+              schema: { $ref: "#/components/schemas/AdminClubConfig" }
         "400":
           $ref: "#/components/responses/Invalid"
         "409":
