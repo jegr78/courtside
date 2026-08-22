@@ -328,15 +328,16 @@ test("given the scanner version, when a static file names it, then it is the dep
     .find((tool) => tool.id === "authenticated-zap").version, zapVersion);
 });
 
-test("given a wait the health checks end, when the stack is started, then no clock is put over it", () => {
+test("given docker commands that end with their process, when running them, then no clock is put over any", () => {
   // given
   const source = readFileSync(fileURLToPath(new URL("./security-environment.mjs", import.meta.url)), "utf8");
-  const start = source.slice(source.indexOf("export async function startSecurityEnvironment"));
-  const call = start.slice(0, start.indexOf("\n}"));
+  const declaration = source.slice(source.indexOf("function execute("));
+  const body = declaration.slice(0, declaration.indexOf("\n}"));
 
   // when / then
-  assert.match(call, /"up", "-d", "--wait"\][^;]*WAIT_FOR_THE_HEALTH_CHECKS/,
-    "docker compose --wait returns when the stack's health checks pass and fails when their "
-    + "retries are spent. A process timeout over it does not measure that condition; it only "
-    + "kills a valid wait on a slow machine, and raising the number is not a fix.");
+  assert.doesNotMatch(body, /timeout/,
+    "execFileSync already returns when the docker process exits, and docker compose --wait already "
+    + "ends when the stack's health checks pass. A process timeout measures neither condition; it "
+    + "only kills a valid wait on a loaded machine, and raising the number is not a fix. The job's "
+    + "timeout-minutes is what bounds a wedged daemon.");
 });
