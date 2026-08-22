@@ -2,6 +2,7 @@ package org.courtside.config.internal;
 
 import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
+import org.courtside.config.CredentialLifetime;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -34,8 +35,10 @@ class ConfigServiceTest {
         ConfigService service = new ConfigService(configurations, List.of(constraint), mock(ApplicationEventPublisher.class));
 
         // when
-        service.update("Example Tennis Club", "#004f2d", "#c8a415", null, null,
-                "en", 45, "Pacific/Auckland", 168, 24);
+        service.update(new ChangeClubConfigurationCommand(
+                "Example Tennis Club", "#004f2d", "#c8a415", null, null, "en",
+                new BookingSlotDuration(45), "Pacific/Auckland",
+                new CredentialLifetime(168), new CredentialLifetime(24)));
 
         // then
         var slotDuration = org.mockito.ArgumentCaptor.forClass(BookingSlotDuration.class);

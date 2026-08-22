@@ -8,6 +8,9 @@ import org.courtside.api.ClubConfigApi;
 import org.courtside.api.ManifestApi;
 import org.courtside.api.ApiWebManifest;
 import org.courtside.api.ApiWebManifestIcon;
+import org.courtside.config.BookingSlotDuration;
+import org.courtside.config.CredentialLifetime;
+import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
 import lombok.RequiredArgsConstructor;
@@ -40,11 +43,12 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
 
     @Override
     public ResponseEntity<ApiAdminClubConfig> changeClubConfig(ApiClubConfigRequest request) {
-        return ResponseEntity.ok(toAdminResponse(config.update(
+        return ResponseEntity.ok(toAdminResponse(config.update(new ChangeClubConfigurationCommand(
                 request.getClubName(), request.getPrimaryColor(), request.getAccentColor(),
                 request.getLogoUrl(), request.getImprintUrl(), request.getDefaultLocale(),
-                request.getSlotMinutes(), request.getTimeZone(),
-                request.getNewAccountCredentialHours(), request.getPasswordResetCredentialHours())));
+                new BookingSlotDuration(request.getSlotMinutes()), request.getTimeZone(),
+                new CredentialLifetime(request.getNewAccountCredentialHours()),
+                new CredentialLifetime(request.getPasswordResetCredentialHours())))));
     }
 
     @Override

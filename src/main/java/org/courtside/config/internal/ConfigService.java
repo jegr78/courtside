@@ -7,6 +7,7 @@ import org.courtside.config.CredentialValidity;
 import org.courtside.shared.CredentialsRequested;
 import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
+import org.courtside.config.CredentialLifetime;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.config.ConfigEvent;
@@ -59,9 +60,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     @Override
     public java.time.Duration validFor(CredentialsRequested.Reason reason) {
         ClubConfigurationSnapshot configuration = current();
-        return java.time.Duration.ofHours(reason == CredentialsRequested.Reason.NEW_ACCOUNT
+        return new CredentialLifetime(reason == CredentialsRequested.Reason.NEW_ACCOUNT
                 ? configuration.newAccountCredentialHours()
-                : configuration.passwordResetCredentialHours());
+                : configuration.passwordResetCredentialHours()).toDuration();
     }
 
     @Override
@@ -77,12 +78,18 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     }
 
     @Transactional
-    public ClubConfigurationSnapshot update(String clubName, String primaryColor, String accentColor,
-                                            String logoUrl, String imprintUrl, String defaultLocale,
-                                            int slotMinutes, String timeZone,
-                                            int newAccountCredentialHours,
-                                            int passwordResetCredentialHours) {
-        BookingSlotDuration slotDuration = new BookingSlotDuration(slotMinutes);
+    public ClubConfigurationSnapshot update(ChangeClubConfigurationCommand command) {
+        String clubName = command.clubName();
+        String primaryColor = command.primaryColor();
+        String accentColor = command.accentColor();
+        String logoUrl = command.logoUrl();
+        String imprintUrl = command.imprintUrl();
+        String defaultLocale = command.defaultLocale();
+        String timeZone = command.timeZone();
+        int slotMinutes = command.slotMinutes();
+        int newAccountCredentialHours = command.newAccountCredential().hours();
+        int passwordResetCredentialHours = command.passwordResetCredential().hours();
+        BookingSlotDuration slotDuration = command.slotDuration();
         ZoneId zoneId = ZoneId.of(timeZone);
         lock();
         ClubConfiguration configuration = currentEntity();
