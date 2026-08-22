@@ -1,6 +1,7 @@
 import { expect, test as base, type Browser, type BrowserContext, type Metadata, type Page } from "@playwright/test";
 import { journeyInstant, type JourneyService } from "./global-setup";
 import { connectJourneyService, type JourneyControlReference } from "./journey-control";
+import { observeBrowserDisconnect } from "./browser-diagnostics";
 
 // Every browser is drawn from the pinned image, so a run compares like for like anywhere.
 // A project on the plain origin covers the club that serves Courtside without TLS.
@@ -35,8 +36,21 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   }, { scope: "worker" }],
   browser: [async ({ playwright, browserName, journeyService }, provide) => {
     const pinned = await playwright[browserName].connect(await journeyService.pinnedBrowser(browserName));
-    await provide(pinned);
-    await pinned.close();
+    const finishDiagnostics = observeBrowserDisconnect(pinned,
+      () => journeyService.browserDiagnostics(browserName, "browser-disconnected"));
+    try {
+      await provide(pinned);
+    } finally {
+      try {
+        await finishDiagnostics();
+      } finally {
+        try {
+          if (pinned.isConnected()) await pinned.close();
+        } finally {
+          await journeyService.releasePinnedBrowser(browserName);
+        }
+      }
+    }
   }, { scope: "worker" }],
   baseURL: async ({ journeyService }, provide, testInfo) => {
     await provide(usesPlainOrigin(testInfo.project)

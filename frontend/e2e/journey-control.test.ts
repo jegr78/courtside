@@ -9,6 +9,8 @@ function journeyService(): { service: JourneyService; calls: Record<string, Retu
   };
   const calls = {
     pinnedBrowser: vi.fn().mockResolvedValue("ws://127.0.0.1/browser"),
+    releasePinnedBrowser: vi.fn().mockResolvedValue(undefined),
+    browserDiagnostics: vi.fn().mockResolvedValue({ browserName: "webkit", containerState: { OOMKilled: false } }),
     executeSql: vi.fn().mockResolvedValue("result"),
     holdDatabaseLock: vi.fn().mockResolvedValue(lock),
     publishServiceWorkerUpdate: vi.fn().mockResolvedValue(undefined),
@@ -20,6 +22,8 @@ function journeyService(): { service: JourneyService; calls: Record<string, Retu
     plainBaseURL: "http://courtside.test:8081",
     visualDate: "2026-05-13",
     pinnedBrowser: calls.pinnedBrowser,
+    releasePinnedBrowser: calls.releasePinnedBrowser,
+    browserDiagnostics: calls.browserDiagnostics,
     executeSql: calls.executeSql,
     holdDatabaseLock: calls.holdDatabaseLock,
     publishServiceWorkerUpdate: calls.publishServiceWorkerUpdate,
@@ -39,6 +43,8 @@ describe("journey control", () => {
     try {
       // when
       const browser = await remote.pinnedBrowser("webkit");
+      const diagnostics = await remote.browserDiagnostics("webkit", "browser-disconnected");
+      await remote.releasePinnedBrowser("webkit");
       const sql = await remote.executeSql("SELECT 1");
       const lock = await remote.holdDatabaseLock("LOCK TABLE booking");
       const waiters = await lock.waitForWaiters(2);
@@ -54,9 +60,12 @@ describe("journey control", () => {
         visualDate: service.visualDate
       });
       expect(browser).toBe("ws://127.0.0.1/browser");
+      expect(diagnostics).toMatchObject({ browserName: "webkit", containerState: { OOMKilled: false } });
       expect(sql).toBe("result");
       expect(waiters).toBe("waiting");
       expect(calls.pinnedBrowser).toHaveBeenCalledWith("webkit");
+      expect(calls.browserDiagnostics).toHaveBeenCalledWith("webkit", "browser-disconnected");
+      expect(calls.releasePinnedBrowser).toHaveBeenCalledWith("webkit");
       expect(calls.executeSql).toHaveBeenCalledWith("SELECT 1");
       expect(calls.holdDatabaseLock).toHaveBeenCalledWith("LOCK TABLE booking");
       expect(calls.publishServiceWorkerUpdate).toHaveBeenCalledOnce();

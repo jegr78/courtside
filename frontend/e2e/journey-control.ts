@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { type AddressInfo } from "node:net";
 import type { DatabaseLock, JourneyService } from "./global-setup";
+import type { BrowserDiagnostics } from "./browser-diagnostics";
 
 export interface JourneyControlReference {
   endpoint: string;
@@ -12,9 +13,10 @@ export interface JourneyControlReference {
 }
 
 interface JourneyCommand {
-  operation: "pinnedBrowser" | "executeSql" | "holdDatabaseLock" | "waitForWaiters"
+  operation: "pinnedBrowser" | "releasePinnedBrowser" | "browserDiagnostics" | "executeSql" | "holdDatabaseLock" | "waitForWaiters"
     | "releaseLock" | "publishServiceWorkerUpdate" | "reset" | "restart";
   browserName?: string;
+  reason?: string;
   sql?: string;
   lockId?: string;
   count?: number;
@@ -53,6 +55,9 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
   locks: Map<string, DatabaseLock>): Promise<unknown> {
   switch (command.operation) {
     case "pinnedBrowser": return service.pinnedBrowser(requiredString(command.browserName, "browserName"));
+    case "releasePinnedBrowser": return service.releasePinnedBrowser(requiredString(command.browserName, "browserName"));
+    case "browserDiagnostics": return service.browserDiagnostics(requiredString(command.browserName, "browserName"),
+      requiredString(command.reason, "reason"));
     case "executeSql": return service.executeSql(requiredString(command.sql, "sql"));
     case "holdDatabaseLock": {
       const lockId = randomUUID();
@@ -139,6 +144,9 @@ export function connectJourneyService(reference: JourneyControlReference): Journ
     plainBaseURL: reference.plainBaseURL,
     visualDate: reference.visualDate,
     pinnedBrowser: (browserName) => command(reference, { operation: "pinnedBrowser", browserName }),
+    releasePinnedBrowser: (browserName) => command(reference, { operation: "releasePinnedBrowser", browserName }),
+    browserDiagnostics: (browserName, reason) => command<BrowserDiagnostics>(reference,
+      { operation: "browserDiagnostics", browserName, reason }),
     executeSql: (sql) => command(reference, { operation: "executeSql", sql }),
     holdDatabaseLock: async (sql) => {
       const lockId = await command<string>(reference, { operation: "holdDatabaseLock", sql });
