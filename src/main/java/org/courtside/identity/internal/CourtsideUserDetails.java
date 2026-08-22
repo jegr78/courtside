@@ -12,8 +12,8 @@ public final class CourtsideUserDetails extends User {
     private final long securityEpoch;
 
     CourtsideUserDetails(UUID accountId, String username, String password, boolean enabled,
-                         List<String> authorities, long securityEpoch) {
-        super(username, password, enabled, true, true, true,
+                         boolean credentialsNonExpired, List<String> authorities, long securityEpoch) {
+        super(username, password, enabled, true, credentialsNonExpired, true,
                 authorities.stream().map(SimpleGrantedAuthority::new).toList());
         this.accountId = accountId;
         this.securityEpoch = securityEpoch;

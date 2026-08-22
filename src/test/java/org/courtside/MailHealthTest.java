@@ -48,6 +48,14 @@ class MailHealthTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin", authorities = {"ROLE_ADMIN", "PASSWORD_CHANGE_REQUIRED"})
+    void givenAnAdministratorWhoHasNotSetTheirPassword_whenAskingForTheMailHealth_thenItStaysHidden()
+            throws Exception {
+        // when / then — every other authenticated surface refuses this session, and so does this one
+        mockMvc.perform(get("/actuator/health/mail")).andExpect(status().isForbidden());
+    }
+
+    @Test
     void givenNothingListeningOnTheRelay_whenCallingHealth_thenTheInstanceStaysUp() throws Exception {
         // when / then
         mockMvc.perform(get("/actuator/health"))

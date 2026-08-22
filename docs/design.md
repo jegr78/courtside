@@ -70,7 +70,12 @@ account's language is a literal nothing writes, so every message goes out in Ger
 [#434](https://github.com/jegr78/courtside/issues/434) makes the other one reachable. Mail
 configuration is mandatory — an instance without it refuses to start and names
 the variables it is missing — and `/actuator/health/mail` reports the sending path to an
-administrator without ever opening it. What raises that event is still to come: the roster continues
+administrator without ever opening it. The message names the date its password stops working, and
+sign-in enforces that date: once it has passed the credential no longer authenticates, and the
+board issues a new one. The date binds the issued credential only, so a member who has since
+chosen their own password keeps it. A message the relay refuses is retried, and if it is still
+refused the event stays outstanding rather than being recorded as delivered, so a restart
+republishes it instead of losing it. What raises that event is still to come: the roster continues
 to ask an administrator for a one-time password.
 
 The web client is built and covered by tests too: the court plan as the public landing page,

@@ -13,8 +13,6 @@ import java.util.Properties;
 @EnableConfigurationProperties(MailProperties.class)
 class NotificationConfiguration {
 
-    // Built from this module's own settings rather than from spring.mail, so what an operator sets
-    // and what is validated at startup are the same six values and not two overlapping sets.
     @Bean
     JavaMailSender courtsideMailSender(MailProperties properties) {
         MailSettings.verify(properties);

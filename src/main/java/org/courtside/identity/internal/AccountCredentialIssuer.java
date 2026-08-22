@@ -31,10 +31,15 @@ class AccountCredentialIssuer implements CredentialIssuer {
     public IssuedCredential issueFor(UUID accountId, Instant expiresAt) {
         UserAccount account = accounts.findById(accountId).orElseThrow(() ->
                 new IllegalStateException("No account to issue a credential for"));
+        String address = account.getPerson().getEmail();
+        if (address == null || address.isBlank()) {
+            throw new IllegalStateException("Account " + accountId
+                    + " has no address to send its credential to");
+        }
         String credential = generated();
         account.credentialsIssued(passwordEncoder.encode(credential), expiresAt);
         log.info("Issued a credential for account {}", accountId);
-        return new IssuedCredential(account.getPerson().getEmail(),
+        return new IssuedCredential(address,
                 account.getPerson().getFirstName(), account.getLocale(),
                 account.getUsername(), credential, expiresAt);
     }

@@ -135,6 +135,13 @@ public class UserAccount {
         this.passwordChangeRequired = true;
     }
 
+    // Only while the issued credential is still the one in use: a member who has set their own
+    // password keeps it, and the column the change query leaves behind must not lock them out.
+    public boolean isCredentialExpired(Instant now) {
+        return passwordChangeRequired && credentialsExpireAt != null
+                && !now.isBefore(credentialsExpireAt);
+    }
+
     public Set<Role> getRoles() {
         return Set.copyOf(roles);
     }

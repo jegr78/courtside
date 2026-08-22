@@ -50,10 +50,7 @@ class CredentialMailer {
         String messageId = MailDispatch.newMessageId(senderDomain());
         String subject = templates.render(key + ".subject", locale, values);
         String body = templates.render(key + ".body", locale, values);
-        handover.attempt(messageId,
-                () -> dispatch.send(issued.recipientAddress(), subject, body, messageId),
-                failure -> log.warn("The {} message for account {} was not handed over",
-                        requested.reason(), requested.accountId()));
+        handover.attempt(messageId, () -> dispatch.send(issued.recipientAddress(), subject, body, messageId));
         log.info("Handed over the {} message for account {}", requested.reason(), requested.accountId());
     }
 

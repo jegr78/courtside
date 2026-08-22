@@ -7,4 +7,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "courtside.mail")
 public record MailProperties(String host, int port, String from, String replyTo,
                              String username, String password, boolean trustRelayCertificate) {
+
+    @Override
+    public String toString() {
+        return "MailProperties[host=%s, port=%d, from=%s, replyTo=%s, username=%s, password=%s, "
+                .formatted(host, port, from, replyTo, username, password == null ? "unset" : "set")
+                + "trustRelayCertificate=%b]".formatted(trustRelayCertificate);
+    }
 }

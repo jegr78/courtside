@@ -2,12 +2,9 @@ package org.courtside.notification.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
 
-import java.time.Clock;
 import java.time.Duration;
-import java.util.function.Consumer;
 
 // The mail server is a neighbour in the same network: if it cannot be reached it is restarting, and
 // that is over in minutes. Waiting for days would leave a member's access in a state nobody can act on.
@@ -20,11 +17,28 @@ class MailHandover {
     private static final Duration FIRST_GAP = Duration.ofSeconds(5);
     private static final int GROWTH = 3;
 
-    private final TaskScheduler scheduler;
-    private final Clock clock;
+    private final MailPause pause;
 
-    void attempt(String messageId, Runnable handover, Consumer<Exception> givenUp) {
-        run(messageId, handover, givenUp, 1, FIRST_GAP);
+    // Returns only once the message is handed over, so that a caller whose completion is recorded
+    // elsewhere records it for a delivery that happened.
+    void attempt(String messageId, Runnable handover) {
+        Duration gap = FIRST_GAP;
+        for (int attempt = 1; ; attempt++) {
+            try {
+                handover.run();
+                return;
+            } catch (RuntimeException failure) {
+                if (attempt >= ATTEMPTS) {
+                    log.warn("Gave up handing over {} after {} attempts: {}", messageId, attempt,
+                            diagnosis(failure));
+                    throw failure;
+                }
+                log.info("Handing over {} failed on attempt {} ({}), retrying in {}", messageId,
+                        attempt, diagnosis(failure), gap);
+                pause.untilTheNextAttempt(gap);
+                gap = gap.multipliedBy(GROWTH);
+            }
+        }
     }
 
     // The types and nothing else: a rejected recipient reports the address it rejected, and an
@@ -36,23 +50,5 @@ class MailHandover {
             chain.append(chain.isEmpty() ? "" : " <- ").append(cause.getClass().getSimpleName());
         }
         return chain.toString();
-    }
-
-    private void run(String messageId, Runnable handover, Consumer<Exception> givenUp,
-                     int attempt, Duration gap) {
-        try {
-            handover.run();
-        } catch (RuntimeException failure) {
-            if (attempt >= ATTEMPTS) {
-                log.warn("Gave up handing over {} after {} attempts: {}", messageId, attempt,
-                        diagnosis(failure));
-                givenUp.accept(failure);
-                return;
-            }
-            log.info("Handing over {} failed on attempt {} ({}), retrying in {}", messageId, attempt,
-                    diagnosis(failure), gap);
-            scheduler.schedule(() -> run(messageId, handover, givenUp, attempt + 1,
-                    gap.multipliedBy(GROWTH)), clock.instant().plus(gap));
-        }
     }
 }

@@ -7,6 +7,7 @@ spring:
   modulith:
     events:
       completion-mode: delete
+      republish-outstanding-events-on-restart: true
       jdbc:
         schema-initialization:
           enabled: false
@@ -56,7 +57,7 @@ courtside:
     fixed-instant: ${COURTSIDE_CLOCK_FIXED_INSTANT:}
   mail:
     host: ${COURTSIDE_MAIL_RELAY_HOST:}
-    port: ${COURTSIDE_MAIL_RELAY_PORT:25}
+    port: ${COURTSIDE_MAIL_RELAY_PORT:587}
     from: ${COURTSIDE_MAIL_FROM:}
     reply-to: ${COURTSIDE_MAIL_REPLY_TO:}
     username: ${COURTSIDE_MAIL_USERNAME:}

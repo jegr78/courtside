@@ -14,9 +14,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +33,7 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
     private final UserAccountRepository accounts;
     private final PasswordRehashWriter rehashWriter;
     private final MeterRegistry meters;
+    private final Clock clock;
 
     @Override
     public UserDetails loadUserByUsername(String username) {
@@ -39,13 +42,14 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
 
         List<String> authorities = account.getRoles().stream()
                 .map(role -> ROLE_PREFIX + role.name())
-                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+                .collect(Collectors.toCollection(ArrayList::new));
         if (account.isPasswordChangeRequired()) {
             authorities.add(PASSWORD_CHANGE_REQUIRED);
         }
 
         return new CourtsideUserDetails(account.getId(), account.getUsername(),
-                account.getPasswordHash(), account.isEnabled(), authorities,
+                account.getPasswordHash(), account.isEnabled(),
+                !account.isCredentialExpired(clock.instant()), authorities,
                 account.getSecurityEpoch());
     }
 

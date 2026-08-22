@@ -217,3 +217,26 @@ test("given a value holding a line break, when a plan is rendered, then renderin
   assert.throws(() => render("base", { COURTSIDE_MAIL_ADMIN_PASSWORD: "two\nlines" }),
     /line break/);
 });
+
+test("given the account the app and the plan share, when the plan service is declared, then it is given the same values", () => {
+  // given
+  const script = readFileSync(new URL("../deploy/mail/render.sh", import.meta.url), "utf8");
+  const compose = readFileSync(new URL("../deploy/compose.yaml", import.meta.url), "utf8");
+  const section = (name, next) =>
+    compose.slice(compose.indexOf(`\n  ${name}:`), compose.indexOf(`\n  ${next}:`));
+  const declared = (text) => new Set([...text.matchAll(/^\s{6}([A-Z_]+):/gm)].map(([, name]) => name));
+  const referenced = (text) => new Set([...text.matchAll(/\$\{(COURTSIDE_MAIL_[A-Z_]+)/g)]
+    .map(([, name]) => name));
+  const rendererReads = referenced(script);
+  const appUses = referenced(section("app", "mail"));
+  const planIsGiven = declared(section("mail-plan", "mail-bootstrap"));
+
+  // when
+  const shared = [...rendererReads].filter((name) => appUses.has(name)).toSorted();
+
+  // then
+  assert.deepEqual(shared.filter((name) => !planIsGiven.has(name)), [],
+    "the app authenticates against the account the plan creates. A value the app reads from .env "
+    + "but the plan service is never given makes the two disagree, and the sender account the "
+    + "bootstrap creates is not the one the application signs in as.");
+});
