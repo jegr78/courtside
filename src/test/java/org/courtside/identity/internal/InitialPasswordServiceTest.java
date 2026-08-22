@@ -30,7 +30,7 @@ class InitialPasswordServiceTest {
     void givenActiveSessions_whenChangingTheInitialPassword_thenTheyAreEnded() {
         // given
         UserAccount account = new UserAccount(new Person("Ada", "Admin", "admin@localhost.invalid"),
-                "admin", "temporary-hash", Set.of(Role.ADMIN));
+                "admin", "temporary-hash", Set.of(Role.ADMIN), "de");
         account.requirePasswordChange();
         when(currentUser.requireAccount()).thenReturn(account);
         when(encoder.encode("new-permanent-password")).thenReturn("new-hash");
@@ -48,7 +48,7 @@ class InitialPasswordServiceTest {
     void givenAnotherSessionAlreadyChangedThePassword_whenChangingIt_thenThePasswordIsNotOverwritten() {
         // given
         UserAccount account = new UserAccount(new Person("Ada", "Admin", "admin@localhost.invalid"),
-                "admin", "temporary-hash", Set.of(Role.ADMIN));
+                "admin", "temporary-hash", Set.of(Role.ADMIN), "de");
         account.requirePasswordChange();
         when(currentUser.requireAccount()).thenReturn(account);
         when(encoder.encode("new-permanent-password")).thenReturn("new-hash");

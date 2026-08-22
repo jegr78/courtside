@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
-    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 63;
+    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 64;
 
     private static final String CATCH_ALL_UUID = "11111111-1111-1111-1111-111111111111";
 
@@ -63,6 +63,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/manifest.webmanifest");
 
     private static final Set<String> AUTHENTICATED_PATHS = Set.of(
+            "/api/account/locale",
             "/api/public/booking-cards",
             "/api/public/participant-cards",
             "/api/public/participant-members",
@@ -103,7 +104,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
 
         Person person = persons.save(new Person("Jane", "Doe", "doe.jane@example.org"));
         UserAccount account = new UserAccount(
-                person, "doe.jane", passwordEncoder.encode("secret"), Set.of(Role.MEMBER));
+                person, "doe.jane", passwordEncoder.encode("secret"), Set.of(Role.MEMBER), "de");
         account.enable();
         accounts.save(account);
     }

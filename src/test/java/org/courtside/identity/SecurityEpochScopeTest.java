@@ -77,7 +77,7 @@ class SecurityEpochScopeTest extends AbstractIntegrationTest {
         Person person = persons.save(new Person(
                 firstName, lastName, lastName.toLowerCase() + "@example.org"));
         UserAccount account = new UserAccount(
-                person, username, passwordEncoder.encode(PASSWORD), Set.of(Role.MEMBER));
+                person, username, passwordEncoder.encode(PASSWORD), Set.of(Role.MEMBER), "de");
         account.enable();
         return accounts.save(account);
     }

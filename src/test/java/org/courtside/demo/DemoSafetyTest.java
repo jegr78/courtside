@@ -86,11 +86,28 @@ class DemoSafetyTest {
                 mock(FacilityService.class), mock(BookingService.class), mock(BookingRepository.class),
                 mock(PasswordEncoder.class), Clock.systemUTC(),
                 new DemoProperties(true, "member-password"), "admin", "admin-password",
-                () -> java.time.ZoneId.of("Europe/Berlin"));
+                () -> java.time.ZoneId.of("Europe/Berlin"), GERMAN_CLUB);
 
         // when / then
         assertThatThrownBy(() -> seeder.run(new DefaultApplicationArguments(new String[0])))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("only the bootstrap administrator");
     }
+
+    private static final org.courtside.config.ClubIdentity GERMAN_CLUB = new org.courtside.config.ClubIdentity() {
+        @Override
+        public String clubName() {
+            return "Example Tennis Club";
+        }
+
+        @Override
+        public String defaultLocale() {
+            return "de";
+        }
+
+        @Override
+        public java.time.ZoneId zoneId() {
+            return java.time.ZoneId.of("Europe/Berlin");
+        }
+    };
 }

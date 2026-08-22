@@ -1,14 +1,24 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { api } from "../api/client";
 import { setLocale, type SupportedLocale } from "../i18n";
 import { initialTheme, setTheme, type Theme } from "../theme";
 
 const controlClass = "form-control rounded-lg border px-3 py-2 text-sm font-semibold";
 
-export function Preferences() {
+export function Preferences({ authenticated = false }: { authenticated?: boolean }) {
   const { t, i18n } = useTranslation();
   const [theme, updateTheme] = useState<Theme>(initialTheme);
   const locale = i18n.resolvedLanguage === "en" ? "en" : "de";
+
+  // Stored on the account rather than in the browser, so the next message the instance sends
+  // arrives in the language the member reads.
+  async function changeLocale(value: SupportedLocale) {
+    await setLocale(value);
+    if (authenticated) {
+      await api.changeOwnLocale(value);
+    }
+  }
 
   function changeTheme(value: Theme) {
     updateTheme(value);
@@ -17,7 +27,7 @@ export function Preferences() {
 
   return <div className="flex flex-wrap justify-end gap-2">
     <label className="sr-only" htmlFor="locale-preference">{t("preferences.language")}</label>
-    <select id="locale-preference" className={controlClass} value={locale} onChange={(event) => void setLocale(event.target.value as SupportedLocale)}>
+    <select id="locale-preference" className={controlClass} value={locale} onChange={(event) => void changeLocale(event.target.value as SupportedLocale)}>
       <option value="de">Deutsch</option>
       <option value="en">English</option>
     </select>

@@ -1018,6 +1018,12 @@ components:
           type: [string, "null"]
           format: date
           description: The date the membership began, absent when the person holds none.
+        locale:
+          type: string
+          pattern: "^(de|en)$"
+          description: |
+            The language the instance writes to this account in. Absent while the person holds no
+            account.
         membershipEndedOn:
           type: [string, "null"]
           format: date
@@ -1066,6 +1072,16 @@ components:
           minItems: 1
           uniqueItems: true
           items: { $ref: "#/components/schemas/Role" }
+
+    AccountLocaleRequest:
+      type: object
+      description: |
+        The language the instance writes to this account in. It is stored on the account rather than
+        kept in the browser, so a message reaches the member in the language they read and not in the
+        one the club happens to default to.
+      required: [locale]
+      properties:
+        locale: { type: string, pattern: "^(de|en)$" }
 
     UsernameRequest:
       type: object
@@ -1767,6 +1783,31 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+
+  /api/account/locale:
+    put:
+      tags: [account]
+      operationId: changeOwnLocale
+      summary: Choose the language this account is written to in.
+      description: |
+        Available to any authenticated account, for itself. The choice is stored, so the next
+        message the instance sends arrives in it; a language picked in the browser alone changes
+        what a page shows and nothing that is written.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountLocaleRequest" }
+      responses:
+        "204":
+          description: Changed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
 
   /api/public/courts:
     get:
@@ -3220,6 +3261,44 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+
+  /api/admin/roster/{personId}/account/locale:
+    put:
+      tags: [admin-roster]
+      operationId: changeAccountLocale
+      summary: Correct the language a person's account is written to in.
+      description: |
+        A member who cannot reach the choice themselves, or one whose language was wrong from the
+        start, is otherwise written to in a language they may not read. The person, their roles,
+        their state and their password are untouched here, and the account's sessions are left
+        alone: the language decides what a message says, not what an account may do.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountLocaleRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/admin/roster/{personId}/account/password:
     put:

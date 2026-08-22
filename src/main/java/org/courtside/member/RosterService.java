@@ -1,6 +1,7 @@
 package org.courtside.member;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.config.ClubIdentity;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.identity.AccountSessions;
 import org.courtside.identity.Person;
@@ -59,6 +60,7 @@ public class RosterService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
     private final ClubTimeZone clubTimeZone;
+    private final ClubIdentity club;
     private final ApplicationEventPublisher events;
 
     public CursorPage.Result<RosterEntry> list(String query, UUID membershipTypeId, UUID cursor, int limit) {
@@ -147,7 +149,7 @@ public class RosterService {
             throw new PersonAccountExistsException("Person " + id + " already holds an account");
         }
         UserAccount account = new UserAccount(
-                person, name, passwordEncoder.encode(oneTimePassword), requested);
+                person, name, passwordEncoder.encode(oneTimePassword), requested, club.defaultLocale());
         account.enable();
         account.requirePasswordChange();
         saveOrRejectTakenUsername(account);
@@ -181,6 +183,15 @@ public class RosterService {
         saveOrRejectTakenUsername(account);
         endStoredSessionsIfRevoked(account, previous, epoch);
         events.publishEvent(new RosterEvent.AccountUsernameCorrected(id, account.getId()));
+        return load(List.of(id)).getFirst();
+    }
+
+    @Transactional
+    public RosterEntry changeLocale(UUID personId, String locale) {
+        UUID id = requiredPersonId(personId);
+        UserAccount account = requireAccount(id);
+        account.changeLocale(locale);
+        events.publishEvent(new RosterEvent.AccountLocaleCorrected(id, account.getId(), locale));
         return load(List.of(id)).getFirst();
     }
 
@@ -443,11 +454,11 @@ public class RosterService {
                 member.getMembershipTypeId(), member.getStartedOn(), member.getEndedOn());
         if (account == null) {
             return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
-                    person.getEmail(), null, null, false, membership, Set.of());
+                    person.getEmail(), null, null, null, false, membership, Set.of());
         }
         return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
-                person.getEmail(), account.getId(), account.getUsername(), account.isEnabled(),
-                membership, account.getRoles());
+                person.getEmail(), account.getId(), account.getUsername(), account.getLocale(),
+                account.isEnabled(), membership, account.getRoles());
     }
 
     private static String normalize(String query) {
@@ -473,7 +484,7 @@ public class RosterService {
     }
 
     public record RosterEntry(UUID personId, String firstName, String lastName, String email,
-                              UUID accountId, String username, boolean enabled,
+                              UUID accountId, String username, String locale, boolean enabled,
                               Membership membership, Set<Role> roles) {
 
         public RosterEntry {

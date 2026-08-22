@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import org.courtside.config.ClubIdentity;
 import org.courtside.config.ClubTimeZone;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
@@ -48,6 +49,7 @@ class DemoDataSeeder implements ApplicationRunner {
             UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final String MARKER_USERNAME = "jane.doe";
 
+    private final ClubIdentity club;
     private final PersonRepository persons;
     private final UserAccountRepository accounts;
     private final MemberRepository members;
@@ -66,7 +68,7 @@ class DemoDataSeeder implements ApplicationRunner {
                    PasswordEncoder passwordEncoder, Clock clock, DemoProperties properties,
                    @Value("${courtside.bootstrap-admin.username}") String adminUsername,
                    @Value("${courtside.bootstrap-admin.password}") String adminPassword,
-                   ClubTimeZone timeZone) {
+                   ClubTimeZone timeZone, ClubIdentity club) {
         this.persons = persons;
         this.accounts = accounts;
         this.members = members;
@@ -79,6 +81,7 @@ class DemoDataSeeder implements ApplicationRunner {
         this.adminUsername = adminUsername;
         this.adminPassword = adminPassword;
         this.timeZone = timeZone;
+        this.club = club;
     }
 
     @Override
@@ -128,7 +131,7 @@ class DemoDataSeeder implements ApplicationRunner {
         Person person = persons.save(new Person(firstName, lastName, email));
         UserAccount account = new UserAccount(person, username,
                 passwordEncoder.encode(properties.memberPassword()),
-                Set.of(Role.MEMBER));
+                Set.of(Role.MEMBER), club.defaultLocale());
         account.enable();
         accounts.save(account);
         members.save(new Member(person.getId(), ACTIVE_MEMBERSHIP_TYPE,

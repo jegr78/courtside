@@ -74,6 +74,17 @@ public sealed interface RosterEvent extends DomainEventRecord {
 
     }
 
+    record AccountLocaleCorrected(UUID personId, UUID accountId, String locale) implements RosterEvent {
+
+        static final String TYPE = "roster.account.localeCorrected";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+    }
+
     record AccountPasswordReset(UUID personId, UUID accountId) implements RosterEvent {
 
         static final String TYPE = "roster.account.passwordReset";
