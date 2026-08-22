@@ -62,7 +62,7 @@ function activePlan() {
   return buildSecurityPlan(input({
     tools: [
       { id: "target-identity", version: "1.0.0", testIds: [] },
-      { id: "authenticated-zap", version: "2.16.1", testIds: ["CSA-DAST-001"] },
+      { id: "authenticated-zap", version: "2.17.0", testIds: ["CSA-DAST-001"] },
       { id: "openapi-fuzzer", version: "4.25.0", testIds: ["CSA-API-001", "CSA-IMPORT-001"] },
       { id: "authorization-matrix", version: "1.0.0", testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"] }
     ],

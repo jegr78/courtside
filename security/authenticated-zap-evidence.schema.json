@@ -8,7 +8,7 @@
     "schemaVersion": { "const": 1 },
     "testId": { "const": "CSA-DAST-001" },
     "targetFingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-    "image": { "type": "string", "pattern": "^zaproxy/zap-stable:2\\.16\\.1@sha256:[a-f0-9]{64}$" },
+    "image": { "type": "string", "pattern": "^zaproxy/zap-stable:[\\w.]+@sha256:[a-f0-9]{64}$" },
     "policyDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "planDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "roles": {

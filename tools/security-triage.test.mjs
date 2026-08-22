@@ -40,7 +40,7 @@ function candidate(overrides = {}) {
     parameter: "username",
     attackClass: "authentication-enumeration",
     provenance: {
-      tool: "owasp-zap", version: "2.16.1", runId: "run-0001", attempt: 1,
+      tool: "owasp-zap", version: "2.17.0", runId: "run-0001", attempt: 1,
       targetFingerprint: digest, observedAt: "2026-08-20T12:00:00.000Z"
     },
     evidence: [{
