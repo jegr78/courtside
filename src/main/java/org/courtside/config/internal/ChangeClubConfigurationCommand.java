@@ -15,7 +15,22 @@ public record ChangeClubConfigurationCommand(
         CredentialLifetime newAccountCredential,
         CredentialLifetime passwordResetCredential) {
 
-    public int slotMinutes() {
-        return slotDuration.minutes();
+    // A logo and an imprint are the two a club may leave unset. Everything else names something the
+    // instance cannot operate without, so an absent one is a caller that skipped its own validation.
+    public ChangeClubConfigurationCommand {
+        requirePresent(clubName, "clubName");
+        requirePresent(primaryColor, "primaryColor");
+        requirePresent(accentColor, "accentColor");
+        requirePresent(defaultLocale, "defaultLocale");
+        requirePresent(slotDuration, "slotDuration");
+        requirePresent(timeZone, "timeZone");
+        requirePresent(newAccountCredential, "newAccountCredential");
+        requirePresent(passwordResetCredential, "passwordResetCredential");
+    }
+
+    private static void requirePresent(Object value, String field) {
+        if (value == null) {
+            throw new IllegalArgumentException("A club configuration change needs a " + field);
+        }
     }
 }

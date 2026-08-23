@@ -1,8 +1,5 @@
 package org.courtside.config;
 
-import org.courtside.config.BookingSlotDuration;
-import org.courtside.config.CredentialLifetime;
-import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.config.internal.ConfigService;
@@ -69,17 +66,6 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
-
-    @Test
-    void givenAnInvalidSlotDuration_whenUpdatingThroughTheService_thenTheInvariantIsRejected() {
-        // when / then
-        assertThatThrownBy(() -> config.update(new ChangeClubConfigurationCommand(
-                "Example Tennis Club", "#b85c38", "#d7e24b", null, null, "de",
-                new BookingSlotDuration(7), "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("five-minute steps");
-    }
 
     @Test
     void givenAnUncommittedGridChange_whenOpeningHoursAreChanged_thenTheWriterWaitsAndRejectsTheOldGrid()

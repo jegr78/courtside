@@ -3,8 +3,6 @@ package org.courtside.config;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.audit.testfixture.AuditTestFixture.RecordedEvent;
-import org.courtside.config.BookingSlotDuration;
-import org.courtside.config.CredentialLifetime;
 import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;

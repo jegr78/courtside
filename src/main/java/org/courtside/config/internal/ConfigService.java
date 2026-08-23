@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 import java.time.ZoneId;
 
@@ -79,78 +80,83 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
 
     @Transactional
     public ClubConfigurationSnapshot update(ChangeClubConfigurationCommand command) {
-        String clubName = command.clubName();
-        String primaryColor = command.primaryColor();
-        String accentColor = command.accentColor();
-        String logoUrl = command.logoUrl();
-        String imprintUrl = command.imprintUrl();
-        String defaultLocale = command.defaultLocale();
-        String timeZone = command.timeZone();
-        int slotMinutes = command.slotMinutes();
-        int newAccountCredentialHours = command.newAccountCredential().hours();
-        int passwordResetCredentialHours = command.passwordResetCredential().hours();
-        BookingSlotDuration slotDuration = command.slotDuration();
-        ZoneId zoneId = ZoneId.of(timeZone);
+        ZoneId zoneId = ZoneId.of(command.timeZone());
         lock();
         ClubConfiguration configuration = currentEntity();
-
-        if (!configuration.getTimeZone().equals(timeZone)) {
-            firstConflict(constraint -> constraint.timeZoneConflictCode())
-                    .ifPresent(code -> {
-                        throw new TimeZoneConflictException(code, timeZone);
-                    });
-        }
-        if (configuration.getSlotMinutes() != slotMinutes) {
-            firstConflict(constraint -> constraint.conflictCode(slotDuration, zoneId))
-                    .ifPresent(code -> {
-                        throw new SlotDurationConflictException(code, slotMinutes);
-                    });
-        }
-
-        List<String> changedFields = new ArrayList<>();
-        if (!Objects.equals(configuration.getClubName(), clubName)) {
-            changedFields.add("clubName");
-        }
-        if (!Objects.equals(configuration.getPrimaryColor(), primaryColor)) {
-            changedFields.add("primaryColor");
-        }
-        if (!Objects.equals(configuration.getAccentColor(), accentColor)) {
-            changedFields.add("accentColor");
-        }
-        if (!Objects.equals(configuration.getLogoUrl(), logoUrl)) {
-            changedFields.add("logoUrl");
-        }
-        if (!Objects.equals(configuration.getImprintUrl(), imprintUrl)) {
-            changedFields.add("imprintUrl");
-        }
-        if (configuration.getNewAccountCredentialHours() != newAccountCredentialHours) {
-            changedFields.add("newAccountCredentialHours");
-        }
-        if (configuration.getPasswordResetCredentialHours() != passwordResetCredentialHours) {
-            changedFields.add("passwordResetCredentialHours");
-        }
-        boolean localeChanged = !Objects.equals(configuration.getDefaultLocale(), defaultLocale);
-        boolean slotMinutesChanged = configuration.getSlotMinutes() != slotMinutes;
-        boolean timeZoneChanged = !configuration.getTimeZone().equals(timeZone);
-
-        configuration.changeTo(clubName, primaryColor, accentColor,
-                logoUrl, imprintUrl, defaultLocale, slotMinutes, timeZone);
-        configuration.changeCredentialValidity(newAccountCredentialHours, passwordResetCredentialHours);
-
-        if (!changedFields.isEmpty()) {
-            events.publishEvent(new ConfigEvent.ClubChanged(configuration.getId(), List.copyOf(changedFields)));
-        }
-        if (localeChanged) {
-            events.publishEvent(new ConfigEvent.LocaleChanged(configuration.getId(), defaultLocale));
-        }
-        if (slotMinutesChanged) {
-            events.publishEvent(new ConfigEvent.SlotDurationChanged(configuration.getId(), slotMinutes));
-        }
-        if (timeZoneChanged) {
-            events.publishEvent(new ConfigEvent.TimeZoneChanged(configuration.getId(), timeZone));
-        }
-
+        Changes changes = changesBetween(configuration, command);
+        refuseAConflictingGrid(command, zoneId, changes);
+        apply(configuration, command);
+        announce(configuration.getId(), command, changes);
         return ClubConfigurationSnapshot.from(configuration);
+    }
+
+    private void refuseAConflictingGrid(ChangeClubConfigurationCommand command, ZoneId zoneId,
+                                        Changes changes) {
+        if (changes.timeZone()) {
+            firstConflict(BookingGridConstraint::timeZoneConflictCode)
+                    .ifPresent(code -> {
+                        throw new TimeZoneConflictException(code, command.timeZone());
+                    });
+        }
+        if (changes.slotDuration()) {
+            firstConflict(constraint -> constraint.conflictCode(command.slotDuration(), zoneId))
+                    .ifPresent(code -> {
+                        throw new SlotDurationConflictException(code, command.slotDuration().minutes());
+                    });
+        }
+    }
+
+    private static Changes changesBetween(ClubConfiguration configuration,
+                                          ChangeClubConfigurationCommand command) {
+        List<String> fields = new ArrayList<>();
+        addIfChanged(fields, "clubName", configuration.getClubName(), command.clubName());
+        addIfChanged(fields, "primaryColor", configuration.getPrimaryColor(), command.primaryColor());
+        addIfChanged(fields, "accentColor", configuration.getAccentColor(), command.accentColor());
+        addIfChanged(fields, "logoUrl", configuration.getLogoUrl(), command.logoUrl());
+        addIfChanged(fields, "imprintUrl", configuration.getImprintUrl(), command.imprintUrl());
+        addIfChanged(fields, "newAccountCredentialHours",
+                configuration.getNewAccountCredentialHours(), command.newAccountCredential().hours());
+        addIfChanged(fields, "passwordResetCredentialHours",
+                configuration.getPasswordResetCredentialHours(), command.passwordResetCredential().hours());
+        return new Changes(List.copyOf(fields),
+                !Objects.equals(configuration.getDefaultLocale(), command.defaultLocale()),
+                configuration.getSlotMinutes() != command.slotDuration().minutes(),
+                !configuration.getTimeZone().equals(command.timeZone()));
+    }
+
+    private static void addIfChanged(List<String> fields, String name, Object current, Object wanted) {
+        if (!Objects.equals(current, wanted)) {
+            fields.add(name);
+        }
+    }
+
+    private static void apply(ClubConfiguration configuration, ChangeClubConfigurationCommand command) {
+        configuration.changeTo(command.clubName(), command.primaryColor(), command.accentColor(),
+                command.logoUrl(), command.imprintUrl(), command.defaultLocale(),
+                command.slotDuration().minutes(), command.timeZone());
+        configuration.changeCredentialValidity(command.newAccountCredential().hours(),
+                command.passwordResetCredential().hours());
+    }
+
+    private void announce(UUID configId, ChangeClubConfigurationCommand command, Changes changes) {
+        if (!changes.fields().isEmpty()) {
+            events.publishEvent(new ConfigEvent.ClubChanged(configId, changes.fields()));
+        }
+        if (changes.locale()) {
+            events.publishEvent(new ConfigEvent.LocaleChanged(configId, command.defaultLocale()));
+        }
+        if (changes.slotDuration()) {
+            events.publishEvent(new ConfigEvent.SlotDurationChanged(configId,
+                    command.slotDuration().minutes()));
+        }
+        if (changes.timeZone()) {
+            events.publishEvent(new ConfigEvent.TimeZoneChanged(configId, command.timeZone()));
+        }
+    }
+
+    // The locale, the grid and the zone are announced on their own, so what changed is three
+    // questions and a list rather than one.
+    private record Changes(List<String> fields, boolean locale, boolean slotDuration, boolean timeZone) {
     }
 
     private Optional<String> firstConflict(

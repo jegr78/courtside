@@ -1,7 +1,5 @@
 package org.courtside.config;
 
-import org.courtside.config.BookingSlotDuration;
-import org.courtside.config.CredentialLifetime;
 import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
