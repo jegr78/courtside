@@ -18,6 +18,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
+import { useFragmentTarget } from "../navigation/useFragmentTarget";
 
 const RULE_SET_NAME_LENGTH = 60;
 
@@ -57,6 +58,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
+  useFragmentTarget("slot-minutes", config !== undefined);
 
   useEffect(() => {
     let active = true;
@@ -216,7 +218,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             {t("admin.config.defaultLocale")}
             <LocaleSelect className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} supported={supported} changed={(defaultLocale) => changeConfig({ defaultLocale })} />
           </label>
-          <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
+          <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
           <TextField data-testid="new-account-credential-hours" type="number" min={1} max={8760} label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => changeConfig({ newAccountCredentialHours: Number(event.target.value) })} />
           <TextField data-testid="password-reset-credential-hours" type="number" min={1} max={8760} label={t("admin.config.passwordResetCredentialHours")} value={config.passwordResetCredentialHours} onChange={(event) => changeConfig({ passwordResetCredentialHours: Number(event.target.value) })} />
           <div className="grid gap-1">
@@ -269,7 +271,7 @@ function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTy
   const [params, setParams] = useState<Record<string, number>>({});
   useEffect(() => setParams(definition?.params ?? {}), [definition]);
   return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
-    <div><h3 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <p data-testid={`rule-${type.ruleType}-global`} className="text-muted">{t("admin.rules.global")}</p>}</div>
+    <div><h3 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <GlobalRuleLink ruleType={type.ruleType} />}</div>
     {type.configurable && <>
       {type.parameters.map((parameter) => <div key={parameter.name} className="grid gap-1">
         <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setParams({ ...params, [parameter.name]: Number(event.target.value) })} />
@@ -281,4 +283,15 @@ function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTy
       </div>
     </>}
   </article>;
+}
+
+function GlobalRuleLink({ ruleType }: { ruleType: RuleType }) {
+  const { t } = useTranslation();
+  const target = ruleType === "OPENING_HOURS" ? "/admin/facility#opening-hours"
+    : ruleType === "SLOT_GRID" ? "/admin/configuration#slot-minutes"
+      : undefined;
+  if (!target) return null;
+  return <Link data-testid={`rule-${ruleType}-global`} className="text-muted underline" to={target}>
+    {t(`admin.rules.global.${ruleType}`)}
+  </Link>;
 }

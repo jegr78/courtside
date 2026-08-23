@@ -24,6 +24,7 @@ describe("AdminConfigurationView", () => {
     vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
     vi.spyOn(api, "ruleTypes").mockResolvedValue([
       { ruleType: "OPENING_HOURS", configurable: false, parameters: [] },
+      { ruleType: "SLOT_GRID", configurable: false, parameters: [] },
       { ruleType: "ADVANCE_WINDOW", configurable: true, parameters: [{ name: "maxDays", minimum: 1, maximum: 365 }] }
     ]);
     vi.spyOn(api, "rules").mockResolvedValue([
@@ -139,9 +140,22 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("time-zone")).toHaveValue("Europe/Berlin");
     expect(screen.getByTestId("rule-OPENING_HOURS-title")).toHaveRole("heading");
     expect(screen.getByTestId("rule-OPENING_HOURS-title")).toHaveTextContent("Opening hours");
-    expect(screen.getByTestId("rule-OPENING_HOURS-global")).toHaveTextContent("Configured globally for the whole facility");
+    expect(screen.getByTestId("rule-OPENING_HOURS-global")).toHaveAttribute("href", "/admin/facility#opening-hours");
+    expect(screen.getByTestId("rule-SLOT_GRID-global")).toHaveAttribute("href", "/admin/configuration#slot-minutes");
+    expect(screen.getByTestId("slot-minutes")).toHaveAttribute("id", "slot-minutes");
     await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range")).toHaveTextContent("Allowed range: 1 to 365");
+  });
+
+  it("given the time-grid fragment, when configuration loads, then the owned setting receives focus", async () => {
+    // given
+    render(<MemoryRouter initialEntries={["/admin/configuration#slot-minutes"]}><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // when
+    const slotMinutes = await screen.findByTestId("slot-minutes");
+
+    // then
+    await waitFor(() => expect(slotMinutes).toHaveFocus());
   });
 
   it("given configuration cannot load, when opening the view, then the failure replaces the loading state", async () => {

@@ -18,6 +18,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
+import { useFragmentTarget } from "../navigation/useFragmentTarget";
 import { ImpactPanel } from "../components/ImpactPanel";
 
 const roles: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER"];
@@ -35,6 +36,8 @@ export function AdminFacilityView() {
   const [success, setSuccess] = useState<string>();
   const pendingRef = useRef(new Set<string>());
   const [pending, setPending] = useState(new Set<string>());
+  useFragmentTarget("opening-hours", courts !== undefined && hours !== undefined
+    && cards !== undefined && timeZone !== undefined);
 
   useEffect(() => {
     void Promise.all([api.adminCourts(), api.adminOpeningHours(), api.adminBookingCards(),
@@ -283,7 +286,7 @@ export function AdminFacilityView() {
           </form>
         </section>
         <section className="grid gap-4">
-          <h2 className="text-2xl font-bold">{t("admin.facility.openingHours")}</h2>
+          <h2 id="opening-hours" data-testid="opening-hours-heading" tabIndex={-1} className="text-2xl font-bold">{t("admin.facility.openingHours")}</h2>
           <div className="grid gap-3 lg:grid-cols-2">
             {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} timeZone={timeZone} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} reportError={reportError} />)}
           </div>
