@@ -4,18 +4,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Properties;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.junit.jupiter.api.Test;
 
 class BuildProvenanceTest {
 
     @Test
     void givenLinkedWorktree_whenBuildMetadataIsGenerated_thenCurrentWorktreeCommitIsRecorded()
-            throws IOException, InterruptedException {
+            throws IOException {
         // given
-        Process git = new ProcessBuilder("git", "rev-parse", "HEAD").start();
-        String expectedCommit = new String(git.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+        String expectedCommit;
+        try (Repository repository = new FileRepositoryBuilder().findGitDir().build()) {
+            expectedCommit = repository.resolve(Constants.HEAD).name();
+        }
         Properties buildProvenance = new Properties();
         try (InputStream gitProperties = getClass().getResourceAsStream("/git.properties")) {
             assertThat(gitProperties).isNotNull();
@@ -23,10 +27,9 @@ class BuildProvenanceTest {
         }
 
         // when
-        int exitCode = git.waitFor();
+        String recordedCommit = buildProvenance.getProperty("git.commit.id");
 
         // then
-        assertThat(exitCode).isZero();
-        assertThat(buildProvenance.getProperty("git.commit.id")).isEqualTo(expectedCommit);
+        assertThat(recordedCommit).isEqualTo(expectedCommit);
     }
 }
