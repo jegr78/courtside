@@ -50,11 +50,12 @@ const dockerCommand: DockerDiagnosticCommand = async (args, signal) =>
   (await executeFile("docker", args, { maxBuffer: 1024 * 1024, signal })).stdout;
 
 function safeLogs(value: string): string {
-  return value.slice(-16_384)
+  return value
     .replaceAll(/((?:https?|wss?):\/\/[^\s/?#]+)[^\s]*/gi, "$1/<redacted>")
     .replaceAll(/(["']?(?:authorization|proxy-authorization|cookie|set-cookie|password|passwd|csrf(?:-token)?|xsrf(?:-token)?|token|secret|api[-_]?key)["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^,}\r\n]+)/gi,
       "$1\"<redacted>\"")
-    .replaceAll(/\b[A-Za-z0-9_-]{24,}\b/g, "<redacted>");
+    .replaceAll(/\b[A-Za-z0-9_-]{24,}\b/g, "<redacted>")
+    .slice(-16_384);
 }
 
 async function capture(command: DockerDiagnosticCommand, args: string[], errors: string[], timeoutMs: number): Promise<string | undefined> {

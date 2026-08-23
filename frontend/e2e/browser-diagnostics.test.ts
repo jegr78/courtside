@@ -103,6 +103,24 @@ describe("browser diagnostics", () => {
     expect(diagnostics.diagnosticErrors.every((error) => error.includes("timed out"))).toBe(true);
   });
 
+  it("given truncation would remove a credential key, when collecting logs, then redaction happens before truncation", async () => {
+    // given
+    const secret = "short-secret";
+    const suffix = `\n${"x".repeat(16_371)}`;
+    const command = vi.fn((args: string[]) => {
+      if (args[0] === "logs") return Promise.resolve(`Authorization: Bearer ${secret}${suffix}`);
+      return Promise.resolve("{}");
+    });
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics(
+      "container-5", "webkit", "browser-disconnected", command);
+
+    // then
+    expect(diagnostics.containerLogs).not.toContain(secret);
+    expect(diagnostics.containerLogs?.length).toBeLessThanOrEqual(16_384);
+  });
+
   it("given Docker can no longer inspect a lost container, when collecting diagnostics, then the diagnostic failure is retained", async () => {
     // given
     const command = vi.fn().mockRejectedValue(new Error("container missing"));
