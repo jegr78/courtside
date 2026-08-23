@@ -1,5 +1,6 @@
 package org.courtside.config;
 
+import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
@@ -30,9 +31,11 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
     @Test
     void givenChangedConfiguration_whenUpdatingThroughTheService_thenAnImmutableSnapshotIsReturned() {
         // when
-        ClubConfigurationSnapshot snapshot = config.update(
+        ClubConfigurationSnapshot snapshot = config.update(new ChangeClubConfigurationCommand(
                 "Example Tennis Club", "#34584A", "#D7E24B",
-                "/logo.svg", "/imprint", "en", 15, "Pacific/Auckland", 72, 12);
+                "/logo.svg", "/imprint", "en",
+                new BookingSlotDuration(15), "Pacific/Auckland",
+                new CredentialLifetime(72), new CredentialLifetime(12)));
 
         // then
         assertThat(snapshot.getClass().isRecord()).isTrue();

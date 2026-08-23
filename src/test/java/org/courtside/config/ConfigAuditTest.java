@@ -3,6 +3,7 @@ package org.courtside.config;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.audit.testfixture.AuditTestFixture.RecordedEvent;
+import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
 import org.junit.jupiter.api.Test;
@@ -30,10 +31,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         ClubConfigurationSnapshot current = config.current();
 
         // when
-        config.update("Example Tennis Club", current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                current.slotMinutes(), current.timeZone(),
-                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
+        config.update(withClubName(current, "Example Tennis Club"));
 
         // then
         Map<String, Object> payload = latestPayloadOf(ConfigEvent.ClubChanged.TYPE);
@@ -51,10 +49,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         ClubConfigurationSnapshot current = config.current();
 
         // when
-        config.update(current.clubName(), current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), "en",
-                current.slotMinutes(), current.timeZone(),
-                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
+        config.update(withLocale(current, "en"));
 
         // then
         assertThat(latestPayloadOf(ConfigEvent.LocaleChanged.TYPE)).containsEntry("defaultLocale", "en");
@@ -69,10 +64,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         ClubConfigurationSnapshot current = config.current();
 
         // when
-        config.update(current.clubName(), current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                60, current.timeZone(),
-                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
+        config.update(withSlotMinutes(current, 60));
 
         // then
         assertThat(latestPayloadOf(ConfigEvent.SlotDurationChanged.TYPE)).containsEntry("slotMinutes", 60);
@@ -87,10 +79,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         ClubConfigurationSnapshot current = config.current();
 
         // when
-        config.update(current.clubName(), current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                current.slotMinutes(), "UTC",
-                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
+        config.update(withTimeZone(current, "UTC"));
 
         // then
         assertThat(latestPayloadOf(ConfigEvent.TimeZoneChanged.TYPE)).containsEntry("timeZone", "UTC");
@@ -106,10 +95,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         int before = countOf(ConfigEvent.ClubChanged.TYPE);
 
         // when
-        config.update(current.clubName(), current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                current.slotMinutes(), current.timeZone(),
-                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
+        config.update(unchanged(current));
 
         // then
         assertThat(countOf(ConfigEvent.ClubChanged.TYPE)).isEqualTo(before);
@@ -124,10 +110,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
         ClubConfigurationSnapshot current = config.current();
 
         // when
-        config.update("Example Tennis Club", current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
-                current.slotMinutes(), current.timeZone(),
-                current.newAccountCredentialHours(), current.passwordResetCredentialHours());
+        config.update(withClubName(current, "Example Tennis Club"));
 
         // then
         UUID configId = UUID.fromString((String) latestPayloadOf(ConfigEvent.ClubChanged.TYPE).get("configId"));
@@ -143,5 +126,35 @@ class ConfigAuditTest extends AbstractIntegrationTest {
 
     private int countOf(String eventType) {
         return audit.eventsOfType(eventType).size();
+    }
+
+    private static ChangeClubConfigurationCommand unchanged(ClubConfigurationSnapshot current) {
+        return change(current, current.clubName(), current.defaultLocale(),
+                current.slotMinutes(), current.timeZone());
+    }
+
+    private static ChangeClubConfigurationCommand withClubName(ClubConfigurationSnapshot current, String clubName) {
+        return change(current, clubName, current.defaultLocale(), current.slotMinutes(), current.timeZone());
+    }
+
+    private static ChangeClubConfigurationCommand withLocale(ClubConfigurationSnapshot current, String locale) {
+        return change(current, current.clubName(), locale, current.slotMinutes(), current.timeZone());
+    }
+
+    private static ChangeClubConfigurationCommand withSlotMinutes(ClubConfigurationSnapshot current, int minutes) {
+        return change(current, current.clubName(), current.defaultLocale(), minutes, current.timeZone());
+    }
+
+    private static ChangeClubConfigurationCommand withTimeZone(ClubConfigurationSnapshot current, String timeZone) {
+        return change(current, current.clubName(), current.defaultLocale(), current.slotMinutes(), timeZone);
+    }
+
+    private static ChangeClubConfigurationCommand change(ClubConfigurationSnapshot current, String clubName,
+                                                         String locale, int minutes, String timeZone) {
+        return new ChangeClubConfigurationCommand(clubName, current.primaryColor(), current.accentColor(),
+                current.logoUrl(), current.imprintUrl(), locale,
+                new BookingSlotDuration(minutes), timeZone,
+                new CredentialLifetime(current.newAccountCredentialHours()),
+                new CredentialLifetime(current.passwordResetCredentialHours()));
     }
 }

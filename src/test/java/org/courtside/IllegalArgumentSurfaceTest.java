@@ -21,6 +21,8 @@ class IllegalArgumentSurfaceTest {
             "org/courtside/booking/series/MoveRequest.java",
             "org/courtside/booking/series/SeriesRule.java",
             "org/courtside/config/BookingSlotDuration.java",
+            "org/courtside/config/CredentialLifetime.java",
+            "org/courtside/config/internal/ChangeClubConfigurationCommand.java",
             "org/courtside/dataexchange/internal/MemberNumber.java",
             "org/courtside/shared/CodedDomainFailure.java",
             "org/courtside/shared/ProblemType.java",

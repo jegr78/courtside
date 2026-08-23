@@ -68,16 +68,6 @@ class BookingGridCoordinationTest extends AbstractIntegrationTest {
     private JdbcClient jdbc;
 
     @Test
-    void givenAnInvalidSlotDuration_whenUpdatingThroughTheService_thenTheInvariantIsRejected() {
-        // when / then
-        assertThatThrownBy(() -> config.update(
-                "Example Tennis Club", "#b85c38", "#d7e24b", null, null, "de", 7,
-                "Europe/Berlin", 168, 24))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("five-minute steps");
-    }
-
-    @Test
     void givenAnUncommittedGridChange_whenOpeningHoursAreChanged_thenTheWriterWaitsAndRejectsTheOldGrid()
             throws Exception {
         // given
