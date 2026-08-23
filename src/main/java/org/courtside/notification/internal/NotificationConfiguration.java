@@ -44,8 +44,11 @@ class NotificationConfiguration {
         mail.put("mail.smtp.auth", String.valueOf(MailSettings.isSet(properties.username())));
         mail.put("mail.smtp.starttls.enable", "true");
         mail.put("mail.smtp.starttls.required", "true");
+        // The name on a certificate whose issuer is already unchecked proves nothing — whoever can
+        // redirect the connection writes both — and no name the relay serves has to be reachable.
         if (properties.trustRelayCertificate()) {
             mail.put("mail.smtp.ssl.trust", properties.host());
+            mail.put("mail.smtp.ssl.checkserveridentity", "false");
         }
         mail.put("mail.smtp.timeout", "10000");
         mail.put("mail.smtp.connectiontimeout", "10000");

@@ -36,8 +36,8 @@ function deployedMailSinkImage(): string {
   return found[0];
 }
 
-// Courtside requires STARTTLS of every relay and Mailpit offers it only when it holds a certificate.
-// Trusting one still checks that it names the host reached, so every name Docker may report is on it.
+// Courtside requires STARTTLS of every relay, and Mailpit offers it only when it holds a certificate.
+// It names every host Docker may report, so the journey does not lean on the trust exception.
 function selfSignedRelayCertificate(): { certificate: string; key: string } {
   const directory = mkdtempSync(resolve(tmpdir(), "courtside-relay-"));
   const certificatePath = resolve(directory, "cert.pem");

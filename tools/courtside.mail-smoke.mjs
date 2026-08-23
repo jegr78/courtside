@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { connect as connectTls } from "node:tls";
 import { createConnection } from "node:net";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,37 +19,25 @@ const adminPassword = randomBytes(18).toString("base64url");
 const applicationPassword = randomBytes(18).toString("base64url");
 const runtime = mkdtempSync(join(tmpdir(), "courtside-mail-smoke-"));
 
-function openssl(args) {
-  const result = spawnSync("openssl", args, { cwd: runtime, encoding: "utf8" });
+function openssl(args, input) {
+  const result = spawnSync("openssl", args, { cwd: runtime, encoding: "utf8", input });
   if (result.error) throw new Error(`openssl ${args[0]} could not run: ${result.error.message}`);
   if (result.status !== 0) throw new Error(`openssl ${args[0]} failed: ${result.stderr}`);
+  return result.stdout;
 }
 
-// A throwaway authority, so the client can validate the way a client should rather than be told
-// to accept whatever it is handed.
-function issueCertificate() {
-  openssl(["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
-    "-keyout", "ca.key", "-out", "ca.crt", "-subj", "/CN=courtside-mail-smoke",
-    "-addext", "basicConstraints=critical,CA:TRUE"]);
-  openssl(["req", "-newkey", "rsa:2048", "-nodes",
-    "-keyout", "server.key", "-out", "server.csr", "-subj", `/CN=${hostname}`]);
-  writeFileSync(join(runtime, "san.ext"), `subjectAltName=DNS:${hostname}\n`);
-  openssl(["x509", "-req", "-in", "server.csr", "-CA", "ca.crt", "-CAkey", "ca.key",
-    "-CAcreateserial", "-days", "1", "-extfile", "san.ext", "-out", "server.crt"]);
-  const read = (name) => readFileSync(join(runtime, name), "utf8");
-  writeFileSync(join(runtime, "certificate.ndjson"), [
-    JSON.stringify({ "@type": "create", object: "Certificate",
-      value: { "certificate-smoke": {
-        certificate: { "@type": "Text", value: read("server.crt") },
-        privateKey: { "@type": "Text", secret: read("server.key") } } } }),
-    JSON.stringify({ "@type": "update", object: "SystemSettings",
-      value: { defaultCertificateId: "#certificate-smoke" } })
-  ].join("\n") + "\n");
-  // Readable to anyone on the host, server key included, because the CLI container reads it as
-  // another user and mkdtemp yields a directory only its owner may enter. The run deletes it.
-  chmodSync(runtime, 0o711);
-  chmodSync(join(runtime, "certificate.ndjson"), 0o644);
-  return read("ca.crt");
+// What a club's own mail server hands out, read the way the application meets it: nothing installs
+// a certificate here, because nothing in `deploy/` installs one either.
+function servedCertificate(port) {
+  const shown = openssl(["s_client", "-starttls", "smtp", "-connect", `127.0.0.1:${port}`], "");
+  const found = /-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----/.exec(shown);
+  assert.ok(found, `the submission listener on ${port} presented no certificate`);
+  return found[0];
+}
+
+function namesOn(certificate) {
+  const described = openssl(["x509", "-noout", "-subject", "-ext", "subjectAltName"], certificate);
+  return [...described.matchAll(/(?:CN\s*=\s*|DNS:|IP Address:)([^,\n]+)/g)].map((match) => match[1]);
 }
 
 function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure = false } = {}) {
@@ -62,8 +50,7 @@ function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure 
       COURTSIDE_MAIL_ADMIN_PASSWORD: adminPassword,
       COURTSIDE_MAIL_PASSWORD: applicationPassword,
       COURTSIDE_MAIL_SETUP_PASSWORD: setupPassword,
-      COURTSIDE_MAIL_RECOVERY_ADMIN: recoveryAdmin,
-      COURTSIDE_MAIL_RUNTIME_PLAN: runtime
+      COURTSIDE_MAIL_RECOVERY_ADMIN: recoveryAdmin
     }
   });
   if (result.status !== 0 && !allowFailure) {
@@ -129,18 +116,22 @@ class Smtp {
     return this.expect(code);
   }
 
-  async startTls(authority) {
+  // The application's posture, without weakening the handshake to reach it: what the relay presents
+  // is its own anchor, and the name on it decides nothing — which is what the exception it runs with means.
+  async startTls(served) {
     await this.send("EHLO courtside-smoke", "250");
     await this.send("STARTTLS", "220");
-    const secure = connectTls({ socket: this.socket, servername: hostname, ca: [authority] });
+    const secure = connectTls({
+      socket: this.socket, ca: [served], checkServerIdentity: () => undefined
+    });
     await new Promise((ready, fail) => secure.once("secureConnect", ready).once("error", fail));
     return new Smtp(secure);
   }
 }
 
-async function submit(port, from, to, password, authority) {
+async function submit(port, from, to, password, served) {
   const plain = await Smtp.open(port);
-  const session = await plain.startTls(authority);
+  const session = await plain.startTls(served);
   const greeting = await session.send("EHLO courtside-smoke", "250");
   assert.match(greeting, /AUTH[^\r\n]*PLAIN/,
     "the submission listener offers no PLAIN authentication after STARTTLS");
@@ -169,10 +160,6 @@ async function main() {
     compose(["run", "--rm", "apply", "apply", "--file", "/plan/base.ndjson"]);
     compose(["run", "--rm", "apply", "apply", "--file", "/plan/journey.ndjson"]);
 
-    console.log("Issuing a certificate for the run and handing it to the mail server");
-    const authority = issueCertificate();
-    compose(["run", "--rm", "apply", "apply", "--file", "/runtime/certificate.ndjson"]);
-
     console.log("Restarting without the recovery credential");
     compose(["up", "-d", "--force-recreate", "mail"], { recoveryAdmin: "" });
     await until("the mail server to report healthy", mailIsHealthy);
@@ -192,8 +179,16 @@ async function main() {
       return true;
     });
 
+    const served = servedCertificate(submission);
+    const names = namesOn(served);
+    // The reason `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` exists, checked rather than assumed: when
+    // this stops holding, the exception can go and the instance can validate the hop in full.
+    assert.deepEqual(names.filter((name) => [hostname, "mail", "127.0.0.1"].includes(name)), [],
+      `the mail server now names a host the instance reaches it at (${names.join(", ")}), `
+      + "so the certificate exception is no longer what makes the handover possible");
+
     console.log("Submitting as the instance, with the account the shipped plan gave it");
-    await submit(submission, sender, recipient, applicationPassword, authority);
+    await submit(submission, sender, recipient, applicationPassword, served);
 
     await until("the message to arrive in the sink", async () => {
       const response = await fetch(`http://127.0.0.1:${sink}/api/v1/messages`);

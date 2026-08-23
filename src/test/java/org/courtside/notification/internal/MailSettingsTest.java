@@ -43,7 +43,8 @@ class MailSettingsTest {
         // when / then
         runner.run(context -> assertThat(settings(context))
                 .containsEntry("mail.smtp.starttls.required", "true")
-                .doesNotContainKey("mail.smtp.ssl.trust"));
+                .doesNotContainKey("mail.smtp.ssl.trust")
+                .doesNotContainKey("mail.smtp.ssl.checkserveridentity"));
     }
 
     @Test
@@ -54,10 +55,10 @@ class MailSettingsTest {
                 "courtside.mail.from=no-reply@courts.example.org",
                 "courtside.mail.reply-to=board@courts.example.org");
 
-        // when / then — the exception covers the issuer, and the name the relay proves stays checked
+        // when / then
         runner.run(context -> assertThat(settings(context))
                 .containsEntry("mail.smtp.ssl.trust", "mail")
-                .doesNotContainKey("mail.smtp.ssl.checkserveridentity"));
+                .containsEntry("mail.smtp.ssl.checkserveridentity", "false"));
     }
 
     @Test
