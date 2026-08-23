@@ -33,6 +33,16 @@ describe("AdminFacilityView", () => {
     });
   });
 
+  it("when the facility loads, then opening hours have a stable navigation target", async () => {
+    // when
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+
+    // then
+    const heading = await screen.findByTestId("opening-hours-heading");
+    expect(heading).toHaveRole("heading");
+    expect(heading).toHaveAttribute("id", "opening-hours");
+  });
+
   it("given a court in use, when its impact is asked for, then the bookings it would displace are named", async () => {
     // given
     vi.spyOn(api, "courtImpact").mockResolvedValue({

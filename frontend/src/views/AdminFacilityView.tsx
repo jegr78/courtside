@@ -283,7 +283,7 @@ export function AdminFacilityView() {
           </form>
         </section>
         <section className="grid gap-4">
-          <h2 className="text-2xl font-bold">{t("admin.facility.openingHours")}</h2>
+          <h2 id="opening-hours" data-testid="opening-hours-heading" className="text-2xl font-bold">{t("admin.facility.openingHours")}</h2>
           <div className="grid gap-3 lg:grid-cols-2">
             {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} timeZone={timeZone} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} reportError={reportError} />)}
           </div>
