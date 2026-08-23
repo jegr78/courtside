@@ -46,7 +46,9 @@ beforeEach(async () => {
     moves: [{
       bookingId: upcomingId,
       fromStartsAt: "2026-08-12T16:00:00Z",
+      fromEndsAt: "2026-08-12T17:00:00Z",
       toStartsAt: "2026-08-12T17:00:00Z",
+      toEndsAt: "2026-08-12T18:00:00Z",
       blockedCourtIds: [], unbookableCourtIds: [], violations: [], executable: true
     }]
   });
@@ -269,6 +271,31 @@ it("given a series occurrence, when previewing and confirming a move, then the s
   })));
 });
 
+it("given differently long occurrences, when previewing a move, then each returned period is shown", async () => {
+  // given
+  vi.mocked(api.previewSeriesMove).mockResolvedValue({
+    executable: true,
+    moves: [{
+      bookingId: upcomingId,
+      fromStartsAt: "2026-08-12T16:00:00Z",
+      fromEndsAt: "2026-08-12T17:30:00Z",
+      toStartsAt: "2026-08-12T18:00:00Z",
+      toEndsAt: "2026-08-12T19:30:00Z",
+      blockedCourtIds: [], unbookableCourtIds: [], violations: [], executable: true
+    }]
+  });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("move-booking"));
+  await userEvent.type(screen.getByTestId("move-start-time"), "20:00");
+
+  // when
+  await userEvent.click(screen.getByTestId("preview-move"));
+
+  // then
+  expect(await screen.findByTestId("move-preview"))
+    .toHaveTextContent("Aug 12, 2026, 6:00 PM – 7:30 PM → Aug 12, 2026, 8:00 PM – 9:30 PM");
+});
+
 it("given a move is blocked, when previewed, then every reason is translated and courts are named", async () => {
   // given
   vi.mocked(api.previewSeriesMove).mockResolvedValue({
@@ -276,7 +303,9 @@ it("given a move is blocked, when previewed, then every reason is translated and
     moves: [{
       bookingId: upcomingId,
       fromStartsAt: "2026-08-12T16:00:00Z",
+      fromEndsAt: "2026-08-12T17:00:00Z",
       toStartsAt: "2026-08-12T20:00:00Z",
+      toEndsAt: "2026-08-12T21:00:00Z",
       blockedCourtIds: ["33333333-3333-3333-3333-333333333333"],
       unbookableCourtIds: ["33333333-3333-3333-3333-333333333333"],
       violations: [{ code: "booking.rule.openingHours.closed", params: {} }],

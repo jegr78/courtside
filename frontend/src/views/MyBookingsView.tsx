@@ -259,7 +259,6 @@ function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking:
     ...(duration ? { newDurationMinutes: Number(duration) } : {}),
     ...(courtIds.join() !== booking.courtIds.join() ? { newCourtIds: courtIds } : {})
   };
-  const movedDuration = duration ? Number(duration) * 60_000 : Date.parse(booking.endsAt) - Date.parse(booking.startsAt);
   const courtNames = new Map(courts.map((court) => [court.id, court.name ?? t("court.number", { number: court.number })]));
   async function previewMove() {
     try { setPreview(await api.previewSeriesMove(booking.seriesId!, request)); setError(undefined); }
@@ -276,7 +275,7 @@ function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking:
     <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input data-testid="move-duration" type="number" min="1" value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
     <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
     {error && <Alert>{error}</Alert>}
-    {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{movePeriod(move.fromStartsAt, Date.parse(booking.endsAt) - Date.parse(booking.startsAt), i18n.language, timeZone)} → {movePeriod(move.toStartsAt, movedDuration, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
+    {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatBookingPeriod(move.fromStartsAt, move.fromEndsAt, i18n.language, timeZone)} → {formatBookingPeriod(move.toStartsAt, move.toEndsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
     <div className="flex gap-2">{preview ? <Button data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
@@ -308,10 +307,6 @@ function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }: { boo
     </>}
     <div><Button data-testid="close-managed-appointment" className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
-}
-
-function movePeriod(startsAt: string, duration: number, locale: string, timeZone: string): string {
-  return formatBookingPeriod(startsAt, new Date(Date.parse(startsAt) + duration).toISOString(), locale, timeZone);
 }
 
 function MoveReasons({ move, courtNames, t }: { move: MovePreview["moves"][number]; courtNames: Map<string, string>; t: Translate }) {

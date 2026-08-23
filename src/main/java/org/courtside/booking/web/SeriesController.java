@@ -149,7 +149,9 @@ class SeriesController implements BookingSeriesApi {
     private static ApiMove toResponse(MovePreview.Move move) {
         return new ApiMove(move.bookingId(),
                 WireTypes.toOffsetDateTime(move.from().start()),
+                WireTypes.toOffsetDateTime(move.from().end()),
                 WireTypes.toOffsetDateTime(move.to().start()),
+                WireTypes.toOffsetDateTime(move.to().end()),
                 move.blockedCourtIds(), move.unbookableCourtIds(),
                 move.violations().stream().map(SeriesController::toResponse).toList(),
                 move.isExecutable());

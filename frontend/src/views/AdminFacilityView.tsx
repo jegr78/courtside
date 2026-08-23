@@ -30,6 +30,7 @@ export function AdminFacilityView() {
   const [hours, setHours] = useState<OpeningHours[]>();
   const [cards, setCards] = useState<BookingCard[]>();
   const [fillers, setFillers] = useState<ParticipantCard[]>();
+  const [timeZone, setTimeZone] = useState<string>();
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const pendingRef = useRef(new Set<string>());
@@ -37,12 +38,13 @@ export function AdminFacilityView() {
 
   useEffect(() => {
     void Promise.all([api.adminCourts(), api.adminOpeningHours(), api.adminBookingCards(),
-      api.adminParticipantCards()])
-      .then(([loadedCourts, loadedHours, loadedCards, loadedFillers]) => {
+      api.adminParticipantCards(), api.config()])
+      .then(([loadedCourts, loadedHours, loadedCards, loadedFillers, configuration]) => {
         setCourts(loadedCourts);
         setHours(loadedHours);
         setCards(loadedCards);
         setFillers(loadedFillers);
+        setTimeZone(configuration.timeZone);
       })
       .catch((failure) => setError(problemMessage(failure, t)));
   }, [t]);
@@ -266,14 +268,14 @@ export function AdminFacilityView() {
       <h1 className="text-3xl font-bold">{t("admin.facility.title")}</h1>
       <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
     </div>
-    {!courts || !hours || !cards
+    {!courts || !hours || !cards || !timeZone
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert>{error}</Alert>}
         {success && <Alert tone="success">{success}</Alert>}
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.courts")}</h2>
-          {courts.map((court) => <CourtEditor key={court.id} court={court} disabled={pending.has(`court:${court.id}`)} changed={(changed) => setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCourt} toggle={toggleCourt} reportError={reportError} />)}
+          {courts.map((court) => <CourtEditor key={court.id} court={court} timeZone={timeZone} disabled={pending.has(`court:${court.id}`)} changed={(changed) => setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCourt} toggle={toggleCourt} reportError={reportError} />)}
           <form noValidate onSubmit={(event) => void createCourt(event)} className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
             <TextField data-testid="new-court-number" disabled={pending.has("court:new")} name="number" type="number" label={t("admin.facility.number")} />
             <TextField data-testid="new-court-name" disabled={pending.has("court:new")} name="name" label={t("admin.facility.name")} />
@@ -283,12 +285,12 @@ export function AdminFacilityView() {
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.openingHours")}</h2>
           <div className="grid gap-3 lg:grid-cols-2">
-            {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} reportError={reportError} />)}
+            {hours.map((day) => <HoursEditor key={day.dayOfWeek} hours={day} timeZone={timeZone} disabled={pending.has(`hours:${day.dayOfWeek}`)} changed={replaceHours} save={saveHours} close={closeDay} reportError={reportError} />)}
           </div>
         </section>
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.cards")}</h2>
-          {cards.map((card) => <CardEditor key={card.id} card={card} disabled={pending.has(`card:${card.id}`)} changed={(changed) => setCards((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCard} toggle={toggleCard} reportError={reportError} />)}
+          {cards.map((card) => <CardEditor key={card.id} card={card} timeZone={timeZone} disabled={pending.has(`card:${card.id}`)} changed={(changed) => setCards((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCard} toggle={toggleCard} reportError={reportError} />)}
           <CardCreateForm disabled={pending.has("card:new")} create={createCard} />
         </section>
         <section className="grid gap-4">
@@ -308,7 +310,7 @@ export function AdminFacilityView() {
   </section>;
 }
 
-function CourtEditor({ court, disabled, changed, save, toggle, reportError }: { court: AdminCourt; disabled: boolean; changed: (court: AdminCourt) => void; save: (court: AdminCourt) => Promise<void>; toggle: (court: AdminCourt) => Promise<void>; reportError: (failure: unknown) => void }) {
+function CourtEditor({ court, timeZone, disabled, changed, save, toggle, reportError }: { court: AdminCourt; timeZone: string; disabled: boolean; changed: (court: AdminCourt) => void; save: (court: AdminCourt) => Promise<void>; toggle: (court: AdminCourt) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto_auto] sm:items-end">
     <TextField disabled={disabled} type="number" label={t("admin.facility.number")} value={court.number} onChange={(event) => changed({ ...court, number: Number(event.target.value) })} />
@@ -316,12 +318,12 @@ function CourtEditor({ court, disabled, changed, save, toggle, reportError }: { 
     <Button disabled={disabled} type="button" onClick={() => void save(court)}>{t("admin.save")}</Button>
     <Button disabled={disabled} data-testid={`toggle-court-${court.id}`} type="button" onClick={() => void toggle(court)}>{t(court.active ? "admin.deactivate" : "admin.activate")}</Button>
     <div className="sm:col-span-full">
-      <ImpactPanel kind="court" subject={court.id} ask={() => api.courtImpact(court.id)} reportError={reportError} />
+      <ImpactPanel kind="court" subject={court.id} timeZone={timeZone} ask={() => api.courtImpact(court.id)} reportError={reportError} />
     </div>
   </article>;
 }
 
-function HoursEditor({ hours, disabled, changed, save, close, reportError }: { hours: OpeningHours; disabled: boolean; changed: (hours: OpeningHours) => void; save: (hours: OpeningHours) => Promise<void>; close: (day: DayOfWeek) => Promise<void>; reportError: (failure: unknown) => void }) {
+function HoursEditor({ hours, timeZone, disabled, changed, save, close, reportError }: { hours: OpeningHours; timeZone: string; disabled: boolean; changed: (hours: OpeningHours) => void; save: (hours: OpeningHours) => Promise<void>; close: (day: DayOfWeek) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4">
     <h3 className="font-bold">{t(`weekday.${hours.dayOfWeek}`)}</h3>
@@ -336,13 +338,14 @@ function HoursEditor({ hours, disabled, changed, save, close, reportError }: { h
     <ImpactPanel
       kind="opening-hours"
       subject={hours.dayOfWeek}
+      timeZone={timeZone}
       ask={() => api.openingHoursImpact(hours.dayOfWeek, shortTime(hours.opensAt), shortTime(hours.closesAt))}
       reportError={reportError}
     />
   </article>;
 }
 
-function CardEditor({ card, disabled, changed, save, toggle, reportError }: { card: BookingCard; disabled: boolean; changed: (card: BookingCard) => void; save: (card: BookingCard) => Promise<void>; toggle: (card: BookingCard) => Promise<void>; reportError: (failure: unknown) => void }) {
+function CardEditor({ card, timeZone, disabled, changed, save, toggle, reportError }: { card: BookingCard; timeZone: string; disabled: boolean; changed: (card: BookingCard) => void; save: (card: BookingCard) => Promise<void>; toggle: (card: BookingCard) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   const [counts, setCounts] = useState(card.allowedPlayerCounts.join(", "));
   const countsValue = playerCounts(counts);
@@ -361,7 +364,7 @@ function CardEditor({ card, disabled, changed, save, toggle, reportError }: { ca
       <Button disabled={disabled} data-testid={`save-card-${card.id}`} type="button" onClick={() => void save({ ...card, allowedPlayerCounts: countsValue, tracksPlayers: countsValue.length > 0 })}>{t("admin.save")}</Button>
       <Button disabled={disabled} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
     </div>
-    <ImpactPanel kind="booking-card" subject={card.id} ask={() => api.bookingCardImpact(card.id)} reportError={reportError} />
+    <ImpactPanel kind="booking-card" subject={card.id} timeZone={timeZone} ask={() => api.bookingCardImpact(card.id)} reportError={reportError} />
   </article>;
 }
 
@@ -456,4 +459,3 @@ function cardRequest(card: BookingCard): BookingCardRequest {
 function playerCounts(value: string): number[] {
   return value.split(",").map((count) => count.trim()).filter(Boolean).map(Number);
 }
-
