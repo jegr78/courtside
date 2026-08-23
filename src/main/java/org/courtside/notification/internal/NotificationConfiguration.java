@@ -1,5 +1,6 @@
 package org.courtside.notification.internal;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +19,7 @@ class NotificationConfiguration {
     // Handing a message over waits for the relay, and the shared executor also carries the audit
     // trail and every other module's listeners, which must not queue behind a mail server.
     @Bean
+    @ConditionalOnMissingBean(name = "credentialMailExecutor")
     TaskExecutor credentialMailExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);

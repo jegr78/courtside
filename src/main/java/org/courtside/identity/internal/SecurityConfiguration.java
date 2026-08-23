@@ -27,7 +27,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
-@EnableConfigurationProperties({BootstrapAdminProperties.class, LoginProtectionProperties.class})
+@EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
+        LoginProtectionProperties.class})
 public class SecurityConfiguration {
 
     // OWASP's Argon2id minimum; the login filter limits how often a caller can incur this cost.

@@ -76,15 +76,22 @@ board issues a new one. How long an invitation and a reset last is a club settin
 each, so a board that knows its own members decides it rather than inheriting ours. The date binds
 the issued credential only, so a member who has since chosen their own password keeps it. A message
 the relay refuses is retried, and if it is still refused the event stays outstanding rather than
-being recorded as delivered, so a restart republishes it instead of losing it. What raises that
-event is still to come: the roster continues to ask an administrator for a one-time password.
+being recorded as delivered, so a restart republishes it instead of losing it. What raises the
+event is the roster: creating an account asks for a credential at once, and one action sends a new
+one afterwards, for a message that never arrived, a deadline that passed, or a member who no longer
+knows their own password. Nobody on the board chooses it, sees it, or has to pass it on, and it
+appears in no response, log or problem detail. Which of the two lifetimes applies is read from the
+account rather than chosen by the caller, and how often one account may be sent a credential is
+limited. Correcting a person's address withdraws whatever was
+issued to the address it replaces, because a message already sent cannot be recalled from a mailbox
+that was never theirs.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers — including creating a recurring
 series, which is previewed before anything is written and reports what it had to skip — and the
 browser admin surface for configuration, facilities and the club's people — adding somebody,
 correcting their name or address, giving them an account, changing its roles, correcting its
-username, handing out a new one-time password and disabling it. Membership types are administered
+username, sending it new credentials and disabling it. Membership types are administered
 there as well, each showing how many people hold it, and so is the whole import: describing a
 source, linking the people a file cannot match by number, uploading a member list, reading what it
 would change, and running it. The column mapping is offered from the club's own export, read in the
@@ -95,8 +102,8 @@ that have no surface, in `tools/surfaceless-endpoints.json`; every entry left in
 decision rather than a gap.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
-container image scanning, reports and exports, and the self-service password reset of section 4 — an administrator hands out a new one-time password
-through the roster instead.
+container image scanning, reports and exports, and the self-service password reset of section 4 — a
+board member has the instance send new credentials through the roster instead.
 
 ---
 
@@ -597,8 +604,8 @@ paths, both supported:
    with its own reset link ("Accounts for this address: *doe.jane*, *roe.john*").
 
 This is a case standard frameworks do not provide and must be built explicitly. Until it is, the
-roster is the only remedy: an administrator hands out a new one-time password (section 10), which
-is what the self-service paths above would take the board out of.
+roster is the only remedy: a board member has the instance send new credentials (section 10),
+which reaches the member without the board seeing anything, but still needs somebody to ask.
 
 A **guardian relation** (a parent seeing their children's bookings) falls out of this model
 almost for free. It is noted as a candidate for a later release, not Release 1.
@@ -1208,6 +1215,11 @@ whether it is built or designed. **Designed means absent today.**
   both are stored in PostgreSQL. There is deliberately no username lockout: an anonymous attacker
   could renew it against a known administrator indefinitely. Success clears its address counter,
   while `Retry-After` tells a client when an address or instance cooldown ends.
+- **Credential issuing:** limited per account over a configurable window, counted in PostgreSQL.
+  *Built.* The account is the unit because the account is what the abuse targets: somebody holding a
+  board member's session filling one member's mailbox with credentials that each invalidate the
+  last. A board sending twice in a row is nowhere near the limit, and the refusal says how many went
+  out rather than who sent them.
 - **Admin roles:** optional TOTP second factor. **Designed, not built** — there is no second
   factor of any kind today.
 - **Booking authorization:** every booking mutation has an authenticated account as its actor.
@@ -1240,15 +1252,29 @@ whether it is built or designed. **Designed means absent today.**
   that grants access travels by mail, so the credential and the password the instance authenticates
   with both cross the hop to the mail server. That hop is required to be encrypted — STARTTLS is
   required and not merely enabled, so a relay that stops offering it fails the handover rather than
-  carrying a password in the clear — but its certificate is not checked, because Caddy issues for
-  `COURTSIDE_DOMAIN` and not for the mail hostname and the submission listener therefore presents a
-  self-signed one. An observer needs to be on the private compose network *and* able to redirect the
+  carrying a password in the clear — but who issued its certificate is not checked, because Caddy
+  issues for `COURTSIDE_DOMAIN` and not for the mail hostname and the submission listener therefore
+  presents a self-signed one. An observer needs to be on the private compose network *and* able to redirect the
   application's connection to a server of their own. What bounds it: the exception is off by default
   in the application and switched on in `compose.yaml`, where a reader sees it; it names one host,
-  the configured relay; and a club pointing `COURTSIDE_MAIL_RELAY_HOST` at a provider with a real
-  certificate clears `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` and is validated again. It closes when
+  the configured relay; the certificate still has to name the host the application connects to, so a
+  server presenting one issued for another name fails the handshake with the exception switched on;
+  and a club pointing `COURTSIDE_MAIL_RELAY_HOST` at a provider with a real certificate clears
+  `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` and is validated in full again. It closes when
   the mail server has a certificate of its own, which
   [#342](https://github.com/jegr78/courtside/issues/342) covers. *Built, as described.*
+- **Accepted: whoever holds a mailbox can take over every account registered to it.** One address
+  serving several people is deliberate — a parent registering for their children — so the same
+  inbox receives each of their credentials, and a first credential is enough to set a password and
+  keep the account. That was already true when a board member handed the password over; what
+  changed is that no person stands between the address a club typed and the message. What bounds it:
+  the club decides which address sits on which person and can correct it, and correcting it
+  withdraws whatever was issued to the old one; the roster shows, before anybody sends, how many
+  people share the address a message is about to go to; the subject names the person it is for, so a
+  shared inbox can tell two apart; and nothing else about an account can be reached this way — a
+  credential grants the roles that account already had and no others. It stays open because closing
+  it would mean forbidding a shared address, which is the case the schema exists to serve.
+  *Built, as described.*
 
 ### Roles
 

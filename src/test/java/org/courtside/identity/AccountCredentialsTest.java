@@ -1,5 +1,6 @@
 package org.courtside.identity;
 
+import org.courtside.identity.internal.CredentialIssuing;
 import org.courtside.shared.CredentialsRequested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -25,7 +26,8 @@ class AccountCredentialsTest {
 
     private final UserAccountRepository accounts = mock(UserAccountRepository.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
-    private final AccountCredentials credentials = new AccountCredentials(accounts, events,
+    private final CredentialIssuing issuing = mock(CredentialIssuing.class);
+    private final AccountCredentials credentials = new AccountCredentials(accounts, issuing, events,
             Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
@@ -91,6 +93,19 @@ class AccountCredentialsTest {
         // when / then
         assertThatThrownBy(() -> credentials.issueTo(accountId))
                 .isInstanceOf(AccountDeactivatedException.class);
+        verifyNoInteractions(events, issuing);
+    }
+
+    @Test
+    void givenTheAccountHasBeenSentTooMany_whenIssuingAgain_thenNothingIsPublished() {
+        // given
+        UUID accountId = holding(awaiting());
+        org.mockito.Mockito.doThrow(new IllegalStateException("refused by the limit"))
+                .when(issuing).registerOrRefuse(accountId);
+
+        // when / then — the limit decides before an event exists, so nothing is half done
+        assertThatThrownBy(() -> credentials.issueTo(accountId))
+                .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(events);
     }
 

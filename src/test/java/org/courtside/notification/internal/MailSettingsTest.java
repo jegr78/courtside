@@ -54,9 +54,10 @@ class MailSettingsTest {
                 "courtside.mail.from=no-reply@courts.example.org",
                 "courtside.mail.reply-to=board@courts.example.org");
 
-        // when / then
+        // when / then — the exception covers the issuer, and the name the relay proves stays checked
         runner.run(context -> assertThat(settings(context))
-                .containsEntry("mail.smtp.ssl.trust", "mail"));
+                .containsEntry("mail.smtp.ssl.trust", "mail")
+                .doesNotContainKey("mail.smtp.ssl.checkserveridentity"));
     }
 
     @Test

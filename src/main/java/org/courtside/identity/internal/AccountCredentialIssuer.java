@@ -2,6 +2,7 @@ package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.courtside.identity.AccountSessions;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.CredentialIssuer;
@@ -23,6 +24,7 @@ class AccountCredentialIssuer implements CredentialIssuer {
     private static final int CREDENTIAL_BYTES = 24;
 
     private final UserAccountRepository accounts;
+    private final AccountSessions sessions;
     private final PasswordEncoder passwordEncoder;
     private final SecureRandom random = new SecureRandom();
 
@@ -38,6 +40,7 @@ class AccountCredentialIssuer implements CredentialIssuer {
         }
         String credential = generated();
         account.credentialsIssued(passwordEncoder.encode(credential), expiresAt);
+        sessions.endFor(account.getUsername());
         log.info("Issued a credential for account {}", accountId);
         return new IssuedCredential(address,
                 account.getPerson().getFirstName(), account.getLocale(),

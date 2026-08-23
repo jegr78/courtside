@@ -1,6 +1,7 @@
 package org.courtside.identity;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.identity.internal.CredentialIssuing;
 import org.courtside.shared.CredentialsRequested;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import java.util.UUID;
 public class AccountCredentials {
 
     private final UserAccountRepository accounts;
+    private final CredentialIssuing issuing;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
@@ -24,6 +26,7 @@ public class AccountCredentials {
         if (!account.isEnabled()) {
             throw new AccountDeactivatedException();
         }
+        issuing.registerOrRefuse(accountId);
         events.publishEvent(new CredentialsRequested(accountId, reasonFor(account)));
     }
 

@@ -283,7 +283,7 @@ default.
 | `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from and authenticates as, in `COURTSIDE_MAIL_DOMAIN`. |
 | `COURTSIDE_MAIL_RELAY_HOST` | `mail` | Where the instance hands its messages in. The mail server on the compose network by default; point it at the club's provider instead if this deployment runs without one. |
 | `COURTSIDE_MAIL_RELAY_PORT` | `587` | Submission port on that host. |
-| `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `true` in this deployment, `false` in the application | Accept the certificate the relay presents without validating it. Set because Caddy issues for `COURTSIDE_DOMAIN` and not for the mail server, which therefore serves a self-signed certificate on the private compose network. Clear it when you point `COURTSIDE_MAIL_RELAY_HOST` at a provider that has a real one. |
+| `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `true` in this deployment, `false` in the application | Accept the certificate the relay presents without checking who issued it. It must still name the host `COURTSIDE_MAIL_RELAY_HOST` points at; one issued for another name fails the handshake either way. Set because Caddy issues for `COURTSIDE_DOMAIN` and not for the mail server, which therefore serves a self-signed certificate on the private compose network. Clear it when you point `COURTSIDE_MAIL_RELAY_HOST` at a provider that has a real one. |
 | `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
 | `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`. Needed for the initial setup, and a way back in afterwards. **The server serves no mail while it is set.** |
 | `COURTSIDE_MAIL_OUTBOUND_PROBE` | `gmail-smtp-in.l.google.com` | The host `mail-check` opens port 25 to when testing whether outbound mail leaves at all. A third party by default; point it at a server of your own if you would rather not tell one. |
@@ -298,6 +298,9 @@ default.
 | `COURTSIDE_LOGIN_GLOBAL_MAX_FAILURES` | `100` | Login attempts allowed across the instance and window. |
 | `COURTSIDE_LOGIN_GLOBAL_WINDOW` | `1m` | Instance-wide counting window. |
 | `COURTSIDE_LOGIN_GLOBAL_BLOCK` | `1m` | Instance-wide login cooldown duration. |
+| `COURTSIDE_CREDENTIAL_ISSUE_MAX_PER_WINDOW` | `5` | How often one account may be sent credentials within the window. Counted per account, because the account is what a filled mailbox targets; a board sending twice in a row is nowhere near it. |
+| `COURTSIDE_CREDENTIAL_ISSUE_WINDOW` | `1h` | Counting window for one account's credentials. |
+| `COURTSIDE_CREDENTIAL_ISSUE_RETENTION` | `24h` | How long a counting row is kept after its window started, before the hourly cleanup deletes it. |
 | `COURTSIDE_OTLP_ENABLED` | `false` | Exports traces and metrics over OTLP/HTTP when enabled. Keep disabled until both collector endpoints are reachable from the application container. |
 | `COURTSIDE_OTLP_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | Complete OTLP/HTTP trace endpoint. Set a container-network hostname when the collector runs in another container. |
 | `COURTSIDE_OTLP_METRICS_ENDPOINT` | `http://localhost:4318/v1/metrics` | Complete OTLP/HTTP metrics endpoint. |

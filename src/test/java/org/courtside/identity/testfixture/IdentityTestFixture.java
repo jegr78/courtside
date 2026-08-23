@@ -68,6 +68,17 @@ public class IdentityTestFixture {
         accounts.save(account);
     }
 
+    // The bootstrap administrator's shape: a password that came from the environment, which must
+    // still be replaced and which no deadline binds.
+    public UUID createAccountWithEnvironmentCredential(UUID personId, String username,
+                                                       String passwordHash, Set<Role> roles) {
+        UUID accountId = createEnabledAccount(personId, username, passwordHash, roles);
+        UserAccount account = accounts.findById(accountId).orElseThrow();
+        account.requirePasswordChange();
+        accounts.save(account);
+        return accountId;
+    }
+
     public UUID createEnabledAccount(UUID personId, String username, Set<Role> roles) {
         return createEnabledAccount(personId, username, "synthetic-test-password-hash", roles);
     }

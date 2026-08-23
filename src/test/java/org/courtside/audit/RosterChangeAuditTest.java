@@ -86,8 +86,9 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
                 .containsExactlyInAnyOrder("roster.person.added", "roster.account.created",
-                        "roster.account.rolesChanged", "roster.account.usernameCorrected",
-                        "roster.account.credentialsRequested", "roster.account.availabilityChanged");
+                        "roster.account.credentialsRequested", "roster.account.rolesChanged",
+                        "roster.account.usernameCorrected", "roster.account.credentialsRequested",
+                        "roster.account.availabilityChanged");
     }
 
     @Test
@@ -170,8 +171,8 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
                 .containsExactlyInAnyOrder("roster.person.added", "roster.membership.written",
-                        "roster.account.created", "roster.membership.ended",
-                        "roster.account.availabilityChanged");
+                        "roster.account.created", "roster.account.credentialsRequested",
+                        "roster.membership.ended", "roster.account.availabilityChanged");
         assertThat(audit.latestPayload(personId, "roster.account.availabilityChanged"))
                 .containsEntry("enabled", false);
     }
