@@ -69,46 +69,93 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
-  test(`${locale} administration views meet automated WCAG 2.2 AA checks`, async ({ page }) => {
+  test(`${locale} administration configuration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
     await page.locator("#locale-preference").selectOption(locale);
     await signIn(page, "configuration-admin");
 
-    // when / then
+    // when
     await page.goto("/admin/configuration");
     await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
     await expect(page.getByTestId("save-club-config")).toBeVisible();
+
+    // then
     await expectNoWcagViolations(page);
+  });
+
+  test(`${locale} facility and audit administration meet automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await page.locator("#locale-preference").selectOption(locale);
+    await signIn(page, "configuration-admin");
+
+    // when
     await page.goto("/admin/facility");
     await expect(page.getByTestId("admin-facility-view")).toBeVisible();
     await expect(page.getByTestId("create-court")).toBeVisible();
+
+    // then
     await expectNoWcagViolations(page);
-    // The audit table needs a row to check its own markup, not the empty state.
+
+    // when
     const courtToggled = page.waitForResponse((response) =>
       response.url().endsWith("/api/admin/courts/dddddddd-0000-0000-0000-000000000002/active")
         && response.request().method() === "PUT"
     );
     await page.getByTestId("toggle-court-dddddddd-0000-0000-0000-000000000002").click();
     await courtToggled;
+    await page.goto("/admin/audit");
+    await expect(page.getByTestId("admin-audit-view")).toBeVisible();
+    await expect(page.getByTestId("audit-row").first()).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+  });
+
+  test(`${locale} roster administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await page.locator("#locale-preference").selectOption(locale);
+    await signIn(page, "configuration-admin");
+
+    // when
     await page.goto("/admin/roster");
     await expect(page.getByTestId("admin-roster-view")).toBeVisible();
     await expect(page.getByTestId("create-person")).toBeVisible();
+
+    // then
     await expectNoWcagViolations(page);
+  });
+
+  test(`${locale} membership type administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await page.locator("#locale-preference").selectOption(locale);
+    await signIn(page, "configuration-admin");
+
+    // when
     await page.goto("/admin/membership-types");
     await expect(page.getByTestId("admin-membership-types-view")).toBeVisible();
     await expect(page.getByTestId("create-membership-type")).toBeVisible();
+
+    // then
     await expectNoWcagViolations(page);
-    // The import form is the one place this product asks for a file and renders selects and a
-    // fieldset built by hand, so it is checked with a source open rather than only listed.
+  });
+
+  test(`${locale} import administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await page.locator("#locale-preference").selectOption(locale);
+    await signIn(page, "configuration-admin");
+
+    // when
     await page.goto("/admin/import");
     await expect(page.getByTestId("no-sources")).toBeVisible();
     await page.getByTestId("new-source").click();
     await expect(page.getByTestId("column-EXTERNAL_ID")).toBeVisible();
-    await expectNoWcagViolations(page);
-    await page.goto("/admin/audit");
-    await expect(page.getByTestId("admin-audit-view")).toBeVisible();
-    await expect(page.getByTestId("audit-row").first()).toBeVisible();
+
+    // then
     await expectNoWcagViolations(page);
   });
 }

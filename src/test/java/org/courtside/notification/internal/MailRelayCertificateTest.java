@@ -4,6 +4,7 @@ import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.testcontainers.containers.GenericContainer;
@@ -84,6 +85,57 @@ class MailRelayCertificateTest {
                 .hasStackTraceContaining("SSLHandshakeException");
     }
 
+    @Test
+    void givenAnAbsoluteSearchDirectory_whenResolvingAnExecutable_thenItsNormalizedPathIsReturned(
+            @TempDir Path directory) throws IOException {
+        // given
+        Path executable = executableFile(directory, "openssl");
+
+        // when
+        Path resolved = executable("openssl", List.of(directory), List.of(""));
+
+        // then
+        assertThat(resolved).isEqualTo(executable.toAbsolutePath().normalize()).isAbsolute();
+    }
+
+    @Test
+    void givenOnlyARelativeSearchDirectory_whenResolvingAnExecutable_thenResolutionFailsClosed()
+            throws IOException {
+        // given
+        Path directory = Files.createTempDirectory(Path.of("target"), "relative-executable-search-");
+        Path executable = executableFile(directory, "openssl");
+
+        // when / then
+        try {
+            assertThatThrownBy(() -> executable("openssl", List.of(directory), List.of("")))
+                    .isInstanceOf(IllegalStateException.class);
+        } finally {
+            Files.deleteIfExists(executable);
+            Files.deleteIfExists(directory);
+        }
+    }
+
+    @Test
+    void givenAWindowsExecutableExtension_whenResolvingAnExecutable_thenTheExtensionIsApplied(
+            @TempDir Path directory) throws IOException {
+        // given
+        Path executable = executableFile(directory, "openssl.exe");
+
+        // when
+        Path resolved = executable("openssl", List.of(directory), List.of(".exe"));
+
+        // then
+        assertThat(resolved).isEqualTo(executable.toAbsolutePath().normalize());
+    }
+
+    @Test
+    void givenNoMatchingExecutable_whenResolvingAnExecutable_thenResolutionFailsClosed(
+            @TempDir Path directory) {
+        // given / when / then
+        assertThatThrownBy(() -> executable("openssl", List.of(directory), List.of("")))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
     private JavaMailSender senderTrusting(boolean trustRelayCertificate) {
         return new NotificationConfiguration().courtsideMailSender(new MailProperties(
                 REACHED_AT, relay.getMappedPort(1025), "no-reply@example.org",
@@ -137,16 +189,29 @@ class MailRelayCertificateTest {
         if (searchPath == null || searchPath.isBlank()) {
             throw new IllegalStateException("PATH does not name an OpenSSL executable");
         }
-        List<String> extensions = executableExtensions();
-        return Arrays.stream(searchPath.split(Pattern.quote(File.pathSeparator)))
+        List<Path> directories = Arrays.stream(searchPath.split(Pattern.quote(File.pathSeparator)))
                 .filter(entry -> !entry.isBlank())
                 .map(Path::of)
+                .toList();
+        return executable(name, directories, executableExtensions());
+    }
+
+    private static Path executable(String name, List<Path> directories, List<String> extensions) {
+        return directories.stream()
                 .filter(Path::isAbsolute)
                 .flatMap(directory -> extensions.stream().map(extension -> directory.resolve(name + extension)))
                 .filter(candidate -> Files.isRegularFile(candidate) && Files.isExecutable(candidate))
                 .findFirst()
                 .map(candidate -> candidate.toAbsolutePath().normalize())
                 .orElseThrow(() -> new IllegalStateException("PATH does not name an OpenSSL executable"));
+    }
+
+    private static Path executableFile(Path directory, String name) throws IOException {
+        Path executable = Files.createFile(directory.resolve(name));
+        if (!executable.toFile().setExecutable(true)) {
+            throw new IllegalStateException("Could not make the test executable available");
+        }
+        return executable;
     }
 
     private static List<String> executableExtensions() {
