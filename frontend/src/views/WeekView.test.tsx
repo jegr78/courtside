@@ -425,6 +425,7 @@ it("given an own member booking, when it is shown, then the viewer marker and ot
 
   // then
   expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You, Major, Miles");
+  expect(screen.getByTestId("own-allocation")).toHaveTextContent("6:00 PM – 7:00 PM");
 });
 
 it("given a free slot, when booking it with a guest, then the refreshed allocation is visible", async () => {
@@ -461,6 +462,114 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
     participants: [{ guestName: "John Roe" }]
   }), expect.any(String)));
   expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You");
+});
+
+it("given adjacent time is free, when selecting sixty minutes, then one booking covers the complete period", async () => {
+  // given
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // when
+  await userEvent.selectOptions(screen.getByTestId("booking-duration"), "60");
+  expect(screen.getByTestId("booking-period")).toHaveTextContent("Aug 10, 2026, 8:00 AM – 9:00 AM");
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  await waitFor(() => expect(api.createBooking).toHaveBeenCalledWith(expect.objectContaining({
+    startsAt: "2026-08-10T08:00:00+02:00",
+    endsAt: "2026-08-10T07:00:00.000Z"
+  }), expect.any(String)));
+});
+
+it("given another booking bounds a court, when choosing a duration, then overlapping periods are not offered", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T09:00:00+02:00",
+    endsAt: "2026-08-10T10:00:00+02:00",
+    cardLabel: "Training",
+    cardColor: "#176b55",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: 2
+  }] : []));
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // then
+  const duration = screen.getByTestId("booking-duration");
+  expect(duration).toHaveDisplayValue("30 minutes");
+  expect(duration).toContainHTML('value="60"');
+  expect(duration).not.toContainHTML('value="90"');
+});
+
+it("given a second selected court becomes occupied, when choosing a duration, then that court bounds the period", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[1].id,
+    startsAt: "2026-08-10T08:30:00+02:00",
+    endsAt: "2026-08-10T09:00:00+02:00",
+    cardLabel: "Training",
+    cardColor: "#176b55",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: 2
+  }] : []));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // when
+  await userEvent.click(screen.getByTestId(`booking-court-${courts[1].id}`));
+
+  // then
+  expect(screen.getByTestId("booking-duration")).not.toContainHTML('value="60"');
+});
+
+it("given opening hours cross a spring-forward gap, when choosing a duration, then the closing instant bounds the choices", async () => {
+  // given
+  vi.mocked(api.bookingGrid).mockResolvedValue({
+    timeZone: "Europe/Berlin",
+    slotMinutes: 30,
+    openingHours: [{ dayOfWeek: "SUNDAY", opensAt: "01:00:00", closesAt: "04:00:00" }]
+  });
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView today={new Date("2026-03-29T00:00:00Z")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "01:30"));
+
+  // then
+  const duration = screen.getByTestId("booking-duration");
+  expect(duration).toContainHTML('value="90"');
+  expect(duration).not.toContainHTML('value="120"');
+});
+
+it("given an own booking is opened for cancellation, when the dialog appears, then it names the complete period", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "33333333-3333-3333-3333-333333333333",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Member booking",
+    cardColor: "#176b55",
+    ownBooking: true,
+    showGenericOccupancy: true,
+    participantLastNames: [],
+    participantCount: 2
+  }] : []));
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("own-allocation"));
+
+  // then
+  expect(screen.getByTestId("cancellation-period")).toHaveTextContent("Aug 10, 2026, 6:00 PM – 7:00 PM");
 });
 
 it("given booking rules reject a slot, when submitting it, then violations and the trace reference are shown", async () => {

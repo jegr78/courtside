@@ -7,7 +7,7 @@ import { Button } from "../components/Button";
 import { BookingDialog, type BookingSelection } from "./BookingDialog";
 import { CancellationDialog } from "./CancellationDialog";
 import {
-  addDays, calendarDayNumber, dateInTimeZone, dateInTimeZoneValue,
+  addDays, calendarDayNumber, dateInTimeZone, dateInTimeZoneValue, formatBookingTimeRange,
   formatDate, formatTime, isPastSlot, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes, weekDays
 } from "../time/clubZone";
 
@@ -211,7 +211,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
               {slot}
             </th>
             {data.courts.map((court) => renderCell(
-              court, slot, selectedDate, selectedAllocations, data.grid.slotMinutes, data.grid.timeZone, t,
+              court, slot, selectedDate, selectedAllocations, data.grid.slotMinutes, data.grid.timeZone, language, t,
               () => selectedDate && setBookingSelection({ date: selectedDate, slot, courtId: court.id }),
               setCancellation,
               selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false,
@@ -240,6 +240,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
       selection={bookingSelection}
       grid={data.grid}
       courts={data.courts}
+      allocations={data.allocations.get(bookingSelection.date) ?? []}
       closed={() => setBookingSelection(undefined)}
       created={async () => {
         setBookingSelection(undefined);
@@ -251,8 +252,10 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
       }}
       conflicted={() => refreshDate(bookingSelection.date)}
     />}
-    {cancellation && selectedDate && <CancellationDialog
+    {cancellation && selectedDate && data && <CancellationDialog
       allocation={cancellation}
+      locale={language}
+      timeZone={data.grid.timeZone}
       closed={() => setCancellation(undefined)}
       cancelled={async () => {
         setCancellation(undefined);
@@ -273,6 +276,7 @@ function renderCell(
   allocations: Allocation[],
   slotMinutes: number,
   timeZone: string,
+  locale: string,
   t: ReturnType<typeof useTranslation>["t"],
   book: () => void,
   cancel: (allocation: Allocation) => void,
@@ -285,6 +289,7 @@ function renderCell(
   if (allocation) {
     const duration = (Date.parse(allocation.endsAt) - Date.parse(allocation.startsAt)) / 60_000;
     const label = allocationLabel(allocation, t);
+    const period = formatBookingTimeRange(allocation.startsAt, allocation.endsAt, locale, timeZone);
     const className = "h-full w-full rounded-md px-3 py-2 text-left font-semibold";
     const state = allocation.ownBooking ? "own" : allocation.showGenericOccupancy ? "occupied" : "card";
     const style = allocation.ownBooking
@@ -297,11 +302,11 @@ function renderCell(
         data-booking-id={allocation.bookingId}
         data-card-color={allocation.cardColor}
         data-state={state}
-        aria-label={t("booking.cancelLabel", { label })}
+        aria-label={t("booking.cancelLabel", { label: `${label}, ${period}` })}
         onClick={() => cancel(allocation)}
         className={className}
         style={style}
-      >{label}</button> : <div data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}>{label}</div>}
+      ><span className="block">{label}</span><span className="block text-xs">{period}</span></button> : <div data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}><span className="block">{label}</span><span className="block text-xs">{period}</span></div>}
     </td>;
   }
   const minute = timeToMinutes(slot);

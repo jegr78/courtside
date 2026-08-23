@@ -6,7 +6,7 @@ import {
 } from "../api/client";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
-import { formatDateTime } from "../time/clubZone";
+import { formatBookingPeriod } from "../time/clubZone";
 
 const WEEKDAYS: DayOfWeek[] = [
   "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"
@@ -195,7 +195,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
         {preview.occurrences.map((occurrence, index) => <li key={occurrence.startsAt} data-testid={`series-occurrence-${index}`}>
           <label className="flex flex-wrap items-center gap-2">
             <input data-testid={`series-occurrence-chosen-${index}`} type="checkbox" disabled={pending || !occurrence.creatable} checked={chosen.includes(occurrence.startsAt)} onChange={() => toggle(occurrence.startsAt)} />
-            <span>{formatDateTime(occurrence.startsAt, i18n.language, timeZone)}</span>
+            <span>{formatBookingPeriod(occurrence.startsAt, occurrence.endsAt, i18n.language, timeZone)}</span>
             {!occurrence.creatable && <span className="text-muted text-sm">{blockedBy(occurrence, t)}</span>}
           </label>
         </li>)}
@@ -211,7 +211,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
         <p>{t("series.skipped", { skipped: result.skipped.length })}</p>
         <ul className="grid gap-1">
           {result.skipped.map((start) => <li key={start} data-testid={`series-skipped-${start}`}>
-            {formatDateTime(start, i18n.language, timeZone)}
+            {formatBookingPeriod(start, new Date(Date.parse(start) + draft.durationMinutes * 60_000).toISOString(), i18n.language, timeZone)}
           </li>)}
         </ul>
       </div>}

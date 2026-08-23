@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Impact } from "../api/client";
+import { formatBookingPeriod } from "../time/clubZone";
 import { Button } from "./Button";
 
 // The panel informs; it never gates. Nothing around it is disabled while it loads, because a board
 // that has already decided must not be made to wait for a number it did not ask for.
-export function ImpactPanel({ kind, subject, ask, reportError }: {
+export function ImpactPanel({ kind, subject, timeZone, ask, reportError }: {
   kind: string;
   subject: string;
+  timeZone: string;
   ask: () => Promise<Impact>;
   reportError: (failure: unknown) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [impact, setImpact] = useState<Impact>();
 
   async function load() {
@@ -33,7 +35,7 @@ export function ImpactPanel({ kind, subject, ask, reportError }: {
       </p>}
       <ul className="grid gap-1">
         {impact.bookings.map((booking) => <li key={booking.bookingId} data-testid={`impact-booking-${booking.bookingId}`}>
-          {new Date(booking.startsAt).toLocaleString()} – {new Date(booking.endsAt).toLocaleTimeString()}
+          {formatBookingPeriod(booking.startsAt, booking.endsAt, i18n.language, timeZone)}
         </li>)}
       </ul>
     </div>}
