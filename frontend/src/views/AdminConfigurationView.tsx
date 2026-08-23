@@ -18,6 +18,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
+import { useFragmentTarget } from "../navigation/useFragmentTarget";
 
 const RULE_SET_NAME_LENGTH = 60;
 
@@ -57,6 +58,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
+  useFragmentTarget("slot-minutes", config !== undefined);
 
   useEffect(() => {
     let active = true;

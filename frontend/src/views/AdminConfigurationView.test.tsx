@@ -147,6 +147,17 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range")).toHaveTextContent("Allowed range: 1 to 365");
   });
 
+  it("given the time-grid fragment, when configuration loads, then the owned setting receives focus", async () => {
+    // given
+    render(<MemoryRouter initialEntries={["/admin/configuration#slot-minutes"]}><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // when
+    const slotMinutes = await screen.findByTestId("slot-minutes");
+
+    // then
+    await waitFor(() => expect(slotMinutes).toHaveFocus());
+  });
+
   it("given configuration cannot load, when opening the view, then the failure replaces the loading state", async () => {
     // given
     vi.spyOn(api, "adminConfig").mockRejectedValue(new Error("unavailable"));
