@@ -13,28 +13,28 @@ _validation_keywords = {"additionalProperties", "allOf", "anyOf", "const", "cont
                         "required", "schema", "type", "unevaluatedProperties", "uniqueItems"}
 
 
-def _status_class(value):
+def _status(value):
     if not isinstance(value, int) or value < 100 or value > 599:
         raise ValueError("unsupported HTTP status")
-    return f"{value // 100}xx"
+    return value
 
 
-def _expected_status_classes(values):
-    classes = []
+def _expected_statuses(values):
+    statuses = []
     for value in values:
         if isinstance(value, int):
-            candidate = _status_class(value)
+            candidate = _status(value)
         elif isinstance(value, str) and re.fullmatch(r"[1-5]XX", value.upper()):
             candidate = value[0] + "xx"
         elif isinstance(value, str) and value.isdigit():
-            candidate = _status_class(int(value))
+            candidate = _status(int(value))
         else:
             raise ValueError("unsupported expected HTTP status")
-        if candidate not in classes:
-            classes.append(candidate)
-    if not classes or len(classes) > 6:
+        if candidate not in statuses:
+            statuses.append(candidate)
+    if not statuses or len(statuses) > 20:
         raise ValueError("unsupported expected HTTP status set")
-    return classes
+    return statuses
 
 
 def _normalized_media_type(value):
@@ -70,29 +70,38 @@ def _schema_reason(failure):
     keyword = schema_path[-1] if schema_path else "schema"
     if keyword not in _validation_keywords:
         raise ValueError("unsupported validation keyword")
+    missing_properties = []
+    if keyword == "required" and isinstance(failure.schema, dict) and isinstance(failure.instance, dict):
+        required = failure.schema.get("required", [])
+        if not isinstance(required, list) or not all(isinstance(value, str) for value in required):
+            raise ValueError("unsupported required-property schema")
+        missing_properties = sorted(value for value in required if value not in failure.instance)
+        if not missing_properties:
+            raise ValueError("required-property failure has no structural disagreement")
     return {"kind": "schema", "instancePointer": _pointer(instance_path),
-            "schemaPointer": _pointer(schema_path), "validationKeyword": keyword}
+            "validationKeyword": keyword, "missingProperties": missing_properties}
 
 
 def _reason(failure):
     name = type(failure).__name__
     if name == "ServerError":
-        return {"kind": "status", "observedClass": _status_class(failure.status_code),
-                "expectedClasses": ["non-5xx"]}
+        return {"kind": "status", "observedStatus": _status(failure.status_code),
+                "expectedStatuses": ["non-5xx"]}
     if name == "UndefinedStatusCode":
-        return {"kind": "status", "observedClass": _status_class(failure.status_code),
-                "expectedClasses": _expected_status_classes(failure.allowed_status_codes)}
+        return {"kind": "status", "observedStatus": _status(failure.status_code),
+                "expectedStatuses": _expected_statuses(failure.allowed_status_codes)}
     if name == "AcceptedNegativeData":
-        return {"kind": "status", "observedClass": _status_class(failure.status_code),
-                "expectedClasses": _expected_status_classes(failure.expected_statuses)}
+        return {"kind": "status", "observedStatus": _status(failure.status_code),
+                "expectedStatuses": _expected_statuses(failure.expected_statuses)}
     if name == "RejectedPositiveData":
-        return {"kind": "status", "observedClass": _status_class(failure.status_code),
-                "expectedClasses": _expected_status_classes(failure.allowed_statuses)}
+        return {"kind": "status", "observedStatus": _status(failure.status_code),
+                "expectedStatuses": _expected_statuses(failure.allowed_statuses)}
     if name == "MissingContentType":
         return {"kind": "media-type", "observed": "missing",
                 "expected": _expected_media_types(failure.media_types)}
     if name == "UndefinedContentType":
-        return {"kind": "media-type", "observed": _normalized_media_type(failure.content_type),
+        _normalized_media_type(failure.content_type)
+        return {"kind": "media-type", "observed": "undocumented",
                 "expected": _expected_media_types(failure.defined_content_types)}
     if name == "MalformedMediaType":
         return {"kind": "media-type", "observed": "malformed",
@@ -100,8 +109,8 @@ def _reason(failure):
     if name == "JsonSchemaError":
         return _schema_reason(failure)
     if name == "MalformedJson":
-        return {"kind": "schema", "instancePointer": "", "schemaPointer": "",
-                "validationKeyword": "json-syntax"}
+        return {"kind": "schema", "instancePointer": "", "validationKeyword": "json-syntax",
+                "missingProperties": []}
     protocol = {
         "MissingHeaders": "missing-required-header",
         "MissingHeaderNotRejected": "missing-required-header",

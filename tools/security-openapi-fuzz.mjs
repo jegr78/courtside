@@ -12,8 +12,8 @@ const yaml = require("js-yaml");
 const Ajv = require("ajv/dist/2020").default;
 const specification = readFileSync(apiDocumentPath());
 const api = yaml.load(specification.toString("utf8"));
-const publicSchemaTokens = collectSchemaTokens(api);
 const publicPropertyNames = collectPropertyNames(api.components?.schemas ?? {});
+const publicMediaTypes = collectMediaTypes(api);
 const evidenceSchema = JSON.parse(readFileSync(
   new URL("../security/openapi-fuzz-evidence.schema.json", import.meta.url), "utf8"));
 const lifecycleSchema = JSON.parse(readFileSync(
@@ -97,7 +97,7 @@ export function normalizeSchemathesisEvents(events, inventory, mode, contractOpe
       for (const caseId of caseIds) {
         for (const check of (scenario.recorder?.checks?.[caseId] ?? []).filter(({ status }) => status === "failure")) {
           const generatedCase = scenario.recorder.cases[caseId].value;
-          counterexamples.push(safeCounterexample(entry, mode, caseId, check, generatedCase));
+          counterexamples.push(safeCounterexample(entry, mode, counterexamples.length + 1, check, generatedCase));
           failed = true;
         }
       }
@@ -160,7 +160,7 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     || scanner.importCases.some(({ outcome }) => outcome === "incomplete")
     || scanner.mutationCases.some(({ outcome }) => outcome === "incomplete");
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     testIds: ["CSA-API-001", "CSA-IMPORT-001"],
     targetFingerprint: plan.targetFingerprint,
     image: openApiFuzzPolicy.image,
@@ -519,23 +519,23 @@ export function undocumentedRuntimeRoutes(observedRoutes, inventory) {
   return observedRoutes.filter(({ method, pathTemplate }) => !documented.has(`${method} ${pathTemplate}`));
 }
 
-function safeCounterexample(operation, mode, caseId, check, generatedCase) {
+function safeCounterexample(operation, mode, sequence, check, generatedCase) {
   const normalizedCheck = String(check.name).replaceAll("_", "-").toLowerCase();
   const reason = failureReasonProjection(normalizedCheck, check.failure_info?.reason);
-  const minimizedRequest = minimizedRequestProjection(generatedCase);
+  const requestShape = requestShapeProjection(generatedCase);
   const reproductionDigest = `sha256:${createHash("sha256")
     .update(JSON.stringify({ seed: openApiFuzzPolicy.seed, operationId: operation.operationId,
-      mode, check: normalizedCheck, reason, minimizedRequest }))
+      mode, check: normalizedCheck, reason, requestShape }))
     .digest("hex")}`;
   return {
     operationId: operation.operationId,
     mode,
-    caseId: String(caseId).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 32),
+    caseId: `case-${sequence}`,
     check: normalizedCheck.slice(0, 80),
     method: operation.method,
     pathTemplate: operation.path,
     reason,
-    minimizedRequest,
+    requestShape,
     reproductionDigest
   };
 }
@@ -556,14 +556,14 @@ function failureReasonProjection(check, reason) {
   const keys = reason && typeof reason === "object" && !Array.isArray(reason)
     ? Object.keys(reason).toSorted() : [];
   const exactKeys = (expected) => JSON.stringify(keys) === JSON.stringify(expected.toSorted());
-  const statusClasses = new Set(["1xx", "2xx", "3xx", "4xx", "5xx", "non-5xx"]);
+  const statusSelector = (value) => Number.isInteger(value) && value >= 100 && value <= 599
+    || ["1xx", "2xx", "3xx", "4xx", "5xx", "non-5xx"].includes(value);
   const pointerSegments = (value) => typeof value === "string" && value.length <= 300
     && (value === "" || /^\/(?:[^~/]|~[01])+(?:\/(?:[^~/]|~[01])+)*$/.test(value))
     ? value.slice(1).split("/").filter(Boolean).map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"))
     : undefined;
   const mediaType = (value) => typeof value === "string" && value.length <= 100
-    && (["missing", "malformed"].includes(value)
-      || /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(value));
+    && publicMediaTypes.has(value);
   const validationKeywords = new Set(["additionalProperties", "allOf", "anyOf", "const", "contains",
     "dependentRequired", "enum", "exclusiveMaximum", "exclusiveMinimum", "format", "json-syntax",
     "maxContains", "maximum", "maxItems", "maxLength", "maxProperties", "minContains", "minimum",
@@ -571,43 +571,57 @@ function failureReasonProjection(check, reason) {
     "required", "schema", "type", "unevaluatedProperties", "uniqueItems"]);
   let valid = allowedKinds[check]?.includes(reason?.kind) ?? false;
   if (reason?.kind === "status") {
-    valid &&= exactKeys(["kind", "observedClass", "expectedClasses"])
-      && statusClasses.has(reason.observedClass) && Array.isArray(reason.expectedClasses)
-      && reason.expectedClasses.length > 0 && reason.expectedClasses.length <= 6
-      && reason.expectedClasses.every((value) => statusClasses.has(value))
-      && new Set(reason.expectedClasses).size === reason.expectedClasses.length;
+    valid &&= exactKeys(["kind", "observedStatus", "expectedStatuses"])
+      && Number.isInteger(reason.observedStatus) && reason.observedStatus >= 100 && reason.observedStatus <= 599
+      && Array.isArray(reason.expectedStatuses)
+      && reason.expectedStatuses.length > 0 && reason.expectedStatuses.length <= 20
+      && reason.expectedStatuses.every(statusSelector)
+      && new Set(reason.expectedStatuses).size === reason.expectedStatuses.length;
   } else if (reason?.kind === "media-type") {
     valid &&= exactKeys(["kind", "observed", "expected"])
-      && mediaType(reason.observed) && Array.isArray(reason.expected)
+      && ["missing", "malformed", "undocumented"].includes(reason.observed) && Array.isArray(reason.expected)
       && reason.expected.length > 0 && reason.expected.length <= 20
       && reason.expected.every(mediaType) && new Set(reason.expected).size === reason.expected.length;
   } else if (reason?.kind === "schema") {
     const instanceSegments = pointerSegments(reason.instancePointer);
-    const schemaSegments = pointerSegments(reason.schemaPointer);
-    valid &&= exactKeys(["kind", "instancePointer", "schemaPointer", "validationKeyword"])
-      && instanceSegments !== undefined && schemaSegments !== undefined
+    valid &&= exactKeys(["kind", "instancePointer", "validationKeyword", "missingProperties"])
+      && instanceSegments !== undefined
       && instanceSegments.every((segment) => segment === "*" || publicPropertyNames.has(segment))
-      && schemaSegments.every((segment) => /^\d+$/.test(segment) || publicSchemaTokens.has(segment))
-      && validationKeywords.has(reason.validationKeyword);
+      && validationKeywords.has(reason.validationKeyword)
+      && Array.isArray(reason.missingProperties) && reason.missingProperties.length <= 20
+      && reason.missingProperties.every((value) => publicPropertyNames.has(value))
+      && new Set(reason.missingProperties).size === reason.missingProperties.length
+      && (reason.validationKeyword === "required" ? reason.missingProperties.length > 0
+        : reason.missingProperties.length === 0);
   } else if (reason?.kind === "protocol") {
     valid &&= exactKeys(["kind", "disagreement"])
       && ["missing-required-header", "unsupported-method-status", "missing-allow-header",
         "allow-header-mismatch"].includes(reason.disagreement);
   }
-  if (!valid) throw new Error(`Unsupported Schemathesis failure reason for ${check}`);
+  if (!valid) {
+    const diagnostic = reason?.kind === "schema"
+      ? schemaReasonDiagnostic(reason, exactKeys, pointerSegments, validationKeywords)
+      : "closed-shape-mismatch";
+    throw new Error(`Unsupported Schemathesis failure reason for ${check} (${diagnostic})`);
+  }
   return structuredClone(reason);
 }
 
-function collectSchemaTokens(value, tokens = new Set()) {
-  if (Array.isArray(value)) {
-    value.forEach((entry) => collectSchemaTokens(entry, tokens));
-  } else if (value && typeof value === "object") {
-    for (const [key, entry] of Object.entries(value)) {
-      tokens.add(key);
-      collectSchemaTokens(entry, tokens);
-    }
+function schemaReasonDiagnostic(reason, exactKeys, pointerSegments, validationKeywords) {
+  if (!exactKeys(["kind", "instancePointer", "validationKeyword", "missingProperties"])) {
+    return "schema-fields";
   }
-  return tokens;
+  const instanceSegments = pointerSegments(reason.instancePointer);
+  if (instanceSegments === undefined) return "instance-pointer-shape";
+  if (!instanceSegments.every((segment) => segment === "*" || publicPropertyNames.has(segment))) {
+    return "instance-pointer-not-public";
+  }
+  if (!validationKeywords.has(reason.validationKeyword)) return "validation-keyword";
+  if (!Array.isArray(reason.missingProperties)) return "missing-properties-shape";
+  if (!reason.missingProperties.every((value) => publicPropertyNames.has(value))) {
+    return "missing-properties-not-public";
+  }
+  return "missing-properties-relationship";
 }
 
 function collectPropertyNames(value, names = new Set()) {
@@ -624,16 +638,27 @@ function collectPropertyNames(value, names = new Set()) {
   return names;
 }
 
-function minimizedRequestProjection(generatedCase) {
-  const projected = structuredClone(generatedCase);
-  delete projected.meta;
-  delete projected.cookies;
-  delete projected.headers;
-  const serialized = JSON.stringify(projected);
-  if (!serialized || serialized.length > 1_048_576) {
-    throw new Error("The minimized request exceeds the protected evidence limit");
+function collectMediaTypes(value, mediaTypes = new Set()) {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectMediaTypes(entry, mediaTypes));
+  } else if (value && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      if (key === "content" && entry && typeof entry === "object" && !Array.isArray(entry)) {
+        Object.keys(entry).forEach((mediaType) => mediaTypes.add(mediaType.toLowerCase()));
+      }
+      collectMediaTypes(entry, mediaTypes);
+    }
   }
-  return serialized;
+  return mediaTypes;
+}
+
+function requestShapeProjection(generatedCase) {
+  const locations = [
+    generatedCase.path_parameters && "path",
+    generatedCase.query && "query",
+    generatedCase.body !== undefined && "body"
+  ].filter(Boolean);
+  return { locations: [...new Set(locations)].toSorted() };
 }
 
 function mergeCandidates(candidates) {
