@@ -46,6 +46,7 @@
         <pitest.version>1.25.9</pitest.version>
         <pitest-junit5.version>1.2.3</pitest-junit5.version>
         <quicktheories.version>0.26</quicktheories.version>
+        <jgit.version>7.7.1.202607240634-r</jgit.version>
         <jacocoArgLine/>
     </properties>
 
@@ -176,6 +177,12 @@
             <groupId>org.quicktheories</groupId>
             <artifactId>quicktheories</artifactId>
             <version>${quicktheories.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+            <version>${jgit.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
