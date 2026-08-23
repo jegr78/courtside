@@ -9,6 +9,7 @@ import { evaluateResourceSignals, evaluateSafetyLimits } from "./security-resour
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
+const schemathesisReasonProjection = readFileSync(join(root, "security", "schemathesis_reason.py"), "utf8");
 const stateRoot = join(root, "build", "security");
 const reservationImage = "caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648";
 export const securityStateRoot = stateRoot;
@@ -541,12 +542,15 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
     const config = `headers = { Cookie = ${JSON.stringify(fixture.client.header())}, X-XSRF-TOKEN = ${JSON.stringify(fixture.client.csrfToken())} }\n`;
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-schemathesis.toml"],
       { input: config });
+    await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/sitecustomize.py"],
+      { input: schemathesisReasonProjection });
     const events = {};
     let generatedBytes = 0;
     const runMode = async (mode) => {
       const selected = limits.inventory.filter(({ modes }) => modes.includes(mode));
       const reportDirectory = `/tmp/courtside-schemathesis-${mode}`;
-      const args = ["exec", scanner, "st", "--config-file", "/tmp/courtside-schemathesis.toml", "run",
+      const args = ["exec", "-e", "PYTHONPATH=/tmp", scanner, "st", "--config-file",
+        "/tmp/courtside-schemathesis.toml", "run",
         "/schema/openapi.yaml", "--url", "http://scanner-gateway:8090", "--phases", limits.policy.phases.join(","),
         "--mode", mode,
         "--max-examples", String(limits.policy.maxExamples), "--workers", String(limits.policy.workers),

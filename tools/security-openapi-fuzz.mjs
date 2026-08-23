@@ -12,6 +12,8 @@ const yaml = require("js-yaml");
 const Ajv = require("ajv/dist/2020").default;
 const specification = readFileSync(apiDocumentPath());
 const api = yaml.load(specification.toString("utf8"));
+const publicSchemaTokens = collectSchemaTokens(api);
+const publicPropertyNames = collectPropertyNames(api.components?.schemas ?? {});
 const evidenceSchema = JSON.parse(readFileSync(
   new URL("../security/openapi-fuzz-evidence.schema.json", import.meta.url), "utf8"));
 const lifecycleSchema = JSON.parse(readFileSync(
@@ -95,7 +97,7 @@ export function normalizeSchemathesisEvents(events, inventory, mode, contractOpe
       for (const caseId of caseIds) {
         for (const check of (scenario.recorder?.checks?.[caseId] ?? []).filter(({ status }) => status === "failure")) {
           const generatedCase = scenario.recorder.cases[caseId].value;
-          counterexamples.push(safeCounterexample(entry, mode, caseId, check.name, generatedCase));
+          counterexamples.push(safeCounterexample(entry, mode, caseId, check, generatedCase));
           failed = true;
         }
       }
@@ -435,11 +437,12 @@ function retainOpenApiFuzzEvidence(directory, evidence) {
 }
 
 function counterexampleCandidate(counterexample, plan, context, observedAt) {
+  const reasonDigest = createHash("sha256").update(JSON.stringify(counterexample.reason)).digest("hex");
   return createCandidate({
     scanner: "schemathesis",
     ruleId: counterexample.check,
     normalizedSurface: `${counterexample.method} ${counterexample.pathTemplate}`,
-    parameter: "request",
+    parameter: `reason-${reasonDigest.slice(0, 16)}`,
     attackClass: "contract-boundary",
     provenance: {
       tool: "schemathesis",
@@ -517,11 +520,12 @@ export function undocumentedRuntimeRoutes(observedRoutes, inventory) {
 }
 
 function safeCounterexample(operation, mode, caseId, check, generatedCase) {
-  const normalizedCheck = String(check).replaceAll("_", "-").toLowerCase();
+  const normalizedCheck = String(check.name).replaceAll("_", "-").toLowerCase();
+  const reason = failureReasonProjection(normalizedCheck, check.failure_info?.reason);
   const minimizedRequest = minimizedRequestProjection(generatedCase);
   const reproductionDigest = `sha256:${createHash("sha256")
     .update(JSON.stringify({ seed: openApiFuzzPolicy.seed, operationId: operation.operationId,
-      mode, check: normalizedCheck, minimizedRequest }))
+      mode, check: normalizedCheck, reason, minimizedRequest }))
     .digest("hex")}`;
   return {
     operationId: operation.operationId,
@@ -530,20 +534,101 @@ function safeCounterexample(operation, mode, caseId, check, generatedCase) {
     check: normalizedCheck.slice(0, 80),
     method: operation.method,
     pathTemplate: operation.path,
+    reason,
     minimizedRequest,
     reproductionDigest
   };
+}
+
+function failureReasonProjection(check, reason) {
+  const allowedKinds = {
+    "not-a-server-error": ["status"],
+    "status-code-conformance": ["status"],
+    "negative-data-rejection": ["status"],
+    "positive-data-acceptance": ["status"],
+    "content-type-conformance": ["media-type"],
+    "response-schema-conformance": ["schema"],
+    "response-headers-conformance": ["schema", "protocol"],
+    "missing-required-header": ["protocol"],
+    "unsupported-method": ["status", "protocol"],
+    "allow-header-conformance": ["protocol"]
+  };
+  const keys = reason && typeof reason === "object" && !Array.isArray(reason)
+    ? Object.keys(reason).toSorted() : [];
+  const exactKeys = (expected) => JSON.stringify(keys) === JSON.stringify(expected.toSorted());
+  const statusClasses = new Set(["1xx", "2xx", "3xx", "4xx", "5xx", "non-5xx"]);
+  const pointerSegments = (value) => typeof value === "string" && value.length <= 300
+    && (value === "" || /^\/(?:[^~/]|~[01])+(?:\/(?:[^~/]|~[01])+)*$/.test(value))
+    ? value.slice(1).split("/").filter(Boolean).map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"))
+    : undefined;
+  const mediaType = (value) => typeof value === "string" && value.length <= 100
+    && (["missing", "malformed"].includes(value)
+      || /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(value));
+  const validationKeywords = new Set(["additionalProperties", "allOf", "anyOf", "const", "contains",
+    "dependentRequired", "enum", "exclusiveMaximum", "exclusiveMinimum", "format", "json-syntax",
+    "maxContains", "maximum", "maxItems", "maxLength", "maxProperties", "minContains", "minimum",
+    "minItems", "minLength", "minProperties", "multipleOf", "not", "oneOf", "pattern", "propertyNames",
+    "required", "schema", "type", "unevaluatedProperties", "uniqueItems"]);
+  let valid = allowedKinds[check]?.includes(reason?.kind) ?? false;
+  if (reason?.kind === "status") {
+    valid &&= exactKeys(["kind", "observedClass", "expectedClasses"])
+      && statusClasses.has(reason.observedClass) && Array.isArray(reason.expectedClasses)
+      && reason.expectedClasses.length > 0 && reason.expectedClasses.length <= 6
+      && reason.expectedClasses.every((value) => statusClasses.has(value))
+      && new Set(reason.expectedClasses).size === reason.expectedClasses.length;
+  } else if (reason?.kind === "media-type") {
+    valid &&= exactKeys(["kind", "observed", "expected"])
+      && mediaType(reason.observed) && Array.isArray(reason.expected)
+      && reason.expected.length > 0 && reason.expected.length <= 20
+      && reason.expected.every(mediaType) && new Set(reason.expected).size === reason.expected.length;
+  } else if (reason?.kind === "schema") {
+    const instanceSegments = pointerSegments(reason.instancePointer);
+    const schemaSegments = pointerSegments(reason.schemaPointer);
+    valid &&= exactKeys(["kind", "instancePointer", "schemaPointer", "validationKeyword"])
+      && instanceSegments !== undefined && schemaSegments !== undefined
+      && instanceSegments.every((segment) => segment === "*" || publicPropertyNames.has(segment))
+      && schemaSegments.every((segment) => /^\d+$/.test(segment) || publicSchemaTokens.has(segment))
+      && validationKeywords.has(reason.validationKeyword);
+  } else if (reason?.kind === "protocol") {
+    valid &&= exactKeys(["kind", "disagreement"])
+      && ["missing-required-header", "unsupported-method-status", "missing-allow-header",
+        "allow-header-mismatch"].includes(reason.disagreement);
+  }
+  if (!valid) throw new Error(`Unsupported Schemathesis failure reason for ${check}`);
+  return structuredClone(reason);
+}
+
+function collectSchemaTokens(value, tokens = new Set()) {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectSchemaTokens(entry, tokens));
+  } else if (value && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      tokens.add(key);
+      collectSchemaTokens(entry, tokens);
+    }
+  }
+  return tokens;
+}
+
+function collectPropertyNames(value, names = new Set()) {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectPropertyNames(entry, names));
+  } else if (value && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      if (key === "properties" && entry && typeof entry === "object" && !Array.isArray(entry)) {
+        Object.keys(entry).forEach((name) => names.add(name));
+      }
+      collectPropertyNames(entry, names);
+    }
+  }
+  return names;
 }
 
 function minimizedRequestProjection(generatedCase) {
   const projected = structuredClone(generatedCase);
   delete projected.meta;
   delete projected.cookies;
-  if (projected.headers && typeof projected.headers === "object" && !Array.isArray(projected.headers)) {
-    for (const name of Object.keys(projected.headers)) {
-      if (["authorization", "cookie", "x-xsrf-token"].includes(name.toLowerCase())) delete projected.headers[name];
-    }
-  }
+  delete projected.headers;
   const serialized = JSON.stringify(projected);
   if (!serialized || serialized.length > 1_048_576) {
     throw new Error("The minimized request exceeds the protected evidence limit");
