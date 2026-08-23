@@ -10,12 +10,12 @@ CREATE TABLE user_account (
     person_id     uuid        NOT NULL REFERENCES person,
     username      text        NOT NULL,
     password_hash text        NOT NULL,
-    locale        text        NOT NULL DEFAULT 'de',
+    locale        text        NOT NULL,
     enabled       boolean     NOT NULL DEFAULT false,
     created_at    timestamptz NOT NULL DEFAULT now(),
     last_login_at timestamptz,
     CONSTRAINT user_account_unique_username UNIQUE (username),
-    CONSTRAINT user_account_locale_supported CHECK (locale IN ('de', 'en'))
+    CONSTRAINT user_account_locale_well_formed CHECK (locale ~ '^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$')
 );
 
 CREATE TABLE user_account_role (

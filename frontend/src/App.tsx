@@ -191,7 +191,7 @@ export function App() {
         {config?.logoUrl ? <img src={config.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
         <span data-testid="club-brand-name" className="text-xl font-bold">{config?.clubName ?? t("app.name")}</span>
       </div>
-      <Preferences />
+      <Preferences authenticated={session?.authenticated ?? false} supported={config?.supportedLocales} />
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-center justify-center px-4 py-8">

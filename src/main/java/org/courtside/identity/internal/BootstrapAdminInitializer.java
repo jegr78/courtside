@@ -1,5 +1,6 @@
 package org.courtside.identity.internal;
 
+import org.courtside.config.ClubIdentity;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -27,6 +28,7 @@ class BootstrapAdminInitializer implements ApplicationRunner {
     private final UserAccountRepository accounts;
     private final PasswordEncoder passwordEncoder;
     private final BootstrapAdminProperties properties;
+    private final ClubIdentity club;
 
     @Override
     @Transactional
@@ -41,7 +43,7 @@ class BootstrapAdminInitializer implements ApplicationRunner {
         Name name = Name.parse(values.displayName());
         Person person = persons.save(new Person(name.firstName(), name.lastName(), LOCAL_ADMIN_EMAIL));
         UserAccount account = new UserAccount(person, values.username(),
-                passwordEncoder.encode(values.password()), Set.of(Role.ADMIN));
+                passwordEncoder.encode(values.password()), Set.of(Role.ADMIN), club.defaultLocale());
         account.enable();
         account.requirePasswordChange();
         accounts.save(account);

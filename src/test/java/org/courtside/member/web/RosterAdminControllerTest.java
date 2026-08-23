@@ -32,6 +32,7 @@ import java.util.stream.Stream;
 import static org.courtside.member.MemberFixtures.MEMBER_SINCE;
 import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -745,6 +746,92 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAClubConfiguredInEnglish_whenAnAccountIsCreated_thenItInheritsThatLanguage()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(englishClubConfig())
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // when
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", jane)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountBody("doe.jane", "one-time-password", "MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.locale").value("en"));
+
+        // then — the setting means something: a literal would have written German here
+        assertThat(accounts.findByUsername("doe.jane").orElseThrow().getLocale()).isEqualTo("en");
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAccountWrittenToInTheWrongLanguage_whenItIsCorrected_thenTheEntryCarriesTheNewOne()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+
+        // when
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/locale", jane)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locale\": \"en\"}")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.personId").value(jane.toString()))
+                .andExpect(jsonPath("$.locale").value("en"));
+
+        // then
+        mockMvc.perform(get("/api/admin/roster"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[?(@.personId=='" + jane + "')].locale").value("en"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAWellFormedTagTheInstanceShipsNoTranslationFor_whenCorrecting_thenItNamesWhatItShips()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+
+        // when / then — the document states the shape, so only the service can refuse this one
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/locale", jane)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locale\": \"fr\"}")
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:language-unsupported"))
+                .andExpect(jsonPath("$.violations[0].code").value("language.unsupported"))
+                .andExpect(jsonPath("$.violations[0].params.locale").value("fr"))
+                .andExpect(jsonPath("$.violations[0].params.supported",
+                        containsInAnyOrder("de", "en")));
+        assertThat(accounts.findByUsername("doe.jane").orElseThrow().getLocale()).isEqualTo("de");
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenSomethingThatIsNotALanguageTagAtAll_whenCorrecting_thenTheFieldIsNamed()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/locale", jane)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locale\": \"not a tag!\"}")
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("locale"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAMistypedUsername_whenItIsCorrected_thenTheEntryCarriesTheNewOne() throws Exception {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
@@ -1287,6 +1374,14 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         return """
                 {"oneTimePassword": "%s"}
                 """.formatted(oneTimePassword);
+    }
+
+    private static String englishClubConfig() {
+        return """
+                {"clubName": "Example Tennis Club", "primaryColor": "#004f2d", "accentColor": "#c8a415",
+                 "defaultLocale": "en", "timeZone": "Europe/Berlin", "slotMinutes": 30,
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
+                """;
     }
 
     private static String accountBody(String username, String oneTimePassword, String... roles) {

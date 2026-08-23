@@ -2,19 +2,25 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { api, ApiError, type MembershipType, type RosterEntry } from "../api/client";
+import { api, ApiError, type ClubConfig, type MembershipType, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
 import { AdminPersonView } from "./AdminPersonView";
 
 const jane: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
-  accountId: "account-1", username: "doe.jane", enabled: true, roles: ["MEMBER"],
+  accountId: "account-1", username: "doe.jane", locale: "de", enabled: true, roles: ["MEMBER"],
   membershipTypeId: "type-1", membershipStartedOn: "2026-01-01", membershipEndedOn: null
 };
 
 const withoutAccount: RosterEntry = {
   personId: "person-1", firstName: "John", lastName: "Roe", email: "john.roe@example.org",
   accountId: null, username: null, enabled: false, roles: []
+};
+
+const club: ClubConfig = {
+  clubName: "Example Tennis Club", primaryColor: "#004f2d", accentColor: "#c8a415",
+  logoUrl: null, imprintUrl: null, defaultLocale: "de", supportedLocales: ["de", "en"],
+  slotMinutes: 30, timeZone: "Europe/Berlin"
 };
 
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true };
@@ -34,6 +40,7 @@ describe("AdminPersonView", () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults, juniors]);
+    vi.spyOn(api, "config").mockResolvedValue(club);
   });
 
   it("given the person cannot load, when opening the page, then the failure replaces the loading state", async () => {
@@ -234,6 +241,32 @@ describe("AdminPersonView", () => {
 
     // then
     expect(api.changeAccountUsername).toHaveBeenCalledWith("person-1", "doe.j");
+  });
+
+  it("given an account written to in the wrong language, when correcting it, then the account is told", async () => {
+    // given
+    vi.spyOn(api, "changeAccountLocale").mockResolvedValue({ ...jane, locale: "en" });
+    showPerson();
+    await screen.findByTestId("account-locale");
+
+    // when
+    await userEvent.selectOptions(screen.getByTestId("account-locale"), "en");
+    await userEvent.click(screen.getByTestId("save-locale"));
+
+    // then
+    expect(api.changeAccountLocale).toHaveBeenCalledWith("person-1", "en");
+  });
+
+  it("given an instance that ships one language, when opening an account, then only that one is offered", async () => {
+    // given
+    vi.spyOn(api, "config").mockResolvedValue({ ...club, supportedLocales: ["de"] });
+
+    // when
+    showPerson();
+
+    // then
+    const offered = await screen.findByTestId("account-locale");
+    expect(Array.from(offered.children).map((option) => option.getAttribute("value"))).toEqual(["de"]);
   });
 
   it("given a member who forgot their password, when resetting it, then the new one-time password is sent", async () => {

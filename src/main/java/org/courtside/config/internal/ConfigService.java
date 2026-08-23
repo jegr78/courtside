@@ -5,6 +5,7 @@ import org.courtside.config.BookingGridSettings;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.CredentialValidity;
 import org.courtside.shared.CredentialsRequested;
+import org.courtside.shared.SupportedLanguages;
 import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
@@ -30,6 +31,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         CredentialValidity, ClubIdentity {
 
     private final ClubConfigurationRepository configurations;
+    private final SupportedLanguages languages;
     private final List<BookingGridConstraint> bookingGridConstraints;
     private final ApplicationEventPublisher events;
 
@@ -80,6 +82,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
 
     @Transactional
     public ClubConfigurationSnapshot update(ChangeClubConfigurationCommand command) {
+        languages.require(command.defaultLocale());
         ZoneId zoneId = ZoneId.of(command.timeZone());
         lock();
         ClubConfiguration configuration = currentEntity();

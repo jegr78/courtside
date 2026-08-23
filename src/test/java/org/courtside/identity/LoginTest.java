@@ -8,6 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -51,9 +52,9 @@ class LoginTest extends AbstractIntegrationTest {
         Person john = persons.save(new Person("John", "Roe", "family@example.org"));
 
         accounts.save(enabled(new UserAccount(
-                jane, "doe.jane", passwordEncoder.encode("correct-horse"), Set.of(Role.MEMBER))));
+                jane, "doe.jane", passwordEncoder.encode("correct-horse"), Set.of(Role.MEMBER), "de")));
         accounts.save(enabled(new UserAccount(
-                john, "roe.john", passwordEncoder.encode("battery-staple"), Set.of(Role.MEMBER))));
+                john, "roe.john", passwordEncoder.encode("battery-staple"), Set.of(Role.MEMBER), "de")));
     }
 
     @Test
@@ -79,6 +80,53 @@ class LoginTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(false))
                 .andExpect(jsonPath("$.username").doesNotExist());
+    }
+
+    @Test
+    void givenAMemberWhoReadsAnotherLanguage_whenTheyChooseIt_thenTheAccountKeepsTheChoice()
+            throws Exception {
+        // given
+        MockHttpSession session = signedInAsJane();
+
+        // when
+        mockMvc.perform(put("/api/account/locale").session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locale\": \"en\"}")
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // then — stored, not kept in the browser, so the next message is written in it
+        mockMvc.perform(get("/api/session").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locale").value("en"));
+        assertThat(accounts.findByUsername("doe.jane").orElseThrow().getLocale()).isEqualTo("en");
+    }
+
+    @Test
+    void givenALanguageThisInstanceShipsNoTranslationFor_whenAMemberChoosesIt_thenItIsRefused()
+            throws Exception {
+        // given
+        MockHttpSession session = signedInAsJane();
+
+        // when / then — well formed, so the guard in the service is the only thing that can refuse it
+        mockMvc.perform(put("/api/account/locale").session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locale\": \"fr\"}")
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:language-unsupported"))
+                .andExpect(jsonPath("$.violations[0].code").value("language.unsupported"));
+        assertThat(accounts.findByUsername("doe.jane").orElseThrow().getLocale()).isEqualTo("de");
+    }
+
+    @Test
+    void givenNobodySignedIn_whenChoosingALanguage_thenItIsRefused() throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/account/locale")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locale\": \"en\"}")
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -142,7 +190,7 @@ class LoginTest extends AbstractIntegrationTest {
         // given
         Person pending = persons.save(new Person("Mary", "Major", "new@example.org"));
         accounts.save(new UserAccount(
-                pending, "major.mary", passwordEncoder.encode("secret"), Set.of(Role.MEMBER)));
+                pending, "major.mary", passwordEncoder.encode("secret"), Set.of(Role.MEMBER), "de"));
         String wrongPassword = signInFailure("doe.jane", "wrong");
 
         // when
@@ -150,6 +198,16 @@ class LoginTest extends AbstractIntegrationTest {
 
         // then
         assertThat(awaitingApproval).isEqualTo(wrongPassword);
+    }
+
+    private MockHttpSession signedInAsJane() throws Exception {
+        MvcResult login = mockMvc.perform(post("/api/session")
+                        .param("username", "doe.jane")
+                        .param("password", "correct-horse")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andReturn();
+        return (MockHttpSession) login.getRequest().getSession(false);
     }
 
     private String signInFailure(String username, String password) throws Exception {
@@ -167,7 +225,7 @@ class LoginTest extends AbstractIntegrationTest {
         // given
         Person admin = persons.save(new Person("Ada", "Admin", "admin@localhost.invalid"));
         UserAccount account = enabled(new UserAccount(admin, "admin",
-                passwordEncoder.encode("temporary-password"), Set.of(Role.ADMIN)));
+                passwordEncoder.encode("temporary-password"), Set.of(Role.ADMIN), "de"));
         account.requirePasswordChange();
         accounts.save(account);
 

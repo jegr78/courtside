@@ -65,9 +65,9 @@ tagged release builds a multi-arch container image, publishes it to GHCR signed 
 carrying an SBOM attestation, and attaches the OpenAPI document to the release. The reference
 deployment carries the club's own mail server behind a profile, together with a check that resolves
 the DNS a receiver looks at, and the application sends through it: the `notification` module reacts
-to an event and generates the credential at the moment it is sent. Both message bundles ship, but an
-account's language is a literal nothing writes, so every message goes out in German until
-[#434](https://github.com/jegr78/courtside/issues/434) makes the other one reachable. Mail
+to an event and generates the credential at the moment it is sent. Both message bundles ship, and
+which one an account is written to in is the club's configured default at creation, the member's
+own choice afterwards, and an administrator's correction where a member cannot reach it. Mail
 configuration is mandatory — an instance without it refuses to start and names
 the variables it is missing — and `/actuator/health/mail` reports the sending path to an
 administrator without ever opening it. The message names the date its password stops working, and
@@ -195,6 +195,17 @@ Code, identifiers, comments, commit messages, documentation, API field names and
 database schema are **English**. User-facing text — UI strings and email templates — goes
 through message bundles. German is the default locale, English the second. Locale is
 stored per user account with a fallback to the instance setting.
+
+**Which languages an instance has is derived, not declared.** A language exists because the image
+carries a `messages_<tag>` bundle for the screen and a `mail_<tag>` bundle for what is sent, and
+because the frontend carries a translation of the same name; nothing lists the set anywhere, and an
+image that translates one surface but not the other refuses to start rather than writing to a member
+in a language they did not choose. `GET /api/public/config` serves the derived set as
+`supportedLocales`, and every surface that offers a language reads it from there — no client, no
+schema and no database constraint names a language. The contract states the *shape* of a language
+tag; a well-formed tag the instance ships no translation for is refused with
+`urn:courtside:error:language-unsupported`, at the boundary as a field error and again in the
+service that writes it.
 
 Domain vocabulary:
 

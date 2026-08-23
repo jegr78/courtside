@@ -71,7 +71,7 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
         // given
         Person admin = persons.save(new Person("Ada", "Admin", "admin@example.org"));
         UserAccount account = new UserAccount(
-                admin, "admin", passwordEncoder.encode("correct-horse"), Set.of(Role.ADMIN));
+                admin, "admin", passwordEncoder.encode("correct-horse"), Set.of(Role.ADMIN), "de");
         account.enable();
         accounts.save(account);
         failLogin("admin", "192.0.2.11");
@@ -88,7 +88,7 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
         // given
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         UserAccount account = new UserAccount(
-                jane, "doe.jane", passwordEncoder.encode("correct-horse"), Set.of(Role.MEMBER));
+                jane, "doe.jane", passwordEncoder.encode("correct-horse"), Set.of(Role.MEMBER), "de");
         account.enable();
         accounts.save(account);
         failLogin("doe.jane", "192.0.2.20");

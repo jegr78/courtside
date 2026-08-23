@@ -69,7 +69,7 @@ class PasswordRehashTest extends AbstractIntegrationTest {
         Argon2PasswordEncoder weaker = new Argon2PasswordEncoder(16, 32, 1, 16384, 2);
         Person person = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         UserAccount account = accounts.save(new UserAccount(
-                person, "doe.jane", weaker.encode(PASSWORD), Set.of(Role.MEMBER)));
+                person, "doe.jane", weaker.encode(PASSWORD), Set.of(Role.MEMBER), "de"));
 
         // when
         UserDetails details = userDetailsService.loadUserByUsername("doe.jane");
@@ -89,7 +89,7 @@ class PasswordRehashTest extends AbstractIntegrationTest {
         Argon2PasswordEncoder weaker = new Argon2PasswordEncoder(16, 32, 1, 16384, 2);
         Person person = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         UserAccount account = accounts.save(new UserAccount(
-                person, "doe.jane", weaker.encode(PASSWORD), Set.of(Role.MEMBER)));
+                person, "doe.jane", weaker.encode(PASSWORD), Set.of(Role.MEMBER), "de"));
         UserDetails details = userDetailsService.loadUserByUsername("doe.jane");
 
         String concurrentHash = passwordEncoder.encode("a-different-password");
@@ -114,7 +114,7 @@ class PasswordRehashTest extends AbstractIntegrationTest {
         Argon2PasswordEncoder weaker = new Argon2PasswordEncoder(16, 32, 1, 16384, 2);
         Person person = persons.save(new Person("John", "Roe", "john.roe@example.org"));
         UserAccount account = accounts.save(enabled(new UserAccount(
-                person, "roe.john", weaker.encode(PASSWORD), Set.of(Role.MEMBER))));
+                person, "roe.john", weaker.encode(PASSWORD), Set.of(Role.MEMBER), "de")));
 
         // when
         mockMvc.perform(post("/api/session")
@@ -137,7 +137,7 @@ class PasswordRehashTest extends AbstractIntegrationTest {
         Argon2PasswordEncoder weaker = new Argon2PasswordEncoder(16, 32, 1, 16384, 2);
         Person person = persons.save(new Person("John", "Roe", "john.roe@example.org"));
         UserAccount account = accounts.save(enabled(new UserAccount(
-                person, "roe.john", weaker.encode(PASSWORD), Set.of(Role.MEMBER))));
+                person, "roe.john", weaker.encode(PASSWORD), Set.of(Role.MEMBER), "de")));
         long epochBefore = account.getSecurityEpoch();
 
         // when
@@ -164,10 +164,10 @@ class PasswordRehashTest extends AbstractIntegrationTest {
         Argon2PasswordEncoder weaker = new Argon2PasswordEncoder(16, 32, 1, 16384, 2);
         Person legacy = persons.save(new Person("John", "Roe", "john.roe@example.org"));
         accounts.save(enabled(new UserAccount(
-                legacy, "roe.john", weaker.encode(PASSWORD), Set.of(Role.MEMBER))));
+                legacy, "roe.john", weaker.encode(PASSWORD), Set.of(Role.MEMBER), "de")));
         Person current = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
         accounts.save(enabled(new UserAccount(
-                current, "major.mary", passwordEncoder.encode(PASSWORD), Set.of(Role.MEMBER))));
+                current, "major.mary", passwordEncoder.encode(PASSWORD), Set.of(Role.MEMBER), "de")));
 
         // when
         MockHttpServletResponse legacyResponse = signIn("roe.john");

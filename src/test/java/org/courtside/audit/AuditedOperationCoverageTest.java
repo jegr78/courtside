@@ -79,6 +79,7 @@ class AuditedOperationCoverageTest {
             "MemberService#setMembershipTypeActive",
             "RosterService#changePerson",
             "RosterService#changeRoles",
+            "RosterService#changeLocale",
             "RosterService#changeUsername",
             "RosterService#correctPerson",
             "RosterService#createAccount",

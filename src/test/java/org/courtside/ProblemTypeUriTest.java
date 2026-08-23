@@ -58,6 +58,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:import-source-invalid",
             "urn:courtside:error:import-source-key-taken",
             "urn:courtside:error:import-source-not-found",
+            "urn:courtside:error:language-unsupported",
             "urn:courtside:error:invalid-membership-period",
             "urn:courtside:error:invalid-opening-window",
             "urn:courtside:error:last-administrator",

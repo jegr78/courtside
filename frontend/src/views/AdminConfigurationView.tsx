@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
   api,
+  type AdminClubConfig,
   type ClubConfig,
   type ClubConfigRequest,
   type MembershipType,
@@ -12,12 +13,29 @@ import {
   type RuleTypeConfiguration
 } from "../api/client";
 import { problemMessage } from "../api/problem-message";
+import { LocaleSelect } from "../components/LocaleSelect";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 
 const RULE_SET_NAME_LENGTH = 60;
+
+// Named field by field so a request-only shape cannot pick up what the response adds to it.
+function editable(loaded: AdminClubConfig): ClubConfigRequest {
+  return {
+    clubName: loaded.clubName,
+    primaryColor: loaded.primaryColor,
+    accentColor: loaded.accentColor,
+    logoUrl: loaded.logoUrl,
+    imprintUrl: loaded.imprintUrl,
+    defaultLocale: loaded.defaultLocale,
+    slotMinutes: loaded.slotMinutes,
+    timeZone: loaded.timeZone,
+    newAccountCredentialHours: loaded.newAccountCredentialHours,
+    passwordResetCredentialHours: loaded.passwordResetCredentialHours
+  };
+}
 
 function timeZones(current: string): string[] {
   const known = Intl.supportedValuesOf("timeZone");
@@ -27,6 +45,7 @@ function timeZones(current: string): string[] {
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const [config, setConfig] = useState<ClubConfigRequest>();
+  const [supported, setSupported] = useState<string[]>();
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
   const [ruleTypes, setRuleTypes] = useState<RuleTypeConfiguration[]>([]);
   const [selectedRuleSetId, setSelectedRuleSetId] = useState("");
@@ -44,7 +63,8 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     void Promise.all([api.adminConfig(), api.ruleSets(), api.ruleTypes(), api.membershipTypes()])
       .then(([loadedConfig, loadedRuleSets, loadedRuleTypes, loadedMembershipTypes]) => {
         if (!active) return;
-        setConfig((current) => current ?? loadedConfig);
+        setConfig((current) => current ?? editable(loadedConfig));
+        setSupported(loadedConfig.supportedLocales);
         setRuleSets(loadedRuleSets);
         setRuleTypes(loadedRuleTypes);
         setMembershipTypes(loadedMembershipTypes);
@@ -194,9 +214,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           </div>
           <label className="grid gap-2 font-medium">
             {t("admin.config.defaultLocale")}
-            <select className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} onChange={(event) => changeConfig({ defaultLocale: event.target.value })}>
-              <option value="de">Deutsch</option><option value="en">English</option>
-            </select>
+            <LocaleSelect className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} supported={supported} changed={(defaultLocale) => changeConfig({ defaultLocale })} />
           </label>
           <TextField data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
           <TextField data-testid="new-account-credential-hours" type="number" min={1} max={8760} label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => changeConfig({ newAccountCredentialHours: Number(event.target.value) })} />

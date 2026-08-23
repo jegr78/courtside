@@ -114,19 +114,35 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenInsertingAUserAccountWithAnUnsupportedLocale_thenItIsRejected() {
+    void whenInsertingAUserAccountWhoseLocaleIsNotALanguageTag_thenItIsRejected() {
         // given
         UUID personId = insertPerson();
 
-        // when / then
+        // when / then — which languages exist is the image's answer, so the column checks the shape
         assertThatThrownBy(() -> jdbc.sql("""
                         INSERT INTO user_account (id, person_id, username, password_hash, locale)
-                        VALUES (?, ?, 'doe.jane', 'irrelevant', 'fr')
+                        VALUES (?, ?, 'doe.jane', 'irrelevant', 'not a tag')
                         """)
                         .params(UUID.randomUUID(), personId)
                         .update())
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("user_account_locale_supported");
+                .hasMessageContaining("user_account_locale_well_formed");
+    }
+
+    @Test
+    void whenInsertingAUserAccountWithNoLocaleAtAll_thenItIsRejected() {
+        // given
+        UUID personId = insertPerson();
+
+        // when / then — the column carries no default, so a caller that forgets it cannot land German
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO user_account (id, person_id, username, password_hash)
+                        VALUES (?, ?, 'doe.jane', 'irrelevant')
+                        """)
+                        .params(UUID.randomUUID(), personId)
+                        .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("locale");
     }
 
     @Test
@@ -187,8 +203,8 @@ class CheckConstraintTest extends AbstractIntegrationTest {
         UUID id = UUID.randomUUID();
         UUID personId = insertPerson();
         jdbc.sql("""
-                        INSERT INTO user_account (id, person_id, username, password_hash)
-                        VALUES (?, ?, 'doe.jane', 'irrelevant')
+                        INSERT INTO user_account (id, person_id, username, password_hash, locale)
+                        VALUES (?, ?, 'doe.jane', 'irrelevant', 'de')
                         """)
                 .params(id, personId)
                 .update();

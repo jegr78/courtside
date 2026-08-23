@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
-import { api, type MembershipType, type PersonRequest, type Role, type RosterEntry } from "../api/client";
+import { api, type ClubConfig, type MembershipType, type PersonRequest, type Role, type RosterEntry } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
+import { LocaleSelect } from "../components/LocaleSelect";
 import { Modal } from "../components/Modal";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
@@ -23,6 +24,7 @@ export function AdminPersonView() {
   const { personId = "" } = useParams();
   const [entry, setEntry] = useState<RosterEntry>();
   const [types, setTypes] = useState<MembershipType[]>([]);
+  const [club, setClub] = useState<ClubConfig>();
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -33,10 +35,11 @@ export function AdminPersonView() {
   }, [t]);
 
   useEffect(() => {
-    void Promise.all([api.person(personId), api.membershipTypes()])
-      .then(([person, membershipTypes]) => {
+    void Promise.all([api.person(personId), api.membershipTypes(), api.config()])
+      .then(([person, membershipTypes, configuration]) => {
         setEntry(person);
         setTypes(membershipTypes);
+        setClub(configuration);
       })
       .catch(reportError);
   }, [personId, reportError]);
@@ -78,9 +81,11 @@ export function AdminPersonView() {
         {entry.accountId
           ? <AccountSection
             entry={entry}
+            club={club}
             disabled={pending}
             saveRoles={(chosen) => mutate(() => api.changeAccountRoles(personId, chosen))}
             saveUsername={(username) => mutate(() => api.changeAccountUsername(personId, username))}
+            saveLocale={(locale) => mutate(() => api.changeAccountLocale(personId, locale))}
             resetPassword={(password) => mutate(() => api.resetAccountPassword(personId, password))}
             toggleAccount={() => mutate(() => api.setAccountActive(personId, !entry.enabled))}
           />
@@ -173,16 +178,19 @@ function MembershipSection({ entry, types, disabled, save }: {
   </section>;
 }
 
-function AccountSection({ entry, disabled, saveRoles, saveUsername, resetPassword, toggleAccount }: {
+function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLocale, resetPassword, toggleAccount }: {
   entry: RosterEntry;
+  club: ClubConfig | undefined;
   disabled: boolean;
   saveRoles: (roles: Role[]) => Saved;
   saveUsername: (username: string) => Saved;
+  saveLocale: (locale: string) => Saved;
   resetPassword: (oneTimePassword: string) => Saved;
   toggleAccount: () => Saved;
 }) {
   const { t } = useTranslation();
   const [username, setUsername] = useState(entry.username ?? "");
+  const [locale, setLocale] = useState(entry.locale ?? club?.defaultLocale ?? "");
   const [chosenRoles, setChosenRoles] = useState(entry.roles);
   const [oneTimePassword, setOneTimePassword] = useState("");
 
@@ -195,6 +203,13 @@ function AccountSection({ entry, disabled, saveRoles, saveUsername, resetPasswor
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <TextField data-testid="account-username" disabled={disabled} autoComplete="off" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} value={username} onChange={(event) => setUsername(event.target.value)} />
       <Button data-testid="save-username" disabled={disabled} className="self-end" type="button" onClick={() => void saveUsername(username)}>{t("admin.save")}</Button>
+    </div>
+    <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+      <label className="grid gap-2 font-medium">
+        {t("admin.person.accountLocale")}
+        <LocaleSelect testId="account-locale" disabled={disabled} className="form-control rounded-lg border px-3 py-2" value={locale} supported={club?.supportedLocales} changed={setLocale} />
+      </label>
+      <Button data-testid="save-locale" disabled={disabled} className="self-end" type="button" onClick={() => void saveLocale(locale)}>{t("admin.save")}</Button>
     </div>
     <RoleCheckboxes testIdPrefix="account-roles" disabled={disabled} selected={chosenRoles} changed={setChosenRoles} />
     <Button data-testid="save-roles" disabled={disabled} className="justify-self-start" type="button" onClick={() => void saveRoles(chosenRoles)}>{t("admin.save")}</Button>

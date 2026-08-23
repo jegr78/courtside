@@ -6,6 +6,7 @@ import org.courtside.booking.BookingRepository;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.card.CardService;
 import org.courtside.card.ParticipantCard;
+import org.courtside.config.ClubIdentity;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
@@ -51,6 +52,7 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
     private static final UUID MEMBER_BOOKING_CARD =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
 
+    private final ClubIdentity club;
     private final PersonRepository persons;
     private final UserAccountRepository accounts;
     private final MemberRepository members;
@@ -125,7 +127,7 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
     private SecurityIdentity createIdentity(String firstName, String lastName, String username,
                                             String hash, Set<Role> roles, boolean currentMember) {
         Person person = persons.save(new Person(firstName, lastName, username + "@example.org"));
-        UserAccount account = new UserAccount(person, username, hash, roles);
+        UserAccount account = new UserAccount(person, username, hash, roles, club.defaultLocale());
         account.enable();
         accounts.save(account);
         Member member = new Member(person.getId(), ACTIVE_MEMBERSHIP_TYPE,

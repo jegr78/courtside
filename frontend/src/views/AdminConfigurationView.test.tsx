@@ -15,6 +15,7 @@ describe("AdminConfigurationView", () => {
       primaryColor: "#b85c38",
       accentColor: "#d7e24b",
       defaultLocale: "en",
+      supportedLocales: ["de", "en"],
       slotMinutes: 30,
       timeZone: "Europe/Berlin",
       newAccountCredentialHours: 168,
@@ -165,6 +166,7 @@ describe("AdminConfigurationView", () => {
       primaryColor: "#b85c38",
       accentColor: "#d7e24b",
       defaultLocale: "en",
+      supportedLocales: ["de", "en"],
       slotMinutes: 15,
       timeZone: "Pacific/Auckland",
       newAccountCredentialHours: 168,
@@ -196,6 +198,8 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Racquet Club", slotMinutes: 15, timeZone: "Pacific/Auckland",
       newAccountCredentialHours: 72
     }));
+    // What the instance ships is read from the response and never sent back: the request refuses it
+    expect(changeConfig.mock.calls[0][0]).not.toHaveProperty("supportedLocales");
     expect(configurationChanged).toHaveBeenCalled();
     expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 });
   });
@@ -209,6 +213,7 @@ describe("AdminConfigurationView", () => {
       primaryColor: "#b85c38",
       accentColor: "#d7e24b",
       defaultLocale: "en",
+      supportedLocales: ["de", "en"],
       slotMinutes: 30,
       timeZone: "Europe/Berlin",
       newAccountCredentialHours: 168,
@@ -229,6 +234,7 @@ describe("AdminConfigurationView", () => {
         primaryColor: "#b85c38",
         accentColor: "#d7e24b",
         defaultLocale: "en",
+        supportedLocales: ["de", "en"],
         slotMinutes: 30,
         timeZone: "Europe/Berlin",
         newAccountCredentialHours: 168,
@@ -276,6 +282,7 @@ describe("AdminConfigurationView", () => {
       primaryColor: "#b85c38",
       accentColor: "#d7e24b",
       defaultLocale: "en",
+      supportedLocales: ["de", "en"],
       slotMinutes: 30,
       timeZone: "US/Eastern",
       newAccountCredentialHours: 168,

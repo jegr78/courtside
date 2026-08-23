@@ -113,6 +113,9 @@ function csrfToken(): string | undefined {
 export const api = {
   session: () => request<SessionStatus>("/api/session"),
   config: () => request<ClubConfig>("/api/public/config"),
+  changeOwnLocale: (locale: string) => request<void>("/api/account/locale", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale })
+  }),
   adminConfig: () => request<AdminClubConfig>("/api/admin/config"),
   changeAdminConfig: (config: ClubConfigRequest) => request<AdminClubConfig>("/api/admin/config", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config)
@@ -209,6 +212,11 @@ export const api = {
   changeAccountRoles: (personId: string, roles: Role[]) => request<RosterEntry>(
     `/api/admin/roster/${personId}/account/roles`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles })
+    }
+  ),
+  changeAccountLocale: (personId: string, locale: string) => request<RosterEntry>(
+    `/api/admin/roster/${personId}/account/locale`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale })
     }
   ),
   changeAccountUsername: (personId: string, username: string) => request<RosterEntry>(

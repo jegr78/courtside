@@ -171,7 +171,7 @@ components:
           type: string
         locale:
           type: string
-          pattern: "^(de|en)$"
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
         roles:
           type: array
           items: { $ref: "#/components/schemas/Role" }
@@ -313,7 +313,8 @@ components:
 
     ClubConfig:
       type: object
-      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes, timeZone]
+      required: [clubName, primaryColor, accentColor, defaultLocale, supportedLocales, slotMinutes,
+                 timeZone]
       properties:
         clubName: { type: string }
         primaryColor: { type: string }
@@ -321,6 +322,18 @@ components:
         logoUrl: { type: [string, "null"] }
         imprintUrl: { type: [string, "null"] }
         defaultLocale: { type: string }
+        supportedLocales:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
+          description: |
+            The languages this instance carries translations for, derived from the message bundles
+            in the image rather than declared anywhere. A client offers a choice from this and never
+            from a list of its own: an instance that ships a third language starts answering with it
+            here, and nothing else has to be released for that to be true. Every language-valued
+            field in this document is refused with `urn:courtside:error:language-unsupported` unless
+            it names one of these.
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone: { type: string, example: Europe/Berlin }
 
@@ -352,7 +365,7 @@ components:
           type: [string, "null"]
           maxLength: 500
           pattern: "^(https?://.+|/[^/\\\\].*|/)$"
-        defaultLocale: { type: string, pattern: "^(de|en)$" }
+        defaultLocale: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone:
           type: string
@@ -1002,6 +1015,12 @@ components:
         email: { type: [string, "null"], format: email }
         accountId: { type: [string, "null"], format: uuid }
         username: { type: [string, "null"] }
+        locale:
+          type: [string, "null"]
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+          description: |
+            The language the instance writes to this account in, and `null` for a person who holds
+            no account. Read it together with `accountId`, the same way `username` is read.
         enabled:
           type: boolean
           description: |
@@ -1066,6 +1085,21 @@ components:
           minItems: 1
           uniqueItems: true
           items: { $ref: "#/components/schemas/Role" }
+
+    AccountLocaleRequest:
+      type: object
+      description: |
+        The language the instance writes to this account in. It is stored on the account rather than
+        kept in the browser, so a message reaches the member in the language they read and not in the
+        one the club happens to default to.
+
+        The pattern is the shape of a language tag, not the set of languages: which languages exist
+        is a property of the image and is served as `supportedLocales` on the club configuration. A
+        well-formed tag this instance ships no translation for is refused with
+        `urn:courtside:error:language-unsupported`, which names the languages it does ship.
+      required: [locale]
+      properties:
+        locale: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
 
     UsernameRequest:
       type: object
@@ -1767,6 +1801,31 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+
+  /api/account/locale:
+    put:
+      tags: [account]
+      operationId: changeOwnLocale
+      summary: Choose the language this account is written to in.
+      description: |
+        Available to any authenticated account, for itself. The choice is stored, so the next
+        message the instance sends arrives in it; a language picked in the browser alone changes
+        what a page shows and nothing that is written.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountLocaleRequest" }
+      responses:
+        "204":
+          description: Changed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
 
   /api/public/courts:
     get:
@@ -3220,6 +3279,44 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+
+  /api/admin/roster/{personId}/account/locale:
+    put:
+      tags: [admin-roster]
+      operationId: changeAccountLocale
+      summary: Correct the language a person's account is written to in.
+      description: |
+        A member who cannot reach the choice themselves, or one whose language was wrong from the
+        start, is otherwise written to in a language they may not read. The person, their roles,
+        their state and their password are untouched here, and the account's sessions are left
+        alone: the language decides what a message says, not what an account may do.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountLocaleRequest" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/admin/roster/{personId}/account/password:
     put:

@@ -1,8 +1,6 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
-export type SupportedLocale = "de" | "en";
-
 const resources = {
   de: { translation: {
     "app.name": "Courtside",
@@ -75,6 +73,7 @@ const resources = {
     "admin.person.title": "Person",
     "admin.person.person": "Person",
     "admin.person.membership": "Mitgliedschaft",
+    "admin.person.accountLocale": "Sprache der Benachrichtigungen",
     "admin.person.account": "Konto",
     "admin.import.title": "Import",
     "admin.import.source": "Quelle",
@@ -444,6 +443,7 @@ const resources = {
     "roster.usernameTaken": "Diesen Benutzernamen gibt es bereits.",
     "roster.accountExists": "Diese Person hat bereits ein Konto.",
     "roster.account.addressMissing": "Diese Person hat keine E-Mail-Adresse. Ein Konto wird per E-Mail erreicht, tragen Sie zuerst eine Adresse ein.",
+    "language.unsupported": "Diese Instanz schreibt nur in den Sprachen, für die sie Übersetzungen mitbringt: {{supported}}.",
     "roster.person.addressHeldByAccount": "Diese Person hat ein Konto, das per E-Mail erreicht wird. Korrigieren Sie die Adresse, statt sie zu entfernen.",
     "openingWindow.incomplete": "Ein Öffnungsfenster benötigt sowohl eine Öffnungs- als auch eine Schließzeit.",
     "openingWindow.closesBeforeItOpens": "Ein Tag muss nach seiner Öffnung schließen.",
@@ -460,6 +460,7 @@ const resources = {
     "validation.DurationMax": "Diese Dauer darf höchstens {{seconds}} Sekunden betragen.",
     "validation.DurationMin": "Diese Dauer muss mindestens {{seconds}} Sekunden betragen.",
     "validation.Email": "Dieses Feld muss eine gültige E-Mail-Adresse sein.",
+    "validation.Language": "Diese Instanz bringt für diese Sprache keine Übersetzung mit.",
     "validation.Max": "Dieses Feld darf höchstens {{value}} sein.",
     "validation.Min": "Dieses Feld muss mindestens {{value}} sein.",
     "validation.MoveChangesSomething": "Eine Verschiebung muss Zeit, Dauer oder Plätze ändern.",
@@ -540,6 +541,7 @@ const resources = {
     "audit.event.identity.account.credentialsRequested": "Zugangsdaten ausgestellt",
     "audit.event.roster.account.created": "Konto angelegt",
     "audit.event.roster.account.rolesChanged": "Kontorollen geändert",
+    "audit.event.roster.account.localeCorrected": "Sprache korrigiert",
     "audit.event.roster.account.usernameCorrected": "Benutzername korrigiert",
     "audit.event.roster.account.passwordReset": "Passwort zurückgesetzt",
     "audit.event.roster.account.availabilityChanged": "Kontoverfügbarkeit geändert",
@@ -625,6 +627,7 @@ const resources = {
     "admin.person.title": "Person",
     "admin.person.person": "Person",
     "admin.person.membership": "Membership",
+    "admin.person.accountLocale": "Language for notifications",
     "admin.person.account": "Account",
     "admin.import.title": "Import",
     "admin.import.source": "Source",
@@ -994,6 +997,7 @@ const resources = {
     "roster.usernameTaken": "This username is already in use.",
     "roster.accountExists": "This person already holds an account.",
     "roster.account.addressMissing": "This person has no email address. An account is reached by mail, so give them an address first.",
+    "language.unsupported": "This instance only writes in the languages it carries translations for: {{supported}}.",
     "roster.person.addressHeldByAccount": "This person holds an account, which is reached by mail. Correct the address rather than removing it.",
     "openingWindow.incomplete": "An opening window needs both an opening and a closing time.",
     "openingWindow.closesBeforeItOpens": "A day must close after it opens.",
@@ -1010,6 +1014,7 @@ const resources = {
     "validation.DurationMax": "This duration must be at most {{seconds}} seconds.",
     "validation.DurationMin": "This duration must be at least {{seconds}} seconds.",
     "validation.Email": "This field must be a valid email address.",
+    "validation.Language": "This instance carries no translation for that language.",
     "validation.Max": "This field must be at most {{value}}.",
     "validation.Min": "This field must be at least {{value}}.",
     "validation.MoveChangesSomething": "A move must change the time, the duration or the courts.",
@@ -1090,6 +1095,7 @@ const resources = {
     "audit.event.identity.account.credentialsRequested": "Credentials issued",
     "audit.event.roster.account.created": "Account created",
     "audit.event.roster.account.rolesChanged": "Account roles changed",
+    "audit.event.roster.account.localeCorrected": "Language corrected",
     "audit.event.roster.account.usernameCorrected": "Username corrected",
     "audit.event.roster.account.passwordReset": "Password reset",
     "audit.event.roster.account.availabilityChanged": "Account availability changed",
@@ -1106,9 +1112,19 @@ const resources = {
   } }
 };
 
+// Derived from the bundles above, so a language arrives by being translated and by nothing else.
+export type SupportedLocale = keyof typeof resources;
+
+export const shippedLocales = Object.keys(resources) as SupportedLocale[];
+
 export function supportedLocale(value?: string | null): SupportedLocale | undefined {
   const language = value?.toLowerCase().split("-")[0];
-  return language === "de" || language === "en" ? language : undefined;
+  return shippedLocales.find((tag) => tag === language);
+}
+
+// What the instance answers with wins, because it is the API that refuses an unknown language.
+export function availableLocales(served?: string[]): SupportedLocale[] {
+  return served ? shippedLocales.filter((tag) => served.includes(tag)) : shippedLocales;
 }
 
 export function initialLocale(): SupportedLocale {
