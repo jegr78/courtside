@@ -9,6 +9,7 @@ import { AdminPersonView } from "./AdminPersonView";
 const jane: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
   accountId: "account-1", username: "doe.jane", locale: "de", enabled: true, roles: ["MEMBER"],
+  credentialState: "CREDENTIAL_ISSUED", addressSharedBy: 1,
   membershipTypeId: "type-1", membershipStartedOn: "2026-01-01", membershipEndedOn: null
 };
 
@@ -197,15 +198,23 @@ describe("AdminPersonView", () => {
 
     // when
     await userEvent.type(screen.getByTestId("new-account-username"), "roe.john");
-    await userEvent.type(screen.getByTestId("new-account-password"), "handover-password");
     await userEvent.click(screen.getByTestId("new-account-role-MEMBER"));
     await userEvent.click(screen.getByTestId("new-account-role-TRAINER"));
     await userEvent.click(screen.getByTestId("create-account"));
 
     // then
     expect(api.createAccount).toHaveBeenCalledWith("person-1", {
-      username: "roe.john", oneTimePassword: "handover-password", roles: ["MEMBER", "TRAINER"]
+      username: "roe.john", roles: ["MEMBER", "TRAINER"]
     });
+  });
+
+  it("given a person without an account, when giving them one, then nothing asks for a password", async () => {
+    // given
+    showPerson(withoutAccount);
+
+    // when / then — the instance generates it and sends it, so there is nothing for a board to type
+    await screen.findByTestId("new-account-username");
+    expect(screen.queryByTestId("new-account-password")).not.toBeInTheDocument();
   });
 
   it("given a person without an account, when the page loads, then nothing offers to enable one", async () => {
@@ -269,18 +278,73 @@ describe("AdminPersonView", () => {
     expect(Array.from(offered.children).map((option) => option.getAttribute("value"))).toEqual(["de"]);
   });
 
-  it("given a member who forgot their password, when resetting it, then the new one-time password is sent", async () => {
+  it("given a member who never received their credentials, when sending them, then no confirmation stands in the way", async () => {
     // given
-    vi.spyOn(api, "resetAccountPassword").mockResolvedValue(jane);
-    showPerson();
-    await screen.findByTestId("account-password");
+    vi.spyOn(api, "requestAccountCredentials").mockResolvedValue(jane);
+    showPerson({ ...jane, credentialState: "CREDENTIAL_ISSUED" });
+    await screen.findByTestId("send-credentials");
 
     // when
-    await userEvent.type(screen.getByTestId("account-password"), "fresh-password");
-    await userEvent.click(screen.getByTestId("reset-password"));
+    await userEvent.click(screen.getByTestId("send-credentials"));
+
+    // then — nothing usable is lost here, so asking would be friction where the press is the remedy
+    expect(api.requestAccountCredentials).toHaveBeenCalledWith("person-1");
+    expect(screen.queryByTestId("confirm-send-credentials")).not.toBeInTheDocument();
+  });
+
+  it("given a member with a password of their own, when sending credentials, then it asks before destroying it", async () => {
+    // given
+    const sent = vi.spyOn(api, "requestAccountCredentials").mockResolvedValue(jane);
+    showPerson({ ...jane, credentialState: "PASSWORD_CHOSEN" });
+    await screen.findByTestId("send-credentials");
+
+    // when
+    await userEvent.click(screen.getByTestId("send-credentials"));
 
     // then
-    expect(api.resetAccountPassword).toHaveBeenCalledWith("person-1", "fresh-password");
+    expect(sent).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId("confirm-send-credentials"));
+    expect(sent).toHaveBeenCalledWith("person-1");
+  });
+
+  it("given the confirmation is dismissed, when it closes, then nothing was sent", async () => {
+    // given
+    const sent = vi.spyOn(api, "requestAccountCredentials").mockResolvedValue(jane);
+    showPerson({ ...jane, credentialState: "PASSWORD_CHOSEN" });
+    await screen.findByTestId("send-credentials");
+
+    // when
+    await userEvent.click(screen.getByTestId("send-credentials"));
+    await userEvent.click(screen.getByTestId("cancel-send-credentials"));
+
+    // then
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("given a deactivated account, when reading the section, then credentials cannot be sent", async () => {
+    // given
+    showPerson({ ...jane, enabled: false });
+
+    // when / then — a message telling somebody their access is ready when it is not is worse than none
+    expect(await screen.findByTestId("send-credentials")).toBeDisabled();
+  });
+
+  it("given an address several people share, when about to send, then the count is shown", async () => {
+    // given
+    showPerson({ ...jane, addressSharedBy: 3 });
+
+    // when / then
+    expect(await screen.findByTestId("credential-destination"))
+      .toHaveTextContent("This address belongs to 3 people.");
+  });
+
+  it("given an address nobody else has, when about to send, then no count is shown", async () => {
+    // given
+    showPerson({ ...jane, addressSharedBy: 1 });
+
+    // when / then
+    expect(await screen.findByTestId("credential-destination"))
+      .not.toHaveTextContent("belongs to");
   });
 
   it("given an enabled account, when disabling it, then the button offers to enable it again", async () => {

@@ -5,7 +5,6 @@ import org.courtside.api.AdminRosterApi;
 import org.courtside.api.ApiAccountRequest;
 import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiMembershipRequest;
-import org.courtside.api.ApiPasswordResetRequest;
 import org.courtside.api.ApiPersonRequest;
 import org.courtside.api.ApiRole;
 import org.courtside.api.ApiRolesRequest;
@@ -69,7 +68,7 @@ class RosterAdminController implements AdminRosterApi {
     public ResponseEntity<ApiRosterEntry> createAccount(UUID personId, ApiAccountRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(toResponse(roster.createAccount(personId, request.getUsername(),
-                        request.getOneTimePassword(), roles(request.getRoles()))));
+                        roles(request.getRoles()))));
     }
 
     @Override
@@ -92,10 +91,8 @@ class RosterAdminController implements AdminRosterApi {
     }
 
     @Override
-    public ResponseEntity<ApiRosterEntry> resetAccountPassword(UUID personId,
-                                                               ApiPasswordResetRequest request) {
-        return ResponseEntity.ok(toResponse(
-                roster.resetPassword(personId, request.getOneTimePassword())));
+    public ResponseEntity<ApiRosterEntry> requestAccountCredentials(UUID personId) {
+        return ResponseEntity.ok(toResponse(roster.requestCredentials(personId)));
     }
 
     @Override
@@ -133,12 +130,20 @@ class RosterAdminController implements AdminRosterApi {
     private static ApiRosterEntry toResponse(RosterService.RosterEntry entry) {
         return new ApiRosterEntry(entry.personId(), entry.firstName(), entry.lastName(),
                 address(entry.email()), entry.enabled(), roleNames(entry.roles()))
+                .addressSharedBy(entry.addressSharedBy())
                 .accountId(entry.accountId())
                 .username(entry.username())
                 .locale(entry.locale())
+                .credentialState(credentialState(entry))
                 .membershipTypeId(membershipTypeId(entry))
                 .membershipStartedOn(membershipDate(entry, RosterService.Membership::startedOn))
                 .membershipEndedOn(membershipDate(entry, RosterService.Membership::endedOn));
+    }
+
+    private static ApiRosterEntry.CredentialStateEnum credentialState(RosterService.RosterEntry entry) {
+        return entry.credentialState() == null
+                ? null
+                : ApiRosterEntry.CredentialStateEnum.fromValue(entry.credentialState().name());
     }
 
     private static String address(String email) {

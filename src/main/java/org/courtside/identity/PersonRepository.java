@@ -18,6 +18,15 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Person> findWithLockById(UUID id);
 
+    // One grouped query for a whole page: a board about to send a credential should see whether the
+    // address it goes to belongs to more than one person.
+    @Query("""
+            SELECT person.email, COUNT(person) FROM Person person
+            WHERE person.email IN :addresses AND person.email <> ''
+            GROUP BY person.email
+            """)
+    List<Object[]> countByAddressIn(@Param("addresses") Collection<String> addresses);
+
     @Query("""
             SELECT person FROM Person person
             WHERE lower(concat(person.firstName, ' ', person.lastName)) IN :nameKeys

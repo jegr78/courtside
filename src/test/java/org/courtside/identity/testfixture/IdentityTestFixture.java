@@ -62,6 +62,12 @@ public class IdentityTestFixture {
         return accounts.save(account).getId();
     }
 
+    public void issueCredential(UUID accountId, String credential, java.time.Instant expiresAt) {
+        UserAccount account = accounts.findById(accountId).orElseThrow();
+        account.credentialsIssued(passwordEncoder.encode(credential), expiresAt);
+        accounts.save(account);
+    }
+
     public UUID createEnabledAccount(UUID personId, String username, Set<Role> roles) {
         return createEnabledAccount(personId, username, "synthetic-test-password-hash", roles);
     }

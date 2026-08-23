@@ -1021,6 +1021,31 @@ components:
           description: |
             The language the instance writes to this account in, and `null` for a person who holds
             no account. Read it together with `accountId`, the same way `username` is read.
+        addressSharedBy:
+          type: [integer, "null"]
+          minimum: 1
+          description: |
+            How many people this instance holds at this email address, counting the person
+            themselves, and `null` for a person the club has no address for. One address serving
+            several accounts is by design — a parent registering for their children — so this is not
+            a warning; it is the number that tells a family apart from an address entered by
+            mistake, at the moment somebody is about to have a credential sent there.
+        credentialState:
+          type: [string, "null"]
+          enum: [AWAITING_CREDENTIAL, CREDENTIAL_ISSUED, CREDENTIAL_EXPIRED, PASSWORD_CHOSEN, null]
+          description: |
+            Where the account stands between being created and being used, and `null` for a person
+            who holds none.
+
+            `AWAITING_CREDENTIAL` means nothing has been issued yet, or that what was issued has
+            been withdrawn because the address it was sent to is no longer the person's.
+            `CREDENTIAL_ISSUED` means one is out and has not been replaced; `CREDENTIAL_EXPIRED`
+            means its deadline has passed and it no longer authenticates, while the account itself
+            stays active and keeps its roles. `PASSWORD_CHOSEN` means the member has replaced it
+            with one of their own.
+
+            It says nothing about whether a message arrived: the instance hands a message over and
+            does not learn what became of it.
         enabled:
           type: boolean
           description: |
@@ -1066,11 +1091,9 @@ components:
     AccountRequest:
       type: object
       description: |
-        The one-time password is what an administrator hands the member; the member replaces it
-        before reaching anything else and it is never stored as given. Twelve characters is the
-        floor the bootstrap administrator's password is held to, and an administrator creating
-        accounts is not held to a weaker one.
-      required: [username, oneTimePassword, roles]
+        The request carries no credential. The instance generates one when the account is created
+        and sends it to the member, so nobody on the board chooses it, sees it or has to pass it on.
+      required: [username, roles]
       properties:
         username:
           type: string
@@ -1079,7 +1102,6 @@ components:
           pattern: "^[a-z0-9._-]+$"
           description: |
             The login identifier, unique across the instance and suggested as `lastname.firstname`.
-        oneTimePassword: { type: string, format: password, minLength: 12, maxLength: 200 }
         roles:
           type: array
           minItems: 1
@@ -1116,17 +1138,6 @@ components:
           pattern: "^[a-z0-9._-]+$"
           description: |
             The login identifier, unique across the instance and suggested as `lastname.firstname`.
-
-    PasswordResetRequest:
-      type: object
-      description: |
-        The one-time password is what an administrator hands the member; the member replaces it
-        before reaching anything else and it is never stored as given. Twelve characters is the
-        floor the bootstrap administrator's password is held to, and a reset an administrator
-        performs is not held to a weaker one.
-      required: [oneTimePassword]
-      properties:
-        oneTimePassword: { type: string, format: password, minLength: 12, maxLength: 200 }
 
     RolesRequest:
       type: object
@@ -3133,9 +3144,9 @@ paths:
       operationId: createAccount
       summary: Give a person a user account.
       description: |
-        The account is enabled at once and starts out having to replace its one-time password
-        before it can reach anything else, which is the state the bootstrap administrator starts
-        in as well.
+        The account is enabled at once and the instance sends its first credential to the member
+        without anybody on the board seeing it. Until that credential is replaced the account can
+        reach nothing else, which is the state the bootstrap administrator starts in as well.
 
         A person holds at most one account here. Every write on this surface names an account by
         its person, so a second one would be unreachable through the surface that created it and
@@ -3144,8 +3155,8 @@ paths:
         different problem types.
 
         **The person needs an email address.** Everything that grants or restores access travels by
-        mail - the first password and both reset paths - so an account without one could never be
-        recovered. A person who holds none is answered `400` with
+        mail - the first credential and every later one - so an account without one could never be
+        reached at all. A person who holds none is answered `400` with
         `urn:courtside:error:account-needs-address`, and for the same reason a correction may not
         take the address away from a person who already holds an account.
 
@@ -3318,24 +3329,31 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /api/admin/roster/{personId}/account/password:
-    put:
+  /api/admin/roster/{personId}/account/credentials:
+    post:
       tags: [admin-roster]
-      operationId: resetAccountPassword
-      summary: Give a person's account a new one-time password.
+      operationId: requestAccountCredentials
+      summary: Have the instance send this account new credentials.
       description: |
-        For a member who cannot sign in at all: without this, a one-time password forgotten before
-        the first sign-in leaves an account nobody can reach, since the self-service reset is not
-        built. The account keeps its username, its roles and its state.
+        The instance generates the credential and sends it to the member. Nobody on the board
+        chooses it, sees it, or has to pass it on, and it appears in no response, log or problem
+        detail. The account keeps its username, its roles and its state.
 
-        The account is left having to replace the new password before it can reach anything else,
-        which is the state a freshly created account starts in, and the reset ends its sessions
-        because the credential they were opened with no longer exists.
+        One action covers every case a board reaches for: a message that never arrived, a deadline
+        that passed, and a member who no longer knows their own password. Which of the two
+        configured lifetimes applies is read from the account rather than chosen by the caller —
+        everything short of a password the member picked themselves is still the invitation, and
+        keeps the longer window a club set for one.
 
-        The response is the roster entry and never echoes the password.
+        Whatever was issued before stops working, and the account's sessions end with it: the
+        message may be sitting in a mailbox that is not the member's, which is the case this
+        answers.
 
-        A write that would overwrite a change to the account made since this entry was read is
-        answered `409` with `urn:courtside:error:concurrent-modification`.
+        `POST`, because each call issues something new rather than writing a state twice.
+
+        A deactivated account is answered `409` with `urn:courtside:error:account-deactivated`:
+        it cannot be reached, and a message telling somebody their access is ready when it is not
+        is worse than none. Activate it first.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -3344,19 +3362,12 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/PasswordResetRequest" }
       responses:
         "200":
-          description: Changed.
+          description: Requested.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RosterEntry" }
-        "400":
-          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":

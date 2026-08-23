@@ -68,7 +68,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         UUID person = identity.createPerson("John", "Roe", "john.roe@example.org");
 
         // when
-        roster.createAccount(person, "roe.john", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(person, "roe.john", Set.of(Role.MEMBER));
 
         // then
         UserAccount stored = accounts.findByUsername("roe.john").orElseThrow();
@@ -86,7 +86,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
 
         // when
         RosterService.RosterEntry entry = roster.createAccount(
-                person, "roe.john", "one-time-password", Set.of(Role.MEMBER, Role.TRAINER));
+                person, "roe.john", Set.of(Role.MEMBER, Role.TRAINER));
 
         // then
         assertThat(entry.personId()).isEqualTo(person);
@@ -101,11 +101,11 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // given
         UUID first = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         UUID second = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        roster.createAccount(first, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(first, "doe.jane", Set.of(Role.MEMBER));
 
         // when / then
         assertThatThrownBy(() -> roster.createAccount(
-                second, "doe.jane", "another-password", Set.of(Role.MEMBER)))
+                second, "doe.jane", Set.of(Role.MEMBER)))
                 .isInstanceOf(UsernameTakenException.class);
     }
 
@@ -113,11 +113,11 @@ class RosterAccountTest extends AbstractIntegrationTest {
     void givenAPersonHoldingAnAccount_whenCreatingASecondOne_thenItIsRefused() {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when / then
         assertThatThrownBy(() -> roster.createAccount(
-                jane, "doe.jane.second", "another-password", Set.of(Role.MEMBER)))
+                jane, "doe.jane.second", Set.of(Role.MEMBER)))
                 .isInstanceOf(PersonAccountExistsException.class)
                 .hasMessageContaining(jane.toString());
         assertThat(accounts.findByPersonIdIn(List.of(jane)))
@@ -133,7 +133,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> roster.createAccount(
-                mary.personId(), "major.mary", "one-time-password", Set.of(Role.MEMBER)))
+                mary.personId(), "major.mary", Set.of(Role.MEMBER)))
                 .isInstanceOf(AccountAddressRequiredException.class)
                 .extracting("code").isEqualTo("roster.account.addressMissing");
         assertThat(accounts.findByPersonIdIn(List.of(mary.personId()))).isEmpty();
@@ -147,7 +147,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
 
         // when
         RosterService.RosterEntry entry = roster.createAccount(
-                mary.personId(), "major.mary", "one-time-password", Set.of(Role.MEMBER));
+                mary.personId(), "major.mary", Set.of(Role.MEMBER));
 
         // then
         assertThat(entry.username()).isEqualTo("major.mary");
@@ -157,7 +157,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
     void givenAPersonHoldingAnAccount_whenTakingTheirAddressAway_thenItIsRefusedWithItsReason() {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when / then
         assertThatThrownBy(() -> roster.changePerson(jane, "Jane", "Doe", null))
@@ -170,7 +170,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
     void givenAPersonHoldingAnAccount_whenCorrectingTheirAddress_thenTheChangeIsAllowed() {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when
         RosterService.RosterEntry changed =
@@ -187,7 +187,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> roster.createAccount(
-                absent, "roe.john", "one-time-password", Set.of(Role.MEMBER)))
+                absent, "roe.john", Set.of(Role.MEMBER)))
                 .isInstanceOf(PersonNotFoundException.class)
                 .hasMessageContaining(absent.toString());
     }
@@ -199,7 +199,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> roster.createAccount(
-                person, "roe.john", "eleven.char", Set.of(Role.MEMBER)))
+                person, "roe.john", Set.of(Role.MEMBER)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("12");
         assertThat(accounts.findByUsername("roe.john")).isEmpty();
@@ -220,7 +220,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
     void givenAnAccount_whenItsRolesAreReplaced_thenTheRosterEntryCarriesTheNewOnes() {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when
         RosterService.RosterEntry entry =
@@ -236,7 +236,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
     void givenADisabledAccount_whenItIsEnabledAgain_thenTheRosterEntrySaysSo() {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
         roster.setAccountEnabled(jane, false);
 
         // when
@@ -322,7 +322,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
     void givenAMistypedUsername_whenItIsCorrected_thenTheEntryAndTheAccountCarryTheNewOne() {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        roster.createAccount(jane, "doe.jaen", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, "doe.jaen", Set.of(Role.MEMBER));
 
         // when
         RosterService.RosterEntry entry = roster.changeUsername(jane, "doe.jane");
@@ -339,7 +339,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
     void givenTheUsernameAnAccountAlreadyHolds_whenCorrectingIt_thenNothingChanges() {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when
         RosterService.RosterEntry entry = roster.changeUsername(jane, "doe.jane");
@@ -354,8 +354,8 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
-        roster.createAccount(mary, "major.mary", "another-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        roster.createAccount(mary, "major.mary", Set.of(Role.MEMBER));
 
         // when / then
         UUID refused = accounts.findByUsername("major.mary").orElseThrow().getId();
@@ -395,7 +395,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
     void givenABlankUsername_whenCorrectingIt_thenTheServiceRefusesItsOwnCaller() {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        roster.createAccount(jane, "doe.jane", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when / then
         assertThatThrownBy(() -> roster.changeUsername(jane, "   "))
@@ -434,7 +434,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         // when
         roster.changeUsername(jane, "doe.jane");
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        roster.createAccount(mary, "doe.jaen", "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(mary, "doe.jaen", Set.of(Role.MEMBER));
 
         // then
         mockMvc.perform(get("/api/my/bookings").session(session))
@@ -465,7 +465,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when
-        RosterService.RosterEntry entry = roster.resetPassword(jane, "second-one-time-password");
+        RosterService.RosterEntry entry = roster.requestCredentials(jane);
 
         // then
         assertThat(entry.username()).isEqualTo("doe.jane");
@@ -491,7 +491,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         // when
-        roster.resetPassword(jane, "second-one-time-password");
+        roster.requestCredentials(jane);
 
         // then
         mockMvc.perform(get("/api/my/bookings").session(session))
@@ -507,7 +507,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when
-        roster.resetPassword(jane, "second-one-time-password");
+        roster.requestCredentials(jane);
 
         // then
         mockMvc.perform(post("/api/session")
@@ -525,7 +525,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        assertThatThrownBy(() -> roster.resetPassword(jane, "second-one-time-password"))
+        assertThatThrownBy(() -> roster.requestCredentials(jane))
                 .isInstanceOf(AccountNotFoundException.class)
                 .hasMessageContaining(jane.toString());
     }
@@ -536,7 +536,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         UUID absent = UUID.fromString("00000000-0000-0000-0000-0000000000fd");
 
         // when / then
-        assertThatThrownBy(() -> roster.resetPassword(absent, "second-one-time-password"))
+        assertThatThrownBy(() -> roster.requestCredentials(absent))
                 .isInstanceOf(PersonNotFoundException.class)
                 .hasMessageContaining(absent.toString());
     }
@@ -548,7 +548,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
 
         // when / then
-        assertThatThrownBy(() -> roster.resetPassword(jane, "eleven.char"))
+        assertThatThrownBy(() -> roster.requestCredentials(jane))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("12");
         assertThat(passwordEncoder.matches(SIGN_IN_PASSWORD,

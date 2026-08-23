@@ -17,7 +17,6 @@ const roles: Role[] = [
 const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
 const USERNAME_LENGTH = 60;
-const PASSWORD_LENGTH = 200;
 
 export function AdminPersonView() {
   const { t } = useTranslation();
@@ -44,14 +43,15 @@ export function AdminPersonView() {
       .catch(reportError);
   }, [personId, reportError]);
 
-  async function mutate(change: () => Promise<RosterEntry>): Promise<RosterEntry | undefined> {
+  async function mutate(change: () => Promise<RosterEntry>,
+                       message = "admin.roster.saved"): Promise<RosterEntry | undefined> {
     if (pending) return undefined;
     setPending(true);
     try {
       const changed = await change();
       setEntry(changed);
       setError(undefined);
-      setSuccess(t("admin.roster.saved"));
+      setSuccess(t(message));
       return changed;
     } catch (failure) {
       reportError(failure);
@@ -86,7 +86,7 @@ export function AdminPersonView() {
             saveRoles={(chosen) => mutate(() => api.changeAccountRoles(personId, chosen))}
             saveUsername={(username) => mutate(() => api.changeAccountUsername(personId, username))}
             saveLocale={(locale) => mutate(() => api.changeAccountLocale(personId, locale))}
-            resetPassword={(password) => mutate(() => api.resetAccountPassword(personId, password))}
+            sendCredentials={() => mutate(() => api.requestAccountCredentials(personId), "admin.person.credentialsSent")}
             toggleAccount={() => mutate(() => api.setAccountActive(personId, !entry.enabled))}
           />
           : <AccountCreateSection
@@ -178,24 +178,34 @@ function MembershipSection({ entry, types, disabled, save }: {
   </section>;
 }
 
-function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLocale, resetPassword, toggleAccount }: {
+function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLocale, sendCredentials, toggleAccount }: {
   entry: RosterEntry;
   club: ClubConfig | undefined;
   disabled: boolean;
   saveRoles: (roles: Role[]) => Saved;
   saveUsername: (username: string) => Saved;
   saveLocale: (locale: string) => Saved;
-  resetPassword: (oneTimePassword: string) => Saved;
+  sendCredentials: () => Saved;
   toggleAccount: () => Saved;
 }) {
   const { t } = useTranslation();
   const [username, setUsername] = useState(entry.username ?? "");
   const [locale, setLocale] = useState(entry.locale ?? club?.defaultLocale ?? "");
   const [chosenRoles, setChosenRoles] = useState(entry.roles);
-  const [oneTimePassword, setOneTimePassword] = useState("");
+  const [replacing, setReplacing] = useState(false);
 
-  async function reset() {
-    if (await resetPassword(oneTimePassword)) setOneTimePassword("");
+  // Only a chosen password can be destroyed by sending: the other three states have nothing to lose.
+  function send() {
+    if (entry.credentialState === "PASSWORD_CHOSEN") {
+      setReplacing(true);
+      return;
+    }
+    void sendCredentials();
+  }
+
+  async function replace() {
+    await sendCredentials();
+    setReplacing(false);
   }
 
   return <section className="surface-subtle grid gap-3 rounded-xl border p-4">
@@ -213,18 +223,44 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
     </div>
     <RoleCheckboxes testIdPrefix="account-roles" disabled={disabled} selected={chosenRoles} changed={setChosenRoles} />
     <Button data-testid="save-roles" disabled={disabled} className="justify-self-start" type="button" onClick={() => void saveRoles(chosenRoles)}>{t("admin.save")}</Button>
-    <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-      <TextField data-testid="account-password" disabled={disabled} autoComplete="off" maxLength={PASSWORD_LENGTH} label={t("admin.roster.oneTimePassword")} value={oneTimePassword} onChange={(event) => setOneTimePassword(event.target.value)} />
-      <Button data-testid="reset-password" disabled={disabled || !oneTimePassword} className="self-end" type="button" onClick={() => void reset()}>{t("admin.roster.resetPassword")}</Button>
+    <div className="grid gap-2">
+      <span className="font-medium">{t("admin.person.credentialState")}</span>
+      <p data-testid="credential-state" className="text-muted text-sm">
+        {t(`admin.person.credentialState.${entry.credentialState ?? "AWAITING_CREDENTIAL"}`)}
+      </p>
+      <CredentialDestination entry={entry} />
+      <Button data-testid="send-credentials" disabled={disabled || !entry.enabled} className="justify-self-start" type="button" onClick={send}>{t("admin.person.sendCredentials")}</Button>
     </div>
     <Button data-testid="toggle-account" disabled={disabled} className="justify-self-start" type="button" onClick={() => void toggleAccount()}>{t(entry.enabled ? "admin.deactivate" : "admin.activate")}</Button>
+    {replacing && <Modal labelledBy="replace-chosen-title" closed={() => setReplacing(false)}>
+      <div className="grid gap-4">
+        <h2 id="replace-chosen-title" className="text-2xl font-bold">{t("admin.person.replaceChosenTitle")}</h2>
+        <p>{t("admin.person.replaceChosenExplain")}</p>
+        <div className="flex flex-wrap gap-3">
+          <Button data-testid="confirm-send-credentials" disabled={disabled} type="button" onClick={() => void replace()}>{t("admin.person.replaceChosenConfirm")}</Button>
+          <Button data-testid="cancel-send-credentials" type="button" onClick={() => setReplacing(false)}>{t("admin.cancel")}</Button>
+        </div>
+      </div>
+    </Modal>}
   </section>;
+}
+
+// The address is entered by somebody else and a typo only shows up as a member who never appears,
+// so this is the last moment anybody checks it.
+function CredentialDestination({ entry }: { entry: RosterEntry }) {
+  const { t } = useTranslation();
+  if (!entry.email) return null;
+  return <p data-testid="credential-destination" className="text-muted text-sm">
+    {t("admin.person.credentialsGoTo", { address: entry.email })}
+    {(entry.addressSharedBy ?? 1) > 1
+      && ` ${t("admin.person.addressSharedBy", { count: entry.addressSharedBy })}`}
+  </p>;
 }
 
 function AccountCreateSection({ entry, disabled, create }: {
   entry: RosterEntry;
   disabled: boolean;
-  create: (request: { username: string; oneTimePassword: string; roles: Role[] }) => Saved;
+  create: (request: { username: string; roles: Role[] }) => Saved;
 }) {
   const { t } = useTranslation();
   if (!entry.email) {
@@ -238,16 +274,13 @@ function AccountCreateSection({ entry, disabled, create }: {
     const form = new FormData(event.currentTarget);
     void create({
       username: formString(form, "username"),
-      oneTimePassword: formString(form, "oneTimePassword"),
       roles: form.getAll("roles") as Role[]
     });
   }
   return <form noValidate onSubmit={submit} className="surface-subtle grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.roster.newAccount")}</h2>
-    <div className="grid gap-3 md:grid-cols-2">
-      <TextField data-testid="new-account-username" disabled={disabled} autoComplete="off" name="username" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} />
-      <TextField data-testid="new-account-password" disabled={disabled} autoComplete="off" name="oneTimePassword" maxLength={PASSWORD_LENGTH} label={t("admin.roster.oneTimePassword")} />
-    </div>
+    <TextField data-testid="new-account-username" disabled={disabled} autoComplete="off" name="username" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} />
+    <CredentialDestination entry={entry} />
     <RoleCheckboxes testIdPrefix="new-account-role" disabled={disabled} name="roles" selected={[]} />
     <Button data-testid="create-account" disabled={disabled} className="justify-self-start" type="submit">{t("admin.roster.newAccount")}</Button>
   </form>;

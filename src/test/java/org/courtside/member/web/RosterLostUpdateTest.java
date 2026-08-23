@@ -81,7 +81,7 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
             assertThat(corrected.await(5, TimeUnit.SECONDS)).isTrue();
 
             // when
-            Future<?> reset = pool.submit(() -> roster.resetPassword(jane, "another-password"));
+            Future<?> reset = pool.submit(() -> roster.requestCredentials(jane));
 
             // then
             assertThatThrownBy(() -> reset.get(250, TimeUnit.MILLISECONDS))

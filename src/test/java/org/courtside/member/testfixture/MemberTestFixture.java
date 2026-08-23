@@ -44,8 +44,8 @@ public class MemberTestFixture {
         sync.apply(new RosterChangeSet(List.of(), List.of(), List.of(personId)));
     }
 
-    public void giveAccount(UUID personId, String username, String oneTimePassword, Set<Role> roles) {
-        roster.createAccount(personId, username, oneTimePassword, roles);
+    public void giveAccount(UUID personId, String username, Set<Role> roles) {
+        roster.createAccount(personId, username, roles);
     }
 
     public void changeAccountRoles(UUID personId, Set<Role> roles) {
@@ -56,8 +56,8 @@ public class MemberTestFixture {
         roster.changeUsername(personId, username);
     }
 
-    public void resetAccountPassword(UUID personId, String oneTimePassword) {
-        roster.resetPassword(personId, oneTimePassword);
+    public void requestAccountCredentials(UUID personId) {
+        roster.requestCredentials(personId);
     }
 
     public void setAccountEnabled(UUID personId, boolean enabled) {

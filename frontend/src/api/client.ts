@@ -224,10 +224,8 @@ export const api = {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username })
     }
   ),
-  resetAccountPassword: (personId: string, oneTimePassword: string) => request<RosterEntry>(
-    `/api/admin/roster/${personId}/account/password`, {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ oneTimePassword })
-    }
+  requestAccountCredentials: (personId: string) => request<RosterEntry>(
+    `/api/admin/roster/${personId}/account/credentials`, { method: "POST" }
   ),
   setAccountActive: (personId: string, active: boolean) => request<RosterEntry>(
     `/api/admin/roster/${personId}/account/active`, {
