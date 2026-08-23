@@ -79,7 +79,6 @@ class CredentialIssueTest extends AbstractIntegrationTest {
         Person person = people.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         return accounts.save(UserAccount.awaitingCredentials(person,
                 "doe.jane." + UUID.randomUUID().toString().substring(0, 8),
-                passwordEncoder.encode(UUID.randomUUID().toString()),
                 java.util.Set.of(Role.MEMBER), "de")).getId();
     }
 }

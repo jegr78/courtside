@@ -31,6 +31,7 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
     static final String PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED";
 
     private final UserAccountRepository accounts;
+    private final UnusablePassword unusablePassword;
     private final PasswordRehashWriter rehashWriter;
     private final MeterRegistry meters;
     private final Clock clock;
@@ -48,9 +49,15 @@ public class CourtsideUserDetailsService implements UserDetailsService, UserDeta
         }
 
         return new CourtsideUserDetails(account.getId(), account.getUsername(),
-                account.getPasswordHash(), account.isEnabled(),
+                passwordOf(account), account.isEnabled(),
                 !account.isCredentialExpired(clock.instant()), authorities,
                 account.getSecurityEpoch());
+    }
+
+    private String passwordOf(UserAccount account) {
+        return account.getPasswordHash() == null
+                ? unusablePassword.hash()
+                : account.getPasswordHash();
     }
 
     @Override

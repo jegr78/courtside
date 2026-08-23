@@ -53,12 +53,11 @@ public class IdentityTestFixture {
         return accounts.save(new UserAccount(person, username, passwordHash, roles, "de")).getId();
     }
 
-    // What a person holds after a board member adds them and before the message reaches them: a hash
-    // of a value nobody kept, and no expiry, which is what says nothing has been issued yet.
+    // What a person holds after a board member adds them and before the message reaches them: no
+    // password at all, which is what says nothing has been issued yet.
     public UUID createAccountAwaitingCredentials(UUID personId, String username, Set<Role> roles) {
         Person person = persons.findById(personId).orElseThrow();
-        UserAccount account = UserAccount.awaitingCredentials(person, username,
-                "synthetic-test-placeholder-hash", roles, "de");
+        UserAccount account = UserAccount.awaitingCredentials(person, username, roles, "de");
         account.enable();
         return accounts.save(account).getId();
     }

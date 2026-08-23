@@ -210,6 +210,22 @@ class LoginTest extends AbstractIntegrationTest {
         return (MockHttpSession) login.getRequest().getSession(false);
     }
 
+    @Test
+    void givenAnAccountAwaitingItsCredential_whenSigningIn_thenTheAnswerIsTheWrongPasswordAnswer()
+            throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        accounts.save(enabled(UserAccount.awaitingCredentials(
+                mary, "major.mary", Set.of(Role.MEMBER), "de")));
+        String wrongPassword = signInFailure("doe.jane", "wrong");
+
+        // when
+        String nothingIssuedYet = signInFailure("major.mary", "anything-at-all");
+
+        // then
+        assertThat(nothingIssuedYet).isEqualTo(wrongPassword);
+    }
+
     private String signInFailure(String username, String password) throws Exception {
         return mockMvc.perform(post("/api/session")
                         .param("username", username)
