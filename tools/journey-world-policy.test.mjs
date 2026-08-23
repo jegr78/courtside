@@ -8,7 +8,8 @@ const playwright = readFileSync(new URL("../frontend/playwright.config.ts", impo
 
 test("given several browser projects, when Playwright runs them, then one global journey world serves every worker", () => {
   assert.match(setup, /const service = await startJourneyService\(\)/);
-  assert.match(setup, /await service\.pinnedBrowser\(browserName\)/);
+  assert.doesNotMatch(setup, /for \(const browserName of browserNames\)/);
+  assert.match(fixtures, /journeyService\.releasePinnedBrowser\(browserName\)/);
   assert.match(setup, /process\.env\.COURTSIDE_JOURNEY_CONTROL/);
   assert.doesNotMatch(fixtures, /startJourneyService/);
   assert.doesNotMatch(fixtures, /service\.stop/);
