@@ -31,10 +31,7 @@ public class MessageLogService {
         validateLimit(limit);
         MessageRecord start = cursorRecord(cursor);
         List<UUID> ids = records.findPage(personId != null, accountIdsFor(personId), state, unsettled,
-                from, to,
-                start == null ? null : start.getQueuedAt(),
-                start == null ? null : start.getId(),
-                Limit.of(limit + 1));
+                from, to, start == null ? null : start.getQueuedSeq(), Limit.of(limit + 1));
         return CursorPage.of(ids, limit, this::load, MessageEntry::id);
     }
 

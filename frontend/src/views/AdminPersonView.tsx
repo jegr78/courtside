@@ -251,13 +251,23 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
 function LastMessage({ entry }: { entry: RosterEntry }) {
   const { t } = useTranslation();
   const [message, setMessage] = useState<MessageEntry>();
+  const [unreadable, setUnreadable] = useState(false);
 
   useEffect(() => {
     void api.messages(undefined, 1, { personId: entry.personId })
-      .then((page) => setMessage(page.entries[0]))
-      .catch(() => setMessage(undefined));
+      .then((page) => {
+        setMessage(page.entries[0]);
+        setUnreadable(false);
+      })
+      .catch(() => setUnreadable(true));
   }, [entry]);
 
+  // Saying nothing would read as "nothing was ever sent", which is a different answer entirely.
+  if (unreadable) {
+    return <p data-testid="last-message-unreadable" className="text-muted text-sm">
+      {t("admin.person.lastMessageUnreadable")}
+    </p>;
+  }
   if (!message) return null;
   return <p data-testid="last-message" data-state={message.state} className="text-muted text-sm">
     {t("admin.person.lastMessage")}: {t(`messages.state.${message.state}`)}

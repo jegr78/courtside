@@ -14,9 +14,6 @@ interface MessageRecordRepository extends JpaRepository<MessageRecord, UUID> {
 
     List<MessageRecord> findAllByIdIn(Collection<UUID> ids);
 
-    List<MessageRecord> findByAccountIdInOrderByQueuedAtDescIdDesc(Collection<UUID> accountIds,
-                                                                   Limit limit);
-
     @Query("""
             SELECT record.id FROM MessageRecord record
             WHERE (:restricted = FALSE OR record.accountId IN :accountIds)
@@ -26,16 +23,13 @@ interface MessageRecordRepository extends JpaRepository<MessageRecord, UUID> {
                     org.courtside.notification.MessageState.FAILED))
               AND (CAST(:from AS timestamp) IS NULL OR record.queuedAt >= :from)
               AND (CAST(:to AS timestamp) IS NULL OR record.queuedAt < :to)
-              AND (CAST(:cursorQueuedAt AS timestamp) IS NULL
-                   OR record.queuedAt < :cursorQueuedAt
-                   OR (record.queuedAt = :cursorQueuedAt AND record.id < :cursorId))
-            ORDER BY record.queuedAt DESC, record.id DESC
+              AND (:cursorSeq IS NULL OR record.queuedSeq < :cursorSeq)
+            ORDER BY record.queuedSeq DESC
             """)
     List<UUID> findPage(@Param("restricted") boolean restricted,
                         @Param("accountIds") Collection<UUID> accountIds,
                         @Param("state") org.courtside.notification.MessageState state,
                         @Param("unsettled") boolean unsettled,
                         @Param("from") Instant from, @Param("to") Instant to,
-                        @Param("cursorQueuedAt") Instant cursorQueuedAt,
-                        @Param("cursorId") UUID cursorId, Limit limit);
+                        @Param("cursorSeq") Long cursorSeq, Limit limit);
 }

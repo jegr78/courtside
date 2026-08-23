@@ -50,8 +50,8 @@ class MessageLog {
         records.findById(recordId).ifPresent(record -> {
             settlement.accept(record);
             records.save(record);
+            meters.counter("courtside.messages", "state", settled.name().toLowerCase(Locale.ROOT))
+                    .increment();
         });
-        meters.counter("courtside.messages", "state", settled.name().toLowerCase(Locale.ROOT))
-                .increment();
     }
 }

@@ -45,6 +45,9 @@ class MessageRecord {
     @Column(nullable = false, updatable = false)
     private Instant queuedAt;
 
+    @Column(insertable = false, updatable = false)
+    private Long queuedSeq;
+
     private Instant settledAt;
 
     MessageRecord(UUID accountId, MessageKind kind, String messageId, Instant queuedAt) {

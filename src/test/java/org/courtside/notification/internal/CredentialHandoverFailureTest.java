@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -130,6 +131,26 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnInterruptedPause_whenItEscapes_thenTheRowStillSaysWhatBecameOfTheMessage() {
+        // given — the one failure that does not come through MailDispatch, so no wrapper names it
+        doThrow(new MailSendException("nothing is listening")).when(sender).send(any(MimeMessage.class));
+        doThrow(new MailHandoverInterruptedException(new InterruptedException("shutting down")))
+                .when(pause).untilTheNextAttempt(any());
+        UUID personId = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        UUID accountId = identity.createAccountAwaitingCredentials(personId,
+                "miles.richard." + UUID.randomUUID().toString().substring(0, 8), Set.of(Role.MEMBER));
+
+        // when
+        transactions.executeWithoutResult(status ->
+                events.publishEvent(new CredentialsRequested(accountId, CredentialsRequested.Reason.NEW_ACCOUNT)));
+
+        // then — a row left on queued would say the message is still on its way, and it is not
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(recorded(accountId)).containsExactly("FAILED"));
+        assertThat(reasonRecorded(accountId)).isNotBlank();
+    }
+
+    @Test
     void givenAFailedHandover_whenItsEventIsRepublished_thenTheSecondAttemptIsASecondRow() {
         // given — a restart republishes what stayed outstanding, and each run is its own message
         doThrow(new MailSendException("nothing is listening")).when(sender).send(any(MimeMessage.class));
@@ -151,11 +172,13 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
         assertThat(messageIdsRecorded(accountId)).hasSize(2).doesNotHaveDuplicates();
     }
 
+    // The shape Spring builds for a rejected recipient: a failed message, not a cause. This path
+    // runs through MailDispatch, which wraps it again, so both layers are exercised as they ship.
     private static MailSendException refusal() {
         try {
-            return new MailSendException("the relay refused the recipient",
+            return new MailSendException(Map.of("<a-message-id@example.org>",
                     new SendFailedException("550 5.1.1 user unknown", null, new Address[0],
-                            new Address[0], new Address[]{new InternetAddress("nobody@example.org")}));
+                            new Address[0], new Address[]{new InternetAddress("nobody@example.org")})));
         } catch (AddressException impossible) {
             throw new IllegalStateException(impossible);
         }

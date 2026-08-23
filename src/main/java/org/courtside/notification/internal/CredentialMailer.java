@@ -66,8 +66,8 @@ class CredentialMailer {
         } catch (MailRecipientRefusedException refusal) {
             messages.refused(record, refusal.diagnosis(), refusal.statusCode());
             throw refusal;
-        } catch (MailHandoverFailedException failure) {
-            messages.failed(record, failure.diagnosis());
+        } catch (RuntimeException failure) {
+            messages.failed(record, diagnosisOf(failure));
             throw failure;
         }
         messages.handedOver(record);
@@ -88,6 +88,14 @@ class CredentialMailer {
 
     private ZoneId zone() {
         return club.zoneId();
+    }
+
+    // Every escape, not a list of types: an exception this method does not know about would
+    // otherwise leave the row on queued, which is the one thing this log exists to prevent.
+    private static String diagnosisOf(RuntimeException failure) {
+        return failure instanceof MailHandoverFailedException handover
+                ? handover.diagnosis()
+                : failure.getClass().getSimpleName();
     }
 
     private String senderDomain() {

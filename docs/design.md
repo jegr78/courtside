@@ -1445,7 +1445,9 @@ deliver the implementation.
   the one above and a separate one: the snapshot a club later uploads *is* sent, and is then bound
   by the retention. Configuring the source that receives it is not. **Built.**
 - **A message record goes when the account it explains goes.** `message_record` holds no address,
-  no name and no body — an account id, a kind, a state, a `Message-ID` and two instants — and it is
+  no name and no body — an account id, a kind, a state, a `Message-ID`, two instants, the order it
+  was written in, and, where a handover failed, the kinds of failure the mail library reported and
+  the SMTP status code, neither of which carries the relay's own words about an address — and it is
   removed with the account by `ON DELETE CASCADE`. There is no second retention setting for it: a
   row that outlived the account would explain a message to nobody, and one that vanished earlier
   would leave the club unable to answer why a member never heard from the instance. **Built.**

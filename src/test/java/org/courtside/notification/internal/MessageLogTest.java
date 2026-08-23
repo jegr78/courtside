@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Import(IdentityTestFixture.class)
 class MessageLogTest extends AbstractIntegrationTest {
@@ -80,6 +81,43 @@ class MessageLogTest extends AbstractIntegrationTest {
 
         // then — a counter an operator watches must not become a list of who holds an account
         assertThat(tagKeys).containsExactly("state");
+    }
+
+    @Test
+    void givenARecordThatIsGone_whenSettlingIt_thenNothingIsCountedForARowNobodyHas() {
+        // given — an account deleted between queueing and handing over takes its row with it
+        UUID recordId = queued("a-message-id");
+        double before = counter(MessageState.HANDED_OVER);
+        records.deleteById(recordId);
+
+        // when
+        messages.handedOver(recordId);
+
+        // then — a counter that outran the table would report a state change nothing records
+        assertThat(counter(MessageState.HANDED_OVER)).isEqualTo(before);
+    }
+
+    @Test
+    void whenAStateTheApplicationDoesNotKnowIsWritten_thenTheDatabaseRefusesIt() {
+        // given
+        UUID recordId = queued("a-message-id");
+
+        // when / then — no state may claim delivery, and the schema is where that is enforced
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE message_record SET state = 'DELIVERED', settled_at = now() WHERE id = :id
+                """).param("id", recordId).update())
+                .hasMessageContaining("message_record_state_known");
+    }
+
+    @Test
+    void whenAMessageIsSettledWithoutSayingWhen_thenTheDatabaseRefusesIt() {
+        // given
+        UUID recordId = queued("a-message-id");
+
+        // when / then — a settled row with no instant reads as still on its way
+        assertThatThrownBy(() -> jdbc.sql("UPDATE message_record SET state = 'FAILED' WHERE id = :id")
+                .param("id", recordId).update())
+                .hasMessageContaining("message_record_settled_with_its_state");
     }
 
     @Test

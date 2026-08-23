@@ -207,9 +207,10 @@ class MessageAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenMoreMessagesThanOnePageHolds_whenTheCursorIsFollowed_thenEachIsSeenExactlyOnce()
+    void givenMoreMessagesThanOnePageHolds_whenTheCursorIsFollowed_thenEachIsSeenNewestFirstAndOnce()
             throws Exception {
-        // given — one instant for all of them, so only the total order keeps the boundary honest
+        // given — one instant for all of them, so the clock cannot tell them apart and the order
+        // they were written in is the only thing left that can
         for (int index = 0; index < 5; index++) {
             queued(janesAccountId, MessageKind.CREDENTIALS_NEW_ACCOUNT, "message-" + index);
         }
@@ -235,7 +236,8 @@ class MessageAdminControllerTest extends AbstractIntegrationTest {
         }
 
         // then
-        assertThat(seen).hasSize(5).doesNotHaveDuplicates();
+        assertThat(seen).containsExactly("message-4", "message-3", "message-2", "message-1",
+                "message-0");
         assertThat(cursor).isNull();
     }
 

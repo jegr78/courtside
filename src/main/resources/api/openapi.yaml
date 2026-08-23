@@ -4585,8 +4585,9 @@ paths:
         Administrators only. Who was written to and when is personal data, and no officer role
         needs it.
 
-        The page is ordered by `queuedAt` descending, and by `id` descending where several entries
-        share one instant, so the order is total and a page boundary never drops or repeats a row.
+        The page is newest first, in the order the entries were written rather than by the clock
+        they carry: two messages queued inside one tick of it would otherwise have no order at all,
+        and a page boundary would drop or repeat a row.
       security:
         - sessionCookie: []
       parameters:

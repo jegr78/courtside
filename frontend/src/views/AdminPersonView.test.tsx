@@ -419,6 +419,18 @@ describe("AdminPersonView", () => {
       expect(line).toHaveTextContent(i18n.t(`messages.state.${state}`));
     });
 
+  it("given the message log cannot be reached, when the person is opened, then it says so instead of nothing", async () => {
+    // given — silence here is indistinguishable from "nothing was ever sent", a different answer
+    vi.spyOn(api, "messages").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    showPerson();
+
+    // then
+    expect(await screen.findByTestId("last-message-unreadable")).toBeInTheDocument();
+    expect(screen.queryByTestId("last-message")).not.toBeInTheDocument();
+  });
+
   it("given an account nothing was ever sent to, when the person is opened, then no line pretends otherwise", async () => {
     // given — an empty row beside the credential state reads like a failure, and nothing failed
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
