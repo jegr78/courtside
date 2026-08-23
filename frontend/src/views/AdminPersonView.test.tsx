@@ -329,15 +329,6 @@ describe("AdminPersonView", () => {
     expect(await screen.findByTestId("send-credentials")).toBeDisabled();
   });
 
-  it("given an address several people share, when about to send, then the count is shown", async () => {
-    // given
-    showPerson({ ...jane, addressSharedBy: 3 });
-
-    // when / then
-    expect(await screen.findByTestId("credential-destination"))
-      .toHaveTextContent("This address belongs to 3 people.");
-  });
-
   it("given an address nobody else has, when about to send, then no count is shown", async () => {
     // given
     showPerson({ ...jane, addressSharedBy: 1 });

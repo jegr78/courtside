@@ -26,6 +26,11 @@ public class AccountCredentials {
         if (!account.isEnabled()) {
             throw new AccountDeactivatedException();
         }
+        // The layer above guards this too, and a caller that changes must not turn it into a failure
+        // that surfaces only where the board cannot see it: the message is handed over asynchronously.
+        if (account.getPerson().getEmail() == null || account.getPerson().getEmail().isBlank()) {
+            throw new AccountAddressMissingException();
+        }
         issuing.registerOrRefuse(accountId);
         events.publishEvent(new CredentialsRequested(accountId, reasonFor(account)));
     }

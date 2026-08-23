@@ -3351,14 +3351,19 @@ paths:
 
         `POST`, because each call issues something new rather than writing a state twice.
 
-        A deactivated account is answered `409` with `urn:courtside:error:account-deactivated`:
-        it cannot be reached, and a message telling somebody their access is ready when it is not
-        is worse than none. Activate it first.
+        A deactivated account is answered `409` with `urn:courtside:error:account-deactivated`, and
+        one whose person has no address with `urn:courtside:error:account-address-missing`. Neither
+        can be reached, and a message telling somebody their access is ready when it is not is worse
+        than none.
 
-        How often one account may be sent credentials within a configured window is limited, and
-        the excess call is answered `429` with `urn:courtside:error:credential-issue-rate-limited`.
-        The account is the unit, so one member's mailbox cannot be filled and no member's issuing
-        blocks another's.
+        The answer says the request was accepted, not that anything has been sent: the message is
+        handed over afterwards, and `credentialState` is what says it went out. Issuing and sending
+        are one transaction, so a credential nobody received never replaces the one on file.
+
+        How often credentials may be requested for one account within a configured window is
+        limited — requests, not deliveries — and the excess call is answered `429` with
+        `urn:courtside:error:credential-issue-rate-limited`. The account is the unit, so one
+        member's mailbox cannot be filled and no member's issuing blocks another's.
       security:
         - sessionCookie: []
           csrfToken: []

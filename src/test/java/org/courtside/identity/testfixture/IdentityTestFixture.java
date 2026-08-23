@@ -148,6 +148,10 @@ public class IdentityTestFixture {
         return accounts.findById(accountId).orElseThrow().getPasswordHash();
     }
 
+    public long securityEpoch(UUID accountId) {
+        return accounts.findById(accountId).orElseThrow().getSecurityEpoch();
+    }
+
     public UUID personIdForUsername(String username) {
         return accounts.findByUsername(username).orElseThrow().getPerson().getId();
     }

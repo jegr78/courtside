@@ -76,13 +76,19 @@ board issues a new one. How long an invitation and a reset last is a club settin
 each, so a board that knows its own members decides it rather than inheriting ours. The date binds
 the issued credential only, so a member who has since chosen their own password keeps it. A message
 the relay refuses is retried, and if it is still refused the event stays outstanding rather than
-being recorded as delivered, so a restart republishes it instead of losing it. What raises the
+being recorded as delivered, so a restart republishes it instead of losing it. Issuing and sending
+are one transaction: a credential nobody received never replaces the one on file, and a member is
+not locked out by a mail server that was briefly away. The price is that the answer a board reads
+is that its request was accepted, not that anything has gone out — the state on the person's page
+is what says that — and that the retry ladder holds a database connection and that account's row
+for as long as it runs. What raises the
 event is the roster: creating an account asks for a credential at once, and one action sends a new
 one afterwards, for a message that never arrived, a deadline that passed, or a member who no longer
 knows their own password. Nobody on the board chooses it, sees it, or has to pass it on, and it
 appears in no response, log or problem detail. Which of the two lifetimes applies is read from the
-account rather than chosen by the caller, and how often one account may be sent a credential is
-limited. Correcting a person's address withdraws whatever was
+account rather than chosen by the caller; how often credentials may be requested for one account is
+limited; and an account with no address or a deactivated one is refused where the board can see it,
+rather than failing where only a log would carry it. Correcting a person's address withdraws whatever was
 issued to the address it replaces, because a message already sent cannot be recalled from a mailbox
 that was never theirs.
 
@@ -1252,16 +1258,17 @@ whether it is built or designed. **Designed means absent today.**
   that grants access travels by mail, so the credential and the password the instance authenticates
   with both cross the hop to the mail server. That hop is required to be encrypted — STARTTLS is
   required and not merely enabled, so a relay that stops offering it fails the handover rather than
-  carrying a password in the clear — but who issued its certificate is not checked, because Caddy
-  issues for `COURTSIDE_DOMAIN` and not for the mail hostname and the submission listener therefore
-  presents a self-signed one. An observer needs to be on the private compose network *and* able to redirect the
-  application's connection to a server of their own. What bounds it: the exception is off by default
-  in the application and switched on in `compose.yaml`, where a reader sees it; it names one host,
-  the configured relay; the certificate still has to name the host the application connects to, so a
-  server presenting one issued for another name fails the handshake with the exception switched on;
-  and a club pointing `COURTSIDE_MAIL_RELAY_HOST` at a provider with a real certificate clears
-  `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` and is validated in full again. It closes when
-  the mail server has a certificate of its own, which
+  carrying a password in the clear — but the certificate is not authenticated, neither its issuer nor
+  the name on it. Caddy issues for `COURTSIDE_DOMAIN` and not for the mail hostname, and the mail
+  server generates its own for `localhost` alone, which is no name a compose network resolves;
+  checking a name on a certificate whose issuer is unchecked would refuse the relay without proving
+  anything, because whoever can redirect the connection writes both. An observer needs to be on the
+  private compose network *and* able to redirect the application's connection to a server of their
+  own. What bounds it: the exception is off by default in the application and switched on in
+  `compose.yaml`, where a reader sees it; it names one host, the configured relay and no other; and
+  a club pointing `COURTSIDE_MAIL_RELAY_HOST` at a provider with a real certificate clears
+  `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` and is validated in full again. It closes when the mail
+  server has a certificate of its own, which
   [#342](https://github.com/jegr78/courtside/issues/342) covers. *Built, as described.*
 - **Accepted: whoever holds a mailbox can take over every account registered to it.** One address
   serving several people is deliberate — a parent registering for their children — so the same

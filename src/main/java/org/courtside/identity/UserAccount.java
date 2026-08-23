@@ -151,12 +151,6 @@ public class UserAccount {
         revokeSessions();
     }
 
-    public void resetPassword(String passwordHash) {
-        this.passwordHash = passwordHash;
-        requirePasswordChange();
-        revokeSessions();
-    }
-
     void revokeSessions() {
         this.securityEpoch++;
     }

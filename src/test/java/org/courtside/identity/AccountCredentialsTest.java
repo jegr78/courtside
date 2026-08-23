@@ -109,6 +109,19 @@ class AccountCredentialsTest {
         verifyNoInteractions(events);
     }
 
+    @Test
+    void givenAnAccountWhosePersonHasNoAddress_whenIssuing_thenItIsRefusedWhereTheBoardCanSeeIt() {
+        // given
+        UserAccount account = enabled(UserAccount.awaitingCredentials(
+                new Person("Jane", "Doe", ""), "doe.jane", Set.of(Role.MEMBER), "de"));
+        UUID accountId = holding(account);
+
+        // when / then — the message is handed over on another thread, so a failure there reaches nobody
+        assertThatThrownBy(() -> credentials.issueTo(accountId))
+                .isInstanceOf(AccountAddressMissingException.class);
+        verifyNoInteractions(events, issuing);
+    }
+
     private CredentialsRequested published() {
         ArgumentCaptor<Object> event = ArgumentCaptor.forClass(Object.class);
         verify(events).publishEvent(event.capture());

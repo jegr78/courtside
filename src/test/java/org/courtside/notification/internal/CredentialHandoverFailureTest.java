@@ -58,6 +58,7 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
         UUID accountId = identity.createAccountAwaitingCredentials(personId,
                 "roe.john." + UUID.randomUUID().toString().substring(0, 8), Set.of(Role.MEMBER));
         String hashBefore = identity.storedCredentialHash(accountId);
+        long epochBefore = identity.securityEpoch(accountId);
 
         // when
         transactions.executeWithoutResult(status ->
@@ -69,6 +70,9 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
                 assertThat(identity.storedCredentialHash(accountId))
                         .as("a credential nobody received must not have replaced the one on file")
                         .isEqualTo(hashBefore));
+        assertThat(identity.securityEpoch(accountId))
+                .as("and the sessions it would have ended are still the member's own")
+                .isEqualTo(epochBefore);
         await().atMost(Duration.ofSeconds(10))
                 .untilAsserted(() -> assertThat(undeliveredPublications()).isEqualTo(outstandingBefore + 1));
     }

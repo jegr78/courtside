@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Import(IdentityTestFixture.class)
 class CredentialWithdrawalTest extends AbstractIntegrationTest {
@@ -111,6 +112,18 @@ class CredentialWithdrawalTest extends AbstractIntegrationTest {
 
         // then — withdrawing it would lock a club out of its own instance
         assertThat(account(accountId).getPasswordHash()).isEqualTo("from-the-environment");
+    }
+
+    @Test
+    void givenAnAccountHolder_whenASynchronisationClearsTheirAddress_thenItIsRefusedTheSameWay() {
+        // given
+        UUID personId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccountAwaitingCredentials(personId, "doe.jane", Set.of(Role.MEMBER));
+
+        // when / then — an account with no address can be sent nothing, whichever path clears it
+        assertThatThrownBy(() -> roster.correctPerson(personId, null, null, ""))
+                .isInstanceOf(AccountAddressRequiredException.class);
+        assertThat(identity.personName(personId)).isEqualTo("Jane Doe");
     }
 
     private UserAccount account(UUID accountId) {

@@ -133,6 +133,7 @@ public class RosterService {
                     lastName == null ? person.getLastName() : strippedNonBlank(lastName, "last name"));
         }
         if (email != null) {
+            requireAddressWhereAnAccountNeedsOne(id, strippedAddress(email));
             person.changeEmail(strippedAddress(email));
         }
         withdrawIfAddressChanged(id, corrected);
