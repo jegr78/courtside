@@ -1,20 +1,25 @@
 package org.courtside.notification.internal;
 
+import org.courtside.notification.MessageKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MailTemplatesTest {
 
-    private static final Set<String> KEYS = Set.of(
-            "credentials.newAccount.subject", "credentials.newAccount.body",
-            "credentials.passwordReset.subject", "credentials.passwordReset.body");
+    // Derived, so a message kind added without the templates it names fails here rather than at
+    // the moment a member would have been written to.
+    private static final Set<String> KEYS = Stream.of(MessageKind.values())
+            .flatMap(kind -> Stream.of(kind.templateKey() + ".subject", kind.templateKey() + ".body"))
+            .collect(Collectors.toSet());
 
     private static final Map<String, String> VALUES = Map.of("clubName", "Example Tennis Club",
             "firstName", "Jane", "username", "doe.jane",

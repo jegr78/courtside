@@ -157,6 +157,11 @@ for (const locale of ["de", "en"]) {
 
     // then
     await expectNoWcagViolations(page);
+    // Empty, because the control this view adds is the filter and it is on screen either way; the
+    // table's own markup is the shape the roster and the audit table are already checked with.
+    await page.goto("/admin/messages");
+    await expect(page.getByTestId("messages-empty")).toBeVisible();
+    await expectNoWcagViolations(page);
   });
 }
 

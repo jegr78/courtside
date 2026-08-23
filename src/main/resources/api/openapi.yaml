@@ -96,6 +96,8 @@ tags:
     description: Executing a reviewed snapshot, and the log of what was executed.
   - name: admin-audit
     description: The configuration changes this instance recorded.
+  - name: admin-messages
+    description: What became of the messages this instance sent.
 
 security:
   - sessionCookie: []
@@ -1630,6 +1632,66 @@ components:
           description: |
             The acting account's username, or `null` when no account acted, and when the account
             that acted was erased.
+
+    MessageKind:
+      type: string
+      description: |
+        What a message was. The client resolves its label from this; the value is the message's own
+        name, not the reason another part of the instance had for asking.
+      enum: [CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET]
+
+    MessageState:
+      type: string
+      description: |
+        `HANDED_OVER` is where a message that went out rests. Handing a message to the mail server
+        is not delivery, and this instance learns nothing after that point — a state claiming
+        otherwise would claim knowledge nobody has.
+      enum: [QUEUED, HANDED_OVER, REFUSED, FAILED]
+
+    MessageEntry:
+      type: object
+      required: [id, queuedAt, kind, state, messageId, personId, personName]
+      properties:
+        id: { type: string, format: uuid }
+        queuedAt: { type: string, format: date-time }
+        settledAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the message reached the state it is in, and `null` while it is queued.
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        state: { $ref: "#/components/schemas/MessageState" }
+        messageId:
+          type: string
+          description: |
+            The `Message-ID` this instance set before handing the message over. It is the only
+            thread between this row and the mail server's own log, which is where an operator
+            looks for what happened after the handover.
+        reason:
+          type: [string, "null"]
+          description: |
+            The kinds of failure the mail library reported, as type names — never the relay's own
+            words, which are about an address this instance has no business storing verbatim.
+        statusCode:
+          type: [string, "null"]
+          description: The SMTP status code the relay answered with, where it answered one.
+        personId: { type: string, format: uuid }
+        personName:
+          type: string
+          description: |
+            Who was written to. An entry cannot outlive the account it names — the record is
+            removed with it — so this is always a person the club can still open.
+
+    MessagePage:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/MessageEntry" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: Pass this entry id as `cursor` to continue after the current page.
 
     AuditPage:
       type: object
@@ -4498,6 +4560,78 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Impact" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/messages:
+    get:
+      tags: [admin-messages]
+      operationId: readMessageLog
+      summary: What became of the messages this instance sent, newest first.
+      description: |
+        Every message the instance handed to its mail server, with what became of it as far as this
+        instance can know. `HANDED_OVER` is the resting state: the message is with the mail server,
+        a failure would appear here, and nothing after that point is visible without receiving mail.
+
+        A refusal is a recipient the relay rejected during the transaction — most often an address
+        with a typo. There is no way to send the same message again: a credential exists only as a
+        hash once it has gone out, so the remedy is to correct the address and ask for new
+        credentials, on the person this entry names.
+
+        Administrators only. Who was written to and when is personal data, and no officer role
+        needs it.
+
+        The page is ordered by `queuedAt` descending, and by `id` descending where several entries
+        share one instant, so the order is total and a page boundary never drops or repeats a row.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/MessageState" }
+          description: |
+            Restrict the page to one state. A value this instance does not know is answered `400`.
+        - name: unsettled
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: |
+            Restrict the page to what went wrong — `REFUSED` and `FAILED` together. This is the
+            filter a board reaches for; `state` is for looking at one of them on its own.
+        - name: personId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: Restrict the page to the messages written to one person.
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Include only messages queued at or after this instant.
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Exclude messages queued at or after this instant.
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor that does not name an
+            entry of this log is answered `400` rather than silently starting the page over.
+        - $ref: "#/components/parameters/PageLimit"
+      responses:
+        "200":
+          description: A page of the log.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessagePage" }
         "400":
           $ref: "#/components/responses/Invalid"
         "401":

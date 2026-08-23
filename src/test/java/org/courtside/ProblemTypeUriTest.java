@@ -33,6 +33,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:credential-issue-rate-limited",
             "urn:courtside:error:account-not-found",
             "urn:courtside:error:audit-cursor-unknown",
+            "urn:courtside:error:message-cursor-unknown",
             "urn:courtside:error:booking-not-found",
             "urn:courtside:error:booking-not-owned",
             "urn:courtside:error:booking-rules-violated",

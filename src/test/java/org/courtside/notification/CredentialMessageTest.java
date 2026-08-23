@@ -20,11 +20,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import jakarta.mail.internet.MimeMessage;
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -124,6 +127,45 @@ class CredentialMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenAMemberIsWrittenTo_thenTheRecordNamesTheAccountTheKindAndTheMessageThatWentOut()
+            throws Exception {
+        // given
+        UUID accountId = anAccountAwaitingItsCredential();
+
+        // when
+        raise(accountId, CredentialsRequested.Reason.NEW_ACCOUNT);
+        MimeMessage sent = theMessageHandedOver();
+
+        // then — the Message-ID is the only thread between this row and the mail server's own log
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(recordFor(accountId))
+                .containsEntry("kind", "CREDENTIALS_NEW_ACCOUNT")
+                .containsEntry("state", "HANDED_OVER")
+                .containsEntry("message_id", sent.getHeader("Message-ID")[0]));
+        assertThat(recordFor(accountId).get("settled_at")).isNotNull();
+    }
+
+    @Test
+    void whenAMemberIsWrittenTo_thenNoColumnOfTheRecordCarriesTheCredentialOrWhoTheyAre()
+            throws Exception {
+        // given
+        UUID accountId = anAccountAwaitingItsCredential();
+
+        // when
+        raise(accountId, CredentialsRequested.Reason.NEW_ACCOUNT);
+        String credential = credentialIn(body(theMessageHandedOver()));
+
+        // then — every column, so a new one cannot be added that quietly holds one of these
+        List<Map<String, Object>> rows = jdbc.sql("SELECT * FROM message_record").query().listOfRows();
+        assertThat(rows).isNotEmpty();
+        assertThat(rows).allSatisfy(row -> assertThat(row.values())
+                .filteredOn(value -> value != null)
+                .noneMatch(value -> String.valueOf(value).contains(credential)
+                        || String.valueOf(value).contains("jane.doe@example.org")
+                        || String.valueOf(value).contains("Jane")
+                        || String.valueOf(value).contains("Doe")));
+    }
+
+    @Test
     void whenAMemberIsWrittenTo_thenNothingTheAuditKeepsCarriesIt() throws Exception {
         // given
         UUID accountId = anAccountAwaitingItsCredential();
@@ -138,6 +180,11 @@ class CredentialMessageTest extends AbstractIntegrationTest {
                 .list();
         assertThat(payloads).isNotEmpty();
         assertThat(payloads).noneMatch(payload -> payload.contains(credential));
+    }
+
+    private Map<String, Object> recordFor(UUID accountId) {
+        return jdbc.sql("SELECT * FROM message_record WHERE account_id = :id")
+                .param("id", accountId).query().singleRow();
     }
 
     private List<String> logLines() {
