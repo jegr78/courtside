@@ -57,9 +57,14 @@ test("given minimized Schemathesis events, when normalizing them, then failures 
       phase: "Fuzzing",
       recorder: {
         label: "GET /api/admin/roster",
-        cases: { abc123: { value: { method: "GET", path: "/api/admin/roster", query: { cursor: "candidate" },
+        cases: { "credential-shaped-case-id": { value: { method: "GET", path: "/api/admin/roster",
+          path_parameters: { memberId: "sensitive-object-id" }, query: { cursor: "sensitive-cursor-value" },
+          body: { password: "sensitive-body-value" },
+          headers: { "X-Api-Key": "request-secret", "X-Trace": "object-id" },
           meta: { generation: { mode: "negative" } } } } },
-        checks: { abc123: [{ name: "not_a_server_error", status: "failure" }] },
+        checks: { "credential-shaped-case-id": [{ name: "not_a_server_error", status: "failure", failure_info: {
+          reason: { kind: "status", observedStatus: 503, expectedStatuses: ["non-5xx"] }
+        } }] },
         interactions: { abc123: { request: { headers: { Cookie: "SESSION=secret" }, body: "secret" },
           response: { content: { $base64: "c2VjcmV0" } } } }
       }
@@ -73,11 +78,102 @@ test("given minimized Schemathesis events, when normalizing them, then failures 
   assert.equal(normalized.operationResults[0].operationId, "listRoster");
   assert.equal(normalized.operationResults[0].outcome, "incomplete");
   assert.equal(normalized.counterexamples[0].check, "not-a-server-error");
+  assert.equal(normalized.counterexamples[0].caseId, "case-1");
   assert.equal(normalized.counterexamples[0].pathTemplate, "/api/admin/roster");
-  assert.equal(JSON.parse(normalized.counterexamples[0].minimizedRequest).query.cursor, "candidate");
+  assert.deepEqual(normalized.counterexamples[0].reason,
+    { kind: "status", observedStatus: 503, expectedStatuses: ["non-5xx"] });
+  assert.deepEqual(normalized.counterexamples[0].requestShape, { locations: ["body", "path", "query"] });
   assert.match(normalized.counterexamples[0].reproductionDigest, /^sha256:[a-f0-9]{64}$/);
   assert.deepEqual(normalized.undocumentedRoutes, []);
-  assert.doesNotMatch(JSON.stringify(normalized), /SESSION|secret|c2VjcmV0/);
+  assert.doesNotMatch(JSON.stringify(normalized),
+    /SESSION|secret|object-id|c2VjcmV0|credential-shaped-case-id|sensitive-(?:object-id|cursor-value|body-value)/);
+});
+
+test("given distinct structural failures, when normalizing them, then candidates remain distinguishable", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "listRoster")];
+  const check = (missingProperty) => ({ name: "response_schema_conformance", status: "failure",
+    failure_info: { reason: { kind: "schema", instancePointer: "/items/*",
+      validationKeyword: "required", missingProperties: [missingProperty] } } });
+  const events = [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: { status: "failure", recorder: { label: "GET /api/admin/roster",
+      cases: {
+        one: { value: { method: "GET", meta: { generation: { mode: "negative" } } } },
+        two: { value: { method: "GET", meta: { generation: { mode: "negative" } } } }
+      }, checks: { one: [check("email")], two: [check("status")] } } } }
+  ];
+
+  // when
+  const normalized = normalizeSchemathesisEvents(events, inventory, "negative");
+
+  // then
+  assert.equal(normalized.counterexamples.length, 2);
+  assert.notEqual(normalized.counterexamples[0].reproductionDigest,
+    normalized.counterexamples[1].reproductionDigest);
+});
+
+test("given exact statuses in one class, when normalizing them, then their disagreements remain distinguishable", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "listRoster")];
+  const check = (observedStatus) => ({ name: "status_code_conformance", status: "failure",
+    failure_info: { reason: { kind: "status", observedStatus, expectedStatuses: [400] } } });
+  const events = [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: { status: "failure", recorder: { label: "GET /api/admin/roster",
+      cases: {
+        one: { value: { method: "GET", meta: { generation: { mode: "negative" } } } },
+        two: { value: { method: "GET", meta: { generation: { mode: "negative" } } } }
+      }, checks: { one: [check(404)], two: [check(409)] } } } }
+  ];
+
+  // when
+  const normalized = normalizeSchemathesisEvents(events, inventory, "negative");
+
+  // then
+  assert.notEqual(normalized.counterexamples[0].reproductionDigest,
+    normalized.counterexamples[1].reproductionDigest);
+});
+
+test("given unsafe or unsupported failure reasons, when normalizing them, then the adapter fails closed", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "listRoster")];
+  const events = (reason, name = "response_schema_conformance") => [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: { status: "failure", recorder: { label: "GET /api/admin/roster",
+      cases: { one: { value: { method: "GET", meta: { generation: { mode: "negative" } } } } },
+      checks: { one: [{ name, status: "failure",
+        failure_info: { reason } }] } } } }
+  ];
+
+  // when / then
+  assert.throws(() => normalizeSchemathesisEvents(events({ kind: "schema", instancePointer: "/members/secret-id",
+    validationKeyword: "type", missingProperties: [], value: "SESSION=secret" }),
+  inventory, "negative"), /unsupported Schemathesis failure reason/i);
+  assert.throws(() => normalizeSchemathesisEvents(events({ kind: "scanner-message", message: "token=secret" }),
+    inventory, "negative"), /unsupported Schemathesis failure reason/i);
+  assert.throws(() => normalizeSchemathesisEvents(events({ kind: "status", observedStatus: 503,
+    expectedStatuses: ["credential-secret"] }, "status_code_conformance"), inventory, "negative"),
+  /unsupported Schemathesis failure reason/i);
+  assert.throws(() => normalizeSchemathesisEvents(events({ kind: "media-type", observed: "application/json",
+    expected: ["session/secret;token=value"] }, "content_type_conformance"), inventory, "negative"),
+  /unsupported Schemathesis failure reason/i);
+  assert.throws(() => normalizeSchemathesisEvents(events({ kind: "schema", instancePointer: "/members/0/id",
+    validationKeyword: "secretValue", missingProperties: [] }),
+  inventory, "negative"), /unsupported Schemathesis failure reason/i);
+  assert.throws(() => normalizeSchemathesisEvents(events({ kind: "schema",
+    instancePointer: "/items/object-id-from-response", validationKeyword: "type", missingProperties: [] }),
+  inventory, "negative"),
+  /unsupported Schemathesis failure reason/i);
+  assert.doesNotThrow(() => normalizeSchemathesisEvents(events({ kind: "schema",
+    instancePointer: "/items/*/id", validationKeyword: "format", missingProperties: [] }),
+  inventory, "negative"));
+  assert.throws(() => normalizeSchemathesisEvents(events({ kind: "media-type", observed: "undocumented",
+    expected: ["session/secret"] }, "content_type_conformance"), inventory, "negative"),
+  /unsupported Schemathesis failure reason/i);
 });
 
 test("given missing or contradictory operation evidence, when normalizing it, then coverage fails closed", () => {
@@ -127,7 +223,7 @@ test("given runtime handler mappings, when comparing them with OpenAPI, then und
   assert.deepEqual(unexpected, [{ method: "POST", pathTemplate: "/api/internal/rebuild" }]);
 });
 
-test("given repeated minimized failures, when retaining lifecycle evidence, then one candidate owns both requests", async () => {
+test("given repeated and distinct failures, when retaining lifecycle evidence, then candidates follow reasons", async () => {
   // given
   const inventory = buildOpenApiFuzzInventory(api);
   const generatedInventory = inventory.filter(({ method }) => method === "GET");
@@ -136,15 +232,18 @@ test("given repeated minimized failures, when retaining lifecycle evidence, then
       selected: generatedInventory.filter(({ modes }) => modes.includes(mode)).length } } } },
     ...generatedInventory.filter(({ modes }) => modes.includes(mode)).map((entry) => {
       const failing = entry.operationId === "listRoster" && mode === "negative";
-      const cases = failing ? ["one", "two"] : ["one"];
+      const cases = failing ? ["one", "two", "three"] : ["one"];
       return { ScenarioFinished: { status: failing ? "failure" : "success", recorder: {
         label: `${entry.method} ${entry.path}`,
         cases: Object.fromEntries(cases.map((id, caseIndex) => [id, { value: {
           method: entry.method, path: entry.path, query: { case: String(caseIndex) },
           meta: { generation: { mode } }
         } }])),
-        checks: failing ? Object.fromEntries(cases.map((id) =>
-          [id, [{ name: "not_a_server_error", status: "failure" }]])) : {}
+        checks: failing ? Object.fromEntries(cases.map((id, caseIndex) =>
+          [id, [{ name: "status_code_conformance", status: "failure", failure_info: {
+            reason: { kind: "status", observedStatus: caseIndex === 2 ? 404 : 503,
+              expectedStatuses: ["2xx"] }
+          } }]])) : {}
       } } };
     })
   ];
@@ -177,9 +276,9 @@ test("given repeated minimized failures, when retaining lifecycle evidence, then
   });
 
   // then
-  assert.equal(evidence.counterexamples.length, 2);
-  assert.equal(evidence.candidates.length, 1);
-  assert.equal(evidence.candidates[0].evidence.length, 2);
+  assert.equal(evidence.counterexamples.length, 3);
+  assert.equal(evidence.candidates.length, 2);
+  assert.deepEqual(evidence.candidates.map(({ evidence: values }) => values.length).toSorted(), [1, 1]);
 });
 
 test("given every state-changing operation, when building negative probes, then each is rejected", async () => {
