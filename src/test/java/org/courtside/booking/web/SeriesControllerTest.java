@@ -147,6 +147,8 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.executable").value(false))
                 .andExpect(jsonPath("$.moves[0].executable").value(false))
+                .andExpect(jsonPath("$.moves[0].fromEndsAt").value("2026-04-07T18:00:00Z"))
+                .andExpect(jsonPath("$.moves[0].toEndsAt").value("2026-04-07T21:00:00Z"))
                 .andExpect(jsonPath("$.moves[0].violations.length()").value(1))
                 .andExpect(jsonPath("$.moves[0].violations[0].code")
                         .value("booking.rule.openingHours.outside"))

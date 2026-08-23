@@ -26,6 +26,11 @@ describe("AdminFacilityView", () => {
     vi.spyOn(api, "adminParticipantCards").mockResolvedValue([
       { id: "filler-1", label: "Ball machine", capacity: 1, active: true }
     ]);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Pacific/Auckland"
+    });
   });
 
   it("given a court in use, when its impact is asked for, then the bookings it would displace are named", async () => {
@@ -46,6 +51,8 @@ describe("AdminFacilityView", () => {
     const impact = await screen.findByTestId("impact-court-1");
     expect(impact).toHaveTextContent("2");
     expect(screen.getAllByTestId(/^impact-booking-/)).toHaveLength(2);
+    expect(screen.getByTestId("impact-booking-booking-1"))
+      .toHaveTextContent("Sep 1, 2026, 8:00 PM – 9:00 PM");
   });
 
   it("given a court nothing is booked on, when its impact is asked for, then it says so plainly", async () => {

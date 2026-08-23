@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { bookingTimeSlot, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
+import { bookingTimeSlot, formatBookingPeriod, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
 
 const localTimeIn = (isoInstant: string, timeZone: string) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -123,4 +123,24 @@ it("given a duplicated fall-back time, when resolving its zoned instant, then th
 
   // then
   expect(instant).toBe("2026-10-25T02:30:00+02:00");
+});
+
+it("given a booking within one club day, when formatting its period, then the date and both times use the club locale", () => {
+  // when
+  const period = formatBookingPeriod(
+    "2026-08-12T16:00:00Z", "2026-08-12T17:30:00Z", "en", "Europe/Berlin"
+  );
+
+  // then
+  expect(period).toBe("Aug 12, 2026, 6:00 PM – 7:30 PM");
+});
+
+it("given a booking crosses a club-day boundary, when formatting its period, then both dates are retained", () => {
+  // when
+  const period = formatBookingPeriod(
+    "2026-08-12T21:30:00Z", "2026-08-12T22:30:00Z", "de", "Europe/Berlin"
+  );
+
+  // then
+  expect(period).toBe("12.08.2026, 23:30 – 13.08.2026, 00:30");
 });

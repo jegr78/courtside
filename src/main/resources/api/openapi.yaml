@@ -1543,11 +1543,13 @@ components:
 
     Move:
       type: object
-      required: [bookingId, fromStartsAt, toStartsAt, blockedCourtIds, unbookableCourtIds, violations, executable]
+      required: [bookingId, fromStartsAt, fromEndsAt, toStartsAt, toEndsAt, blockedCourtIds, unbookableCourtIds, violations, executable]
       properties:
         bookingId: { type: string, format: uuid }
         fromStartsAt: { type: string, format: date-time }
+        fromEndsAt: { type: string, format: date-time }
         toStartsAt: { type: string, format: date-time }
+        toEndsAt: { type: string, format: date-time }
         blockedCourtIds:
           type: array
           items: { type: string, format: uuid }

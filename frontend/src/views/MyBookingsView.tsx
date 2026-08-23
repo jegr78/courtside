@@ -5,7 +5,7 @@ import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
-import { formatDateTime } from "../time/clubZone";
+import { formatBookingPeriod } from "../time/clubZone";
 import { SeriesForm } from "./SeriesForm";
 
 type Appointment = PersonalBooking | ManagedAppointment;
@@ -127,7 +127,7 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
     {!loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={load} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={(action.managed ? managed : bookings).filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={(action.managed ? managedNextCursor : nextCursor) !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
-    {action?.kind === "detail" && <ManagedAppointmentDialog bookingId={action.booking.id} closed={() => setAction(undefined)} />}
+    {grid && action?.kind === "detail" && <ManagedAppointmentDialog bookingId={action.booking.id} locale={i18n.language} timeZone={grid.timeZone} closed={() => setAction(undefined)} />}
   </section>;
 }
 
@@ -161,7 +161,7 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
         : <ul className="grid gap-3">{participations.map((participation) =>
           <li key={participation.id} data-testid={`participation-${participation.id}`} data-status={participation.status} className="border-structural grid gap-1 rounded-xl border p-4">
             <span className="font-semibold">{participation.cardLabel}</span>
-            <time dateTime={participation.startsAt}>{formatDateTime(participation.startsAt, locale, timeZone)}</time>
+            <span>{formatBookingPeriod(participation.startsAt, participation.endsAt, locale, timeZone)}</span>
             <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
             {participation.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
             <div className="pt-1">
@@ -187,7 +187,7 @@ function BookingSection({ testId, title, empty, bookings, courtNames, locale, ti
         {group.series && <p data-testid="series-marker" className="mb-2 font-semibold">{t("myBookings.series")}</p>}
         <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} data-testid={`booking-${booking.id}`} data-status={booking.status} className="border-structural grid gap-1 border-b pb-3 last:border-0 last:pb-0">
           <span className="font-semibold">{booking.cardLabel}</span>
-          <time dateTime={booking.startsAt}>{formatDateTime(booking.startsAt, locale, timeZone)}</time>
+          <span>{formatBookingPeriod(booking.startsAt, booking.endsAt, locale, timeZone)}</span>
           <span>{booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
           {managed && "participantCount" in booking && <span>{t("managedAppointments.participants", { count: booking.participantCount })}</span>}
@@ -238,7 +238,7 @@ function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, clos
     <h2 id="cancel-personal-title" className="text-xl font-bold">{t("booking.cancelTitle")}</h2>
     {booking.seriesId && <ScopeFields scope={scope} changed={setScope} t={t} />}
     <p className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
-    <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatDateTime(candidate.startsAt, i18n.language, timeZone)}</li>)}</ul>
+    <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
     {hasMoreBookings && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
     {error && <Alert>{error}</Alert>}
     <div className="flex gap-2"><Button data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
@@ -275,12 +275,12 @@ function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking:
     <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input data-testid="move-duration" type="number" min="1" value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
     <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
     {error && <Alert>{error}</Alert>}
-    {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatDateTime(move.fromStartsAt, i18n.language, timeZone)} → {formatDateTime(move.toStartsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
+    {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatBookingPeriod(move.fromStartsAt, move.fromEndsAt, i18n.language, timeZone)} → {formatBookingPeriod(move.toStartsAt, move.toEndsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
     <div className="flex gap-2">{preview ? <Button data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 
-function ManagedAppointmentDialog({ bookingId, closed }: { bookingId: string; closed: () => void }) {
+function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }: { bookingId: string; locale: string; timeZone: string; closed: () => void }) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<ManagedAppointmentDetail>();
   const [error, setError] = useState<string>();
@@ -299,6 +299,7 @@ function ManagedAppointmentDialog({ bookingId, closed }: { bookingId: string; cl
     {!detail && !error && <p aria-live="polite">{t("status.loading")}</p>}
     {detail && <>
       <p data-testid="managed-card-label" className="font-semibold">{detail.cardLabel}</p>
+      <span data-testid="managed-period">{formatBookingPeriod(detail.startsAt, detail.endsAt, locale, timeZone)}</span>
       <section data-testid="managed-note"><h3 className="font-semibold">{t("managedAppointments.note")}</h3><p>{detail.note || t("managedAppointments.noNote")}</p></section>
       <section data-testid="managed-participants"><h3 className="font-semibold">{t("managedAppointments.participantDetails")}</h3>
         {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`}>{participant.displayName} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
