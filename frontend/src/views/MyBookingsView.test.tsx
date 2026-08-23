@@ -65,6 +65,7 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   expect(screen.getByTestId("past-bookings")).toHaveTextContent("Past");
   expect(screen.getAllByTestId("series-marker")).toHaveLength(2);
   expect(screen.getByTestId(`booking-${upcomingId}`)).toHaveTextContent("Centre Court");
+  expect(screen.getByTestId(`booking-${upcomingId}`)).toHaveTextContent("Aug 12, 2026, 6:00 PM – 7:00 PM");
   expect(screen.getByTestId("booking-44444444-4444-4444-4444-444444444444")).toHaveTextContent("Centre Court");
 });
 
@@ -140,6 +141,7 @@ it("given a managed appointment, when opening details, then its internal data is
 
   // then
   expect(await screen.findByTestId("managed-note")).toHaveTextContent("Prepare score sheets");
+  expect(screen.getByTestId("managed-period")).toHaveTextContent("Aug 12, 2026, 8:00 PM – 9:00 PM");
   expect(screen.getByTestId("managed-participants")).toHaveTextContent("Jane Doe · Member");
   expect(api.managedAppointment).toHaveBeenCalledWith(bookingId);
 });
@@ -318,7 +320,8 @@ it("given somebody named this member, when the page loads, then the participatio
 
   render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
 
-  expect(await screen.findByTestId(`participation-${participationId}`)).toBeInTheDocument();
+  expect(await screen.findByTestId(`participation-${participationId}`))
+    .toHaveTextContent("Aug 19, 2026, 6:00 PM – 7:00 PM");
 });
 
 it("given a listed participation, when the member withdraws, then it is sent and the page reloads", async () => {

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -43,8 +43,7 @@ describe("AdminConfigurationView", () => {
     await screen.findByTestId("rule-set-name");
 
     // when
-    await userEvent.clear(screen.getByTestId("rule-set-name"));
-    await userEvent.type(screen.getByTestId("rule-set-name"), "Standard rules");
+    fireEvent.change(screen.getByTestId("rule-set-name"), { target: { value: "Standard rules" } });
     await userEvent.click(screen.getByTestId("save-rule-set"));
 
     // then
@@ -177,31 +176,28 @@ describe("AdminConfigurationView", () => {
     });
     const configurationChanged = vi.fn();
     render(<MemoryRouter><AdminConfigurationView configurationChanged={configurationChanged} /></MemoryRouter>);
-    const user = userEvent.setup();
     await screen.findByTestId("club-name");
 
     // when
-    await user.clear(screen.getByTestId("club-name"));
-    await user.type(screen.getByTestId("club-name"), "Example Racquet Club");
-    await user.clear(screen.getByTestId("slot-minutes"));
-    await user.type(screen.getByTestId("slot-minutes"), "15");
-    await user.clear(screen.getByTestId("new-account-credential-hours"));
-    await user.type(screen.getByTestId("new-account-credential-hours"), "72");
-    await user.selectOptions(screen.getByTestId("time-zone"), "Pacific/Auckland");
-    await user.click(screen.getByTestId("save-club-config"));
-    await user.clear(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"));
-    await user.type(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "14");
-    await user.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
+    fireEvent.change(screen.getByTestId("club-name"), { target: { value: "Example Racquet Club" } });
+    fireEvent.change(screen.getByTestId("slot-minutes"), { target: { value: "15" } });
+    fireEvent.change(screen.getByTestId("new-account-credential-hours"), { target: { value: "72" } });
+    fireEvent.change(screen.getByTestId("time-zone"), { target: { value: "Pacific/Auckland" } });
+    fireEvent.click(screen.getByTestId("save-club-config"));
+    fireEvent.change(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), { target: { value: "14" } });
+    fireEvent.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
 
     // then
-    expect(changeConfig).toHaveBeenCalledWith(expect.objectContaining({
-      clubName: "Example Racquet Club", slotMinutes: 15, timeZone: "Pacific/Auckland",
-      newAccountCredentialHours: 72
-    }));
+    await waitFor(() => {
+      expect(changeConfig).toHaveBeenCalledWith(expect.objectContaining({
+        clubName: "Example Racquet Club", slotMinutes: 15, timeZone: "Pacific/Auckland",
+        newAccountCredentialHours: 72
+      }));
+      expect(configurationChanged).toHaveBeenCalled();
+      expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 });
+    });
     // What the instance ships is read from the response and never sent back: the request refuses it
     expect(changeConfig.mock.calls[0][0]).not.toHaveProperty("supportedLocales");
-    expect(configurationChanged).toHaveBeenCalled();
-    expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 });
   });
 
   it("given an edited setting, when a locale change finishes an older reload, then the edit is retained", async () => {
@@ -220,10 +216,8 @@ describe("AdminConfigurationView", () => {
       passwordResetCredentialHours: 24
     })).mockReturnValueOnce(reload.promise);
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
-    const user = userEvent.setup();
     const clubName = await screen.findByTestId("club-name");
-    await user.clear(clubName);
-    await user.type(clubName, "Example Racquet Club");
+    fireEvent.change(clubName, { target: { value: "Example Racquet Club" } });
 
     // when
     await i18n.changeLanguage("de");

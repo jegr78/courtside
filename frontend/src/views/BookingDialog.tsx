@@ -1,12 +1,12 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError, api, type BookingGrid, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
+import { ApiError, api, type Allocation, type BookingGrid, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
 import { problemMessage, problemReference } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
-import { bookingTimeSlot } from "../time/clubZone";
+import { bookingTimeSlot, formatBookingPeriod, zonedDateTime } from "../time/clubZone";
 
 export interface BookingSelection {
   date: string;
@@ -14,19 +14,21 @@ export interface BookingSelection {
   courtId: string;
 }
 
-export function BookingDialog({ selection, grid, courts, closed, created, conflicted }: {
+export function BookingDialog({ selection, grid, courts, allocations, closed, created, conflicted }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
+  allocations: Allocation[];
   closed: () => void;
   created: () => Promise<void>;
   conflicted: () => Promise<void>;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [bookingCards, setBookingCards] = useState<PublicBookingCard[]>([]);
   const [participantCards, setParticipantCards] = useState<PublicParticipantCard[]>([]);
   const [courtIds, setCourtIds] = useState([selection.courtId]);
   const [cardId, setCardId] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState(grid.slotMinutes);
   const [guestNames, setGuestNames] = useState([""]);
   const [participantCardIds, setParticipantCardIds] = useState([""]);
   const [memberQuery, setMemberQuery] = useState("");
@@ -72,7 +74,7 @@ export function BookingDialog({ selection, grid, courts, closed, created, confli
     setViolations([]);
     try {
       const { startsAt, endsAt } = bookingTimeSlot(
-        selection.date, selection.slot, grid.timeZone, grid.slotMinutes
+        selection.date, selection.slot, grid.timeZone, selectedDuration
       );
       const participants = [
         ...selectedMembers.map((member) => ({ personId: member.personId })),
@@ -109,16 +111,25 @@ export function BookingDialog({ selection, grid, courts, closed, created, confli
 
   const fieldViolations = (field: string) => violations.filter((violation) => violation.field === field);
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
+  const durations = availableDurations(selection, grid, courtIds, allocations);
+  const selectedDuration = durations.includes(durationMinutes) ? durationMinutes : durations[0] ?? grid.slotMinutes;
+  const period = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration);
 
   return <Modal labelledBy="booking-heading" closed={closed}>
     <form data-testid="booking-dialog" onSubmit={(event) => void submit(event)} className="surface-panel flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
       <div className="overflow-y-auto p-6">
-      <h3 id="booking-heading" className="text-xl font-bold">{t("booking.title", { date: selection.date, time: selection.slot })}</h3>
+      <h3 id="booking-heading" className="text-xl font-bold">{t("booking.title")}</h3>
+      <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
+      <label className="mt-5 grid gap-2 font-medium">{t("booking.duration")}
+        <select data-testid="booking-duration" value={selectedDuration} onChange={(event) => setDurationMinutes(Number(event.target.value))} className="form-control rounded-lg border px-3 py-3">
+          {durations.map((minutes) => <option key={minutes} value={minutes}>{t("booking.durationMinutes", { count: minutes })}</option>)}
+        </select>
+      </label>
       <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
         <legend className="font-semibold">{t("booking.courts")}</legend>
         {courts.map((court) => <label key={court.id} className="flex gap-2">
-          <input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => setCourtIds((current) => event.target.checked ? [...current, court.id] : current.filter((id) => id !== court.id))} />
+          <input data-testid={`booking-court-${court.id}`} type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => setCourtIds((current) => event.target.checked ? [...current, court.id] : current.filter((id) => id !== court.id))} />
           {court.name || t("court.number", { number: court.number })}
         </label>)}
       </fieldset>
@@ -180,6 +191,29 @@ export function BookingDialog({ selection, grid, courts, closed, created, confli
       </div>
     </form>
   </Modal>;
+}
+
+function availableDurations(selection: BookingSelection, grid: BookingGrid, courtIds: string[], allocations: Allocation[]): number[] {
+  const start = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, grid.slotMinutes).startsAt;
+  const openingHours = grid.openingHours.find((window) => window.dayOfWeek === dayOfWeek(selection.date));
+  const closesAt = openingHours?.closesAt
+    ? zonedDateTime(selection.date, openingHours.closesAt.slice(0, 5), grid.timeZone)
+    : new Date(Date.parse(start) + grid.slotMinutes * 60_000).toISOString();
+  const maximum = Math.max(grid.slotMinutes, Math.floor((Date.parse(closesAt) - Date.parse(start)) / 60_000));
+  const durations: number[] = [];
+  for (let minutes = grid.slotMinutes; minutes <= maximum; minutes += grid.slotMinutes) {
+    const end = Date.parse(start) + minutes * 60_000;
+    const overlaps = allocations.some((allocation) => courtIds.includes(allocation.courtId)
+      && Date.parse(allocation.startsAt) < end && Date.parse(allocation.endsAt) > Date.parse(start));
+    if (overlaps) break;
+    durations.push(minutes);
+  }
+  return durations;
+}
+
+function dayOfWeek(date: string): string {
+  const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+  return days[new Date(`${date}T12:00:00Z`).getUTCDay()];
 }
 
 function FieldViolations({ id, violations }: { id: string; violations: Array<{ field: string; code: string; message: string }> }) {

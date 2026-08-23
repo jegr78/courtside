@@ -86,6 +86,28 @@ export function formatDateTime(timestamp: string, locale: string, timeZone: stri
     .format(new Date(timestamp));
 }
 
+export function formatBookingPeriod(startsAt: string, endsAt: string, locale: string, timeZone: string): string {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone });
+  if (localDateKey(start, timeZone) !== localDateKey(end, timeZone)) {
+    return `${dateTime.format(start)} – ${dateTime.format(end)}`;
+  }
+  const endTime = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone }).format(end);
+  return `${dateTime.format(start)} – ${endTime}`;
+}
+
+export function formatBookingTimeRange(startsAt: string, endsAt: string, locale: string, timeZone: string): string {
+  const time = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone });
+  return `${time.format(new Date(startsAt))} – ${time.format(new Date(endsAt))}`;
+}
+
+function localDateKey(instant: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(instant);
+}
+
 export function isPastSlot(date: string, time: string, timeZone: string, now: Date): boolean {
   return Date.parse(zonedDateTime(date, time, timeZone)) < now.getTime();
 }
