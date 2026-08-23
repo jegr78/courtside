@@ -46,6 +46,9 @@ class CredentialMessageTest extends AbstractIntegrationTest {
     @Autowired
     private TransactionTemplate transactions;
 
+    @Autowired
+    private org.springframework.jdbc.core.simple.JdbcClient jdbc;
+
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
 
     @BeforeEach
@@ -118,6 +121,23 @@ class CredentialMessageTest extends AbstractIntegrationTest {
         assertThat(logLines()).noneMatch(line -> line.contains(credential)
                 || line.contains("jane.doe@example.org")
                 || line.contains("Jane") || line.contains("Doe"));
+    }
+
+    @Test
+    void whenAMemberIsWrittenTo_thenNothingTheAuditKeepsCarriesIt() throws Exception {
+        // given
+        UUID accountId = anAccountAwaitingItsCredential();
+
+        // when
+        raise(accountId, CredentialsRequested.Reason.NEW_ACCOUNT);
+        String credential = credentialIn(body(theMessageHandedOver()));
+
+        // then — the trail records that one was asked for, never which one went out
+        List<String> payloads = jdbc.sql("SELECT payload FROM domain_event")
+                .query(String.class)
+                .list();
+        assertThat(payloads).isNotEmpty();
+        assertThat(payloads).noneMatch(payload -> payload.contains(credential));
     }
 
     private List<String> logLines() {

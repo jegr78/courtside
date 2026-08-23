@@ -40,7 +40,7 @@ class RosterSessionRowTest extends AbstractIntegrationTest {
         storeSessionFor("doe.jane");
 
         // when
-        roster.resetPassword(jane, "another-one-time-password");
+        roster.requestCredentials(jane);
 
         // then
         assertThat(sessions.findByPrincipalName("doe.jane")).isEmpty();
@@ -80,7 +80,7 @@ class RosterSessionRowTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
-            roster.resetPassword(jane, "another-one-time-password");
+            roster.requestCredentials(jane);
             throw new IllegalStateException("refused after the sessions were revoked");
         })).isInstanceOf(IllegalStateException.class);
         assertThat(sessions.findByPrincipalName("doe.jane")).hasSize(1);
@@ -88,7 +88,7 @@ class RosterSessionRowTest extends AbstractIntegrationTest {
 
     private UUID accountHolder(String username) {
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        roster.createAccount(jane, username, "one-time-password", Set.of(Role.MEMBER));
+        roster.createAccount(jane, username, Set.of(Role.MEMBER));
         return jane;
     }
 

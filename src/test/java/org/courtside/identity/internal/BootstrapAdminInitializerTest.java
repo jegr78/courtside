@@ -51,6 +51,10 @@ class BootstrapAdminInitializerTest {
         assertThat(account.getRoles()).containsExactly(Role.ADMIN);
         assertThat(account).extracting(UserAccount::isEnabled,
                 UserAccount::isPasswordChangeRequired).containsExactly(true, true);
+        // The credential comes from the environment: nothing issued it and no deadline binds it, so
+        // a correction elsewhere cannot withdraw it and lock a club out of its own instance.
+        assertThat(account.getPasswordHash()).isEqualTo("encoded");
+        assertThat(account.getCredentialsExpireAt()).isNull();
     }
 
     @Test

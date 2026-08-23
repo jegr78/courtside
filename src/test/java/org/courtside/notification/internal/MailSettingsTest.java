@@ -43,7 +43,8 @@ class MailSettingsTest {
         // when / then
         runner.run(context -> assertThat(settings(context))
                 .containsEntry("mail.smtp.starttls.required", "true")
-                .doesNotContainKey("mail.smtp.ssl.trust"));
+                .doesNotContainKey("mail.smtp.ssl.trust")
+                .doesNotContainKey("mail.smtp.ssl.checkserveridentity"));
     }
 
     @Test
@@ -56,7 +57,8 @@ class MailSettingsTest {
 
         // when / then
         runner.run(context -> assertThat(settings(context))
-                .containsEntry("mail.smtp.ssl.trust", "mail"));
+                .containsEntry("mail.smtp.ssl.trust", "mail")
+                .containsEntry("mail.smtp.ssl.checkserveridentity", "false"));
     }
 
     @Test

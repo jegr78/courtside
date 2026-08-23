@@ -20,6 +20,7 @@ function journeyService(): { service: JourneyService; calls: Record<string, Retu
   const service: JourneyService = {
     baseURL: "https://courtside.test",
     plainBaseURL: "http://courtside.test:8081",
+    mailboxURL: "http://127.0.0.1:8025",
     visualDate: "2026-05-13",
     pinnedBrowser: calls.pinnedBrowser,
     releasePinnedBrowser: calls.releasePinnedBrowser,

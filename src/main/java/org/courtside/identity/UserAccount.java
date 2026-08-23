@@ -36,7 +36,7 @@ public class UserAccount {
     @Column(nullable = false, unique = true)
     private String username;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash")
     private String passwordHash;
 
     @Column(nullable = false)
@@ -68,14 +68,25 @@ public class UserAccount {
     @Enumerated(EnumType.STRING)
     private Set<Role> roles;
 
-    // Between creation and delivery the hash is of a value nobody kept, so no input matches it and
-    // the encoder never warns about a broken one; the absent expiry is what says nothing is out yet.
-    public static UserAccount awaitingCredentials(Person person, String username,
-                                                  String placeholderHash, Set<Role> roles,
+    // An account before its first issue holds no password, because it has none: the sign-in path
+    // answers such a row exactly as it answers a wrong one, and nothing here can be matched.
+    public static UserAccount awaitingCredentials(Person person, String username, Set<Role> roles,
                                                   String locale) {
-        UserAccount account = new UserAccount(person, username, placeholderHash, roles, locale);
+        UserAccount account = new UserAccount(person, username, null, roles, locale);
         account.requirePasswordChange();
         return account;
+    }
+
+    public CredentialState credentialState(Instant now) {
+        if (passwordHash == null) {
+            return CredentialState.AWAITING_CREDENTIAL;
+        }
+        if (!passwordChangeRequired) {
+            return CredentialState.PASSWORD_CHOSEN;
+        }
+        return isCredentialExpired(now)
+                ? CredentialState.CREDENTIAL_EXPIRED
+                : CredentialState.CREDENTIAL_ISSUED;
     }
 
     public void credentialsIssued(String passwordHash, Instant expiresAt) {
@@ -129,9 +140,14 @@ public class UserAccount {
         this.locale = locale;
     }
 
-    public void resetPassword(String passwordHash) {
-        this.passwordHash = passwordHash;
-        requirePasswordChange();
+    // An address correction cannot reach a message already sent, so what was sent stops working. A
+    // credential with no deadline came from the environment and is not this instance's to withdraw.
+    public void withdrawUnusedCredential() {
+        if (credentialsExpireAt == null || !passwordChangeRequired) {
+            return;
+        }
+        this.passwordHash = null;
+        this.credentialsExpireAt = null;
         revokeSessions();
     }
 

@@ -13,6 +13,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.courtside.identity.AccountFixtures.enabled;
@@ -41,6 +42,9 @@ class LoginTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private java.time.Clock clock;
 
     private MockMvc mockMvc;
 
@@ -200,6 +204,32 @@ class LoginTest extends AbstractIntegrationTest {
         assertThat(awaitingApproval).isEqualTo(wrongPassword);
     }
 
+    @Test
+    void givenFourDifferentReasonsToRefuse_whenSigningIn_thenTheAnswersCannotBeToldApart()
+            throws Exception {
+        // given
+        Person pending = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        accounts.save(new UserAccount(
+                pending, "major.mary", passwordEncoder.encode("secret"), Set.of(Role.MEMBER), "de"));
+        Person waiting = persons.save(new Person("Richard", "Miles", "richard.miles@example.org"));
+        accounts.save(enabled(UserAccount.awaitingCredentials(
+                waiting, "miles.richard", Set.of(Role.MEMBER), "de")));
+        Person stale = persons.save(new Person("Ada", "Admin", "ada.admin@example.org"));
+        UserAccount expired = enabled(UserAccount.awaitingCredentials(
+                stale, "admin.ada", Set.of(Role.MEMBER), "de"));
+        expired.credentialsIssued(passwordEncoder.encode("ran-out"), clock.instant().minusSeconds(60));
+        accounts.save(expired);
+
+        // when / then — a caller must not learn which of the four applies, and the message they do
+        // get says what to do about all of them
+        String wrongPassword = signInFailure("doe.jane", "wrong");
+        assertThat(List.of(
+                signInFailure("major.mary", "secret"),
+                signInFailure("miles.richard", "anything-at-all"),
+                signInFailure("admin.ada", "ran-out")))
+                .containsOnly(wrongPassword);
+    }
+
     private MockHttpSession signedInAsJane() throws Exception {
         MvcResult login = mockMvc.perform(post("/api/session")
                         .param("username", "doe.jane")
@@ -208,6 +238,22 @@ class LoginTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         return (MockHttpSession) login.getRequest().getSession(false);
+    }
+
+    @Test
+    void givenAnAccountAwaitingItsCredential_whenSigningIn_thenTheAnswerIsTheWrongPasswordAnswer()
+            throws Exception {
+        // given
+        Person mary = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
+        accounts.save(enabled(UserAccount.awaitingCredentials(
+                mary, "major.mary", Set.of(Role.MEMBER), "de")));
+        String wrongPassword = signInFailure("doe.jane", "wrong");
+
+        // when
+        String nothingIssuedYet = signInFailure("major.mary", "anything-at-all");
+
+        // then
+        assertThat(nothingIssuedYet).isEqualTo(wrongPassword);
     }
 
     private String signInFailure(String username, String password) throws Exception {

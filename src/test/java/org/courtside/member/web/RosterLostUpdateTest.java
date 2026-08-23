@@ -64,7 +64,7 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAUsernameCorrectionInFlight_whenAPasswordResetLandsOnTheSameAccount_thenItIsRefused()
+    void givenAUsernameCorrectionInFlight_whenARoleChangeLandsOnTheSameAccount_thenItIsRefused()
             throws Exception {
         // given
         UUID jane = accountHolder();
@@ -81,14 +81,15 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
             assertThat(corrected.await(5, TimeUnit.SECONDS)).isTrue();
 
             // when
-            Future<?> reset = pool.submit(() -> roster.resetPassword(jane, "another-password"));
+            Future<?> roleChange = pool.submit(() ->
+                    roster.changeRoles(jane, Set.of(Role.MEMBER, Role.TRAINER)));
 
             // then
-            assertThatThrownBy(() -> reset.get(250, TimeUnit.MILLISECONDS))
+            assertThatThrownBy(() -> roleChange.get(250, TimeUnit.MILLISECONDS))
                     .isInstanceOf(TimeoutException.class);
             allowCommit.countDown();
             correction.get(5, TimeUnit.SECONDS);
-            assertThatThrownBy(() -> reset.get(5, TimeUnit.SECONDS))
+            assertThatThrownBy(() -> roleChange.get(5, TimeUnit.SECONDS))
                     .isInstanceOf(ExecutionException.class)
                     .hasCauseInstanceOf(OptimisticLockingFailureException.class);
             assertThat(accounts.findByUsername("doe.j")).isPresent();
@@ -99,7 +100,7 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAUsernameCorrectionInFlight_whenAPasswordResetIsRequested_thenTheAnswerIsTranslatable()
+    void givenAUsernameCorrectionInFlight_whenTheRolesAreReplaced_thenTheAnswerIsTranslatable()
             throws Exception {
         // given
         UUID jane = accountHolder();
@@ -116,22 +117,22 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
             assertThat(corrected.await(5, TimeUnit.SECONDS)).isTrue();
 
             // when
-            Future<MockHttpServletResponse> reset = pool.submit(() -> mockMvc.perform(
-                            put("/api/admin/roster/{personId}/account/password", jane)
+            Future<MockHttpServletResponse> roleChange = pool.submit(() -> mockMvc.perform(
+                            put("/api/admin/roster/{personId}/account/roles", jane)
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content("""
-                                            {"oneTimePassword": "another-password"}
+                                            {"roles": ["MEMBER", "TRAINER"]}
                                             """)
                                     .with(user("admin").roles("ADMIN"))
                                     .with(csrf()))
                     .andReturn().getResponse());
 
             // then
-            assertThatThrownBy(() -> reset.get(250, TimeUnit.MILLISECONDS))
+            assertThatThrownBy(() -> roleChange.get(250, TimeUnit.MILLISECONDS))
                     .isInstanceOf(TimeoutException.class);
             allowCommit.countDown();
             correction.get(5, TimeUnit.SECONDS);
-            MockHttpServletResponse response = reset.get(5, TimeUnit.SECONDS);
+            MockHttpServletResponse response = roleChange.get(5, TimeUnit.SECONDS);
             assertThat(response.getStatus()).isEqualTo(409);
             assertThat(response.getContentAsString())
                     .contains("urn:courtside:error:concurrent-modification")

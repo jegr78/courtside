@@ -43,15 +43,16 @@ class CredentialIssueTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnAccountAwaitingItsFirstCredential_whenSigningIn_thenNothingMatchesThePlaceholder() {
+    void givenAnAccountAwaitingItsFirstCredential_thenItHoldsNoPasswordAtAll() {
         // given / when
         UUID accountId = accountAwaitingCredentials();
 
-        // then — a real hash of a value nobody kept, so no input can match and no encoder warns
+        // then — it has none, and the absent expiry is what says nothing has been issued yet
         UserAccount account = accounts.findById(accountId).orElseThrow();
+        assertThat(account.getPasswordHash()).isNull();
         assertThat(account.getCredentialsExpireAt()).isNull();
-        assertThat(passwordEncoder.matches("", account.getPasswordHash())).isFalse();
-        assertThat(account.getPasswordHash()).startsWith("$argon2id$");
+        assertThat(account.credentialState(Instant.now()))
+                .isEqualTo(CredentialState.AWAITING_CREDENTIAL);
     }
 
     @Test
@@ -79,7 +80,6 @@ class CredentialIssueTest extends AbstractIntegrationTest {
         Person person = people.save(new Person("Jane", "Doe", "jane.doe@example.org"));
         return accounts.save(UserAccount.awaitingCredentials(person,
                 "doe.jane." + UUID.randomUUID().toString().substring(0, 8),
-                passwordEncoder.encode(UUID.randomUUID().toString()),
                 java.util.Set.of(Role.MEMBER), "de")).getId();
     }
 }

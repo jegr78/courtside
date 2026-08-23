@@ -87,7 +87,7 @@ class AuditedOperationCoverageTest {
             "RosterService#endMembership",
             "RosterService#list",
             "RosterService#person",
-            "RosterService#resetPassword",
+            "RosterService#requestCredentials",
             "RosterService#setAccountEnabled",
             "RosterService#writeMembership",
             "RosterSyncService#apply",

@@ -53,14 +53,30 @@ public class IdentityTestFixture {
         return accounts.save(new UserAccount(person, username, passwordHash, roles, "de")).getId();
     }
 
-    // What a person holds after a board member adds them and before the message reaches them: a hash
-    // of a value nobody kept, and no expiry, which is what says nothing has been issued yet.
+    // What a person holds after a board member adds them and before the message reaches them: no
+    // password at all, which is what says nothing has been issued yet.
     public UUID createAccountAwaitingCredentials(UUID personId, String username, Set<Role> roles) {
         Person person = persons.findById(personId).orElseThrow();
-        UserAccount account = UserAccount.awaitingCredentials(person, username,
-                "synthetic-test-placeholder-hash", roles, "de");
+        UserAccount account = UserAccount.awaitingCredentials(person, username, roles, "de");
         account.enable();
         return accounts.save(account).getId();
+    }
+
+    public void issueCredential(UUID accountId, String credential, java.time.Instant expiresAt) {
+        UserAccount account = accounts.findById(accountId).orElseThrow();
+        account.credentialsIssued(passwordEncoder.encode(credential), expiresAt);
+        accounts.save(account);
+    }
+
+    // The bootstrap administrator's shape: a password that came from the environment, which must
+    // still be replaced and which no deadline binds.
+    public UUID createAccountWithEnvironmentCredential(UUID personId, String username,
+                                                       String passwordHash, Set<Role> roles) {
+        UUID accountId = createEnabledAccount(personId, username, passwordHash, roles);
+        UserAccount account = accounts.findById(accountId).orElseThrow();
+        account.requirePasswordChange();
+        accounts.save(account);
+        return accountId;
     }
 
     public UUID createEnabledAccount(UUID personId, String username, Set<Role> roles) {
@@ -130,6 +146,10 @@ public class IdentityTestFixture {
 
     public String storedCredentialHash(UUID accountId) {
         return accounts.findById(accountId).orElseThrow().getPasswordHash();
+    }
+
+    public long securityEpoch(UUID accountId) {
+        return accounts.findById(accountId).orElseThrow().getSecurityEpoch();
     }
 
     public UUID personIdForUsername(String username) {

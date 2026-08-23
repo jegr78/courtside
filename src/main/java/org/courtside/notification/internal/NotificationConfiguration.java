@@ -1,5 +1,6 @@
 package org.courtside.notification.internal;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +19,7 @@ class NotificationConfiguration {
     // Handing a message over waits for the relay, and the shared executor also carries the audit
     // trail and every other module's listeners, which must not queue behind a mail server.
     @Bean
+    @ConditionalOnMissingBean(name = "credentialMailExecutor")
     TaskExecutor credentialMailExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
@@ -42,8 +44,11 @@ class NotificationConfiguration {
         mail.put("mail.smtp.auth", String.valueOf(MailSettings.isSet(properties.username())));
         mail.put("mail.smtp.starttls.enable", "true");
         mail.put("mail.smtp.starttls.required", "true");
+        // The name on a certificate whose issuer is already unchecked proves nothing — whoever can
+        // redirect the connection writes both — and no name the relay serves has to be reachable.
         if (properties.trustRelayCertificate()) {
             mail.put("mail.smtp.ssl.trust", properties.host());
+            mail.put("mail.smtp.ssl.checkserveridentity", "false");
         }
         mail.put("mail.smtp.timeout", "10000");
         mail.put("mail.smtp.connectiontimeout", "10000");

@@ -67,6 +67,10 @@ courtside:
     username: ${COURTSIDE_BOOTSTRAP_ADMIN_USERNAME:}
     password: ${COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD:}
     display-name: ${COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME:}
+  credential-issue:
+    max-per-window: ${COURTSIDE_CREDENTIAL_ISSUE_MAX_PER_WINDOW:5}
+    window: ${COURTSIDE_CREDENTIAL_ISSUE_WINDOW:1h}
+    retention: ${COURTSIDE_CREDENTIAL_ISSUE_RETENTION:24h}
   login-protection:
     address:
       max-failures: ${COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES:20}

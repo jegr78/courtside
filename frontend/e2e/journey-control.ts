@@ -9,6 +9,7 @@ export interface JourneyControlReference {
   token: string;
   baseURL: string;
   plainBaseURL: string;
+  mailboxURL: string;
   visualDate: string;
 }
 
@@ -117,6 +118,7 @@ export async function startJourneyControl(service: JourneyService): Promise<{
       token,
       baseURL: service.baseURL,
       plainBaseURL: service.plainBaseURL,
+      mailboxURL: service.mailboxURL,
       visualDate: service.visualDate
     },
     close: () => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
@@ -142,6 +144,7 @@ export function connectJourneyService(reference: JourneyControlReference): Journ
   return {
     baseURL: reference.baseURL,
     plainBaseURL: reference.plainBaseURL,
+    mailboxURL: reference.mailboxURL,
     visualDate: reference.visualDate,
     pinnedBrowser: (browserName) => command(reference, { operation: "pinnedBrowser", browserName }),
     releasePinnedBrowser: (browserName) => command(reference, { operation: "releasePinnedBrowser", browserName }),

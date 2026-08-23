@@ -3,7 +3,9 @@ package org.courtside.member;
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.ClubTimeZone;
+import org.courtside.identity.AccountCredentials;
 import org.courtside.identity.AccountSessions;
+import org.courtside.identity.CredentialState;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -22,13 +24,14 @@ import org.courtside.shared.SupportedLanguages;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -44,7 +47,6 @@ public class RosterService {
 
     private static final int MAX_PAGE_SIZE = 200;
     private static final int MAX_QUERY_LENGTH = 60;
-    private static final int MIN_PASSWORD_LENGTH = 12;
     private static final String UNIQUE_USERNAME_CONSTRAINT = "user_account_unique_username";
 
     private static final Comparator<UserAccount> ACCOUNT_PRECEDENCE =
@@ -58,7 +60,7 @@ public class RosterService {
     private final MemberService memberships;
     private final AdministratorLock administrators;
     private final AccountSessions sessions;
-    private final PasswordEncoder passwordEncoder;
+    private final AccountCredentials credentials;
     private final Clock clock;
     private final ClubTimeZone clubTimeZone;
     private final ClubIdentity club;
@@ -94,7 +96,8 @@ public class RosterService {
                 strippedAddress(email));
         Person saved = persons.save(person);
         events.publishEvent(new RosterEvent.PersonAdded(saved.getId()));
-        return toEntry(saved, null, null);
+        return toEntry(saved, null, null, clock.instant(),
+                addressSharing(List.of(saved)).get(saved.getEmail()));
     }
 
     @Transactional
@@ -109,6 +112,7 @@ public class RosterService {
         Set<String> changed = changedFields(person, first, last, address);
         person.rename(first, last);
         person.changeEmail(address);
+        withdrawIfAddressChanged(id, changed);
         if (!changed.isEmpty()) {
             events.publishEvent(new RosterEvent.PersonCorrected(person.getId(), changed));
         }
@@ -129,20 +133,20 @@ public class RosterService {
                     lastName == null ? person.getLastName() : strippedNonBlank(lastName, "last name"));
         }
         if (email != null) {
+            requireAddressWhereAnAccountNeedsOne(id, strippedAddress(email));
             person.changeEmail(strippedAddress(email));
         }
+        withdrawIfAddressChanged(id, corrected);
         if (!corrected.isEmpty()) {
             events.publishEvent(new RosterEvent.PersonCorrected(id, corrected));
         }
     }
 
     @Transactional
-    public RosterEntry createAccount(UUID personId, String username, String oneTimePassword,
-                                     Set<Role> roles) {
+    public RosterEntry createAccount(UUID personId, String username, Set<Role> roles) {
         UUID id = requiredPersonId(personId);
         String name = requiredUsername(username);
         Set<Role> requested = requiredRoles(roles);
-        requireUsablePassword(oneTimePassword);
         Person person = requireLockedPerson(id);
         if (person.getEmail().isEmpty()) {
             throw new AccountAddressRequiredException("roster.account.addressMissing", Map.of());
@@ -150,12 +154,13 @@ public class RosterService {
         if (!accounts.findByPersonIdIn(List.of(id)).isEmpty()) {
             throw new PersonAccountExistsException("Person " + id + " already holds an account");
         }
-        UserAccount account = new UserAccount(person, name,
-                passwordEncoder.encode(oneTimePassword), requested, requiredLanguage(club.defaultLocale()));
+        UserAccount account = UserAccount.awaitingCredentials(
+                person, name, requested, requiredLanguage(club.defaultLocale()));
         account.enable();
-        account.requirePasswordChange();
         saveOrRejectTakenUsername(account);
         events.publishEvent(new RosterEvent.AccountCreated(id, account.getId(), requested));
+        credentials.issueTo(account.getId());
+        events.publishEvent(new RosterEvent.AccountCredentialsRequested(id, account.getId()));
         return load(List.of(id)).getFirst();
     }
 
@@ -199,14 +204,11 @@ public class RosterService {
     }
 
     @Transactional
-    public RosterEntry resetPassword(UUID personId, String oneTimePassword) {
+    public RosterEntry requestCredentials(UUID personId) {
         UUID id = requiredPersonId(personId);
-        requireUsablePassword(oneTimePassword);
         UserAccount account = requireAccount(id);
-        long epoch = account.getSecurityEpoch();
-        account.resetPassword(passwordEncoder.encode(oneTimePassword));
-        endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
-        events.publishEvent(new RosterEvent.AccountPasswordReset(id, account.getId()));
+        credentials.issueTo(account.getId());
+        events.publishEvent(new RosterEvent.AccountCredentialsRequested(id, account.getId()));
         return load(List.of(id)).getFirst();
     }
 
@@ -398,13 +400,6 @@ public class RosterService {
         return Set.copyOf(roles);
     }
 
-    private static void requireUsablePassword(String password) {
-        if (password == null || password.length() < MIN_PASSWORD_LENGTH) {
-            throw new IllegalStateException("A one-time password must contain at least "
-                    + MIN_PASSWORD_LENGTH + " characters");
-        }
-    }
-
     private static String strippedNonBlank(String value, String what) {
         String stripped = value == null ? "" : PersonText.stripped(value);
         if (!PersonFieldLimits.isUsableName(stripped)) {
@@ -442,9 +437,13 @@ public class RosterService {
                         RosterService::preferredAccount));
         Map<UUID, Member> membershipsByPerson = members.findByPersonIdIn(personIds).stream()
                 .collect(Collectors.toMap(Member::getPersonId, member -> member));
-        return persons.findAllById(personIds).stream()
+        Instant now = clock.instant();
+        List<Person> people = persons.findAllById(personIds);
+        Map<String, Integer> sharing = addressSharing(people);
+        return people.stream()
                 .map(person -> toEntry(person, accountsByPerson.get(person.getId()),
-                        membershipsByPerson.get(person.getId())))
+                        membershipsByPerson.get(person.getId()), now,
+                        sharing.get(person.getEmail())))
                 .toList();
     }
 
@@ -452,16 +451,46 @@ public class RosterService {
         return ACCOUNT_PRECEDENCE.compare(first, second) <= 0 ? first : second;
     }
 
-    private static RosterEntry toEntry(Person person, UserAccount account, Member member) {
+    private Map<String, Integer> addressSharing(List<Person> people) {
+        Set<String> addresses = people.stream()
+                .map(Person::getEmail)
+                .filter(address -> !address.isEmpty())
+                .collect(Collectors.toSet());
+        if (addresses.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Integer> counts = new HashMap<>();
+        persons.countByAddressIn(addresses)
+                .forEach(row -> counts.put((String) row[0], ((Number) row[1]).intValue()));
+        return counts;
+    }
+
+    private static RosterEntry toEntry(Person person, UserAccount account, Member member,
+                                       Instant now, Integer addressSharedBy) {
         Membership membership = member == null ? null : new Membership(
                 member.getMembershipTypeId(), member.getStartedOn(), member.getEndedOn());
         if (account == null) {
             return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
-                    person.getEmail(), null, null, null, false, membership, Set.of());
+                    person.getEmail(), addressSharedBy, null, null, null, null, false,
+                    membership, Set.of());
         }
         return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
-                person.getEmail(), account.getId(), account.getUsername(), account.getLocale(),
-                account.isEnabled(), membership, account.getRoles());
+                person.getEmail(), addressSharedBy, account.getId(), account.getUsername(),
+                account.getLocale(), account.credentialState(now), account.isEnabled(),
+                membership, account.getRoles());
+    }
+
+    // An address with a typo that happens to exist accepts the message and nothing reports it as
+    // refused, so a stranger would hold a working first credential until it expired on its own.
+    private void withdrawIfAddressChanged(UUID personId, Set<String> changed) {
+        if (!changed.contains("email")) {
+            return;
+        }
+        accounts.findByPersonIdIn(List.of(personId)).forEach(account -> {
+            long epoch = account.getSecurityEpoch();
+            account.withdrawUnusedCredential();
+            endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
+        });
     }
 
     private String requiredLanguage(String locale) {
@@ -492,7 +521,8 @@ public class RosterService {
     }
 
     public record RosterEntry(UUID personId, String firstName, String lastName, String email,
-                              UUID accountId, String username, String locale, boolean enabled,
+                              Integer addressSharedBy, UUID accountId, String username,
+                              String locale, CredentialState credentialState, boolean enabled,
                               Membership membership, Set<Role> roles) {
 
         public RosterEntry {

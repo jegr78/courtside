@@ -21,6 +21,8 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -35,6 +37,20 @@ class CourtsideUserDetailsServiceTest {
     private PasswordRehashWriter rehashWriter;
 
     private final MeterRegistry meters = new SimpleMeterRegistry();
+
+    private static final String STAND_IN_HASH = "a-hash-of-a-value-nobody-kept";
+
+    private final UnusablePassword unusablePassword = new UnusablePassword(new PasswordEncoder() {
+        @Override
+        public String encode(CharSequence raw) {
+            return STAND_IN_HASH;
+        }
+
+        @Override
+        public boolean matches(CharSequence raw, String encoded) {
+            return false;
+        }
+    });
 
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
 
@@ -82,11 +98,24 @@ class CourtsideUserDetailsServiceTest {
 
     private static UserAccount anAccountAwaitingItsCredential() {
         return UserAccount.awaitingCredentials(new Person("Jane", "Doe", "jane.doe@example.org"),
-                "doe.jane", "placeholder-hash", Set.of(Role.MEMBER), "de");
+                "doe.jane", Set.of(Role.MEMBER), "de");
+    }
+
+    @Test
+    void givenAnAccountAwaitingItsCredential_whenLoadingIt_thenItCarriesAPasswordNothingCanMatch() {
+        // given
+        when(accounts.findByUsername("doe.jane"))
+                .thenReturn(Optional.of(anAccountAwaitingItsCredential()));
+
+        // when
+        UserDetails details = serviceAtNow().loadUserByUsername("doe.jane");
+
+        // then — never null, so the comparison runs and costs what every other one costs
+        assertThat(details.getPassword()).isEqualTo(STAND_IN_HASH);
     }
 
     private CourtsideUserDetailsService serviceAtNow() {
-        return new CourtsideUserDetailsService(accounts, rehashWriter, meters,
+        return new CourtsideUserDetailsService(accounts, unusablePassword, rehashWriter, meters,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -102,7 +131,7 @@ class CourtsideUserDetailsServiceTest {
         when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
         doThrow(new DataAccessResourceFailureException("read-only replica"))
                 .when(rehashWriter).rehash(account.getId(), "old-hash", "new-hash");
-        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters,
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, unusablePassword, rehashWriter, meters,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         // when / then
@@ -120,7 +149,7 @@ class CourtsideUserDetailsServiceTest {
                 .build();
         when(accounts.findByUsername("doe.jane"))
                 .thenThrow(new DataAccessResourceFailureException("connection pool exhausted"));
-        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters,
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, unusablePassword, rehashWriter, meters,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         // when / then
@@ -141,7 +170,7 @@ class CourtsideUserDetailsServiceTest {
         when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
         doThrow(new DataAccessResourceFailureException("read-only replica"))
                 .when(rehashWriter).rehash(account.getId(), "old-hash", "new-hash");
-        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters,
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, unusablePassword, rehashWriter, meters,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         // when
@@ -162,7 +191,7 @@ class CourtsideUserDetailsServiceTest {
                 .build();
         when(accounts.findByUsername("doe.jane"))
                 .thenThrow(new DataAccessResourceFailureException("connection pool exhausted"));
-        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters,
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, unusablePassword, rehashWriter, meters,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         // when
@@ -186,7 +215,7 @@ class CourtsideUserDetailsServiceTest {
         when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
         doThrow(new CannotCreateTransactionException("connection pool exhausted"))
                 .when(rehashWriter).rehash(account.getId(), "old-hash", "new-hash");
-        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, rehashWriter, meters,
+        CourtsideUserDetailsService service = new CourtsideUserDetailsService(accounts, unusablePassword, rehashWriter, meters,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         // when / then

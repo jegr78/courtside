@@ -77,17 +77,18 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
         UUID personId = roster.addPerson("John", "Roe", "john.roe@example.org");
 
         // when
-        roster.giveAccount(personId, "roe.john", "handover-password", Set.of(Role.MEMBER));
+        roster.giveAccount(personId, "roe.john", Set.of(Role.MEMBER));
         roster.changeAccountRoles(personId, Set.of(Role.MEMBER, Role.TRAINER));
         roster.correctAccountUsername(personId, "roe.johnny");
-        roster.resetAccountPassword(personId, "another-password");
+        roster.requestAccountCredentials(personId);
         roster.setAccountEnabled(personId, false);
 
         // then
         assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
                 .containsExactlyInAnyOrder("roster.person.added", "roster.account.created",
-                        "roster.account.rolesChanged", "roster.account.usernameCorrected",
-                        "roster.account.passwordReset", "roster.account.availabilityChanged");
+                        "roster.account.credentialsRequested", "roster.account.rolesChanged",
+                        "roster.account.usernameCorrected", "roster.account.credentialsRequested",
+                        "roster.account.availabilityChanged");
     }
 
     @Test
@@ -162,7 +163,7 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
         UUID personId = roster.addPerson("John", "Roe", "john.roe@example.org");
         UUID membershipTypeId = roster.createMembershipType("Adults");
         roster.assignMembership(personId, membershipTypeId);
-        roster.giveAccount(personId, "roe.john", "handover-password", Set.of(Role.MEMBER));
+        roster.giveAccount(personId, "roe.john", Set.of(Role.MEMBER));
 
         // when
         roster.synchroniseDeparture(personId);
@@ -170,8 +171,8 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.eventsAbout(personId)).extracting(AuditTestFixture.RecordedEvent::eventType)
                 .containsExactlyInAnyOrder("roster.person.added", "roster.membership.written",
-                        "roster.account.created", "roster.membership.ended",
-                        "roster.account.availabilityChanged");
+                        "roster.account.created", "roster.account.credentialsRequested",
+                        "roster.membership.ended", "roster.account.availabilityChanged");
         assertThat(audit.latestPayload(personId, "roster.account.availabilityChanged"))
                 .containsEntry("enabled", false);
     }

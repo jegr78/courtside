@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
 import { appendFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
@@ -28,6 +28,32 @@ function deployedPostgresImage(): string {
   if (!found) throw new Error(`${compose} names no PostgreSQL image pinned by digest`);
   return found[0];
 }
+// The relay a journey reads is the one the deployment's mail smoke test already runs against.
+function deployedMailSinkImage(): string {
+  const compose = resolve("../deploy/compose.mail-smoke.yaml");
+  const found = /axllent\/mailpit:[\w.-]+@sha256:[a-f0-9]{64}/.exec(readFileSync(compose, "utf8"));
+  if (!found) throw new Error(`${compose} names no Mailpit image pinned by digest`);
+  return found[0];
+}
+
+// Courtside requires STARTTLS of every relay, and Mailpit offers it only when it holds a certificate.
+// It names every host Docker may report, so the journey does not lean on the trust exception.
+function selfSignedRelayCertificate(): { certificate: string; key: string } {
+  const directory = mkdtempSync(resolve(tmpdir(), "courtside-relay-"));
+  const certificatePath = resolve(directory, "cert.pem");
+  const keyPath = resolve(directory, "key.pem");
+  const issued = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+    "-subj", "/CN=courtside-mail-sink",
+    "-addext", "subjectAltName=DNS:localhost,DNS:host.docker.internal,IP:127.0.0.1",
+    "-keyout", keyPath, "-out", certificatePath]);
+  if (issued.status !== 0) {
+    throw new Error(`Could not issue the mail sink certificate: ${issued.stderr?.toString()}`);
+  }
+  const issuedCertificate = { certificate: readFileSync(certificatePath, "utf8"), key: readFileSync(keyPath, "utf8") };
+  rmSync(directory, { recursive: true, force: true });
+  return issuedCertificate;
+}
+
 const CLUB_PLAIN_PORT = 8081;
 const CADDY_LOCAL_AUTHORITY = "/data/caddy/pki/authorities/local";
 const CADDY_ISSUED_CERTIFICATES = "/data/caddy/certificates";
@@ -229,6 +255,7 @@ export const journeyDate = dayAfterInBerlin(journeyInstant);
 export interface JourneyService {
   baseURL: string;
   plainBaseURL: string;
+  mailboxURL: string;
   visualDate: string;
   pinnedBrowser(browserName: string): Promise<string>;
   releasePinnedBrowser(browserName: string): Promise<void>;
@@ -294,6 +321,11 @@ async function resetJourneyData(postgres: StartedTestContainer, tables: string[]
   }
 }
 
+async function emptyMailbox(mailboxURL: string): Promise<void> {
+  const response = await fetch(`${mailboxURL}/api/v1/messages`, { method: "DELETE" });
+  if (!response.ok) throw new Error(`Could not empty the journey mailbox: ${response.status}`);
+}
+
 export async function startJourneyService(): Promise<StartedJourneyService> {
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
@@ -301,10 +333,12 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string }>();
   let clubNetwork: StartedNetwork | undefined;
   let clubProxy: StartedTestContainer | undefined;
+  let mailSink: StartedTestContainer | undefined;
   const stopContainers = async () => {
     await Promise.all([...browserServers.values()].map((server) => server.container.stop()));
     browserServers.clear();
     await clubProxy?.stop();
+    await mailSink?.stop();
     await postgres?.stop();
     await clubNetwork?.stop();
   };
@@ -318,6 +352,20 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       })
       .withExposedPorts(5432)
       .start();
+    const relayCertificate = selfSignedRelayCertificate();
+    mailSink = await new GenericContainer(deployedMailSinkImage())
+      .withEnvironment({
+        MP_SMTP_TLS_CERT: "/etc/mailpit/cert.pem",
+        MP_SMTP_TLS_KEY: "/etc/mailpit/key.pem"
+      })
+      .withCopyContentToContainer([
+        { content: relayCertificate.certificate, target: "/etc/mailpit/cert.pem" },
+        { content: relayCertificate.key, target: "/etc/mailpit/key.pem" }
+      ])
+      .withExposedPorts(1025, 8025)
+      .withWaitStrategy(Wait.forHttp("/readyz", 8025))
+      .start();
+    const mailboxURL = `http://${mailSink.getHost()}:${mailSink.getMappedPort(8025)}`;
     const java = process.env.JAVA_HOME ? `${process.env.JAVA_HOME}/bin/java` : "java";
     requireBuiltAfterItsSources(resolve("dist"), resolve("src"), "npm run build");
     requireBuiltAfterItsSources(applicationJar(), resolve("../src/main"), "./mvnw package -DskipTests");
@@ -344,7 +392,9 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: "bootstrap-admin",
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: "temporary-password",
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "Bootstrap Administrator",
-      COURTSIDE_MAIL_RELAY_HOST: "mail.invalid",
+      COURTSIDE_MAIL_RELAY_HOST: mailSink.getHost(),
+      COURTSIDE_MAIL_RELAY_PORT: String(mailSink.getMappedPort(1025)),
+      COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true",
       COURTSIDE_MAIL_FROM: "no-reply@example.org",
       COURTSIDE_MAIL_REPLY_TO: "board@example.org",
       SPRING_WEB_RESOURCES_STATIC_LOCATIONS: `file:${staticDirectory}/,classpath:/static/`
@@ -479,6 +529,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     return {
       baseURL: `https://${CLUB_HOST}`,
       plainBaseURL: `http://${CLUB_HOST}:${CLUB_PLAIN_PORT}`,
+      mailboxURL,
       visualDate,
       pinnedBrowser: startPinnedBrowser,
       releasePinnedBrowser,
@@ -498,6 +549,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       reset: async () => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         resetStaticAssets();
+        await emptyMailbox(mailboxURL);
         await resetJourneyData(postgres!, tables);
       },
       restart: async () => {

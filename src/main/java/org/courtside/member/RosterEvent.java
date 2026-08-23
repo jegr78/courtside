@@ -85,9 +85,9 @@ public sealed interface RosterEvent extends DomainEventRecord {
 
     }
 
-    record AccountPasswordReset(UUID personId, UUID accountId) implements RosterEvent {
+    record AccountCredentialsRequested(UUID personId, UUID accountId) implements RosterEvent {
 
-        static final String TYPE = "roster.account.passwordReset";
+        static final String TYPE = "roster.account.credentialsRequested";
 
         @Override
         public String eventType() {

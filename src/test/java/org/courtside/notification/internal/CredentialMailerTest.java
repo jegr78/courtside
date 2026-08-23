@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -50,7 +51,7 @@ class CredentialMailerTest {
         mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
 
         // then — the club default is German, so only the account's own language can produce this
-        assertThat(subjectSent()).isEqualTo("Example Tennis Club: your access");
+        assertThat(subjectSent()).isEqualTo("Example Tennis Club: access for Jane");
         assertThat(bodySent()).contains("Hello Jane").contains("May 1, 2026");
     }
 
@@ -64,7 +65,7 @@ class CredentialMailerTest {
         mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.PASSWORD_RESET));
 
         // then
-        assertThat(subjectSent()).isEqualTo("Example Tennis Club: dein neues Passwort");
+        assertThat(subjectSent()).isEqualTo("Example Tennis Club: ein neues Passwort für Jane");
         assertThat(bodySent()).contains("Hallo Jane").contains("1. Mai 2026");
     }
 
@@ -78,7 +79,34 @@ class CredentialMailerTest {
         mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
 
         // then
-        assertThat(subjectSent()).isEqualTo("Example Tennis Club: dein Zugang");
+        assertThat(subjectSent()).isEqualTo("Example Tennis Club: Zugang für Jane");
+    }
+
+    @Test
+    void givenAParentReceivingForTwoChildren_whenBothAreSent_thenTheSubjectsTellThemApart() {
+        // given
+        club("de");
+        when(validity.validFor(any())).thenReturn(Duration.ofDays(7));
+        UUID sibling = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000002");
+        issuesTo(ACCOUNT, "Jane", "doe.jane");
+        issuesTo(sibling, "John", "roe.john");
+
+        // when
+        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
+        mailer.on(new CredentialsRequested(sibling, CredentialsRequested.Reason.NEW_ACCOUNT));
+
+        // then
+        ArgumentCaptor<String> subjects = ArgumentCaptor.forClass(String.class);
+        verify(dispatch, times(2)).send(eq(ADDRESS), subjects.capture(), anyString(), anyString());
+        assertThat(subjects.getAllValues())
+                .as("one inbox holds both, so the subject is what separates them")
+                .containsExactly("Example Tennis Club: Zugang für Jane",
+                        "Example Tennis Club: Zugang für John");
+    }
+
+    private void issuesTo(UUID accountId, String firstName, String username) {
+        when(credentials.issueFor(eq(accountId), any())).thenReturn(new IssuedCredential(
+                ADDRESS, firstName, "de", username, "a-credential", NOW.plus(Duration.ofDays(7))));
     }
 
     private String subjectSent() {
