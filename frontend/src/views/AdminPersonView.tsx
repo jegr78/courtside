@@ -225,7 +225,8 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
     <Button data-testid="save-roles" disabled={disabled} className="justify-self-start" type="button" onClick={() => void saveRoles(chosenRoles)}>{t("admin.save")}</Button>
     <div className="grid gap-2">
       <span className="font-medium">{t("admin.person.credentialState")}</span>
-      <p data-testid="credential-state" className="text-muted text-sm">
+      <p data-testid="credential-state" data-state={entry.credentialState ?? "AWAITING_CREDENTIAL"}
+         className="text-muted text-sm">
         {t(`admin.person.credentialState.${entry.credentialState ?? "AWAITING_CREDENTIAL"}`)}
       </p>
       <CredentialDestination entry={entry} />

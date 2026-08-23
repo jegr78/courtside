@@ -1,4 +1,5 @@
 import { expect, selectJourneyDate, test } from "./fixtures";
+import { credentialIn, messagesTo, messageTo } from "./mailbox";
 
 function freeSlot(page: import("@playwright/test").Page, court: number, slot: string) {
   return page.locator(`[data-testid="free-slot"][data-court-number="${court}"][data-slot="${slot}"][data-state="free"]`);
@@ -300,9 +301,10 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await expect(page).toHaveURL(new RegExp(`/admin/roster/${personId}$`));
   await expect(page.getByTestId("person-email")).toHaveValue("mary.roe@example.org");
 
-  // when
+  // when — nothing here asks for a password: the instance generates one and sends it
+  await expect(page.getByTestId("new-account-password")).toHaveCount(0);
+  await expect(page.getByTestId("credential-destination")).toContainText("mary.roe@example.org");
   await page.getByTestId("new-account-username").fill("roe.mary");
-  await page.getByTestId("new-account-password").fill("handover-password");
   await page.getByTestId("new-account-role-MEMBER").check();
   const accountCreated = page.waitForResponse((response) =>
     response.url().endsWith(`/api/admin/roster/${personId}/account`) && response.request().method() === "POST"
@@ -310,22 +312,30 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await page.getByTestId("create-account").click();
   expect((await accountCreated).status()).toBe(201);
 
-  // then
+  // then — the board sees where the account stands, and never the password itself
+  const mailed = await messageTo(journeyService.mailboxURL, "mary.roe@example.org");
+  const credential = credentialIn(mailed, "Passwort:");
   await expect(page.getByTestId("account-username")).toHaveValue("roe.mary");
   await expect(page.getByTestId("account-roles-MEMBER")).toBeChecked();
+  await expect(page.getByTestId("admin-person-view")).not.toContainText(credential);
+  // the message is handed over after the credential is stored, so reading it settles the state
+  await page.reload();
+  await expect(page.getByTestId("credential-state"))
+    .toHaveAttribute("data-state", "CREDENTIAL_ISSUED");
 
-  // when
+  // when — the member signs in with what the instance mailed them and replaces it
   await page.getByTestId("logout").click();
+  await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("roe.mary");
-  await page.getByTestId("password").fill("handover-password");
+  await page.getByTestId("password").fill(credential);
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId("initial-password-view")).toBeVisible();
-  await page.getByTestId("new-password").fill("her-own-password");
-  await page.getByTestId("confirm-password").fill("her-own-password");
+  await page.getByTestId("new-password").fill("mary-chose-this-one");
+  await page.getByTestId("confirm-password").fill("mary-chose-this-one");
   await page.getByTestId("password-submit").click();
-  await expect(page.getByTestId("login-submit")).toBeVisible();
+  await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("roe.mary");
-  await page.getByTestId("password").fill("her-own-password");
+  await page.getByTestId("password").fill("mary-chose-this-one");
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
   await selectJourneyDate(page, journeyService.visualDate);
@@ -336,4 +346,30 @@ test("an admin adds a person, gives them an account, and that person signs in an
 
   // then
   await expect(page.getByTestId("own-allocation")).toBeVisible();
+
+  // when — the board sends again, which now destroys a password the member chose
+  await page.getByTestId("logout").click();
+  await expect(page.getByTestId("login-view")).toBeVisible();
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("admin-roster-link")).toBeVisible();
+  await page.goto(`/admin/roster/${personId}`);
+  await expect(page.getByTestId("credential-state"))
+    .toHaveAttribute("data-state", "PASSWORD_CHOSEN");
+  await page.getByTestId("send-credentials").click();
+  await page.getByTestId("cancel-send-credentials").click();
+
+  // then — dismissing asks nothing of the instance, so the member keeps what they chose
+  await expect(page.getByTestId("confirm-send-credentials")).toHaveCount(0);
+  expect(await messagesTo(journeyService.mailboxURL, "mary.roe@example.org")).toHaveLength(1);
+
+  // when
+  await page.getByTestId("send-credentials").click();
+  await page.getByTestId("confirm-send-credentials").click();
+
+  // then
+  await expect
+    .poll(async () => (await messagesTo(journeyService.mailboxURL, "mary.roe@example.org")).length)
+    .toBe(2);
 });

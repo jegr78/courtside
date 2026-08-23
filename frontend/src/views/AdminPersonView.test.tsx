@@ -347,6 +347,32 @@ describe("AdminPersonView", () => {
       .not.toHaveTextContent("belongs to");
   });
 
+  it.each([
+    ["AWAITING_CREDENTIAL", "Nothing has been issued yet."],
+    ["CREDENTIAL_ISSUED", "Credentials are out and have not been replaced."],
+    ["CREDENTIAL_EXPIRED", "The issued credentials have expired. Send new ones."],
+    ["PASSWORD_CHOSEN", "The member has chosen a password of their own."]
+  ] as const)("given an account in %s, when reading the section, then the board is told where it stands",
+    async (credentialState, told) => {
+      // given
+      showPerson({ ...jane, credentialState });
+
+      // when / then
+      const state = await screen.findByTestId("credential-state");
+      expect(state).toHaveTextContent(told);
+      expect(state).toHaveAttribute("data-state", credentialState);
+    });
+
+  it("given an address several people share, when about to send, then only a count says so", async () => {
+    // given
+    showPerson({ ...jane, addressSharedBy: 3 });
+
+    // when / then — a count answers the question without telling one member about another
+    const destination = await screen.findByTestId("credential-destination");
+    expect(destination).toHaveTextContent("This address belongs to 3 people.");
+    expect(destination.textContent).toContain(jane.email);
+  });
+
   it("given an enabled account, when disabling it, then the button offers to enable it again", async () => {
     // given
     vi.spyOn(api, "setAccountActive").mockResolvedValue({ ...jane, enabled: false });
