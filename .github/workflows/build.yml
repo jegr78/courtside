@@ -68,6 +68,15 @@ jobs:
         name: Pull pinned assessment images
         run: node tools/security-image-inventory.mjs active | xargs -n1 docker pull
       - if: steps.runtime.outputs.changed == 'true'
+        name: Verify the Schemathesis reason adapter
+        run: |
+          IMAGE=$(jq -r .image security/openapi-fuzz-policy.json)
+          docker run --rm --entrypoint python \
+            -e PYTHONPATH=/projection \
+            -v "$PWD/security/schemathesis_reason.py:/projection/sitecustomize.py:ro" \
+            -v "$PWD/security/schemathesis_reason_integration.py:/projection/integration.py:ro" \
+            "$IMAGE" /projection/integration.py
+      - if: steps.runtime.outputs.changed == 'true'
         name: Run paired active assessments
         env:
           BASE_RUN_ID: compare-base-${{ github.run_id }}-${{ github.run_attempt }}

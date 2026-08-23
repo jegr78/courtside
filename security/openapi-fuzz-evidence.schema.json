@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:security:openapi-fuzz-evidence:v1",
+  "$id": "urn:courtside:security:openapi-fuzz-evidence:v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "testIds", "targetFingerprint", "image", "policyDigest", "specificationDigest", "seed", "operations", "counterexamples", "undocumentedRoutes", "inputCases", "importCases", "mutationCases", "stateBefore", "stateAfter", "candidates", "requestCount", "generatedDataMegabytes", "outcome"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "testIds": { "const": ["CSA-API-001", "CSA-IMPORT-001"] },
     "targetFingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "image": { "type": "string", "pattern": "^schemathesis/schemathesis:4\\.25\\.0@sha256:[a-f0-9]{64}$" },
@@ -58,7 +58,7 @@
     "counterexample": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operationId", "mode", "caseId", "check", "method", "pathTemplate", "minimizedRequest", "reproductionDigest"],
+      "required": ["operationId", "mode", "caseId", "check", "method", "pathTemplate", "reason", "requestShape", "reproductionDigest"],
       "properties": {
         "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
         "mode": { "enum": ["positive", "negative"] },
@@ -66,9 +66,51 @@
         "check": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
         "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
         "pathTemplate": { "type": "string", "pattern": "^/", "maxLength": 200 },
-        "minimizedRequest": { "type": "string", "minLength": 2, "maxLength": 1048576 },
+        "reason": { "$ref": "#/$defs/failureReason" },
+        "requestShape": { "type": "object", "additionalProperties": false, "required": ["locations"],
+          "properties": { "locations": { "type": "array", "maxItems": 3, "uniqueItems": true,
+            "items": { "enum": ["body", "path", "query"] } } } },
         "reproductionDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
       }
+    },
+    "failureReason": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false,
+            "required": ["kind", "observedStatus", "expectedStatuses"], "properties": {
+            "kind": { "const": "status" },
+            "observedStatus": { "type": "integer", "minimum": 100, "maximum": 599 },
+            "expectedStatuses": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true,
+              "items": { "oneOf": [
+                { "type": "integer", "minimum": 100, "maximum": 599 },
+                { "enum": ["1xx", "2xx", "3xx", "4xx", "5xx", "non-5xx"] }
+              ] } }
+          } },
+        { "type": "object", "additionalProperties": false,
+          "required": ["kind", "observed", "expected"], "properties": {
+            "kind": { "const": "media-type" },
+            "observed": { "enum": ["missing", "malformed", "undocumented"] },
+            "expected": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+$", "maxLength": 100 } }
+          } },
+        { "type": "object", "additionalProperties": false,
+          "required": ["kind", "instancePointer", "validationKeyword", "missingProperties"], "properties": {
+            "kind": { "const": "schema" },
+            "instancePointer": { "type": "string", "maxLength": 300 },
+            "validationKeyword": { "enum": ["additionalProperties", "allOf", "anyOf", "const", "contains",
+              "dependentRequired", "enum", "exclusiveMaximum", "exclusiveMinimum", "format", "json-syntax",
+              "maxContains", "maximum", "maxItems", "maxLength", "maxProperties", "minContains", "minimum",
+              "minItems", "minLength", "minProperties", "multipleOf", "not", "oneOf", "pattern",
+              "propertyNames", "required", "schema", "type", "unevaluatedProperties", "uniqueItems"] },
+            "missingProperties": { "type": "array", "maxItems": 20, "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1, "maxLength": 100 } }
+          } },
+        { "type": "object", "additionalProperties": false,
+          "required": ["kind", "disagreement"], "properties": {
+            "kind": { "const": "protocol" },
+            "disagreement": { "enum": ["missing-required-header", "unsupported-method-status",
+              "missing-allow-header", "allow-header-mismatch"] }
+          } }
+      ]
     },
     "inputCase": {
       "type": "object",
