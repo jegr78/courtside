@@ -171,7 +171,7 @@ components:
           type: string
         locale:
           type: string
-          pattern: "^(de|en)$"
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
         roles:
           type: array
           items: { $ref: "#/components/schemas/Role" }
@@ -313,7 +313,8 @@ components:
 
     ClubConfig:
       type: object
-      required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes, timeZone]
+      required: [clubName, primaryColor, accentColor, defaultLocale, supportedLocales, slotMinutes,
+                 timeZone]
       properties:
         clubName: { type: string }
         primaryColor: { type: string }
@@ -321,6 +322,18 @@ components:
         logoUrl: { type: [string, "null"] }
         imprintUrl: { type: [string, "null"] }
         defaultLocale: { type: string }
+        supportedLocales:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
+          description: |
+            The languages this instance carries translations for, derived from the message bundles
+            in the image rather than declared anywhere. A client offers a choice from this and never
+            from a list of its own: an instance that ships a third language starts answering with it
+            here, and nothing else has to be released for that to be true. Every language-valued
+            field in this document is refused with `urn:courtside:error:language-unsupported` unless
+            it names one of these.
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone: { type: string, example: Europe/Berlin }
 
@@ -352,7 +365,7 @@ components:
           type: [string, "null"]
           maxLength: 500
           pattern: "^(https?://.+|/[^/\\\\].*|/)$"
-        defaultLocale: { type: string, pattern: "^(de|en)$" }
+        defaultLocale: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone:
           type: string
@@ -1002,6 +1015,12 @@ components:
         email: { type: [string, "null"], format: email }
         accountId: { type: [string, "null"], format: uuid }
         username: { type: [string, "null"] }
+        locale:
+          type: [string, "null"]
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+          description: |
+            The language the instance writes to this account in, and `null` for a person who holds
+            no account. Read it together with `accountId`, the same way `username` is read.
         enabled:
           type: boolean
           description: |
@@ -1018,12 +1037,6 @@ components:
           type: [string, "null"]
           format: date
           description: The date the membership began, absent when the person holds none.
-        locale:
-          type: string
-          pattern: "^(de|en)$"
-          description: |
-            The language the instance writes to this account in. Absent while the person holds no
-            account.
         membershipEndedOn:
           type: [string, "null"]
           format: date
@@ -1079,9 +1092,14 @@ components:
         The language the instance writes to this account in. It is stored on the account rather than
         kept in the browser, so a message reaches the member in the language they read and not in the
         one the club happens to default to.
+
+        The pattern is the shape of a language tag, not the set of languages: which languages exist
+        is a property of the image and is served as `supportedLocales` on the club configuration. A
+        well-formed tag this instance ships no translation for is refused with
+        `urn:courtside:error:language-unsupported`, which names the languages it does ship.
       required: [locale]
       properties:
-        locale: { type: string, pattern: "^(de|en)$" }
+        locale: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
 
     UsernameRequest:
       type: object

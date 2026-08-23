@@ -18,6 +18,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -447,14 +448,29 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnUnsupportedDefaultLocale_whenChangingTheConfig_thenItIsRejected() throws Exception {
+        // when / then — a well-formed tag, so the shipped set is the only thing that can refuse it
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club")
+                                .replace("\"defaultLocale\": \"de\"", "\"defaultLocale\": \"fr\""))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("defaultLocale"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Language"));
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultLocale").value("de"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenSomethingThatIsNotALanguageTag_whenChangingTheConfig_thenTheShapeRefusesIt()
+            throws Exception {
         // when / then
         mockMvc.perform(put("/api/admin/config")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
-                                 "accentColor": "#f78166", "defaultLocale": "fr", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
-                                """)
+                        .content(configJson("Example Tennis Club")
+                                .replace("\"defaultLocale\": \"de\"", "\"defaultLocale\": \"not a tag!\""))
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("defaultLocale"))
@@ -536,6 +552,15 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("newAccountCredentialHours"));
+    }
+
+    @Test
+    void whenReadingThePublicConfiguration_thenItNamesTheLanguagesThisImageCanWriteIn()
+            throws Exception {
+        // when / then — a client offers a choice from this rather than from a list of its own
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.supportedLocales", containsInAnyOrder("de", "en")));
     }
 
     private static String configJson(String clubName) {

@@ -86,13 +86,7 @@ class LoginTest extends AbstractIntegrationTest {
     void givenAMemberWhoReadsAnotherLanguage_whenTheyChooseIt_thenTheAccountKeepsTheChoice()
             throws Exception {
         // given
-        MvcResult login = mockMvc.perform(post("/api/session")
-                        .param("username", "doe.jane")
-                        .param("password", "correct-horse")
-                        .with(csrf()))
-                .andExpect(status().isOk())
-                .andReturn();
-        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+        MockHttpSession session = signedInAsJane();
 
         // when
         mockMvc.perform(put("/api/account/locale").session(session)
@@ -106,6 +100,23 @@ class LoginTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.locale").value("en"));
         assertThat(accounts.findByUsername("doe.jane").orElseThrow().getLocale()).isEqualTo("en");
+    }
+
+    @Test
+    void givenALanguageThisInstanceShipsNoTranslationFor_whenAMemberChoosesIt_thenItIsRefused()
+            throws Exception {
+        // given
+        MockHttpSession session = signedInAsJane();
+
+        // when / then — well formed, so the guard in the service is the only thing that can refuse it
+        mockMvc.perform(put("/api/account/locale").session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locale\": \"fr\"}")
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:language-unsupported"))
+                .andExpect(jsonPath("$.violations[0].code").value("language.unsupported"));
+        assertThat(accounts.findByUsername("doe.jane").orElseThrow().getLocale()).isEqualTo("de");
     }
 
     @Test
@@ -187,6 +198,16 @@ class LoginTest extends AbstractIntegrationTest {
 
         // then
         assertThat(awaitingApproval).isEqualTo(wrongPassword);
+    }
+
+    private MockHttpSession signedInAsJane() throws Exception {
+        MvcResult login = mockMvc.perform(post("/api/session")
+                        .param("username", "doe.jane")
+                        .param("password", "correct-horse")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andReturn();
+        return (MockHttpSession) login.getRequest().getSession(false);
     }
 
     private String signInFailure(String username, String password) throws Exception {

@@ -13,6 +13,7 @@ import org.courtside.config.CredentialLifetime;
 import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
+import org.courtside.shared.SupportedLanguages;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.InitBinder;
 class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
 
     private final ConfigService config;
+    private final SupportedLanguages languages;
     private final ConfigRequestValidator requestValidator;
 
     @InitBinder
@@ -65,19 +67,21 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
         return ResponseEntity.ok(manifest);
     }
 
-    private static ApiClubConfig toResponse(ClubConfigurationSnapshot configuration) {
+    private ApiClubConfig toResponse(ClubConfigurationSnapshot configuration) {
         return new ApiClubConfig(
                 configuration.clubName(), configuration.primaryColor(),
                 configuration.accentColor(), configuration.defaultLocale(),
+                languages.tags(),
                 configuration.slotMinutes(), configuration.timeZone())
                 .logoUrl(configuration.logoUrl())
                 .imprintUrl(configuration.imprintUrl());
     }
 
-    private static ApiAdminClubConfig toAdminResponse(ClubConfigurationSnapshot configuration) {
+    private ApiAdminClubConfig toAdminResponse(ClubConfigurationSnapshot configuration) {
         return new ApiAdminClubConfig(
                 configuration.clubName(), configuration.primaryColor(),
                 configuration.accentColor(), configuration.defaultLocale(),
+                languages.tags(),
                 configuration.slotMinutes(), configuration.timeZone(),
                 configuration.newAccountCredentialHours(),
                 configuration.passwordResetCredentialHours())

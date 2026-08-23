@@ -19,7 +19,8 @@ const courtAdded: AuditEntry = {
 
 const clubConfig: ClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff",
-  logoUrl: null, imprintUrl: null, defaultLocale: "en", slotMinutes: 60, timeZone: "Europe/Berlin"
+  logoUrl: null, imprintUrl: null, defaultLocale: "en", supportedLocales: ["de", "en"],
+  slotMinutes: 60, timeZone: "Europe/Berlin"
 };
 
 function row(entryId: string): HTMLElement {

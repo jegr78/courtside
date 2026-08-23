@@ -196,6 +196,17 @@ database schema are **English**. User-facing text — UI strings and email templ
 through message bundles. German is the default locale, English the second. Locale is
 stored per user account with a fallback to the instance setting.
 
+**Which languages an instance has is derived, not declared.** A language exists because the image
+carries a `messages_<tag>` bundle for the screen and a `mail_<tag>` bundle for what is sent, and
+because the frontend carries a translation of the same name; nothing lists the set anywhere, and an
+image that translates one surface but not the other refuses to start rather than writing to a member
+in a language they did not choose. `GET /api/public/config` serves the derived set as
+`supportedLocales`, and every surface that offers a language reads it from there — no client, no
+schema and no database constraint names a language. The contract states the *shape* of a language
+tag; a well-formed tag the instance ships no translation for is refused with
+`urn:courtside:error:language-unsupported`, at the boundary as a field error and again in the
+service that writes it.
+
 Domain vocabulary:
 
 | German | Code |

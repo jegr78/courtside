@@ -32,6 +32,7 @@ import java.util.stream.Stream;
 import static org.courtside.member.MemberFixtures.MEMBER_SINCE;
 import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -792,7 +793,29 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenALanguageTheInstanceDoesNotShip_whenCorrectingAnAccount_thenTheFieldIsNamed()
+    void givenAWellFormedTagTheInstanceShipsNoTranslationFor_whenCorrecting_thenItNamesWhatItShips()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+
+        // when / then — the document states the shape, so only the service can refuse this one
+        mockMvc.perform(put("/api/admin/roster/{personId}/account/locale", jane)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locale\": \"fr\"}")
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:language-unsupported"))
+                .andExpect(jsonPath("$.violations[0].code").value("language.unsupported"))
+                .andExpect(jsonPath("$.violations[0].params.locale").value("fr"))
+                .andExpect(jsonPath("$.violations[0].params.supported",
+                        containsInAnyOrder("de", "en")));
+        assertThat(accounts.findByUsername("doe.jane").orElseThrow().getLocale()).isEqualTo("de");
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenSomethingThatIsNotALanguageTagAtAll_whenCorrecting_thenTheFieldIsNamed()
             throws Exception {
         // given
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
@@ -801,7 +824,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(put("/api/admin/roster/{personId}/account/locale", jane)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"locale\": \"fr\"}")
+                        .content("{\"locale\": \"not a tag!\"}")
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("locale"));

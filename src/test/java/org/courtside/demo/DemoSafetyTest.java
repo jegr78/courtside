@@ -2,6 +2,7 @@ package org.courtside.demo;
 
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
+import org.courtside.config.ClubIdentity;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -17,6 +18,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.time.Clock;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,6 +26,25 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class DemoSafetyTest {
+
+    private static final ZoneId BERLIN = ZoneId.of("Europe/Berlin");
+
+    private static final ClubIdentity GERMAN_CLUB = new ClubIdentity() {
+        @Override
+        public String clubName() {
+            return "Example Tennis Club";
+        }
+
+        @Override
+        public String defaultLocale() {
+            return "de";
+        }
+
+        @Override
+        public ZoneId zoneId() {
+            return BERLIN;
+        }
+    };
 
     @Test
     void givenDisposableUseWasNotConfirmed_whenGuardingTheEnvironment_thenStartupIsRejected() {
@@ -86,7 +107,7 @@ class DemoSafetyTest {
                 mock(FacilityService.class), mock(BookingService.class), mock(BookingRepository.class),
                 mock(PasswordEncoder.class), Clock.systemUTC(),
                 new DemoProperties(true, "member-password"), "admin", "admin-password",
-                () -> java.time.ZoneId.of("Europe/Berlin"), GERMAN_CLUB);
+                () -> BERLIN, GERMAN_CLUB);
 
         // when / then
         assertThatThrownBy(() -> seeder.run(new DefaultApplicationArguments(new String[0])))
@@ -94,20 +115,4 @@ class DemoSafetyTest {
                 .hasMessageContaining("only the bootstrap administrator");
     }
 
-    private static final org.courtside.config.ClubIdentity GERMAN_CLUB = new org.courtside.config.ClubIdentity() {
-        @Override
-        public String clubName() {
-            return "Example Tennis Club";
-        }
-
-        @Override
-        public String defaultLocale() {
-            return "de";
-        }
-
-        @Override
-        public java.time.ZoneId zoneId() {
-            return java.time.ZoneId.of("Europe/Berlin");
-        }
-    };
 }

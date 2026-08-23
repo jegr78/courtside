@@ -1,11 +1,13 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+import { api, ApiError } from "../api/client";
 import i18n, { applyAccountLocale, initialLocale } from "../i18n";
 import { applyTheme } from "../theme";
 import { Preferences } from "./Preferences";
 
 beforeEach(async () => {
+  vi.restoreAllMocks();
   const values = new Map<string, string>();
   Object.defineProperty(window, "localStorage", { configurable: true, value: {
     clear: () => values.clear(),
@@ -72,4 +74,50 @@ it("givenAnExplicitLanguagePreference_whenAnAccountHasAnotherLocale_thenThePrefe
   // then
   expect(i18n.resolvedLanguage).toBe("en");
   expect(document.documentElement).toHaveAttribute("lang", "en");
+});
+
+it("givenASignedInMember_whenSelectingAnotherLanguage_thenTheAccountIsToldSoTheNextMessageFollows", async () => {
+  // given
+  const stored = vi.spyOn(api, "changeOwnLocale").mockResolvedValue(undefined);
+  render(<Preferences authenticated />);
+
+  // when
+  await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
+
+  // then
+  expect(stored).toHaveBeenCalledWith("en");
+});
+
+it("givenNobodySignedIn_whenSelectingAnotherLanguage_thenNoAccountIsWrittenTo", async () => {
+  // given
+  const stored = vi.spyOn(api, "changeOwnLocale").mockResolvedValue(undefined);
+  render(<Preferences />);
+
+  // when
+  await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
+
+  // then
+  expect(stored).not.toHaveBeenCalled();
+  expect(i18n.resolvedLanguage).toBe("en");
+});
+
+it("givenTheAccountRefusesTheChange_whenSelectingAnotherLanguage_thenTheMemberIsToldRatherThanNothing", async () => {
+  // given
+  vi.spyOn(api, "changeOwnLocale").mockRejectedValue(new ApiError(403));
+  render(<Preferences authenticated />);
+
+  // when
+  await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
+
+  // then — the page has already switched, so silence would leave the two disagreeing unnoticed
+  expect(await screen.findByTestId("locale-not-stored")).toBeInTheDocument();
+});
+
+it("givenAnInstanceThatShipsOneLanguage_whenOfferingTheChoice_thenOnlyThatOneIsOffered", () => {
+  // when
+  render(<Preferences supported={["de"]} />);
+
+  // then
+  expect(Array.from(document.getElementById("locale-preference")!.children)
+    .map((option) => option.getAttribute("value"))).toEqual(["de"]);
 });

@@ -18,6 +18,7 @@ import org.courtside.member.internal.PersonText;
 import org.courtside.member.internal.RosterCursorUnknownException;
 import org.courtside.member.internal.UsernameTakenException;
 import org.courtside.shared.CursorPage;
+import org.courtside.shared.SupportedLanguages;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -61,6 +62,7 @@ public class RosterService {
     private final Clock clock;
     private final ClubTimeZone clubTimeZone;
     private final ClubIdentity club;
+    private final SupportedLanguages languages;
     private final ApplicationEventPublisher events;
 
     public CursorPage.Result<RosterEntry> list(String query, UUID membershipTypeId, UUID cursor, int limit) {
@@ -148,8 +150,8 @@ public class RosterService {
         if (!accounts.findByPersonIdIn(List.of(id)).isEmpty()) {
             throw new PersonAccountExistsException("Person " + id + " already holds an account");
         }
-        UserAccount account = new UserAccount(
-                person, name, passwordEncoder.encode(oneTimePassword), requested, club.defaultLocale());
+        UserAccount account = new UserAccount(person, name,
+                passwordEncoder.encode(oneTimePassword), requested, requiredLanguage(club.defaultLocale()));
         account.enable();
         account.requirePasswordChange();
         saveOrRejectTakenUsername(account);
@@ -189,9 +191,10 @@ public class RosterService {
     @Transactional
     public RosterEntry changeLocale(UUID personId, String locale) {
         UUID id = requiredPersonId(personId);
+        String language = requiredLanguage(locale);
         UserAccount account = requireAccount(id);
-        account.changeLocale(locale);
-        events.publishEvent(new RosterEvent.AccountLocaleCorrected(id, account.getId(), locale));
+        account.changeLocale(language);
+        events.publishEvent(new RosterEvent.AccountLocaleCorrected(id, account.getId(), language));
         return load(List.of(id)).getFirst();
     }
 
@@ -459,6 +462,11 @@ public class RosterService {
         return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
                 person.getEmail(), account.getId(), account.getUsername(), account.getLocale(),
                 account.isEnabled(), membership, account.getRoles());
+    }
+
+    private String requiredLanguage(String locale) {
+        languages.require(locale);
+        return locale;
     }
 
     private static String normalize(String query) {
