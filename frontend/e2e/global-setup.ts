@@ -277,6 +277,7 @@ export function waitForProcessMarker(
   if (!stdout) return Promise.reject(new Error("Process stdout is unavailable"));
   return new Promise((resolve, reject) => {
     let output = "";
+    let cancelling = false;
     const finish = (result: () => void) => {
       stdout.off("data", onData);
       client.off("error", onError);
@@ -289,12 +290,14 @@ export function waitForProcessMarker(
       if (output.includes(marker)) finish(resolve);
     };
     const onError = (error: Error) => finish(() => reject(error));
-    const onExit = (code: number | null, signal: NodeJS.Signals | null) => finish(() => reject(new Error(
-      `Database lock client stopped with code ${code ?? "none"} and signal ${signal ?? "none"}: ${errors()}`
-    )));
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => finish(() => reject(new Error(cancelling
+      ? `Database lock acquisition was cancelled: ${errors()}`
+      : `Database lock client stopped with code ${code ?? "none"} and signal ${signal ?? "none"}: ${errors()}`)));
     const onAbort = () => {
-      client.kill();
-      finish(() => reject(new Error(`Database lock acquisition was cancelled: ${errors()}`)));
+      cancelling = true;
+      if (!client.kill()) {
+        finish(() => reject(new Error(`Database lock client could not be terminated: ${errors()}`)));
+      }
     };
     stdout.on("data", onData);
     client.once("error", onError);
@@ -460,11 +463,16 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       return result.stdout.trim();
     };
     const heldLocks = new Set<DatabaseLock>();
+    const lockClients = new Set<ChildProcess>();
     const holdDatabaseLock = async (sql: string, signal?: AbortSignal): Promise<DatabaseLock> => {
       const client = spawn("docker", [
         "exec", "-i", postgres!.getId(), "psql", "-U", "courtside", "-d", "courtside",
         "-v", "ON_ERROR_STOP=1", "-At"
       ], { stdio: ["pipe", "pipe", "pipe"] });
+      lockClients.add(client);
+      const forgetClient = () => lockClients.delete(client);
+      client.once("error", forgetClient);
+      client.once("exit", forgetClient);
       let errors = "";
       client.stderr.on("data", (chunk: Buffer) => { errors += chunk.toString(); });
       const lockReady = waitForProcessMarker(client, "COURTSIDE_LOCK_READY", () => errors, signal);
@@ -591,6 +599,12 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       },
       stop: async () => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
+        await Promise.all([...lockClients].map(async (client) => {
+          if (client.exitCode !== null) return;
+          const stopped = once(client, "exit");
+          if (!client.kill()) throw new Error("Database lock client could not be stopped");
+          await stopped;
+        }));
         await stopApplication();
         await stopContainers();
         rmSync(staticDirectory!, { recursive: true, force: true });

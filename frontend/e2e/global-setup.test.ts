@@ -39,7 +39,10 @@ describe("process marker coordination", () => {
   it("given an abandoned command, when its request is cancelled, then the process and listeners are released", async () => {
     // given
     const { client, output } = processWithOutput();
-    const kill = vi.fn().mockReturnValue(true);
+    const kill = vi.fn().mockImplementation(() => {
+      queueMicrotask(() => client.emit("exit", null, "SIGTERM"));
+      return true;
+    });
     client.kill = kill;
     const controller = new AbortController();
     const waiting = waitForProcessMarker(client, "LOCK_READY", () => "still starting", controller.signal);
@@ -53,5 +56,19 @@ describe("process marker coordination", () => {
     expect(output.listenerCount("data")).toBe(0);
     expect(client.listenerCount("error")).toBe(0);
     expect(client.listenerCount("exit")).toBe(0);
+  });
+
+  it("given a child that cannot be signalled, when its request is cancelled, then termination failure is explicit", async () => {
+    // given
+    const { client } = processWithOutput();
+    client.kill = vi.fn().mockReturnValue(false);
+    const controller = new AbortController();
+    const waiting = waitForProcessMarker(client, "LOCK_READY", () => "docker unavailable", controller.signal);
+
+    // when
+    controller.abort();
+
+    // then
+    await expect(waiting).rejects.toThrow("Database lock client could not be terminated: docker unavailable");
   });
 });
