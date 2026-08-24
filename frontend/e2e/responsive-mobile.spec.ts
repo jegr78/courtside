@@ -51,7 +51,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await expect(page.getByTestId("create-court")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
-  // when — the roster is the widest table this product has, so it is where a phone gives out first
+  // when
   await page.goto("/admin/roster");
 
   // then
@@ -76,7 +76,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await page.goto("/admin/audit");
 
   // then
-  await expect(page.getByTestId("audit-row").first()).toBeVisible();
+  await expect(page.getByTestId("admin-audit-view")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -95,4 +95,33 @@ test("the initial-password form remains usable on a touch viewport", async ({ pa
   await page.getByTestId("new-password").fill("permanent-password");
   await page.getByTestId("confirm-password").fill("permanent-password");
   await expect(page.getByTestId("password-submit")).toBeVisible();
+});
+
+test("a court selector wider than the phone shows where more courts continue", async ({ page }) => {
+  // given
+  await signIn(page, "doe.jane");
+  const selector = page.getByTestId("court-selector");
+  await expect(selector).toBeVisible();
+  expect(await selector.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+
+  // then
+  await expect(page.getByTestId("court-selector-continuation")).toBeVisible();
+
+  // when
+  await selector.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
+
+  // then
+  await expect(page.getByTestId("court-selector-continuation")).toBeHidden();
+});
+
+test("a vertical gesture over the phone plan scrolls the page rather than a nested grid", async ({ page }) => {
+  // given
+  await signIn(page, "doe.jane");
+  const plan = page.getByTestId("week-grid");
+  await expect(plan).toBeVisible();
+
+  // then
+  expect(await plan.evaluate((element) => getComputedStyle(element).overflowY)).toBe("visible");
+  expect(await plan.evaluate((element) => element.scrollHeight)).toBe(await plan.evaluate((element) => element.clientHeight));
+  expect(await page.evaluate(() => document.documentElement.scrollHeight > document.documentElement.clientHeight)).toBe(true);
 });

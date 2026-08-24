@@ -98,6 +98,11 @@ input[type="time"] {
   table-layout: fixed;
 }
 
+.day-plan {
+  max-height: 70vh;
+  overflow: auto;
+}
+
 .day-plan-table.day-plan-many-courts {
   min-width: calc(5rem + var(--court-count) * 10rem);
 }
@@ -192,8 +197,28 @@ input[type="time"] {
 }
 
 .mobile-day-navigation,
+.mobile-court-selector-frame,
 .mobile-court-selector {
   display: none;
+}
+
+.mobile-court-selector-continuation {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 3rem;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--cs-panel) 70%);
+}
+
+.mobile-court-selector-continuation::after {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  color: var(--cs-text);
+  content: "›";
+  transform: translateY(-50%);
 }
 
 @media (width < 1024px) {
@@ -202,12 +227,28 @@ input[type="time"] {
   }
 
   .mobile-day-navigation,
+  .mobile-court-selector-frame,
   .mobile-court-selector {
     display: flex;
   }
 
   .mobile-day-navigation {
     display: grid;
+  }
+
+  .mobile-court-selector-frame {
+    position: sticky;
+    display: block;
+  }
+
+  .mobile-court-selector > button {
+    flex: 0 0 auto;
+    min-width: 6rem;
+  }
+
+  .day-plan {
+    max-height: none;
+    overflow: visible;
   }
 
   .day-plan-table.day-plan-many-courts {

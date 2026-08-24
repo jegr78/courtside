@@ -39,7 +39,9 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
   const [cancellation, setCancellation] = useState<Allocation>();
   const planRef = useRef<HTMLDivElement>(null);
+  const courtSelectorRef = useRef<HTMLDivElement>(null);
   const shownDate = useRef<string>(undefined);
+  const [courtSelectorContinues, setCourtSelectorContinues] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -72,6 +74,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
   const selectedAllocations = selectedDate ? data?.allocations.get(selectedDate) ?? [] : [];
   const slots = selectedDay && data ? slotsFor(selectedDay, data.grid) : [];
   const language = i18n.resolvedLanguage ?? i18n.language;
+  const courtCount = data?.courts.length ?? 0;
   const isToday = selectedDate === dateInTimeZoneValue(currentInstant, data?.grid.timeZone);
   const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
   const slotHeight = data ? Math.max(32, data.grid.slotMinutes * 4 / 3) : 40;
@@ -113,6 +116,17 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
     const frame = window.requestAnimationFrame(() => scrollToSlot(planRef.current, currentSlot));
     return () => window.cancelAnimationFrame(frame);
   }, [currentSlot, isToday]);
+
+  useEffect(() => {
+    const selector = courtSelectorRef.current;
+    if (!selector) return;
+    const update = () => setCourtSelectorContinues(
+      selector.scrollLeft + selector.clientWidth < selector.scrollWidth - 1
+    );
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [courtCount, language]);
 
   // Another day has no current time to scroll to.
   useEffect(() => {
@@ -165,15 +179,28 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
       <Button type="button" data-testid="day-next" className="button-secondary px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), 1)))} aria-label={t("week.nextDay")}>›</Button>
     </div>}
 
-    {data && data.courts.length > 1 && <div className="mobile-court-selector surface-panel sticky top-0 z-10 mt-3 flex gap-2 overflow-x-auto py-2" role="group" aria-label={t("week.chooseCourt")}>
-      {data.courts.map((court) => <Button
-        key={court.id}
-        type="button"
-        data-testid={`court-selector-${court.number}`}
-        className={selectedCourtId === court.id ? "" : "button-secondary"}
-        aria-pressed={selectedCourtId === court.id}
-        onClick={() => setSelectedCourtId(court.id)}
-      >{court.name || t("court.number", { number: court.number })}</Button>)}
+    {data && data.courts.length > 1 && <div className="mobile-court-selector-frame surface-panel sticky top-0 z-10 mt-3">
+      <div
+        ref={courtSelectorRef}
+        data-testid="court-selector"
+        className="mobile-court-selector flex gap-2 overflow-x-auto py-2"
+        role="group"
+        aria-label={t("week.chooseCourt")}
+        onScroll={() => {
+          const selector = courtSelectorRef.current;
+          if (selector) setCourtSelectorContinues(selector.scrollLeft + selector.clientWidth < selector.scrollWidth - 1);
+        }}
+      >
+        {data.courts.map((court) => <Button
+          key={court.id}
+          type="button"
+          data-testid={`court-selector-${court.number}`}
+          className={selectedCourtId === court.id ? "" : "button-secondary"}
+          aria-pressed={selectedCourtId === court.id}
+          onClick={() => setSelectedCourtId(court.id)}
+        >{court.name || t("court.number", { number: court.number })}</Button>)}
+      </div>
+      {courtSelectorContinues && <span data-testid="court-selector-continuation" className="mobile-court-selector-continuation" aria-hidden="true" />}
     </div>}
 
     {error && <Alert>{error}</Alert>}
@@ -186,7 +213,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
       data-testid="week-grid"
       data-week-offset={weekOffset}
       tabIndex={0}
-      className="day-plan border-structural relative mt-3 max-h-[70vh] overflow-auto rounded-xl border"
+      className="day-plan border-structural relative mt-3 rounded-xl border"
       style={{ "--court-count": data.courts.length } as CSSProperties}
     >
       <table data-testid="day-plan-table" className={`day-plan-table border-collapse text-sm ${data.courts.length > 4 ? "day-plan-many-courts" : ""}`}>
