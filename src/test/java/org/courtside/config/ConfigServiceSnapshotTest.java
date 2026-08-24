@@ -8,10 +8,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Transactional
 class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
+
+    private static final UUID YOUTH_RULE_SET = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000002");
 
     @Autowired
     private ConfigService config;
@@ -35,7 +39,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
                 "Example Tennis Club", "#34584A", "#D7E24B",
                 "/logo.svg", "/imprint", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
-                new CredentialLifetime(72), new CredentialLifetime(12)));
+                new CredentialLifetime(72), new CredentialLifetime(12), null));
 
         // then
         assertThat(snapshot.getClass().isRecord()).isTrue();
@@ -47,5 +51,47 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
         assertThat(snapshot.defaultLocale()).isEqualTo("en");
         assertThat(snapshot.slotMinutes()).isEqualTo(15);
         assertThat(snapshot.timeZone()).isEqualTo("Pacific/Auckland");
+    }
+
+    @Test
+    void givenNoRuleSetForPeopleWithoutAMembershipType_whenReadingTheConfiguration_thenNoneIsNamed() {
+        // when
+        ClubConfigurationSnapshot snapshot = config.current();
+
+        // then
+        assertThat(snapshot.noMembershipTypeRuleSetId()).isNull();
+    }
+
+    @Test
+    void givenARuleSetForPeopleWithoutAMembershipType_whenUpdating_thenTheSnapshotCarriesIt() {
+        // when
+        ClubConfigurationSnapshot snapshot = config.update(new ChangeClubConfigurationCommand(
+                "Example Tennis Club", "#34584A", "#D7E24B",
+                "/logo.svg", "/imprint", "en",
+                new BookingSlotDuration(15), "Pacific/Auckland",
+                new CredentialLifetime(72), new CredentialLifetime(12), YOUTH_RULE_SET));
+
+        // then
+        assertThat(snapshot.noMembershipTypeRuleSetId()).isEqualTo(YOUTH_RULE_SET);
+    }
+
+    @Test
+    void givenAnAssignedRuleSet_whenClearingIt_thenTheConfigurationNamesNoneAgain() {
+        // given
+        config.update(commandWith(YOUTH_RULE_SET));
+
+        // when
+        ClubConfigurationSnapshot snapshot = config.update(commandWith(null));
+
+        // then
+        assertThat(snapshot.noMembershipTypeRuleSetId()).isNull();
+    }
+
+    private static ChangeClubConfigurationCommand commandWith(UUID noMembershipTypeRuleSetId) {
+        return new ChangeClubConfigurationCommand(
+                "Example Tennis Club", "#34584A", "#D7E24B",
+                "/logo.svg", "/imprint", "en",
+                new BookingSlotDuration(15), "Pacific/Auckland",
+                new CredentialLifetime(72), new CredentialLifetime(12), noMembershipTypeRuleSetId);
     }
 }

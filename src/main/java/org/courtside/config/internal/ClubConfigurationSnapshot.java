@@ -1,5 +1,7 @@
 package org.courtside.config.internal;
 
+import java.util.UUID;
+
 public record ClubConfigurationSnapshot(
         String clubName,
         String primaryColor,
@@ -10,7 +12,8 @@ public record ClubConfigurationSnapshot(
         int slotMinutes,
         String timeZone,
         int newAccountCredentialHours,
-        int passwordResetCredentialHours) {
+        int passwordResetCredentialHours,
+        UUID noMembershipTypeRuleSetId) {
 
     static ClubConfigurationSnapshot from(ClubConfiguration configuration) {
         return new ClubConfigurationSnapshot(
@@ -23,6 +26,7 @@ public record ClubConfigurationSnapshot(
                 configuration.getSlotMinutes(),
                 configuration.getTimeZone(),
                 configuration.getNewAccountCredentialHours(),
-                configuration.getPasswordResetCredentialHours());
+                configuration.getPasswordResetCredentialHours(),
+                configuration.getNoMembershipTypeRuleSetId());
     }
 }

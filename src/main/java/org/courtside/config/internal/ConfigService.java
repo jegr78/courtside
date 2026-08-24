@@ -12,6 +12,7 @@ import org.courtside.config.CredentialLifetime;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.config.ConfigEvent;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
@@ -30,7 +32,10 @@ import java.time.ZoneId;
 public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone,
         CredentialValidity, ClubIdentity {
 
+    private static final String RULE_SET_CONSTRAINT = "club_config_no_membership_type_rule_set";
+
     private final ClubConfigurationRepository configurations;
+    private final RuleSetAssignabilityRepository assignableRuleSets;
     private final SupportedLanguages languages;
     private final List<BookingGridConstraint> bookingGridConstraints;
     private final ApplicationEventPublisher events;
@@ -84,13 +89,39 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     public ClubConfigurationSnapshot update(ChangeClubConfigurationCommand command) {
         languages.require(command.defaultLocale());
         ZoneId zoneId = ZoneId.of(command.timeZone());
+        requireAnAssignableRuleSet(command.noMembershipTypeRuleSetId());
         lock();
         ClubConfiguration configuration = currentEntity();
         Changes changes = changesBetween(configuration, command);
         refuseAConflictingGrid(command, zoneId, changes);
         apply(configuration, command);
+        writeOrRejectAnUnresolvableRuleSet(configuration);
         announce(configuration.getId(), command, changes);
         return ClubConfigurationSnapshot.from(configuration);
+    }
+
+    private void requireAnAssignableRuleSet(UUID ruleSetId) {
+        if (ruleSetId != null && assignableRuleSets.isInactive(ruleSetId)) {
+            throw new NoMembershipTypeRuleSetInactiveException(
+                    "config.noMembershipTypeRuleSet.inactive",
+                    Map.of("field", "noMembershipTypeRuleSetId"));
+        }
+    }
+
+    // Flushed here rather than at commit: a reference the database refuses has to reach the board
+    // as its own answer, and after the transaction closes there is nobody left to tell.
+    private void writeOrRejectAnUnresolvableRuleSet(ClubConfiguration configuration) {
+        try {
+            configurations.saveAndFlush(configuration);
+        } catch (DataIntegrityViolationException e) {
+            String message = e.getMostSpecificCause().getMessage();
+            if (message != null && message.contains(RULE_SET_CONSTRAINT)) {
+                throw new NoMembershipTypeRuleSetInvalidException(
+                        "config.noMembershipTypeRuleSet.unresolvable",
+                        Map.of("field", "noMembershipTypeRuleSetId"), e);
+            }
+            throw e;
+        }
     }
 
     private void refuseAConflictingGrid(ChangeClubConfigurationCommand command, ZoneId zoneId,
@@ -121,6 +152,8 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                 configuration.getNewAccountCredentialHours(), command.newAccountCredential().hours());
         addIfChanged(fields, "passwordResetCredentialHours",
                 configuration.getPasswordResetCredentialHours(), command.passwordResetCredential().hours());
+        addIfChanged(fields, "noMembershipTypeRuleSetId",
+                configuration.getNoMembershipTypeRuleSetId(), command.noMembershipTypeRuleSetId());
         return new Changes(List.copyOf(fields),
                 !Objects.equals(configuration.getDefaultLocale(), command.defaultLocale()),
                 configuration.getSlotMinutes() != command.slotDuration().minutes(),
@@ -139,6 +172,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                 command.slotDuration().minutes(), command.timeZone());
         configuration.changeCredentialValidity(command.newAccountCredential().hours(),
                 command.passwordResetCredential().hours());
+        configuration.bindPeopleWithoutAMembershipTypeTo(command.noMembershipTypeRuleSetId());
     }
 
     private void announce(UUID configId, ChangeClubConfigurationCommand command, Changes changes) {

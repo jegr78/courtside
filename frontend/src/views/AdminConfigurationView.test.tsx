@@ -36,6 +36,65 @@ describe("AdminConfigurationView", () => {
     ]);
   });
 
+  it("when the configuration is loaded, then the rule set for people without a membership type is offered", async () => {
+    // given
+    vi.spyOn(api, "ruleSets").mockResolvedValue([
+      { id: "rule-set", name: "Standard", active: true },
+      { id: "retired", name: "Retired", active: false }
+    ]);
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // when
+    const select = await screen.findByTestId("no-membership-type-rule-set");
+
+    // then — an inactive set is not offered, because assigning one is refused
+    expect(within(select).getAllByRole("option").map((option) => option.getAttribute("value")))
+      .toEqual(["", "rule-set"]);
+  });
+
+  it("given a chosen rule set for people without a membership type, when saving, then it is written", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      noMembershipTypeRuleSetId: "rule-set"
+    });
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("no-membership-type-rule-set");
+
+    // when
+    fireEvent.change(screen.getByTestId("no-membership-type-rule-set"), { target: { value: "rule-set" } });
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(
+      expect.objectContaining({ noMembershipTypeRuleSetId: "rule-set" })));
+  });
+
+  it("given an assigned rule set that has since been deactivated, when the configuration is loaded, then it is still the selected one", async () => {
+    // given
+    vi.spyOn(api, "ruleSets").mockResolvedValue([
+      { id: "rule-set", name: "Standard", active: true },
+      { id: "retired", name: "Retired", active: false }
+    ]);
+    vi.spyOn(api, "adminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      noMembershipTypeRuleSetId: "retired"
+    });
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // when
+    const select = await screen.findByTestId("no-membership-type-rule-set");
+
+    // then — dropping it from the list would clear the club's choice on the next save
+    expect((select as HTMLSelectElement).value).toEqual("retired");
+    expect(within(select).getAllByRole("option").map((option) => option.getAttribute("value")))
+      .toContain("retired");
+  });
+
   it("given a mistyped rule set name, when it is corrected, then the correction is written", async () => {
     // given
     const changing = vi.spyOn(api, "changeRuleSet")
@@ -271,6 +330,24 @@ describe("AdminConfigurationView", () => {
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("The input does not have the permitted format.");
+  });
+
+  it("given a rule set the instance refuses, when saving, then the board is told why in its own language", async () => {
+    // given
+    vi.spyOn(api, "changeAdminConfig").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:no-membership-type-rule-set-inactive",
+      title: "Rule set inactive",
+      status: 400,
+      violations: [{ code: "config.noMembershipTypeRuleSet.inactive", params: { field: "noMembershipTypeRuleSetId" } }]
+    }));
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("club-name");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("The chosen rule set is not active.");
   });
 
   it("offers the club time zone as a list of known zones", async () => {

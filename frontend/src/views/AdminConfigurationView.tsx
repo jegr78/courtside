@@ -34,7 +34,8 @@ function editable(loaded: AdminClubConfig): ClubConfigRequest {
     slotMinutes: loaded.slotMinutes,
     timeZone: loaded.timeZone,
     newAccountCredentialHours: loaded.newAccountCredentialHours,
-    passwordResetCredentialHours: loaded.passwordResetCredentialHours
+    passwordResetCredentialHours: loaded.passwordResetCredentialHours,
+    noMembershipTypeRuleSetId: loaded.noMembershipTypeRuleSetId ?? null
   };
 }
 
@@ -108,6 +109,11 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     await mutateRuleSet(() => api.createRuleSet({ name }));
     formElement.reset();
   }
+
+  // A set that went inactive after it was chosen stays on the list: dropping it would clear the
+  // club's own choice the next time anybody saves this form.
+  const assignableRuleSets = ruleSets.filter((ruleSet) =>
+    ruleSet.active || ruleSet.id === config?.noMembershipTypeRuleSetId);
 
   const selectedRuleSet = ruleSets.find((ruleSet) => ruleSet.id === selectedRuleSetId);
   // Retiring a rule set does not stop it binding: the rule query joins on rule_set_id without
@@ -221,6 +227,18 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
           <TextField data-testid="new-account-credential-hours" type="number" min={1} max={8760} label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => changeConfig({ newAccountCredentialHours: Number(event.target.value) })} />
           <TextField data-testid="password-reset-credential-hours" type="number" min={1} max={8760} label={t("admin.config.passwordResetCredentialHours")} value={config.passwordResetCredentialHours} onChange={(event) => changeConfig({ passwordResetCredentialHours: Number(event.target.value) })} />
+          <div className="grid gap-1">
+            <label className="grid gap-2 font-medium">
+              {t("admin.config.noMembershipTypeRuleSet")}
+              <select data-testid="no-membership-type-rule-set" className="form-control rounded-lg border px-3 py-3"
+                      value={config.noMembershipTypeRuleSetId ?? ""}
+                      onChange={(event) => changeConfig({ noMembershipTypeRuleSetId: event.target.value || null })}>
+                <option value="">{t("admin.config.noMembershipTypeRuleSetNone")}</option>
+                {assignableRuleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
+              </select>
+            </label>
+            <p className="text-muted text-sm">{t("admin.config.noMembershipTypeRuleSetHelp")}</p>
+          </div>
           <div className="grid gap-1">
             <label className="grid gap-2 font-medium">
               {t("admin.config.timeZone")}

@@ -50,7 +50,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 request.getLogoUrl(), request.getImprintUrl(), request.getDefaultLocale(),
                 new BookingSlotDuration(request.getSlotMinutes()), request.getTimeZone(),
                 new CredentialLifetime(request.getNewAccountCredentialHours()),
-                new CredentialLifetime(request.getPasswordResetCredentialHours())))));
+                new CredentialLifetime(request.getPasswordResetCredentialHours()),
+                request.getNoMembershipTypeRuleSetId()))));
     }
 
     @Override
@@ -86,6 +87,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.newAccountCredentialHours(),
                 configuration.passwordResetCredentialHours())
                 .logoUrl(configuration.logoUrl())
-                .imprintUrl(configuration.imprintUrl());
+                .imprintUrl(configuration.imprintUrl())
+                .noMembershipTypeRuleSetId(configuration.noMembershipTypeRuleSetId());
     }
 }

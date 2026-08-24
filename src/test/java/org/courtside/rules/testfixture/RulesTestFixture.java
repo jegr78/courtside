@@ -13,4 +13,10 @@ public class RulesTestFixture {
     public UUID activeRuleSet(String name) {
         return rules.createRuleSet(name).getId();
     }
+
+    public UUID inactiveRuleSet(String name) {
+        UUID ruleSetId = activeRuleSet(name);
+        rules.setRuleSetActive(ruleSetId, false);
+        return ruleSetId;
+    }
 }
