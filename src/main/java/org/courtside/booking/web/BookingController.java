@@ -2,6 +2,8 @@ package org.courtside.booking.web;
 
 import org.courtside.api.ApiAllocation;
 import org.courtside.api.ApiBookingCreated;
+import org.courtside.api.ApiBookingEligibility;
+import org.courtside.api.ApiViolation;
 import org.courtside.api.ApiCreateBookingRequest;
 import org.courtside.api.ApiBookingStatus;
 import org.courtside.api.ApiPersonalBooking;
@@ -23,6 +25,7 @@ import org.courtside.booking.ParticipationService;
 import org.courtside.booking.PersonalBookingPage;
 import org.courtside.booking.Booking;
 import org.courtside.booking.internal.AllocationVisibilityService;
+import org.courtside.booking.internal.BookingRuleGate;
 import org.courtside.booking.internal.ManagedAppointmentQuery;
 import org.courtside.booking.internal.AllocationVisibilityService.AllocationVisibility;
 import org.courtside.card.BookingCard;
@@ -55,6 +58,7 @@ class BookingController implements BookingsApi {
     private final ManagedAppointmentQuery managedAppointments;
     private final ClubTimeZone timeZone;
     private final ParticipationService participations;
+    private final BookingRuleGate ruleGate;
 
     BookingController(BookingService bookings,
                       CardService cards,
@@ -63,7 +67,8 @@ class BookingController implements BookingsApi {
                       BookingRequestValidator crossFieldRules,
                       ManagedAppointmentQuery managedAppointments,
                       ClubTimeZone timeZone,
-                      ParticipationService participations) {
+                      ParticipationService participations,
+                      BookingRuleGate ruleGate) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
@@ -72,6 +77,17 @@ class BookingController implements BookingsApi {
         this.managedAppointments = managedAppointments;
         this.timeZone = timeZone;
         this.participations = participations;
+        this.ruleGate = ruleGate;
+    }
+
+    @Override
+    public ResponseEntity<ApiBookingEligibility> getBookingEligibility() {
+        UserAccount account = currentUser.requireAccount();
+        List<ApiViolation> violations = ruleGate.bookingEligibilityFor(
+                        personIdOf(account), account.getRoles()).stream()
+                .map(violation -> new ApiViolation(violation.code(), violation.params()))
+                .toList();
+        return ResponseEntity.ok(new ApiBookingEligibility(violations));
     }
 
     @InitBinder

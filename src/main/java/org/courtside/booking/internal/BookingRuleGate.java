@@ -6,6 +6,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberService;
 import org.courtside.rules.RuleContext;
+import org.courtside.rules.CourtBookingPermission;
 import org.courtside.rules.RuleEngine;
 import org.courtside.rules.RuleViolation;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -22,6 +24,7 @@ import java.util.UUID;
 public class BookingRuleGate {
 
     private final RuleEngine ruleEngine;
+    private final CourtBookingPermission bookingPermission;
     private final MemberService members;
     private final UserAccountRepository accounts;
 
@@ -65,6 +68,16 @@ public class BookingRuleGate {
         return accounts.findById(accountId)
                 .map(account -> account.getPerson().getId())
                 .orElse(null);
+    }
+
+    public List<RuleViolation> bookingEligibilityFor(UUID personId, Set<Role> roles) {
+        if (roles.contains(Role.ADMIN)) {
+            return List.of();
+        }
+        UUID membershipTypeId = personId == null
+                ? null
+                : members.membershipTypeIdOf(personId).orElse(null);
+        return bookingPermission.violationsFor(membershipTypeId);
     }
 
     public void requireNoViolations(BookingRuleCheck check) {

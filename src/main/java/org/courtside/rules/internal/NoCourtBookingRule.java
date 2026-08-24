@@ -1,8 +1,8 @@
 package org.courtside.rules.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.rules.CourtBookingPermission;
 import org.courtside.rules.RuleContext;
-import org.courtside.rules.RuleType;
 import org.courtside.rules.RuleViolation;
 import org.springframework.stereotype.Component;
 
@@ -15,15 +15,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NoCourtBookingRule implements BookingRule {
 
-    private static final List<RuleViolation> BARRED =
-            List.of(new RuleViolation("booking.rule.noCourtBooking", Map.of()));
-
-    private final RuleParameterRepository ruleParameters;
+    private final CourtBookingPermission permission;
 
     @Override
     public List<RuleViolation> check(RuleContext context) {
-        return barred(ruleParameters.carriesRule(context.membershipTypeId(),
-                RuleType.NO_COURT_BOOKING));
+        return permission.violationsFor(context.membershipTypeId());
     }
 
     // Reshaping court time somebody may not hold is the same question as taking it in the first
@@ -35,13 +31,8 @@ public class NoCourtBookingRule implements BookingRule {
 
     @Override
     public Prepared prepare() {
-        Map<UUID, Boolean> barsByMembership = new HashMap<>();
-        return context -> barred(barsByMembership.computeIfAbsent(context.membershipTypeId(),
-                membershipTypeId -> ruleParameters.carriesRule(
-                        membershipTypeId, RuleType.NO_COURT_BOOKING)));
-    }
-
-    private static List<RuleViolation> barred(boolean bars) {
-        return bars ? BARRED : List.of();
+        Map<UUID, List<RuleViolation>> violationsByMembership = new HashMap<>();
+        return context -> violationsByMembership.computeIfAbsent(context.membershipTypeId(),
+                permission::violationsFor);
     }
 }

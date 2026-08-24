@@ -73,6 +73,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/managed/bookings",
             "/api/managed/bookings/{id}",
             "/api/bookings",
+            "/api/bookings/eligibility",
             "/api/bookings/{id}",
             "/api/booking-series",
             "/api/booking-series/preview",

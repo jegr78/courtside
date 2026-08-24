@@ -208,6 +208,15 @@ components:
           additionalProperties: true
           examples: [{ maxDays: 14 }]
 
+    BookingEligibility:
+      type: object
+      description: Standing rule violations that prevent the signed-in account from booking a court.
+      required: [violations]
+      properties:
+        violations:
+          type: array
+          items: { $ref: "#/components/schemas/Violation" }
+
     FieldError:
       type: object
       description: A violation that also names the input it came from.
@@ -2128,6 +2137,23 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/bookings/eligibility:
+    get:
+      tags: [bookings]
+      operationId: getBookingEligibility
+      summary: Report standing rule violations that prevent the signed-in account from booking.
+      description: |
+        Returns coded violations for the caller without publishing the rule set or membership type
+        behind them. Slot-specific rules remain authoritative when a booking is submitted.
+      responses:
+        "200":
+          description: The caller's current standing booking eligibility.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingEligibility" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
 
   /api/bookings/{id}:
     delete:

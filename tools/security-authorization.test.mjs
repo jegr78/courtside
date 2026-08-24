@@ -30,10 +30,21 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
   const matrix = buildOperationAuthorizationMatrix(api);
 
   // then
-  assert.equal(matrix.length, 92);
-  assert.equal(new Set(matrix.map((entry) => entry.operationId)).size, 92);
+  assert.equal(matrix.length, 93);
+  assert.equal(new Set(matrix.map((entry) => entry.operationId)).size, 93);
   assert.deepEqual(Object.keys(matrix[0].expectations).toSorted(), [...authorizationActors].toSorted());
   assert.ok(matrix.every((entry) => Object.keys(entry.expectations).length === authorizationActors.length));
+  assert.deepEqual(matrix.find((entry) => entry.operationId === "getBookingEligibility").expectations, {
+    ANONYMOUS: "deny-unauthenticated",
+    MEMBER: "allow",
+    TRAINER: "allow",
+    SPORT_DIRECTOR: "allow",
+    YOUTH_DIRECTOR: "allow",
+    GROUNDSKEEPER: "allow",
+    TREASURER: "allow",
+    ADMIN: "allow",
+    INITIAL_PASSWORD: "deny-forbidden"
+  });
 });
 
 test("given two members and an administrator, when substituting owned identifiers and fields, then state stays unchanged", async () => {

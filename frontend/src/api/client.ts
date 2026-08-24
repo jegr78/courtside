@@ -61,6 +61,7 @@ export type ParticipantCardRequest = components["schemas"]["ParticipantCardReque
 export type PublicParticipantMember = components["schemas"]["PublicParticipantMember"];
 export type CreateBookingRequest = components["schemas"]["CreateBookingRequest"];
 export type BookingCreated = components["schemas"]["BookingCreated"];
+export type BookingEligibility = components["schemas"]["BookingEligibility"];
 export type PersonalBooking = components["schemas"]["PersonalBooking"];
 export type PersonalBookingPage = components["schemas"]["PersonalBookingPage"];
 export type Participation = components["schemas"]["Participation"];
@@ -336,6 +337,7 @@ export const api = {
     headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
     body: JSON.stringify(booking)
   }),
+  bookingEligibility: () => request<BookingEligibility>("/api/bookings/eligibility"),
   cancelBooking: (bookingId: string) => request<void>(`/api/bookings/${bookingId}`, { method: "DELETE" }),
   personalBookings: (cursor?: string, limit = 50) => request<PersonalBookingPage>(
     `/api/my/bookings?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`

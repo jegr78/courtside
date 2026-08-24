@@ -1,6 +1,6 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type Allocation, type BookingGrid, type PublicCourt } from "../api/client";
+import { api, type Allocation, type BookingEligibility, type BookingGrid, type PublicCourt } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -36,6 +36,8 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
   const [selectedCourtId, setSelectedCourtId] = useState<string>();
   const [data, setData] = useState<WeekData>();
   const [error, setError] = useState<string>();
+  const [eligibility, setEligibility] = useState<BookingEligibility>();
+  const [eligibilityError, setEligibilityError] = useState<string>();
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
   const [cancellation, setCancellation] = useState<Allocation>();
   const planRef = useRef<HTMLDivElement>(null);
@@ -69,6 +71,42 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
     return () => { active = false; };
   }, [referenceInstant, t, weekOffset]);
 
+  useEffect(() => {
+    if (!canBook) {
+      setEligibility(undefined);
+      setEligibilityError(undefined);
+      return;
+    }
+    let active = true;
+    setEligibility(undefined);
+    setEligibilityError(undefined);
+    const refresh = () => {
+      void api.bookingEligibility().then((current) => {
+        if (active) {
+          setEligibility(current);
+          setEligibilityError(undefined);
+        }
+      }).catch((failure: unknown) => {
+        if (active) {
+          setEligibility(undefined);
+          setEligibilityError(problemMessage(failure, t));
+        }
+      });
+    };
+    refresh();
+    const interval = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [canBook, t]);
+
+  useEffect(() => {
+    if (eligibility?.violations.length) setBookingSelection(undefined);
+  }, [eligibility]);
+
   const days = data?.days ?? [];
   const selectedDay = days.find((day) => formatDate(day) === selectedDate);
   const selectedAllocations = selectedDate ? data?.allocations.get(selectedDate) ?? [] : [];
@@ -79,6 +117,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
   const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
   const slotHeight = data ? Math.max(32, data.grid.slotMinutes * 4 / 3) : 40;
   const currentSlot = currentTime && (slots.find((slot) => slot >= currentTime) ?? slots.at(-1));
+  const bookingAllowed = canBook && eligibility?.violations.length === 0;
 
   function selectDate(value: string | undefined) {
     if (!value || !data) return;
@@ -204,6 +243,14 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
     </div>}
 
     {error && <Alert>{error}</Alert>}
+    {eligibilityError && <Alert testId="booking-eligibility-error">{eligibilityError}</Alert>}
+    {eligibility && eligibility.violations.length > 0 && <Alert testId="booking-eligibility">
+      <ul>
+        {eligibility.violations.map((violation) => <li key={violation.code} data-code={violation.code}>
+          {t(violation.code, { ...violation.params, defaultValue: t("error.generic") })}
+        </li>)}
+      </ul>
+    </Alert>}
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
     {data && <div className="mt-4 flex justify-end">
       {isToday && <Button type="button" data-testid="current-time" className="button-secondary" onClick={() => scrollToSlot(planRef.current, currentSlot)}>{t("week.now")}</Button>}
@@ -242,7 +289,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
               () => selectedDate && setBookingSelection({ date: selectedDate, slot, courtId: court.id }),
               setCancellation,
               selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false,
-              canBook,
+              bookingAllowed,
               selectedCourtId === court.id
             ))}
           </tr>)}
