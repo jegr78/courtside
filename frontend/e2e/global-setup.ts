@@ -287,7 +287,7 @@ export function waitForProcessMarker(
     };
     const onData = (chunk: Buffer) => {
       output += chunk.toString();
-      if (output.includes(marker)) finish(resolve);
+      if (!cancelling && output.includes(marker)) finish(resolve);
     };
     const onError = (error: Error) => finish(() => reject(error));
     const onExit = (code: number | null, signal: NodeJS.Signals | null) => finish(() => reject(new Error(cancelling

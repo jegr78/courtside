@@ -71,4 +71,23 @@ describe("process marker coordination", () => {
     // then
     await expect(waiting).rejects.toThrow("Database lock client could not be terminated: docker unavailable");
   });
+
+  it("given a marker after cancellation, when the process exits, then cancellation cannot become success", async () => {
+    // given
+    const { client, output } = processWithOutput();
+    client.kill = vi.fn().mockReturnValue(true);
+    const controller = new AbortController();
+    const waiting = waitForProcessMarker(client, "LOCK_READY", () => "cancelled", controller.signal);
+
+    // when
+    controller.abort();
+    output.write("LOCK_READY\n");
+    client.emit("exit", null, "SIGTERM");
+
+    // then
+    await expect(waiting).rejects.toThrow("Database lock acquisition was cancelled: cancelled");
+    expect(output.listenerCount("data")).toBe(0);
+    expect(client.listenerCount("error")).toBe(0);
+    expect(client.listenerCount("exit")).toBe(0);
+  });
 });
