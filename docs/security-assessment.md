@@ -114,13 +114,31 @@ candidates awaiting triage.
 
 [`security-assessment.yml`](../.github/workflows/security-assessment.yml) runs the bounded `safe`
 profile weekly and on manual dispatch. It builds and qualifies one local candidate, resolves its
-immutable Docker image ID, runs the assessment once and retains only the redacted gate record and
-run manifest for 14 days. Missing scanners, missing evidence and incomplete outcomes fail the job;
-they are never normalized as a clean run.
+immutable Docker image ID and runs the assessment once. The artifact retains the redacted gate
+record and run manifest plus a CMS-encrypted envelope of the protected normalized evidence for 14
+days. Missing scanners, missing evidence and incomplete outcomes fail the job; they are never
+normalized as a clean run.
 
 Manual dispatch may select the complete `active` profile for a baseline or retest. It uses the same
 fresh hosted runner, qualified immutable image and evidence gate as the scheduled job. The schedule
 always selects `safe`; an active run is never introduced by changing a default or cron expression.
+
+The public certificate in [`.github/security-evidence-recipient.pem`](../.github/security-evidence-recipient.pem)
+encrypts that envelope with AES-256-GCM through OpenSSL CMS. Its security evidence private key is
+kept outside the repository. Verify the downloaded envelope against `protected-evidence.sha256`,
+then decrypt and extract it without writing its contents into a public workspace or log:
+
+```bash
+openssl cms -decrypt -binary -inform DER \
+  -in protected-evidence.cms \
+  -recip .github/security-evidence-recipient.pem \
+  -inkey <security-evidence-private-key.pem> \
+  -out protected-evidence.tar.gz
+tar -xzf protected-evidence.tar.gz
+```
+
+Rotating the certificate requires proving that retained envelopes have either expired or been
+re-encrypted before the previous private key is retired.
 
 The release workflow runs the complete `active` profile after both architectures qualify the
 candidate and before the security record can be assembled. The active manifest, normalized gate,

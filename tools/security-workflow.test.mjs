@@ -11,6 +11,7 @@ const release = readFileSync(join(repository, ".github/workflows/release.yml"), 
 const scheduled = readFileSync(join(repository, ".github/workflows/security-assessment.yml"), "utf8");
 const policy = readFileSync(join(repository, "docs/security-scanning.md"), "utf8");
 const assessment = readFileSync(join(repository, "docs/security-assessment.md"), "utf8");
+const runContract = JSON.parse(readFileSync(join(repository, "security/run-contract.json"), "utf8"));
 
 test("given a pull request, when the required build runs, then dependency, source and built Java surfaces are scanned", () => {
   // when / then
@@ -33,7 +34,7 @@ test("given a pull request, when the required build runs, then dependency, sourc
 test("given stable assessment suites, when scheduling them, then safe traffic is bounded and evidence fails closed", () => {
   // when / then
   assert.match(scheduled, /schedule:[\s\S]+cron:/);
-  assert.match(scheduled, /timeout-minutes: 45/);
+  assert.match(scheduled, /timeout-minutes:[^\n]+45/);
   assert.match(scheduled, /security-run "\$RUN_ID" safe/);
   assert.match(scheduled, /github\.event_name == 'schedule' && 'safe' \|\| inputs\.profile/);
   assert.match(scheduled, /security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
@@ -51,6 +52,29 @@ test("given a manual baseline run, when selecting active, then the isolated work
   assert.match(scheduled, /security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
   assert.match(scheduled, /if \[\[ "\$PROFILE" = active \]\]; then[\s\S]+security-run "\$RUN_ID" active[\s\S]+--authorize "authorize-active-\$RUN_ID"/);
   assert.match(scheduled, /--profile "\$PROFILE"/);
+});
+
+test("given protected active evidence, when the hosted run finishes, then only its encrypted envelope is uploaded", () => {
+  // when / then
+  assert.equal(existsSync(join(repository, ".github/security-evidence-recipient.pem")), true);
+  assert.match(scheduled, /set -o pipefail[\s\S]+tar -czf - -C[\s\S]+assessment\/attempt-1" evidence[\s\S]+\| openssl cms -encrypt -binary -aes-256-gcm/);
+  assert.match(scheduled, /openssl cms -encrypt -binary -aes-256-gcm[\s\S]+\.github\/security-evidence-recipient\.pem/);
+  assert.match(scheduled, /build\/security-gate\/protected-evidence\.cms/);
+  assert.doesNotMatch(scheduled, /build\/security-gate\/protected-evidence\.tar\.gz/);
+  assert.doesNotMatch(scheduled, /path:[\s\S]+assessment\/attempt-1\/evidence/);
+  assert.match(assessment, /security evidence private key/);
+  assert.match(assessment, /openssl cms -decrypt/);
+});
+
+test("given the active duration contract, when the workflow chooses its job budget, then active retains the safe cleanup reserve", () => {
+  // given
+  const safeMinutes = runContract.profiles.safe.durationSeconds / 60;
+  const activeMinutes = runContract.profiles.active.durationSeconds / 60;
+  const safeJobMinutes = 45;
+  const activeJobMinutes = safeJobMinutes + activeMinutes - safeMinutes;
+
+  // when / then
+  assert.match(scheduled, new RegExp(`timeout-minutes:.*${activeJobMinutes}.*${safeJobMinutes}`));
 });
 
 test("given changed assessment bytes, when the required build runs, then paired immutable evidence is compared", () => {

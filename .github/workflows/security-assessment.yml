@@ -24,7 +24,7 @@ permissions:
 jobs:
   assessment:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.profile == 'active' && 65 || 45 }}
     env:
       PROFILE: ${{ github.event_name == 'schedule' && 'safe' || inputs.profile }}
       RUN_ID: assessment-${{ github.run_id }}-${{ github.run_attempt }}
@@ -66,6 +66,17 @@ jobs:
           umask 077
           mkdir -p build/security-gate
           frontend/node/node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest.json
+      - name: Seal protected assessment evidence
+        if: always()
+        run: |
+          umask 077
+          set -o pipefail
+          tar -czf - -C "build/security/$RUN_ID/assessment/attempt-1" evidence \
+            | openssl cms -encrypt -binary -aes-256-gcm -outform DER \
+            -out build/security-gate/protected-evidence.cms \
+            .github/security-evidence-recipient.pem
+          openssl dgst -sha256 -r build/security-gate/protected-evidence.cms \
+            | awk '{print $1}' > build/security-gate/protected-evidence.sha256
       - name: Enforce the assessment gate
         if: always()
         env:
@@ -87,5 +98,7 @@ jobs:
           path: |
             build/security-gate/manifest.json
             build/security-gate/summary.json
+            build/security-gate/protected-evidence.cms
+            build/security-gate/protected-evidence.sha256
           retention-days: 14
           if-no-files-found: error
