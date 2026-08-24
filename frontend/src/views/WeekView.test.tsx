@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ApiError, api } from "../api/client";
@@ -21,6 +21,12 @@ function freeSlot(courtNumber: number, slot: string) {
 async function findFreeSlot(courtNumber: number, slot: string) {
   await screen.findAllByTestId("free-slot");
   return freeSlot(courtNumber, slot);
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => { resolve = complete; });
+  return { promise, resolve };
 }
 
 beforeEach(async () => {
@@ -264,6 +270,53 @@ it("given a booking dialog is open, when the member becomes barred, then the dia
 
   // then
   expect(await screen.findByTestId("booking-eligibility")).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(freeSlot(1, "12:30").tagName).toBe("DIV");
+});
+
+it("given eligibility refreshes overlap, when an older response arrives last, then the latest refusal remains", async () => {
+  // given
+  const older = deferred<Awaited<ReturnType<typeof api.bookingEligibility>>>();
+  const latest = deferred<Awaited<ReturnType<typeof api.bookingEligibility>>>();
+  vi.mocked(api.bookingEligibility)
+    .mockResolvedValueOnce({ violations: [] })
+    .mockImplementationOnce(() => older.promise)
+    .mockImplementationOnce(() => latest.promise);
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "12:30");
+  await waitFor(() => expect(slot).toHaveRole("button"));
+  window.dispatchEvent(new Event("focus"));
+  window.dispatchEvent(new Event("focus"));
+
+  // when
+  latest.resolve({ violations: [{ code: "booking.rule.noCourtBooking", params: {} }] });
+  expect(await screen.findByTestId("booking-eligibility")).toBeInTheDocument();
+  await act(async () => {
+    older.resolve({ violations: [] });
+    await older.promise;
+  });
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("booking-eligibility")).toBeInTheDocument());
+  expect(freeSlot(1, "12:30").tagName).toBe("DIV");
+});
+
+it("given a booking dialog is open, when eligibility cannot be refreshed, then the dialog closes", async () => {
+  // given
+  vi.mocked(api.bookingEligibility)
+    .mockResolvedValueOnce({ violations: [] })
+    .mockRejectedValueOnce(new Error("unavailable"));
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "12:30");
+  await waitFor(() => expect(slot).toHaveRole("button"));
+  await userEvent.click(slot);
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+  // when
+  window.dispatchEvent(new Event("focus"));
+
+  // then
+  expect(await screen.findByTestId("booking-eligibility-error")).toBeInTheDocument();
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   expect(freeSlot(1, "12:30").tagName).toBe("DIV");
 });

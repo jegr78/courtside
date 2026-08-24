@@ -42,6 +42,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
   const [cancellation, setCancellation] = useState<Allocation>();
   const planRef = useRef<HTMLDivElement>(null);
   const courtSelectorRef = useRef<HTMLDivElement>(null);
+  const eligibilityRequest = useRef(0);
   const shownDate = useRef<string>(undefined);
   const [courtSelectorContinues, setCourtSelectorContinues] = useState(false);
 
@@ -81,13 +82,14 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
     setEligibility(undefined);
     setEligibilityError(undefined);
     const refresh = () => {
+      const request = ++eligibilityRequest.current;
       void api.bookingEligibility().then((current) => {
-        if (active) {
+        if (active && request === eligibilityRequest.current) {
           setEligibility(current);
           setEligibilityError(undefined);
         }
       }).catch((failure: unknown) => {
-        if (active) {
+        if (active && request === eligibilityRequest.current) {
           setEligibility(undefined);
           setEligibilityError(problemMessage(failure, t));
         }
@@ -104,8 +106,8 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
   }, [canBook, t]);
 
   useEffect(() => {
-    if (eligibility?.violations.length) setBookingSelection(undefined);
-  }, [eligibility]);
+    if (eligibilityError || eligibility?.violations.length) setBookingSelection(undefined);
+  }, [eligibility, eligibilityError]);
 
   const days = data?.days ?? [];
   const selectedDay = days.find((day) => formatDate(day) === selectedDate);
