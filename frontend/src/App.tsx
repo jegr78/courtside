@@ -14,6 +14,7 @@ import { InitialPasswordView } from "./views/InitialPasswordView";
 import { LoginView } from "./views/LoginView";
 import { MyBookingsPage } from "./views/MyBookingsPage";
 import { AdminAuditView } from "./views/AdminAuditView";
+import { AdminMessagesView } from "./views/AdminMessagesView";
 import { AdminConfigurationView } from "./views/AdminConfigurationView";
 import { AdminFacilityView } from "./views/AdminFacilityView";
 import { AdminMembershipTypesView } from "./views/AdminMembershipTypesView";
@@ -68,6 +69,9 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <Navigate to="/" replace />} />
     <Route path="/admin/audit" element={session.roles.includes("ADMIN")
       ? <AdminAuditView />
+      : <Navigate to="/" replace />} />
+    <Route path="/admin/messages" element={session.roles.includes("ADMIN")
+      ? <AdminMessagesView />
       : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

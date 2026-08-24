@@ -23,7 +23,8 @@ const destinations: Destination[] = [
   { to: "/admin/roster", testId: "admin-roster-link", label: "nav.adminRoster", visible: isAdmin },
   { to: "/admin/membership-types", testId: "admin-membership-types-link", label: "nav.adminMembershipTypes", visible: isAdmin },
   { to: "/admin/import", testId: "admin-import-link", label: "nav.adminImport", visible: isAdmin },
-  { to: "/admin/audit", testId: "admin-audit-link", label: "nav.adminAudit", visible: isAdmin }
+  { to: "/admin/audit", testId: "admin-audit-link", label: "nav.adminAudit", visible: isAdmin },
+  { to: "/admin/messages", testId: "admin-messages-link", label: "nav.adminMessages", visible: isAdmin }
 ];
 
 // NavLink decides aria-current itself, and its to="/" matches every path, so the court plan would

@@ -86,6 +86,7 @@ public class SecurityConfiguration {
                                 "/admin/configuration", "/admin/facility", "/admin/roster",
                                 "/admin/roster/{personId}", "/admin/membership-types", "/admin/import",
                                 "/admin/audit",
+                                "/admin/messages",
                                 "/index.html",
                                 "/assets/**", "/icon.svg", "/manifest.webmanifest", "/sw.js",
                                 "/workbox-*.js").permitAll()

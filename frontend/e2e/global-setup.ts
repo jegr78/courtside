@@ -356,7 +356,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     mailSink = await new GenericContainer(deployedMailSinkImage())
       .withEnvironment({
         MP_SMTP_TLS_CERT: "/etc/mailpit/cert.pem",
-        MP_SMTP_TLS_KEY: "/etc/mailpit/key.pem"
+        MP_SMTP_TLS_KEY: "/etc/mailpit/key.pem",
+        // A club's relay refuses an address that does not exist, and a journey cannot show what
+        // becomes of a refused message against a sink that accepts every one of them.
+        MP_SMTP_ALLOWED_RECIPIENTS: "@example\\.org$"
       })
       .withCopyContentToContainer([
         { content: relayCertificate.certificate, target: "/etc/mailpit/cert.pem" },

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
-import { api, type ClubConfig, type MembershipType, type PersonRequest, type Role, type RosterEntry } from "../api/client";
+import { api, type ClubConfig, type MembershipType, type MessageEntry, type PersonRequest, type Role, type RosterEntry } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -230,6 +230,7 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
         {t(`admin.person.credentialState.${entry.credentialState ?? "AWAITING_CREDENTIAL"}`)}
       </p>
       <CredentialDestination entry={entry} />
+      <LastMessage entry={entry} />
       <Button data-testid="send-credentials" disabled={disabled || !entry.enabled} className="justify-self-start" type="button" onClick={send}>{t("admin.person.sendCredentials")}</Button>
     </div>
     <Button data-testid="toggle-account" disabled={disabled} className="justify-self-start" type="button" onClick={() => void toggleAccount()}>{t(entry.enabled ? "admin.deactivate" : "admin.activate")}</Button>
@@ -244,6 +245,33 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
       </div>
     </Modal>}
   </section>;
+}
+
+// What became of the message is only visible where a board member asked for it to be sent.
+function LastMessage({ entry }: { entry: RosterEntry }) {
+  const { t } = useTranslation();
+  const [message, setMessage] = useState<MessageEntry>();
+  const [unreadable, setUnreadable] = useState(false);
+
+  useEffect(() => {
+    void api.messages(undefined, 1, { personId: entry.personId })
+      .then((page) => {
+        setMessage(page.entries[0]);
+        setUnreadable(false);
+      })
+      .catch(() => setUnreadable(true));
+  }, [entry]);
+
+  // Saying nothing would read as "nothing was ever sent", which is a different answer entirely.
+  if (unreadable) {
+    return <p data-testid="last-message-unreadable" className="text-muted text-sm">
+      {t("admin.person.lastMessageUnreadable")}
+    </p>;
+  }
+  if (!message) return null;
+  return <p data-testid="last-message" data-state={message.state} className="text-muted text-sm">
+    {t("admin.person.lastMessage")}: {t(`messages.state.${message.state}`)}
+  </p>;
 }
 
 // The address is entered by somebody else and a typo only shows up as a member who never appears,

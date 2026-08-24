@@ -10,6 +10,9 @@ on:
       - 'deploy/compose.yaml'
       - 'tools/courtside.mail-smoke.mjs'
       - '.github/workflows/mail-smoke.yml'
+      # The code that talks to the relay decides whether a message goes out, so a change to it is
+      # as much a reason to run this as a change to the server it talks to.
+      - 'src/main/java/org/courtside/notification/**'
   workflow_dispatch:
 
 concurrency:

@@ -108,6 +108,13 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // then
   await stableScreenshot(page.getByTestId("admin-audit-view"), "admin-audit.png");
+
+  // when — the same reset makes the empty message log the one state it reaches deterministically
+  await page.goto("/admin/messages");
+  await expect(page.getByTestId("messages-empty")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-messages-view"), "admin-messages.png");
 });
 
 async function signIn(page: Page, username: string): Promise<void> {

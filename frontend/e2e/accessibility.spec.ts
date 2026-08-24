@@ -158,6 +158,21 @@ for (const locale of ["de", "en"]) {
     // then
     await expectNoWcagViolations(page);
   });
+
+  test(`${locale} message log administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await page.locator("#locale-preference").selectOption(locale);
+    await signIn(page, "configuration-admin");
+
+    // when — empty, because the control this view adds is the filter and it is on screen either
+    // way; the table's own markup is the shape the roster and the audit table are checked with
+    await page.goto("/admin/messages");
+    await expect(page.getByTestId("messages-empty")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+  });
 }
 
 test("initial password and validation states meet automated WCAG 2.2 AA checks", async ({ page }) => {

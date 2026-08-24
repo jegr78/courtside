@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { api, ApiError, type ClubConfig, type MembershipType, type RosterEntry } from "../api/client";
+import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
 import { AdminPersonView } from "./AdminPersonView";
 
@@ -24,6 +24,12 @@ const club: ClubConfig = {
   slotMinutes: 30, timeZone: "Europe/Berlin"
 };
 
+const handedOver: MessageEntry = {
+  id: "message-1", queuedAt: "2026-08-20T12:00:00Z", settledAt: "2026-08-20T12:00:01Z",
+  kind: "CREDENTIALS_NEW_ACCOUNT", state: "HANDED_OVER", messageId: "<a-message-id@example.org>",
+  reason: null, statusCode: null, personId: "person-1", personName: "Jane Doe"
+};
+
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true };
 const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null, active: true };
 
@@ -42,6 +48,7 @@ describe("AdminPersonView", () => {
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults, juniors]);
     vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
   });
 
   it("given the person cannot load, when opening the page, then the failure replaces the loading state", async () => {
@@ -393,5 +400,59 @@ describe("AdminPersonView", () => {
 
     // then
     expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
+
+  it.each(["QUEUED", "HANDED_OVER", "REFUSED", "FAILED"] as const)(
+    "given the last message to this account is %s, when the person is opened, then it stands beside the credential state",
+    async (state) => {
+      // given
+      vi.spyOn(api, "messages").mockResolvedValue({
+        entries: [{ ...handedOver, state }], nextCursor: null
+      });
+
+      // when
+      showPerson();
+
+      // then
+      const line = await screen.findByTestId("last-message");
+      expect(line).toHaveAttribute("data-state", state);
+      expect(line).toHaveTextContent(i18n.t(`messages.state.${state}`));
+    });
+
+  it("given the message log cannot be reached, when the person is opened, then it says so instead of nothing", async () => {
+    // given — silence here is indistinguishable from "nothing was ever sent", a different answer
+    vi.spyOn(api, "messages").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    showPerson();
+
+    // then
+    expect(await screen.findByTestId("last-message-unreadable")).toBeInTheDocument();
+    expect(screen.queryByTestId("last-message")).not.toBeInTheDocument();
+  });
+
+  it("given an account nothing was ever sent to, when the person is opened, then no line pretends otherwise", async () => {
+    // given — an empty row beside the credential state reads like a failure, and nothing failed
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
+
+    // when
+    showPerson();
+    await screen.findByTestId("credential-state");
+
+    // then
+    expect(screen.queryByTestId("last-message")).not.toBeInTheDocument();
+  });
+
+  it("given a person who holds no account, when they are opened, then nothing is asked about messages to them", async () => {
+    // given
+    const messages = vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
+
+    // when
+    showPerson(withoutAccount);
+    await screen.findByTestId("create-account");
+
+    // then
+    expect(screen.queryByTestId("last-message")).not.toBeInTheDocument();
+    expect(messages).not.toHaveBeenCalled();
   });
 });

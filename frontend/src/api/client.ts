@@ -22,6 +22,9 @@ export type RosterEntry = components["schemas"]["RosterEntry"];
 export type RosterPage = components["schemas"]["RosterPage"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
 export type AuditPage = components["schemas"]["AuditPage"];
+export type MessageEntry = components["schemas"]["MessageEntry"];
+export type MessagePage = components["schemas"]["MessagePage"];
+export type MessageState = components["schemas"]["MessageState"];
 export type PersonRequest = components["schemas"]["PersonRequest"];
 export type MembershipRequest = components["schemas"]["MembershipRequest"];
 export type MembershipType = components["schemas"]["MembershipType"];
@@ -308,6 +311,15 @@ export const api = {
       ...(subjectId ? { subjectId } : {})
     })}`
   ),
+  messages: (cursor?: string, limit = 50, options: { unsettled?: boolean; personId?: string } = {}) =>
+    request<MessagePage>(
+      `/api/admin/messages?${new URLSearchParams({
+        limit: String(limit),
+        ...(cursor ? { cursor } : {}),
+        ...(options.unsettled ? { unsettled: "true" } : {}),
+        ...(options.personId ? { personId: options.personId } : {})
+      })}`
+    ),
   source: () => request<SourceOffer>("/api/source"),
   courts: () => request<PublicCourt[]>("/api/public/courts"),
   bookingGrid: () => request<BookingGrid>("/api/public/booking-grid"),

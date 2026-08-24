@@ -2,6 +2,7 @@ package org.courtside.notification.internal;
 
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.CredentialValidity;
+import org.courtside.notification.MessageKind;
 import org.courtside.shared.CredentialIssuer;
 import org.courtside.shared.CredentialsRequested;
 import org.courtside.shared.IssuedCredential;
@@ -37,8 +38,10 @@ class CredentialMailerTest {
     private final MailProperties properties = new MailProperties(
             "mail.example.org", 587, "noreply@example.org", "board@example.org", null, null, false);
 
+    private final MessageLog messages = mock(MessageLog.class);
+
     private final CredentialMailer mailer = new CredentialMailer(credentials, validity, club,
-            new MailTemplates(), dispatch, new MailHandover(gap -> { }), properties,
+            new MailTemplates(), dispatch, new MailHandover(gap -> { }), properties, messages,
             Clock.fixed(NOW, ZONE));
 
     @Test
@@ -107,6 +110,25 @@ class CredentialMailerTest {
     private void issuesTo(UUID accountId, String firstName, String username) {
         when(credentials.issueFor(eq(accountId), any())).thenReturn(new IssuedCredential(
                 ADDRESS, firstName, "de", username, "a-credential", NOW.plus(Duration.ofDays(7))));
+    }
+
+    @Test
+    void givenTheTwoReasonsAMemberIsWrittenTo_whenTheyAreSent_thenTheRecordCarriesTheMessagesOwnName() {
+        // given
+        club("de");
+        issues("de");
+
+        // when
+        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
+        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.PASSWORD_RESET));
+
+        // then — the template's own key, so a later message joins without identity's vocabulary
+        ArgumentCaptor<MessageKind> kinds = ArgumentCaptor.forClass(MessageKind.class);
+        verify(messages, times(2)).queued(eq(ACCOUNT), kinds.capture(), anyString());
+        assertThat(kinds.getAllValues()).containsExactly(
+                MessageKind.CREDENTIALS_NEW_ACCOUNT, MessageKind.CREDENTIALS_PASSWORD_RESET);
+        assertThat(kinds.getAllValues()).extracting(MessageKind::templateKey)
+                .containsExactly("credentials.newAccount", "credentials.passwordReset");
     }
 
     private String subjectSent() {

@@ -14,15 +14,15 @@
 
 ## 0. What is built today
 
-Fourteen modules exist: `api`, `audit`, `booking`, `card`, `config`, `dataexchange`, `demo`, `facility`,
-`identity`, `member`, `performance`, `rules`, `securityassessment`, `shared`. `api` holds the OpenAPI-generated request, response and
+Fifteen modules exist: `api`, `audit`, `booking`, `card`, `config`, `dataexchange`, `demo`, `facility`,
+`identity`, `member`, `notification`, `performance`, `rules`, `securityassessment`, `shared`. `api` holds the OpenAPI-generated request, response and
 controller-interface types and carries no logic of its own, which is why it is declared shared
 alongside `shared` rather than given `allowedDependencies` of its own. `demo` and `performance`
 seed disposable environments — a walkthrough dataset and a synthetic load-test dataset — and each
 refuses to start unless its environment guard confirms the database it is about to fill is the
 disposable one it names (`courtside_dev` for `demo`, `courtside_perf` for `performance`), not
-whatever the deployment happens to point at. The `notification`, `reporting` and `integration`
-modules of section 3 are designed and not built. `audit` is built: every configuration change made
+whatever the deployment happens to point at. The `reporting` and `integration` modules of section 3
+are designed and not built. `audit` is built: every configuration change made
 through the admin API — facility, cards, config, rule sets and the roster — is recorded in the
 append-only `domain_event` table before the commit that makes it: actor, time, entity, and, except
 for free text, the values. A free-text field never carries its value — a create event omits it, a
@@ -74,14 +74,28 @@ administrator without ever opening it. The message names the date its password s
 sign-in enforces that date: once it has passed the credential no longer authenticates, and the
 board issues a new one. How long an invitation and a reset last is a club setting, one figure for
 each, so a board that knows its own members decides it rather than inheriting ours. The date binds
-the issued credential only, so a member who has since chosen their own password keeps it. A message
-the relay refuses is retried, and if it is still refused the event stays outstanding rather than
-being recorded as delivered, so a restart republishes it instead of losing it. Issuing and sending
-are one transaction: a credential nobody received never replaces the one on file, and a member is
-not locked out by a mail server that was briefly away. The price is that the answer a board reads
-is that its request was accepted, not that anything has gone out — the state on the person's page
-is what says that — and that the retry ladder holds a database connection and that account's row
-for as long as it runs. What raises the
+the issued credential only, so a member who has since chosen their own password keeps it. A message a
+transport failure interrupts is retried, and if the ladder is spent the event stays outstanding
+rather than being recorded as sent, so a restart republishes it instead of losing it. A recipient
+the relay itself rejects is not retried at all: an address nobody holds is not going to start
+existing between attempts. Issuing and sending are one transaction: a credential nobody received
+never replaces the one on file, and a member is not locked out by a mail server that was briefly
+away. The price is that the retry ladder holds a database connection and that account's row for as
+long as it runs.
+
+Every outgoing message leaves a record of its own, in `message_record`: which account, which kind of
+message, the `Message-ID` this instance set, when it was queued and what became of it. Four states,
+and none of them says delivered — `queued`, `handed_over`, `refused`, `failed` — because handing a
+message to the club's mail server is the last thing this instance can observe, and a state claiming
+more would claim knowledge nobody has. A refusal carries the kinds of failure the mail library
+reported and the SMTP status code, never the relay's own words about an address. The record stands
+on its own transaction per state change, so the rollback that protects the credential above cannot
+take the row that explains it. `GET /api/admin/messages` reads it back, cursor-paged and
+administrator-only — who was written to and when is personal data, and no officer role needs it —
+and the administration surface shows it as a log of its own and as the last message beside the
+credential state on the person's page. There is no control anywhere that sends the same message
+again: a credential exists only as a hash once it has gone out, so the remedy for a refusal is to
+correct the address and ask for new credentials. What raises the
 event is the roster: creating an account asks for a credential at once, and one action sends a new
 one afterwards, for a message that never arrived, a deadline that passed, or a member who no longer
 knows their own password. Nobody on the board chooses it, sees it, or has to pass it on, and it
@@ -1136,7 +1150,7 @@ alerting.
 | `courtside.bookings.conflicts` | Built | Counter | How often concurrent occupancy prevents a booking |
 | `courtside.password.rehash.failed` | Built | Counter (stage) | A rehash that only logs still leaves hashes at the old cost |
 | `courtside.outbox.pending` | Planned with outbox | Gauge | Are emails backing up — the key leading indicator |
-| `courtside.notifications.failed` | Planned with notifications | Counter (reason) | See delivery problems before the complaint |
+| `courtside.messages` | Built | Counter (**state**) | What became of what this instance sent, without opening the table |
 | `courtside.login.failed` | Planned | Counter | Attack detection and UX signal |
 | `courtside.backup.age.seconds` | Planned with backup automation | Gauge | The alert everyone forgets |
 
@@ -1430,6 +1444,13 @@ deliver the implementation.
   instance learns the headers only as the mapping the board saved. This is a stronger promise than
   the one above and a separate one: the snapshot a club later uploads *is* sent, and is then bound
   by the retention. Configuring the source that receives it is not. **Built.**
+- **A message record goes when the account it explains goes.** `message_record` holds no address,
+  no name and no body — an account id, a kind, a state, a `Message-ID`, two instants, the order it
+  was written in, and, where a handover failed, the kinds of failure the mail library reported and
+  the SMTP status code, neither of which carries the relay's own words about an address — and it is
+  removed with the account by `ON DELETE CASCADE`. There is no second retention setting for it: a
+  row that outlived the account would explain a message to nobody, and one that vanished earlier
+  would leave the club unable to answer why a member never heard from the instance. **Built.**
 - **Subject access and portability** (Art. 15/20) as self-service: every member can export
   their own data as JSON. The Release 1 export covers this.
 - **Documentation templates in the repository**: a pre-filled record of processing
