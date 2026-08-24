@@ -29,8 +29,15 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   const inventory = buildOpenApiFuzzInventory(api);
 
   // then
-  assert.equal(inventory.length, 92);
-  assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 92);
+  assert.equal(inventory.length, 93);
+  assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 93);
+  assert.deepEqual(inventory.find(({ operationId }) => operationId === "getBookingEligibility"), {
+    operationId: "getBookingEligibility",
+    method: "GET",
+    path: "/api/bookings/eligibility",
+    modes: ["positive"],
+    excludedModes: { negative: "The operation has no request input to invalidate." }
+  });
   assert.equal(inventory.find(({ operationId }) => operationId === "listRoster").modes.join(","),
     "positive,negative");
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "createCourt").modes, ["negative"]);

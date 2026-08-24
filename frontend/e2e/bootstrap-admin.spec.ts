@@ -88,6 +88,32 @@ test("a seeded member stays signed in across a reload and can sign out", async (
   await expect(page.getByTestId("login-view")).toBeVisible();
 });
 
+test("a barred member sees the refusal before a booking dialog can open", async ({ page, journeyService }) => {
+  // given
+  await journeyService.executeSql(`
+    INSERT INTO rule_definition (id, rule_set_id, rule_type, params)
+    VALUES ('bbbbbbbb-0000-0000-0000-000000000099',
+      'aaaaaaaa-0000-0000-0000-000000000001', 'NO_COURT_BOOKING', '{}'::jsonb)
+  `);
+  await page.goto("/login");
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("temporary-password");
+
+  // when
+  await page.getByTestId("login-submit").click();
+
+  // then
+  const refusal = page.getByTestId("booking-eligibility");
+  await expect(refusal).toContainText("Booking a court is not open to you.");
+  await expect(refusal.locator('[data-code="booking.rule.noCourtBooking"]')).toBeVisible();
+  await selectJourneyDate(page, journeyService.visualDate);
+  const targetSlot = freeSlot(page, 2, "12:00");
+  await expect(targetSlot).toBeVisible();
+  await expect(targetSlot).not.toHaveRole("button");
+  await targetSlot.click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+});
+
 test("a seeded member can book a free slot and cancel it again", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");

@@ -705,6 +705,10 @@ it* — that set is measured exactly like a membership type's own, which is why 
 Where a club has named none, such a person is bound by no membership-scoped rule at all, the bar
 included.
 
+The signed-in court plan reads this standing permission before it offers a booking action and shows
+the same coded violation that a refused write returns. Anonymous callers receive neither the check
+nor the membership or rule-set configuration behind it.
+
 It also survives a move, which no other overridable rule does. A move neither creates court time nor
 adds a booking, so the quantity rules leave it alone and only the grid decides where an occurrence
 may land; the bar is a different question, and somebody who may not book must not be able to reshape
