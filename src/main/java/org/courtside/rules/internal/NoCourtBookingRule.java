@@ -26,6 +26,13 @@ public class NoCourtBookingRule implements BookingRule {
                 RuleType.NO_COURT_BOOKING));
     }
 
+    // Reshaping court time somebody may not hold is the same question as taking it in the first
+    // place, so a move has to ask it too.
+    @Override
+    public boolean appliesToAMove() {
+        return true;
+    }
+
     @Override
     public Prepared prepare() {
         Map<UUID, Boolean> barsByMembership = new HashMap<>();

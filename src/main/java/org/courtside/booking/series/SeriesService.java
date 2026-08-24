@@ -8,9 +8,11 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -189,9 +191,11 @@ public class SeriesService {
                 .toList();
         List<ParticipantCardCapacity.Target> targets = participantTargets(planned);
 
-        List<List<RuleViolation>> ruleViolations = ruleGate.nonOverridableViolationsFor(
+        Map<UUID, Optional<UUID>> owners = new HashMap<>();
+        List<List<RuleViolation>> ruleViolations = ruleGate.moveViolationsFor(
                 planned.stream().map(move -> ownerCheck(
-                        move.courts(), move.cardId(), move.to(), move.bookedBy())).toList());
+                        move.courts(), move.cardId(), move.to(), move.bookedBy(), callerRoles, owners))
+                        .toList());
         List<MovePreview.Move> moves = IntStream.range(0, planned.size())
                 .mapToObj(index -> toPreviewMove(
                         planned.get(index), planned, movingIds, targets, ruleViolations.get(index)))
@@ -226,10 +230,12 @@ public class SeriesService {
         List<UUID> movingIds = movingBookingIds(executions);
         executions.forEach(execution -> facility.requireBookableCourts(execution.courtIds()));
 
-        List<List<RuleViolation>> ruleViolations = ruleGate.nonOverridableViolationsFor(
+        Map<UUID, Optional<UUID>> owners = new HashMap<>();
+        List<List<RuleViolation>> ruleViolations = ruleGate.moveViolationsFor(
                 executions.stream().map(execution -> ownerCheck(
                         execution.courtIds(), execution.booking().getCardId(),
-                        execution.slot(), execution.booking().getBookedBy())).toList());
+                        execution.slot(), execution.booking().getBookedBy(), callerRoles, owners))
+                        .toList());
         IntStream.range(0, executions.size()).forEach(index -> {
             MoveExecution execution = executions.get(index);
             requireNoViolations(ruleViolations.get(index));
@@ -308,9 +314,15 @@ public class SeriesService {
                 violations);
     }
 
-    private BookingRuleCheck ownerCheck(List<UUID> courtIds, UUID cardId,
-                                       TimeSlot slot, UUID bookedBy) {
-        return new BookingRuleCheck(courtIds, cardId, slot, bookedBy, null, Set.of());
+    // The person measured is the one holding the booking, not the one moving it; the roles are the
+    // mover's, because the override is a property of who is acting. One series, one owner, one read.
+    private BookingRuleCheck ownerCheck(List<UUID> courtIds, UUID cardId, TimeSlot slot,
+                                        UUID bookedBy, Set<Role> callerRoles,
+                                        Map<UUID, Optional<UUID>> owners) {
+        UUID bookedByPersonId = owners
+                .computeIfAbsent(bookedBy, account -> Optional.ofNullable(ruleGate.personBehind(account)))
+                .orElse(null);
+        return new BookingRuleCheck(courtIds, cardId, slot, bookedBy, bookedByPersonId, callerRoles);
     }
 
     private void requireNoViolations(List<RuleViolation> violations) {

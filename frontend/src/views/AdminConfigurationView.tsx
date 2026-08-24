@@ -291,7 +291,7 @@ function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTy
   return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
     <div><h3 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <GlobalRuleLink ruleType={type.ruleType} />}</div>
     {type.configurable && <>
-      {type.parameters.length === 0 && <p data-testid={`rule-${type.ruleType}-description`} className="text-muted text-sm">{t(`admin.rules.description.${type.ruleType}`)}</p>}
+      {type.parameters.length === 0 && <p data-testid={`rule-${type.ruleType}-description`} className="text-muted text-sm">{t(`admin.rules.description.${type.ruleType}`, { defaultValue: "" })}</p>}
       {type.parameters.map((parameter) => <div key={parameter.name} className="grid gap-1">
         <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setParams({ ...params, [parameter.name]: Number(event.target.value) })} />
         <p data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted text-sm">{t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}</p>

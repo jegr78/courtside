@@ -109,8 +109,10 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         assertThat(moved).isEqualTo(count);
         assertStableRuleQueriesAreBounded(previewSnapshot);
         assertStableRuleQueriesAreBounded(moveSnapshot, 14);
+        // One more than before, and constant: a move resolves the person holding the series once for
+        // the whole batch, because the bar is measured against them and not against whoever moves it.
         assertThat(previewSnapshot.total()).as(previewSnapshot.toString())
-                .isLessThanOrEqualTo(3L * count + 13);
+                .isLessThanOrEqualTo(3L * count + 14);
         assertThat(moveSnapshot.total()).as(moveSnapshot.toString())
                 .isLessThanOrEqualTo(8L * count + 30);
     }

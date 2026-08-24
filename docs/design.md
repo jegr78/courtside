@@ -699,18 +699,33 @@ and its violation carries its own key. A club builds a "passive" rule set, switc
 points the membership type at it — a row, not a release.
 
 It is an overridable rule, because it states who may book rather than what the grid is: an
-administrator recording a court for somebody is doing their job. Taking the membership away does
-not lift it — the rule set for people holding no membership type is measured the same way, which
-is why that had to exist first.
+administrator recording a court for somebody is doing their job. Taking the membership away does not
+lift it *where a club has named a rule set for people holding no membership type and put the bar in
+it* — that set is measured exactly like a membership type's own, which is why it had to exist first.
+Where a club has named none, such a person is bound by no membership-scoped rule at all, the bar
+included.
+
+It also survives a move, which no other overridable rule does. A move neither creates court time nor
+adds a booking, so the quantity rules leave it alone and only the grid decides where an occurrence
+may land; the bar is a different question, and somebody who may not book must not be able to reshape
+what they already hold. `BookingRule.appliesToAMove` is where a rule says so, and it answers
+`!isOverridable()` unless a rule states otherwise — a move that stayed silent would only ever miss a
+restriction, never accept one the grid cannot hold.
+
+What the bar does **not** govern is being named as a participant: a member barred from booking can
+still be recorded as somebody else's co-player, because participants are named inside the booking
+and only the booker is measured. A club that wants that closed as well is asking a different
+question — who may *play* — and the product does not answer it today.
 
 ### Two kinds of rule: who may book, and what the grid is
 
 Rules split along a line that matters more than it first appears:
 
-**Overridable rules restrict who may book.** Advance window, maximum open bookings, and the
-roles a booking card allows are all statements about a person's entitlement. `ADMIN` sets
-them aside — no flag, no per-request opt-in, the role itself is the override. An admin
-placing a training block six weeks out is doing their job, not circumventing anything.
+**Overridable rules restrict who may book.** Advance window, maximum open bookings, the bar on
+booking at all, and the roles a booking card allows are all statements about a person's
+entitlement. `ADMIN` sets them aside — no flag, no per-request opt-in, the role itself is the
+override. An admin placing a training block six weeks out is doing their job, not circumventing
+anything.
 
 **Non-overridable rules describe the grid itself.** Opening hours and the slot granularity
 are properties of the facility, not of the person booking. The booking UI renders exactly
@@ -727,13 +742,18 @@ bookings on it consistent.
 public interface BookingRule {
     List<RuleViolation> check(RuleContext context);
     default boolean isOverridable() { return true; }
+    default boolean appliesToAMove() { return !isOverridable(); }
 }
 ```
 
-`RuleEngine.evaluate` runs every rule; `evaluateNonOverridable` runs only the second kind. A
-new rule is overridable unless it says otherwise, which is the safe default: forgetting the
-flag costs an admin a restriction they could have skipped, never a booking the grid cannot
-hold.
+`RuleEngine.evaluate` runs every rule; `evaluateNonOverridable` runs only the second kind;
+`evaluateForAMove` runs what a move still has to satisfy. A new rule is overridable unless it says
+otherwise, which is the safe default: forgetting the flag costs an admin a restriction they could
+have skipped, never a booking the grid cannot hold.
+
+A move is measured against the person holding the booking, with the roles of whoever is moving it
+deciding the override. The check the move builds carries both, because a rule that resolves the
+membership from an absent person measures the wrong rule set without saying so.
 
 Below all of it sits the court's non-overlap constraint, which is not a rule at all. Two
 bookings on one court at one time is not a permission question, and the guarantee lives in

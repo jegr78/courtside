@@ -3,6 +3,7 @@ package org.courtside.booking.internal;
 import org.courtside.booking.BookingRuleCheck;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.identity.Role;
+import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberService;
 import org.courtside.rules.RuleContext;
 import org.courtside.rules.RuleEngine;
@@ -22,6 +23,7 @@ public class BookingRuleGate {
 
     private final RuleEngine ruleEngine;
     private final MemberService members;
+    private final UserAccountRepository accounts;
 
     public List<RuleViolation> violationsFor(BookingRuleCheck check) {
         RuleContext context = contextOf(check);
@@ -47,10 +49,22 @@ public class BookingRuleGate {
                 : ruleEngine.evaluateNonOverridable(contexts);
     }
 
-    public List<List<RuleViolation>> nonOverridableViolationsFor(List<BookingRuleCheck> checks) {
-        return ruleEngine.evaluateNonOverridable(checks.stream()
-                .map(this::contextOf)
-                .toList());
+    // A move is measured against the person who holds the booking, with the caller's roles deciding
+    // the override: an administrator moving somebody's court is doing their job, the holder is not.
+    public List<List<RuleViolation>> moveViolationsFor(List<BookingRuleCheck> checks) {
+        if (checks.isEmpty()) {
+            return List.of();
+        }
+        List<RuleContext> contexts = checks.stream().map(this::contextOf).toList();
+        return restrictionsApplyTo(checks.getFirst())
+                ? ruleEngine.evaluateForAMove(contexts)
+                : ruleEngine.evaluateNonOverridable(contexts);
+    }
+
+    public UUID personBehind(UUID accountId) {
+        return accounts.findById(accountId)
+                .map(account -> account.getPerson().getId())
+                .orElse(null);
     }
 
     public void requireNoViolations(BookingRuleCheck check) {

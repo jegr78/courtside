@@ -68,6 +68,10 @@ public class MemberTestFixture {
         return memberships.createMembershipType(name, null).getId();
     }
 
+    public UUID membershipTypeMeasuredBy(String name, UUID ruleSetId) {
+        return memberships.createMembershipType(name, ruleSetId).getId();
+    }
+
     public void deactivateMembershipType(UUID membershipTypeId) {
         memberships.setMembershipTypeActive(membershipTypeId, false);
     }

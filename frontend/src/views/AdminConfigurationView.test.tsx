@@ -359,7 +359,7 @@ describe("AdminConfigurationView", () => {
     const description = await screen.findByTestId("rule-NO_COURT_BOOKING-description");
 
     // then — a Save button beside no field says nothing on its own
-    expect(description).toHaveTextContent("This rule has no setting.");
+    expect(description).toHaveTextContent("nobody measured by that set may book a court or move a booking");
     expect(screen.getByTestId("save-rule-NO_COURT_BOOKING")).toBeInTheDocument();
   });
 
