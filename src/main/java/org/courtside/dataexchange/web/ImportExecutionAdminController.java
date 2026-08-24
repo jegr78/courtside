@@ -43,7 +43,8 @@ class ImportExecutionAdminController implements AdminImportRunsApi {
         return new ApiImportRun(outcome.runId(), outcome.sourceId(), outcome.previewId(),
                 ApiSnapshotMode.fromValue(outcome.mode().name()), outcome.fileHash(),
                 outcome.created(), outcome.corrected(), outcome.membershipsEnded(),
-                outcome.accountsDisabled(), outcome.rolesRemoved(), outcome.rowErrors(),
+                outcome.accountsCreated(), outcome.accountsDisabled(), outcome.rolesRemoved(),
+                outcome.rowErrors(),
                 outcome.removalsConfirmed(), WireTypes.toOffsetDateTime(outcome.executedAt()));
     }
 }

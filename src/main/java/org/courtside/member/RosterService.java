@@ -83,6 +83,12 @@ public class RosterService {
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
     }
 
+    public Set<UUID> personIdsHoldingAnAccount(List<UUID> personIds) {
+        return personIds.isEmpty() ? Set.of() : accounts.findByPersonIdIn(personIds).stream()
+                .map(account -> account.getPerson().getId())
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
     public RosterEntry person(UUID personId) {
         UUID id = requiredPersonId(personId);
         return load(List.of(id)).stream().findFirst()

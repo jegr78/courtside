@@ -30,8 +30,8 @@ const handedOver: MessageEntry = {
   reason: null, statusCode: null, personId: "person-1", personName: "Jane Doe"
 };
 
-const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true };
-const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null, active: true };
+const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
+const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null, active: true, grantsAccount: false };
 
 function showPerson(entry: RosterEntry = jane) {
   vi.spyOn(api, "person").mockResolvedValue(entry);

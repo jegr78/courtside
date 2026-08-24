@@ -6,7 +6,9 @@ const MEMBER_LIST = [
   "9001;Jane;Doe;jane.doe@example.org;active",
   "9002;John;Roe;john.roe@example.org;active",
   "9003;Mary;Major;mary.major@example.org;supporting",
-  "9004;Richard;Miles;;active"
+  "9004;Richard;Miles;;active",
+  "9005;Peter;Poe;peter.poe@example.org;active",
+  "9006;Sam;Sample;peter.poe@example.org;active"
 ].join("\n");
 
 async function signInAsAdministrator(page: Page): Promise<void> {
@@ -30,6 +32,7 @@ test("a board describes its membership system, reads what a member list would do
     await page.getByTestId("admin-membership-types-link").click();
     await expect(page.getByTestId("create-membership-type")).toBeVisible();
     await page.getByTestId("new-membership-type-name").fill("Imported adults");
+    await page.getByTestId("new-membership-type-grants-account").check();
     const typeCreated = page.waitForResponse((response) =>
       response.url().endsWith("/api/admin/membership-types") && response.request().method() === "POST");
     await page.getByTestId("create-membership-type").click();
@@ -69,10 +72,21 @@ test("a board describes its membership system, reads what a member list would do
     await page.getByTestId("upload-snapshot").click();
     expect((await previewed).status()).toBe(201);
 
-    // then the preview counts the four rows and names the file it read
+    // then the preview counts the six rows and names the file it read
     await expect(page.getByTestId("preview-identity")).toContainText("members.csv");
-    await expect(page.getByTestId("changes-heading")).toContainText("4");
+    await expect(page.getByTestId("changes-heading")).toContainText("6");
     await expect(page.getByTestId("row-errors-heading")).toContainText("0");
+
+    // and it says how many sign-ins it would open: two, because this world already holds people
+    // by three of the names and one row carries no address to send a credential to
+    await expect(page.getByTestId("preview-accounts")).toContainText("2");
+
+    // and it names the two rows whose one-time passwords would land in the same mailbox, which is
+    // the count section 10 promises a board sees before anything is sent
+    await page.getByTestId("shared-addresses-heading").click();
+    await expect(page.getByTestId("shared-addresses-heading")).toContainText("2");
+    await expect(page.getByTestId("shared-address-9005")).toContainText("2");
+    await expect(page.getByTestId("shared-address-9006")).toContainText("2");
 
     // when the run is executed, which is confirmed because repeating it does not undo it
     await page.getByTestId("execute-preview").click();
@@ -82,7 +96,8 @@ test("a board describes its membership system, reads what a member list would do
     expect((await executed).status()).toBe(200);
 
     // then the result names what it did and the run joins the log
-    await expect(page.getByTestId("run-result-created")).toContainText("4");
+    await expect(page.getByTestId("run-result-created")).toContainText("6");
+    await expect(page.getByTestId("run-result-accountsCreated")).toContainText("2");
     await expect(page.getByTestId("run-result-rowErrors")).toContainText("0");
     await expect(page.locator('[data-testid^="import-run-"]').first()).toBeVisible();
 
@@ -137,11 +152,12 @@ test("a member number the file does not yet carry is linked by hand rather than 
     await page.getByTestId("upload-snapshot").click();
     await page.getByTestId("changes-heading").click();
 
-    // then her row is not a creation, and she alone is missing from the duplicate report - the
-    // journey world already holds people by the other three names, which is what makes that
-    // report worth having in the first place
+    // then her row is not a creation, and she is missing from the duplicate report - the journey
+    // world already holds people by three of the other names, which is what makes that report
+    // worth having in the first place, and the two it does not hold are absent for that reason
     await expect(page.getByTestId("change-CREATE-9001")).toBeVisible();
     await expect(page.getByTestId("change-CREATE-9003")).toHaveCount(0);
     await page.getByTestId("duplicates-heading").click();
+    await expect(page.getByTestId("duplicate-9001")).toBeVisible();
     await expect(page.getByTestId("duplicate-9003")).toHaveCount(0);
   });

@@ -10,6 +10,10 @@ function isExpired(preview: ImportPreview): boolean {
   return Date.parse(preview.expiresAt) <= Date.now();
 }
 
+function accountsOpenedBy(preview: ImportPreview): number {
+  return preview.changes.filter((change) => change.account === "CREATE").length;
+}
+
 function changed(change: ImportPersonChange): string {
   return Object.entries(change.values).map(([field, value]) => `${field}: ${value}`).join(", ");
 }
@@ -108,6 +112,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
           percent: preview.removals.percent
         })}
       </p>}
+      <p data-testid="preview-accounts">{t("admin.import.accounts", { count: accountsOpenedBy(preview) })}</p>
       {preview.ignoredColumns.length > 0 && <p data-testid="preview-ignored-columns">
         {t("admin.import.unmapped", { columns: preview.ignoredColumns.join(", ") })}
       </p>}
@@ -119,6 +124,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
             {" "}<span className="font-mono">{change.externalId}</span>
             {change.personName && <> — {change.personName}</>}
             {Object.keys(change.values).length > 0 && <> — {changed(change)}</>}
+            {change.account !== "NOT_ASKED" && <> — {t(`admin.import.account.${change.account}`)}</>}
           </li>)}
         </ul>
       </Section>
@@ -127,6 +133,16 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
         <ul className="grid gap-1">
           {preview.rowErrors.map((error) => <li key={error.rowNumber} data-testid={`row-error-${error.rowNumber}`}>
             {t("admin.import.row", { row: error.rowNumber })} — {t(error.code, error.params)}
+          </li>)}
+        </ul>
+      </Section>
+
+      <Section testId="shared-addresses" heading={t("admin.import.sharedAddresses", { shown: preview.sharedAddresses.length })}>
+        <p className="text-sm">{t("admin.import.sharedAddressesExplain")}</p>
+        <ul className="grid gap-1">
+          {preview.sharedAddresses.map((shared) => <li key={shared.externalId} data-testid={`shared-address-${shared.externalId}`}>
+            {t("admin.import.row", { row: shared.rowNumber })}
+            {" "}<span className="font-mono">{shared.externalId}</span> — {t("admin.import.sharedBy", { sharedBy: shared.sharedBy })}
           </li>)}
         </ul>
       </Section>

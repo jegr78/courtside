@@ -2,6 +2,7 @@ package org.courtside.member;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.courtside.config.ClubIdentity;
 import org.courtside.identity.AccountSessions;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -9,14 +10,18 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.PersonNotFoundException;
+import org.courtside.member.internal.UsernameFromName;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -31,6 +36,7 @@ public class RosterSyncService {
     private final UserAccountRepository accounts;
     private final RosterService roster;
     private final AccountSessions sessions;
+    private final ClubIdentity club;
     private final ApplicationEventPublisher events;
 
     @Transactional
@@ -41,18 +47,53 @@ public class RosterSyncService {
         // One order over both phases, not one per phase: two runs that correct and end opposite
         // people would otherwise take the same two rows in opposite orders and deadlock.
         lockInIdOrder(requested);
-        requested.corrections().stream()
-                .sorted(Comparator.comparing(RosterChangeSet.PersonCorrection::personId))
-                .forEach(this::correct);
+        int corrected = 0;
+        for (RosterChangeSet.PersonCorrection correction : requested.corrections().stream()
+                .sorted(Comparator.comparing(RosterChangeSet.PersonCorrection::personId)).toList()) {
+            corrected += correct(correction) ? 1 : 0;
+        }
         Departures departures = endMemberships(requested.membershipEndings().stream()
                 .sorted().toList());
+        int accountsCreated = createAccounts(requested, created);
         log.info("Applied a roster snapshot: {} created, {} corrected, {} memberships ended, "
-                        + "{} accounts disabled, {} accounts lost the member role",
-                created.size(), requested.corrections().size(), requested.membershipEndings().size(),
-                departures.disabled(), departures.rolesRemoved());
-        return new RosterSyncOutcome(created, created.size(), requested.corrections().size(),
-                requested.membershipEndings().size(), departures.disabled(),
+                        + "{} accounts created, {} accounts disabled, {} accounts lost the member role",
+                created.size(), corrected, requested.membershipEndings().size(),
+                accountsCreated, departures.disabled(), departures.rolesRemoved());
+        return new RosterSyncOutcome(created, created.size(), corrected,
+                requested.membershipEndings().size(), accountsCreated, departures.disabled(),
                 departures.rolesRemoved());
+    }
+
+    private int createAccounts(RosterChangeSet changeSet, Map<String, UUID> created) {
+        List<AccountToCreate> wanted = new ArrayList<>();
+        changeSet.creations().stream().filter(RosterChangeSet.NewPerson::withAccount)
+                .forEach(creation -> wanted.add(new AccountToCreate(
+                        created.get(creation.externalId()), creation.externalId())));
+        changeSet.corrections().stream().filter(RosterChangeSet.PersonCorrection::withAccount)
+                .forEach(correction -> wanted.add(new AccountToCreate(
+                        correction.personId(), correction.externalId())));
+        Set<String> issued = new HashSet<>();
+        wanted.stream().sorted(Comparator.comparing(AccountToCreate::personId)).forEach(account -> {
+            Person person = persons.findById(account.personId())
+                    .orElseThrow(() -> new PersonNotFoundException(
+                            "No person with id " + account.personId()));
+            String username = unusedUsername(UsernameFromName.suggestFor(person.getFirstName(),
+                    person.getLastName(), account.externalId(),
+                    Locale.forLanguageTag(club.defaultLocale())), issued);
+            roster.createAccount(account.personId(), username, Set.of(Role.MEMBER));
+            issued.add(username);
+        });
+        return wanted.size();
+    }
+
+    // Both halves are needed: the query cannot see a username this same run has just handed out,
+    // and the run-local set cannot see the accounts a board created by hand.
+    private String unusedUsername(String suggestion, Set<String> issued) {
+        String username = suggestion;
+        for (int number = 2; issued.contains(username) || accounts.existsByUsername(username); number++) {
+            username = suggestion + "." + number;
+        }
+        return username;
     }
 
     private void lockInIdOrder(RosterChangeSet changeSet) {
@@ -71,9 +112,12 @@ public class RosterSyncService {
         return personId;
     }
 
-    private void correct(RosterChangeSet.PersonCorrection correction) {
-        if (correction.firstName() != null || correction.lastName() != null
-                || correction.email() != null) {
+    // A row whose only reason to exist is its account corrects nothing, and a run log that counts
+    // it as a correction says something about a member that did not happen.
+    private boolean correct(RosterChangeSet.PersonCorrection correction) {
+        boolean names = correction.firstName() != null || correction.lastName() != null
+                || correction.email() != null;
+        if (names) {
             roster.correctPerson(correction.personId(), correction.firstName(),
                     correction.lastName(), correction.email());
         }
@@ -81,6 +125,7 @@ public class RosterSyncService {
             roster.writeMembership(correction.personId(), correction.membershipTypeId(),
                     MembershipPeriod.running());
         }
+        return names || correction.membershipTypeId() != null;
     }
 
     private Departures endMemberships(List<UUID> personIds) {
@@ -135,5 +180,8 @@ public class RosterSyncService {
     }
 
     private record Departures(int disabled, int rolesRemoved) {
+    }
+
+    private record AccountToCreate(UUID personId, String externalId) {
     }
 }

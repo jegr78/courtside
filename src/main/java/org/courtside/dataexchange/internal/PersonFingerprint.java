@@ -14,10 +14,11 @@ public final class PersonFingerprint {
 
     // Every field carries its own length, so no arrangement of two fields hashes like another.
     public static String of(String firstName, String lastName, String email, UUID membershipTypeId,
-                            boolean membershipCurrent) {
+                            boolean membershipCurrent, boolean holdsAnAccount) {
         StringBuilder joined = new StringBuilder();
         Stream.of(nullSafe(firstName), nullSafe(lastName), nullSafe(email),
-                        String.valueOf(membershipTypeId), String.valueOf(membershipCurrent))
+                        String.valueOf(membershipTypeId), String.valueOf(membershipCurrent),
+                        String.valueOf(holdsAnAccount))
                 .forEach(field -> joined.append(field.length()).append(':').append(field));
         return sha256(joined.toString());
     }

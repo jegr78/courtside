@@ -57,8 +57,12 @@ people. A club can upload a snapshot and see exactly what it would change — ev
 field of every update, every membership that would end, every row that could not be read and every
 creation that resembles somebody the roster already holds — and it can then execute exactly that
 reviewed change set, atomically, once per source at a time, refusing the run if anybody it would
-touch has changed in the meantime. What is still missing is accounts created from a snapshot, and
-export. `/actuator/health` is exposed. The
+touch has changed in the meantime. A membership type can be marked as granting an account, and an
+execution then opens one for every person it covers who does not already hold one, holding `MEMBER`
+alone and with its one-time password mailed to that member rather than shown to anybody; the
+preview names per row whether an account would be opened and, where it would not, why, and it
+reports every row whose mailbox more than one person reads. What is
+still missing is export. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -112,8 +116,8 @@ series, which is previewed before anything is written and reports what it had to
 browser admin surface for configuration, facilities and the club's people — adding somebody,
 correcting their name or address, giving them an account, changing its roles, correcting its
 username, sending it new credentials and disabling it. Membership types are administered there as
-well, each showing how many people hold it, and the configuration names the rule set that measures a
-person holding none. A rule set can bar its holders from booking a court at all. So is the whole
+well, each showing how many people hold it and whether it opens an account on import, and the
+configuration names the rule set that measures a person holding none. A rule set can bar its holders from booking a court at all. So is the whole
 import: describing a source, linking the people a file cannot match by number, uploading a member
 list, reading what it would change, and running it. The column
 mapping is offered from the club's own export, read in the browser and never uploaded for that
@@ -1102,26 +1106,52 @@ Import and export:
   anybody it would touch changed between the preview and the run, it is refused rather than writing
   over a roster it no longer describes. Executions of one source serialise, and a successful one
   supersedes every preview of that source, so a stale change set cannot be applied afterwards.
-- **A synchronisation creates the accounts a club would otherwise create by hand.** *Designed.*
+- **A synchronisation creates the accounts a club would otherwise create by hand.** *Built.*
   A club that imports 175 members and then opens 175 account forms has had the import's whole
   purpose handed back to it, so an execution gives an account to every person it creates whose
   membership type calls for one. The membership type carries two separate answers, because they
   are separate questions: whether its holders get an account, and whether they may book. A passive
-  member may well want to see their own record without being able to reserve a court.
+  member may well want to see their own record without being able to reserve a court. The answer
+  defaults to no, including for the membership types an instance already holds: switching it on
+  mails a credential to everybody the next run touches, and no club starts doing that because it
+  upgraded.
 
   What such an account may be is bounded. It holds `MEMBER` and nothing else, because no snapshot
   may hand out a role that administers the club. Its username is generated as `lastname.firstname`,
   the same shape registration suggests, numbered on collision and correctable afterwards like every
   other name a club enters. Its first password is generated, never displayed, and mailed to the
-  member — a board that could read 131 passwords is the outcome this exists to avoid. A person with
-  no address gets none, which follows from the identity model rather than from a special case, and
-  the preview says how many that is.
+  member — a board that could read 131 passwords is the outcome this exists to avoid.
+
+  **The transliteration follows the language the club runs in**, because there is no neutral answer:
+  German writes `Jörg` as `joerg` and a Scandinavian club writing `Jørgen` is not served by the same
+  substitution. Where the club's language has no rule for a character, the accent is stripped and
+  what remains is kept. A name that leaves nothing a login name can hold — a script this rule cannot
+  transliterate at all — falls back to `member.<the member number the club's own system uses>`,
+  which is never nothing and is a name that club already recognises. None of this has to be right
+  the first time: a username is editable afterwards like every other field an administrative
+  surface writes.
 
   **It creates; it never overwrites.** A person who already holds an account is untouched, whatever
   the file says, so a repeated import cannot reissue a password or rename a login somebody is
   using. That also means the accounts a club has been missing appear on the next run rather than
-  only for people the import has yet to meet — the board reads the count in the preview before any
-  of it is sent.
+  only for people the import has yet to meet.
+
+  **The preview answers per row, not only in total.** Each row says whether an account would be
+  opened and, where none would be, which of four reasons applies: the membership type grants none,
+  the row carries no address to send a credential to, the row looks like somebody the roster already
+  holds, or that person already signs in. A possible duplicate is deliberately among them — the
+  person is still created, but an account for somebody who may already have one waits for a board
+  to look. The count sits above the list, so what a board approves is what runs.
+
+  **A shared mailbox is named, not refused.** Where a row would open an account on an address more
+  than one person holds, the preview reports it with the number of people who would be on it once
+  the run is done — those the roster already has plus those this run puts there. The account is
+  still opened, because a shared address is the case the schema exists to serve, and refusing it
+  would take the import away from exactly the clubs that enrol children under a parent's address.
+  What must not happen is that it goes unsaid: one mailbox receiving twenty one-time passwords is
+  the risk section 10 accepts, and it accepts it on the condition that a board sees the count
+  first. A row that moves somebody onto the address counts twice at worst — the error runs towards
+  reporting more sharing rather than less, which is the direction a warning may err in.
 
 - **A synchronisation can take a membership away; it can never hand one out.** When a membership
   ends, an account that held `MEMBER` and nothing else is disabled and its sessions end; an account
@@ -1322,7 +1352,9 @@ whether it is built or designed. **Designed means absent today.**
   changed is that no person stands between the address a club typed and the message. What bounds it:
   the club decides which address sits on which person and can correct it, and correcting it
   withdraws whatever was issued to the old one; the roster shows, before anybody sends, how many
-  people share the address a message is about to go to; the subject names the person it is for, so a
+  people share the address a message is about to go to, and an import preview says the same per row
+  before a run opens any account, because a snapshot sends at a scale no per-person click reaches;
+  the subject names the person it is for, so a
   shared inbox can tell two apart; and nothing else about an account can be reached this way — a
   credential grants the roles that account already had and no others. It stays open because closing
   it would mean forbidding a shared address, which is the case the schema exists to serve.

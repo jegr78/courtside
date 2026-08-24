@@ -14,12 +14,13 @@ const preview: ImportPreview = {
   rowCount: 3,
   ignoredColumns: [],
   changes: [
-    { kind: "CREATE", rowNumber: 1, externalId: "4711", personId: null, personName: null, values: { FIRST_NAME: "Jane", LAST_NAME: "Doe" } },
-    { kind: "UPDATE", rowNumber: 2, externalId: "4712", personId: "person-2", personName: "John Roe", values: { EMAIL: "john.roe@example.org" } },
-    { kind: "END_MEMBERSHIP", rowNumber: 0, externalId: "4713", personId: "person-3", personName: "Mary Major", values: {} }
+    { kind: "CREATE", rowNumber: 1, externalId: "4711", personId: null, personName: null, values: { FIRST_NAME: "Jane", LAST_NAME: "Doe" }, account: "CREATE" },
+    { kind: "UPDATE", rowNumber: 2, externalId: "4712", personId: "person-2", personName: "John Roe", values: { EMAIL: "john.roe@example.org" }, account: "NO_ADDRESS" },
+    { kind: "END_MEMBERSHIP", rowNumber: 0, externalId: "4713", personId: "person-3", personName: "Mary Major", values: {}, account: "NOT_ASKED" }
   ],
   rowErrors: [{ rowNumber: 4, code: "import.snapshot.row.externalIdUnusable", params: { maxLength: 120 } }],
   possibleDuplicates: [{ rowNumber: 5, externalId: "4714", personId: "person-4", personName: "Richard Miles" }],
+  sharedAddresses: [{ rowNumber: 1, externalId: "4711", sharedBy: 3 }],
   removals: { count: 1, currentlyLinked: 4, percent: 25 },
   needsConfirmation: false,
   superseded: false,
@@ -148,11 +149,38 @@ describe("ImportPreviewPanel", () => {
     expect(screen.getByTestId("duplicate-4714")).toHaveTextContent("Richard Miles");
   });
 
+  it("given a preview, when reading it, then each row says what would happen to its account", async () => {
+    // given
+    show(preview);
+
+    // when
+    await userEvent.click(screen.getByTestId("changes-heading"));
+
+    // then
+    expect(screen.getByTestId("preview-accounts")).toHaveTextContent("Accounts that would be opened: 1");
+    expect(screen.getByTestId("change-CREATE-4711")).toHaveTextContent("an account is opened");
+    expect(screen.getByTestId("change-UPDATE-4712")).toHaveTextContent("no email address on file");
+    expect(screen.getByTestId("change-END_MEMBERSHIP-4713")).not.toHaveTextContent("account");
+  });
+
+  it("given a row whose mailbox several people read, when reading the preview, then it says how many", async () => {
+    // given
+    show(preview);
+
+    // when
+    await userEvent.click(screen.getByTestId("shared-addresses-heading"));
+
+    // then
+    expect(screen.getByTestId("shared-addresses-heading")).toHaveTextContent("1");
+    expect(screen.getByTestId("shared-address-4711")).toHaveTextContent("3");
+  });
+
   it("given more rows than fit comfortably, when a section is opened, then every one of them is shown", async () => {
     // given
     const many = { ...preview, changes: Array.from({ length: 120 }, (_, index) => ({
       kind: "CREATE" as const, rowNumber: index + 1, externalId: `n${index}`,
-      personId: null, personName: null, values: { FIRST_NAME: "Jane", LAST_NAME: "Doe" }
+      personId: null, personName: null, values: { FIRST_NAME: "Jane", LAST_NAME: "Doe" },
+      account: "MEMBERSHIP_TYPE_GRANTS_NONE" as const
     })) };
     show(many);
 
@@ -175,7 +203,7 @@ describe("ImportPreviewPanel", () => {
 
   it("given an expired preview, when it is read, then its file is still identified by name and hash", () => {
     // given — past retention the change set is gone; the row, its hash and its counts are not
-    show({ ...preview, changes: [], rowErrors: [], possibleDuplicates: [], expiresAt: "2020-01-01T00:00:00Z" });
+    show({ ...preview, changes: [], rowErrors: [], possibleDuplicates: [], sharedAddresses: [], expiresAt: "2020-01-01T00:00:00Z" });
 
     // then
     expect(screen.getByTestId("preview-expired")).toBeInTheDocument();

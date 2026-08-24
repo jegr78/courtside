@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.PersonRepository;
+import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberRepository;
 import org.courtside.member.testfixture.MemberTestFixture;
@@ -13,18 +14,31 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Import({IdentityTestFixture.class, MemberTestFixture.class})
 class ExecutionServiceTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+
+    private static final String ONE_MEMBER_WITHOUT_AN_ADDRESS = """
+            Member number,First name,Last name,Email
+            4711,Jane,Doe,
+            """;
+
+    private static final String TWO_MEMBERS_ON_ONE_ADDRESS = """
+            Member number,First name,Last name,Email
+            4711,Jane,Doe,house@example.org
+            4712,John,Roe,house@example.org
+            """;
 
     private static final String TWO_MEMBERS = """
             Member number,First name,Last name,Email
@@ -309,6 +323,166 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> sources.delete(source))
                 .isInstanceOf(ImportSourceInUseException.class);
         assertThat(executions.runsOf(source)).hasSize(1);
+    }
+
+    @Test
+    void givenAMembershipTypeThatGrantsAnAccount_whenTheSnapshotIsExecuted_thenEachMemberGetsOne() {
+        // given
+        UUID granting = memberFixture.membershipTypeGrantingAnAccount("Contributing");
+        UUID grantingSource = sourceWithDefaultType(granting);
+        PreviewSummary summary = previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor);
+
+        // when
+        RunOutcome outcome = executions.execute(summary.previewId(), false, actor);
+
+        // then
+        assertThat(summary.changeSet().changes())
+                .extracting(ResolvedChangeSet.PersonChange::account)
+                .containsOnly(ResolvedChangeSet.AccountOutcome.CREATE);
+        assertThat(outcome.accountsCreated()).isEqualTo(2);
+        assertThat(accounts.findAll()).extracting(UserAccount::getUsername)
+                .contains("doe.jane", "roe.john");
+        assertThat(accounts.findAll()).filteredOn(account -> !"admin".equals(account.getUsername()))
+                .allSatisfy(account -> {
+                    assertThat(account.getRoles()).containsExactly(Role.MEMBER);
+                    assertThat(account.isPasswordChangeRequired()).isTrue();
+                });
+    }
+
+    @Test
+    void givenAMemberWithNoAddress_whenTheSnapshotIsExecuted_thenTheyGetNoAccountAndThePreviewSaidSo() {
+        // given
+        UUID granting = memberFixture.membershipTypeGrantingAnAccount("Contributing");
+        UUID grantingSource = sourceWithDefaultType(granting);
+        PreviewSummary summary = previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                "roster.csv", ONE_MEMBER_WITHOUT_AN_ADDRESS.getBytes(StandardCharsets.UTF_8), actor);
+
+        // when
+        RunOutcome outcome = executions.execute(summary.previewId(), false, actor);
+
+        // then
+        assertThat(summary.changeSet().changes()).singleElement()
+                .extracting(ResolvedChangeSet.PersonChange::account)
+                .isEqualTo(ResolvedChangeSet.AccountOutcome.NO_ADDRESS);
+        assertThat(outcome.created()).isEqualTo(1);
+        assertThat(outcome.accountsCreated()).isZero();
+        assertThat(accounts.findAll()).extracting(UserAccount::getUsername)
+                .containsExactly("admin");
+    }
+
+    @Test
+    void givenAMemberWhoAlreadySignsIn_whenTheSnapshotIsExecutedAgain_thenTheirLoginIsLeftAlone() {
+        // given
+        UUID granting = memberFixture.membershipTypeGrantingAnAccount("Contributing");
+        UUID grantingSource = sourceWithDefaultType(granting);
+        executions.execute(previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(),
+                false, actor);
+        UUID jane = personIdsOf(grantingSource).get("4711");
+        memberFixture.correctAccountUsername(jane, "jane");
+
+        // when
+        RunOutcome outcome = executions.execute(previews.create(grantingSource,
+                SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
+                TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(), false, actor);
+
+        // then — a second run must not reissue a password or rename a login somebody is using
+        assertThat(outcome.accountsCreated()).isZero();
+        assertThat(accounts.findByPersonIdIn(List.of(jane))).singleElement()
+                .extracting(UserAccount::getUsername).isEqualTo("jane");
+    }
+
+    @Test
+    void givenARowWhoseOnlyChangeIsItsAccount_whenExecuted_thenItIsNotReportedAsACorrection() {
+        // given — the members are already in the roster from an earlier run, and the board now
+        // switches their type on, so the account is the only reason these rows change anything
+        UUID type = memberFixture.createMembershipType("Contributing");
+        UUID typedSource = sourceWithDefaultType(type);
+        executions.execute(previews.create(typedSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(),
+                false, actor);
+        memberFixture.letMembershipTypeGrantAnAccount(type, "Contributing");
+
+        // when
+        RunOutcome outcome = executions.execute(previews.create(typedSource,
+                SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
+                TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(), false, actor);
+
+        // then — a run log that says somebody was corrected when nothing about them was is a
+        // false statement in a record a board reads and cannot amend
+        assertThat(outcome.accountsCreated()).isEqualTo(2);
+        assertThat(outcome.corrected()).isZero();
+    }
+
+    @Test
+    void givenAnAccountCreatedByHandAfterThePreview_whenExecuting_thenTheRunIsRefusedAsStale() {
+        // given
+        UUID type = memberFixture.createMembershipType("Contributing");
+        UUID typedSource = sourceWithDefaultType(type);
+        executions.execute(previews.create(typedSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(),
+                false, actor);
+        memberFixture.letMembershipTypeGrantAnAccount(type, "Contributing");
+        UUID jane = personIdsOf(typedSource).get("4711");
+        UUID previewId = previews.create(typedSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId();
+        memberFixture.giveAccount(jane, "jane", Set.of(Role.MEMBER));
+
+        // when / then — whether somebody signs in is part of what a preview described, so a board
+        // that opened the account by hand meanwhile gets the stale refusal and not a raw conflict
+        assertThatThrownBy(() -> executions.execute(previewId, false, actor))
+                .isInstanceOf(ImportPreviewStaleException.class)
+                .extracting("code").isEqualTo("import.preview.stale");
+    }
+
+    @Test
+    void givenTwoMembersOnOneAddress_whenPreviewed_thenItSaysHowManyReadThatMailbox() {
+        // given
+        UUID granting = memberFixture.membershipTypeGrantingAnAccount("Contributing");
+        UUID grantingSource = sourceWithDefaultType(granting);
+
+        // when
+        PreviewSummary summary = previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                "roster.csv", TWO_MEMBERS_ON_ONE_ADDRESS.getBytes(StandardCharsets.UTF_8), actor);
+
+        // then — a shared mailbox is deliberate, so both accounts are still opened; what the
+        // board must not be denied is the count before the run sends anything
+        assertThat(summary.changeSet().changes())
+                .extracting(ResolvedChangeSet.PersonChange::account)
+                .containsOnly(ResolvedChangeSet.AccountOutcome.CREATE);
+        assertThat(summary.changeSet().sharedAddresses())
+                .extracting(ResolvedChangeSet.SharedAddress::externalId,
+                        ResolvedChangeSet.SharedAddress::sharedBy)
+                .containsExactlyInAnyOrder(tuple("4711", 2), tuple("4712", 2));
+    }
+
+    @Test
+    void givenAnAddressTheClubAlreadyUsesForSomebodyElse_whenPreviewed_thenTheyAreCounted() {
+        // given
+        UUID granting = memberFixture.membershipTypeGrantingAnAccount("Contributing");
+        UUID grantingSource = sourceWithDefaultType(granting);
+        identity.createPerson("Mary", "Major", "jane.doe@example.org");
+
+        // when
+        PreviewSummary summary = previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor);
+
+        // then — the count is asked of the roster, not only of the file
+        assertThat(summary.changeSet().sharedAddresses())
+                .extracting(ResolvedChangeSet.SharedAddress::externalId,
+                        ResolvedChangeSet.SharedAddress::sharedBy)
+                .containsExactly(tuple("4711", 2));
+    }
+
+    private UUID sourceWithDefaultType(UUID membershipTypeId) {
+        return sources.create("contributing-system", "Contributing members", ",", "UTF-8",
+                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                        "First name", CanonicalField.FIRST_NAME,
+                        "Last name", CanonicalField.LAST_NAME,
+                        "Email", CanonicalField.EMAIL),
+                Map.of(), membershipTypeId, Set.of(CanonicalField.FIRST_NAME,
+                        CanonicalField.LAST_NAME, CanonicalField.EMAIL), 10).sourceId();
     }
 
     private UUID preview(String content, SnapshotMode mode) {

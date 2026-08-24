@@ -13,10 +13,11 @@ public record RosterChangeSet(List<NewPerson> creations, List<PersonCorrection> 
     }
 
     public record NewPerson(String externalId, String firstName, String lastName, String email,
-                            UUID membershipTypeId) {
+                            UUID membershipTypeId, boolean withAccount) {
     }
 
-    public record PersonCorrection(UUID personId, String firstName, String lastName, String email,
-                                   UUID membershipTypeId) {
+    public record PersonCorrection(UUID personId, String externalId, String firstName,
+                                   String lastName, String email, UUID membershipTypeId,
+                                   boolean withAccount) {
     }
 }

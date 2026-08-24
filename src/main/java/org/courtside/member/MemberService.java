@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -50,6 +51,13 @@ public class MemberService {
         return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
+    public Set<UUID> membershipTypeIdsGrantingAnAccount() {
+        return membershipTypes.findAllByOrderByNameAsc().stream()
+                .filter(MembershipType::isGrantsAccount)
+                .map(MembershipType::getId)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
     public Set<UUID> activeMembershipTypeIds() {
         return membershipTypes.findAllByOrderByNameAsc().stream()
                 .filter(MembershipType::isActive)
@@ -66,24 +74,32 @@ public class MemberService {
     }
 
     @Transactional
-    public MembershipType createMembershipType(String name, UUID ruleSetId) {
+    public MembershipType createMembershipType(String name, UUID ruleSetId, boolean grantsAccount) {
         requireActiveRuleSet(ruleSetId);
-        MembershipType saved = saveOrRejectTakenName(new MembershipType(name, ruleSetId));
+        MembershipType saved = saveOrRejectTakenName(
+                new MembershipType(name, ruleSetId, grantsAccount));
         events.publishEvent(new MembershipTypeEvent.Added(saved.getId(), saved.getRuleSetId()));
         return saved;
     }
 
     @Transactional
-    public MembershipType changeMembershipType(UUID membershipTypeId, String name, UUID ruleSetId) {
+    public MembershipType changeMembershipType(UUID membershipTypeId, String name, UUID ruleSetId,
+                                               boolean grantsAccount) {
         MembershipType type = requireMembershipType(membershipTypeId);
-        List<String> changedFields = Objects.equals(type.getName(), name) ? List.of() : List.of("name");
+        List<String> changedFields = new ArrayList<>();
+        if (!Objects.equals(type.getName(), name)) {
+            changedFields.add("name");
+        }
+        if (type.isGrantsAccount() != grantsAccount) {
+            changedFields.add("grantsAccount");
+        }
         boolean ruleSetChanged = !Objects.equals(type.getRuleSetId(), ruleSetId);
         // Only a rule set this type is newly pointing at. Keeping a retired one it already names is
         // not an assignment, and refusing it would stop a club correcting the name beside it.
         if (ruleSetChanged) {
             requireActiveRuleSet(ruleSetId);
         }
-        type.changeTo(name, ruleSetId);
+        type.changeTo(name, ruleSetId, grantsAccount);
         MembershipType saved = saveOrRejectTakenName(type);
         if (!changedFields.isEmpty() || ruleSetChanged) {
             events.publishEvent(

@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 public final class ChangeSetResolver {
@@ -28,6 +29,7 @@ public final class ChangeSetResolver {
         List<ResolvedChangeSet.PersonChange> changes = new ArrayList<>();
         List<ResolvedChangeSet.PossibleDuplicate> duplicates = new ArrayList<>();
         List<ResolvedChangeSet.RowError> rowErrors = new ArrayList<>(errorsOf(snapshot));
+        List<AddressAnAccountWouldGoTo> addresses = new ArrayList<>();
         Set<String> present = new HashSet<>();
         for (CsvSnapshot.SnapshotRow row : snapshot.rows()) {
             present.add(row.externalId());
@@ -39,25 +41,85 @@ public final class ChangeSetResolver {
                 continue;
             }
             if (personId == null) {
-                changes.add(creationOf(row, configuration));
-                duplicateOf(row, roster).ifPresent(duplicates::add);
+                Optional<ResolvedChangeSet.PossibleDuplicate> duplicate = duplicateOf(row, roster);
+                duplicate.ifPresent(duplicates::add);
+                ResolvedChangeSet.PersonChange creation =
+                        creationOf(row, configuration, roster, duplicate.isPresent());
+                changes.add(creation);
+                recordAddress(addresses, creation,
+                        addressAfterThisRun(row, configuration, null));
             } else {
-                updateOf(row, personId, configuration, roster).ifPresent(changes::add);
+                CurrentRoster.RosterPerson current = roster.peopleById().get(personId);
+                updateOf(row, personId, configuration, roster).ifPresent(update -> {
+                    changes.add(update);
+                    recordAddress(addresses, update,
+                            addressAfterThisRun(row, configuration, current));
+                });
             }
         }
         List<ResolvedChangeSet.PersonChange> endings = endingsFor(mode, present, roster);
         changes.addAll(endings);
         return new ResolvedChangeSet(changes, rowErrors, duplicates,
-                removalsOf(endings.size(), roster));
+                sharedAddressesAmong(addresses, roster), removalsOf(endings.size(), roster));
+    }
+
+    private static void recordAddress(List<AddressAnAccountWouldGoTo> addresses,
+                                      ResolvedChangeSet.PersonChange change, String address) {
+        if (change.account() == ResolvedChangeSet.AccountOutcome.CREATE) {
+            addresses.add(new AddressAnAccountWouldGoTo(change.rowNumber(), change.externalId(),
+                    address, change.kind() == ResolvedChangeSet.ChangeKind.CREATE));
+        }
+    }
+
+    // The people already on the address plus the ones this run puts there. A row that moves
+    // somebody onto it counts twice at worst, which errs towards showing more sharing, not less.
+    private static List<ResolvedChangeSet.SharedAddress> sharedAddressesAmong(
+            List<AddressAnAccountWouldGoTo> addresses, CurrentRoster roster) {
+        Map<String, Long> newcomers = addresses.stream()
+                .filter(AddressAnAccountWouldGoTo::newPerson)
+                .collect(Collectors.groupingBy(AddressAnAccountWouldGoTo::address,
+                        Collectors.counting()));
+        List<ResolvedChangeSet.SharedAddress> shared = new ArrayList<>();
+        addresses.forEach(use -> {
+            int sharedBy = roster.peopleByAddress().getOrDefault(use.address(), 0)
+                    + newcomers.getOrDefault(use.address(), 0L).intValue();
+            if (sharedBy > 1) {
+                shared.add(new ResolvedChangeSet.SharedAddress(use.rowNumber(), use.externalId(),
+                        sharedBy));
+            }
+        });
+        return shared;
+    }
+
+    // An empty cell in an owned column says the file has nothing to say about the address, so the
+    // one already on file stays - the same rule the update itself follows.
+    private static String addressAfterThisRun(CsvSnapshot.SnapshotRow row,
+                                              SourceConfiguration configuration,
+                                              CurrentRoster.RosterPerson current) {
+        String fromFile = row.values().get(CanonicalField.EMAIL);
+        boolean owned = configuration.ownedFields().contains(CanonicalField.EMAIL);
+        if (current == null) {
+            return fromFile;
+        }
+        return owned && fromFile != null && !fromFile.isEmpty() ? fromFile : current.email();
+    }
+
+    private record AddressAnAccountWouldGoTo(int rowNumber, String externalId, String address,
+                                             boolean newPerson) {
     }
 
     private static ResolvedChangeSet.PersonChange creationOf(CsvSnapshot.SnapshotRow row,
-                                                             SourceConfiguration configuration) {
+                                                             SourceConfiguration configuration,
+                                                             CurrentRoster roster,
+                                                             boolean possibleDuplicate) {
         Map<CanonicalField, String> values = new EnumMap<>(CanonicalField.class);
         values.putAll(row.values());
         values.remove(CanonicalField.MEMBERSHIP_TYPE);
+        UUID membershipTypeId = membershipTypeOf(row, configuration);
         return new ResolvedChangeSet.PersonChange(ResolvedChangeSet.ChangeKind.CREATE,
-                row.rowNumber(), row.externalId(), null, values, membershipTypeOf(row, configuration));
+                row.rowNumber(), row.externalId(), null, values, membershipTypeId,
+                accountOutcomeOf(roster, false, membershipTypeId, possibleDuplicate,
+                        addressAfterThisRun(row, configuration, null)));
     }
 
     private static Optional<ResolvedChangeSet.PersonChange> updateOf(
@@ -79,12 +141,45 @@ public final class ChangeSetResolver {
             }
         });
         UUID membershipTypeId = ownedMembershipTypeOf(row, configuration, current);
-        if (changed.isEmpty() && membershipTypeId == null) {
+        ResolvedChangeSet.AccountOutcome account = accountOutcomeOf(roster,
+                roster.personIdsHoldingAnAccount().contains(personId),
+                membershipTypeAfterThisRun(membershipTypeId, current), false,
+                addressAfterThisRun(row, configuration, current));
+        if (changed.isEmpty() && membershipTypeId == null
+                && account != ResolvedChangeSet.AccountOutcome.CREATE) {
             return Optional.empty();
         }
         return Optional.of(new ResolvedChangeSet.PersonChange(
                 ResolvedChangeSet.ChangeKind.UPDATE, row.rowNumber(), row.externalId(), personId,
-                changed, membershipTypeId));
+                changed, membershipTypeId, account));
+    }
+
+    // An account is a membership's benefit, so a lapsed member whose row writes no membership is
+    // answered by the type they would hold afterwards: none.
+    private static UUID membershipTypeAfterThisRun(UUID written, CurrentRoster.RosterPerson current) {
+        if (written != null) {
+            return written;
+        }
+        return current != null && current.membershipCurrent() ? current.membershipTypeId() : null;
+    }
+
+    private static ResolvedChangeSet.AccountOutcome accountOutcomeOf(
+            CurrentRoster roster, boolean holdsAnAccount, UUID membershipTypeId,
+            boolean possibleDuplicate, String email) {
+        if (holdsAnAccount) {
+            return ResolvedChangeSet.AccountOutcome.ALREADY_HELD;
+        }
+        if (membershipTypeId == null
+                || !roster.membershipTypeIdsGrantingAnAccount().contains(membershipTypeId)) {
+            return ResolvedChangeSet.AccountOutcome.MEMBERSHIP_TYPE_GRANTS_NONE;
+        }
+        if (possibleDuplicate) {
+            return ResolvedChangeSet.AccountOutcome.POSSIBLE_DUPLICATE;
+        }
+        if (email == null || email.isBlank()) {
+            return ResolvedChangeSet.AccountOutcome.NO_ADDRESS;
+        }
+        return ResolvedChangeSet.AccountOutcome.CREATE;
     }
 
     private static UUID ownedMembershipTypeOf(CsvSnapshot.SnapshotRow row,
@@ -143,7 +238,7 @@ public final class ChangeSetResolver {
             if (!present.contains(externalId) && person != null && person.membershipCurrent()) {
                 endings.add(new ResolvedChangeSet.PersonChange(
                         ResolvedChangeSet.ChangeKind.END_MEMBERSHIP, 0, externalId, personId,
-                        Map.of(), null));
+                        Map.of(), null, ResolvedChangeSet.AccountOutcome.NOT_ASKED));
             }
         });
         return endings;

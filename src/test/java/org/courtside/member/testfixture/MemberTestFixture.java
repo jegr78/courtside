@@ -36,7 +36,7 @@ public class MemberTestFixture {
 
     public void synchroniseCorrectedLastName(UUID personId, String lastName) {
         sync.apply(new RosterChangeSet(List.of(),
-                List.of(new RosterChangeSet.PersonCorrection(personId, null, lastName, null, null)),
+                List.of(new RosterChangeSet.PersonCorrection(personId, "4711", null, lastName, null, null, false)),
                 List.of()));
     }
 
@@ -65,11 +65,19 @@ public class MemberTestFixture {
     }
 
     public UUID createMembershipType(String name) {
-        return memberships.createMembershipType(name, null).getId();
+        return memberships.createMembershipType(name, null, false).getId();
+    }
+
+    public UUID membershipTypeGrantingAnAccount(String name) {
+        return memberships.createMembershipType(name, null, true).getId();
+    }
+
+    public void letMembershipTypeGrantAnAccount(UUID membershipTypeId, String name) {
+        memberships.changeMembershipType(membershipTypeId, name, null, true);
     }
 
     public UUID membershipTypeMeasuredBy(String name, UUID ruleSetId) {
-        return memberships.createMembershipType(name, ruleSetId).getId();
+        return memberships.createMembershipType(name, ruleSetId, false).getId();
     }
 
     public void deactivateMembershipType(UUID membershipTypeId) {

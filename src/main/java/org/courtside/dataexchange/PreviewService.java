@@ -17,12 +17,14 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.courtside.member.MemberService;
+import org.courtside.member.RosterService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,6 +48,7 @@ public class PreviewService {
     private final PersonRepository persons;
     private final MemberRepository members;
     private final MemberService memberships;
+    private final RosterService roster;
     private final ObjectMapper json;
     private final ImportProperties properties;
     private final Clock clock;
@@ -91,7 +94,32 @@ public class PreviewService {
                 .collect(Collectors.toMap(Person::getId,
                         person -> toRosterPerson(person, membershipsByPerson.get(person.getId()))));
         return new CurrentRoster(personIdsByExternalId, peopleById,
-                memberships.activeMembershipTypeIds(), personIdsByNameKey(snapshot));
+                memberships.activeMembershipTypeIds(), personIdsByNameKey(snapshot),
+                memberships.membershipTypeIdsGrantingAnAccount(),
+                roster.personIdsHoldingAnAccount(linked),
+                peopleByAddress(snapshot, peopleById.values()));
+    }
+
+    // One grouped query for the addresses this snapshot puts in play, so a board sees before the
+    // run how many people read the mailbox each credential is about to land in.
+    private Map<String, Integer> peopleByAddress(CsvSnapshot snapshot,
+                                                 Collection<CurrentRoster.RosterPerson> people) {
+        Set<String> addresses = new HashSet<>();
+        snapshot.rows().forEach(row -> addUsable(addresses, row.values().get(CanonicalField.EMAIL)));
+        people.forEach(person -> addUsable(addresses, person.email()));
+        if (addresses.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Integer> counts = new HashMap<>();
+        persons.countByAddressIn(addresses)
+                .forEach(row -> counts.put((String) row[0], ((Number) row[1]).intValue()));
+        return counts;
+    }
+
+    private static void addUsable(Set<String> addresses, String address) {
+        if (address != null && !address.isBlank()) {
+            addresses.add(address);
+        }
     }
 
     // Asked of the database by name, because a club with thousands of members would otherwise
@@ -129,7 +157,8 @@ public class PreviewService {
                     if (person != null) {
                         fingerprints.put(personId.toString(), PersonFingerprint.of(person.firstName(),
                                 person.lastName(), person.email(), person.membershipTypeId(),
-                                person.membershipCurrent()));
+                                person.membershipCurrent(),
+                                roster.personIdsHoldingAnAccount().contains(personId)));
                     }
                 });
         return fingerprints;

@@ -74,7 +74,8 @@ export function AdminMembershipTypesView() {
     const formElement = event.currentTarget;
     await mutate(() => api.createMembershipType({
       name: formString(form, "name"),
-      ruleSetId: formString(form, "ruleSetId") || null
+      ruleSetId: formString(form, "ruleSetId") || null,
+      grantsAccount: form.get("grantsAccount") === "on"
     }));
     formElement.reset();
   }
@@ -110,6 +111,11 @@ export function AdminMembershipTypesView() {
               </select>
             </label>
           </div>
+          <label className="flex items-center gap-2 font-medium">
+            <input data-testid="new-membership-type-grants-account" disabled={pending} name="grantsAccount" type="checkbox" className="size-5" />
+            {t("admin.membershipTypes.grantsAccount")}
+          </label>
+          <p className="text-muted text-sm">{t("admin.membershipTypes.grantsAccountNote")}</p>
           <Button data-testid="create-membership-type" disabled={pending} className="justify-self-start" type="submit">{t("admin.create")}</Button>
         </form>
       </>}
@@ -127,6 +133,7 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
   const { t } = useTranslation();
   const [name, setName] = useState(type.name);
   const [ruleSetId, setRuleSetId] = useState(type.ruleSetId ?? "");
+  const [grantsAccount, setGrantsAccount] = useState(type.grantsAccount);
 
   return <article data-testid={`membership-type-${type.id}`} className="surface-subtle grid gap-3 rounded-xl border p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -149,9 +156,14 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
         </select>
       </label>
     </div>
+    <label className="flex items-center gap-2 font-medium">
+      <input data-testid={`membership-type-grants-account-${type.id}`} disabled={disabled} type="checkbox" className="size-5" checked={grantsAccount} onChange={(event) => setGrantsAccount(event.target.checked)} />
+      {t("admin.membershipTypes.grantsAccount")}
+    </label>
+    <p className="text-muted text-sm">{t("admin.membershipTypes.grantsAccountNote")}</p>
     <Link data-testid={`membership-type-rules-link-${type.id}`} className="underline" to="/admin/configuration">{t("admin.membershipTypes.ruleSetLink")}</Link>
     <div className="grid gap-2 md:grid-cols-[auto_1fr] md:items-center">
-      <Button data-testid={`save-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void save({ name, ruleSetId: ruleSetId || null })}>{t("admin.save")}</Button>
+      <Button data-testid={`save-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
       <span />
       <Button data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
       {type.active && <p data-testid={`membership-type-retire-note-${type.id}`} className="text-muted text-sm">{t("admin.membershipTypes.retireNote")}</p>}

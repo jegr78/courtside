@@ -40,7 +40,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipThatEnded_whenAskingWhichTypeBindsThePerson_thenNoneDoes() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, type.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
 
         // when
@@ -62,7 +62,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipDatedToEndInDecember_whenWritingIt_thenTheFutureDateIsRefused() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
 
         // when / then
         assertThatThrownBy(() -> roster.writeMembership(mary, type.getId(),
@@ -77,7 +77,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipDatedToBeginNextYear_whenWritingIt_thenTheFutureDateIsRefused() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
 
         // when / then
         assertThatThrownBy(() -> roster.writeMembership(mary, type.getId(),
@@ -92,7 +92,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipThatBeganToday_whenTheRosterEndsIt_thenItEndsWithoutInvertingItself() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, type.getId(), MembershipPeriod.running());
 
         // when
@@ -111,7 +111,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenADormantMembershipOnARetiredType_whenRevivingIt_thenTheRetiredTypeIsRefused() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType retired = memberships.createMembershipType("Passive", null);
+        MembershipType retired = memberships.createMembershipType("Passive", null, false);
         roster.writeMembership(mary, retired.getId(),
                 new MembershipPeriod(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
         memberships.setMembershipTypeActive(retired.getId(), false);
@@ -129,7 +129,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenARunningMembershipOnARetiredType_whenEndingIt_thenEndingStaysPossible() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType retired = memberships.createMembershipType("Passive", null);
+        MembershipType retired = memberships.createMembershipType("Passive", null, false);
         roster.writeMembership(mary, retired.getId(), MembershipPeriod.running());
         memberships.setMembershipTypeActive(retired.getId(), false);
 
@@ -144,7 +144,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenARunningMembership_whenOnlyItsStartDateIsCorrected_thenTheCorrectionIsStored() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, type.getId(),
                 new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
 
@@ -174,7 +174,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAWriteThatBypassesThePeriodType_whenItInvertsTheDates_thenTheDatabaseRefusesIt() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
 
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""
@@ -192,7 +192,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipThatAlreadyEnded_whenEndingItAgain_thenTheRecordedDateStands() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, type.getId(),
                 new MembershipPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31)));
 
@@ -211,7 +211,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipThatEnded_whenTheSameTypeIsWrittenAgain_thenItRunsAgainFromTheNewStart() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, type.getId(),
                 new MembershipPeriod(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
 
@@ -233,7 +233,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipEndedOnTheWrongDate_whenTheDateIsCorrected_thenTheCorrectionHolds() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, type.getId(),
                 new MembershipPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31)));
 
@@ -252,7 +252,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipOnATypeTheClubRetired_whenCorrectingItsEndDate_thenItIsNotRefused() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType retired = memberships.createMembershipType("Passive", null);
+        MembershipType retired = memberships.createMembershipType("Passive", null, false);
         roster.writeMembership(mary, retired.getId(),
                 new MembershipPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31)));
         memberships.setMembershipTypeActive(retired.getId(), false);
@@ -269,8 +269,8 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipOnATypeTheClubRetired_whenMovingThePersonOntoIt_thenItIsRefused() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType running = memberships.createMembershipType("Adults", null);
-        MembershipType retired = memberships.createMembershipType("Passive", null);
+        MembershipType running = memberships.createMembershipType("Adults", null, false);
+        MembershipType retired = memberships.createMembershipType("Passive", null, false);
         roster.writeMembership(mary, running.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
         memberships.setMembershipTypeActive(retired.getId(), false);
 
@@ -285,8 +285,8 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenARunningMembership_whenTheTypeChanges_thenTheDateItBeganStands() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType first = memberships.createMembershipType("Junior", null);
-        MembershipType second = memberships.createMembershipType("Adults", null);
+        MembershipType first = memberships.createMembershipType("Junior", null, false);
+        MembershipType second = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, first.getId(), new MembershipPeriod(LocalDate.of(2020, 9, 1), null));
 
         // when
@@ -304,7 +304,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipThatEnded_whenSearchingForCoPlayers_thenThePersonIsNotOffered() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, type.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
         assertThat(memberships.findParticipants("major")).isNotEmpty();
 
@@ -319,7 +319,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenARunningMembership_whenTheRosterEndsIt_thenItEndsOnTheClubsToday() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, type.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
 
         // when
@@ -335,7 +335,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     void givenAMembershipWrittenWithoutAStart_whenReadingIt_thenItBeganOnTheClubsToday() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
-        MembershipType type = memberships.createMembershipType("Adults", null);
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
 
         // when
         RosterService.RosterEntry entry =

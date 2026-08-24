@@ -29,7 +29,8 @@ class MembershipTypeAdminController implements AdminMembershipTypesApi {
 
     @Override
     public ResponseEntity<ApiMembershipType> createMembershipType(ApiMembershipTypeRequest request) {
-        MembershipType type = members.createMembershipType(request.getName(), request.getRuleSetId());
+        MembershipType type = members.createMembershipType(request.getName(), request.getRuleSetId(),
+                Boolean.TRUE.equals(request.getGrantsAccount()));
         return ResponseEntity
                 .created(URI.create("/api/admin/membership-types/" + type.getId()))
                 .body(toResponse(type));
@@ -39,7 +40,8 @@ class MembershipTypeAdminController implements AdminMembershipTypesApi {
     public ResponseEntity<ApiMembershipType> changeMembershipType(
             UUID id, ApiMembershipTypeRequest request) {
         return ResponseEntity.ok(toResponse(
-                members.changeMembershipType(id, request.getName(), request.getRuleSetId())));
+                members.changeMembershipType(id, request.getName(), request.getRuleSetId(),
+                        Boolean.TRUE.equals(request.getGrantsAccount()))));
     }
 
     @Override
@@ -54,7 +56,8 @@ class MembershipTypeAdminController implements AdminMembershipTypesApi {
     }
 
     private static ApiMembershipType toResponse(MembershipType type) {
-        return new ApiMembershipType(type.getId(), type.getName(), type.isActive())
+        return new ApiMembershipType(type.getId(), type.getName(), type.isActive(),
+                type.isGrantsAccount())
                 .ruleSetId(type.getRuleSetId());
     }
 }

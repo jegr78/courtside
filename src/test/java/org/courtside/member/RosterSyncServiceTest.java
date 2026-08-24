@@ -145,7 +145,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
 
         // when
         sync.apply(new RosterChangeSet(List.of(), List.of(new RosterChangeSet.PersonCorrection(
-                john, "John", "Roe", "john.roe@example.org", STANDARD_MEMBERSHIP)), List.of()));
+                john, "4711", "John", "Roe", "john.roe@example.org", STANDARD_MEMBERSHIP, false)), List.of()));
 
         // then
         assertThat(accounts.findById(account.getId()).orElseThrow().isEnabled()).isFalse();
@@ -157,7 +157,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
         // when
         RosterSyncOutcome outcome = sync.apply(new RosterChangeSet(
                 List.of(new RosterChangeSet.NewPerson("4711", "Jane", "Doe",
-                        "jane.doe@example.org", STANDARD_MEMBERSHIP)),
+                        "jane.doe@example.org", STANDARD_MEMBERSHIP, false)),
                 List.of(), List.of()));
 
         // then
@@ -169,13 +169,84 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACreationAskingForAnAccount_whenApplying_thenOneIsOpenedForTheMemberRoleAlone() {
+        // when
+        RosterSyncOutcome outcome = sync.apply(new RosterChangeSet(
+                List.of(new RosterChangeSet.NewPerson("4711", "Jane", "Doe",
+                        "jane.doe@example.org", STANDARD_MEMBERSHIP, true)),
+                List.of(), List.of()));
+
+        // then
+        UUID created = outcome.createdPersonIdsByExternalId().get("4711");
+        assertThat(outcome.accountsCreated()).isEqualTo(1);
+        assertThat(accounts.findByPersonIdIn(List.of(created))).singleElement()
+                .satisfies(account -> {
+                    assertThat(account.getUsername()).isEqualTo("doe.jane");
+                    assertThat(account.getRoles()).containsExactly(Role.MEMBER);
+                    assertThat(account.isEnabled()).isTrue();
+                    assertThat(account.isPasswordChangeRequired()).isTrue();
+                });
+    }
+
+    @Test
+    void givenAUsernameSomebodyAlreadyHolds_whenTwoRowsWouldTakeIt_thenEachGetsItsOwn() {
+        // given
+        UUID held = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        account(held, "doe.jane", Set.of(Role.MEMBER));
+
+        // when
+        RosterSyncOutcome outcome = sync.apply(new RosterChangeSet(
+                List.of(new RosterChangeSet.NewPerson("4711", "Jane", "Doe",
+                                "jane.doe.1@example.org", STANDARD_MEMBERSHIP, true),
+                        new RosterChangeSet.NewPerson("4712", "Jane", "Doe",
+                                "jane.doe.2@example.org", STANDARD_MEMBERSHIP, true)),
+                List.of(), List.of()));
+
+        // then
+        assertThat(outcome.accountsCreated()).isEqualTo(2);
+        assertThat(accounts.findAll()).extracting(UserAccount::getUsername)
+                .contains("doe.jane", "doe.jane.2", "doe.jane.3");
+    }
+
+    @Test
+    void givenAMemberTheClubHasBeenMissingAnAccountFor_whenACorrectionAsksForOne_thenItIsOpened() {
+        // given
+        UUID jane = member("Jane", "Doe");
+
+        // when
+        RosterSyncOutcome outcome = sync.apply(new RosterChangeSet(List.of(),
+                List.of(new RosterChangeSet.PersonCorrection(jane, "4711", null, "Roe", null, null,
+                        true)),
+                List.of()));
+
+        // then — the username follows the name the correction leaves behind, not the one it replaced
+        assertThat(outcome.accountsCreated()).isEqualTo(1);
+        assertThat(accounts.findByPersonIdIn(List.of(jane))).singleElement()
+                .extracting(UserAccount::getUsername).isEqualTo("roe.jane");
+    }
+
+    @Test
+    void givenACreationWhoseNameNormalisesToNothing_whenAnAccountIsAsked_thenTheNumberCarriesIt() {
+        // when
+        RosterSyncOutcome outcome = sync.apply(new RosterChangeSet(
+                List.of(new RosterChangeSet.NewPerson("10473", "\u82b1\u5b50", "\u5c71\u7530",
+                        "hanako.yamada@example.org", STANDARD_MEMBERSHIP, true)),
+                List.of(), List.of()));
+
+        // then
+        UUID created = outcome.createdPersonIdsByExternalId().get("10473");
+        assertThat(accounts.findByPersonIdIn(List.of(created))).singleElement()
+                .extracting(UserAccount::getUsername).isEqualTo("member.10473");
+    }
+
+    @Test
     void givenACorrectionNamingOnlyTheLastName_whenApplying_thenTheOtherFieldsAreLeftAlone() {
         // given
         UUID jane = member("Jane", "Doe");
 
         // when
         sync.apply(new RosterChangeSet(List.of(),
-                List.of(new RosterChangeSet.PersonCorrection(jane, null, "Roe", null, null)),
+                List.of(new RosterChangeSet.PersonCorrection(jane, "4711", null, "Roe", null, null, false)),
                 List.of()));
 
         // then
