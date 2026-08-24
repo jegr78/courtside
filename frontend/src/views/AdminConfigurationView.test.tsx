@@ -25,7 +25,8 @@ describe("AdminConfigurationView", () => {
     vi.spyOn(api, "ruleTypes").mockResolvedValue([
       { ruleType: "OPENING_HOURS", configurable: false, parameters: [] },
       { ruleType: "SLOT_GRID", configurable: false, parameters: [] },
-      { ruleType: "ADVANCE_WINDOW", configurable: true, parameters: [{ name: "maxDays", minimum: 1, maximum: 365 }] }
+      { ruleType: "ADVANCE_WINDOW", configurable: true, parameters: [{ name: "maxDays", minimum: 1, maximum: 365 }] },
+      { ruleType: "NO_COURT_BOOKING", configurable: true, parameters: [] }
     ]);
     vi.spyOn(api, "rules").mockResolvedValue([
       { ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }
@@ -348,6 +349,32 @@ describe("AdminConfigurationView", () => {
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("The chosen rule set is not active.");
+  });
+
+  it("given a rule with no parameters, when it is offered, then it says what switching it on does", async () => {
+    // given
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // when
+    const description = await screen.findByTestId("rule-NO_COURT_BOOKING-description");
+
+    // then — a Save button beside no field says nothing on its own
+    expect(description).toHaveTextContent("nobody measured by that set may book a court or move a booking");
+    expect(screen.getByTestId("save-rule-NO_COURT_BOOKING")).toBeInTheDocument();
+  });
+
+  it("given a rule with no parameters, when it is saved, then it is written without any parameter", async () => {
+    // given
+    const saving = vi.spyOn(api, "setRule")
+      .mockResolvedValue({ ruleType: "NO_COURT_BOOKING", params: {} });
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("save-rule-NO_COURT_BOOKING");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-rule-NO_COURT_BOOKING"));
+
+    // then
+    expect(saving).toHaveBeenCalledWith("rule-set", "NO_COURT_BOOKING", {});
   });
 
   it("offers the club time zone as a list of known zones", async () => {

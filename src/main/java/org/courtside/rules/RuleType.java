@@ -4,5 +4,6 @@ public enum RuleType {
     OPENING_HOURS,
     SLOT_GRID,
     ADVANCE_WINDOW,
-    MAX_OPEN_BOOKINGS
+    MAX_OPEN_BOOKINGS,
+    NO_COURT_BOOKING
 }

@@ -31,6 +31,10 @@ public class RuleEngine {
         return evaluate(contexts, rules.stream().filter(rule -> !rule.isOverridable()).toList());
     }
 
+    public List<List<RuleViolation>> evaluateForAMove(List<RuleContext> contexts) {
+        return evaluate(contexts, rules.stream().filter(BookingRule::appliesToAMove).toList());
+    }
+
     private List<RuleViolation> evaluate(RuleContext context, List<BookingRule> applicable) {
         return applicable.stream()
                 .flatMap(rule -> rule.check(context).stream())

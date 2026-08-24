@@ -11,7 +11,9 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
+import org.courtside.rules.RuleType;
 import org.courtside.rules.RuleViolation;
+import org.courtside.rules.testfixture.RulesTestFixture;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import({FacilityTestFixture.class, ConfigTestFixture.class})
+@Import({FacilityTestFixture.class, ConfigTestFixture.class, RulesTestFixture.class})
 class SeriesPreviewTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -57,6 +59,9 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
 
     @Autowired
     private ConfigTestFixture clubConfiguration;
+
+    @Autowired
+    private RulesTestFixture rules;
 
     @MockitoSpyBean
     private CourtAllocationRepository allocations;
@@ -285,6 +290,22 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
         assertThat(preview.occurrences()).allSatisfy(occurrence ->
                 assertThat(occurrence.violations()).extracting(RuleViolation::code)
                         .contains("booking.rule.advanceWindow.exceeded"));
+    }
+
+    @Test
+    void givenARuleSetThatBarsBooking_whenPreviewingASeries_thenEveryOccurrenceCarriesTheBar() {
+        // given
+        UUID barred = rules.ruleSetBarringCourtBookings("Passive");
+        clubConfiguration.bindPeopleWithoutAMembershipTypeTo(barred);
+
+        // when
+        SeriesPreview preview = previewAsTrainer(rule(4));
+
+        // then
+        assertThat(preview.occurrences()).hasSize(4);
+        assertThat(preview.occurrences()).allSatisfy(occurrence ->
+                assertThat(occurrence.violations()).extracting(RuleViolation::code)
+                        .contains("booking.rule.noCourtBooking"));
     }
 
     private SeriesPreview previewAsTrainer(SeriesRule rule) {
