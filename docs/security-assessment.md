@@ -114,9 +114,43 @@ candidates awaiting triage.
 
 [`security-assessment.yml`](../.github/workflows/security-assessment.yml) runs the bounded `safe`
 profile weekly and on manual dispatch. It builds and qualifies one local candidate, resolves its
-immutable Docker image ID, runs the assessment once and retains only the redacted gate record and
-run manifest for 14 days. Missing scanners, missing evidence and incomplete outcomes fail the job;
-they are never normalized as a clean run.
+immutable Docker image ID and runs the assessment once. The artifact retains the redacted gate
+record and run manifest plus a CMS-encrypted envelope of the protected normalized evidence for 14
+days. Missing scanners, missing evidence and incomplete outcomes fail the job; they are never
+normalized as a clean run.
+
+Manual dispatch may select the complete `active` profile for a baseline or retest. It uses the same
+fresh hosted runner, qualified immutable image and evidence gate as the scheduled job. The schedule
+always selects `safe`; an active run is never introduced by changing a default or cron expression.
+
+The public certificate in [`.github/security-evidence-recipient.pem`](../.github/security-evidence-recipient.pem)
+encrypts that envelope with AES-256-GCM through OpenSSL CMS. Its security evidence private key is
+kept outside the repository. The workflow verifies the certificate fingerprint and the current
+decrypt-canary window against [the key inventory](../.github/security-evidence-key.json), then
+attests the encrypted envelope through GitHub artifact attestation. Verify that attestation before
+decrypting the downloaded envelope:
+
+```bash
+gh attestation verify protected-evidence.cms --repo jegr78/courtside
+```
+
+After verifying the attestation, compare the envelope against `protected-evidence.sha256`, then
+decrypt and extract it without writing its contents into a public workspace or log:
+
+```bash
+openssl cms -decrypt -binary -inform DER \
+  -in protected-evidence.cms \
+  -recip .github/security-evidence-recipient.pem \
+  -inkey <security-evidence-private-key.pem> \
+  -out protected-evidence.tar.gz
+tar -xzf protected-evidence.tar.gz
+```
+
+Before `canaryValidThrough`, the custodian encrypts and decrypts synthetic content with the tracked
+certificate and external private key and records the new verification window in the inventory.
+Rotation additionally requires proving that retained envelopes have either expired or been
+re-encrypted before the previous private key is retired. A lost or unavailable private key blocks
+the inventory renewal and therefore the next hosted assessment.
 
 The release workflow runs the complete `active` profile after both architectures qualify the
 candidate and before the security record can be assembled. The active manifest, normalized gate,

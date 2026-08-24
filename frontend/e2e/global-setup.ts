@@ -261,10 +261,47 @@ export interface JourneyService {
   releasePinnedBrowser(browserName: string): Promise<void>;
   browserDiagnostics(browserName: string, reason: string): Promise<BrowserDiagnostics>;
   executeSql(sql: string): Promise<string>;
-  holdDatabaseLock(sql: string): Promise<DatabaseLock>;
+  holdDatabaseLock(sql: string, signal?: AbortSignal): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): Promise<void>;
   reset(): Promise<void>;
   restart(): Promise<void>;
+}
+
+export function waitForProcessMarker(
+  client: ChildProcess,
+  marker: string,
+  errors: () => string,
+  signal?: AbortSignal
+): Promise<void> {
+  const stdout = client.stdout;
+  if (!stdout) return Promise.reject(new Error("Process stdout is unavailable"));
+  return new Promise((resolve, reject) => {
+    let output = "";
+    const finish = (result: () => void) => {
+      stdout.off("data", onData);
+      client.off("error", onError);
+      client.off("exit", onExit);
+      signal?.removeEventListener("abort", onAbort);
+      result();
+    };
+    const onData = (chunk: Buffer) => {
+      output += chunk.toString();
+      if (output.includes(marker)) finish(resolve);
+    };
+    const onError = (error: Error) => finish(() => reject(error));
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => finish(() => reject(new Error(
+      `Database lock client stopped with code ${code ?? "none"} and signal ${signal ?? "none"}: ${errors()}`
+    )));
+    const onAbort = () => {
+      client.kill();
+      finish(() => reject(new Error(`Database lock acquisition was cancelled: ${errors()}`)));
+    };
+    stdout.on("data", onData);
+    client.once("error", onError);
+    client.once("exit", onExit);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+  });
 }
 
 interface StartedJourneyService extends JourneyService {
@@ -423,24 +460,16 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       return result.stdout.trim();
     };
     const heldLocks = new Set<DatabaseLock>();
-    const holdDatabaseLock = async (sql: string): Promise<DatabaseLock> => {
+    const holdDatabaseLock = async (sql: string, signal?: AbortSignal): Promise<DatabaseLock> => {
       const client = spawn("docker", [
         "exec", "-i", postgres!.getId(), "psql", "-U", "courtside", "-d", "courtside",
         "-v", "ON_ERROR_STOP=1", "-At"
       ], { stdio: ["pipe", "pipe", "pipe"] });
-      let output = "";
       let errors = "";
-      client.stdout.on("data", (chunk: Buffer) => { output += chunk.toString(); });
       client.stderr.on("data", (chunk: Buffer) => { errors += chunk.toString(); });
+      const lockReady = waitForProcessMarker(client, "COURTSIDE_LOCK_READY", () => errors, signal);
       client.stdin.write(`BEGIN;\n${sql};\nSELECT 'COURTSIDE_LOCK_READY';\n`);
-      for (let attempt = 0; attempt < 100 && !output.includes("COURTSIDE_LOCK_READY"); attempt += 1) {
-        if (client.exitCode !== null) throw new Error(`Database lock client stopped: ${errors}`);
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-      if (!output.includes("COURTSIDE_LOCK_READY")) {
-        client.kill();
-        throw new Error(`Database lock was not acquired: ${errors}`);
-      }
+      await lockReady;
       let released = false;
       const lock: DatabaseLock = {
         waitForWaiters: async (count) => {

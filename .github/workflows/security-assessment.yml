@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '23 2 * * 3'
   workflow_dispatch:
+    inputs:
+      profile:
+        description: Assessment profile
+        required: true
+        default: safe
+        type: choice
+        options:
+          - safe
+          - active
 
 concurrency:
   group: scheduled-security-assessment
@@ -13,9 +22,14 @@ permissions:
   contents: read
 
 jobs:
-  safe:
+  assessment:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.profile == 'active' && 65 || 45 }}
+    outputs:
+      evidence-sealed: ${{ steps.seal.outputs.sealed }}
+    env:
+      PROFILE: ${{ github.event_name == 'schedule' && 'safe' || inputs.profile }}
+      RUN_ID: assessment-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -28,51 +42,92 @@ jobs:
       - name: Build and test the candidate
         run: ./mvnw -B verify
       - name: Qualify the local candidate image
-        run: node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+        run: frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
       - id: candidate
         name: Resolve the immutable local image digest
         run: echo "digest=$(docker image inspect courtside:uat-local --format '{{.Id}}')" >> "$GITHUB_OUTPUT"
       - name: Prepare pinned assessment images
-        run: node tools/security-image-inventory.mjs safe | xargs -n1 docker pull
+        run: frontend/node/node tools/security-image-inventory.mjs "$PROFILE" | xargs -n1 docker pull
       - name: Start the disposable security target
         env:
-          RUN_ID: scheduled-${{ github.run_id }}-${{ github.run_attempt }}
           IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
-        run: node tools/courtside.mjs security "$RUN_ID" "$IMAGE_DIGEST"
-      - name: Execute the bounded safe assessment
-        env:
-          RUN_ID: scheduled-${{ github.run_id }}-${{ github.run_attempt }}
-        run: node tools/courtside.mjs security-run "$RUN_ID" safe --qualification build/uat-smoke/qualification.json
+        run: frontend/node/node tools/courtside.mjs security "$RUN_ID" "$IMAGE_DIGEST"
+      - name: Execute the bounded assessment
+        run: |
+          if [[ "$PROFILE" = active ]]; then
+            frontend/node/node tools/courtside.mjs security-run "$RUN_ID" active \
+              --qualification build/uat-smoke/qualification.json \
+              --authorize "authorize-active-$RUN_ID"
+          else
+            frontend/node/node tools/courtside.mjs security-run "$RUN_ID" safe \
+              --qualification build/uat-smoke/qualification.json
+          fi
       - name: Capture the immutable first-attempt manifest
         if: always()
-        env:
-          RUN_ID: scheduled-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           umask 077
           mkdir -p build/security-gate
-          node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest.json
-      - name: Enforce the scheduled assessment gate
+          frontend/node/node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest.json
+      - id: seal
+        name: Seal protected assessment evidence
+        if: always()
+        run: |
+          umask 077
+          set -o pipefail
+          EXPECTED_FINGERPRINT="$(jq -r '.certificateSha256' .github/security-evidence-key.json)"
+          ACTUAL_FINGERPRINT="$(openssl x509 -in .github/security-evidence-recipient.pem -noout -fingerprint -sha256 | cut -d= -f2)"
+          test "$ACTUAL_FINGERPRINT" = "$EXPECTED_FINGERPRINT"
+          TODAY="$(date -u +%F)"
+          jq -e --arg today "$TODAY" \
+            '.canaryVerifiedOn <= $today and $today <= .canaryValidThrough' \
+            .github/security-evidence-key.json > /dev/null
+          tar -czf - -C "build/security/$RUN_ID/assessment/attempt-1" evidence \
+            | openssl cms -encrypt -binary -aes-256-gcm -outform DER \
+            -out build/security-gate/protected-evidence.cms \
+            .github/security-evidence-recipient.pem
+          openssl dgst -sha256 -r build/security-gate/protected-evidence.cms \
+            | awk '{print $1}' > build/security-gate/protected-evidence.sha256
+          echo "sealed=true" >> "$GITHUB_OUTPUT"
+      - name: Enforce the assessment gate
         if: always()
         env:
           IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
         run: >
-          node tools/security-assessment-gate.mjs
+          frontend/node/node tools/security-assessment-gate.mjs
           --manifest build/security-gate/manifest.json
-          --profile safe
+          --profile "$PROFILE"
           --subject "$IMAGE_DIGEST"
           --source-commit "${{ github.sha }}"
           --output build/security-gate/summary.json
       - name: Remove the disposable security target
         if: always()
-        env:
-          RUN_ID: scheduled-${{ github.run_id }}-${{ github.run_attempt }}
-        run: node tools/courtside.mjs security-cleanup "$RUN_ID"
+        run: frontend/node/node tools/courtside.mjs security-cleanup "$RUN_ID"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: scheduled-security-assessment-${{ github.run_id }}-${{ github.run_attempt }}
+          name: security-assessment-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             build/security-gate/manifest.json
             build/security-gate/summary.json
+            build/security-gate/protected-evidence.cms
+            build/security-gate/protected-evidence.sha256
           retention-days: 14
           if-no-files-found: error
+
+  attest-evidence:
+    needs: assessment
+    if: always() && needs.assessment.outputs.evidence-sealed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: security-assessment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/security-gate
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        with:
+          subject-path: build/security-gate/protected-evidence.cms

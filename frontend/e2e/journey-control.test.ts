@@ -68,7 +68,7 @@ describe("journey control", () => {
       expect(calls.browserDiagnostics).toHaveBeenCalledWith("webkit", "browser-disconnected");
       expect(calls.releasePinnedBrowser).toHaveBeenCalledWith("webkit");
       expect(calls.executeSql).toHaveBeenCalledWith("SELECT 1");
-      expect(calls.holdDatabaseLock).toHaveBeenCalledWith("LOCK TABLE booking");
+      expect(calls.holdDatabaseLock).toHaveBeenCalledWith("LOCK TABLE booking", expect.any(AbortSignal));
       expect(calls.publishServiceWorkerUpdate).toHaveBeenCalledOnce();
       expect(calls.reset).toHaveBeenCalledOnce();
       expect(calls.restart).toHaveBeenCalledOnce();
