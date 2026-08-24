@@ -1,11 +1,13 @@
 package org.courtside.rules;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.rules.internal.AdvanceWindowRule;
 import org.courtside.rules.internal.RuleAdminService;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -14,11 +16,13 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Import(ConfigTestFixture.class)
 class AdvanceWindowRuleTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
     private static final UUID YOUTH = UUID.fromString("cccccccc-0000-0000-0000-000000000002");
     private static final UUID STANDARD_RULE_SET = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001");
+    private static final UUID YOUTH_RULE_SET = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000002");
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
 
     @Autowired
@@ -26,6 +30,9 @@ class AdvanceWindowRuleTest extends AbstractIntegrationTest {
 
     @Autowired
     private RuleAdminService ruleAdminService;
+
+    @Autowired
+    private ConfigTestFixture clubConfiguration;
 
     @Test
     void givenADeactivatedRuleSet_whenBookingBeyondItsWindow_thenTheRuleStillGovernsExistingMembers() {
@@ -110,6 +117,19 @@ class AdvanceWindowRuleTest extends AbstractIntegrationTest {
 
         // when
         var violations = rule.check(contextAt("2026-05-14T15:00:00+02:00"));
+
+        // then
+        assertThat(violations).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.advanceWindow.exceeded");
+    }
+
+    @Test
+    void givenAClubRuleSetForPeopleWithoutAMembershipType_whenBookingBeyondItsWindow_thenItBinds() {
+        // given
+        clubConfiguration.bindPeopleWithoutAMembershipTypeTo(YOUTH_RULE_SET);
+
+        // when
+        var violations = rule.check(contextFor(null, NOW.plus(5, ChronoUnit.DAYS)));
 
         // then
         assertThat(violations).extracting(RuleViolation::code)

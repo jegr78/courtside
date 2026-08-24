@@ -350,6 +350,14 @@ components:
           properties:
             newAccountCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
             passwordResetCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
+            noMembershipTypeRuleSetId:
+              type: [string, "null"]
+              format: uuid
+              description: |
+                The rule set measured against a person who holds no current membership type. `null`
+                leaves such a person bound by no membership-scoped rule, which is the most permissive
+                state the booking rules know — the facility-wide rules still apply. It is deliberately
+                not on the public configuration: a visitor learns nothing about how a club is run.
 
     ClubConfigRequest:
       type: object
@@ -393,6 +401,13 @@ components:
           maximum: 8760
           description: How long a password a board hands out after a reset stays usable.
           example: 24
+        noMembershipTypeRuleSetId:
+          type: [string, "null"]
+          format: uuid
+          description: |
+            The rule set to measure a person against while they hold no current membership type.
+            It must name a rule set that exists and is active; `null` clears the assignment and
+            restores the state in which no membership-scoped rule binds such a person.
 
     WebManifest:
       type: object

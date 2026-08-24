@@ -51,6 +51,9 @@ public class ClubConfiguration {
     @Column(name = "password_reset_credential_hours", nullable = false)
     private int passwordResetCredentialHours;
 
+    @Column(name = "no_membership_type_rule_set_id")
+    private UUID noMembershipTypeRuleSetId;
+
     public void changeTo(String clubName, String primaryColor, String accentColor,
                          String logoUrl, String imprintUrl, String defaultLocale, int slotMinutes,
                          String timeZone) {
@@ -67,5 +70,9 @@ public class ClubConfiguration {
     public void changeCredentialValidity(int newAccountHours, int passwordResetHours) {
         this.newAccountCredentialHours = newAccountHours;
         this.passwordResetCredentialHours = passwordResetHours;
+    }
+
+    public void bindPeopleWithoutAMembershipTypeTo(UUID ruleSetId) {
+        this.noMembershipTypeRuleSetId = ruleSetId;
     }
 }

@@ -76,9 +76,13 @@ public class MemberService {
     @Transactional
     public MembershipType changeMembershipType(UUID membershipTypeId, String name, UUID ruleSetId) {
         MembershipType type = requireMembershipType(membershipTypeId);
-        requireActiveRuleSet(ruleSetId);
         List<String> changedFields = Objects.equals(type.getName(), name) ? List.of() : List.of("name");
         boolean ruleSetChanged = !Objects.equals(type.getRuleSetId(), ruleSetId);
+        // Only a rule set this type is newly pointing at. Keeping a retired one it already names is
+        // not an assignment, and refusing it would stop a club correcting the name beside it.
+        if (ruleSetChanged) {
+            requireActiveRuleSet(ruleSetId);
+        }
         type.changeTo(name, ruleSetId);
         MembershipType saved = saveOrRejectTakenName(type);
         if (!changedFields.isEmpty() || ruleSetChanged) {

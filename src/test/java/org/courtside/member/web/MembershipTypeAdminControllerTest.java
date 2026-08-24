@@ -205,6 +205,27 @@ class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAMembershipTypeWhoseRuleSetWasRetired_whenCorrectingItsName_thenItIsStillAccepted()
+            throws Exception {
+        // given
+        String ruleSetId = createRuleSet("Seniors");
+        String typeId = createMembershipType("Supporting", ruleSetId);
+        deactivateRuleSet(ruleSetId);
+
+        // when / then — retiring takes a rule set out of the choices; it does not freeze what
+        // already points at it, or a club could no longer correct a name it mistyped
+        mockMvc.perform(put("/api/admin/membership-types/" + typeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Supporting members", "ruleSetId": "%s"}
+                                """.formatted(ruleSetId))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Supporting members"))
+                .andExpect(jsonPath("$.ruleSetId").value(ruleSetId));
+    }
+
+    @Test
     void givenAMemberOfAType_whenDeactivatingTheType_thenTheMemberStillResolvesToIt() throws Exception {
         // given
         String typeId = createMembershipType("Veterans", null);

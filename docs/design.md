@@ -111,14 +111,15 @@ personal booking management, managed appointments for officers — including cre
 series, which is previewed before anything is written and reports what it had to skip — and the
 browser admin surface for configuration, facilities and the club's people — adding somebody,
 correcting their name or address, giving them an account, changing its roles, correcting its
-username, sending it new credentials and disabling it. Membership types are administered
-there as well, each showing how many people hold it, and so is the whole import: describing a
-source, linking the people a file cannot match by number, uploading a member list, reading what it
-would change, and running it. The column mapping is offered from the club's own export, read in the
-browser and never uploaded for that purpose. Before a court, a booking card or a day goes out of
-service, the facility view says which bookings sit on it — information beside the control, never a
-gate in front of it. What a board still cannot reach from a browser is listed with the endpoints
-that have no surface, in `tools/surfaceless-endpoints.json`; every entry left in it now names a
+username, sending it new credentials and disabling it. Membership types are administered there as
+well, each showing how many people hold it, and the configuration names the rule set that measures a
+person holding none. So is the whole import: describing a source, linking the people a file cannot
+match by number, uploading a member list, reading what it would change, and running it. The column
+mapping is offered from the club's own export, read in the browser and never uploaded for that
+purpose. Before a court, a booking card or a day goes out of service, the facility view says which
+bookings sit on it — information beside the control, never a gate in front of it. What a board still
+cannot reach from a browser is listed with the endpoints that have no surface, in
+`tools/surfaceless-endpoints.json`; every entry left in it now names a
 decision rather than a gap.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
@@ -655,28 +656,28 @@ public interface BookingRule {
 A rule set belongs to a membership type or role. On a booking attempt, all applicable rules
 run as a chain.
 
-**A person without a membership is bound by no membership-scoped rule.** *Accepted, not closed.*
-This covers a membership that has **ended** exactly as it covers one never given: a person whose
-membership carries an end date is no longer measured against its type, so ending a membership
-loosens what its holder may book rather than tightening it. Anything that ends memberships in bulk
-therefore has to take the account's permission away in the same step, or it hands departed members a
-less restricted account than they had as members.
+**A person without a membership is bound by no membership-scoped rule, unless the club says
+otherwise.** *Built.* This covers a membership that has **ended** exactly as it covers one never
+given: a person whose membership carries an end date is no longer measured against its type, so
+ending a membership loosens what its holder may book rather than tightening it, and anything that
+ends memberships in bulk has to take the account's permission away in the same step.
 
-Section 10 states the same thing from the session side and calls it the most permissive state the
-booking rules know; the roster reaches it in one step, because a person can be given an account
-without being given a membership, and such an account then books as far ahead and as often as the
-grid allows. Three things bound it: the roster reports the membership on every entry, so a person
-without one is visible in the list rather than hidden in it; opening hours, the slot grid and every
-rule not scoped to a membership type still bind, because they describe the facility and not the
-person; and only an administrator can create an account, so nobody reaches the state without a
-board putting them there.
+The configuration answers it: `club_config.no_membership_type_rule_set_id` names the rule set
+measured against a person who holds no current membership type, and the two membership-scoped rules
+— the advance window and the open-booking cap — resolve through it. The obvious repair, reading "no
+membership" as "no booking", stays rejected: it would change what every installation already permits
+and decide for the club rather than asking it. So the column is nullable and starts unset, and while
+it is unset the state below is what holds.
 
-**A default rule set closes it.** *Designed.* The obvious repair — reading "no membership" as "no
-booking" — stays rejected: it changes what every installation already permits and decides for the
-club rather than asking it. The configuration instead gains a rule set that applies when a person
-holds no membership type. The permissive state then stops being the *most* permissive one and
-becomes whatever each club says it is, which is the same answer this product gives everywhere else
-a board would plausibly disagree with us. Until it exists, the three bounds above are what hold.
+While no rule set is named, this is the most permissive state the booking rules know, and the roster
+reaches it in one step, because a person can be given an account without being given a membership.
+Three things bound it: the roster reports the membership on every entry, so a person without one is
+visible in the list rather than hidden in it; opening hours, the slot grid and every rule not scoped
+to a membership type still bind, because they describe the facility and not the person; and only an
+administrator can create an account, so nobody reaches the state without a board putting them there.
+
+A membership type that names *no* rule set is a different answer and keeps it: the club said that
+category is measured by nothing, and the club-level set does not stand in for it.
 
 **Evaluation does not stop at the first violation.** All violations are collected —
 otherwise a member works through three error messages one at a time.
@@ -1217,8 +1218,8 @@ whether it is built or designed. **Designed means absent today.**
   with. A membership is not a role, and no session carries a stale copy of one — a booking resolves
   the membership as it evaluates the rules — so the epoch moves here for the second reason above
   and not the first. Neither direction is harmless: the advance window and the open-booking cap
-  are looked up through a membership type and are found for nobody without one, so no membership
-  is the most permissive state the booking rules know; and a person without one drops out of
+  are looked up through a membership type and, unless the club named a rule set for people holding
+  none, are found for nobody without one; and a person without one drops out of
   participant search, so ending a membership takes as much away as assigning one does. The policy
   is about what an account is, not about what the club has configured: repointing a membership type
   at another rule set changes what every member holding it may book and leaves every session

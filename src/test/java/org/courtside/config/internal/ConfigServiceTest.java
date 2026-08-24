@@ -37,14 +37,14 @@ class ConfigServiceTest {
         when(configuration.getTimeZone()).thenReturn("Europe/Berlin");
         when(constraint.timeZoneConflictCode()).thenReturn(Optional.empty());
         when(constraint.conflictCode(any(), any())).thenReturn(Optional.empty());
-        ConfigService service = new ConfigService(configurations, shipping("de", "en"),
-                List.of(constraint), mock(ApplicationEventPublisher.class));
+        ConfigService service = new ConfigService(configurations, mock(),
+                shipping("de", "en"), List.of(constraint), mock(ApplicationEventPublisher.class));
 
         // when
         service.update(new ChangeClubConfigurationCommand(
                 "Example Tennis Club", "#004f2d", "#c8a415", null, null, "en",
                 new BookingSlotDuration(45), "Pacific/Auckland",
-                new CredentialLifetime(168), new CredentialLifetime(24)));
+                new CredentialLifetime(168), new CredentialLifetime(24), null));
 
         // then
         var slotDuration = org.mockito.ArgumentCaptor.forClass(BookingSlotDuration.class);
@@ -58,14 +58,14 @@ class ConfigServiceTest {
     void givenALanguageTheImageShipsNoBundleFor_whenUpdating_thenNothingIsWritten() {
         // given
         ClubConfigurationRepository configurations = mock();
-        ConfigService service = new ConfigService(configurations, shipping("de", "en"),
-                List.of(), mock(ApplicationEventPublisher.class));
+        ConfigService service = new ConfigService(configurations, mock(),
+                shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class));
 
         // when / then — the guard sits before the row is locked, so no caller can leave it half done
         assertThatThrownBy(() -> service.update(new ChangeClubConfigurationCommand(
                 "Example Tennis Club", "#004f2d", "#c8a415", null, null, "fr",
                 new BookingSlotDuration(30), "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24))))
+                new CredentialLifetime(168), new CredentialLifetime(24), null)))
                 .isInstanceOf(UnsupportedLanguageException.class)
                 .extracting(failure -> ((UnsupportedLanguageException) failure).getParams())
                 .isEqualTo(Map.of("locale", "fr", "supported", List.of("de", "en")));

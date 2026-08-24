@@ -26,7 +26,7 @@ class ChangeClubConfigurationCommandTest {
         // when / then
         assertThatCode(() -> new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d",
                 "#c8a415", null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24)))
+                new CredentialLifetime(168), new CredentialLifetime(24), null))
                 .doesNotThrowAnyException();
     }
 
@@ -35,7 +35,7 @@ class ChangeClubConfigurationCommandTest {
         // when / then
         assertThatThrownBy(() -> new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d",
                 "#c8a415", null, null, "de", null, "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24)))
+                new CredentialLifetime(168), new CredentialLifetime(24), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("slotDuration");
     }
@@ -45,7 +45,7 @@ class ChangeClubConfigurationCommandTest {
         // when / then
         assertThatThrownBy(() -> new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d",
                 "#c8a415", null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
-                null, new CredentialLifetime(24)))
+                null, new CredentialLifetime(24), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("newAccountCredential");
     }
@@ -55,7 +55,7 @@ class ChangeClubConfigurationCommandTest {
         // when / then
         assertThatThrownBy(() -> new ChangeClubConfigurationCommand(null, "#004f2d",
                 "#c8a415", null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24)))
+                new CredentialLifetime(168), new CredentialLifetime(24), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("clubName");
     }
@@ -64,6 +64,6 @@ class ChangeClubConfigurationCommandTest {
         return new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d", "#c8a415",
                 "/branding/logo.svg", "https://example-tennis-club.example/imprint", "de",
                 new BookingSlotDuration(30), "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24));
+                new CredentialLifetime(168), new CredentialLifetime(24), null);
     }
 }

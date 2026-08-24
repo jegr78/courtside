@@ -173,14 +173,20 @@ test("an admin changes club configuration and a booking rule through the browser
   await clubName.fill("Example Racquet Club");
   await clubName.press("Tab");
   await expect(clubName).toHaveValue("Example Racquet Club");
+  const withoutMembershipType = page.getByTestId("no-membership-type-rule-set");
+  const offered = await withoutMembershipType.locator("option").nth(1).getAttribute("value");
+  expect(offered).toBeTruthy();
+  await withoutMembershipType.selectOption(offered);
   const configSaved = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
   );
   await page.getByTestId("save-club-config").click();
   const configResponse = await configSaved;
   expect(configResponse.status()).toBe(200);
-  const changedConfig = await configResponse.json() as { clubName: string };
+  const changedConfig =
+    await configResponse.json() as { clubName: string; noMembershipTypeRuleSetId: string };
   expect(changedConfig.clubName).toBe("Example Racquet Club");
+  expect(changedConfig.noMembershipTypeRuleSetId).toBe(offered);
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
   await expect(page.getByTestId("club-brand-name")).toHaveText("Example Racquet Club");
   await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");

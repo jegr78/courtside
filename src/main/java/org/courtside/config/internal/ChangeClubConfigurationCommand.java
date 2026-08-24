@@ -3,6 +3,8 @@ package org.courtside.config.internal;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 
+import java.util.UUID;
+
 public record ChangeClubConfigurationCommand(
         String clubName,
         String primaryColor,
@@ -13,10 +15,11 @@ public record ChangeClubConfigurationCommand(
         BookingSlotDuration slotDuration,
         String timeZone,
         CredentialLifetime newAccountCredential,
-        CredentialLifetime passwordResetCredential) {
+        CredentialLifetime passwordResetCredential,
+        UUID noMembershipTypeRuleSetId) {
 
-    // A logo and an imprint are the two a club may leave unset. Everything else names something the
-    // instance cannot operate without, so an absent one is a caller that skipped its own validation.
+    // A logo, an imprint and the rule set for people holding no membership type are what a club may
+    // leave unset; an absent value anywhere else is a caller that skipped its own validation.
     public ChangeClubConfigurationCommand {
         requirePresent(clubName, "clubName");
         requirePresent(primaryColor, "primaryColor");
