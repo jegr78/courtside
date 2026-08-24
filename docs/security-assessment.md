@@ -205,3 +205,8 @@ The scanner runs with one worker and an in-memory generation database. Its image
 The disposable target is described in [`security-environment.md`](security-environment.md). Its run-specific marker, synthetic role matrix, network isolation and cleanup are prerequisites for every `active` or `destructive` assessment.
 
 The same document describes the bounded CLI workflow. The machine-readable run contract and manifest schema fix its budgets, first-attempt evidence and interruption semantics before assessment tools are added.
+
+The redacted result of the first safe-and-active execution is recorded in
+[`security-baseline.md`](security-baseline.md). Its incomplete state is deliberate: a scanner run
+does not become a passing baseline until every candidate and manual control has an auditable
+outcome.
