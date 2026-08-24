@@ -23,6 +23,11 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.match(fixtures, /connect\(await journeyService\.pinnedBrowser\(browserName\)\)/);
   assert.match(fixtures, /observeBrowserDisconnect\(pinned/);
   assert.match(fixtures, /journeyService\.browserDiagnostics\(browserName, "browser-disconnected"\)/);
+  assert.match(fixtures, /failureDiagnostics: \[async \(\{ browser, browserName, journeyService, page \}/);
+  assert.match(fixtures, /if \(!browser\.isConnected\(\)\) return;/);
+  assert.match(fixtures, /diagnoseUnexpectedBrowserTest\(\{/);
+  assert.match(fixtures, /status: testInfo\.status/);
+  assert.match(fixtures, /\(reason\) => journeyService\.browserDiagnostics\(browserName, reason\)/);
   assert.doesNotMatch(fixtures, /\.launch\(/);
 });
 

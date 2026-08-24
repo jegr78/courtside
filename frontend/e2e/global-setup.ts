@@ -10,7 +10,12 @@ import { GenericContainer, Network, Wait,
   type StartedNetwork, type StartedTestContainer } from "testcontainers";
 import type { FullConfig } from "@playwright/test";
 import { requireBuiltAfterItsSources } from "./build-freshness";
-import { collectBrowserDiagnostics, retainBrowserDiagnostics, type BrowserDiagnostics } from "./browser-diagnostics";
+import {
+  collectBrowserDiagnostics,
+  retainBrowserDiagnostics,
+  type BrowserDiagnostics,
+  type BrowserFailureReason
+} from "./browser-diagnostics";
 import { startJourneyControl } from "./journey-control";
 
 const PINNED_BROWSER_IMAGE =
@@ -259,7 +264,7 @@ export interface JourneyService {
   visualDate: string;
   pinnedBrowser(browserName: string): Promise<string>;
   releasePinnedBrowser(browserName: string): Promise<void>;
-  browserDiagnostics(browserName: string, reason: string): Promise<BrowserDiagnostics>;
+  browserDiagnostics(browserName: string, reason: BrowserFailureReason): Promise<BrowserDiagnostics>;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string, signal?: AbortSignal): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): Promise<void>;
@@ -606,7 +611,18 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       browserDiagnostics: async (browserName, reason) => {
         const browser = browserServers.get(browserName);
         if (!browser) throw new Error(`No pinned ${browserName} browser exists`);
-        const diagnostics = await collectBrowserDiagnostics(browser.container.getId(), browserName, reason);
+        const diagnostics = await collectBrowserDiagnostics(browser.container.getId(), browserName, reason, undefined, 5_000, {
+          relatedContainers: {
+            proxy: clubProxy!.getId(),
+            postgres: postgres!.getId()
+          },
+          applicationState: {
+            pid: application?.pid,
+            exitCode: application?.exitCode ?? null,
+            signalCode: application?.signalCode ?? null,
+            killed: application?.killed ?? false
+          }
+        });
         retainBrowserDiagnostics(diagnostics);
         return diagnostics;
       },

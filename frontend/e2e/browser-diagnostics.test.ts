@@ -1,8 +1,90 @@
 import { describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
-import { collectBrowserDiagnostics, observeBrowserDisconnect, retainBrowserDiagnostics } from "./browser-diagnostics";
+import { rmSync } from "node:fs";
+import {
+  classifyBrowserFailure,
+  collectBrowserDiagnostics,
+  diagnoseUnexpectedBrowserTest,
+  observeBrowserDisconnect,
+  retainBrowserDiagnostics
+} from "./browser-diagnostics";
 
 describe("browser diagnostics", () => {
+  it("given a successful test, when its fixture ends, then no diagnostic is collected", async () => {
+    // given
+    const diagnose = vi.fn();
+
+    // when
+    await diagnoseUnexpectedBrowserTest({
+      status: "passed",
+      expectedStatus: "passed",
+      errors: [],
+      pageCrashed: false,
+      browserConnected: true
+    }, diagnose);
+
+    // then
+    expect(diagnose).not.toHaveBeenCalled();
+  });
+
+  it("given an unexpected target loss, when its fixture ends, then diagnosis completes before cleanup", async () => {
+    // given
+    let completed = false;
+    const diagnose = vi.fn(() => {
+      completed = true;
+      return Promise.resolve();
+    });
+
+    // when
+    await diagnoseUnexpectedBrowserTest({
+      status: "failed",
+      expectedStatus: "passed",
+      errors: [{ message: "Target page, context or browser has been closed" }],
+      pageCrashed: false,
+      browserConnected: true
+    }, diagnose);
+
+    // then
+    expect(diagnose).toHaveBeenCalledWith("target-lost");
+    expect(completed).toBe(true);
+  });
+
+  it("given Playwright times a test out without an error message, when its fixture ends, then the timeout remains classified", async () => {
+    // given
+    const diagnose = vi.fn().mockResolvedValue(undefined);
+
+    // when
+    await diagnoseUnexpectedBrowserTest({
+      status: "timedOut",
+      expectedStatus: "passed",
+      errors: [],
+      pageCrashed: false,
+      browserConnected: true
+    }, diagnose);
+
+    // then
+    expect(diagnose).toHaveBeenCalledWith("test-timeout");
+  });
+
+  it.each([
+    [true, true, ["ordinary failure"], "page-crashed"],
+    [false, false, ["ordinary failure"], "browser-disconnected"],
+    [false, true, ["page.goto: WebKit encountered an internal error"], "browser-internal-error"],
+    [false, true, ["frame.evaluate: Target page, context or browser has been closed"], "target-lost"],
+    [false, true, ["Test timeout of 60000ms exceeded"], "test-timeout"],
+    [false, true, ["Expected the control to be visible"], "harness-incomplete"]
+  ])("given observed browser state, when a test fails, then its failure class is derived",
+    (pageCrashed, browserConnected, messages, expected) => {
+      // given
+      const errors = messages.map((message) => ({ message }));
+
+      // when
+      const reason = classifyBrowserFailure(errors, { pageCrashed, browserConnected });
+
+      // then
+      expect(reason).toBe(expected);
+    });
+
   it("given a connected browser, when its server disappears, then diagnostics finish before worker cleanup", async () => {
     // given
     const browser = new EventEmitter();
@@ -81,6 +163,39 @@ describe("browser diagnostics", () => {
     expect(diagnostics.containerLogs).not.toContain("brief");
   });
 
+  it("given related service containers and an application process, when collecting diagnostics, then the whole journey state is retained", async () => {
+    // given
+    const command = vi.fn((args: string[]) => {
+      const containerId = args.at(-1);
+      if (args[0] === "inspect") return Promise.resolve(JSON.stringify({ Status: "running", containerId }));
+      if (args[0] === "stats") return Promise.resolve(JSON.stringify({ CPUPerc: "4%", containerId }));
+      return Promise.resolve(`container=${containerId}`);
+    });
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics(
+      "browser-1", "webkit", "target-lost", command, 5_000, {
+        relatedContainers: { proxy: "proxy-1", postgres: "postgres-1" },
+        applicationState: { pid: 42, exitCode: null, signalCode: null, killed: false }
+      });
+
+    // then
+    expect(diagnostics.applicationState).toEqual({ pid: 42, exitCode: null, signalCode: null, killed: false });
+    expect(diagnostics.relatedContainers).toMatchObject({
+      proxy: {
+        containerId: "proxy-1",
+        containerState: { Status: "running", containerId: "proxy-1" },
+        containerStats: { CPUPerc: "4%", containerId: "proxy-1" }
+      },
+      postgres: {
+        containerId: "postgres-1",
+        containerState: { Status: "running", containerId: "postgres-1" },
+        containerStats: { CPUPerc: "4%", containerId: "postgres-1" }
+      }
+    });
+    expect(command).toHaveBeenCalledTimes(9);
+  });
+
   it("given Docker does not answer, when collecting diagnostics, then every command is aborted and reported", async () => {
     // given
     const command = vi.fn((_args: string[], signal: AbortSignal) => new Promise<string>((_resolve, reject) => {
@@ -138,8 +253,9 @@ describe("browser diagnostics", () => {
   it("given an unsupported browser name, when retaining diagnostics, then no artifact path can escape the directory", () => {
     // given
     const diagnostics = {
+      schemaVersion: 1 as const,
       browserName: "../../outside",
-      reason: "browser-disconnected",
+      reason: "browser-disconnected" as const,
       recordedAt: "2026-08-22T12:00:00.000Z",
       containerId: "container-3",
       diagnosticErrors: [],
@@ -153,5 +269,36 @@ describe("browser diagnostics", () => {
 
     // when / then
     expect(() => retainBrowserDiagnostics(diagnostics)).toThrowError("Unsupported browser name for diagnostics");
+  });
+
+  it("given two failures in one millisecond, when retaining diagnostics, then neither artifact is overwritten", () => {
+    // given
+    vi.spyOn(Date, "now").mockReturnValue(1_787_592_000_000);
+    const diagnostics = {
+      schemaVersion: 1 as const,
+      browserName: "webkit",
+      reason: "target-lost" as const,
+      recordedAt: "2026-08-24T12:00:00.000Z",
+      containerId: "container-6",
+      diagnosticErrors: [],
+      host: {
+        freeMemoryBytes: 1,
+        totalMemoryBytes: 2,
+        loadAverage: [0, 0, 0],
+        processMemory: process.memoryUsage()
+      }
+    };
+
+    // when
+    const first = retainBrowserDiagnostics(diagnostics);
+    const second = retainBrowserDiagnostics(diagnostics);
+
+    // then
+    try {
+      expect(second).not.toBe(first);
+    } finally {
+      for (const path of new Set([first, second])) rmSync(path);
+      vi.restoreAllMocks();
+    }
   });
 });

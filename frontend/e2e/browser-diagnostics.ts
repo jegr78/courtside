@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { freemem, loadavg, totalmem } from "node:os";
 import { resolve } from "node:path";
@@ -7,14 +8,17 @@ import { promisify } from "node:util";
 const executeFile = promisify(execFile);
 
 export interface BrowserDiagnostics {
+  schemaVersion: 1;
   browserName: string;
-  reason: string;
+  reason: BrowserFailureReason;
   recordedAt: string;
   containerId: string;
   containerState?: Record<string, unknown>;
   containerStats?: Record<string, unknown>;
   containerLogs?: string;
   diagnosticErrors: string[];
+  relatedContainers?: Record<string, ContainerDiagnostics>;
+  applicationState?: ApplicationProcessState;
   host: {
     freeMemoryBytes: number;
     totalMemoryBytes: number;
@@ -23,11 +27,70 @@ export interface BrowserDiagnostics {
   };
 }
 
+export interface ContainerDiagnostics {
+  containerId: string;
+  containerState?: Record<string, unknown>;
+  containerStats?: Record<string, unknown>;
+  containerLogs?: string;
+  diagnosticErrors: string[];
+}
+
+export interface ApplicationProcessState {
+  pid?: number;
+  exitCode: number | null;
+  signalCode: NodeJS.Signals | null;
+  killed: boolean;
+}
+
+export const browserFailureReasons = [
+  "browser-disconnected",
+  "browser-internal-error",
+  "page-crashed",
+  "target-lost",
+  "test-timeout",
+  "harness-incomplete"
+] as const;
+
+export type BrowserFailureReason = typeof browserFailureReasons[number];
+
+interface FailureState {
+  pageCrashed: boolean;
+  browserConnected: boolean;
+  timedOut?: boolean;
+}
+
+interface BrowserTestOutcome extends FailureState {
+  status?: string;
+  expectedStatus: string;
+  errors: ReadonlyArray<{ message?: string }>;
+}
+
+interface DiagnosticContext {
+  relatedContainers?: Record<string, string>;
+  applicationState?: ApplicationProcessState;
+}
+
 export type DockerDiagnosticCommand = (args: string[], signal: AbortSignal) => Promise<string>;
 
 interface DisconnectSource {
   on(event: "disconnected", listener: () => void): unknown;
   removeListener(event: "disconnected", listener: () => void): unknown;
+}
+
+export function classifyBrowserFailure(errors: ReadonlyArray<{ message?: string }>, state: FailureState): BrowserFailureReason {
+  if (!state.browserConnected) return "browser-disconnected";
+  if (state.pageCrashed) return "page-crashed";
+  const messages = errors.map(({ message }) => message ?? "").join("\n");
+  if (/WebKit encountered an internal error/i.test(messages)) return "browser-internal-error";
+  if (/Target page, context or browser has been closed/i.test(messages)) return "target-lost";
+  if (state.timedOut || /Test timeout of \d+ms exceeded/i.test(messages)) return "test-timeout";
+  return "harness-incomplete";
+}
+
+export async function diagnoseUnexpectedBrowserTest(outcome: BrowserTestOutcome,
+  diagnose: (reason: BrowserFailureReason) => Promise<unknown>): Promise<void> {
+  if (outcome.status === outcome.expectedStatus) return;
+  await diagnose(classifyBrowserFailure(outcome.errors, { ...outcome, timedOut: outcome.status === "timedOut" }));
 }
 
 export function observeBrowserDisconnect(browser: DisconnectSource, diagnose: () => Promise<unknown>): () => Promise<void> {
@@ -82,23 +145,22 @@ function json(value: string | undefined, errors: string[]): Record<string, unkno
   }
 }
 
-export async function collectBrowserDiagnostics(containerId: string, browserName: string, reason: string,
-  command: DockerDiagnosticCommand = dockerCommand, timeoutMs = 5_000): Promise<BrowserDiagnostics> {
-  const diagnosticErrors: string[] = [];
-  const [state, stats, logs] = await Promise.all([
-    capture(command, ["inspect", "--format", "{{json .State}}", containerId], diagnosticErrors, timeoutMs),
-    capture(command, ["stats", "--no-stream", "--format", "{{json .}}", containerId], diagnosticErrors, timeoutMs),
-    capture(command, ["logs", "--tail", "200", containerId], diagnosticErrors, timeoutMs)
-  ]);
+export async function collectBrowserDiagnostics(containerId: string, browserName: string, reason: BrowserFailureReason,
+  command: DockerDiagnosticCommand = dockerCommand, timeoutMs = 5_000,
+  context: DiagnosticContext = {}): Promise<BrowserDiagnostics> {
+  const browser = await collectContainerDiagnostics(containerId, command, timeoutMs);
+  const relatedContainers = Object.fromEntries(await Promise.all(
+    Object.entries(context.relatedContainers ?? {}).map(async ([name, id]) =>
+      [name, await collectContainerDiagnostics(id, command, timeoutMs)] as const)
+  ));
   return {
+    schemaVersion: 1,
     browserName,
     reason,
     recordedAt: new Date().toISOString(),
-    containerId,
-    containerState: json(state, diagnosticErrors),
-    containerStats: json(stats, diagnosticErrors),
-    containerLogs: logs === undefined ? undefined : safeLogs(logs),
-    diagnosticErrors,
+    ...browser,
+    relatedContainers: Object.keys(relatedContainers).length === 0 ? undefined : relatedContainers,
+    applicationState: context.applicationState,
     host: {
       freeMemoryBytes: freemem(),
       totalMemoryBytes: totalmem(),
@@ -108,13 +170,30 @@ export async function collectBrowserDiagnostics(containerId: string, browserName
   };
 }
 
+async function collectContainerDiagnostics(containerId: string, command: DockerDiagnosticCommand,
+  timeoutMs: number): Promise<ContainerDiagnostics> {
+  const diagnosticErrors: string[] = [];
+  const [state, stats, logs] = await Promise.all([
+    capture(command, ["inspect", "--format", "{{json .State}}", containerId], diagnosticErrors, timeoutMs),
+    capture(command, ["stats", "--no-stream", "--format", "{{json .}}", containerId], diagnosticErrors, timeoutMs),
+    capture(command, ["logs", "--tail", "200", containerId], diagnosticErrors, timeoutMs)
+  ]);
+  return {
+    containerId,
+    containerState: json(state, diagnosticErrors),
+    containerStats: json(stats, diagnosticErrors),
+    containerLogs: logs === undefined ? undefined : safeLogs(logs),
+    diagnosticErrors
+  };
+}
+
 export function retainBrowserDiagnostics(diagnostics: BrowserDiagnostics): string {
   if (!new Set(["chromium", "firefox", "webkit"]).has(diagnostics.browserName)) {
     throw new Error("Unsupported browser name for diagnostics");
   }
   const directory = resolve("test-results", "browser-diagnostics");
   mkdirSync(directory, { recursive: true });
-  const filename = `${diagnostics.browserName}-${Date.now()}.json`;
+  const filename = `${diagnostics.browserName}-${diagnostics.reason}-${Date.now()}-${randomUUID()}.json`;
   const path = resolve(directory, filename);
   writeFileSync(path, `${JSON.stringify(diagnostics, null, 2)}\n`, { mode: 0o600 });
   return path;
