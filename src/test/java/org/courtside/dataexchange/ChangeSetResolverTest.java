@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ChangeSetResolverTest {
@@ -190,7 +191,7 @@ class ChangeSetResolverTest {
         // given
         CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe"));
         CurrentRoster roster = new CurrentRoster(Map.of(), Map.of(), Set.of(ACTIVE_TYPE),
-                Map.of("jane doe", List.of(JANE)), Set.of(), Set.of());
+                Map.of("jane doe", List.of(JANE)), Set.of(), Set.of(), Map.of());
 
         // when
         ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, roster);
@@ -227,7 +228,7 @@ class ChangeSetResolverTest {
         CurrentRoster roster = new CurrentRoster(Map.of("4711", JANE),
                 Map.of(JANE, new CurrentRoster.RosterPerson(JANE, "Jane", "Doe",
                         "jane.doe@example.org", ACTIVE_TYPE, false)),
-                Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of());
+                Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of(), Map.of());
 
         // when
         ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, roster);
@@ -402,7 +403,7 @@ class ChangeSetResolverTest {
         CurrentRoster roster = new CurrentRoster(Map.of("4711", personId),
                 Map.of(personId, new CurrentRoster.RosterPerson(personId, "Jane", "Doe",
                         "jane.doe@example.org", ACTIVE_TYPE, false)),
-                Set.of(ACTIVE_TYPE), Map.of(), Set.of(ACTIVE_TYPE), Set.of());
+                Set.of(ACTIVE_TYPE), Map.of(), Set.of(ACTIVE_TYPE), Set.of(), Map.of());
 
         // when — an account is a membership's benefit, and this run gives them no membership
         ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.UPDATE_ONLY, roster);
@@ -413,14 +414,76 @@ class ChangeSetResolverTest {
                 .isEqualTo(ResolvedChangeSet.AccountOutcome.MEMBERSHIP_TYPE_GRANTS_NONE);
     }
 
+    @Test
+    void givenTwoRowsOnOneAddress_whenBothWouldGetAnAccount_thenBothAreReportedAsSharing() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(
+                row(1, "4711", "Jane", "Doe", Map.of(CanonicalField.EMAIL, "house@example.org")),
+                row(2, "4712", "John", "Roe", Map.of(CanonicalField.EMAIL, "house@example.org")));
+
+        // when — one mailbox would receive two one-time passwords from this single run
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, granting());
+
+        // then
+        assertThat(resolved.sharedAddresses())
+                .extracting(ResolvedChangeSet.SharedAddress::externalId,
+                        ResolvedChangeSet.SharedAddress::sharedBy)
+                .containsExactlyInAnyOrder(tuple("4711", 2), tuple("4712", 2));
+    }
+
+    @Test
+    void givenAnAddressTheRosterAlreadyHolds_whenOneRowWouldGetAnAccount_thenTheCountIncludesThem() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(
+                row(1, "4711", "Jane", "Doe", Map.of(CanonicalField.EMAIL, "house@example.org")));
+        CurrentRoster roster = new CurrentRoster(Map.of(), Map.of(), Set.of(ACTIVE_TYPE), Map.of(),
+                Set.of(ACTIVE_TYPE), Set.of(), Map.of("house@example.org", 3));
+
+        // when
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, roster);
+
+        // then — three people read that mailbox already, and this run adds a fourth
+        assertThat(resolved.sharedAddresses()).singleElement()
+                .extracting(ResolvedChangeSet.SharedAddress::sharedBy).isEqualTo(4);
+    }
+
+    @Test
+    void givenAnAddressNobodyElseHolds_whenTheRowWouldGetAnAccount_thenNothingIsReported() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe"));
+
+        // when
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, granting());
+
+        // then
+        assertThat(resolved.changes()).singleElement()
+                .extracting(ResolvedChangeSet.PersonChange::account)
+                .isEqualTo(ResolvedChangeSet.AccountOutcome.CREATE);
+        assertThat(resolved.sharedAddresses()).isEmpty();
+    }
+
+    @Test
+    void givenTwoRowsOnOneAddress_whenTheirTypeGrantsNoAccount_thenNothingIsReported() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(
+                row(1, "4711", "Jane", "Doe", Map.of(CanonicalField.EMAIL, "house@example.org")),
+                row(2, "4712", "John", "Roe", Map.of(CanonicalField.EMAIL, "house@example.org")));
+
+        // when — no credential is sent, so there is nothing for a board to weigh
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, emptyRoster());
+
+        // then
+        assertThat(resolved.sharedAddresses()).isEmpty();
+    }
+
     private static CurrentRoster granting() {
         return new CurrentRoster(Map.of(), Map.of(), Set.of(ACTIVE_TYPE), Map.of(),
-                Set.of(ACTIVE_TYPE), Set.of());
+                Set.of(ACTIVE_TYPE), Set.of(), Map.of());
     }
 
     private static CurrentRoster grantingWithANameKeyFor(String nameKey) {
         return new CurrentRoster(Map.of(), Map.of(), Set.of(ACTIVE_TYPE),
-                Map.of(nameKey, List.of(UUID.randomUUID())), Set.of(ACTIVE_TYPE), Set.of());
+                Map.of(nameKey, List.of(UUID.randomUUID())), Set.of(ACTIVE_TYPE), Set.of(), Map.of());
     }
 
     private static CurrentRoster grantingRosterHolding(UUID personId, String externalId,
@@ -430,7 +493,7 @@ class ChangeSetResolverTest {
                 Map.of(personId, new CurrentRoster.RosterPerson(personId, firstName, lastName,
                         "jane.doe@example.org", ACTIVE_TYPE, true)),
                 Set.of(ACTIVE_TYPE), Map.of(), Set.of(ACTIVE_TYPE),
-                holdsAnAccount ? Set.of(personId) : Set.of());
+                holdsAnAccount ? Set.of(personId) : Set.of(), Map.of());
     }
 
     private static CsvSnapshot.SnapshotRow row(int rowNumber, String externalId, String firstName,
@@ -445,7 +508,7 @@ class ChangeSetResolverTest {
     }
 
     private static CurrentRoster emptyRoster() {
-        return new CurrentRoster(Map.of(), Map.of(), Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of());
+        return new CurrentRoster(Map.of(), Map.of(), Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of(), Map.of());
     }
 
     private static SourceConfiguration owningMembershipType() {
@@ -460,7 +523,7 @@ class ChangeSetResolverTest {
         return new CurrentRoster(Map.of("4711", JANE),
                 Map.of(JANE, new CurrentRoster.RosterPerson(JANE, "Jane", "Doe",
                         "jane.doe@example.org", membershipTypeId, true)),
-                Set.of(ACTIVE_TYPE, RETIRED_TYPE), Map.of(), Set.of(), Set.of());
+                Set.of(ACTIVE_TYPE, RETIRED_TYPE), Map.of(), Set.of(), Set.of(), Map.of());
     }
 
     private static CurrentRoster rosterOfThree() {
@@ -471,7 +534,7 @@ class ChangeSetResolverTest {
                 Map.of(JANE, person(JANE, "Jane", "Doe"),
                         john, person(john, "John", "Roe"),
                         mary, person(mary, "Mary", "Major")),
-                Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of());
+                Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of(), Map.of());
     }
 
     private static CurrentRoster.RosterPerson person(UUID personId, String firstName, String lastName) {
@@ -484,6 +547,6 @@ class ChangeSetResolverTest {
         return new CurrentRoster(Map.of(externalId, personId),
                 Map.of(personId, new CurrentRoster.RosterPerson(personId, firstName, lastName,
                         "jane.doe@example.org", ACTIVE_TYPE, true)),
-                Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of());
+                Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of(), Map.of());
     }
 }

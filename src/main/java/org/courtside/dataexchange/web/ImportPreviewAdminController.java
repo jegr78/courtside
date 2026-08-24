@@ -6,6 +6,7 @@ import org.courtside.api.ApiImportChangeKind;
 import org.courtside.api.ApiImportAccountOutcome;
 import org.courtside.api.ApiImportPersonChange;
 import org.courtside.api.ApiImportPossibleDuplicate;
+import org.courtside.api.ApiImportSharedAddress;
 import org.courtside.api.ApiImportPreview;
 import org.courtside.api.ApiImportRemovalCounts;
 import org.courtside.api.ApiImportRowError;
@@ -65,7 +66,7 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
                 ApiSnapshotMode.fromValue(summary.mode().name()), summary.fileName(),
                 summary.fileHash(), summary.rowCount(), summary.ignoredColumns(),
                 changesOf(changeSet, summary.personNames()), rowErrorsOf(changeSet),
-                duplicatesOf(changeSet, summary.personNames()),
+                duplicatesOf(changeSet, summary.personNames()), sharedAddressesOf(changeSet),
                 removalsOf(changeSet), summary.needsConfirmation(), summary.superseded(),
                 WireTypes.toOffsetDateTime(summary.createdAt()),
                 WireTypes.toOffsetDateTime(summary.expiresAt()));
@@ -111,6 +112,16 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
                 .map(duplicate -> new ApiImportPossibleDuplicate(duplicate.rowNumber(),
                         duplicate.externalId(), duplicate.personId(),
                         nameOf(names, duplicate.personId())))
+                .toList();
+    }
+
+    private static List<ApiImportSharedAddress> sharedAddressesOf(ResolvedChangeSet changeSet) {
+        if (changeSet == null) {
+            return List.of();
+        }
+        return changeSet.sharedAddresses().stream()
+                .map(shared -> new ApiImportSharedAddress(shared.rowNumber(), shared.externalId(),
+                        shared.sharedBy()))
                 .toList();
     }
 

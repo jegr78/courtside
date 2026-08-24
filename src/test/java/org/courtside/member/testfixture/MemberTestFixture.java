@@ -72,6 +72,10 @@ public class MemberTestFixture {
         return memberships.createMembershipType(name, null, true).getId();
     }
 
+    public void letMembershipTypeGrantAnAccount(UUID membershipTypeId, String name) {
+        memberships.changeMembershipType(membershipTypeId, name, null, true);
+    }
+
     public UUID membershipTypeMeasuredBy(String name, UUID ruleSetId) {
         return memberships.createMembershipType(name, ruleSetId, false).getId();
     }

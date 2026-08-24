@@ -10,7 +10,8 @@ public record CurrentRoster(Map<String, UUID> personIdsByExternalId,
                             Set<UUID> activeMembershipTypeIds,
                             Map<String, List<UUID>> personIdsByNameKey,
                             Set<UUID> membershipTypeIdsGrantingAnAccount,
-                            Set<UUID> personIdsHoldingAnAccount) {
+                            Set<UUID> personIdsHoldingAnAccount,
+                            Map<String, Integer> peopleByAddress) {
 
     public CurrentRoster {
         personIdsByExternalId = Map.copyOf(personIdsByExternalId);
@@ -19,6 +20,7 @@ public record CurrentRoster(Map<String, UUID> personIdsByExternalId,
         personIdsByNameKey = Map.copyOf(personIdsByNameKey);
         membershipTypeIdsGrantingAnAccount = Set.copyOf(membershipTypeIdsGrantingAnAccount);
         personIdsHoldingAnAccount = Set.copyOf(personIdsHoldingAnAccount);
+        peopleByAddress = Map.copyOf(peopleByAddress);
     }
 
     public record RosterPerson(UUID personId, String firstName, String lastName, String email,

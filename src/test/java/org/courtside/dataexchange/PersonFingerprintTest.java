@@ -14,8 +14,8 @@ class PersonFingerprintTest {
     @Test
     void givenTwoPeopleWhoseFieldsOnlyDifferInWhereTheySplit_thenTheirFingerprintsDiffer() {
         // when
-        String left = PersonFingerprint.of("Jane", "DoeX", "jane@example.org", TYPE, true);
-        String right = PersonFingerprint.of("JaneD", "oeX", "jane@example.org", TYPE, true);
+        String left = PersonFingerprint.of("Jane", "DoeX", "jane@example.org", TYPE, true, false);
+        String right = PersonFingerprint.of("JaneD", "oeX", "jane@example.org", TYPE, true, false);
 
         // then
         assertThat(left).isNotEqualTo(right);
@@ -24,14 +24,22 @@ class PersonFingerprintTest {
     @Test
     void givenTheSamePerson_thenTheFingerprintIsStable() {
         // when / then
-        assertThat(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, true))
-                .isEqualTo(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, true));
+        assertThat(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, true, false))
+                .isEqualTo(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, true, false));
+    }
+
+    @Test
+    void whenSomebodyStartsSigningIn_thenTheFingerprintChanges() {
+        // when / then — a preview that said an account would be opened no longer describes
+        // somebody who has one, so the execution has to notice
+        assertThat(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, true, false))
+                .isNotEqualTo(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, true, true));
     }
 
     @Test
     void whenAMembershipEnds_thenTheFingerprintChanges() {
         // when / then
-        assertThat(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, true))
-                .isNotEqualTo(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, false));
+        assertThat(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, true, false))
+                .isNotEqualTo(PersonFingerprint.of("Jane", "Doe", "jane@example.org", TYPE, false, false));
     }
 }

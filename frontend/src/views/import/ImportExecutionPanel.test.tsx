@@ -16,6 +16,7 @@ const preview: ImportPreview = {
   changes: [],
   rowErrors: [],
   possibleDuplicates: [],
+  sharedAddresses: [],
   removals: { count: 1, currentlyLinked: 4, percent: 25 },
   needsConfirmation: false,
   superseded: false,

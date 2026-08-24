@@ -18,6 +18,7 @@ import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.courtside.member.RosterChangeSet;
 import org.courtside.member.RosterSyncOutcome;
+import org.courtside.member.RosterService;
 import org.courtside.member.RosterSyncService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +51,7 @@ public class ExecutionService {
     private final RosterSyncService rosterSync;
     private final PersonRepository persons;
     private final MemberRepository members;
+    private final RosterService roster;
     private final SourceLock sourceLock;
     private final ObjectMapper json;
     private final Clock clock;
@@ -181,13 +183,14 @@ public class ExecutionService {
     private Map<UUID, String> fingerprintsOf(List<UUID> personIds) {
         Map<UUID, Member> membershipsByPerson = members.findByPersonIdIn(personIds).stream()
                 .collect(Collectors.toMap(Member::getPersonId, Function.identity()));
+        Set<UUID> holders = roster.personIdsHoldingAnAccount(personIds);
         Map<UUID, String> fingerprints = new HashMap<>();
         persons.findAllById(personIds).forEach(person -> {
             Member member = membershipsByPerson.get(person.getId());
             fingerprints.put(person.getId(), PersonFingerprint.of(person.getFirstName(),
                     person.getLastName(), person.getEmail(),
                     member == null ? null : member.getMembershipTypeId(),
-                    member != null && member.isCurrent()));
+                    member != null && member.isCurrent(), holders.contains(person.getId())));
         });
         return fingerprints;
     }

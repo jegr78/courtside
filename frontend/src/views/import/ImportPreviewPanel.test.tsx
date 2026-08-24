@@ -20,6 +20,7 @@ const preview: ImportPreview = {
   ],
   rowErrors: [{ rowNumber: 4, code: "import.snapshot.row.externalIdUnusable", params: { maxLength: 120 } }],
   possibleDuplicates: [{ rowNumber: 5, externalId: "4714", personId: "person-4", personName: "Richard Miles" }],
+  sharedAddresses: [{ rowNumber: 1, externalId: "4711", sharedBy: 3 }],
   removals: { count: 1, currentlyLinked: 4, percent: 25 },
   needsConfirmation: false,
   superseded: false,
@@ -162,6 +163,18 @@ describe("ImportPreviewPanel", () => {
     expect(screen.getByTestId("change-END_MEMBERSHIP-4713")).not.toHaveTextContent("account");
   });
 
+  it("given a row whose mailbox several people read, when reading the preview, then it says how many", async () => {
+    // given
+    show(preview);
+
+    // when
+    await userEvent.click(screen.getByTestId("shared-addresses-heading"));
+
+    // then
+    expect(screen.getByTestId("shared-addresses-heading")).toHaveTextContent("1");
+    expect(screen.getByTestId("shared-address-4711")).toHaveTextContent("3");
+  });
+
   it("given more rows than fit comfortably, when a section is opened, then every one of them is shown", async () => {
     // given
     const many = { ...preview, changes: Array.from({ length: 120 }, (_, index) => ({
@@ -190,7 +203,7 @@ describe("ImportPreviewPanel", () => {
 
   it("given an expired preview, when it is read, then its file is still identified by name and hash", () => {
     // given — past retention the change set is gone; the row, its hash and its counts are not
-    show({ ...preview, changes: [], rowErrors: [], possibleDuplicates: [], expiresAt: "2020-01-01T00:00:00Z" });
+    show({ ...preview, changes: [], rowErrors: [], possibleDuplicates: [], sharedAddresses: [], expiresAt: "2020-01-01T00:00:00Z" });
 
     // then
     expect(screen.getByTestId("preview-expired")).toBeInTheDocument();

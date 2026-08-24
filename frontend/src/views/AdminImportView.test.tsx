@@ -129,7 +129,7 @@ describe("AdminImportView", () => {
     vi.spyOn(api, "createImportPreview").mockResolvedValue({
       previewId: "preview-1", sourceId: "source-1", mode: "UPDATE_ONLY", fileName: "members.csv",
       fileHash: "abc", rowCount: 1, ignoredColumns: [], changes: [], rowErrors: [],
-      possibleDuplicates: [], removals: { count: 0, currentlyLinked: 0, percent: 0 },
+      possibleDuplicates: [], sharedAddresses: [], removals: { count: 0, currentlyLinked: 0, percent: 0 },
       needsConfirmation: false, superseded: false,
       createdAt: "2026-08-21T10:00:00Z", expiresAt: "2126-08-22T10:00:00Z"
     });

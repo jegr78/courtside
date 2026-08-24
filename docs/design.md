@@ -60,7 +60,8 @@ reviewed change set, atomically, once per source at a time, refusing the run if 
 touch has changed in the meantime. A membership type can be marked as granting an account, and an
 execution then opens one for every person it covers who does not already hold one, holding `MEMBER`
 alone and with its one-time password mailed to that member rather than shown to anybody; the
-preview names per row whether an account would be opened and, where it would not, why. What is
+preview names per row whether an account would be opened and, where it would not, why, and it
+reports every row whose mailbox more than one person reads. What is
 still missing is export. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
@@ -1142,6 +1143,16 @@ Import and export:
   person is still created, but an account for somebody who may already have one waits for a board
   to look. The count sits above the list, so what a board approves is what runs.
 
+  **A shared mailbox is named, not refused.** Where a row would open an account on an address more
+  than one person holds, the preview reports it with the number of people who would be on it once
+  the run is done — those the roster already has plus those this run puts there. The account is
+  still opened, because a shared address is the case the schema exists to serve, and refusing it
+  would take the import away from exactly the clubs that enrol children under a parent's address.
+  What must not happen is that it goes unsaid: one mailbox receiving twenty one-time passwords is
+  the risk section 10 accepts, and it accepts it on the condition that a board sees the count
+  first. A row that moves somebody onto the address counts twice at worst — the error runs towards
+  reporting more sharing rather than less, which is the direction a warning may err in.
+
 - **A synchronisation can take a membership away; it can never hand one out.** When a membership
   ends, an account that held `MEMBER` and nothing else is disabled and its sessions end; an account
   holding another role keeps it and loses `MEMBER` only, so a card requiring `MEMBER` refuses it.
@@ -1341,7 +1352,9 @@ whether it is built or designed. **Designed means absent today.**
   changed is that no person stands between the address a club typed and the message. What bounds it:
   the club decides which address sits on which person and can correct it, and correcting it
   withdraws whatever was issued to the old one; the roster shows, before anybody sends, how many
-  people share the address a message is about to go to; the subject names the person it is for, so a
+  people share the address a message is about to go to, and an import preview says the same per row
+  before a run opens any account, because a snapshot sends at a scale no per-person click reaches;
+  the subject names the person it is for, so a
   shared inbox can tell two apart; and nothing else about an account can be reached this way — a
   credential grants the roles that account already had and no others. It stays open because closing
   it would mean forbidding a shared address, which is the case the schema exists to serve.

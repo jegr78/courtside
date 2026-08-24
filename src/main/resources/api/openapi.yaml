@@ -907,6 +907,25 @@ components:
           type: string
           description: The name that person carries today, resolved when the preview is read.
 
+    ImportSharedAddress:
+      type: object
+      required: [rowNumber, externalId, sharedBy]
+      description: |
+        A row this run would open an account for, whose address more than one person holds. The
+        account is still opened — a shared address is deliberate, a parent registering for their
+        children — but whoever reads that mailbox receives every one-time password sent to it and a
+        first credential is enough to keep an account. The count is here so a board sees that
+        before the run sends anything, the way the roster shows it before a single credential.
+      properties:
+        rowNumber: { type: integer }
+        externalId: { type: string }
+        sharedBy:
+          type: integer
+          description: |
+            People who would hold that address once the run is done: those the roster already has
+            on it plus those this run puts there. A row moving somebody onto the address counts
+            twice at worst, which errs towards reporting more sharing rather than less.
+
     ImportRemovalCounts:
       type: object
       required: [count, currentlyLinked, percent]
@@ -923,8 +942,8 @@ components:
     ImportPreview:
       type: object
       required: [previewId, sourceId, mode, fileName, fileHash, rowCount, ignoredColumns, changes,
-                 rowErrors, possibleDuplicates, removals, needsConfirmation, superseded, createdAt,
-                 expiresAt]
+                 rowErrors, possibleDuplicates, sharedAddresses, removals, needsConfirmation,
+                 superseded, createdAt, expiresAt]
       properties:
         previewId: { type: string, format: uuid }
         sourceId: { type: string, format: uuid }
@@ -953,6 +972,9 @@ components:
         possibleDuplicates:
           type: array
           items: { $ref: "#/components/schemas/ImportPossibleDuplicate" }
+        sharedAddresses:
+          type: array
+          items: { $ref: "#/components/schemas/ImportSharedAddress" }
         removals: { $ref: "#/components/schemas/ImportRemovalCounts" }
         needsConfirmation:
           type: boolean

@@ -137,6 +137,16 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
         </ul>
       </Section>
 
+      <Section testId="shared-addresses" heading={t("admin.import.sharedAddresses", { shown: preview.sharedAddresses.length })}>
+        <p className="text-sm">{t("admin.import.sharedAddressesExplain")}</p>
+        <ul className="grid gap-1">
+          {preview.sharedAddresses.map((shared) => <li key={shared.externalId} data-testid={`shared-address-${shared.externalId}`}>
+            {t("admin.import.row", { row: shared.rowNumber })}
+            {" "}<span className="font-mono">{shared.externalId}</span> — {t("admin.import.sharedBy", { sharedBy: shared.sharedBy })}
+          </li>)}
+        </ul>
+      </Section>
+
       <Section testId="duplicates" heading={t("admin.import.duplicates", { shown: preview.possibleDuplicates.length })}>
         <p className="text-sm">{t("admin.import.duplicatesExplain")}</p>
         <ul className="grid gap-1">

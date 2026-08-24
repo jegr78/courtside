@@ -47,17 +47,19 @@ public class RosterSyncService {
         // One order over both phases, not one per phase: two runs that correct and end opposite
         // people would otherwise take the same two rows in opposite orders and deadlock.
         lockInIdOrder(requested);
-        requested.corrections().stream()
-                .sorted(Comparator.comparing(RosterChangeSet.PersonCorrection::personId))
-                .forEach(this::correct);
+        int corrected = 0;
+        for (RosterChangeSet.PersonCorrection correction : requested.corrections().stream()
+                .sorted(Comparator.comparing(RosterChangeSet.PersonCorrection::personId)).toList()) {
+            corrected += correct(correction) ? 1 : 0;
+        }
         Departures departures = endMemberships(requested.membershipEndings().stream()
                 .sorted().toList());
         int accountsCreated = createAccounts(requested, created);
         log.info("Applied a roster snapshot: {} created, {} corrected, {} memberships ended, "
                         + "{} accounts created, {} accounts disabled, {} accounts lost the member role",
-                created.size(), requested.corrections().size(), requested.membershipEndings().size(),
+                created.size(), corrected, requested.membershipEndings().size(),
                 accountsCreated, departures.disabled(), departures.rolesRemoved());
-        return new RosterSyncOutcome(created, created.size(), requested.corrections().size(),
+        return new RosterSyncOutcome(created, created.size(), corrected,
                 requested.membershipEndings().size(), accountsCreated, departures.disabled(),
                 departures.rolesRemoved());
     }
@@ -110,9 +112,12 @@ public class RosterSyncService {
         return personId;
     }
 
-    private void correct(RosterChangeSet.PersonCorrection correction) {
-        if (correction.firstName() != null || correction.lastName() != null
-                || correction.email() != null) {
+    // A row whose only reason to exist is its account corrects nothing, and a run log that counts
+    // it as a correction says something about a member that did not happen.
+    private boolean correct(RosterChangeSet.PersonCorrection correction) {
+        boolean names = correction.firstName() != null || correction.lastName() != null
+                || correction.email() != null;
+        if (names) {
             roster.correctPerson(correction.personId(), correction.firstName(),
                     correction.lastName(), correction.email());
         }
@@ -120,6 +125,7 @@ public class RosterSyncService {
             roster.writeMembership(correction.personId(), correction.membershipTypeId(),
                     MembershipPeriod.running());
         }
+        return names || correction.membershipTypeId() != null;
     }
 
     private Departures endMemberships(List<UUID> personIds) {

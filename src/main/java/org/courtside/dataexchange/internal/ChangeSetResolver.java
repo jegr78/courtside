@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 public final class ChangeSetResolver {
@@ -28,6 +29,7 @@ public final class ChangeSetResolver {
         List<ResolvedChangeSet.PersonChange> changes = new ArrayList<>();
         List<ResolvedChangeSet.PossibleDuplicate> duplicates = new ArrayList<>();
         List<ResolvedChangeSet.RowError> rowErrors = new ArrayList<>(errorsOf(snapshot));
+        List<AddressAnAccountWouldGoTo> addresses = new ArrayList<>();
         Set<String> present = new HashSet<>();
         for (CsvSnapshot.SnapshotRow row : snapshot.rows()) {
             present.add(row.externalId());
@@ -41,15 +43,69 @@ public final class ChangeSetResolver {
             if (personId == null) {
                 Optional<ResolvedChangeSet.PossibleDuplicate> duplicate = duplicateOf(row, roster);
                 duplicate.ifPresent(duplicates::add);
-                changes.add(creationOf(row, configuration, roster, duplicate.isPresent()));
+                ResolvedChangeSet.PersonChange creation =
+                        creationOf(row, configuration, roster, duplicate.isPresent());
+                changes.add(creation);
+                recordAddress(addresses, creation,
+                        addressAfterThisRun(row, configuration, null));
             } else {
-                updateOf(row, personId, configuration, roster).ifPresent(changes::add);
+                CurrentRoster.RosterPerson current = roster.peopleById().get(personId);
+                updateOf(row, personId, configuration, roster).ifPresent(update -> {
+                    changes.add(update);
+                    recordAddress(addresses, update,
+                            addressAfterThisRun(row, configuration, current));
+                });
             }
         }
         List<ResolvedChangeSet.PersonChange> endings = endingsFor(mode, present, roster);
         changes.addAll(endings);
         return new ResolvedChangeSet(changes, rowErrors, duplicates,
-                removalsOf(endings.size(), roster));
+                sharedAddressesAmong(addresses, roster), removalsOf(endings.size(), roster));
+    }
+
+    private static void recordAddress(List<AddressAnAccountWouldGoTo> addresses,
+                                      ResolvedChangeSet.PersonChange change, String address) {
+        if (change.account() == ResolvedChangeSet.AccountOutcome.CREATE) {
+            addresses.add(new AddressAnAccountWouldGoTo(change.rowNumber(), change.externalId(),
+                    address, change.kind() == ResolvedChangeSet.ChangeKind.CREATE));
+        }
+    }
+
+    // The people already on the address plus the ones this run puts there. A row that moves
+    // somebody onto it counts twice at worst, which errs towards showing more sharing, not less.
+    private static List<ResolvedChangeSet.SharedAddress> sharedAddressesAmong(
+            List<AddressAnAccountWouldGoTo> addresses, CurrentRoster roster) {
+        Map<String, Long> newcomers = addresses.stream()
+                .filter(AddressAnAccountWouldGoTo::newPerson)
+                .collect(Collectors.groupingBy(AddressAnAccountWouldGoTo::address,
+                        Collectors.counting()));
+        List<ResolvedChangeSet.SharedAddress> shared = new ArrayList<>();
+        addresses.forEach(use -> {
+            int sharedBy = roster.peopleByAddress().getOrDefault(use.address(), 0)
+                    + newcomers.getOrDefault(use.address(), 0L).intValue();
+            if (sharedBy > 1) {
+                shared.add(new ResolvedChangeSet.SharedAddress(use.rowNumber(), use.externalId(),
+                        sharedBy));
+            }
+        });
+        return shared;
+    }
+
+    // An empty cell in an owned column says the file has nothing to say about the address, so the
+    // one already on file stays - the same rule the update itself follows.
+    private static String addressAfterThisRun(CsvSnapshot.SnapshotRow row,
+                                              SourceConfiguration configuration,
+                                              CurrentRoster.RosterPerson current) {
+        String fromFile = row.values().get(CanonicalField.EMAIL);
+        boolean owned = configuration.ownedFields().contains(CanonicalField.EMAIL);
+        if (current == null) {
+            return fromFile;
+        }
+        return owned && fromFile != null && !fromFile.isEmpty() ? fromFile : current.email();
+    }
+
+    private record AddressAnAccountWouldGoTo(int rowNumber, String externalId, String address,
+                                             boolean newPerson) {
     }
 
     private static ResolvedChangeSet.PersonChange creationOf(CsvSnapshot.SnapshotRow row,
@@ -63,7 +119,7 @@ public final class ChangeSetResolver {
         return new ResolvedChangeSet.PersonChange(ResolvedChangeSet.ChangeKind.CREATE,
                 row.rowNumber(), row.externalId(), null, values, membershipTypeId,
                 accountOutcomeOf(roster, false, membershipTypeId, possibleDuplicate,
-                        values.get(CanonicalField.EMAIL)));
+                        addressAfterThisRun(row, configuration, null)));
     }
 
     private static Optional<ResolvedChangeSet.PersonChange> updateOf(
@@ -88,8 +144,7 @@ public final class ChangeSetResolver {
         ResolvedChangeSet.AccountOutcome account = accountOutcomeOf(roster,
                 roster.personIdsHoldingAnAccount().contains(personId),
                 membershipTypeAfterThisRun(membershipTypeId, current), false,
-                changed.containsKey(CanonicalField.EMAIL) ? changed.get(CanonicalField.EMAIL)
-                        : heldValueOf(current, CanonicalField.EMAIL));
+                addressAfterThisRun(row, configuration, current));
         if (changed.isEmpty() && membershipTypeId == null
                 && account != ResolvedChangeSet.AccountOutcome.CREATE) {
             return Optional.empty();
