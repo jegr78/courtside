@@ -14,6 +14,8 @@ const composeFile = join(root, "deploy", "compose.mail-smoke.yaml");
 const project = `courtside-mail-${randomBytes(4).toString("hex")}`;
 const domain = "courts.example.org";
 const hostname = `mail.${domain}`;
+// The same foreign domain the deployment's own setup check offers it, so both ask one question.
+const relayProbeDomain = process.env.COURTSIDE_MAIL_RELAY_PROBE ?? "relay-probe.example.com";
 const setupPassword = randomBytes(18).toString("base64url");
 const adminPassword = randomBytes(18).toString("base64url");
 const applicationPassword = randomBytes(18).toString("base64url");
@@ -98,22 +100,33 @@ class Smtp {
   }
 
   async expect(code) {
+    const reply = await this.reply();
+    if (!statusOf(reply).startsWith(code)) throw new Error(`Expected ${code}, got: ${reply.trim()}`);
+    return reply;
+  }
+
+  async reply() {
     for (let attempt = 0; attempt < 200; attempt += 1) {
       const line = this.buffer.split("\r\n").filter(Boolean).pop();
       if (line && /^\d{3} /.test(line)) {
         const reply = this.buffer;
         this.buffer = "";
-        if (!line.startsWith(code)) throw new Error(`Expected ${code}, got: ${reply.trim()}`);
         return reply;
       }
       await new Promise((wake) => setTimeout(wake, 50));
     }
-    throw new Error(`No complete reply while expecting ${code}: ${this.buffer}`);
+    throw new Error(`No complete reply: ${this.buffer}`);
   }
 
   async send(line, code) {
     this.socket.write(`${line}\r\n`);
     return this.expect(code);
+  }
+
+  // Whatever the server answers: a probe that exists to read a refusal cannot demand a code.
+  async attempt(line) {
+    this.socket.write(`${line}\r\n`);
+    return this.reply();
   }
 
   // The application's posture, without weakening the handshake to reach it: what the relay presents
@@ -127,6 +140,33 @@ class Smtp {
     await new Promise((ready, fail) => secure.once("secureConnect", ready).once("error", fail));
     return new Smtp(secure);
   }
+}
+
+function statusOf(reply) {
+  return reply.split("\r\n").filter(Boolean).pop();
+}
+
+// Port 25 is published because this deployment has an MX record and bounces have to arrive
+// somewhere. What keeps that from harming strangers is that the server carries no mail of theirs.
+async function relayProbe(port, announcing, sender, foreign) {
+  const session = await Smtp.open(port);
+  try {
+    // Only once greeting and sender were accepted does the recipient's answer say anything about
+    // relaying: a server that turned the sender away answers "bad sequence", which is not a refusal.
+    await session.send(`EHLO ${announcing}`, "250");
+    await session.send(`MAIL FROM:<${sender}>`, "250");
+    return statusOf(await session.attempt(`RCPT TO:<probe@${foreign}>`));
+  } finally {
+    session.socket.end();
+  }
+}
+
+async function awaitListener(port, what) {
+  await until(what, async () => {
+    const session = await Smtp.open(port);
+    session.socket.end();
+    return true;
+  });
 }
 
 async function submit(port, from, to, password, served) {
@@ -165,6 +205,7 @@ async function main() {
     await until("the mail server to report healthy", mailIsHealthy);
 
     const submission = publishedPort("mail", 587);
+    const inbound = publishedPort("mail", 25);
     const sink = publishedPort("sink", 8025);
     // The account the shipped plan gives the instance, not the mail administrator's: what a club
     // runs has to let the application in as itself.
@@ -173,11 +214,7 @@ async function main() {
     // rather than being filed into a local mailbox.
     const recipient = "jane.doe@example.org";
 
-    await until("the submission listener to accept connections", async () => {
-      const session = await Smtp.open(submission);
-      session.socket.end();
-      return true;
-    });
+    await awaitListener(submission, "the submission listener to accept connections");
 
     const served = servedCertificate(submission);
     const names = namesOn(served);
@@ -186,6 +223,15 @@ async function main() {
     assert.deepEqual(names.filter((name) => [hostname, "mail", "127.0.0.1"].includes(name)), [],
       `the mail server now names a host the instance reaches it at (${names.join(", ")}), `
       + "so the certificate exception is no longer what makes the handover possible");
+
+    console.log("Offering the shipped mail server somebody else's mail on the published port");
+    await awaitListener(inbound, "the inbound listener to accept connections");
+    const answer = await relayProbe(inbound, hostname, `probe@${domain}`, relayProbeDomain);
+    // Outright, not merely "not accepted": a 4xx is a server asking to be tried again, and one that
+    // greylists a stranger today can still carry their mail after the wait.
+    assert.match(answer, /^5\d\d/,
+      `the mail server answered ${answer} for ${relayProbeDomain} instead of refusing outright, `
+      + "and an open relay is the one state in which this instance harms people who are not its members");
 
     console.log("Submitting as the instance, with the account the shipped plan gave it");
     await submit(submission, sender, recipient, applicationPassword, served);

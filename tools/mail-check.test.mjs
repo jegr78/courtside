@@ -17,7 +17,11 @@ const ANSWERS = {
   dkim: "v1._domainkey.courts.example.org\ttext = \"v=DKIM1; k=ed25519; p=AAAA\"\n"
 };
 
-function stubs(answers, { outboundOpen = true, relayReply = "550 5.7.1 Relaying denied" } = {}) {
+function stubs(answers, {
+  outboundOpen = true,
+  senderReply = "250 2.1.0 sender ok",
+  relayReply = "550 5.7.1 Relaying denied"
+} = {}) {
   const directory = mkdtempSync(join(tmpdir(), "courtside-mail-check-"));
   const lookup = Object.entries({ ...ANSWERS, ...answers })
     .map(([kind, text]) => `  ${kind}) printf '%b' ${JSON.stringify(text)} ;;`)
@@ -42,7 +46,7 @@ case "$*" in
   *-z*) exit ${outboundOpen ? 0 : 1} ;;
 esac
 cat >/dev/null
-printf '220 mail.courts.example.org ESMTP\\r\\n250 ok\\r\\n250 2.1.0 sender ok\\r\\n%s\\r\\n' ${JSON.stringify(relayReply)}
+printf '220 mail.courts.example.org ESMTP\\r\\n250 ok\\r\\n%s\\r\\n%s\\r\\n' ${JSON.stringify(senderReply)} ${JSON.stringify(relayReply)}
 `);
   for (const name of ["nslookup", "nc"]) chmodSync(join(directory, name), 0o755);
   return directory;
@@ -122,6 +126,26 @@ test("given a server that relays for a foreign domain, when the check runs, then
   // then
   assert.equal(failed, true, output);
   assert.match(output, /^FAIL {2}mail accepts unauthenticated mail for relay-probe\.example\.com$/m);
+});
+
+test("given a server that accepts without the words the check used to look for, when it runs, then it still fails", () => {
+  // given / when — a plain 250 is an acceptance, and reading the answer beats matching its prose
+  const { output, failed } = run({}, { relayReply: "250 Accepted" });
+
+  // then
+  assert.equal(failed, true, output);
+  assert.match(output, /^FAIL {2}mail accepts unauthenticated mail for relay-probe\.example\.com$/m);
+});
+
+test("given a server that turns the probe's sender away, when the check runs, then it says it cannot tell", () => {
+  // given / when — the recipient answer is then a bad sequence, which is not a refusal to relay
+  const { output, failed } = run({}, {
+    senderReply: "550 5.7.1 Sender denied", relayReply: "503 5.5.1 Bad sequence of commands"
+  });
+
+  // then
+  assert.equal(failed, true, output);
+  assert.match(output, /^FAIL {2}mail turned the probe's sender away/m);
 });
 
 test("given a host that blocks outbound port 25, when the check runs, then it names the way out", () => {

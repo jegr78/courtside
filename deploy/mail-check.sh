@@ -95,10 +95,21 @@ fi
 
 relay=$(printf 'EHLO %s\r\nMAIL FROM:<probe@%s>\r\nRCPT TO:<probe@%s>\r\nQUIT\r\n' \
   "$hostname" "$domain" "$relay_probe" | nc -w 10 "$relay_target" 25 2>/dev/null | tr -d '\r')
+# The greeting, the end of EHLO, the sender and the recipient, in that order. Continuation lines
+# carry a hyphen instead of the space, so the fourth answer is the one about the recipient.
+relay_answers=$(printf '%s\n' "$relay" | grep -E '^[0-9]{3} ')
+relay_sender=$(printf '%s\n' "$relay_answers" | sed -n '3p')
+relay_recipient=$(printf '%s\n' "$relay_answers" | sed -n '4p')
 if [ -z "$relay" ]; then
   report fail "port 25 of $relay_target answered nothing" \
     "the relay probe needs the mail server running and reachable as $relay_target"
-elif echo "$relay" | grep -q '^250 .*[Rr]ecipient\|^250 2\.1\.5'; then
+elif [ -z "$relay_recipient" ]; then
+  report fail "$relay_target ended the probe before answering about the recipient" \
+    "this says nothing either way about relaying, and a check that cannot tell must not say it can"
+elif ! echo "$relay_sender" | grep -q '^2'; then
+  report fail "$relay_target turned the probe's sender away, so it never decided about the recipient" \
+    "what came back is a bad sequence and not a refusal to relay; the probe cannot answer this"
+elif echo "$relay_recipient" | grep -q '^2'; then
   report fail "$relay_target accepts unauthenticated mail for $relay_probe" \
     "an open relay is the one state in which this instance harms people who are not its members"
 else
