@@ -15,6 +15,9 @@ services:
       - mail-config:/etc/stalwart
       - mail-data:/var/lib/stalwart
     ports:
+      # 25 is published for the same reason the deployment publishes it, and so that the smoke can
+      # offer this server somebody else's mail on it and watch it refuse.
+      - "127.0.0.1::25"
       - "127.0.0.1::587"
       - "127.0.0.1::8080"
 

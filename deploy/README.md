@@ -231,9 +231,12 @@ domain the relay test asks about.
 `node tools/courtside.mail-smoke.mjs` brings this same mail server up on a scratch Compose project,
 renders and applies these same plans, and hands it a message over the submission port the way the
 application will — authenticated, over STARTTLS — then reads that message back out of a local sink.
-It tears the project down afterwards and needs Docker and `openssl`. The `mail smoke` workflow runs
-it whenever anything under `deploy/mail/` changes, so the configuration a club applies is
-configuration that has been applied.
+Before that it offers the same server somebody else's mail on port 25, unauthenticated and with the
+transcript `mail-check.sh` sends, and requires it to refuse: an open relay is the one state in which
+an instance harms people who are not its members, and it is not a state anybody should have to take
+on trust. It tears the project down afterwards and needs Docker and `openssl`. The `mail smoke`
+workflow runs it whenever anything under `deploy/mail/` or in the application's own mail path
+changes, so the configuration a club applies is configuration that has been applied.
 
 One thing the run does differently on purpose: it issues itself a throwaway authority and installs
 a certificate for the mail hostname, where your instance serves the self-signed one it generated.
