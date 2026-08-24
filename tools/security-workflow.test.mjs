@@ -35,12 +35,22 @@ test("given stable assessment suites, when scheduling them, then safe traffic is
   assert.match(scheduled, /schedule:[\s\S]+cron:/);
   assert.match(scheduled, /timeout-minutes: 45/);
   assert.match(scheduled, /security-run "\$RUN_ID" safe/);
-  assert.match(scheduled, /security-image-inventory\.mjs safe \| xargs -n1 docker pull/);
+  assert.match(scheduled, /github\.event_name == 'schedule' && 'safe' \|\| inputs\.profile/);
+  assert.match(scheduled, /security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
   assert.match(scheduled, /security-assessment-gate\.mjs/);
   assert.match(scheduled, /--subject "\$IMAGE_DIGEST"/);
   assert.match(scheduled, /security-cleanup "\$RUN_ID"/);
   assert.match(scheduled, /retention-days: 14/);
   assert.match(build, /security-update-report\.mjs[\s\S]+github\.event\.pull_request\.base\.sha/);
+});
+
+test("given a manual baseline run, when selecting active, then the isolated workflow executes the complete active profile", () => {
+  // when / then
+  assert.match(scheduled, /workflow_dispatch:[\s\S]+profile:[\s\S]+options:[\s\S]+- safe[\s\S]+- active/);
+  assert.match(scheduled, /github\.event_name == 'schedule' && 'safe' \|\| inputs\.profile/);
+  assert.match(scheduled, /security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
+  assert.match(scheduled, /if \[\[ "\$PROFILE" = active \]\]; then[\s\S]+security-run "\$RUN_ID" active[\s\S]+--authorize "authorize-active-\$RUN_ID"/);
+  assert.match(scheduled, /--profile "\$PROFILE"/);
 });
 
 test("given changed assessment bytes, when the required build runs, then paired immutable evidence is compared", () => {

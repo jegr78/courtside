@@ -118,6 +118,10 @@ immutable Docker image ID, runs the assessment once and retains only the redacte
 run manifest for 14 days. Missing scanners, missing evidence and incomplete outcomes fail the job;
 they are never normalized as a clean run.
 
+Manual dispatch may select the complete `active` profile for a baseline or retest. It uses the same
+fresh hosted runner, qualified immutable image and evidence gate as the scheduled job. The schedule
+always selects `safe`; an active run is never introduced by changing a default or cron expression.
+
 The release workflow runs the complete `active` profile after both architectures qualify the
 candidate and before the security record can be assembled. The active manifest, normalized gate,
 image-security summaries and final release record all name the same candidate digest. Publication
