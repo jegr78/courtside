@@ -3,6 +3,7 @@ package org.courtside.dataexchange.web;
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminImportPreviewsApi;
 import org.courtside.api.ApiImportChangeKind;
+import org.courtside.api.ApiImportAccountOutcome;
 import org.courtside.api.ApiImportPersonChange;
 import org.courtside.api.ApiImportPossibleDuplicate;
 import org.courtside.api.ApiImportPreview;
@@ -79,7 +80,8 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
             Map<String, String> values = new LinkedHashMap<>();
             change.values().forEach((field, value) -> values.put(field.name(), value));
             return new ApiImportPersonChange(ApiImportChangeKind.fromValue(change.kind().name()),
-                    change.rowNumber(), change.externalId(), values)
+                    change.rowNumber(), change.externalId(), values,
+                    ApiImportAccountOutcome.fromValue(change.account().name()))
                     .personId(change.personId())
                     .personName(nameOf(names, change.personId()))
                     .membershipTypeId(change.membershipTypeId());

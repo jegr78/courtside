@@ -5,8 +5,8 @@ import { type ImportSource, type ImportSourceRequest, type MembershipType } from
 import i18n from "../../i18n";
 import { ImportSourceForm } from "./ImportSourceForm";
 
-const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true };
-const passive: MembershipType = { id: "type-2", name: "Passive", ruleSetId: null, active: true };
+const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
+const passive: MembershipType = { id: "type-2", name: "Passive", ruleSetId: null, active: true, grantsAccount: false };
 
 const existing: ImportSource = {
   id: "source-1",

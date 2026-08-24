@@ -205,6 +205,47 @@ class MembershipTypeAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenAMembershipTypeIsCreatedAskingToGrantAccounts_thenItIsStoredThatWay() throws Exception {
+        // when
+        String body = mockMvc.perform(post("/api/admin/membership-types")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Contributing", "grantsAccount": true}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.grantsAccount").value(true))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        mockMvc.perform(get("/api/admin/membership-types/" + JsonPath.read(body, "$.id")))
+                .andExpect(jsonPath("$.grantsAccount").value(true));
+    }
+
+    @Test
+    void givenAMembershipType_whenItIsAskedToGrantAccounts_thenTheAnswerIsCarriedBack()
+            throws Exception {
+        // given
+        String typeId = createMembershipType("Contributing", null);
+
+        // when / then — absent means false, so an existing type keeps granting nothing
+        mockMvc.perform(get("/api/admin/membership-types/" + typeId))
+                .andExpect(jsonPath("$.grantsAccount").value(false));
+
+        mockMvc.perform(put("/api/admin/membership-types/" + typeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Contributing", "grantsAccount": true}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.grantsAccount").value(true));
+
+        mockMvc.perform(get("/api/admin/membership-types/" + typeId))
+                .andExpect(jsonPath("$.grantsAccount").value(true));
+    }
+
+    @Test
     void givenAMembershipTypeWhoseRuleSetWasRetired_whenCorrectingItsName_thenItIsStillAccepted()
             throws Exception {
         // given

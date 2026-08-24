@@ -17,6 +17,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.courtside.member.MemberService;
+import org.courtside.member.RosterService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -46,6 +47,7 @@ public class PreviewService {
     private final PersonRepository persons;
     private final MemberRepository members;
     private final MemberService memberships;
+    private final RosterService roster;
     private final ObjectMapper json;
     private final ImportProperties properties;
     private final Clock clock;
@@ -91,7 +93,9 @@ public class PreviewService {
                 .collect(Collectors.toMap(Person::getId,
                         person -> toRosterPerson(person, membershipsByPerson.get(person.getId()))));
         return new CurrentRoster(personIdsByExternalId, peopleById,
-                memberships.activeMembershipTypeIds(), personIdsByNameKey(snapshot));
+                memberships.activeMembershipTypeIds(), personIdsByNameKey(snapshot),
+                memberships.membershipTypeIdsGrantingAnAccount(),
+                roster.personIdsHoldingAnAccount(linked));
     }
 
     // Asked of the database by name, because a club with thousands of members would otherwise

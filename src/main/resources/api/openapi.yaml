@@ -598,12 +598,18 @@ components:
 
     MembershipType:
       type: object
-      required: [id, name, active]
+      required: [id, name, active, grantsAccount]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
         ruleSetId: { type: [string, "null"], format: uuid }
         active: { type: boolean }
+        grantsAccount:
+          type: boolean
+          description: |
+            Whether a roster synchronisation gives an account to the people it finds holding this
+            type. It answers a different question from the rule set: a member may be entitled to
+            read their own record without being entitled to book a court.
 
     CanonicalField:
       type: string
@@ -831,9 +837,20 @@ components:
         that differ, and `END_MEMBERSHIP` records that somebody the file no longer carries has left.
       enum: [CREATE, UPDATE, END_MEMBERSHIP]
 
+    ImportAccountOutcome:
+      type: string
+      description: |
+        What the execution would do about this row's account. `CREATE` means one is opened and the
+        one-time password is mailed to the member. Every other value means none is, and names the
+        reason: the membership type grants none, the row has no address to send a credential to,
+        the row looks like somebody the roster already holds, the person already signs in, or the
+        row ends a membership and was never asked.
+      enum: [CREATE, MEMBERSHIP_TYPE_GRANTS_NONE, NO_ADDRESS, POSSIBLE_DUPLICATE, ALREADY_HELD,
+             NOT_ASKED]
+
     ImportPersonChange:
       type: object
-      required: [kind, rowNumber, externalId, values]
+      required: [kind, rowNumber, externalId, values, account]
       properties:
         kind: { $ref: "#/components/schemas/ImportChangeKind" }
         rowNumber:
@@ -857,6 +874,7 @@ components:
             source does not own never appears here, however different the file is.
           additionalProperties: { type: string }
         membershipTypeId: { type: [string, "null"], format: uuid }
+        account: { $ref: "#/components/schemas/ImportAccountOutcome" }
 
     ImportRowError:
       type: object
@@ -953,7 +971,8 @@ components:
     ImportRun:
       type: object
       required: [runId, sourceId, previewId, mode, fileHash, created, corrected, membershipsEnded,
-                 accountsDisabled, rolesRemoved, rowErrors, removalsConfirmed, executedAt]
+                 accountsCreated, accountsDisabled, rolesRemoved, rowErrors, removalsConfirmed,
+                 executedAt]
       properties:
         runId: { type: string, format: uuid }
         sourceId: { type: string, format: uuid }
@@ -963,6 +982,11 @@ components:
         created: { type: integer }
         corrected: { type: integer }
         membershipsEnded: { type: integer }
+        accountsCreated:
+          type: integer
+          description: |
+            Accounts opened for members whose membership type grants one. Each was mailed its own
+            one-time password; nobody else ever sees it.
         accountsDisabled:
           type: integer
           description: |
@@ -993,6 +1017,12 @@ components:
       properties:
         name: { type: string, maxLength: 60, pattern: ".*\\S.*" }
         ruleSetId: { type: [string, "null"], format: uuid }
+        grantsAccount:
+          type: boolean
+          default: false
+          description: |
+            Absent is `false`. Switching it on changes nothing by itself; the next synchronisation
+            of a source is what creates the accounts, and its preview says how many first.
 
     PersonRequest:
       type: object

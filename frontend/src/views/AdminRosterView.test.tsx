@@ -23,7 +23,7 @@ const departed: RosterEntry = {
   membershipTypeId: "type-1", membershipStartedOn: "2025-01-01", membershipEndedOn: "2026-03-31"
 };
 
-const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true };
+const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
 
 function row(personId: string): HTMLElement {
   return screen.getByTestId(`roster-row-${personId}`);

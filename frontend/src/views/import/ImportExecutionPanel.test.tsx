@@ -32,6 +32,7 @@ const run: ImportRun = {
   created: 12,
   corrected: 3,
   membershipsEnded: 1,
+  accountsCreated: 7,
   accountsDisabled: 1,
   rolesRemoved: 0,
   rowErrors: 2,

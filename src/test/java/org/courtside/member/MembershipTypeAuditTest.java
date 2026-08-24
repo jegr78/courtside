@@ -38,7 +38,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
     @Test
     void givenAMembershipTypeName_whenItIsCreated_thenTheLogCarriesItsRuleSet() {
         // when
-        MembershipType type = members.createMembershipType("Adult", ruleSetId);
+        MembershipType type = members.createMembershipType("Adult", ruleSetId, false);
 
         // then
         assertThat(audit.latestPayload(type.getId(), MembershipTypeEvent.Added.TYPE))
@@ -50,10 +50,10 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
     void givenAMembershipType_whenItsRuleSetChanges_thenTheLogCarriesTheNewRuleSet() {
         // given
         UUID other = rulesFixture.activeRuleSet("Winter");
-        MembershipType type = members.createMembershipType("Adult", ruleSetId);
+        MembershipType type = members.createMembershipType("Adult", ruleSetId, false);
 
         // when
-        members.changeMembershipType(type.getId(), "Adult", other);
+        members.changeMembershipType(type.getId(), "Adult", other, false);
 
         // then
         assertThat(audit.latestPayload(type.getId(), MembershipTypeEvent.Changed.TYPE))
@@ -66,10 +66,10 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
     @Test
     void givenAMembershipType_whenOnlyItsNameChanges_thenTheLogNamesTheFieldWithoutTheName() {
         // given
-        MembershipType type = members.createMembershipType("Adult", ruleSetId);
+        MembershipType type = members.createMembershipType("Adult", ruleSetId, false);
 
         // when
-        members.changeMembershipType(type.getId(), "Senior", ruleSetId);
+        members.changeMembershipType(type.getId(), "Senior", ruleSetId, false);
 
         // then
         Map<String, Object> payload = audit.latestPayload(type.getId(), MembershipTypeEvent.Changed.TYPE);
@@ -81,12 +81,27 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAMembershipType_whenChangedWithTheStoredNameAndRuleSet_thenNothingIsRecorded() {
+    void givenAMembershipType_whenItStartsGrantingAccounts_thenTheLogNamesThatField() {
         // given
-        MembershipType type = members.createMembershipType("Adult", ruleSetId);
+        MembershipType type = members.createMembershipType("Adult", ruleSetId, false);
 
         // when
-        members.changeMembershipType(type.getId(), "Adult", ruleSetId);
+        members.changeMembershipType(type.getId(), "Adult", ruleSetId, true);
+
+        // then
+        assertThat(audit.latestPayload(type.getId(), MembershipTypeEvent.Changed.TYPE))
+                .containsEntry("changedFields", List.of("grantsAccount"));
+        assertEventCounts(type.getId(),
+                Map.of(MembershipTypeEvent.Added.TYPE, 1L, MembershipTypeEvent.Changed.TYPE, 1L));
+    }
+
+    @Test
+    void givenAMembershipType_whenChangedWithTheStoredNameAndRuleSet_thenNothingIsRecorded() {
+        // given
+        MembershipType type = members.createMembershipType("Adult", ruleSetId, false);
+
+        // when
+        members.changeMembershipType(type.getId(), "Adult", ruleSetId, false);
 
         // then
         assertThat(audit.eventsAbout(type.getId(), MembershipTypeEvent.Changed.TYPE)).isEmpty();
@@ -95,7 +110,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
     @Test
     void givenAnActiveMembershipType_whenItIsDeactivated_thenTheLogCarriesTheFlag() {
         // given
-        MembershipType type = members.createMembershipType("Adult", ruleSetId);
+        MembershipType type = members.createMembershipType("Adult", ruleSetId, false);
 
         // when
         members.setMembershipTypeActive(type.getId(), false);
@@ -110,7 +125,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
     @Test
     void givenAnActiveMembershipType_whenActivatedAgain_thenNothingIsRecorded() {
         // given
-        MembershipType type = members.createMembershipType("Adult", ruleSetId);
+        MembershipType type = members.createMembershipType("Adult", ruleSetId, false);
 
         // when
         members.setMembershipTypeActive(type.getId(), true);
@@ -122,7 +137,7 @@ class MembershipTypeAuditTest extends AbstractIntegrationTest {
     @Test
     void givenAMembershipType_whenItIsCreated_thenTheAuditLogCanNameIt() {
         // given
-        MembershipType type = members.createMembershipType("Adult", ruleSetId);
+        MembershipType type = members.createMembershipType("Adult", ruleSetId, false);
 
         // then
         assertThat(audit.nameOf(type.getId())).isEqualTo("Adult");

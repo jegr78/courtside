@@ -6,8 +6,8 @@ import { api, type MembershipType, type RosterEntry, type RuleSet } from "../api
 import i18n from "../i18n";
 import { AdminMembershipTypesView } from "./AdminMembershipTypesView";
 
-const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: "rules-1", active: true };
-const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null, active: false };
+const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: "rules-1", active: true, grantsAccount: false };
+const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null, active: false, grantsAccount: true };
 const summer: RuleSet = { id: "rules-1", name: "Summer rules", active: true };
 
 const holder = (personId: string): RosterEntry => ({
@@ -88,7 +88,7 @@ describe("AdminMembershipTypesView", () => {
     await userEvent.click(screen.getByTestId("save-membership-type-type-1"));
 
     // then
-    expect(api.changeMembershipType).toHaveBeenCalledWith("type-1", { name: "Adult", ruleSetId: "rules-1" });
+    expect(api.changeMembershipType).toHaveBeenCalledWith("type-1", { name: "Adult", ruleSetId: "rules-1", grantsAccount: false });
   });
 
   it("given a type on a rule set, when it is taken off that rule set, then no rule set is sent", async () => {
@@ -102,7 +102,7 @@ describe("AdminMembershipTypesView", () => {
     await userEvent.click(screen.getByTestId("save-membership-type-type-1"));
 
     // then
-    expect(api.changeMembershipType).toHaveBeenCalledWith("type-1", { name: "Adults", ruleSetId: null });
+    expect(api.changeMembershipType).toHaveBeenCalledWith("type-1", { name: "Adults", ruleSetId: null, grantsAccount: false });
   });
 
   it("given an active type, when retiring it, then the control offers to offer it again", async () => {
@@ -126,17 +126,42 @@ describe("AdminMembershipTypesView", () => {
 
   it("when adding a type, then it joins the list", async () => {
     // given
-    const created: MembershipType = { id: "type-9", name: "Seniors", ruleSetId: null, active: true };
+    const created: MembershipType = { id: "type-9", name: "Seniors", ruleSetId: null, active: true, grantsAccount: true };
     vi.spyOn(api, "createMembershipType").mockResolvedValue(created);
     render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
     await screen.findByTestId("membership-type-type-1");
 
     // when
     await userEvent.type(screen.getByTestId("new-membership-type-name"), "Seniors");
+    await userEvent.click(screen.getByTestId("new-membership-type-grants-account"));
     await userEvent.click(screen.getByTestId("create-membership-type"));
 
     // then
-    expect(api.createMembershipType).toHaveBeenCalledWith({ name: "Seniors", ruleSetId: null });
+    expect(api.createMembershipType).toHaveBeenCalledWith({ name: "Seniors", ruleSetId: null, grantsAccount: true });
     expect(await screen.findByTestId("membership-type-type-9")).toBeInTheDocument();
+  });
+
+  it("given a type that grants no account, when switching that on and saving, then the change is sent", async () => {
+    // given
+    vi.spyOn(api, "changeMembershipType").mockResolvedValue({ ...adults, grantsAccount: true });
+    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-1");
+
+    // when
+    await userEvent.click(screen.getByTestId("membership-type-grants-account-type-1"));
+    await userEvent.click(screen.getByTestId("save-membership-type-type-1"));
+
+    // then
+    expect(api.changeMembershipType).toHaveBeenCalledWith("type-1",
+      { name: "Adults", ruleSetId: "rules-1", grantsAccount: true });
+  });
+
+  it("given a type that grants an account, when reading it, then the box is already ticked", async () => {
+    // when
+    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("membership-type-grants-account-type-2")).toBeChecked();
+    expect(screen.getByTestId("membership-type-grants-account-type-1")).not.toBeChecked();
   });
 });

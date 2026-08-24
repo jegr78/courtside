@@ -73,7 +73,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     @Test
     void givenAPersonWithoutAMembership_whenOneIsAssigned_thenTheRosterEntryCarriesIt() {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when
@@ -87,7 +87,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     @Test
     void givenAnInactiveMembershipType_whenAssigningIt_thenItIsRefusedAndNothingIsWritten() {
         // given
-        MembershipType type = memberships.createMembershipType("Passive", null);
+        MembershipType type = memberships.createMembershipType("Passive", null, false);
         memberships.setMembershipTypeActive(type.getId(), false);
         UUID richard = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
 
@@ -100,7 +100,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     @Test
     void givenAMembershipOnATypeThatIsLaterDeactivated_whenReadingIt_thenItStillHolds() {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         roster.writeMembership(mary, type.getId(), MembershipPeriod.running());
 
@@ -114,8 +114,8 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     @Test
     void givenAPersonOnTheWrongType_whenAnotherIsAssigned_thenTheirOneMembershipMoves() {
         // given
-        MembershipType wrong = memberships.createMembershipType("Junior", null);
-        MembershipType right = memberships.createMembershipType("Senior", null);
+        MembershipType wrong = memberships.createMembershipType("Junior", null, false);
+        MembershipType right = memberships.createMembershipType("Senior", null, false);
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         roster.writeMembership(mary, wrong.getId(), MembershipPeriod.running());
 
@@ -133,7 +133,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     @Test
     void givenTheTypeAPersonAlreadyHolds_whenAssigningItAgain_thenTheEntryStillCarriesIt() {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         roster.writeMembership(mary, type.getId(), MembershipPeriod.running());
 
@@ -148,7 +148,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     @Test
     void givenAnUnknownPerson_whenAssigningAMembership_thenTheFailureNamesWhatWasNotFound() {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID absent = UUID.fromString("00000000-0000-0000-0000-0000000000fc");
 
         // when / then
@@ -184,7 +184,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     @Test
     void givenAMembership_whenItIsEnded_thenThePersonHoldsNoneAndTheRecordStays() {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         roster.writeMembership(mary, type.getId(), MembershipPeriod.running());
 
@@ -227,7 +227,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     @Test
     void givenAPersonWithoutAnAccount_whenAssigningAMembership_thenThereIsNoSessionToEnd() {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when
@@ -242,7 +242,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     void givenASignedInMember_whenTheyAreGivenAMembership_thenTheirNextRequestIsRefused()
             throws Exception {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
         MockHttpSession session = signIn("doe.jane");
@@ -262,7 +262,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     void givenAPersonHoldingTwoAccounts_whenTheirMembershipChanges_thenBothSessionsAreRefused()
             throws Exception {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
         signInReadyAccount(jane, "doe.jane.second", Set.of(Role.MEMBER));
@@ -285,7 +285,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     void givenASignedInMember_whenTheirMembershipIsRemoved_thenTheirNextRequestIsRefused()
             throws Exception {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
         roster.writeMembership(jane, type.getId(), MembershipPeriod.running());
@@ -304,7 +304,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     void givenASignedInMember_whenTheTypeTheyAlreadyHoldIsWrittenAgain_thenTheirSessionStands()
             throws Exception {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
         roster.writeMembership(jane, type.getId(), MembershipPeriod.running());
@@ -322,7 +322,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     void givenASignedInMember_whenOnlyTheDateTheirMembershipBeganIsCorrected_thenTheirSessionStands()
             throws Exception {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
         roster.writeMembership(jane, type.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
@@ -340,7 +340,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
     void givenASignedInMemberWhoseMembershipEnded_whenItIsRevived_thenTheirNextRequestIsRefused()
             throws Exception {
         // given
-        MembershipType type = memberships.createMembershipType("Junior", null);
+        MembershipType type = memberships.createMembershipType("Junior", null, false);
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER));
         roster.writeMembership(jane, type.getId(),

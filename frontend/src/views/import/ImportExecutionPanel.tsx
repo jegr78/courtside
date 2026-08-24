@@ -5,7 +5,8 @@ import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 
 const NUMBERS = [
-  "created", "corrected", "membershipsEnded", "accountsDisabled", "rolesRemoved", "rowErrors"
+  "created", "corrected", "membershipsEnded", "accountsCreated", "accountsDisabled",
+  "rolesRemoved", "rowErrors"
 ] as const;
 
 function isExecutable(preview: ImportPreview): boolean {

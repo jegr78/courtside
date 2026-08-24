@@ -45,6 +45,9 @@ public class ImportRun {
     @Column(name = "ended_count", nullable = false)
     private int endedCount;
 
+    @Column(name = "accounts_created_count", nullable = false)
+    private int accountsCreatedCount;
+
     @Column(name = "accounts_disabled_count", nullable = false)
     private int accountsDisabledCount;
 
@@ -64,9 +67,9 @@ public class ImportRun {
     private UUID executedByAccountId;
 
     public ImportRun(UUID sourceId, UUID previewId, SnapshotMode mode, String fileHash,
-                     int createdCount, int correctedCount, int endedCount, int accountsDisabledCount,
-                     int rolesRemovedCount, int rowErrorCount, boolean removalsConfirmed,
-                     Instant executedAt, UUID executedByAccountId) {
+                     int createdCount, int correctedCount, int endedCount, int accountsCreatedCount,
+                     int accountsDisabledCount, int rolesRemovedCount, int rowErrorCount,
+                     boolean removalsConfirmed, Instant executedAt, UUID executedByAccountId) {
         this.id = UUID.randomUUID();
         this.sourceId = sourceId;
         this.previewId = previewId;
@@ -75,6 +78,7 @@ public class ImportRun {
         this.createdCount = createdCount;
         this.correctedCount = correctedCount;
         this.endedCount = endedCount;
+        this.accountsCreatedCount = accountsCreatedCount;
         this.accountsDisabledCount = accountsDisabledCount;
         this.rolesRemovedCount = rolesRemovedCount;
         this.rowErrorCount = rowErrorCount;

@@ -72,12 +72,14 @@ public class ExecutionService {
         preview.forget();
         ImportRun run = runs.saveAndFlush(new ImportRun(preview.getSourceId(), preview.getId(),
                 preview.getMode(), preview.getFileHash(), applied.created(), applied.corrected(),
-                applied.membershipsEnded(), applied.accountsDisabled(), applied.rolesRemoved(),
+                applied.membershipsEnded(), applied.accountsCreated(), applied.accountsDisabled(),
+                applied.rolesRemoved(),
                 content.changeSet().errors().size(), confirmRemovals, now,
                 requiredAccountId(accountId)));
-        log.info("Executed import run {} for source {}: {} created, {} corrected, {} ended",
+        log.info("Executed import run {} for source {}: {} created, {} corrected, {} ended, "
+                        + "{} accounts created",
                 run.getId(), preview.getSourceId(), applied.created(), applied.corrected(),
-                applied.membershipsEnded());
+                applied.membershipsEnded(), applied.accountsCreated());
         return toOutcome(run);
     }
 
@@ -196,6 +198,10 @@ public class ExecutionService {
                 : json.readValue(preview.getFingerprints(), new TypeReference<>() { });
     }
 
+    private static boolean wouldCreateAnAccount(ResolvedChangeSet.PersonChange change) {
+        return change.account() == ResolvedChangeSet.AccountOutcome.CREATE;
+    }
+
     private static RosterChangeSet toRosterChangeSet(ResolvedChangeSet changeSet) {
         List<RosterChangeSet.NewPerson> creations = new ArrayList<>();
         List<RosterChangeSet.PersonCorrection> corrections = new ArrayList<>();
@@ -206,11 +212,13 @@ public class ExecutionService {
                         change.values().get(CanonicalField.FIRST_NAME),
                         change.values().get(CanonicalField.LAST_NAME),
                         change.values().get(CanonicalField.EMAIL),
-                        change.membershipTypeId()));
+                        change.membershipTypeId(), wouldCreateAnAccount(change)));
                 case UPDATE -> corrections.add(new RosterChangeSet.PersonCorrection(
-                        change.personId(), change.values().get(CanonicalField.FIRST_NAME),
+                        change.personId(), change.externalId(),
+                        change.values().get(CanonicalField.FIRST_NAME),
                         change.values().get(CanonicalField.LAST_NAME),
-                        change.values().get(CanonicalField.EMAIL), change.membershipTypeId()));
+                        change.values().get(CanonicalField.EMAIL), change.membershipTypeId(),
+                        wouldCreateAnAccount(change)));
                 case END_MEMBERSHIP -> endings.add(change.personId());
             }
         });
@@ -249,7 +257,8 @@ public class ExecutionService {
     private static RunOutcome toOutcome(ImportRun run) {
         return new RunOutcome(run.getId(), run.getSourceId(), run.getPreviewId(), run.getMode(),
                 run.getFileHash(), run.getCreatedCount(), run.getCorrectedCount(),
-                run.getEndedCount(), run.getAccountsDisabledCount(), run.getRolesRemovedCount(),
+                run.getEndedCount(), run.getAccountsCreatedCount(), run.getAccountsDisabledCount(),
+                run.getRolesRemovedCount(),
                 run.getRowErrorCount(), run.isRemovalsConfirmed(), run.getExecutedAt());
     }
 }

@@ -189,6 +189,6 @@ class RosterImportPropertiesTest {
             people.put(personId, new CurrentRoster.RosterPerson(personId, "Old" + index, "Roe",
                     null, ACTIVE_TYPE, true));
         }
-        return new CurrentRoster(personIds, people, Set.of(ACTIVE_TYPE), Map.of());
+        return new CurrentRoster(personIds, people, Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of());
     }
 }

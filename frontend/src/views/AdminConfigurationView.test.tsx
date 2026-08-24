@@ -32,8 +32,8 @@ describe("AdminConfigurationView", () => {
       { ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }
     ]);
     vi.spyOn(api, "membershipTypes").mockResolvedValue([
-      { id: "type-1", name: "Adults", ruleSetId: "rule-set", active: true },
-      { id: "type-2", name: "Juniors", ruleSetId: null, active: true }
+      { id: "type-1", name: "Adults", ruleSetId: "rule-set", active: true, grantsAccount: false },
+      { id: "type-2", name: "Juniors", ruleSetId: null, active: true, grantsAccount: false }
     ]);
   });
 
@@ -139,7 +139,7 @@ describe("AdminConfigurationView", () => {
   it("given a rule set nothing points at, when it is read, then the note says nothing is affected", async () => {
     // given
     vi.spyOn(api, "membershipTypes").mockResolvedValue([
-      { id: "type-2", name: "Juniors", ruleSetId: null, active: true }
+      { id: "type-2", name: "Juniors", ruleSetId: null, active: true, grantsAccount: false }
     ]);
 
     // when

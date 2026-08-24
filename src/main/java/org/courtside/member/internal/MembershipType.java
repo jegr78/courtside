@@ -28,16 +28,21 @@ public class MembershipType {
     @Column(nullable = false)
     private boolean active;
 
-    public MembershipType(String name, UUID ruleSetId) {
+    @Column(name = "grants_account", nullable = false)
+    private boolean grantsAccount;
+
+    public MembershipType(String name, UUID ruleSetId, boolean grantsAccount) {
         this.id = UUID.randomUUID();
         this.name = name;
         this.ruleSetId = ruleSetId;
         this.active = true;
+        this.grantsAccount = grantsAccount;
     }
 
-    public void changeTo(String name, UUID ruleSetId) {
+    public void changeTo(String name, UUID ruleSetId, boolean grantsAccount) {
         this.name = name;
         this.ruleSetId = ruleSetId;
+        this.grantsAccount = grantsAccount;
     }
 
     public void activate() {

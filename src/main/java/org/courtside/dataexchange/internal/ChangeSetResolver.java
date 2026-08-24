@@ -39,8 +39,9 @@ public final class ChangeSetResolver {
                 continue;
             }
             if (personId == null) {
-                changes.add(creationOf(row, configuration));
-                duplicateOf(row, roster).ifPresent(duplicates::add);
+                Optional<ResolvedChangeSet.PossibleDuplicate> duplicate = duplicateOf(row, roster);
+                duplicate.ifPresent(duplicates::add);
+                changes.add(creationOf(row, configuration, roster, duplicate.isPresent()));
             } else {
                 updateOf(row, personId, configuration, roster).ifPresent(changes::add);
             }
@@ -52,12 +53,17 @@ public final class ChangeSetResolver {
     }
 
     private static ResolvedChangeSet.PersonChange creationOf(CsvSnapshot.SnapshotRow row,
-                                                             SourceConfiguration configuration) {
+                                                             SourceConfiguration configuration,
+                                                             CurrentRoster roster,
+                                                             boolean possibleDuplicate) {
         Map<CanonicalField, String> values = new EnumMap<>(CanonicalField.class);
         values.putAll(row.values());
         values.remove(CanonicalField.MEMBERSHIP_TYPE);
+        UUID membershipTypeId = membershipTypeOf(row, configuration);
         return new ResolvedChangeSet.PersonChange(ResolvedChangeSet.ChangeKind.CREATE,
-                row.rowNumber(), row.externalId(), null, values, membershipTypeOf(row, configuration));
+                row.rowNumber(), row.externalId(), null, values, membershipTypeId,
+                accountOutcomeOf(roster, false, membershipTypeId, possibleDuplicate,
+                        values.get(CanonicalField.EMAIL)));
     }
 
     private static Optional<ResolvedChangeSet.PersonChange> updateOf(
@@ -79,12 +85,46 @@ public final class ChangeSetResolver {
             }
         });
         UUID membershipTypeId = ownedMembershipTypeOf(row, configuration, current);
-        if (changed.isEmpty() && membershipTypeId == null) {
+        ResolvedChangeSet.AccountOutcome account = accountOutcomeOf(roster,
+                roster.personIdsHoldingAnAccount().contains(personId),
+                membershipTypeAfterThisRun(membershipTypeId, current), false,
+                changed.containsKey(CanonicalField.EMAIL) ? changed.get(CanonicalField.EMAIL)
+                        : heldValueOf(current, CanonicalField.EMAIL));
+        if (changed.isEmpty() && membershipTypeId == null
+                && account != ResolvedChangeSet.AccountOutcome.CREATE) {
             return Optional.empty();
         }
         return Optional.of(new ResolvedChangeSet.PersonChange(
                 ResolvedChangeSet.ChangeKind.UPDATE, row.rowNumber(), row.externalId(), personId,
-                changed, membershipTypeId));
+                changed, membershipTypeId, account));
+    }
+
+    // An account is a membership's benefit, so a lapsed member whose row writes no membership is
+    // answered by the type they would hold afterwards: none.
+    private static UUID membershipTypeAfterThisRun(UUID written, CurrentRoster.RosterPerson current) {
+        if (written != null) {
+            return written;
+        }
+        return current != null && current.membershipCurrent() ? current.membershipTypeId() : null;
+    }
+
+    private static ResolvedChangeSet.AccountOutcome accountOutcomeOf(
+            CurrentRoster roster, boolean holdsAnAccount, UUID membershipTypeId,
+            boolean possibleDuplicate, String email) {
+        if (holdsAnAccount) {
+            return ResolvedChangeSet.AccountOutcome.ALREADY_HELD;
+        }
+        if (membershipTypeId == null
+                || !roster.membershipTypeIdsGrantingAnAccount().contains(membershipTypeId)) {
+            return ResolvedChangeSet.AccountOutcome.MEMBERSHIP_TYPE_GRANTS_NONE;
+        }
+        if (possibleDuplicate) {
+            return ResolvedChangeSet.AccountOutcome.POSSIBLE_DUPLICATE;
+        }
+        if (email == null || email.isBlank()) {
+            return ResolvedChangeSet.AccountOutcome.NO_ADDRESS;
+        }
+        return ResolvedChangeSet.AccountOutcome.CREATE;
     }
 
     private static UUID ownedMembershipTypeOf(CsvSnapshot.SnapshotRow row,
@@ -143,7 +183,7 @@ public final class ChangeSetResolver {
             if (!present.contains(externalId) && person != null && person.membershipCurrent()) {
                 endings.add(new ResolvedChangeSet.PersonChange(
                         ResolvedChangeSet.ChangeKind.END_MEMBERSHIP, 0, externalId, personId,
-                        Map.of(), null));
+                        Map.of(), null, ResolvedChangeSet.AccountOutcome.NOT_ASKED));
             }
         });
         return endings;
