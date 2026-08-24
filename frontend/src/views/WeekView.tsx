@@ -388,9 +388,12 @@ function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
 }
 
 function scrollToStart(plan: HTMLDivElement | null) {
-  if (plan && typeof plan.scrollTo === "function") {
-    plan.scrollTo(0, 0);
+  if (!plan) return;
+  if (window.getComputedStyle(plan).overflowY === "visible" && typeof plan.scrollIntoView === "function") {
+    plan.scrollIntoView({ block: "start" });
+    return;
   }
+  if (typeof plan.scrollTo === "function") plan.scrollTo(0, 0);
 }
 
 function slotsFor(day: Date, grid: BookingGrid): string[] {

@@ -76,7 +76,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await page.goto("/admin/audit");
 
   // then
-  await expect(page.getByTestId("admin-audit-view")).toBeVisible();
+  await expect(page.getByTestId("audit-empty")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -124,4 +124,17 @@ test("a vertical gesture over the phone plan scrolls the page rather than a nest
   expect(await plan.evaluate((element) => getComputedStyle(element).overflowY)).toBe("visible");
   expect(await plan.evaluate((element) => element.scrollHeight)).toBe(await plan.evaluate((element) => element.clientHeight));
   expect(await page.evaluate(() => document.documentElement.scrollHeight > document.documentElement.clientHeight)).toBe(true);
+
+  // when
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const selectedDate = page.getByTestId("selected-date");
+  const nextDate = await selectedDate.evaluate((element: HTMLInputElement) => {
+    const date = new Date(`${element.value}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + 1);
+    return date.toISOString().slice(0, 10);
+  });
+  await selectedDate.fill(nextDate);
+
+  // then
+  await expect.poll(async () => Math.abs((await plan.boundingBox())?.y ?? Number.POSITIVE_INFINITY)).toBeLessThan(1);
 });

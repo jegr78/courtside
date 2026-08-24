@@ -682,6 +682,21 @@ it("given today scrolled to the current time, when another day is chosen, then t
   expect(scrollTo).toHaveBeenCalledWith(0, 0);
 });
 
+it("given the document owns scrolling, when another day is chosen, then the plan opens at its start", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const plan = await screen.findByTestId("week-grid");
+  const scrollIntoView = vi.fn();
+  plan.scrollIntoView = scrollIntoView;
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ overflowY: "visible" } as CSSStyleDeclaration);
+
+  // when
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-11"));
+
+  // then
+  expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+});
+
 it("given another day is shown, when today is chosen again, then the current time keeps the position", async () => {
   // given
   render(<WeekView today={clubInstant("12:00")} />);
