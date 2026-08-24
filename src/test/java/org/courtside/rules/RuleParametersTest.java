@@ -48,6 +48,27 @@ class RuleParametersTest {
     }
 
     @Test
+    void givenAParameterlessRuleType_whenValidatingWithoutParameters_thenNothingIsCarried() {
+        // when
+        Map<String, Integer> validated = RuleParameters.validated(RuleType.NO_COURT_BOOKING, Map.of());
+
+        // then
+        assertThat(validated).isEmpty();
+        assertThat(RuleParameters.isConfigurablePerRuleSet(RuleType.NO_COURT_BOOKING)).isTrue();
+        assertThat(RuleParameters.parametersOf(RuleType.NO_COURT_BOOKING)).isEmpty();
+    }
+
+    @Test
+    void givenAParameterlessRuleType_whenAValueIsSentWithIt_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() ->
+                RuleParameters.validated(RuleType.NO_COURT_BOOKING, Map.of("limit", 0)))
+                .isInstanceOf(RuleParameterInvalidException.class)
+                .extracting(exception -> ((RuleParameterInvalidException) exception).getCode())
+                .isEqualTo("rule.parameters.unknownParameter");
+    }
+
+    @Test
     void givenARuleTypeThatIsNotConfiguredPerRuleSet_whenValidating_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> RuleParameters.validated(RuleType.OPENING_HOURS, Map.of()))

@@ -18,6 +18,12 @@ public interface BookingRule {
         return true;
     }
 
+    // A move neither creates court time nor adds a booking, so the quantity rules leave it alone.
+    // A rule that answers whether somebody may book at all has to say so for itself.
+    default boolean appliesToAMove() {
+        return !isOverridable();
+    }
+
     @FunctionalInterface
     interface Prepared {
 
