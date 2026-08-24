@@ -50,13 +50,14 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenReadingThePublicConfig_thenItDoesNotPublishHowLongAnIssuedCredentialLasts()
+    void whenReadingThePublicConfig_thenItPublishesNothingOnlyABoardShouldSee()
             throws Exception {
         // when / then
         mockMvc.perform(get("/api/public/config"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.newAccountCredentialHours").doesNotExist())
-                .andExpect(jsonPath("$.passwordResetCredentialHours").doesNotExist());
+                .andExpect(jsonPath("$.passwordResetCredentialHours").doesNotExist())
+                .andExpect(jsonPath("$.noMembershipTypeRuleSetId").doesNotExist());
     }
 
     @Test

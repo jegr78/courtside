@@ -61,6 +61,32 @@ class NoMembershipTypeRuleSetAssignmentTest extends AbstractIntegrationTest {
         assertThat(snapshot.noMembershipTypeRuleSetId()).isEqualTo(guests);
     }
 
+    @Test
+    void givenAnAssignedRuleSetThatWasRetired_whenChangingSomethingElse_thenTheClubCanStillSave() {
+        // given
+        UUID passive = rules.activeRuleSet("Passive");
+        config.update(bindingTo(passive));
+        rules.deactivate(passive);
+
+        // when — retiring takes a rule set out of the choices; it does not lock the form that
+        // still names it, or a club could no longer correct its own name
+        ClubConfigurationSnapshot snapshot = config.update(renamedTo("Example Racquet Club", passive));
+
+        // then
+        assertThat(snapshot.clubName()).isEqualTo("Example Racquet Club");
+        assertThat(snapshot.noMembershipTypeRuleSetId()).isEqualTo(passive);
+    }
+
+    private ChangeClubConfigurationCommand renamedTo(String clubName, UUID ruleSetId) {
+        ClubConfigurationSnapshot current = config.current();
+        return new ChangeClubConfigurationCommand(
+                clubName, current.primaryColor(), current.accentColor(),
+                current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
+                new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
+                new CredentialLifetime(current.newAccountCredentialHours()),
+                new CredentialLifetime(current.passwordResetCredentialHours()), ruleSetId);
+    }
+
     private ChangeClubConfigurationCommand bindingTo(UUID ruleSetId) {
         ClubConfigurationSnapshot current = config.current();
         return new ChangeClubConfigurationCommand(
