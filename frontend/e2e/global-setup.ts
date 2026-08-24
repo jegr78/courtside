@@ -307,6 +307,18 @@ export function waitForProcessMarker(
   });
 }
 
+export async function waitForProcessExit(
+  client: ChildProcess,
+  failure: () => Error | undefined
+): Promise<[number | null, NodeJS.Signals | null]> {
+  const failed = failure();
+  if (failed) throw failed;
+  if (client.exitCode !== null || client.signalCode !== null) {
+    return [client.exitCode, client.signalCode];
+  }
+  return await once(client, "exit") as [number | null, NodeJS.Signals | null];
+}
+
 interface StartedJourneyService extends JourneyService {
   stop(): Promise<void>;
 }
@@ -471,7 +483,11 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       ], { stdio: ["pipe", "pipe", "pipe"] });
       lockClients.add(client);
       const forgetClient = () => lockClients.delete(client);
-      client.once("error", forgetClient);
+      let clientError: Error | undefined;
+      client.once("error", (error) => {
+        clientError = error;
+        forgetClient();
+      });
       client.once("exit", forgetClient);
       let errors = "";
       client.stderr.on("data", (chunk: Buffer) => { errors += chunk.toString(); });
@@ -498,10 +514,18 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         release: async () => {
           if (released) return;
           released = true;
-          client.stdin.end("COMMIT;\n\\q\n");
-          const [code] = await once(client, "exit") as [number | null];
-          heldLocks.delete(lock);
-          if (code !== 0) throw new Error(`Database lock client failed: ${errors}`);
+          try {
+            if (client.exitCode === null && client.signalCode === null && !clientError) {
+              client.stdin.end("COMMIT;\n\\q\n");
+            }
+            const [code, signal] = await waitForProcessExit(client, () => clientError);
+            if (code !== 0) {
+              throw new Error(`Database lock client failed with code ${code ?? "none"}`
+                + ` and signal ${signal ?? "none"}: ${errors}`);
+            }
+          } finally {
+            heldLocks.delete(lock);
+          }
         }
       };
       heldLocks.add(lock);
@@ -600,7 +624,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       stop: async () => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         await Promise.all([...lockClients].map(async (client) => {
-          if (client.exitCode !== null) return;
+          if (client.exitCode !== null || client.signalCode !== null) return;
           const stopped = once(client, "exit");
           if (!client.kill()) throw new Error("Database lock client could not be stopped");
           await stopped;
