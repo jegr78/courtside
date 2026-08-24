@@ -94,4 +94,29 @@ describe("journey control", () => {
       await control.close();
     }
   });
+
+  it("given an unknown diagnostic reason, when a worker sends it, then no diagnostic is collected", async () => {
+    // given
+    const { service, calls } = journeyService();
+    const control = await startJourneyControl(service);
+
+    try {
+      // when
+      const response = await fetch(control.reference.endpoint, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${control.reference.token}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ operation: "browserDiagnostics", browserName: "webkit", reason: "other" })
+      });
+
+      // then
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({ error: "Journey control command requires a browser failure reason" });
+      expect(calls.browserDiagnostics).not.toHaveBeenCalled();
+    } finally {
+      await control.close();
+    }
+  });
 });

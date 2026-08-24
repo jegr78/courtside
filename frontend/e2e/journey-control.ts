@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { type AddressInfo } from "node:net";
 import type { DatabaseLock, JourneyService } from "./global-setup";
-import type { BrowserDiagnostics } from "./browser-diagnostics";
+import { browserFailureReasons, type BrowserDiagnostics, type BrowserFailureReason } from "./browser-diagnostics";
 
 export interface JourneyControlReference {
   endpoint: string;
@@ -45,6 +45,12 @@ function requiredString(value: string | undefined, name: string): string {
   return value;
 }
 
+function requiredBrowserFailureReason(value: string | undefined): BrowserFailureReason {
+  const reason = browserFailureReasons.find((candidate) => candidate === value);
+  if (!reason) throw new Error("Journey control command requires a browser failure reason");
+  return reason;
+}
+
 function requiredCount(value: number | undefined): number {
   if (value === undefined || !Number.isInteger(value) || value < 0) {
     throw new Error("Journey control command requires a non-negative count");
@@ -58,7 +64,7 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
     case "pinnedBrowser": return service.pinnedBrowser(requiredString(command.browserName, "browserName"));
     case "releasePinnedBrowser": return service.releasePinnedBrowser(requiredString(command.browserName, "browserName"));
     case "browserDiagnostics": return service.browserDiagnostics(requiredString(command.browserName, "browserName"),
-      requiredString(command.reason, "reason"));
+      requiredBrowserFailureReason(command.reason));
     case "executeSql": return service.executeSql(requiredString(command.sql, "sql"));
     case "holdDatabaseLock": {
       const lockId = randomUUID();

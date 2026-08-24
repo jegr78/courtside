@@ -1,7 +1,7 @@
 import { expect, test as base, type Browser, type BrowserContext, type Metadata, type Page } from "@playwright/test";
 import { journeyInstant, type JourneyService } from "./global-setup";
 import { connectJourneyService, type JourneyControlReference } from "./journey-control";
-import { observeBrowserDisconnect } from "./browser-diagnostics";
+import { diagnoseUnexpectedBrowserTest, observeBrowserDisconnect } from "./browser-diagnostics";
 
 // Every browser is drawn from the pinned image, so a run compares like for like anywhere.
 // A project on the plain origin covers the club that serves Courtside without TLS.
@@ -13,6 +13,7 @@ interface WorkerFixtures {
 }
 
 interface TestFixtures {
+  failureDiagnostics: void;
   resetJourney: void;
 }
 
@@ -61,6 +62,21 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await pinJourneyClock(context);
     await provide(context);
   },
+  failureDiagnostics: [async ({ browser, browserName, journeyService, page }, provide, testInfo) => {
+    let pageCrashed = false;
+    const crashed = () => { pageCrashed = true; };
+    page.on("crash", crashed);
+    await provide();
+    page.removeListener("crash", crashed);
+    if (!browser.isConnected()) return;
+    await diagnoseUnexpectedBrowserTest({
+      status: testInfo.status,
+      expectedStatus: testInfo.expectedStatus,
+      errors: testInfo.errors,
+      pageCrashed,
+      browserConnected: true
+    }, (reason) => journeyService.browserDiagnostics(browserName, reason));
+  }, { auto: true }],
   resetJourney: [async ({ journeyService }, provide) => {
     await journeyService.reset();
     await provide();
