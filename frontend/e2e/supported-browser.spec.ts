@@ -4,34 +4,50 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.goto("/login");
   await page.getByTestId("username").fill(username);
   await page.getByTestId("password").fill("temporary-password");
-  const allocationResponses = waitForAllocationResponses(page, 7);
+  const allocationResponses = allocationResponseWaiter(page, 7);
   const sessionResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/session") && response.request().method() === "POST");
-  await page.getByTestId("login-submit").click();
-  expect((await sessionResponse).status()).toBe(200);
-  await allocationResponses;
-  await expect(page.getByTestId("logout")).toBeVisible();
-  await expect(page.getByTestId("court-plan-legend")).toBeVisible();
+  try {
+    await page.getByTestId("login-submit").click();
+    expect((await sessionResponse).status()).toBe(200);
+    await allocationResponses.completion;
+    await expect(page.getByTestId("logout")).toBeVisible();
+    await expect(page.getByTestId("court-plan-legend")).toBeVisible();
+  } finally {
+    allocationResponses.cancel();
+  }
 }
 
-function waitForAllocationResponses(page: import("@playwright/test").Page, count: number): Promise<void> {
-  return new Promise((resolve, reject) => {
+function allocationResponseWaiter(page: import("@playwright/test").Page, count: number) {
+  let cancel = () => {};
+  const completion = new Promise<void>((resolve, reject) => {
     let observed = 0;
+    let settled = false;
+    const finish = (result: () => void) => {
+      if (settled) return;
+      settled = true;
+      page.off("response", onResponse);
+      page.off("close", onClose);
+      result();
+    };
     const onResponse = (response: import("@playwright/test").Response) => {
       const url = new URL(response.url());
       if (response.request().method() !== "GET" || url.pathname !== "/api/bookings" || !url.searchParams.has("date")) return;
       if (!response.ok()) {
-        page.off("response", onResponse);
-        reject(new Error(`Allocation request failed with status ${response.status()}`));
+        finish(() => reject(new Error(`Allocation request failed with status ${response.status()}`)));
         return;
       }
       observed += 1;
       if (observed !== count) return;
-      page.off("response", onResponse);
-      resolve();
+      finish(resolve);
     };
+    const onClose = () => finish(() => reject(new Error("Page closed before allocation requests completed")));
+    cancel = () => finish(resolve);
     page.on("response", onResponse);
+    page.once("close", onClose);
   });
+  void completion.catch(() => {});
+  return { completion, cancel };
 }
 
 test("a member can navigate the core signed-in journey", async ({ page }) => {
