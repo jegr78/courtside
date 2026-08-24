@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import type { ChildProcess } from "node:child_process";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { waitForProcessMarker } from "./global-setup";
 
 function processWithOutput(): { client: ChildProcess; output: PassThrough } {
@@ -34,5 +34,24 @@ describe("process marker coordination", () => {
 
     // then
     await expect(waiting).rejects.toThrow("code 2 and signal none: psql failed");
+  });
+
+  it("given an abandoned command, when its request is cancelled, then the process and listeners are released", async () => {
+    // given
+    const { client, output } = processWithOutput();
+    const kill = vi.fn().mockReturnValue(true);
+    client.kill = kill;
+    const controller = new AbortController();
+    const waiting = waitForProcessMarker(client, "LOCK_READY", () => "still starting", controller.signal);
+
+    // when
+    controller.abort();
+
+    // then
+    await expect(waiting).rejects.toThrow("Database lock acquisition was cancelled: still starting");
+    expect(kill).toHaveBeenCalledOnce();
+    expect(output.listenerCount("data")).toBe(0);
+    expect(client.listenerCount("error")).toBe(0);
+    expect(client.listenerCount("exit")).toBe(0);
   });
 });

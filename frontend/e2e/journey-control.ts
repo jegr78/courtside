@@ -53,7 +53,7 @@ function requiredCount(value: number | undefined): number {
 }
 
 async function executeCommand(command: JourneyCommand, service: JourneyService,
-  locks: Map<string, DatabaseLock>): Promise<unknown> {
+  locks: Map<string, DatabaseLock>, signal: AbortSignal): Promise<unknown> {
   switch (command.operation) {
     case "pinnedBrowser": return service.pinnedBrowser(requiredString(command.browserName, "browserName"));
     case "releasePinnedBrowser": return service.releasePinnedBrowser(requiredString(command.browserName, "browserName"));
@@ -62,7 +62,7 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
     case "executeSql": return service.executeSql(requiredString(command.sql, "sql"));
     case "holdDatabaseLock": {
       const lockId = randomUUID();
-      locks.set(lockId, await service.holdDatabaseLock(requiredString(command.sql, "sql")));
+      locks.set(lockId, await service.holdDatabaseLock(requiredString(command.sql, "sql"), signal));
       return lockId;
     }
     case "waitForWaiters": return locks.get(requiredString(command.lockId, "lockId"))
@@ -99,10 +99,19 @@ export async function startJourneyControl(service: JourneyService): Promise<{
       send(response, 404, { error: "Journey control endpoint not found" });
       return;
     }
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    request.once("aborted", abort);
+    response.once("close", abort);
     try {
-      send(response, 200, { result: await executeCommand(await requestBody(request), service, locks) });
+      send(response, 200, { result: await executeCommand(await requestBody(request), service, locks, controller.signal) });
     } catch (error) {
-      send(response, 500, { error: error instanceof Error ? error.message : "Journey control command failed" });
+      if (!response.destroyed) {
+        send(response, 500, { error: error instanceof Error ? error.message : "Journey control command failed" });
+      }
+    } finally {
+      request.off("aborted", abort);
+      response.off("close", abort);
     }
   };
   const server = createServer((request, response) => void serve(request, response));
