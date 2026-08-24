@@ -45,7 +45,7 @@ class MessageRecord {
     @Column(nullable = false, updatable = false)
     private Instant queuedAt;
 
-    @Column(insertable = false, updatable = false)
+    @Column(insertable = false, updatable = false, nullable = false)
     private Long queuedSeq;
 
     private Instant settledAt;

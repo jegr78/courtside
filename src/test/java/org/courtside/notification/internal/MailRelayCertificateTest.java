@@ -12,7 +12,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.DockerImageName;
 
-import java.io.File;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,7 +21,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,10 +41,11 @@ class MailRelayCertificateTest {
     private static final String REACHED_AT = "127.0.0.1";
 
     private static GenericContainer<?> relay;
+    private static TestRelayCertificate issued;
 
     @BeforeAll
     static void startARelayNamingSomethingElse() throws Exception {
-        Certificate issued = issuedFor(UNREACHABLE_NAME);
+        issued = TestRelayCertificate.issuedFor(UNREACHABLE_NAME);
         relay = new GenericContainer<>(DockerImageName.parse(deployedImage()))
                 .withEnv("MP_SMTP_TLS_CERT", "/etc/mailpit/cert.pem")
                 .withEnv("MP_SMTP_TLS_KEY", "/etc/mailpit/key.pem")
@@ -59,6 +61,19 @@ class MailRelayCertificateTest {
         if (relay != null) {
             relay.stop();
         }
+    }
+
+    @Test
+    void whenTheRelayServesItsCertificate_thenItNamesNoHostThisTestReachesItAt() throws Exception {
+        // when — the premise both tests below rest on, which nothing had been asserting
+        X509Certificate served = (X509Certificate) CertificateFactory.getInstance("X.509")
+                .generateCertificate(new ByteArrayInputStream(
+                        issued.certificate().getBytes(StandardCharsets.UTF_8)));
+
+        // then
+        assertThat(served.getSubjectAlternativeNames())
+                .extracting(name -> String.valueOf(name.get(1)))
+                .containsExactly(UNREACHABLE_NAME);
     }
 
     @Test
@@ -92,7 +107,7 @@ class MailRelayCertificateTest {
         Path executable = executableFile(directory, "openssl");
 
         // when
-        Path resolved = executable("openssl", List.of(directory), List.of(""));
+        Path resolved = TestRelayCertificate.executable("openssl", List.of(directory), List.of(""));
 
         // then
         assertThat(resolved).isEqualTo(executable.toAbsolutePath().normalize()).isAbsolute();
@@ -107,7 +122,7 @@ class MailRelayCertificateTest {
 
         // when / then
         try {
-            assertThatThrownBy(() -> executable("openssl", List.of(directory), List.of("")))
+            assertThatThrownBy(() -> TestRelayCertificate.executable("openssl", List.of(directory), List.of("")))
                     .isInstanceOf(IllegalStateException.class);
         } finally {
             Files.deleteIfExists(executable);
@@ -122,7 +137,7 @@ class MailRelayCertificateTest {
         Path executable = executableFile(directory, "openssl.exe");
 
         // when
-        Path resolved = executable("openssl", List.of(directory), List.of(".exe"));
+        Path resolved = TestRelayCertificate.executable("openssl", List.of(directory), List.of(".exe"));
 
         // then
         assertThat(resolved).isEqualTo(executable.toAbsolutePath().normalize());
@@ -132,7 +147,7 @@ class MailRelayCertificateTest {
     void givenNoMatchingExecutable_whenResolvingAnExecutable_thenResolutionFailsClosed(
             @TempDir Path directory) {
         // given / when / then
-        assertThatThrownBy(() -> executable("openssl", List.of(directory), List.of("")))
+        assertThatThrownBy(() -> TestRelayCertificate.executable("openssl", List.of(directory), List.of("")))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -162,50 +177,6 @@ class MailRelayCertificateTest {
 
     // The JDK exposes no way to write an X.509 certificate, and adding a library to sign one would
     // be a dependency this repository carries for a single test.
-    private static Certificate issuedFor(String name) throws Exception {
-        Path directory = Files.createTempDirectory("courtside-relay-");
-        Path certificate = directory.resolve("cert.pem");
-        Path key = directory.resolve("key.pem");
-        try {
-            Process openssl = new ProcessBuilder(executable("openssl").toString(), "req", "-x509",
-                    "-newkey", "rsa:2048", "-nodes", "-days", "1",
-                    "-subj", "/CN=courtside-relay-under-test", "-addext", "subjectAltName=DNS:" + name,
-                    "-keyout", key.toString(), "-out", certificate.toString())
-                    .redirectErrorStream(true).start();
-            String output = new String(openssl.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            if (openssl.waitFor() != 0) {
-                throw new IllegalStateException("Could not issue the relay certificate: " + output);
-            }
-            return new Certificate(Files.readString(certificate), Files.readString(key));
-        } finally {
-            Files.deleteIfExists(certificate);
-            Files.deleteIfExists(key);
-            Files.deleteIfExists(directory);
-        }
-    }
-
-    private static Path executable(String name) {
-        String searchPath = System.getenv("PATH");
-        if (searchPath == null || searchPath.isBlank()) {
-            throw new IllegalStateException("PATH does not name an OpenSSL executable");
-        }
-        List<Path> directories = Arrays.stream(searchPath.split(Pattern.quote(File.pathSeparator)))
-                .filter(entry -> !entry.isBlank())
-                .map(Path::of)
-                .toList();
-        return executable(name, directories, executableExtensions());
-    }
-
-    private static Path executable(String name, List<Path> directories, List<String> extensions) {
-        return directories.stream()
-                .filter(Path::isAbsolute)
-                .flatMap(directory -> extensions.stream().map(extension -> directory.resolve(name + extension)))
-                .filter(candidate -> Files.isRegularFile(candidate) && Files.isExecutable(candidate))
-                .findFirst()
-                .map(candidate -> candidate.toAbsolutePath().normalize())
-                .orElseThrow(() -> new IllegalStateException("PATH does not name an OpenSSL executable"));
-    }
-
     private static Path executableFile(Path directory, String name) throws IOException {
         Path executable = Files.createFile(directory.resolve(name));
         if (!executable.toFile().setExecutable(true)) {
@@ -214,24 +185,11 @@ class MailRelayCertificateTest {
         return executable;
     }
 
-    private static List<String> executableExtensions() {
-        String pathExtensions = System.getenv("PATHEXT");
-        if (pathExtensions == null || pathExtensions.isBlank()) {
-            return List.of("");
-        }
-        return Arrays.stream(pathExtensions.split(Pattern.quote(File.pathSeparator)))
-                .map(String::toLowerCase)
-                .toList();
-    }
-
     private static String deployedImage() throws IOException {
         Matcher found = MAILPIT_IMAGE.matcher(Files.readString(MAIL_DEPLOYMENT));
         if (!found.find()) {
             throw new IllegalStateException(MAIL_DEPLOYMENT + " names no Mailpit image pinned by digest");
         }
         return found.group();
-    }
-
-    private record Certificate(String certificate, String key) {
     }
 }
