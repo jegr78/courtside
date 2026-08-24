@@ -4,6 +4,7 @@ import test from "node:test";
 
 const workflow = readFileSync(new URL("../.github/workflows/test-stability.yml", import.meta.url), "utf8");
 const build = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
+const browserOrder = workflow.slice(workflow.indexOf("  browser-order:"), workflow.indexOf("  browser-compatibility:"));
 
 test("given periodic stability evidence, when reading its workflow, then backend and browser order proofs retain first attempts", () => {
   assert.match(workflow, /schedule:/);
@@ -25,7 +26,9 @@ test("given a required build failure, when collecting evidence, then backend and
   assert.match(build, /frontend\/test-results\/\*\*\/trace\.zip/);
   assert.match(build, /frontend\/test-results\/\*\*\/\*\.png/);
   assert.match(build, /frontend\/test-results\/browser-diagnostics\/\*\.json/);
-  assert.match(workflow, /frontend\/test-results\/browser-diagnostics\/\*\.json/);
+  assert.match(browserOrder, /frontend\/test-results\/browser-diagnostics\/\*\.json/);
+  assert.match(browserOrder, /frontend\/test-results\/\*\*\/trace\.zip/);
+  assert.match(browserOrder, /frontend\/test-results\/\*\*\/error-context\.md/);
   assert.doesNotMatch(build, /frontend\/playwright-report/);
   assert.doesNotMatch(workflow, /frontend\/playwright-report/);
 });
