@@ -55,6 +55,9 @@ test("given a manual baseline run, when selecting active, then the isolated work
 });
 
 test("given protected active evidence, when the hosted run finishes, then only its encrypted envelope is uploaded", () => {
+  // given
+  const workflowPermissions = scheduled.match(/^permissions:\n(?<block>(?:  [^\n]+\n)+)/m)?.groups.block ?? "";
+
   // when / then
   assert.equal(existsSync(join(repository, ".github/security-evidence-recipient.pem")), true);
   assert.equal(existsSync(join(repository, ".github/security-evidence-key.json")), true);
@@ -70,8 +73,11 @@ test("given protected active evidence, when the hosted run finishes, then only i
   assert.match(assessment, /gh attestation verify protected-evidence\.cms/);
   assert.match(scheduled, /actions\/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8/);
   assert.match(scheduled, /subject-path: build\/security-gate\/protected-evidence\.cms/);
-  assert.match(scheduled, /attestations: write/);
-  assert.match(scheduled, /id-token: write/);
+  assert.match(scheduled, /outputs:\s+evidence-sealed: \$\{\{ steps\.seal\.outputs\.sealed \}\}/);
+  assert.match(scheduled, /echo "sealed=true" >> "\$GITHUB_OUTPUT"/);
+  assert.match(scheduled, /attest-evidence:[\s\S]+needs: assessment[\s\S]+if: always\(\) && needs\.assessment\.outputs\.evidence-sealed == 'true'/);
+  assert.match(scheduled, /attest-evidence:[\s\S]+permissions:[\s\S]+attestations: write[\s\S]+id-token: write/);
+  assert.doesNotMatch(workflowPermissions, /attestations: write|id-token: write/);
 });
 
 test("given the active duration contract, when the workflow chooses its job budget, then active retains the safe cleanup reserve", () => {
