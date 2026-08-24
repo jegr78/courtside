@@ -23,14 +23,10 @@ export function Modal({ labelledBy, closed, children }: { labelledBy: string; cl
     if (event.key !== "Tab") return;
     const focusable = reachableControls(dialog.current);
     if (focusable.length === 0) return;
-    const current = focusable.indexOf(document.activeElement as HTMLElement);
-    const next = event.shiftKey
-      ? (current <= 0 ? focusable.length - 1 : current - 1)
-      : (current === focusable.length - 1 ? 0 : current + 1);
     // The trap drives every step rather than deferring to the browser for the ordinary ones:
     // sharing the job is what let a control the browser skips become a dead end.
     event.preventDefault();
-    focusable[next].focus();
+    focusOnward(focusable, document.activeElement as HTMLElement, event.shiftKey ? -1 : 1);
   }
 
   return <div
@@ -44,14 +40,32 @@ export function Modal({ labelledBy, closed, children }: { labelledBy: string; cl
   </div>;
 }
 
-// A control inside a collapsed disclosure is in the document and refuses focus, so a trap that
-// counts it lands on nothing and every further Tab repeats that. Only its summary is reachable.
 function reachableControls(dialog: HTMLElement | null): HTMLElement[] {
   return Array.from(dialog?.querySelectorAll<HTMLElement>(focusableSelector()) ?? [])
-    .filter((control) => {
-      const collapsed = control.closest("details:not([open])");
-      return !collapsed || control === collapsed.querySelector("summary");
-    });
+    .filter(isReachable);
+}
+
+// A control inside a collapsed disclosure refuses focus, and a closed one nested in another closed
+// one hides its own summary too, so every ancestor is asked rather than only the nearest.
+function isReachable(control: HTMLElement): boolean {
+  for (let node = control.parentElement; node; node = node.parentElement) {
+    if (node instanceof HTMLDetailsElement && !node.open
+        && control !== node.querySelector(":scope > summary")) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// A target may still refuse the focus - hidden by something this filter does not know about - and
+// repeating that jump is exactly the dead end the filter exists to prevent.
+function focusOnward(controls: HTMLElement[], active: HTMLElement, step: number): void {
+  const from = controls.indexOf(active) === -1 ? (step === 1 ? -1 : 0) : controls.indexOf(active);
+  for (let moved = 1; moved <= controls.length; moved += 1) {
+    const candidate = controls[(from + step * moved + controls.length * moved) % controls.length];
+    candidate.focus();
+    if (document.activeElement === candidate) return;
+  }
 }
 
 function focusableSelector(): string {

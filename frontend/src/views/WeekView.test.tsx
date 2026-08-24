@@ -898,9 +898,12 @@ it("given the dialog opens, then the common case is visible and the rest sits be
   expect(screen.getByTestId("member-search")).toBeVisible();
   expect(screen.getByTestId("guest-name")).not.toBeVisible();
 
-  // and it opens on request
+  // and it opens on request, with the note reachable rather than clipped by the fixed footer
   await userEvent.click(screen.getByTestId("booking-more-summary"));
   expect(screen.getByTestId("guest-name")).toBeVisible();
+  expect(screen.getByTestId("booking-note")).toBeVisible();
+  await userEvent.type(screen.getByTestId("booking-note"), "Clay court");
+  expect(screen.getByTestId("booking-note")).toHaveValue("Clay court");
 });
 
 it("given a refusal about a field behind the disclosure, when it arrives, then the disclosure is open", async () => {

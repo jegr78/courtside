@@ -199,7 +199,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </fieldset>
       <FieldViolations id="booking-participants-errors" violations={fieldViolations("participants")} />
       <label className="mt-4 grid gap-2 font-medium">{t("booking.note")}
-        <textarea value={note} onChange={(event) => setNote(event.target.value)} aria-invalid={fieldViolations("note").length > 0} aria-describedby={describedBy("note")} className="form-control rounded-lg border px-3 py-3" />
+        <textarea data-testid="booking-note" value={note} onChange={(event) => setNote(event.target.value)} aria-invalid={fieldViolations("note").length > 0} aria-describedby={describedBy("note")} className="form-control rounded-lg border px-3 py-3" />
       </label>
       <FieldViolations id="booking-note-errors" violations={fieldViolations("note")} />
       </details>

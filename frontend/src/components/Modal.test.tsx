@@ -60,3 +60,48 @@ it("given an open disclosure, when tabbing, then the control inside it is reache
   // then
   expect(screen.getByTestId("inside")).toHaveFocus();
 });
+
+it("given a disclosure closed inside another, when tabbing, then the inner summary is passed too", async () => {
+  // given — closest() only sees the nearest closed disclosure, so an inner summary looked
+  // reachable although no browser focuses anything inside a collapsed outer one
+  render(<Modal labelledBy="heading" closed={vi.fn()}>
+    <h2 id="heading">Booking</h2>
+    <input data-testid="before" />
+    <details>
+      <summary data-testid="outer-summary">More details</summary>
+      <details>
+        <summary data-testid="inner-summary">Even more</summary>
+        <input data-testid="deep" />
+      </details>
+    </details>
+    <button data-testid="after" type="button">Book now</button>
+  </Modal>);
+  screen.getByTestId("before").focus();
+
+  // when
+  await userEvent.tab();
+  await userEvent.tab();
+
+  // then
+  expect(screen.getByTestId("after")).toHaveFocus();
+});
+
+it("given a control that refuses the focus, when tabbing, then the trap moves on instead of repeating", async () => {
+  // given — a target that swallows focus() would otherwise leave activeElement where it was, and
+  // the next Tab would compute the same jump for ever
+  render(<Modal labelledBy="heading" closed={vi.fn()}>
+    <h2 id="heading">Booking</h2>
+    <input data-testid="before" />
+    <input data-testid="refuses" />
+    <button data-testid="after" type="button">Book now</button>
+  </Modal>);
+  const refusing = screen.getByTestId("refuses");
+  refusing.focus = () => undefined;
+  screen.getByTestId("before").focus();
+
+  // when
+  await userEvent.tab();
+
+  // then
+  expect(screen.getByTestId("after")).toHaveFocus();
+});
