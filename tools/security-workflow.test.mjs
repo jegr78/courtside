@@ -57,6 +57,9 @@ test("given a manual baseline run, when selecting active, then the isolated work
 test("given protected active evidence, when the hosted run finishes, then only its encrypted envelope is uploaded", () => {
   // when / then
   assert.equal(existsSync(join(repository, ".github/security-evidence-recipient.pem")), true);
+  assert.equal(existsSync(join(repository, ".github/security-evidence-key.json")), true);
+  assert.match(scheduled, /EXPECTED_FINGERPRINT=.*security-evidence-key\.json/);
+  assert.match(scheduled, /canaryVerifiedOn <= \$today and \$today <= \.canaryValidThrough/);
   assert.match(scheduled, /set -o pipefail[\s\S]+tar -czf - -C[\s\S]+assessment\/attempt-1" evidence[\s\S]+\| openssl cms -encrypt -binary -aes-256-gcm/);
   assert.match(scheduled, /openssl cms -encrypt -binary -aes-256-gcm[\s\S]+\.github\/security-evidence-recipient\.pem/);
   assert.match(scheduled, /build\/security-gate\/protected-evidence\.cms/);
@@ -64,6 +67,11 @@ test("given protected active evidence, when the hosted run finishes, then only i
   assert.doesNotMatch(scheduled, /path:[\s\S]+assessment\/attempt-1\/evidence/);
   assert.match(assessment, /security evidence private key/);
   assert.match(assessment, /openssl cms -decrypt/);
+  assert.match(assessment, /gh attestation verify protected-evidence\.cms/);
+  assert.match(scheduled, /actions\/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8/);
+  assert.match(scheduled, /subject-path: build\/security-gate\/protected-evidence\.cms/);
+  assert.match(scheduled, /attestations: write/);
+  assert.match(scheduled, /id-token: write/);
 });
 
 test("given the active duration contract, when the workflow chooses its job budget, then active retains the safe cleanup reserve", () => {

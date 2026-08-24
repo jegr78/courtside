@@ -125,8 +125,17 @@ always selects `safe`; an active run is never introduced by changing a default o
 
 The public certificate in [`.github/security-evidence-recipient.pem`](../.github/security-evidence-recipient.pem)
 encrypts that envelope with AES-256-GCM through OpenSSL CMS. Its security evidence private key is
-kept outside the repository. Verify the downloaded envelope against `protected-evidence.sha256`,
-then decrypt and extract it without writing its contents into a public workspace or log:
+kept outside the repository. The workflow verifies the certificate fingerprint and the current
+decrypt-canary window against [the key inventory](../.github/security-evidence-key.json), then
+attests the encrypted envelope through GitHub artifact attestation. Verify that attestation before
+decrypting the downloaded envelope:
+
+```bash
+gh attestation verify protected-evidence.cms --repo jegr78/courtside
+```
+
+After verifying the attestation, compare the envelope against `protected-evidence.sha256`, then
+decrypt and extract it without writing its contents into a public workspace or log:
 
 ```bash
 openssl cms -decrypt -binary -inform DER \
@@ -137,8 +146,11 @@ openssl cms -decrypt -binary -inform DER \
 tar -xzf protected-evidence.tar.gz
 ```
 
-Rotating the certificate requires proving that retained envelopes have either expired or been
-re-encrypted before the previous private key is retired.
+Before `canaryValidThrough`, the custodian encrypts and decrypts synthetic content with the tracked
+certificate and external private key and records the new verification window in the inventory.
+Rotation additionally requires proving that retained envelopes have either expired or been
+re-encrypted before the previous private key is retired. A lost or unavailable private key blocks
+the inventory renewal and therefore the next hosted assessment.
 
 The release workflow runs the complete `active` profile after both architectures qualify the
 candidate and before the security record can be assembled. The active manifest, normalized gate,

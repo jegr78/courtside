@@ -19,7 +19,9 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  attestations: write
   contents: read
+  id-token: write
 
 jobs:
   assessment:
@@ -71,6 +73,13 @@ jobs:
         run: |
           umask 077
           set -o pipefail
+          EXPECTED_FINGERPRINT="$(jq -r '.certificateSha256' .github/security-evidence-key.json)"
+          ACTUAL_FINGERPRINT="$(openssl x509 -in .github/security-evidence-recipient.pem -noout -fingerprint -sha256 | cut -d= -f2)"
+          test "$ACTUAL_FINGERPRINT" = "$EXPECTED_FINGERPRINT"
+          TODAY="$(date -u +%F)"
+          jq -e --arg today "$TODAY" \
+            '.canaryVerifiedOn <= $today and $today <= .canaryValidThrough' \
+            .github/security-evidence-key.json > /dev/null
           tar -czf - -C "build/security/$RUN_ID/assessment/attempt-1" evidence \
             | openssl cms -encrypt -binary -aes-256-gcm -outform DER \
             -out build/security-gate/protected-evidence.cms \
@@ -91,6 +100,10 @@ jobs:
       - name: Remove the disposable security target
         if: always()
         run: frontend/node/node tools/courtside.mjs security-cleanup "$RUN_ID"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        if: always()
+        with:
+          subject-path: build/security-gate/protected-evidence.cms
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
