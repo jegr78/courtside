@@ -14,9 +14,12 @@ public final class RuleParameters {
     public record Parameter(String name, int minimum, int maximum) {
     }
 
+    // NO_COURT_BOOKING carries no bounds because it carries no parameters: a club switches it on
+    // by putting it in a rule set and off by taking it out, and any value sent with it is refused.
     private static final Map<RuleType, Map<String, Bounds>> CONTRACT = Map.of(
             RuleType.ADVANCE_WINDOW, Map.of("maxDays", new Bounds(1, 365)),
-            RuleType.MAX_OPEN_BOOKINGS, Map.of("limit", new Bounds(1, 99)));
+            RuleType.MAX_OPEN_BOOKINGS, Map.of("limit", new Bounds(1, 99)),
+            RuleType.NO_COURT_BOOKING, Map.of());
 
     private RuleParameters() {
     }

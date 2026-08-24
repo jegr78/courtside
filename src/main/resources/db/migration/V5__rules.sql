@@ -13,7 +13,8 @@ CREATE TABLE rule_definition (
     params      jsonb NOT NULL DEFAULT '{}'::jsonb,
     CONSTRAINT rule_definition_unique_type_per_set UNIQUE (rule_set_id, rule_type),
     CONSTRAINT rule_definition_rule_type_known
-        CHECK (rule_type IN ('OPENING_HOURS', 'SLOT_GRID', 'ADVANCE_WINDOW', 'MAX_OPEN_BOOKINGS'))
+        CHECK (rule_type IN ('OPENING_HOURS', 'SLOT_GRID', 'ADVANCE_WINDOW', 'MAX_OPEN_BOOKINGS',
+                             'NO_COURT_BOOKING'))
 );
 
 CREATE TABLE membership_type (

@@ -113,8 +113,9 @@ browser admin surface for configuration, facilities and the club's people — ad
 correcting their name or address, giving them an account, changing its roles, correcting its
 username, sending it new credentials and disabling it. Membership types are administered there as
 well, each showing how many people hold it, and the configuration names the rule set that measures a
-person holding none. So is the whole import: describing a source, linking the people a file cannot
-match by number, uploading a member list, reading what it would change, and running it. The column
+person holding none. A rule set can bar its holders from booking a court at all. So is the whole
+import: describing a source, linking the people a file cannot match by number, uploading a member
+list, reading what it would change, and running it. The column
 mapping is offered from the club's own export, read in the browser and never uploaded for that
 purpose. Before a court, a booking card or a day goes out of service, the facility view says which
 bookings sit on it — information beside the control, never a gate in front of it. What a board still
@@ -688,14 +689,19 @@ translatable and lets the frontend attach them to the right form field.
 
 Adding a rule type = one validator class + one configuration row.
 
-**A membership type may be barred from booking a court altogether.** *Designed.* Clubs carry
+**A membership type may be barred from booking a court altogether.** *Built.* Clubs carry
 categories that pay dues without playing — passive, supporting, honorary — and every rule type
 above answers *how much*, none of them *whether*. Forcing the question through a quantity would
 say the wrong thing out loud: a limit of zero reaches the member as "too many open bookings
-(limit 0, current 0)". The bar is therefore a rule type of its own, parameterless like the
-opening hours and the slot grid, present in a rule set or absent from it, and its violation
-carries its own key. A club builds a "passive" rule set, switches it on, and points the
-membership type at it — a row, not a release.
+(limit 0, current 0)". The bar is therefore a rule type of its own, `NO_COURT_BOOKING`,
+parameterless like the opening hours and the slot grid, present in a rule set or absent from it,
+and its violation carries its own key. A club builds a "passive" rule set, switches it on, and
+points the membership type at it — a row, not a release.
+
+It is an overridable rule, because it states who may book rather than what the grid is: an
+administrator recording a court for somebody is doing their job. Taking the membership away does
+not lift it — the rule set for people holding no membership type is measured the same way, which
+is why that had to exist first.
 
 ### Two kinds of rule: who may book, and what the grid is
 
