@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import type { ChildProcess } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
-import { waitForProcessExit, waitForProcessMarker } from "./global-setup";
+import { retainProcessUntilClose, waitForProcessExit, waitForProcessMarker } from "./global-setup";
 
 function processWithOutput(): { client: ChildProcess; output: PassThrough } {
   const output = new PassThrough();
@@ -44,6 +44,24 @@ describe("process marker coordination", () => {
 
     // when / then
     await expect(waitForProcessExit(client, () => failure)).rejects.toThrow("spawn failed");
+  });
+
+  it("given a running owned process reports an error, when it later closes, then ownership lasts until close", () => {
+    // given
+    const { client } = processWithOutput();
+    const clients = new Set<ChildProcess>();
+    const failure = retainProcessUntilClose(clients, client);
+
+    // when
+    client.emit("error", new Error("signal failed"));
+
+    // then
+    expect(clients).toContain(client);
+    expect(failure()).toMatchObject({ message: "signal failed" });
+    client.emit("close", null, null);
+    expect(clients).not.toContain(client);
+    expect(client.listenerCount("error")).toBe(0);
+    expect(client.listenerCount("close")).toBe(0);
   });
 
   it("given a process that stops before its marker, when coordinating, then exit diagnostics are retained", async () => {

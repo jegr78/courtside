@@ -319,6 +319,19 @@ export async function waitForProcessExit(
   return await once(client, "exit") as [number | null, NodeJS.Signals | null];
 }
 
+export function retainProcessUntilClose(clients: Set<ChildProcess>, client: ChildProcess): () => Error | undefined {
+  let failure: Error | undefined;
+  const onError = (error: Error) => { failure = error; };
+  const onClose = () => {
+    clients.delete(client);
+    client.off("error", onError);
+  };
+  clients.add(client);
+  client.on("error", onError);
+  client.once("close", onClose);
+  return () => failure;
+}
+
 interface StartedJourneyService extends JourneyService {
   stop(): Promise<void>;
 }
@@ -481,14 +494,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         "exec", "-i", postgres!.getId(), "psql", "-U", "courtside", "-d", "courtside",
         "-v", "ON_ERROR_STOP=1", "-At"
       ], { stdio: ["pipe", "pipe", "pipe"] });
-      lockClients.add(client);
-      const forgetClient = () => lockClients.delete(client);
-      let clientError: Error | undefined;
-      client.once("error", (error) => {
-        clientError = error;
-        forgetClient();
-      });
-      client.once("exit", forgetClient);
+      const clientFailure = retainProcessUntilClose(lockClients, client);
       let errors = "";
       client.stderr.on("data", (chunk: Buffer) => { errors += chunk.toString(); });
       const lockReady = waitForProcessMarker(client, "COURTSIDE_LOCK_READY", () => errors, signal);
@@ -515,10 +521,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
           if (released) return;
           released = true;
           try {
-            if (client.exitCode === null && client.signalCode === null && !clientError) {
+            if (client.exitCode === null && client.signalCode === null && !clientFailure()) {
               client.stdin.end("COMMIT;\n\\q\n");
             }
-            const [code, signal] = await waitForProcessExit(client, () => clientError);
+            const [code, signal] = await waitForProcessExit(client, clientFailure);
             if (code !== 0) {
               throw new Error(`Database lock client failed with code ${code ?? "none"}`
                 + ` and signal ${signal ?? "none"}: ${errors}`);
