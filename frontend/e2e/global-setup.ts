@@ -267,6 +267,35 @@ export interface JourneyService {
   restart(): Promise<void>;
 }
 
+export function waitForProcessMarker(
+  client: ChildProcess,
+  marker: string,
+  errors: () => string
+): Promise<void> {
+  const stdout = client.stdout;
+  if (!stdout) return Promise.reject(new Error("Process stdout is unavailable"));
+  return new Promise((resolve, reject) => {
+    let output = "";
+    const finish = (result: () => void) => {
+      stdout.off("data", onData);
+      client.off("error", onError);
+      client.off("exit", onExit);
+      result();
+    };
+    const onData = (chunk: Buffer) => {
+      output += chunk.toString();
+      if (output.includes(marker)) finish(resolve);
+    };
+    const onError = (error: Error) => finish(() => reject(error));
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => finish(() => reject(new Error(
+      `Database lock client stopped with code ${code ?? "none"} and signal ${signal ?? "none"}: ${errors()}`
+    )));
+    stdout.on("data", onData);
+    client.once("error", onError);
+    client.once("exit", onExit);
+  });
+}
+
 interface StartedJourneyService extends JourneyService {
   stop(): Promise<void>;
 }
@@ -428,19 +457,11 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         "exec", "-i", postgres!.getId(), "psql", "-U", "courtside", "-d", "courtside",
         "-v", "ON_ERROR_STOP=1", "-At"
       ], { stdio: ["pipe", "pipe", "pipe"] });
-      let output = "";
       let errors = "";
-      client.stdout.on("data", (chunk: Buffer) => { output += chunk.toString(); });
       client.stderr.on("data", (chunk: Buffer) => { errors += chunk.toString(); });
+      const lockReady = waitForProcessMarker(client, "COURTSIDE_LOCK_READY", () => errors);
       client.stdin.write(`BEGIN;\n${sql};\nSELECT 'COURTSIDE_LOCK_READY';\n`);
-      for (let attempt = 0; attempt < 100 && !output.includes("COURTSIDE_LOCK_READY"); attempt += 1) {
-        if (client.exitCode !== null) throw new Error(`Database lock client stopped: ${errors}`);
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-      if (!output.includes("COURTSIDE_LOCK_READY")) {
-        client.kill();
-        throw new Error(`Database lock was not acquired: ${errors}`);
-      }
+      await lockReady;
       let released = false;
       const lock: DatabaseLock = {
         waitForWaiters: async (count) => {
