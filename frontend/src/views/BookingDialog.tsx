@@ -14,11 +14,13 @@ export interface BookingSelection {
   courtId: string;
 }
 
-export function BookingDialog({ selection, grid, courts, allocations, closed, created, conflicted }: {
+export function BookingDialog({ selection, grid, courts, allocations, canChooseSeveralCourts,
+  closed, created, conflicted }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
   allocations: Allocation[];
+  canChooseSeveralCourts: boolean;
   closed: () => void;
   created: () => Promise<void>;
   conflicted: () => Promise<void>;
@@ -39,6 +41,7 @@ export function BookingDialog({ selection, grid, courts, allocations, closed, cr
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
+  const [showsMore, setShowsMore] = useState(false);
 
   useEffect(() => {
     void Promise.all([api.bookingCards(), api.participantCards()]).then(([cards, participants]) => {
@@ -97,6 +100,10 @@ export function BookingDialog({ selection, grid, courts, allocations, closed, cr
       if (failure instanceof ApiError && failure.problem) {
         const translated = translatedViolations(failure.problem, t);
         setViolations(translated);
+        // A refusal about a field nobody can see leaves a member with no way to answer it.
+        if (translated.some((violation) => BEHIND_THE_DISCLOSURE.includes(violation.field))) {
+          setShowsMore(true);
+        }
         setError(translated.length > 0
           ? problemReference(failure, t)
           : problemMessage(failure, t));
@@ -114,6 +121,11 @@ export function BookingDialog({ selection, grid, courts, allocations, closed, cr
   const durations = availableDurations(selection, grid, courtIds, allocations);
   const selectedDuration = durations.includes(durationMinutes) ? durationMinutes : durations[0] ?? grid.slotMinutes;
   const period = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration);
+  // The booker takes a slot too, which is what BookingWriter counts, so an empty dialog stands at one.
+  const chosenPlayers = 1 + selectedMembers.length
+    + guestNames.filter((name) => name.trim()).length
+    + participantCardIds.filter(Boolean).length;
+  const requiredPlayers = requiredFor(bookingCards.find((card) => card.id === cardId), chosenPlayers);
 
   return <Modal labelledBy="booking-heading" closed={closed}>
     <form data-testid="booking-dialog" onSubmit={(event) => void submit(event)} className="surface-panel flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
@@ -126,13 +138,16 @@ export function BookingDialog({ selection, grid, courts, allocations, closed, cr
           {durations.map((minutes) => <option key={minutes} value={minutes}>{t("booking.durationMinutes", { count: minutes })}</option>)}
         </select>
       </label>
-      <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
-        <legend className="font-semibold">{t("booking.courts")}</legend>
-        {courts.map((court) => <label key={court.id} className="flex gap-2">
-          <input data-testid={`booking-court-${court.id}`} type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => setCourtIds((current) => event.target.checked ? [...current, court.id] : current.filter((id) => id !== court.id))} />
-          {court.name || t("court.number", { number: court.number })}
-        </label>)}
-      </fieldset>
+      {canChooseSeveralCourts
+        ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
+          <legend className="font-semibold">{t("booking.courts")}</legend>
+          {courts.map((court) => <label key={court.id} className="flex gap-2">
+            <input data-testid={`booking-court-${court.id}`} type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => setCourtIds((current) => event.target.checked ? [...current, court.id] : current.filter((id) => id !== court.id))} />
+            {court.name || t("court.number", { number: court.number })}
+          </label>)}
+        </fieldset>
+        : <p data-testid="booking-court" className="mt-5 font-semibold">
+          {courtName(courts, selection.courtId, t)}</p>}
       <FieldViolations id="booking-courtIds-errors" violations={fieldViolations("courtIds")} />
       <label className="mt-4 grid gap-2 font-medium">{t("booking.card")}
         <select data-testid="booking-card" value={cardId} onChange={(event) => setCardId(event.target.value)} required aria-invalid={fieldViolations("cardId").length > 0} aria-describedby={describedBy("cardId")} className="form-control rounded-lg border px-3 py-3">
@@ -140,6 +155,9 @@ export function BookingDialog({ selection, grid, courts, allocations, closed, cr
         </select>
       </label>
       <FieldViolations id="booking-cardId-errors" violations={fieldViolations("cardId")} />
+      {requiredPlayers !== undefined && <p data-testid="booking-players" aria-live="polite" className="mt-2">
+        {t("booking.players", { players: chosenPlayers, required: requiredPlayers })}
+      </p>}
       <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.members")}</legend>
         <label className="grid gap-2 font-medium">{t("booking.memberSearch")}
@@ -158,6 +176,8 @@ export function BookingDialog({ selection, grid, courts, allocations, closed, cr
           <Button type="button" className="button-secondary px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMember", { name: member.displayName })}</Button>
         </div>)}
       </fieldset>
+      <details data-testid="booking-more" open={showsMore} onToggle={(event) => setShowsMore(event.currentTarget.open)} className="mt-4">
+      <summary data-testid="booking-more-summary" className="cursor-pointer font-semibold">{t("booking.more")}</summary>
       <fieldset data-testid="guest-participants" className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.guests")}</legend>
         {guestNames.map((guestName, index) => <label key={index} className="grid gap-2 font-medium">
@@ -182,6 +202,7 @@ export function BookingDialog({ selection, grid, courts, allocations, closed, cr
         <textarea value={note} onChange={(event) => setNote(event.target.value)} aria-invalid={fieldViolations("note").length > 0} aria-describedby={describedBy("note")} className="form-control rounded-lg border px-3 py-3" />
       </label>
       <FieldViolations id="booking-note-errors" violations={fieldViolations("note")} />
+      </details>
       <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
       {error && <Alert>{error}</Alert>}
       </div>
@@ -237,6 +258,20 @@ function translatedViolations(problem: Problem, t: ReturnType<typeof useTranslat
     }))
   ];
 }
+
+// An empty set of counts is how a card says it tracks no players at all, so there is nothing to meet.
+function requiredFor(card: PublicBookingCard | undefined, chosen: number): number | undefined {
+  const counts = [...(card?.allowedPlayerCounts ?? [])].sort((left, right) => left - right);
+  return counts.length === 0 ? undefined : counts.find((count) => count >= chosen) ?? counts.at(-1);
+}
+
+function courtName(courts: PublicCourt[], courtId: string, t: ReturnType<typeof useTranslation>["t"]): string {
+  const court = courts.find((candidate) => candidate.id === courtId);
+  if (!court) return "";
+  return court.name || t("court.number", { number: court.number });
+}
+
+const BEHIND_THE_DISCLOSURE = ["participants", "note"];
 
 function violationField(code: string): string {
   if (code.startsWith("booking.participants.")) return "participants";

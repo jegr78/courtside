@@ -629,7 +629,7 @@ it("given a second selected court becomes occupied, when choosing a duration, th
     showGenericOccupancy: false,
     participantCount: 2
   }] : []));
-  render(<WeekView today={clubInstant("07:00")} />);
+  render(<WeekView today={clubInstant("07:00")} canChooseSeveralCourts />);
   await userEvent.click(await findFreeSlot(1, "08:00"));
 
   // when
@@ -820,4 +820,105 @@ it("given another day is shown, when today is chosen again, then the current tim
 
   // then
   expect(scrollTo).toHaveBeenCalledTimes(1);
+});
+
+it("given a member who holds no other role, when the dialog opens, then the court is stated and cannot be multiplied", async () => {
+  // given
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // then — booking several courts at once is what an officer does; for a member it is a way to
+  // occupy the facility by accident
+  expect(await screen.findByTestId("booking-court")).toHaveTextContent("Centre Court");
+  expect(screen.queryByTestId(`booking-court-${courts[0].id}`)).not.toBeInTheDocument();
+});
+
+it("given somebody holding another role, when the dialog opens, then several courts can be chosen", async () => {
+  // given
+  render(<WeekView today={clubInstant("07:00")} canChooseSeveralCourts />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  await userEvent.click(await screen.findByTestId(`booking-court-${courts[1].id}`));
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  await waitFor(() => expect(api.createBooking).toHaveBeenCalledWith(expect.objectContaining({
+    courtIds: [courts[0].id, courts[1].id]
+  }), expect.any(String)));
+});
+
+it("given a card that allows two or four players, when adding one, then the requirement is shown as progress", async () => {
+  // given — the booker is a player too, so an empty dialog already stands at one
+  vi.mocked(api.participantMembers).mockResolvedValue([{
+    personId: "88888888-8888-8888-8888-888888888888", displayName: "Mary Major"
+  }]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  expect(await screen.findByTestId("booking-players")).toHaveTextContent("1 of 2");
+
+  // when
+  await userEvent.type(screen.getByTestId("member-search"), "Mary");
+  await userEvent.click(await screen.findByTestId("member-match"));
+
+  // then
+  expect(screen.getByTestId("booking-players")).toHaveTextContent("2 of 2");
+});
+
+it("given a card that counts no players, when the dialog opens, then no requirement is shown", async () => {
+  // given
+  vi.mocked(api.bookingCards).mockResolvedValue([{
+    id: "55555555-5555-5555-5555-555555555555",
+    label: "Closure",
+    color: "#b85c38",
+    allowedPlayerCounts: [],
+    guestAllowed: false
+  }]);
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // then
+  await screen.findByTestId("booking-dialog");
+  expect(screen.queryByTestId("booking-players")).not.toBeInTheDocument();
+});
+
+it("given the dialog opens, then the common case is visible and the rest sits behind a disclosure", async () => {
+  // given
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // then
+  expect(await screen.findByTestId("booking-duration")).toBeVisible();
+  expect(screen.getByTestId("member-search")).toBeVisible();
+  expect(screen.getByTestId("guest-name")).not.toBeVisible();
+
+  // and it opens on request
+  await userEvent.click(screen.getByTestId("booking-more-summary"));
+  expect(screen.getByTestId("guest-name")).toBeVisible();
+});
+
+it("given a refusal about a field behind the disclosure, when it arrives, then the disclosure is open", async () => {
+  // given — a member who cannot see why the booking was refused is worse off than before
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(422, {
+    type: "urn:courtside:error:participants-invalid",
+    title: "Participants invalid",
+    status: 422,
+    violations: [{ code: "booking.participants.duplicate", params: {} }]
+  }));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  await screen.findByTestId("booking-dialog");
+  expect(screen.getByTestId("guest-name")).not.toBeVisible();
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("guest-name")).toBeVisible());
 });

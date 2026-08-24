@@ -7,7 +7,7 @@ export function Modal({ labelledBy, closed, children }: { labelledBy: string; cl
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    dialog.current?.querySelector<HTMLElement>(focusableSelector())?.focus();
+    reachableControls(dialog.current)[0]?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
@@ -21,16 +21,16 @@ export function Modal({ labelledBy, closed, children }: { labelledBy: string; cl
       return;
     }
     if (event.key !== "Tab") return;
-    const focusable = Array.from(dialog.current?.querySelectorAll<HTMLElement>(focusableSelector()) ?? []);
+    const focusable = reachableControls(dialog.current);
     if (focusable.length === 0) return;
     const current = focusable.indexOf(document.activeElement as HTMLElement);
     const next = event.shiftKey
       ? (current <= 0 ? focusable.length - 1 : current - 1)
       : (current === focusable.length - 1 ? 0 : current + 1);
-    if (current === -1 || next !== current + (event.shiftKey ? -1 : 1)) {
-      event.preventDefault();
-      focusable[next].focus();
-    }
+    // The trap drives every step rather than deferring to the browser for the ordinary ones:
+    // sharing the job is what let a control the browser skips become a dead end.
+    event.preventDefault();
+    focusable[next].focus();
   }
 
   return <div
@@ -44,6 +44,16 @@ export function Modal({ labelledBy, closed, children }: { labelledBy: string; cl
   </div>;
 }
 
+// A control inside a collapsed disclosure is in the document and refuses focus, so a trap that
+// counts it lands on nothing and every further Tab repeats that. Only its summary is reachable.
+function reachableControls(dialog: HTMLElement | null): HTMLElement[] {
+  return Array.from(dialog?.querySelectorAll<HTMLElement>(focusableSelector()) ?? [])
+    .filter((control) => {
+      const collapsed = control.closest("details:not([open])");
+      return !collapsed || control === collapsed.querySelector("summary");
+    });
+}
+
 function focusableSelector(): string {
-  return "button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])";
+  return "button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex='-1'])";
 }
