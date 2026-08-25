@@ -17,8 +17,7 @@ import java.util.Set;
 @SpringBootTest
 @ActiveProfiles("test")
 @Import({TestcontainersConfiguration.class, FixedClockConfiguration.class,
-        QuietMailConfiguration.class, SqlCountingConfiguration.class,
-        PausedSchedulingConfiguration.class})
+        QuietMailConfiguration.class, SqlCountingConfiguration.class})
 public abstract class AbstractIntegrationTest {
 
     private static final String BASELINE_SCHEMA = "test_baseline";
