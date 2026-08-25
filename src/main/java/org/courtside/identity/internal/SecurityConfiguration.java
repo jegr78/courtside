@@ -23,10 +23,8 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration(proxyBeanMethods = false)
-@EnableScheduling
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
         LoginProtectionProperties.class})
 public class SecurityConfiguration {

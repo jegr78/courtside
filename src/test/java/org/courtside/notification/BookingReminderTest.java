@@ -18,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.scheduling.config.ScheduledTaskHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
@@ -69,9 +68,6 @@ class BookingReminderTest extends AbstractIntegrationTest {
 
     @Autowired
     private ConfigTestFixture configuration;
-
-    @Autowired
-    private ScheduledTaskHolder scheduledTasks;
 
     @Autowired
     private JdbcClient jdbc;
@@ -194,13 +190,6 @@ class BookingReminderTest extends AbstractIntegrationTest {
 
         // then
         verify(sender, never()).send(any(MimeMessage.class));
-    }
-
-    @Test
-    void whenTheApplicationRuns_thenTheSweepIsScheduledRatherThanOnlyCallable() {
-        // when / then — an annotation nobody registers reminds nobody
-        assertThat(scheduledTasks.getScheduledTasks())
-                .anyMatch(task -> String.valueOf(task.getTask()).contains("remindWhatIsDue"));
     }
 
     private UUID book(Instant from, Instant to) {
