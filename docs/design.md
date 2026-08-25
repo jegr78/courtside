@@ -127,6 +127,11 @@ cannot reach from a browser is listed with the endpoints that have no surface, i
 `tools/surfaceless-endpoints.json`; every entry left in it now names a
 decision rather than a gap.
 
+A booking now writes to the member who made it: the confirmation carries the day, the period, every
+court it holds and the kind of booking, in the account's own language, and it is recorded in the
+same message log as a credential. A series stays one decision and gets no message per occurrence.
+Of section 6's table, that is the row that is built; the rest are designed.
+
 Designed and not built: observability alerts and the reference collector stack of section 9,
 container image scanning, reports and exports, and the self-service password reset of section 4 — a
 board member has the instance send new credentials through the roster instead.
@@ -839,6 +844,13 @@ All templates are i18n message bundles and editable per instance:
 
 Per-notification opt-out where legally permissible; transactional messages about one's own
 bookings are not opt-out.
+
+**Built:** the booking confirmation to the booking member. It is sent after the booking's own
+transaction commits, so a message never describes a court nobody holds, and a booking is never
+refused because a message could not go out — an account whose address is empty is logged by its id
+and nothing is sent. The event that carries it names the booking and nothing else; what the message
+says about it is read when the message is written, so neither the audit trail nor the message log
+learns where anybody plays.
 
 ---
 

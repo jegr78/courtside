@@ -19,12 +19,12 @@ class NotificationConfiguration {
     // Handing a message over waits for the relay, and the shared executor also carries the audit
     // trail and every other module's listeners, which must not queue behind a mail server.
     @Bean
-    @ConditionalOnMissingBean(name = "credentialMailExecutor")
-    TaskExecutor credentialMailExecutor() {
+    @ConditionalOnMissingBean(name = "outboundMailExecutor")
+    TaskExecutor outboundMailExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
         executor.setMaxPoolSize(4);
-        executor.setThreadNamePrefix("credential-mail-");
+        executor.setThreadNamePrefix("outbound-mail-");
         executor.initialize();
         return executor;
     }

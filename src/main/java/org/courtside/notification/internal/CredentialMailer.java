@@ -39,7 +39,7 @@ class CredentialMailer {
     private final MessageLog messages;
     private final Clock clock;
 
-    @Async("credentialMailExecutor")
+    @Async("outboundMailExecutor")
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener
     void on(CredentialsRequested requested) {

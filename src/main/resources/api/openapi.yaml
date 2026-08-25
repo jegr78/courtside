@@ -1728,7 +1728,7 @@ components:
       description: |
         What a message was. The client resolves its label from this; the value is the message's own
         name, not the reason another part of the instance had for asking.
-      enum: [CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET]
+      enum: [CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, BOOKING_CONFIRMED]
 
     MessageState:
       type: string

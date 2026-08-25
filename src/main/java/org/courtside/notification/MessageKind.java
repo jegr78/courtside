@@ -5,7 +5,8 @@ package org.courtside.notification;
 public enum MessageKind {
 
     CREDENTIALS_NEW_ACCOUNT("credentials.newAccount"),
-    CREDENTIALS_PASSWORD_RESET("credentials.passwordReset");
+    CREDENTIALS_PASSWORD_RESET("credentials.passwordReset"),
+    BOOKING_CONFIRMED("booking.confirmed");
 
     private final String templateKey;
 

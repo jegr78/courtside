@@ -161,6 +161,33 @@ test("a member drags across the grid and the dialog opens on the period they dre
     await expect(page.getByTestId("booking-period")).toContainText("3:30");
   });
 
+test("a member who books a court is written to, so the booking outlives the dialog",
+  async ({ page, journeyService }) => {
+    // given
+    await page.goto("/login");
+    await page.getByTestId("username").fill("doe.jane");
+    await page.getByTestId("password").fill("temporary-password");
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("court-plan-view")).toBeVisible();
+    await selectJourneyDate(page, journeyService.visualDate);
+    const targetSlot = freeSlot(page, 3, "16:00");
+    await expect(targetSlot).toBeVisible();
+
+    // when
+    await targetSlot.click();
+    await page.getByTestId("member-search").fill("Mary");
+    await page.getByTestId("member-match").click();
+    await page.getByTestId("booking-submit").click();
+    await expect(page.getByTestId("own-allocation")).toBeVisible();
+
+    // then — the account is English, so the message is, and it carries the whole booking
+    const confirmation = await messageTo(journeyService.mailboxURL, "jane.doe@example.org");
+    expect(confirmation.Text).toContain("16:00");
+    expect(confirmation.Text).toContain("16:30");
+    expect(confirmation.Text).toContain("Court 3");
+    expect(confirmation.Text).toContain("Member booking");
+  });
+
 test("a seeded member can book a free slot and cancel it again", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");
@@ -437,12 +464,14 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await page.goto(`/admin/roster/${personId}`);
   await expect(page.getByTestId("credential-state"))
     .toHaveAttribute("data-state", "PASSWORD_CHOSEN");
+  const sentSoFar = (await messagesTo(journeyService.mailboxURL, "mary.roe@example.org")).length;
   await page.getByTestId("send-credentials").click();
   await page.getByTestId("cancel-send-credentials").click();
 
   // then — dismissing asks nothing of the instance, so the member keeps what they chose
   await expect(page.getByTestId("confirm-send-credentials")).toHaveCount(0);
-  expect(await messagesTo(journeyService.mailboxURL, "mary.roe@example.org")).toHaveLength(1);
+  expect(await messagesTo(journeyService.mailboxURL, "mary.roe@example.org"))
+    .toHaveLength(sentSoFar);
 
   // when
   await page.getByTestId("send-credentials").click();
@@ -451,5 +480,5 @@ test("an admin adds a person, gives them an account, and that person signs in an
   // then
   await expect
     .poll(async () => (await messagesTo(journeyService.mailboxURL, "mary.roe@example.org")).length)
-    .toBe(2);
+    .toBe(sentSoFar + 1);
 });
