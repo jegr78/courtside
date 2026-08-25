@@ -6,7 +6,9 @@ public enum MessageKind {
 
     CREDENTIALS_NEW_ACCOUNT("credentials.newAccount"),
     CREDENTIALS_PASSWORD_RESET("credentials.passwordReset"),
-    BOOKING_CONFIRMED("booking.confirmed");
+    BOOKING_CONFIRMED("booking.confirmed"),
+    BOOKING_PLAYER_RECORDED("booking.playerRecorded"),
+    BOOKING_PLAYER_WITHDREW("booking.playerWithdrew");
 
     private final String templateKey;
 

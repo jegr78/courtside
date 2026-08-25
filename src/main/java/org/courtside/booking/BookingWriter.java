@@ -18,6 +18,7 @@ import org.courtside.config.BookingGridCoordination;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.shared.BookingConfirmed;
+import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.TimeSlot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -92,8 +93,17 @@ class BookingWriter {
         // A series is one decision and gets one message of its own, not one per occurrence.
         if (command.seriesId() == null) {
             events.publishEvent(new BookingConfirmed(booking.getId()));
+            announceRecordedMembers(booking.getId(), command);
         }
         return booking.getId();
+    }
+
+    private void announceRecordedMembers(UUID bookingId, CreateBookingCommand command) {
+        command.participants().stream()
+                .filter(slot -> slot.kind() == ParticipantKind.MEMBER)
+                .map(ParticipantSpec::personId)
+                .forEach(personId ->
+                        events.publishEvent(new ParticipantRecorded(bookingId, personId)));
     }
 
     void cancel(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {

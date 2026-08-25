@@ -166,7 +166,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         </label>
         {memberMatches.length > 0 && <ul className="grid gap-2">
           {memberMatches.map((member) => <li key={member.personId}>
-            <Button type="button" data-testid="member-match" className="button-secondary w-full text-left" onClick={() => {
+            <Button type="button" data-testid="member-match" data-person-id={member.personId} className="button-secondary w-full text-left" onClick={() => {
               setSelectedMembers((current) => [...current, member]);
               setMemberQuery("");
             }}>{t("booking.addMember", { name: member.displayName })}</Button>
