@@ -67,18 +67,21 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnAddressThatIsBlocked_whenItTriesAgain_thenTheRefusalNamesTheLimitThatHolds()
+    void givenRepeatedFailures_whenTheLimitCloses_thenOneLineNamesItAndTheAttemptsAgainstItAddNone()
             throws Exception {
         // given
         failLogin("first", "192.0.2.60");
         failLogin("second", "192.0.2.60");
 
-        // when
-        mockMvc.perform(login("third", "wrong", "192.0.2.60"))
-                .andExpect(status().isTooManyRequests());
+        // when — the attempts a blocked caller can make are bounded by nothing, so the log a
+        // refusal writes cannot be per attempt
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(login("third", "wrong", "192.0.2.60"))
+                    .andExpect(status().isTooManyRequests());
+        }
 
-        // then — which limit holds decides whether one client or the whole instance is affected
-        assertThat(blockMessages()).anySatisfy(message -> assertThat(message)
+        // then — which limit closed decides whether one client or the whole instance is affected
+        assertThat(blockMessages()).singleElement().satisfies(message -> assertThat(message)
                 .contains("ADDRESS")
                 .doesNotContain("192.0.2.60"));
     }
@@ -88,7 +91,8 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
     }
 
     private static Logger blockLog() {
-        return (Logger) LoggerFactory.getLogger("org.courtside.identity.internal.LoginAttemptFilter");
+        return (Logger) LoggerFactory.getLogger(
+                "org.courtside.identity.internal.LoginAttemptProtection");
     }
 
     @Test

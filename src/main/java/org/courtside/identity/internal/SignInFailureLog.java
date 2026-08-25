@@ -23,6 +23,7 @@ class SignInFailureLog {
 
     @EventListener
     void on(AbstractAuthenticationFailureEvent event) {
+        // Observing a refusal must not turn it into a different answer than the one it earned.
         accountOf(event)
                 .ifPresentOrElse(id -> log.info("A sign-in was refused as {} for account {}",
                                 reasonOf(event), id),
@@ -31,9 +32,14 @@ class SignInFailureLog {
     }
 
     private Optional<UUID> accountOf(AbstractAuthenticationFailureEvent event) {
-        return Optional.ofNullable(event.getAuthentication().getName())
-                .flatMap(accounts::findByUsername)
-                .map(account -> account.getId());
+        try {
+            return Optional.ofNullable(event.getAuthentication().getName())
+                    .flatMap(accounts::findByUsername)
+                    .map(account -> account.getId());
+        } catch (RuntimeException e) {
+            log.warn("A refused sign-in could not be attributed to an account", e);
+            return Optional.empty();
+        }
     }
 
     private static String reasonOf(AbstractAuthenticationFailureEvent event) {

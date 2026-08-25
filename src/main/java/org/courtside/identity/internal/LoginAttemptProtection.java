@@ -1,6 +1,7 @@
 package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 class LoginAttemptProtection {
@@ -104,6 +106,11 @@ class LoginAttemptProtection {
         int attempts = windowExpired ? 1 : current.attemptCount() + 1;
         Instant windowStartedAt = windowExpired ? now : current.windowStartedAt();
         Instant blockedUntil = attempts >= limit.maxFailures() ? now.plus(limit.block()) : null;
+        if (blockedUntil != null && (current == null || current.blockedUntil() == null
+                || !current.blockedUntil().isAfter(now))) {
+            log.info("The {} limit now refuses sign-ins for {} seconds", scope,
+                    limit.block().toSeconds());
+        }
 
         jdbc.sql("""
                         INSERT INTO login_attempt_limit

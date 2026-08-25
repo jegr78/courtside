@@ -424,4 +424,21 @@ describe("browser diagnostics", () => {
     // then
     expect(diagnostics.failedTest?.errors[0]).toBe("expected visible");
   });
+
+  it("given a coloured test title, when it is retained, then it reads as text like the errors do", async () => {
+    // given
+    const command: DockerDiagnosticCommand = () => Promise.resolve("{}");
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("container-1", "webkit", "product-failure",
+      command, 5_000, {
+        failedTest: {
+          title: "\u001b[31man installed PWA\u001b[39m", projectName: "webkit-pwa",
+          status: "failed", errors: []
+        }
+      });
+
+    // then
+    expect(diagnostics.failedTest?.title).toBe("an installed PWA");
+  });
 });

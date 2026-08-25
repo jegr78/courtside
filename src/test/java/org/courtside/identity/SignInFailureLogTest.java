@@ -10,7 +10,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -23,7 +26,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.courtside.identity.AccountFixtures.enabled;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class SignInFailureLogTest extends AbstractIntegrationTest {
 
@@ -37,7 +44,7 @@ class SignInFailureLogTest extends AbstractIntegrationTest {
     @Autowired
     private PersonRepository persons;
 
-    @Autowired
+    @MockitoSpyBean
     private UserAccountRepository accounts;
 
     @Autowired
@@ -106,6 +113,18 @@ class SignInFailureLogTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheAccountLookupFails_whenASignInIsRefused_thenTheRefusalStillAnswersAsARefusal()
+            throws Exception {
+        // given — a logger that only observes must not decide what the caller is answered
+        doThrow(new DataAccessResourceFailureException("no connection"))
+                .when(accounts).findByUsername(USERNAME);
+
+        // when / then
+        attempt(USERNAME, "battery-staple").andExpect(status().isUnauthorized());
+        verify(accounts, atLeastOnce()).findByUsername(USERNAME);
+    }
+
+    @Test
     void whenASignInIsRefused_thenNothingInTheLogNamesThePersonOrTheirAddress() throws Exception {
         // when
         attempt(USERNAME, "battery-staple");
@@ -118,8 +137,8 @@ class SignInFailureLogTest extends AbstractIntegrationTest {
                 .doesNotContain("Doe"));
     }
 
-    private void attempt(String username, String password) throws Exception {
-        mockMvc.perform(post("/api/session")
+    private ResultActions attempt(String username, String password) throws Exception {
+        return mockMvc.perform(post("/api/session")
                 .param("username", username)
                 .param("password", password)
                 .with(csrf()));

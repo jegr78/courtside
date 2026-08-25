@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         })
 @ActiveProfiles({"test", "demo"})
 @Import({TestcontainersConfiguration.class, FixedClockConfiguration.class, BookingTestFixture.class,
-        FacilityTestFixture.class})
+        FacilityTestFixture.class, PausedSchedulingConfiguration.class})
 class DemoDataSeederTest {
 
     @Autowired

@@ -54,7 +54,7 @@ class SessionCleanupTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenASessionPastItsExpiry_whenTheCleanupRuns_thenItIsRemovedWithoutAnybodyAskingTo() {
+    void givenASessionPastItsExpiry_whenTheCleanupRuns_thenItGoesWhileALiveOneStays() {
         // given
         String expired = storedSession(Duration.ofDays(-1));
         String live = storedSession(Duration.ofDays(1));

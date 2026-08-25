@@ -196,7 +196,9 @@ export async function collectBrowserDiagnostics(containerId: string, browserName
     browserName,
     reason,
     failedTest: context.failedTest === undefined ? undefined : {
-      ...context.failedTest,
+      title: plainText(context.failedTest.title),
+      projectName: plainText(context.failedTest.projectName),
+      status: plainText(context.failedTest.status),
       errors: context.failedTest.errors.map((error) => safeLogs(plainText(error)))
     },
     recordedAt: new Date().toISOString(),
