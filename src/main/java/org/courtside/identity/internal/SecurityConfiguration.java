@@ -146,7 +146,9 @@ public class SecurityConfiguration {
 
     static CookieCsrfTokenRepository csrfTokenRepository(boolean secureCookies) {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        repository.setCookieCustomizer(cookie -> cookie.secure(secureCookies));
+        repository.setCookieCustomizer(cookie -> cookie
+                .secure(secureCookies)
+                .sameSite("Lax"));
         return repository;
     }
 

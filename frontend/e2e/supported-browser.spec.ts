@@ -1,6 +1,17 @@
 import { expect, selectJourneyDate, test } from "./fixtures";
 
 async function signIn(page: import("@playwright/test").Page, username: string) {
+  const cookieHeaders: string[] = [];
+  const pendingHeaders = new Set<Promise<void>>();
+  const collectCookieHeaders = (response: import("@playwright/test").Response) => {
+    const pending = response.headersArray().then((headers) => {
+      cookieHeaders.push(...headers
+        .filter((header) => header.name.toLowerCase() === "set-cookie")
+        .map((header) => header.value));
+    }).finally(() => pendingHeaders.delete(pending));
+    pendingHeaders.add(pending);
+  };
+  page.on("response", collectCookieHeaders);
   await page.goto("/login");
   await page.getByTestId("username").fill(username);
   await page.getByTestId("password").fill("temporary-password");
@@ -15,7 +26,13 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
     await expect(page.getByTestId("court-plan-legend")).toBeVisible();
   } finally {
     allocationResponses.cancel();
+    page.off("response", collectCookieHeaders);
+    await Promise.all(pendingHeaders);
   }
+  expect(cookieHeaders).toEqual(expect.arrayContaining([
+    expect.stringMatching(/^SESSION=.*; Path=\/; HttpOnly; SameSite=Lax$/),
+    expect.stringMatching(/^XSRF-TOKEN=.*; Path=\/; SameSite=Lax$/)
+  ]));
 }
 
 function allocationResponseWaiter(page: import("@playwright/test").Page, count: number) {
