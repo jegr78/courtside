@@ -52,6 +52,8 @@ jobs:
           -DnewVersion="$VERSION" -DgenerateBackupPoms=false
 
       - name: Build and test
+        env:
+          COURTSIDE_WEBKIT_AXE: 'true'
         run: ./mvnw -B verify
 
       - name: Extract the layers

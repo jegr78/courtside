@@ -1,4 +1,4 @@
-import type { FullResult, Reporter, TestCase, TestResult } from "@playwright/test/reporter";
+import type { FullResult, Reporter, TestCase, TestError, TestResult } from "@playwright/test/reporter";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { classifyBrowserFailure } from "./browser-diagnostics";
@@ -21,9 +21,18 @@ interface BrowserGateOutcome {
   claims: GateClaim[];
 }
 
-function claimStatus(results: GateResult[], projectName: string): { product: ClaimStatus; harnessIncomplete: boolean } {
+interface BrowserGateOptions {
+  webkitAxeRequired?: boolean;
+  globalErrors?: ReadonlyArray<TestError>;
+}
+
+function claimStatus(results: GateResult[], projectName: string, required: boolean): { product: ClaimStatus; harnessIncomplete: boolean } {
   const projectResults = results.filter((result) => result.projectName === projectName);
-  if (projectResults.length === 0) return { product: "not-run", harnessIncomplete: false };
+  if (projectResults.length === 0) {
+    return required
+      ? { product: "not-established", harnessIncomplete: true }
+      : { product: "not-run", harnessIncomplete: false };
+  }
   const failures = projectResults.filter((result) => result.status !== "passed");
   if (failures.length === 0) return { product: "passed", harnessIncomplete: false };
   const classifications = failures.flatMap((result) => result.errors.length === 0
@@ -35,10 +44,18 @@ function claimStatus(results: GateResult[], projectName: string): { product: Cla
   return { product: "failed", harnessIncomplete: false };
 }
 
-export function browserGateOutcome(results: GateResult[], runStatus: FullResult["status"] = "passed"): BrowserGateOutcome {
-  const accessibility = claimStatus(results, "chromium-accessibility");
-  const webkit = claimStatus(results, "webkit-core");
-  const webkitAxe = claimStatus(results, "webkit-accessibility");
+export function browserGateOutcome(results: GateResult[], runStatus: FullResult["status"] = "passed",
+  options: BrowserGateOptions = {}): BrowserGateOutcome {
+  const accessibility = claimStatus(results, "chromium-accessibility", true);
+  const webkit = claimStatus(results, "webkit-core", true);
+  const webkitAxe = claimStatus(results, "webkit-accessibility", options.webkitAxeRequired === true);
+  const claimProjects = new Set(["chromium-accessibility", "webkit-core", "webkit-accessibility"]);
+  const hasUntrackedFailure = results.some((result) => !claimProjects.has(result.projectName) && result.status !== "passed");
+  const hasGlobalFailure = (options.globalErrors?.length ?? 0) > 0;
+  const hasClaimProductFailure = [accessibility, webkit, webkitAxe].some((claim) => claim.product === "failed");
+  const unexplainedRunFailure = runStatus !== "passed" && (runStatus !== "failed" || !hasClaimProductFailure);
+  const harnessIncomplete = accessibility.harnessIncomplete || webkit.harnessIncomplete || webkitAxe.harnessIncomplete
+    || hasUntrackedFailure || hasGlobalFailure || unexplainedRunFailure;
   return {
     schemaVersion: 1,
     claims: [
@@ -47,10 +64,7 @@ export function browserGateOutcome(results: GateResult[], runStatus: FullResult[
       { id: "webkit-axe-qualification", status: webkitAxe.product },
       {
         id: "browser-harness",
-        status: runStatus !== "passed" && results.length === 0 ? "incomplete"
-          : results.length === 0 ? "not-run"
-          : accessibility.harnessIncomplete || webkit.harnessIncomplete || webkitAxe.harnessIncomplete
-            ? "incomplete" : "passed"
+        status: harnessIncomplete ? "incomplete" : "passed"
       }
     ]
   };
@@ -58,6 +72,7 @@ export function browserGateOutcome(results: GateResult[], runStatus: FullResult[
 
 export default class BrowserGateReporter implements Reporter {
   private readonly results: GateResult[] = [];
+  private readonly globalErrors: TestError[] = [];
 
   onTestEnd(test: TestCase, result: TestResult): void {
     this.results.push({
@@ -67,10 +82,17 @@ export default class BrowserGateReporter implements Reporter {
     });
   }
 
+  onError(error: TestError): void {
+    this.globalErrors.push(error);
+  }
+
   onEnd(result: FullResult): void {
     const directory = resolve("test-results");
     mkdirSync(directory, { recursive: true });
-    const outcome = browserGateOutcome(this.results, result.status);
+    const outcome = browserGateOutcome(this.results, result.status, {
+      webkitAxeRequired: process.env.COURTSIDE_WEBKIT_AXE === "true",
+      globalErrors: this.globalErrors
+    });
     writeFileSync(resolve(directory, "browser-gate-outcome.json"),
       `${JSON.stringify(outcome, null, 2)}\n`, { mode: 0o600 });
     for (const claim of outcome.claims) process.stdout.write(`Browser gate ${claim.id}: ${claim.status}\n`);

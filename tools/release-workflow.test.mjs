@@ -20,6 +20,11 @@ test("given a release image, when publishing it, then the same digest is qualifi
   assert.match(workflow, /\n  publish:\n    needs: \[build, image, qualify, security-record, upgrade, restore\]/);
 });
 
+test("given a release build, when browser tests run, then WebKit axe qualification is required", () => {
+  // when / then
+  assert.match(workflow, /- name: Build and test\n        env:\n          COURTSIDE_WEBKIT_AXE: 'true'\n        run: \.\/mvnw -B verify/);
+});
+
 test("given a candidate image, when qualifying it, then deployment and vulnerability failures block publication", () => {
   // when / then
   assert.match(workflow, /docker compose[\s\S]+config --quiet/);

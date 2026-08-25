@@ -32,13 +32,40 @@ describe("browser gate reporter", () => {
     expect(outcome.claims).toContainEqual({ id: "webkit-axe-qualification", status: "not-run" });
   });
 
+  it("given a required project did not run, when reporting the run, then the harness is incomplete", () => {
+    // given
+    const results = [{ projectName: "chromium-accessibility", status: "passed", errors: [] }];
+
+    // when
+    const outcome = browserGateOutcome(results);
+
+    // then
+    expect(outcome.claims).toContainEqual({ id: "webkit-core-compatibility", status: "not-established" });
+    expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "incomplete" });
+  });
+
+  it("given WebKit axe qualification is requested but absent, when reporting the run, then the harness is incomplete", () => {
+    // given
+    const results = [
+      { projectName: "chromium-accessibility", status: "passed", errors: [] },
+      { projectName: "webkit-core", status: "passed", errors: [] }
+    ];
+
+    // when
+    const outcome = browserGateOutcome(results, "passed", { webkitAxeRequired: true });
+
+    // then
+    expect(outcome.claims).toContainEqual({ id: "webkit-axe-qualification", status: "not-established" });
+    expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "incomplete" });
+  });
+
   it("given a WebKit assertion fails, when reporting the run, then compatibility fails as a product claim", () => {
     // given
     const results = [{
       projectName: "webkit-core",
       status: "failed",
       errors: [{ message: "Error: expect(locator).toBeVisible() failed" }]
-    }];
+    }, { projectName: "chromium-accessibility", status: "passed", errors: [] }];
 
     // when
     const outcome = browserGateOutcome(results);
@@ -83,6 +110,50 @@ describe("browser gate reporter", () => {
     const outcome = browserGateOutcome(results, "failed");
 
     // then
+    expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "incomplete" });
+  });
+
+  it("given an unrelated project fails, when reporting the run, then the harness is incomplete", () => {
+    // given
+    const results = [
+      { projectName: "chromium-accessibility", status: "passed", errors: [] },
+      { projectName: "webkit-core", status: "passed", errors: [] },
+      { projectName: "visual", status: "failed", errors: [{ message: "Error: expect(page).toHaveScreenshot() failed" }] }
+    ];
+
+    // when
+    const outcome = browserGateOutcome(results, "failed");
+
+    // then
+    expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "incomplete" });
+  });
+
+  it("given global teardown fails, when reporting the run, then the harness is incomplete", () => {
+    // given
+    const results = [
+      { projectName: "chromium-accessibility", status: "passed", errors: [] },
+      { projectName: "webkit-core", status: "passed", errors: [] }
+    ];
+
+    // when
+    const outcome = browserGateOutcome(results, "failed", { globalErrors: [{ message: "teardown failed" }] });
+
+    // then
+    expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "incomplete" });
+  });
+
+  it("given the run is interrupted after a product failure, when reporting the run, then the harness is incomplete", () => {
+    // given
+    const results = [
+      { projectName: "chromium-accessibility", status: "passed", errors: [] },
+      { projectName: "webkit-core", status: "failed", errors: [{ message: "Error: expect(locator).toBeVisible() failed" }] }
+    ];
+
+    // when
+    const outcome = browserGateOutcome(results, "interrupted");
+
+    // then
+    expect(outcome.claims).toContainEqual({ id: "webkit-core-compatibility", status: "failed" });
     expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "incomplete" });
   });
 

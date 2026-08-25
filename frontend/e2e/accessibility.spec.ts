@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, selectJourneyDate, test } from "./fixtures";
+import { productFailure } from "./browser-diagnostics";
 
 async function expectNoWcagViolations(page: import("@playwright/test").Page) {
   const results = await new AxeBuilder({ page })
@@ -21,7 +22,7 @@ async function tabToTestId(page: import("@playwright/test").Page, testId: string
     if (await page.evaluate((value) => document.activeElement?.getAttribute("data-testid") === value, testId)) return;
     await page.keyboard.press(key);
   }
-  throw new Error(`Keyboard focus did not reach ${testId}`);
+  throw productFailure(`Keyboard focus did not reach ${testId}`);
 }
 
 for (const locale of ["de", "en"]) {

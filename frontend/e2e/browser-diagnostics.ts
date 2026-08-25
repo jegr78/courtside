@@ -63,7 +63,13 @@ interface FailureState {
 interface BrowserTestOutcome extends FailureState {
   status?: string;
   expectedStatus: string;
-  errors: ReadonlyArray<{ message?: string }>;
+  errors: ReadonlyArray<BrowserError>;
+}
+
+interface BrowserError {
+  message?: string;
+  cause?: BrowserError;
+  value?: string;
 }
 
 interface DiagnosticContext {
@@ -78,15 +84,22 @@ interface DisconnectSource {
   removeListener(event: "disconnected", listener: () => void): unknown;
 }
 
-export function classifyBrowserFailure(errors: ReadonlyArray<{ message?: string }>, state: FailureState): BrowserFailureReason {
+export function classifyBrowserFailure(errors: ReadonlyArray<BrowserError>, state: FailureState): BrowserFailureReason {
   if (!state.browserConnected) return "browser-disconnected";
   if (state.pageCrashed) return "page-crashed";
   const messages = errors.map(({ message }) => message ?? "").join("\n");
   if (/WebKit encountered an internal error/i.test(messages)) return "browser-internal-error";
   if (/Target page, context or browser has been closed/i.test(messages)) return "target-lost";
   if (state.timedOut || /Test timeout of \d+ms exceeded/i.test(messages)) return "test-timeout";
+  if (errors.some(({ cause }) => cause?.message === "courtside-product-failure" || cause?.value === "courtside-product-failure")) {
+    return "product-failure";
+  }
   if (/(?:Error:\s*)?expect\([^\n]*\)\.(?:to|not\.)|expect\([^\n]*\) failed/i.test(messages)) return "product-failure";
   return "harness-incomplete";
+}
+
+export function productFailure(message: string): Error {
+  return new Error(message, { cause: new Error("courtside-product-failure") });
 }
 
 export async function diagnoseUnexpectedBrowserTest(outcome: BrowserTestOutcome,
