@@ -186,7 +186,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 current.logoUrl(), current.imprintUrl(), locale,
                 new BookingSlotDuration(minutes), timeZone,
                 new CredentialLifetime(current.newAccountCredentialHours()),
-                new CredentialLifetime(current.passwordResetCredentialHours()),
+                new CredentialLifetime(current.passwordResetCredentialHours()), new ReminderLeadTime(24),
                 noMembershipTypeRuleSetId);
     }
 }

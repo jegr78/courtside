@@ -2,6 +2,7 @@ package org.courtside.config.internal;
 
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
+import org.courtside.config.ReminderLeadTime;
 
 import java.util.UUID;
 
@@ -16,6 +17,7 @@ public record ChangeClubConfigurationCommand(
         String timeZone,
         CredentialLifetime newAccountCredential,
         CredentialLifetime passwordResetCredential,
+        ReminderLeadTime bookingReminder,
         UUID noMembershipTypeRuleSetId) {
 
     // A logo, an imprint and the rule set for people holding no membership type are what a club may
@@ -29,6 +31,7 @@ public record ChangeClubConfigurationCommand(
         requirePresent(timeZone, "timeZone");
         requirePresent(newAccountCredential, "newAccountCredential");
         requirePresent(passwordResetCredential, "passwordResetCredential");
+        requirePresent(bookingReminder, "bookingReminder");
     }
 
     private static void requirePresent(Object value, String field) {

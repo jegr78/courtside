@@ -1448,7 +1448,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         return """
                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d", "accentColor": "#c8a415",
                  "defaultLocale": "en", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24}
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
                 """;
     }
 

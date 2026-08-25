@@ -19,7 +19,8 @@ describe("AdminConfigurationView", () => {
       slotMinutes: 30,
       timeZone: "Europe/Berlin",
       newAccountCredentialHours: 168,
-      passwordResetCredentialHours: 24
+      passwordResetCredentialHours: 24,
+      bookingReminderHours: 24
     });
     vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
     vi.spyOn(api, "ruleTypes").mockResolvedValue([
@@ -59,6 +60,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      bookingReminderHours: 24,
       noMembershipTypeRuleSetId: "rule-set"
     });
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
@@ -83,6 +85,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      bookingReminderHours: 24,
       noMembershipTypeRuleSetId: "retired"
     });
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
@@ -243,7 +246,8 @@ describe("AdminConfigurationView", () => {
       slotMinutes: 15,
       timeZone: "Pacific/Auckland",
       newAccountCredentialHours: 168,
-      passwordResetCredentialHours: 24
+      passwordResetCredentialHours: 24,
+      bookingReminderHours: 24
     });
     const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
       ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
@@ -262,6 +266,7 @@ describe("AdminConfigurationView", () => {
     fireEvent.change(screen.getByTestId("club-name"), { target: { value: "Example Racquet Club" } });
     fireEvent.change(screen.getByTestId("slot-minutes"), { target: { value: "15" } });
     fireEvent.change(screen.getByTestId("new-account-credential-hours"), { target: { value: "72" } });
+    fireEvent.change(screen.getByTestId("booking-reminder-hours"), { target: { value: "3" } });
     fireEvent.change(screen.getByTestId("time-zone"), { target: { value: "Pacific/Auckland" } });
     fireEvent.click(screen.getByTestId("save-club-config"));
     fireEvent.change(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), { target: { value: "14" } });
@@ -271,7 +276,7 @@ describe("AdminConfigurationView", () => {
     await waitFor(() => {
       expect(changeConfig).toHaveBeenCalledWith(expect.objectContaining({
         clubName: "Example Racquet Club", slotMinutes: 15, timeZone: "Pacific/Auckland",
-        newAccountCredentialHours: 72
+        newAccountCredentialHours: 72, bookingReminderHours: 3
       }));
       expect(configurationChanged).toHaveBeenCalled();
       expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 });
@@ -293,7 +298,8 @@ describe("AdminConfigurationView", () => {
       slotMinutes: 30,
       timeZone: "Europe/Berlin",
       newAccountCredentialHours: 168,
-      passwordResetCredentialHours: 24
+      passwordResetCredentialHours: 24,
+      bookingReminderHours: 24
     })).mockReturnValueOnce(reload.promise);
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
     const clubName = await screen.findByTestId("club-name");
@@ -312,7 +318,8 @@ describe("AdminConfigurationView", () => {
         slotMinutes: 30,
         timeZone: "Europe/Berlin",
         newAccountCredentialHours: 168,
-        passwordResetCredentialHours: 24
+        passwordResetCredentialHours: 24,
+        bookingReminderHours: 24
       });
       return reload.promise;
     });
@@ -404,7 +411,8 @@ describe("AdminConfigurationView", () => {
       slotMinutes: 30,
       timeZone: "US/Eastern",
       newAccountCredentialHours: 168,
-      passwordResetCredentialHours: 24
+      passwordResetCredentialHours: 24,
+      bookingReminderHours: 24
     });
 
     // when

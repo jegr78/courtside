@@ -96,6 +96,13 @@ class MailTemplatesTest {
     }
 
     @Test
+    void givenAReminder_whenRendered_thenItCarriesTheBookingAndTheWayOut() {
+        // when / then — a court nobody plays on is what a forgotten booking costs the club
+        assertThat(templates.render("booking.reminder.body", Locale.GERMAN, VALUES))
+                .contains("Wednesday, 13 May 2026").contains("Court 1").contains("Absage");
+    }
+
+    @Test
     void givenACredentialMessage_whenRendered_thenItNamesTheClubAndCarriesTheCredential() {
         // when / then
         assertThat(templates.render("credentials.newAccount.body", Locale.GERMAN, VALUES))

@@ -51,6 +51,9 @@ public class ClubConfiguration {
     @Column(name = "password_reset_credential_hours", nullable = false)
     private int passwordResetCredentialHours;
 
+    @Column(name = "booking_reminder_hours", nullable = false)
+    private int bookingReminderHours;
+
     @Column(name = "no_membership_type_rule_set_id")
     private UUID noMembershipTypeRuleSetId;
 
@@ -70,6 +73,10 @@ public class ClubConfiguration {
     public void changeCredentialValidity(int newAccountHours, int passwordResetHours) {
         this.newAccountCredentialHours = newAccountHours;
         this.passwordResetCredentialHours = passwordResetHours;
+    }
+
+    public void remindBookingsAfter(int hours) {
+        this.bookingReminderHours = hours;
     }
 
     public void bindPeopleWithoutAMembershipTypeTo(UUID ruleSetId) {

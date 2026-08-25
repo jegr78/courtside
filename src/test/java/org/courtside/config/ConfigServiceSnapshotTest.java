@@ -39,7 +39,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
                 "Example Tennis Club", "#34584A", "#D7E24B",
                 "/logo.svg", "/imprint", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
-                new CredentialLifetime(72), new CredentialLifetime(12), null));
+                new CredentialLifetime(72), new CredentialLifetime(12), new ReminderLeadTime(24), null));
 
         // then
         assertThat(snapshot.getClass().isRecord()).isTrue();
@@ -69,7 +69,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
                 "Example Tennis Club", "#34584A", "#D7E24B",
                 "/logo.svg", "/imprint", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
-                new CredentialLifetime(72), new CredentialLifetime(12), YOUTH_RULE_SET));
+                new CredentialLifetime(72), new CredentialLifetime(12), new ReminderLeadTime(24), YOUTH_RULE_SET));
 
         // then
         assertThat(snapshot.noMembershipTypeRuleSetId()).isEqualTo(YOUTH_RULE_SET);
@@ -92,6 +92,6 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
                 "Example Tennis Club", "#34584A", "#D7E24B",
                 "/logo.svg", "/imprint", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
-                new CredentialLifetime(72), new CredentialLifetime(12), noMembershipTypeRuleSetId);
+                new CredentialLifetime(72), new CredentialLifetime(12), new ReminderLeadTime(24), noMembershipTypeRuleSetId);
     }
 }

@@ -83,6 +83,7 @@ courtside:
       block: ${COURTSIDE_LOGIN_GLOBAL_BLOCK:1m}
   booking:
     series-horizon-months: 12
+    reminder-sweep-interval: 5m
   import:
     preview-retention: ${COURTSIDE_IMPORT_PREVIEW_RETENTION:7d}
     sweep-interval: ${COURTSIDE_IMPORT_SWEEP_INTERVAL:1h}
