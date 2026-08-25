@@ -12,6 +12,7 @@ export interface BookingSelection {
   date: string;
   slot: string;
   courtId: string;
+  durationMinutes?: number;
 }
 
 export function BookingDialog({ selection, grid, courts, allocations, canChooseSeveralCourts,
@@ -30,7 +31,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [participantCards, setParticipantCards] = useState<PublicParticipantCard[]>([]);
   const [courtIds, setCourtIds] = useState([selection.courtId]);
   const [cardId, setCardId] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState(grid.slotMinutes);
+  const [durationMinutes, setDurationMinutes] = useState(selection.durationMinutes ?? grid.slotMinutes);
   const [guestNames, setGuestNames] = useState([""]);
   const [participantCardIds, setParticipantCardIds] = useState([""]);
   const [memberQuery, setMemberQuery] = useState("");

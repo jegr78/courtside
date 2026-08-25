@@ -114,6 +114,36 @@ test("a barred member sees the refusal before a booking dialog can open", async 
   await expect(page.getByRole("dialog")).not.toBeVisible();
 });
 
+test("a member drags across the grid and the dialog opens on the period they drew",
+  async ({ page, journeyService }) => {
+    // given
+    await page.goto("/login");
+    await page.getByTestId("username").fill("doe.jane");
+    await page.getByTestId("password").fill("temporary-password");
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("court-plan-view")).toBeVisible();
+    await selectJourneyDate(page, journeyService.visualDate);
+    const from = freeSlot(page, 4, "14:00");
+    const to = freeSlot(page, 4, "15:00");
+    await expect(from).toBeVisible();
+    // page.mouse takes viewport coordinates and scrolls nothing on its own.
+    await to.scrollIntoViewIfNeeded();
+    const start = await from.boundingBox();
+    const end = await to.boundingBox();
+
+    // when — a real pointer drag, which synthetic events in the component suite cannot stand for
+    await page.mouse.move(start!.x + start!.width / 2, start!.y + start!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(end!.x + end!.width / 2, end!.y + end!.height / 2, { steps: 8 });
+    await page.mouse.up();
+
+    // then — three grid windows, so the dialog opens on ninety minutes without touching the select
+    await expect(page.getByTestId("booking-dialog")).toBeVisible();
+    await expect(page.getByTestId("booking-duration")).toHaveValue("90");
+    await expect(page.getByTestId("booking-period")).toContainText("2:00");
+    await expect(page.getByTestId("booking-period")).toContainText("3:30");
+  });
+
 test("a seeded member can book a free slot and cancel it again", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");

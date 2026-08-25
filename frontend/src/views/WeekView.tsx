@@ -41,6 +41,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const [eligibility, setEligibility] = useState<BookingEligibility>();
   const [eligibilityError, setEligibilityError] = useState<string>();
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
+  const [drag, setDrag] = useState<{ courtId: string; anchor: string; head: string }>();
   const [cancellation, setCancellation] = useState<Allocation>();
   const planRef = useRef<HTMLDivElement>(null);
   const courtSelectorRef = useRef<HTMLDivElement>(null);
@@ -115,8 +116,47 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const selectedDay = days.find((day) => formatDate(day) === selectedDate);
   const selectedAllocations = selectedDate ? data?.allocations.get(selectedDate) ?? [] : [];
   const slots = selectedDay && data ? slotsFor(selectedDay, data.grid) : [];
+
+  function isBookable(courtId: string, slot: string): boolean {
+    if (!data || !selectedDate) return false;
+    if (isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant)) return false;
+    const minute = timeToMinutes(slot);
+    return !selectedAllocations.some((entry) => entry.courtId === courtId
+      && timeToMinutes(formatTime(entry.startsAt, data.grid.timeZone)) <= minute
+      && timeToMinutes(formatTime(entry.endsAt, data.grid.timeZone)) > minute);
+  }
+
+  // The run stops at the first slot the court cannot give, so the highlight a member drags over
+  // is what they get - a span silently clamped on release would surprise them instead.
+  function bookableSpan(courtId: string, anchor: string, head: string): string[] {
+    const from = slots.indexOf(anchor);
+    const to = slots.indexOf(head);
+    if (from === -1 || to === -1) return [];
+    const step = to >= from ? 1 : -1;
+    const span: string[] = [];
+    for (let index = from; step > 0 ? index <= to : index >= to; index += step) {
+      if (!isBookable(courtId, slots[index])) break;
+      span.push(slots[index]);
+    }
+    return step > 0 ? span : span.reverse();
+  }
   const language = i18n.resolvedLanguage ?? i18n.language;
   const courtCount = data?.courts.length ?? 0;
+  useEffect(() => {
+    if (!drag) return;
+    const finish = () => {
+      const span = bookableSpan(drag.courtId, drag.anchor, drag.head);
+      setDrag(undefined);
+      // A pointer that never left its cell is a click, and that path is also the keyboard's.
+      if (drag.head !== drag.anchor && span.length > 0 && selectedDate && data) {
+        setBookingSelection({ date: selectedDate, slot: span[0], courtId: drag.courtId,
+          durationMinutes: span.length * data.grid.slotMinutes });
+      }
+    };
+    window.addEventListener("pointerup", finish);
+    return () => window.removeEventListener("pointerup", finish);
+  });
+
   const isToday = selectedDate === dateInTimeZoneValue(currentInstant, data?.grid.timeZone);
   const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
   const slotHeight = data ? Math.max(32, data.grid.slotMinutes * 4 / 3) : 40;
@@ -294,7 +334,15 @@ export function WeekView({ today, clock = systemClock, canBook = true,
               setCancellation,
               selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false,
               bookingAllowed,
-              selectedCourtId === court.id
+              selectedCourtId === court.id,
+              {
+                selected: drag?.courtId === court.id
+                  && bookableSpan(court.id, drag.anchor, drag.head).includes(slot),
+                start: (pointerType: string) => pointerType !== "touch"
+                  && setDrag({ courtId: court.id, anchor: slot, head: slot }),
+                extend: () => setDrag((current) => current?.courtId === court.id
+                  ? { ...current, head: slot } : current)
+              }
             ))}
           </tr>)}
         </tbody>
@@ -361,7 +409,8 @@ function renderCell(
   cancel: (allocation: Allocation) => void,
   isPast: boolean,
   canBook: boolean,
-  isSelectedCourt: boolean
+  isSelectedCourt: boolean,
+  drag: { selected: boolean; start: (pointerType: string) => void; extend: () => void }
 ) {
   const cellClass = `border-structural border-b ${isSelectedCourt ? "" : "mobile-court-hidden"}`;
   const allocation = allocations.find((entry) => entry.courtId === court.id && formatTime(entry.startsAt, timeZone) === slot);
@@ -401,10 +450,12 @@ function renderCell(
       data-court-number={court.number}
       data-slot={slot}
       disabled={isPast}
-      data-state={isPast ? "past" : "free"}
+      data-state={isPast ? "past" : drag.selected ? "selected" : "free"}
       className="day-plan-slot h-full w-full rounded-md px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--club-accent)"
       aria-label={isPast ? t("week.pastLabel", { court: courtName, time: slot }) : t("booking.open", { court: courtName, time: slot })}
       onClick={book}
+      onPointerDown={(event) => drag.start(event.pointerType)}
+      onPointerEnter={drag.extend}
     >
       {isPast ? t("week.past") : t("week.available")}
     </button> : <div data-testid="free-slot" data-date={date} data-court-number={court.number} data-slot={slot} data-state={isPast ? "past" : "free"} className="day-plan-slot flex h-full w-full items-center justify-center rounded-md px-2 text-sm">

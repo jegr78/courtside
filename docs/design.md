@@ -1472,6 +1472,12 @@ width; larger facilities keep a usable court width and scroll horizontally. Cour
 time axis remain fixed while the plan scrolls, and a 30-minute slot occupies 40 pixels on desktop.
 An occupancy spans its complete duration instead of repeating in each slot.
 
+A member draws a period by dragging across adjacent free cells of one court, and the dialog opens on
+the period drawn rather than on a single slot. The highlight follows the pointer only as far as the
+court can give: a run stops at the first occupied or past cell instead of being clamped without
+notice when the pointer is released. A touch pointer keeps scrolling the plan and selects nothing,
+so on a phone the duration control in the dialog is the route to the same period.
+
 Free, occupied, own and unavailable states combine text or a pattern with colour. Past slots remain
 visible but cannot open the booking form. On the current day, the plan marks the current time,
 initially moves to the next slot and offers a return-to-now action. It refreshes after mutations,
