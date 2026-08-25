@@ -806,6 +806,38 @@ it("given the document owns scrolling, when another day is chosen, then the plan
   expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
 });
 
+it("given the plan owns its scrolling, when it moves to the current time, then the page is left alone", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const plan = await screen.findByTestId("week-grid");
+  const row = plan.querySelector('[data-slot="12:00"]') as HTMLElement;
+  const scrollIntoView = vi.fn();
+  row.scrollIntoView = scrollIntoView;
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ overflowY: "auto" } as CSSStyleDeclaration);
+
+  // when
+  await userEvent.click(screen.getByTestId("current-time"));
+
+  // then — scrollIntoView takes every scrollable ancestor with it, the page included
+  expect(scrollIntoView).not.toHaveBeenCalled();
+});
+
+it("given the document owns scrolling, when the plan moves to the current time, then it asks the document", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const plan = await screen.findByTestId("week-grid");
+  const row = plan.querySelector('[data-slot="12:00"]') as HTMLElement;
+  const scrollIntoView = vi.fn();
+  row.scrollIntoView = scrollIntoView;
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ overflowY: "visible" } as CSSStyleDeclaration);
+
+  // when
+  await userEvent.click(screen.getByTestId("current-time"));
+
+  // then
+  expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+});
+
 it("given another day is shown, when today is chosen again, then the current time keeps the position", async () => {
   // given
   render(<WeekView today={clubInstant("12:00")} />);
@@ -924,4 +956,128 @@ it("given a refusal about a field behind the disclosure, when it arrives, then t
 
   // then
   await waitFor(() => expect(screen.getByTestId("guest-name")).toBeVisible());
+});
+
+function dragAcross(from: HTMLElement, over: HTMLElement[]) {
+  fireEvent.pointerDown(from, { pointerType: "mouse" });
+  over.forEach((cell) => fireEvent.pointerEnter(cell, { pointerType: "mouse" }));
+  fireEvent.pointerUp(over.at(-1) ?? from, { pointerType: "mouse" });
+}
+
+it("given adjacent free cells of one court, when dragging across them, then the dialog opens with that period", async () => {
+  // given
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  const start = await findFreeSlot(1, "08:00");
+
+  // when — the direct route to the same result as the duration control
+  dragAcross(start, [freeSlot(1, "08:30"), freeSlot(1, "09:00")]);
+
+  // then
+  expect(await screen.findByTestId("booking-period")).toHaveTextContent("9:30");
+  expect(screen.getByTestId("booking-duration")).toHaveValue("90");
+});
+
+it("given a drag that would cross an occupied cell, when releasing, then the period stops before it", async () => {
+  // given
+  vi.mocked(api.allocations).mockResolvedValue([{
+    bookingId: "99999999-9999-9999-9999-999999999999",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T06:30:00Z",
+    endsAt: "2026-08-10T07:00:00Z",
+    cardLabel: "Training",
+    cardColor: "#b85c38",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantLastNames: [],
+    participantCount: 2
+  }]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  const start = await findFreeSlot(1, "08:00");
+
+  // when — 08:30 is taken, so a drag reaching past it must not claim the slot it cannot have
+  dragAcross(start, [freeSlot(1, "09:30")]);
+
+  // then
+  expect(await screen.findByTestId("booking-duration")).toHaveValue("30");
+});
+
+it("given a single cell, when clicking it, then the dialog still opens on one grid window", async () => {
+  // given
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  const start = await findFreeSlot(1, "08:00");
+
+  // when — a click keeps its own path, so the keyboard route is untouched by any of this
+  await userEvent.click(start);
+
+  // then
+  expect(await screen.findByTestId("booking-duration")).toHaveValue("30");
+});
+
+it("given a touch pointer, when dragging down the grid, then only the cell it started on is taken", async () => {
+  // given — a vertical drag on a phone is how a member scrolls the plan
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  const start = await findFreeSlot(1, "08:00");
+
+  // when
+  fireEvent.pointerDown(start, { pointerType: "touch" });
+  fireEvent.pointerEnter(freeSlot(1, "09:00"), { pointerType: "touch" });
+  fireEvent.pointerUp(freeSlot(1, "09:00"), { pointerType: "touch" });
+
+  // then
+  expect(screen.queryByTestId("booking-dialog")).toBeNull();
+  await userEvent.click(start);
+  expect(await screen.findByTestId("booking-duration")).toHaveValue("30");
+});
+
+it("given a pen pointer, when dragging down the grid, then only the cell it started on is taken", async () => {
+  // given — a stylus pans the page like a finger does, so drawing with it would fight the scroll
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  const start = await findFreeSlot(1, "08:00");
+
+  // when
+  fireEvent.pointerDown(start, { pointerType: "pen" });
+  fireEvent.pointerEnter(freeSlot(1, "09:00"), { pointerType: "pen" });
+  fireEvent.pointerUp(freeSlot(1, "09:00"), { pointerType: "pen" });
+
+  // then
+  expect(screen.queryByTestId("booking-dialog")).toBeNull();
+  await userEvent.click(start);
+  expect(await screen.findByTestId("booking-duration")).toHaveValue("30");
+});
+
+it("given a drag that wanders into the next court, when releasing, then it stays on the court it started on", async () => {
+  // given
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  const start = await findFreeSlot(1, "08:00");
+
+  // when — the pointer leaves the column, and the neighbouring court is nobody's anchor
+  fireEvent.pointerDown(start, { pointerType: "mouse" });
+  fireEvent.pointerEnter(freeSlot(2, "09:00"), { pointerType: "mouse" });
+  fireEvent.pointerEnter(freeSlot(1, "08:30"), { pointerType: "mouse" });
+  fireEvent.pointerUp(freeSlot(1, "08:30"), { pointerType: "mouse" });
+
+  // then
+  expect(await screen.findByTestId("booking-duration")).toHaveValue("60");
+  expect(screen.getByTestId("booking-court")).toHaveTextContent(String(courts[0].name));
+});
+
+it("given a drag in progress, when passing over cells, then the span it would take is marked", async () => {
+  // given
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  const start = await findFreeSlot(1, "08:00");
+
+  // when
+  fireEvent.pointerDown(start, { pointerType: "mouse" });
+  fireEvent.pointerEnter(freeSlot(1, "08:30"), { pointerType: "mouse" });
+
+  // then — dragging without feedback is guesswork
+  expect(freeSlot(1, "08:00").dataset.state).toBe("selected");
+  expect(freeSlot(1, "08:30").dataset.state).toBe("selected");
+  expect(freeSlot(1, "09:00").dataset.state).toBe("free");
 });
