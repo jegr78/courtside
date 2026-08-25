@@ -54,20 +54,20 @@ remaining observations led to explicit work rather than scanner suppression:
 
 ### Passive-alert evidence retest
 
-The #472 retest reused the qualified #471 image and its deployment qualification, so only the
-evidence adapter changed. Attempt 9 of run `issue472-evidence` completed all 28 native checks and 30
-bounded requests. Its protected passive record has digest
-`sha256:d6742c448894f993dbf208a5c3ce16c2a5be910f20dc1bc20003b65e6ec6b99e` and remains local until
+The final #472 retest reused the qualified #471 image and its deployment qualification, so only the
+evidence adapter changed. Attempt 1 of run `issue472-evidence-v2` completed all 28 native checks and
+30 bounded requests. Its protected passive record has digest
+`sha256:01181917cdb95172213faa218f85bc3b7b334a62a9391af3e43c56f039b9c714` and remains local until
 8 September 2026.
 
 Every alert now carries closed rule-specific evidence. The suspicious-comment candidate retains
-`comment-query` and location digest
-`sha256:38f324a70820ba7ae43c2c5beb1f46ee765a43188d4c5d4caf07d8d444f76199`, without the matched
-comment or scanner prose. The earlier `SELECT` observation has the same stable route-level finding
-fingerprint but a different rule-evidence digest, so the retest rejects it as the same reproducible
-observation rather than silently treating it as confirmed. The attempt remains `incomplete` because
-the retained candidates still require lifecycle dispositions, not because their scanner evidence is
-missing.
+`comment-query`, resource digest
+`sha256:bb96b04aa0cac7748510cfc97e78f1bcdf38de3993c8a5f0bb91e3a344b62ea1` and location digest
+`sha256:8ff01140999a6ee57840fa0d39d7381ecd2a8fe3f1a737efd26e2ed7f693d449`, without the resource path,
+matched comment or scanner prose. The earlier `SELECT` observation shares the stable route-level
+finding fingerprint but does not match the current rule evidence and therefore is not silently
+confirmed. The attempt remains `incomplete` because the retained candidates still require lifecycle
+dispositions, not because their scanner evidence is missing.
 
 ### Browser and proxy disclosure retest
 

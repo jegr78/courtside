@@ -139,16 +139,52 @@ test("given a suspicious-comment alert, when normalizing it, then only a pattern
     instances: [instance, instance] }] }] };
 
   // when
-  const [alert] = normalizeZapAlerts(report);
+  const [alert] = normalizeZapAlerts(report, digest);
 
   // then
   assert.equal(alert.count, 2);
-  assert.deepEqual(alert.ruleEvidence, { kind: "text-pattern", patternId: "comment-select",
-    locationDigest: alert.ruleEvidence.locationDigest });
-  assert.match(alert.ruleEvidence.locationDigest, /^sha256:[a-f0-9]{64}$/);
-  assert.notEqual(alert.ruleEvidence.locationDigest, alert.fingerprint);
+  assert.deepEqual(alert.ruleEvidence, { kind: "text-pattern", matches: [{ patternId: "comment-select",
+    resourceDigest: alert.ruleEvidence.matches[0].resourceDigest, occurrenceCount: 2,
+    locationDigest: alert.ruleEvidence.matches[0].locationDigest }] });
+  assert.match(alert.ruleEvidence.matches[0].resourceDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.match(alert.ruleEvidence.matches[0].locationDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.notEqual(alert.ruleEvidence.matches[0].locationDigest, alert.fingerprint);
   assert.equal(alert.fingerprint, "sha256:6744ae243ecc24def5606740af614410a70a72e0569fd5dec781f41a7b9d77d6");
   assert.doesNotMatch(JSON.stringify(alert), /secret-like|\\bSELECT\\b|"select"/i);
+});
+
+test("given the same pattern in different assets, when normalizing it, then each resource remains attributable", () => {
+  // given
+  const instance = (asset) => ({ uri: `${passiveScannerOrigin}/assets/${asset}.js`, method: "GET", param: "",
+    evidence: "select", otherinfo: "The following pattern was used: \\bSELECT\\b" });
+  const report = { site: [{ alerts: [{ pluginid: "10027", riskcode: "0", confidence: "1",
+    instances: [instance("first-a1b2c3"), instance("second-d4e5f6")] }] }] };
+
+  // when
+  const [alert] = normalizeZapAlerts(report, digest);
+
+  // then
+  assert.equal(alert.ruleEvidence.matches.length, 2);
+  assert.notEqual(alert.ruleEvidence.matches[0].resourceDigest, alert.ruleEvidence.matches[1].resourceDigest);
+  assert.notEqual(alert.ruleEvidence.matches[0].locationDigest, alert.ruleEvidence.matches[1].locationDigest);
+  assert.doesNotMatch(JSON.stringify(alert), /first-a1b2c3|second-d4e5f6/);
+});
+
+test("given repeated matches in one asset, when normalizing them, then the bounded location records their count", () => {
+  // given
+  const instance = { uri: `${passiveScannerOrigin}/assets/index-a1b2c3.js`, method: "GET", param: "",
+    evidence: "select", otherinfo: "The following pattern was used: \\bSELECT\\b" };
+
+  // when
+  const [single] = normalizeZapAlerts({ site: [{ alerts: [{ pluginid: "10027", riskcode: "0", confidence: "1",
+    instances: [instance] }] }] }, digest);
+  const [repeated] = normalizeZapAlerts({ site: [{ alerts: [{ pluginid: "10027", riskcode: "0", confidence: "1",
+    instances: [instance, instance] }] }] }, digest);
+
+  // then
+  assert.equal(single.ruleEvidence.matches[0].occurrenceCount, 1);
+  assert.equal(repeated.ruleEvidence.matches[0].occurrenceCount, 2);
+  assert.notEqual(single.ruleEvidence.matches[0].locationDigest, repeated.ruleEvidence.matches[0].locationDigest);
 });
 
 test("given every supported suspicious-comment pattern, when normalizing it, then each has one closed identifier", () => {
@@ -160,8 +196,8 @@ test("given every supported suspicious-comment pattern, when normalizing it, the
   for (const pattern of patterns) {
     const [alert] = normalizeZapAlerts({ site: [{ alerts: [{ pluginid: "10027", riskcode: "0", confidence: "1",
       instances: [{ uri: `${passiveScannerOrigin}/assets/index-a1b2c3.js`, method: "GET", param: "",
-        evidence: `unretained-${pattern}`, otherinfo: `The following pattern was used: \\b${pattern}\\b` }] }] }] });
-    assert.equal(alert.ruleEvidence.patternId, `comment-${pattern}`);
+        evidence: `unretained-${pattern}`, otherinfo: `The following pattern was used: \\b${pattern}\\b` }] }] }] }, digest);
+    assert.equal(alert.ruleEvidence.matches[0].patternId, `comment-${pattern}`);
     assert.doesNotMatch(JSON.stringify(alert), /unretained/);
   }
 });
@@ -174,10 +210,10 @@ test("given ZAP keeps a suspicious pattern at alert level, when normalizing it, 
       evidence: "arbitrary matched comment", otherinfo: "scanner-specific summary" }] }] }] };
 
   // when
-  const [alert] = normalizeZapAlerts(report);
+  const [alert] = normalizeZapAlerts(report, digest);
 
   // then
-  assert.equal(alert.ruleEvidence.patternId, "comment-select");
+  assert.equal(alert.ruleEvidence.matches[0].patternId, "comment-select");
   assert.doesNotMatch(JSON.stringify(alert), /arbitrary|omitted|scanner-specific/);
 });
 
@@ -189,18 +225,18 @@ test("given unsafe or unsupported passive evidence, when normalizing it, then th
     evidence: "select", otherinfo: "The following pattern was used: \\bSELECT\\b" };
 
   // when / then
-  assert.throws(() => normalizeZapAlerts(alert("99999", textInstance)), /unsupported passive rule/);
-  const [redacted] = normalizeZapAlerts(alert("10027", { ...textInstance, evidence: "password=secret" }));
+  assert.throws(() => normalizeZapAlerts(alert("99999", textInstance), digest), /unsupported passive rule/);
+  const [redacted] = normalizeZapAlerts(alert("10027", { ...textInstance, evidence: "password=secret" }), digest);
   assert.doesNotMatch(JSON.stringify(redacted), /password|secret/);
-  assert.throws(() => normalizeZapAlerts(alert("10027", { ...textInstance, evidence: "" })),
+  assert.throws(() => normalizeZapAlerts(alert("10027", { ...textInstance, evidence: "" }), digest),
     /no match evidence/);
   assert.throws(() => normalizeZapAlerts(alert("10027", {
     ...textInstance, uri: `${passiveScannerOrigin}/assets/image-a1b2c3.png`
-  })), /textual resource/);
+  }), digest), /textual resource/);
   assert.throws(() => normalizeZapAlerts(alert("10027", { ...textInstance,
-    otherinfo: "The following pattern was used: secret-token" })), /unsupported pattern identifier/);
+    otherinfo: "The following pattern was used: secret-token" }), digest), /unsupported pattern identifier/);
   assert.throws(() => normalizeZapAlerts(alert("10027", { ...textInstance,
-    otherinfo: "The following pattern was used: \\bSELECT\\b and \\bQUERY\\b" })),
+    otherinfo: "The following pattern was used: \\bSELECT\\b and \\bQUERY\\b" }), digest),
   /unsupported pattern identifier/);
 });
 
@@ -243,6 +279,16 @@ test("given the remaining supported passive rules, when normalizing them, then o
     { kind: "session-signal", tokenNames: ["session", "xsrf-token"] }
   ]);
   assert.doesNotMatch(JSON.stringify(alerts), /policy-value|src=secret/);
+});
+
+test("given session fields that name different tokens, when normalizing them, then the evidence fails closed", () => {
+  // given
+  const report = { site: [{ alerts: [{ pluginid: "10112", riskcode: "0", confidence: "2",
+    instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "SESSION", evidence: "SESSION",
+      otherinfo: "cookie:XSRF-TOKEN" }] }] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
 });
 
 test("given a passive alert on an unclassified dynamic route, when normalizing it, then evidence fails closed", () => {
@@ -341,13 +387,32 @@ test("given forged rule evidence, when validating retained evidence, then rule s
   });
 
   // when / then
-  evidence.zap.alerts[0].ruleEvidence.locationDigest = digest;
+  evidence.zap.alerts[0].ruleEvidence.matches[0].locationDigest = digest;
   assert.throws(() => assertPassiveDeploymentEvidence(evidence), /rule evidence/);
   evidence.zap.alerts[0].ruleEvidence = { kind: "cookie-attribute", cookieName: "xsrf-token",
     missingAttribute: "http-only" };
   assert.throws(() => assertPassiveDeploymentEvidence(evidence), /rule evidence/);
   evidence.zap.alerts[0].ruleEvidence.extra = "secret";
   assert.throws(() => assertPassiveDeploymentEvidence(evidence), /invalid/);
+});
+
+test("given duplicate text locations, when validating retained evidence, then one location has one encoding", () => {
+  // given
+  const instance = { uri: `${passiveScannerOrigin}/assets/index-a1b2c3.js`, method: "GET", param: "",
+    evidence: "select", otherinfo: "The following pattern was used: \\bSELECT\\b" };
+  const zapReport = (instances) => ({ version: "2.17.0", site: [{ alerts: [{ pluginid: "10027",
+    riskcode: "0", confidence: "1", instances }] }] });
+  const evidence = buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
+    observations: passingObservations(), requestCount: 1, zapReport: zapReport([instance])
+  });
+  const repeated = buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
+    observations: passingObservations(), requestCount: 1, zapReport: zapReport([instance, instance])
+  });
+  evidence.zap.alerts[0].count = 3;
+  evidence.zap.alerts[0].ruleEvidence.matches.push(repeated.zap.alerts[0].ruleEvidence.matches[0]);
+
+  // when / then
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /rule evidence/);
 });
 
 test("given non-canonical session evidence, when validating it, then equivalent facts cannot have two encodings", () => {

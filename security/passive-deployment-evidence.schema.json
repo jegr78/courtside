@@ -81,13 +81,22 @@
         },
         {
           "type": "object", "additionalProperties": false,
-          "required": ["kind", "patternId", "locationDigest"],
+          "required": ["kind", "matches"],
           "properties": {
             "kind": { "const": "text-pattern" },
-            "patternId": { "enum": ["comment-admin", "comment-administrator", "comment-bug", "comment-bugs",
-              "comment-db", "comment-debug", "comment-fixme", "comment-from", "comment-later", "comment-query",
-              "comment-select", "comment-todo", "comment-user", "comment-username", "comment-where", "comment-xxx"] },
-            "locationDigest": { "$ref": "#/$defs/digest" }
+            "matches": {
+              "type": "array", "minItems": 1, "uniqueItems": true,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["patternId", "resourceDigest", "occurrenceCount", "locationDigest"],
+                "properties": {
+                  "patternId": { "$ref": "#/$defs/textPatternId" },
+                  "resourceDigest": { "$ref": "#/$defs/digest" },
+                  "occurrenceCount": { "type": "integer", "minimum": 1 },
+                  "locationDigest": { "$ref": "#/$defs/digest" }
+                }
+              }
+            }
           }
         },
         {
@@ -120,6 +129,9 @@
         }
       ]
     },
+    "textPatternId": { "enum": ["comment-admin", "comment-administrator", "comment-bug", "comment-bugs",
+      "comment-db", "comment-debug", "comment-fixme", "comment-from", "comment-later", "comment-query",
+      "comment-select", "comment-todo", "comment-user", "comment-username", "comment-where", "comment-xxx"] },
     "checkId": {
       "enum": ["body-limit", "certificate-trust", "direct-forwarded-behavior", "exposure--git-config",
         "exposure-actuator", "exposure-actuator-health", "exposure-assets-app-js-map",
