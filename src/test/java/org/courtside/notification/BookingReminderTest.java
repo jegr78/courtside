@@ -24,6 +24,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -48,6 +49,8 @@ class BookingReminderTest extends AbstractIntegrationTest {
     private static final Instant SIX_PM = Instant.parse("2026-05-12T16:00:00Z");
     private static final Instant SEVEN_PM = Instant.parse("2026-05-12T17:00:00Z");
     private static final Instant IN_SIX_WEEKS = Instant.parse("2026-06-24T16:00:00Z");
+    private static final Instant A_DAY_AHEAD = Instant.parse("2026-05-13T10:00:00Z");
+    private static final Instant A_WEEK_EARLIER = Instant.parse("2026-05-05T10:00:00Z");
 
     @MockitoSpyBean
     private JavaMailSender sender;
@@ -95,7 +98,7 @@ class BookingReminderTest extends AbstractIntegrationTest {
     void givenABookingWithinTheLeadTime_whenTheSweepRuns_thenEverybodyInItIsReminded()
             throws Exception {
         // given — the club reminds a day ahead, and the booking is this evening
-        book(SIX_PM, SEVEN_PM);
+        bookedLongBeforeItsLeadTime(SIX_PM, SEVEN_PM);
         clearInvocations(sender);
 
         // when
@@ -125,7 +128,7 @@ class BookingReminderTest extends AbstractIntegrationTest {
     void givenAReminderAlreadySent_whenTheSweepRunsAgain_thenNobodyIsRemindedTwice()
             throws Exception {
         // given
-        book(SIX_PM, SEVEN_PM);
+        bookedLongBeforeItsLeadTime(SIX_PM, SEVEN_PM);
         clearInvocations(sender);
         reminders.remindWhatIsDue();
 
@@ -139,7 +142,7 @@ class BookingReminderTest extends AbstractIntegrationTest {
     @Test
     void givenAClubThatWantsNoReminders_whenTheSweepRuns_thenNothingGoesOut() {
         // given
-        book(SIX_PM, SEVEN_PM);
+        bookedLongBeforeItsLeadTime(SIX_PM, SEVEN_PM);
         configuration.remindBookingsAfter(0);
         clearInvocations(sender);
 
@@ -153,16 +156,64 @@ class BookingReminderTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABookingMadeInsideItsOwnLeadTime_whenTheSweepRuns_thenItsConfirmationStandsForIt() {
+        // given — booked this morning for this evening, which the confirmation already announced
+        book(SIX_PM, SEVEN_PM);
+        clearInvocations(sender);
+
+        // when
+        reminders.remindWhatIsDue();
+
+        // then
+        verify(sender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void givenABookingStartingExactlyAtTheLeadTime_whenTheSweepRuns_thenItIsReminded()
+            throws Exception {
+        // given — the edge of the window belongs to it, on both the start and the booked-at side
+        book(A_DAY_AHEAD, A_DAY_AHEAD.plusSeconds(3600));
+        clearInvocations(sender);
+
+        // when
+        reminders.remindWhatIsDue();
+
+        // then
+        assertThat(addressesWrittenTo()).contains("jane.doe@example.org");
+    }
+
+    @Test
+    void givenACancelledBooking_whenTheSweepRuns_thenNobodyHearsAboutIt() {
+        // given
+        UUID cancelled = bookedLongBeforeItsLeadTime(SIX_PM, SEVEN_PM);
+        bookings.cancel(cancelled, bookerAccountId, Set.of(Role.MEMBER));
+        clearInvocations(sender);
+
+        // when
+        reminders.remindWhatIsDue();
+
+        // then
+        verify(sender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
     void whenTheApplicationRuns_thenTheSweepIsScheduledRatherThanOnlyCallable() {
         // when / then — an annotation nobody registers reminds nobody
         assertThat(scheduledTasks.getScheduledTasks())
                 .anyMatch(task -> String.valueOf(task.getTask()).contains("remindWhatIsDue"));
     }
 
-    private void book(Instant from, Instant to) {
-        bookings.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,
+    private UUID book(Instant from, Instant to) {
+        return bookings.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,
                 new TimeSlot(from, to), bookerAccountId, bookerPersonId, Set.of(Role.MEMBER),
                 null, List.of(ParticipantSpec.member(playerPersonId)), null));
+    }
+
+    private UUID bookedLongBeforeItsLeadTime(Instant from, Instant to) {
+        UUID bookingId = book(from, to);
+        jdbc.sql("UPDATE booking SET created_at = :at WHERE id = :id")
+                .param("at", A_WEEK_EARLIER.atOffset(ZoneOffset.UTC)).param("id", bookingId).update();
+        return bookingId;
     }
 
     private List<String> addressesWrittenTo() {

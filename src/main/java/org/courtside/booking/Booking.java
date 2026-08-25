@@ -43,6 +43,9 @@ public class Booking {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "reminded_at")
+    private Instant remindedAt;
+
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
@@ -91,6 +94,7 @@ public class Booking {
     public void recordMove(UUID movedBy, Instant at) {
         this.movedBy = movedBy;
         this.movedAt = at;
+        this.remindedAt = null;
     }
 
     public void cancel(UUID cancelledBy, Instant at) {

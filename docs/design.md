@@ -860,7 +860,9 @@ narrowed under a booking tells everybody in every future booking it displaces �
 recorded players alike — naming what was closed; taking something out of service cancels nothing,
 and the message says so, because the impact list beside the control is information for the board and
 the booking stands until the board acts on it. And a booking coming up reminds everybody in it, as
-many hours ahead as the club sets — zero switches reminders off, and a booking is claimed before its
+many hours ahead as the club sets — zero switches reminders off, a booking made when it already
+stood inside that window keeps its confirmation instead of hearing the same thing twice, one that
+moves is reminded again for the appointment it now holds, and a booking is claimed before its
 reminder goes out, so a second sweep, or a second instance, finds nothing left to do.
 
 All of them are sent after the transaction that caused them commits, so a message never describes a

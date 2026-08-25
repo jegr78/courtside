@@ -1,7 +1,5 @@
 package org.courtside.config;
 
-import java.time.Duration;
-
 public record ReminderLeadTime(int hours) {
 
     public ReminderLeadTime {
@@ -16,9 +14,5 @@ public record ReminderLeadTime(int hours) {
 
     public boolean isOff() {
         return hours == 0;
-    }
-
-    public Duration toDuration() {
-        return Duration.ofHours(hours);
     }
 }

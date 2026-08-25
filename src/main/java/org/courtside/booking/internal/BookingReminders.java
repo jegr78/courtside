@@ -36,7 +36,7 @@ public class BookingReminders {
         }
         Instant now = clock.instant();
         int reminded = 0;
-        for (UUID bookingId : bookings.findDueForReminder(now, now.plus(leadTime.toDuration()))) {
+        for (UUID bookingId : bookings.findDueForReminder(now, leadTime.hours())) {
             if (bookings.claimReminder(bookingId, now) == 1) {
                 events.publishEvent(new BookingReminderDue(bookingId));
                 reminded += 1;

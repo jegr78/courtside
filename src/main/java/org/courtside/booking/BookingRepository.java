@@ -23,15 +23,19 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @EntityGraph(attributePaths = "participants")
     Optional<Booking> findWithParticipantsById(UUID id);
 
+    // A booking made when it already stood inside its own lead time was announced by its
+    // confirmation, so a reminder minutes later would only repeat it.
     @Query(value = """
             SELECT DISTINCT b.id FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE b.status = 'CONFIRMED'
               AND b.reminded_at IS NULL
               AND a.status = 'CONFIRMED'
-              AND a.starts_at BETWEEN :from AND :until
+              AND a.starts_at >= :now
+              AND a.starts_at <= cast(:now AS timestamptz) + make_interval(hours => :leadHours)
+              AND b.created_at + make_interval(hours => :leadHours) <= a.starts_at
             """, nativeQuery = true)
-    List<UUID> findDueForReminder(@Param("from") Instant from, @Param("until") Instant until);
+    List<UUID> findDueForReminder(@Param("now") Instant now, @Param("leadHours") int leadHours);
 
     // The claim is the guard: whoever changes the row from null is the one that sends, so a second
     // sweep - or a second instance - finds nothing to do.
