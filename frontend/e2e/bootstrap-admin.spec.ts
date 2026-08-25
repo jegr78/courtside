@@ -318,6 +318,45 @@ test("an admin changes club configuration and a booking rule through the browser
   await expect(page.locator('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeVisible();
 });
 
+test("a court going out of service reaches the member whose booking is on it",
+  async ({ page, journeyService }) => {
+    // given — a member books, and the board later needs that court back
+    await page.goto("/login");
+    await page.getByTestId("username").fill("doe.jane");
+    await page.getByTestId("password").fill("temporary-password");
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("court-plan-view")).toBeVisible();
+    await selectJourneyDate(page, journeyService.visualDate);
+    await freeSlot(page, 3, "13:00").click();
+    await page.getByTestId("member-search").fill("Mary");
+    await page.getByTestId("member-match").first().click();
+    await page.getByTestId("booking-submit").click();
+    await expect(page.locator('tr[data-slot="13:00"] [data-testid="own-allocation"]')).toBeVisible();
+    await page.getByTestId("logout").click();
+    await expect(page.getByTestId("login-view")).toBeVisible();
+    await page.getByTestId("username").fill("configuration-admin");
+    await page.getByTestId("password").fill("temporary-password");
+    await page.getByTestId("login-submit").click();
+    await page.getByTestId("admin-facility-link").click();
+    await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+
+    // when
+    const court = "dddddddd-0000-0000-0000-000000000003";
+    const deactivated = page.waitForResponse((response) =>
+      response.url().endsWith(`/api/admin/courts/${court}/active`)
+        && response.request().method() === "PUT");
+    await page.getByTestId(`toggle-court-${court}`).click();
+    expect((await deactivated).status()).toBe(200);
+
+    // then — the board's impact list already said which bookings sit on it; now they know too
+    // The newest message, because the confirmation of that same booking is already in the mailbox.
+    await expect
+      .poll(async () => (await messageTo(journeyService.mailboxURL, "jane.doe@example.org")).Text)
+      .toContain("out of service");
+    expect((await messageTo(journeyService.mailboxURL, "jane.doe@example.org")).Text)
+      .toContain("13:00");
+  });
+
 test("an admin takes a court out of service and restores it through the browser", async ({ page }) => {
   // given
   await page.goto("/login");

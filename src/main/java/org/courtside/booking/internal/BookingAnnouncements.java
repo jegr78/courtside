@@ -3,6 +3,7 @@ package org.courtside.booking.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
+import org.courtside.booking.BookingParticipant;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.card.CardService;
 import org.courtside.facility.Court;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,16 +30,27 @@ class BookingAnnouncements implements BookingAnnouncer {
     @Override
     @Transactional(readOnly = true)
     public Optional<BookingAnnouncement> describe(UUID bookingId) {
-        return bookings.findWithAllocationsById(bookingId).flatMap(this::announcementOf);
+        return bookings.findWithAllocationsById(bookingId)
+                .flatMap(booking -> announcementOf(booking, playersOf(bookingId)));
     }
 
-    private Optional<BookingAnnouncement> announcementOf(Booking booking) {
+    private List<UUID> playersOf(UUID bookingId) {
+        return bookings.findWithParticipantsById(bookingId)
+                .map(booking -> booking.getParticipants().stream()
+                        .map(BookingParticipant::getPersonId)
+                        .filter(Objects::nonNull)
+                        .toList())
+                .orElseGet(List::of);
+    }
+
+    private Optional<BookingAnnouncement> announcementOf(Booking booking, List<UUID> players) {
         List<CourtAllocation> allocations = booking.getAllocations();
         if (allocations.isEmpty() || booking.getBookedBy() == null) {
             return Optional.empty();
         }
         return Optional.of(new BookingAnnouncement(
                 booking.getBookedBy(),
+                players,
                 allocations.stream().map(CourtAllocation::getStartsAt).min(Comparator.naturalOrder()).orElseThrow(),
                 allocations.stream().map(CourtAllocation::getEndsAt).max(Comparator.naturalOrder()).orElseThrow(),
                 allocations.stream().map(allocation -> courtOf(allocation.getCourtId())).toList(),

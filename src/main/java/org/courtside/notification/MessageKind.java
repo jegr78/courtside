@@ -8,7 +8,8 @@ public enum MessageKind {
     CREDENTIALS_PASSWORD_RESET("credentials.passwordReset"),
     BOOKING_CONFIRMED("booking.confirmed"),
     BOOKING_PLAYER_RECORDED("booking.playerRecorded"),
-    BOOKING_PLAYER_WITHDREW("booking.playerWithdrew");
+    BOOKING_PLAYER_WITHDREW("booking.playerWithdrew"),
+    BOOKING_DISPLACED("booking.displaced");
 
     private final String templateKey;
 

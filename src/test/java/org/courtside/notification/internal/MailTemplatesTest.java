@@ -29,7 +29,8 @@ class MailTemplatesTest {
             entry("username", "doe.jane"), entry("credential", "a-credential"),
             entry("expiresOn", "1 May 2026"), entry("day", "Wednesday, 13 May 2026"),
             entry("from", "18:00"), entry("to", "19:00"), entry("courts", "Court 1"),
-            entry("card", "Member booking"), entry("player", "John Roe"));
+            entry("card", "Member booking"), entry("player", "John Roe"),
+            entry("closure", "A court your booking is on has been taken out of service"));
 
     private final MailTemplates templates = new MailTemplates();
 
@@ -79,6 +80,19 @@ class MailTemplatesTest {
                 .contains("Jane").doesNotContain("John Roe");
         assertThat(templates.render("booking.playerWithdrew.body", Locale.ENGLISH, VALUES))
                 .contains("John Roe");
+    }
+
+    @Test
+    void givenEachKindOfClosure_whenRenderedInEitherLocale_thenItSaysWhatWentOutOfService() {
+        // when / then — one message, three reasons, and none of them may fall back to English
+        assertThat(templates.render("booking.displaced.court", Locale.GERMAN, VALUES))
+                .isEqualTo("Ein Platz deiner Buchung ist außer Betrieb genommen worden");
+        assertThat(templates.render("booking.displaced.card", Locale.GERMAN, VALUES))
+                .contains("Member booking");
+        assertThat(templates.render("booking.displaced.day", Locale.ENGLISH, VALUES))
+                .isEqualTo("The club is closed on that day from now on");
+        assertThat(templates.render("booking.displaced.hours", Locale.ENGLISH, VALUES))
+                .isEqualTo("The opening hours on that day no longer cover your booking");
     }
 
     @Test

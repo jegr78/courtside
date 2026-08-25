@@ -42,14 +42,14 @@ class BookingMailer {
             return;
         }
         BookingAnnouncement booking = announced.get();
-        UserAccount account = accounts.findById(booking.bookedByAccountId()).orElse(null);
-        String address = account == null ? null : account.getPerson().getEmail();
-        if (address == null || address.isBlank()) {
-            log.info("Account {} has no address, so its booking confirmation stays unsent",
+        Optional<UserAccount> recipient =
+                MessageRecipient.reachable(accounts.findById(booking.bookedByAccountId()));
+        if (recipient.isEmpty()) {
+            log.info("Account {} cannot be reached, so its booking confirmation stays unsent",
                     booking.bookedByAccountId());
             return;
         }
-        send(booking, account, address);
+        send(booking, recipient.get(), recipient.get().getPerson().getEmail());
     }
 
     private void send(BookingAnnouncement booking, UserAccount account, String address) {
