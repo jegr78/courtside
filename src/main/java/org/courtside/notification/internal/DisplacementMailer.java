@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -45,10 +46,11 @@ class DisplacementMailer {
     // The booker is a player of their own booking too, so one account is written to once.
     private List<UserAccount> everybodyIn(BookingAnnouncement booking) {
         Map<UUID, UserAccount> byAccount = new LinkedHashMap<>();
-        accounts.findById(booking.bookedByAccountId())
+        MessageRecipient.reachable(accounts.findById(booking.bookedByAccountId()))
                 .ifPresent(account -> byAccount.put(account.getId(), account));
         if (!booking.playerPersonIds().isEmpty()) {
-            accounts.findByPersonIdIn(booking.playerPersonIds())
+            accounts.findByPersonIdIn(booking.playerPersonIds()).stream()
+                    .filter(account -> MessageRecipient.reachable(Optional.of(account)).isPresent())
                     .forEach(account -> byAccount.putIfAbsent(account.getId(), account));
         }
         return List.copyOf(byAccount.values());
@@ -57,10 +59,6 @@ class DisplacementMailer {
     private void send(BookingAnnouncement booking, UserAccount account,
                       BookingDisplaced.Closure closure) {
         String address = account.getPerson().getEmail();
-        if (address == null || address.isBlank()) {
-            log.info("Account {} has no address, so the closure notice stays unsent", account.getId());
-            return;
-        }
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_DISPLACED.templateKey();
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
@@ -77,6 +75,7 @@ class DisplacementMailer {
             case COURT_OUT_OF_SERVICE -> "court";
             case CARD_OUT_OF_SERVICE -> "card";
             case DAY_CLOSED -> "day";
+            case HOURS_NARROWED -> "hours";
         };
     }
 }

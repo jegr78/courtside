@@ -34,6 +34,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
@@ -174,6 +175,8 @@ class SeriesPreviewTest extends AbstractIntegrationTest {
     void givenARuleExpandingPastTheOccurrenceLimit_whenPreviewing_thenItIsRejectedBeforeAnyCalendarQuery() {
         // given
         SeriesRule rule = everyDayUntil(LocalDate.of(2026, 10, 24));
+        // Setting the opening hours asks what a change would displace, and that is not this path.
+        clearInvocations(allocations);
 
         // when / then
         assertThatThrownBy(() -> previewAsTrainer(rule))

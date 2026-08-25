@@ -91,6 +91,8 @@ class MailTemplatesTest {
                 .contains("Member booking");
         assertThat(templates.render("booking.displaced.day", Locale.ENGLISH, VALUES))
                 .isEqualTo("The club is closed on that day from now on");
+        assertThat(templates.render("booking.displaced.hours", Locale.ENGLISH, VALUES))
+                .isEqualTo("The opening hours on that day no longer cover your booking");
     }
 
     @Test

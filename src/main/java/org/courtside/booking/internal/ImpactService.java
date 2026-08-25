@@ -50,38 +50,53 @@ public class ImpactService {
     }
 
     public Impact ofDeactivating(UUID courtId, UUID cursor, int limit) {
+        return ofDeactivating(courtId, clock.instant(), cursor, limit);
+    }
+
+    // The caller pins the instant when it walks every page: reading the clock again per page lets a
+    // booking that starts in between drop out of the cursor's own comparison, and the walk ends there.
+    Impact ofDeactivating(UUID courtId, Instant from, UUID cursor, int limit) {
         validateLimit(limit);
         facility.findCourt(courtId).orElseThrow(
                 () -> new CourtNotFoundException("No court with id " + courtId));
-        Instant from = clock.instant();
         return impactOf(allocations.findImpactBookingIdsByCourt(
                         courtId, from, cursor == null, cursorOrFirstPage(cursor), page(limit)),
                 allocations.countImpactBookingsByCourt(courtId, from), limit);
     }
 
     public Impact ofRetiringCard(UUID cardId, UUID cursor, int limit) {
+        return ofRetiringCard(cardId, clock.instant(), cursor, limit);
+    }
+
+    Impact ofRetiringCard(UUID cardId, Instant from, UUID cursor, int limit) {
         validateLimit(limit);
         cards.findCard(cardId).orElseThrow(
                 () -> new CardNotFoundException("No booking card with id " + cardId));
-        Instant from = clock.instant();
         return impactOf(allocations.findImpactBookingIdsByCard(
                         cardId, from, cursor == null, cursorOrFirstPage(cursor), page(limit)),
                 allocations.countImpactBookingsByCard(cardId, from), limit);
     }
 
     public Impact ofClosingWeekday(DayOfWeek day, UUID cursor, int limit) {
-        return openingHoursImpact(day, true, LocalTime.MIN, LocalTime.MAX, cursor, limit);
+        return ofClosingWeekday(day, clock.instant(), cursor, limit);
+    }
+
+    Impact ofClosingWeekday(DayOfWeek day, Instant from, UUID cursor, int limit) {
+        return openingHoursImpact(day, true, LocalTime.MIN, LocalTime.MAX, from, cursor, limit);
     }
 
     public Impact ofOpeningHours(DayOfWeek day, OpeningWindow window, UUID cursor, int limit) {
+        return ofOpeningHours(day, window, clock.instant(), cursor, limit);
+    }
+
+    Impact ofOpeningHours(DayOfWeek day, OpeningWindow window, Instant from, UUID cursor, int limit) {
         OpeningWindow required = OpeningWindow.required(window);
-        return openingHoursImpact(day, false, required.opensAt(), required.closesAt(), cursor, limit);
+        return openingHoursImpact(day, false, required.opensAt(), required.closesAt(), from, cursor, limit);
     }
 
     private Impact openingHoursImpact(DayOfWeek day, boolean closed, LocalTime opensAt, LocalTime closesAt,
-                                      UUID cursor, int limit) {
+                                      Instant from, UUID cursor, int limit) {
         validateLimit(limit);
-        Instant from = clock.instant();
         List<UUID> bookingIds = allocations.findImpactBookingIdsByOpeningHours(
                 from, timeZone.id(), day.getValue(), closed, opensAt, closesAt,
                 cursor == null, cursorOrFirstPage(cursor), page(limit));

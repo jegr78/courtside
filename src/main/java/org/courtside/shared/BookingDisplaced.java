@@ -14,7 +14,8 @@ public record BookingDisplaced(UUID bookingId, Closure closure) implements Domai
     public enum Closure {
         COURT_OUT_OF_SERVICE,
         CARD_OUT_OF_SERVICE,
-        DAY_CLOSED
+        DAY_CLOSED,
+        HOURS_NARROWED
     }
 
     @Override

@@ -70,6 +70,7 @@ class ClosureMessageTest extends AbstractIntegrationTest {
     private UUID bookerPersonId;
     private UUID bookerAccountId;
     private UUID playerPersonId;
+    private UUID playerAccountId;
 
     @BeforeEach
     void aClubWithABookingOnWednesdayEvening() {
@@ -81,7 +82,7 @@ class ClosureMessageTest extends AbstractIntegrationTest {
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         bookerAccountId = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
         playerPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
-        identity.createEnabledAccount(playerPersonId, "roe.john", Set.of(Role.MEMBER));
+        playerAccountId = identity.createEnabledAccount(playerPersonId, "roe.john", Set.of(Role.MEMBER));
         book(courtId);
         clearInvocations(sender);
     }
@@ -118,6 +119,41 @@ class ClosureMessageTest extends AbstractIntegrationTest {
 
         // then
         assertThat(addressesWrittenTo()).contains("jane.doe@example.org");
+    }
+
+    @Test
+    void givenABookingInTheEvening_whenTheClubClosesEarlier_thenEverybodyInItIsTold()
+            throws Exception {
+        // when — the booking runs to 19:00 and the day now ends at 17:00
+        facility.setOpeningHours(DayOfWeek.WEDNESDAY,
+                new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(17, 0)));
+
+        // then
+        assertThat(addressesWrittenTo()).contains("jane.doe@example.org");
+        assertThat(lastBodyTo("jane.doe@example.org")).contains("13. Mai 2026");
+    }
+
+    @Test
+    void givenABookingWithinTheHours_whenTheClubOpensLonger_thenNobodyIsTold() {
+        // when
+        facility.setOpeningHours(DayOfWeek.WEDNESDAY,
+                new OpeningWindow(LocalTime.of(7, 0), LocalTime.of(23, 0)));
+
+        // then — widening displaces nobody, and a message about it would be noise
+        verify(sender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void givenAMemberWhoseAccountIsDeactivated_whenACourtGoesOutOfService_thenTheyAreNotWrittenTo()
+            throws Exception {
+        // given — somebody who has left the club keeps their bookings on the record
+        identity.disableAccount(playerAccountId);
+
+        // when
+        facility.setCourtActive(courtId, false);
+
+        // then
+        assertThat(addressesWrittenTo()).containsExactly("jane.doe@example.org");
     }
 
     @Test

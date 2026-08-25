@@ -66,17 +66,13 @@ class ParticipationMailer {
 
     private void send(BookingAnnouncement booking, Optional<UserAccount> recipient,
                       MessageKind kind, Map<String, String> extra) {
-        if (recipient.isEmpty()) {
-            log.info("A {} message has no account to reach", kind);
+        Optional<UserAccount> reachable = MessageRecipient.reachable(recipient);
+        if (reachable.isEmpty()) {
+            log.info("A {} message has nobody to reach", kind);
             return;
         }
-        UserAccount account = recipient.get();
+        UserAccount account = reachable.get();
         String address = account.getPerson().getEmail();
-        if (address == null || address.isBlank()) {
-            log.info("Account {} has no address, so its {} message stays unsent",
-                    account.getId(), kind);
-            return;
-        }
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
