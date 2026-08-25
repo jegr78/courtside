@@ -8,6 +8,8 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import org.courtside.api.ApiProblem;
+import org.courtside.api.ApiSetOpeningHoursRequest;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 
@@ -35,14 +37,14 @@ class OpenApiFormatContractTest {
         // given
         Map<String, Object> localTime = schema("LocalTime");
         Map<String, Object> nullableLocalTime = schema("NullableLocalTime");
-        Pattern pattern = Pattern.compile((String) localTime.get("x-format-pattern"));
+        Pattern pattern = Pattern.compile((String) localTime.get("pattern"));
 
         // when / then
         assertThat(localTime).containsEntry("type", "string").containsEntry("format", "local-time");
         assertThat(nullableLocalTime)
                 .containsEntry("type", List.of("string", "null"))
                 .containsEntry("format", "local-time")
-                .containsEntry("x-format-pattern", localTime.get("x-format-pattern"));
+                .containsEntry("pattern", localTime.get("pattern"));
         assertThat(List.of("00:00", "08:15", "23:59:59", "12:30:45.123456789"))
                 .allSatisfy(value -> assertThat(pattern.matcher(value).matches()).isTrue());
         assertThat(List.of("8:15", "24:00", "12:60", "12:30Z", "12:30:00+02:00", "12:30:00."))
@@ -62,6 +64,20 @@ class OpenApiFormatContractTest {
                 .containsEntry("$ref", "#/components/schemas/LocalTime");
         assertThat(parameter("/api/admin/impact/opening-hours/{day}", "closesAt"))
                 .containsEntry("$ref", "#/components/schemas/LocalTime");
+    }
+
+    @Test
+    void givenMappedLocalTimes_whenGeneratingBeanValidation_thenOnlyCompatibleAnnotationsRemain()
+            throws NoSuchMethodException {
+        // when
+        boolean localTimeHasPattern = ApiSetOpeningHoursRequest.class.getMethod("getOpensAt")
+                .isAnnotationPresent(jakarta.validation.constraints.Pattern.class);
+        boolean stringHasPattern = ApiProblem.class.getMethod("getTraceId")
+                .isAnnotationPresent(jakarta.validation.constraints.Pattern.class);
+
+        // then
+        assertThat(localTimeHasPattern).isFalse();
+        assertThat(stringHasPattern).isTrue();
     }
 
     @SuppressWarnings("unchecked")
