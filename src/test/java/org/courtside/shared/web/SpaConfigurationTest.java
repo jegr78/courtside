@@ -15,6 +15,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 
 class SpaConfigurationTest extends AbstractIntegrationTest {
 
@@ -36,7 +39,10 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
                 .andExpect(forwardedUrl("/index.html"))
                 .andExpect(header().string("X-Frame-Options", "DENY"))
                 .andExpect(header().string("Content-Security-Policy",
-                        org.hamcrest.Matchers.containsString("default-src 'self'")));
+                        allOf(containsString("default-src 'self'"),
+                                containsString("img-src 'self' https:"),
+                                not(containsString("http:")),
+                                not(containsString("data:")))));
     }
 
     @Test

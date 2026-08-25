@@ -179,6 +179,17 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenStoringAnInsecureRemoteLogo_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE club_config SET logo_url = 'http://images.example.org/logo.svg'
+                WHERE id = '00000000-0000-0000-0000-000000000001'
+                """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("club_config_logo_url_safe");
+    }
+
+    @Test
     void whenInsertingARuleDefinitionThatIsNotAKnownRuleType_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""

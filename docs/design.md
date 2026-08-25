@@ -1007,6 +1007,11 @@ belongs in code.
 **Branding** is served from a public endpoint `/api/public/config` that the PWA fetches at
 startup: club name, primary and accent colour, logo URL, imprint link, default locale.
 Colours are applied as CSS custom properties on `:root` — no rebuild per club.
+Logo URLs are either root-relative or HTTPS. A remote logo necessarily tells its operator the
+visitor's IP address and the Courtside origin, so clubs should serve the image from their own
+instance where possible. The CSP grants remote HTTPS only to images; every executable resource and
+network connection stays same-origin. The time-bounded acceptance for that remaining image-source
+scope lives in `security/exceptions.json`.
 
 The **booking-grid duration** is a club setting between 5 and 120 minutes in five-minute steps.
 The public grid, booking rules and series validation read the current database value through the

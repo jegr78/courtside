@@ -436,13 +436,14 @@ Until then, you can raise it yourself: look up the current tag's digest with
 `docker buildx imagetools inspect postgres:17-alpine` (or any of the others) and replace the
 `@sha256:…` suffix in `compose.yaml`.
 
-## Two things to adjust before the web client arrives
+## One setting to review for your domain
 
-- The `Content-Security-Policy` in the `Caddyfile` is `default-src 'none'`, which is right for a
-  JSON-only API and will block the web client the day it ships from the same origin.
 - `Strict-Transport-Security` carries `includeSubDomains`. If `COURTSIDE_DOMAIN` is your club's
   apex domain rather than a subdomain, that forces HTTPS on every other subdomain you own,
   including a club website that may still speak plain HTTP.
+
+Configure the club logo with a root-relative path served by this instance where possible. A remote
+logo must use HTTPS and discloses each visitor's IP address and the Courtside origin to its host.
 
 ## What this deployment does not solve yet
 

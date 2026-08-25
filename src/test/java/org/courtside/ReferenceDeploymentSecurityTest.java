@@ -198,6 +198,25 @@ class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void whenReadingEveryCaddyfile_thenProxyImplementationDisclosureIsRemoved() throws IOException {
+        // given
+        List<Path> caddyfiles;
+        try (var deploymentFiles = Files.list(Path.of("deploy"))) {
+            caddyfiles = deploymentFiles
+                    .filter(path -> path.getFileName().toString().startsWith("Caddyfile"))
+                    .sorted()
+                    .toList();
+        }
+
+        // when / then
+        for (Path caddyfile : caddyfiles) {
+            assertThat(Files.readString(caddyfile))
+                    .as("%s removes proxy implementation disclosure", caddyfile)
+                    .contains("-Via");
+        }
+    }
+
+    @Test
     void whenReadingEveryCaddyfile_thenTheSecurityHeadersAgree() throws IOException {
         // when
         String production = Files.readString(Path.of("deploy/Caddyfile"));

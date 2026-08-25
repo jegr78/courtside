@@ -344,7 +344,13 @@ components:
         clubName: { type: string }
         primaryColor: { type: string }
         accentColor: { type: string }
-        logoUrl: { type: [string, "null"] }
+        logoUrl:
+          type: [string, "null"]
+          maxLength: 500
+          pattern: "^(https://.+|/[^/\\\\].*|/)$"
+          description: |
+            A same-origin path or an HTTPS image URL. A remote image discloses the visitor's IP
+            address and the Courtside origin to its operator.
         imprintUrl: { type: [string, "null"] }
         defaultLocale: { type: string }
         supportedLocales:
@@ -394,7 +400,11 @@ components:
         logoUrl:
           type: [string, "null"]
           maxLength: 500
-          pattern: "^(https?://.+|/[^/\\\\].*|/)$"
+          pattern: "^(https://.+|/[^/\\\\].*|/)$"
+          description: |
+            A same-origin path or an HTTPS image URL. A remote image discloses the visitor's IP
+            address and the Courtside origin to its operator, so clubs should prefer a path they
+            serve from their own instance.
         imprintUrl:
           type: [string, "null"]
           maxLength: 500

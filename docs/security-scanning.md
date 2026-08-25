@@ -21,6 +21,12 @@ The same file contains dynamic `riskAcceptances`, keyed by the stable fingerprin
 scanner result and a reproducibly validated product vulnerability do not have the same identity or
 state. The closed schema rejects fields that could become an informal evidence store.
 
+The current acceptance covers only the CSP observation caused by administrator-selected HTTPS
+club logos. It expires on 30 November 2026. The image request may disclose a visitor's IP address
+and the Courtside origin to that host; executable resources and application connections remain
+same-origin, and clubs can avoid the disclosure with a root-relative logo. The acceptance must be
+removed when same-origin asset hosting replaces the external-image requirement.
+
 The project currently has a single maintainer. That maintainer may set `independentReview` to `false` to stay operational, but the missing peer review remains visible in the record. This is intentionally not an approval requirement until another regular maintainer exists.
 
 Raw scanner output is temporary because it can contain source excerpts or secret matches. The

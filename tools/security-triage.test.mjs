@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,6 +18,9 @@ const schema = JSON.parse(readFileSync(new URL("../security/finding-lifecycle.sc
 const exceptionSchema = JSON.parse(readFileSync(new URL("../security/exceptions.schema.json", import.meta.url)));
 const exceptionPolicy = JSON.parse(readFileSync(new URL("../security/exceptions.json", import.meta.url)));
 const documentation = readFileSync(new URL("../docs/security-findings.md", import.meta.url), "utf8");
+const baselineDocumentation = readFileSync(new URL("../docs/security-baseline.md", import.meta.url), "utf8");
+const baselineSummaryBytes = readFileSync(new URL("../security/passive-baseline-finding-summary.json", import.meta.url));
+const baselineSummary = JSON.parse(baselineSummaryBytes);
 const digest = `sha256:${"a".repeat(64)}`;
 
 function lifecycle(overrides = {}) {
@@ -427,7 +431,7 @@ test("given an untriaged lifecycle file, when evaluating it through the CLI, the
     },
     candidates: [candidate()], findings: [], riskAcceptances: []
   }));
-  writeFileSync(policyPath, JSON.stringify(exceptionPolicy));
+  writeFileSync(policyPath, JSON.stringify({ ...exceptionPolicy, riskAcceptances: [] }));
 
   try {
     // when
@@ -446,4 +450,19 @@ test("given an untriaged lifecycle file, when evaluating it through the CLI, the
   } finally {
     rmSync(directory, { recursive: true });
   }
+});
+
+test("given the passive baseline acceptance, when reading its public proof, then policy finding and digest remain bound", () => {
+  // given
+  const acceptance = exceptionPolicy.riskAcceptances.find((entry) => entry.id === "remote-https-club-logo-2026");
+  const acceptedFindings = baselineSummary.findings.filter((finding) => finding.state === "accepted-risk");
+  const summaryDigest = `sha256:${createHash("sha256").update(baselineSummaryBytes).digest("hex")}`;
+
+  // when / then
+  assert.equal(baselineSummary.run.runId, "issue471-closed");
+  assert.equal(baselineSummary.outcome.outcome, "incomplete");
+  assert.deepEqual(baselineSummary.counts, { candidates: 16, findings: 1, regressions: 0 });
+  assert.equal(acceptedFindings.length, 1);
+  assert.equal(acceptedFindings[0].fingerprint, acceptance.fingerprint);
+  assert.match(baselineDocumentation, new RegExp(summaryDigest));
 });
