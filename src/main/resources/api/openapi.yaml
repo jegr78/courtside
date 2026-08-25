@@ -253,7 +253,7 @@ components:
             a caller's input — the translatable part is in `violations`.
         instance:
           type: string
-          format: uri
+          format: uri-reference
         traceId:
           type: string
           pattern: "^[0-9a-f]{32}$"
@@ -293,6 +293,20 @@ components:
         number: { type: integer, minimum: 1, maximum: 999 }
         name: { type: string, maxLength: 60 }
 
+    LocalTime:
+      type: string
+      format: local-time
+      pattern: '^(?:[01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9](?:\.[0-9]{1,9})?)?$'
+      x-courtside-skip-pattern-annotation: true
+      description: A club-local wall-clock time without an offset or time zone.
+
+    NullableLocalTime:
+      type: [string, "null"]
+      format: local-time
+      pattern: '^(?:[01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9](?:\.[0-9]{1,9})?)?$'
+      x-courtside-skip-pattern-annotation: true
+      description: A club-local wall-clock time without an offset or time zone, or null.
+
     OpeningHours:
       type: object
       description: |
@@ -302,8 +316,8 @@ components:
       required: [dayOfWeek]
       properties:
         dayOfWeek: { $ref: "#/components/schemas/DayOfWeek" }
-        opensAt: { type: [string, "null"], format: time }
-        closesAt: { type: [string, "null"], format: time }
+        opensAt: { $ref: "#/components/schemas/NullableLocalTime" }
+        closesAt: { $ref: "#/components/schemas/NullableLocalTime" }
 
     BookingGrid:
       type: object
@@ -319,8 +333,8 @@ components:
       type: object
       required: [opensAt, closesAt]
       properties:
-        opensAt: { type: string, format: time }
-        closesAt: { type: string, format: time }
+        opensAt: { $ref: "#/components/schemas/LocalTime" }
+        closesAt: { $ref: "#/components/schemas/LocalTime" }
 
     ClubConfig:
       type: object
@@ -1482,7 +1496,7 @@ components:
           type: string
           format: date
           description: Occurrences before the current instant cannot be created.
-        startTime: { type: string, format: time }
+        startTime: { $ref: "#/components/schemas/LocalTime" }
         durationMinutes: { type: integer, minimum: 1, maximum: 1440 }
         intervalWeeks: { type: integer, minimum: 1, maximum: 52 }
         weekdays:
@@ -1609,7 +1623,7 @@ components:
       properties:
         fromBookingId: { type: string, format: uuid }
         scope: { $ref: "#/components/schemas/CancelScope" }
-        newStartTime: { type: [string, "null"], format: time }
+        newStartTime: { $ref: "#/components/schemas/NullableLocalTime" }
         newDurationMinutes: { type: [integer, "null"], minimum: 1 }
         newCourtIds:
           type: [array, "null"]
@@ -4640,11 +4654,11 @@ paths:
         - name: opensAt
           in: query
           required: false
-          schema: { type: string, format: time }
+          schema: { $ref: "#/components/schemas/LocalTime" }
         - name: closesAt
           in: query
           required: false
-          schema: { type: string, format: time }
+          schema: { $ref: "#/components/schemas/LocalTime" }
         - $ref: "#/components/parameters/PageCursor"
         - $ref: "#/components/parameters/PageLimit"
       responses:

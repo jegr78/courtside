@@ -346,6 +346,7 @@
                                 <!-- DayOfWeek is deliberately not mapped: it would reach
                                      properties but not path variables. -->
                                 <typeMapping>time=LocalTime</typeMapping>
+                                <typeMapping>local-time=LocalTime</typeMapping>
                             </typeMappings>
                             <importMappings>
                                 <importMapping>JsonDeserialize=tools.jackson.databind.annotation.JsonDeserialize</importMapping>
