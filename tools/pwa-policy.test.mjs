@@ -49,6 +49,11 @@ test("given the installed PWA, when its lifecycle is qualified, then shell avail
   assert.match(pwa, /\/api\//);
 });
 
+test("given the installed PWA, when checking supported engines, then Chromium and WebKit run its signed-in journey", () => {
+  assert.match(playwright, /name: "webkit-pwa".*pwa-browser-compatibility\\\.spec\\\.ts/);
+  assert.match(playwright, /name: "chromium"/);
+});
+
 test("given a release on physical devices, when recording evidence, then both mobile platforms and immutable candidate identity are required", () => {
   assert.match(documentation, /iOS\/Safari/);
   assert.match(documentation, /Android\/Chrome/);

@@ -26,9 +26,10 @@ interface BrowserGateOptions {
   globalErrors?: ReadonlyArray<TestError>;
 }
 
-function claimStatus(results: GateResult[], projectName: string, required: boolean): { product: ClaimStatus; harnessIncomplete: boolean } {
-  const projectResults = results.filter((result) => result.projectName === projectName);
-  if (projectResults.length === 0) {
+function claimStatus(results: GateResult[], projectNames: string | string[], required: boolean): { product: ClaimStatus; harnessIncomplete: boolean } {
+  const names = Array.isArray(projectNames) ? projectNames : [projectNames];
+  const projectResults = results.filter((result) => names.includes(result.projectName));
+  if (projectResults.length === 0 || required && names.some((name) => !results.some((result) => result.projectName === name))) {
     return required
       ? { product: "not-established", harnessIncomplete: true }
       : { product: "not-run", harnessIncomplete: false };
@@ -47,9 +48,10 @@ function claimStatus(results: GateResult[], projectName: string, required: boole
 export function browserGateOutcome(results: GateResult[], runStatus: FullResult["status"] = "passed",
   options: BrowserGateOptions = {}): BrowserGateOutcome {
   const accessibility = claimStatus(results, "chromium-accessibility", true);
-  const webkit = claimStatus(results, "webkit-core", true);
+  const webkitProjects = ["webkit-core", "webkit-pwa"];
+  const webkit = claimStatus(results, webkitProjects, true);
   const webkitAxe = claimStatus(results, "webkit-accessibility", options.webkitAxeRequired === true);
-  const claimProjects = new Set(["chromium-accessibility", "webkit-core", "webkit-accessibility"]);
+  const claimProjects = new Set(["chromium-accessibility", ...webkitProjects, "webkit-accessibility"]);
   const hasUntrackedFailure = results.some((result) => !claimProjects.has(result.projectName) && result.status !== "passed");
   const hasGlobalFailure = (options.globalErrors?.length ?? 0) > 0;
   const hasClaimProductFailure = [accessibility, webkit, webkitAxe].some((claim) => claim.product === "failed");
