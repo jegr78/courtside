@@ -5,6 +5,7 @@
   "maxExamples": 5,
   "workers": 1,
   "requestTimeoutSeconds": 5,
+  "negativeInputProxyStatuses": [421],
   "maxFailures": 100,
   "phases": ["examples", "coverage", "fuzzing"],
   "inputClasses": [
@@ -34,6 +35,7 @@
   ],
   "nativeRequestReserve": 80,
   "excludedOperations": {
+    "getApiDocument": "The SECURITY deployment does not expose its source contract through the assessed proxy.",
     "logIn": "Authentication enumeration and rate limiting are covered by CSA-AUTHN-001.",
     "logOut": "Session invalidation is covered by CSA-AUTHN-001 and browser security journeys.",
     "changeInitialPassword": "The bootstrap-only transition is covered by packaged browser security journeys.",
