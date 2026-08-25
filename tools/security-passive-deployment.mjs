@@ -152,15 +152,28 @@ export function buildPassiveDeploymentEvidence({
 export function evaluatePublicResponseHeaders(response) {
   const contentSecurityPolicy = response.headers.get("content-security-policy") ?? "";
   const permissionsPolicy = response.headers.get("permissions-policy") ?? "";
+  const parsedDirectives = contentSecurityPolicy.split(";").map((directive) => directive.trim())
+    .filter(Boolean).map((directive) => directive.split(/\s+/).map((part) => part.toLowerCase()));
+  const expectedDirectives = new Map([
+    ["default-src", ["'self'"]], ["object-src", ["'none'"]],
+    ["img-src", ["'self'", "https:"]], ["style-src", ["'self'"]],
+    ["script-src", ["'self'"]], ["connect-src", ["'self'"]],
+    ["manifest-src", ["'self'"]], ["worker-src", ["'self'"]],
+    ["frame-ancestors", ["'none'"]], ["base-uri", ["'self'"]],
+    ["form-action", ["'self'"]]
+  ]);
+  const cspValid = parsedDirectives.length === expectedDirectives.size
+    && new Set(parsedDirectives.map(([name]) => name)).size === expectedDirectives.size
+    && parsedDirectives.every(([name, ...sources]) => {
+      const expectedSources = expectedDirectives.get(name);
+      return expectedSources !== undefined && sources.length === expectedSources.length
+        && expectedSources.every((source) => sources.includes(source));
+    });
   const passed = securityHeaders.every((header) => response.headers.has(header))
     && response.headers.get("x-content-type-options") === "nosniff"
     && response.headers.get("x-frame-options") === "DENY"
     && response.headers.get("referrer-policy") === "strict-origin-when-cross-origin"
-    && ["default-src 'self'", "script-src 'self'", "object-src 'none'", "img-src 'self' https:",
-      "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'"].every((directive) =>
-      contentSecurityPolicy.includes(directive))
-    && !contentSecurityPolicy.includes("'unsafe-eval'") && !contentSecurityPolicy.includes("*")
-    && !contentSecurityPolicy.includes("http:") && !contentSecurityPolicy.includes("data:")
+    && cspValid
     && ["geolocation=()", "camera=()", "microphone=()"].every((directive) =>
       permissionsPolicy.includes(directive))
     && !response.headers.has("server") && !response.headers.has("via") && response.cacheProtected;

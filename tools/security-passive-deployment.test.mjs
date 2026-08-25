@@ -44,7 +44,8 @@ test("given the public response boundary, when CSP or proxy disclosure is broade
   // given
   const headers = new Map([
     ["content-security-policy", "default-src 'self'; object-src 'none'; img-src 'self' https:; "
-      + "style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"],
+      + "style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
+      + "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"],
     ["x-content-type-options", "nosniff"], ["x-frame-options", "DENY"],
     ["referrer-policy", "strict-origin-when-cross-origin"],
     ["permissions-policy", "geolocation=(), camera=(), microphone=()"]
@@ -62,6 +63,15 @@ test("given the public response boundary, when CSP or proxy disclosure is broade
     headers: new Map([...headers, ["content-security-policy",
       headers.get("content-security-policy").replace("https:", "https: http: data:")]])
   }), { passed: false, observation: "security-or-cache-headers-invalid" });
+  for (const broaderPolicy of [
+    headers.get("content-security-policy").replace("https:", "https: blob:"),
+    headers.get("content-security-policy").replace("https:", "https: HTTP:"),
+    `${headers.get("content-security-policy")}; img-src 'self' http:`
+  ]) {
+    assert.deepEqual(evaluatePublicResponseHeaders({ ...response,
+      headers: new Map([...headers, ["content-security-policy", broaderPolicy]])
+    }), { passed: false, observation: "security-or-cache-headers-invalid" });
+  }
 });
 
 test("given passing layer observations, when building passive evidence, then only closed redacted facts remain", () => {
