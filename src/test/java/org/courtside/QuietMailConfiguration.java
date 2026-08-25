@@ -24,10 +24,15 @@ class QuietMailConfiguration {
         };
     }
 
-    // On the caller's thread, so a credential is issued before the test method returns and the
+    // On the caller's thread, so a message is written before the test method returns and the
     // listener cannot race the truncation that follows it.
     @Bean
     TaskExecutor credentialMailExecutor() {
+        return new SyncTaskExecutor();
+    }
+
+    @Bean
+    TaskExecutor bookingMailExecutor() {
         return new SyncTaskExecutor();
     }
 }

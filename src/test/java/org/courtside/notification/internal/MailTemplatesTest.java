@@ -21,9 +21,12 @@ class MailTemplatesTest {
             .flatMap(kind -> Stream.of(kind.templateKey() + ".subject", kind.templateKey() + ".body"))
             .collect(Collectors.toSet());
 
+    // Every value any message names, so a template that reaches for a new one is caught here.
     private static final Map<String, String> VALUES = Map.of("clubName", "Example Tennis Club",
             "firstName", "Jane", "username", "doe.jane",
-            "credential", "a-credential", "expiresOn", "1 May 2026");
+            "credential", "a-credential", "expiresOn", "1 May 2026",
+            "day", "Wednesday, 13 May 2026", "from", "18:00", "to", "19:00",
+            "courts", "Court 1", "card", "Member booking");
 
     private final MailTemplates templates = new MailTemplates();
 
@@ -38,7 +41,7 @@ class MailTemplatesTest {
     }
 
     @Test
-    void givenACredentialMessage_whenRenderedInEitherLocale_thenNoPlaceholderSurvives() {
+    void givenEveryMessage_whenRenderedInEitherLocale_thenNoPlaceholderSurvives() {
         // when / then — an unresolved {name} would reach a member as punctuation
         for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
             for (String key : KEYS) {
@@ -47,6 +50,23 @@ class MailTemplatesTest {
                         .doesNotContain("{").doesNotContain("}");
             }
         }
+    }
+
+    @Test
+    void givenACourtWithoutAName_whenRenderedInEitherLocale_thenItIsNamedByItsNumber() {
+        // when / then — the grid says the same thing, and a message must not fall back to English
+        assertThat(templates.render("booking.court", Locale.GERMAN, Map.of("number", "3")))
+                .isEqualTo("Platz 3");
+        assertThat(templates.render("booking.court", Locale.ENGLISH, Map.of("number", "3")))
+                .isEqualTo("Court 3");
+    }
+
+    @Test
+    void givenABookingConfirmation_whenRendered_thenItCarriesThePeriodTheCourtAndTheCard() {
+        // when / then
+        assertThat(templates.render("booking.confirmed.body", Locale.GERMAN, VALUES))
+                .contains("Wednesday, 13 May 2026").contains("18:00").contains("19:00")
+                .contains("Court 1").contains("Member booking");
     }
 
     @Test

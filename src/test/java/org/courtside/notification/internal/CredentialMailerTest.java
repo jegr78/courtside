@@ -41,7 +41,8 @@ class CredentialMailerTest {
     private final MessageLog messages = mock(MessageLog.class);
 
     private final CredentialMailer mailer = new CredentialMailer(credentials, validity, club,
-            new MailTemplates(), dispatch, new MailHandover(gap -> { }), properties, messages,
+            new MailTemplates(),
+            new RecordedHandover(dispatch, new MailHandover(gap -> { }), properties, messages),
             Clock.fixed(NOW, ZONE));
 
     @Test

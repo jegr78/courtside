@@ -17,8 +17,10 @@ import org.courtside.facility.FacilityService;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.shared.BookingConfirmed;
 import org.courtside.shared.TimeSlot;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +54,7 @@ class BookingWriter {
     private final ParticipantCardCapacity participantCardCapacity;
     private final BookingGridCoordination bookingGridCoordination;
     private final MeterRegistry meters;
+    private final ApplicationEventPublisher events;
 
     UUID write(CreateBookingCommand command) {
         return write(command, null, null);
@@ -86,6 +89,10 @@ class BookingWriter {
             throw e;
         }
         meters.counter("courtside.bookings.created").increment();
+        // A series is one decision and gets one message of its own, not one per occurrence.
+        if (command.seriesId() == null) {
+            events.publishEvent(new BookingConfirmed(booking.getId()));
+        }
         return booking.getId();
     }
 
