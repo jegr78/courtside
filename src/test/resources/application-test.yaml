@@ -16,6 +16,9 @@ server:
         secure: false
 
 spring:
+  modulith:
+    moments:
+      enabled: false
   datasource:
     hikari:
       maximum-pool-size: 4
