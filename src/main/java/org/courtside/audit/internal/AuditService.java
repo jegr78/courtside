@@ -8,12 +8,14 @@ import org.courtside.shared.CursorPage;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -89,9 +91,14 @@ public class AuditService {
                 actorAccountId, actorUsername);
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> payloadOf(String payload) {
-        return json.readValue(payload, Map.class);
+        JsonNode root = json.readTree(payload);
+        if (!root.isObject()) {
+            throw new IllegalStateException("Stored audit payload must be a JSON object");
+        }
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        root.forEachEntry(parameters::put);
+        return Collections.unmodifiableMap(parameters);
     }
 
     private static void validateLimit(int limit) {
