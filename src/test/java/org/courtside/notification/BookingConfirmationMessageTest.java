@@ -43,6 +43,7 @@ import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
@@ -171,6 +172,18 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheSameRequestTwice_whenTheSecondIsAnswered_thenOnlyOneConfirmationGoesOut() {
+        // given — the key a client repeats after a connection it never saw answered
+        book(List.of(courtId), "one-and-the-same-request");
+
+        // when
+        book(List.of(courtId), "one-and-the-same-request");
+
+        // then — the replay answers with the booking that exists, so nothing is confirmed twice
+        verify(sender, times(1)).send(any(MimeMessage.class));
+    }
+
+    @Test
     void givenASeriesOfOccurrences_whenItIsCreated_thenNoOccurrenceConfirmsItself() {
         // given
         UUID trainerPerson = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
@@ -215,9 +228,17 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
     }
 
     private void book(List<UUID> courtIds) {
-        bookings.create(new CreateBookingCommand(courtIds, MEMBER_BOOKING_CARD,
+        bookings.create(command(courtIds));
+    }
+
+    private void book(List<UUID> courtIds, String idempotencyKey) {
+        bookings.create(command(courtIds), idempotencyKey);
+    }
+
+    private CreateBookingCommand command(List<UUID> courtIds) {
+        return new CreateBookingCommand(courtIds, MEMBER_BOOKING_CARD,
                 new TimeSlot(SIX_PM, SEVEN_PM), accountId, personId, Set.of(Role.MEMBER), null,
-                List.of(ParticipantSpec.guest("John Roe")), null));
+                List.of(ParticipantSpec.guest("John Roe")), null);
     }
 
     private Map<String, Object> record() {

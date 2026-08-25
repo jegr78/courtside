@@ -23,7 +23,6 @@ import java.time.format.FormatStyle;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -35,12 +34,9 @@ class BookingMailer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
-    private final MailDispatch dispatch;
-    private final MailHandover handover;
-    private final MailProperties properties;
-    private final MessageLog messages;
+    private final RecordedHandover handover;
 
-    @Async("outboundMailExecutor")
+    @Async("bookingMailExecutor")
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener
     void on(BookingConfirmed confirmed) {
@@ -61,7 +57,7 @@ class BookingMailer {
     }
 
     private void send(BookingAnnouncement booking, UserAccount account, String address) {
-        Locale locale = localeOf(account);
+        Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_CONFIRMED.templateKey();
         Map<String, String> values = Map.of(
                 "clubName", club.clubName(),
@@ -71,20 +67,9 @@ class BookingMailer {
                 "to", time(booking.endsAt()),
                 "courts", courts(booking, locale),
                 "card", booking.cardLabel());
-        String messageId = MailDispatch.newMessageId(senderDomain());
-        String subject = templates.render(key + ".subject", locale, values);
-        String body = templates.render(key + ".body", locale, values);
-        UUID record = messages.queued(account.getId(), MessageKind.BOOKING_CONFIRMED, messageId);
-        try {
-            handover.attempt(messageId, () -> dispatch.send(address, subject, body, messageId));
-        } catch (MailRecipientRefusedException refusal) {
-            messages.refused(record, refusal.diagnosis(), refusal.statusCode());
-            throw refusal;
-        } catch (RuntimeException failure) {
-            messages.failed(record, diagnosisOf(failure));
-            throw failure;
-        }
-        messages.handedOver(record);
+        handover.handOver(account.getId(), MessageKind.BOOKING_CONFIRMED, address,
+                templates.render(key + ".subject", locale, values),
+                templates.render(key + ".body", locale, values));
         log.info("Handed over the booking confirmation for account {}", account.getId());
     }
 
@@ -106,25 +91,7 @@ class BookingMailer {
         return DateTimeFormatter.ofPattern("HH:mm").format(ZonedDateTime.ofInstant(instant, zone()));
     }
 
-    private Locale localeOf(UserAccount account) {
-        String tag = account.getLocale() == null || account.getLocale().isBlank()
-                ? club.defaultLocale()
-                : account.getLocale();
-        return Locale.forLanguageTag(tag);
-    }
-
     private ZoneId zone() {
         return club.zoneId();
-    }
-
-    private static String diagnosisOf(RuntimeException failure) {
-        return failure instanceof MailHandoverFailedException handover
-                ? handover.diagnosis()
-                : failure.getClass().getSimpleName();
-    }
-
-    private String senderDomain() {
-        String from = properties.from();
-        return from.substring(from.indexOf('@') + 1);
     }
 }

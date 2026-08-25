@@ -19,12 +19,24 @@ class NotificationConfiguration {
     // Handing a message over waits for the relay, and the shared executor also carries the audit
     // trail and every other module's listeners, which must not queue behind a mail server.
     @Bean
-    @ConditionalOnMissingBean(name = "outboundMailExecutor")
-    TaskExecutor outboundMailExecutor() {
+    @ConditionalOnMissingBean(name = "credentialMailExecutor")
+    TaskExecutor credentialMailExecutor() {
+        return mailExecutor("credential-mail-");
+    }
+
+    // Its own pool, because a relay that has stopped answering holds a thread for the whole retry
+    // ladder: a busy evening of bookings must not delay the message somebody cannot sign in without.
+    @Bean
+    @ConditionalOnMissingBean(name = "bookingMailExecutor")
+    TaskExecutor bookingMailExecutor() {
+        return mailExecutor("booking-mail-");
+    }
+
+    private static TaskExecutor mailExecutor(String threadNamePrefix) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
         executor.setMaxPoolSize(4);
-        executor.setThreadNamePrefix("outbound-mail-");
+        executor.setThreadNamePrefix(threadNamePrefix);
         executor.initialize();
         return executor;
     }
