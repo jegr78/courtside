@@ -57,7 +57,7 @@ remaining observations led to explicit work rather than scanner suppression:
 
 The #471 retest used commit `918011b8c863e27e9e4a1c2fd17f4fbc6127e172` and qualified image
 `sha256:2c0b5af51fc09f1aecfaf20bc4263f7ec58538f5fefc2b8b32ebe61e338e56ee`.
-UAT verified the response through Caddy before safe attempt 1 of run `issue471-final` reused that
+UAT verified the response through Caddy before safe attempt 1 of run `issue471-closed` reused that
 exact image. All 28 native deployment checks passed or were not applicable. Each of the five
 public response checks observed the narrowed image policy and no `Server` or `Via` header.
 
