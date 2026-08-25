@@ -2,6 +2,7 @@ package org.courtside.booking;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +22,23 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     @EntityGraph(attributePaths = "participants")
     Optional<Booking> findWithParticipantsById(UUID id);
+
+    @Query(value = """
+            SELECT DISTINCT b.id FROM booking b
+            JOIN court_allocation a ON a.booking_id = b.id
+            WHERE b.status = 'CONFIRMED'
+              AND b.reminded_at IS NULL
+              AND a.status = 'CONFIRMED'
+              AND a.starts_at BETWEEN :from AND :until
+            """, nativeQuery = true)
+    List<UUID> findDueForReminder(@Param("from") Instant from, @Param("until") Instant until);
+
+    // The claim is the guard: whoever changes the row from null is the one that sends, so a second
+    // sweep - or a second instance - finds nothing to do.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE booking SET reminded_at = :at WHERE id = :id AND reminded_at IS NULL",
+            nativeQuery = true)
+    int claimReminder(@Param("id") UUID id, @Param("at") Instant at);
 
     @Query("""
             SELECT count(b) FROM Booking b

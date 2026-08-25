@@ -369,10 +369,11 @@ components:
       allOf:
         - $ref: "#/components/schemas/ClubConfig"
         - type: object
-          required: [newAccountCredentialHours, passwordResetCredentialHours]
+          required: [newAccountCredentialHours, passwordResetCredentialHours, bookingReminderHours]
           properties:
             newAccountCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
             passwordResetCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
+            bookingReminderHours: { type: integer, minimum: 0, maximum: 168 }
             noMembershipTypeRuleSetId:
               type: [string, "null"]
               format: uuid
@@ -385,7 +386,7 @@ components:
     ClubConfigRequest:
       type: object
       required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes, timeZone,
-                 newAccountCredentialHours, passwordResetCredentialHours]
+                 newAccountCredentialHours, passwordResetCredentialHours, bookingReminderHours]
       properties:
         clubName: { type: string, maxLength: 100, pattern: ".*\\S.*" }
         primaryColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
@@ -410,6 +411,13 @@ components:
             refused: the club grid has to follow daylight saving. It can only be changed while
             no confirmed future booking exists.
           example: Europe/Berlin
+        bookingReminderHours:
+          type: integer
+          minimum: 0
+          maximum: 168
+          description: |
+            How long before a booking starts its people are reminded of it. `0` switches reminders
+            off; the club decides, because a day's notice serves one club and an hour serves another.
         newAccountCredentialHours:
           type: integer
           minimum: 1
@@ -1729,7 +1737,8 @@ components:
         What a message was. The client resolves its label from this; the value is the message's own
         name, not the reason another part of the instance had for asking.
       enum: [CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, BOOKING_CONFIRMED,
-             BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED]
+             BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
+             BOOKING_REMINDER]
 
     MessageState:
       type: string
