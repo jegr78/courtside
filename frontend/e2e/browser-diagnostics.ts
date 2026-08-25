@@ -48,6 +48,7 @@ export const browserFailureReasons = [
   "page-crashed",
   "target-lost",
   "test-timeout",
+  "product-failure",
   "harness-incomplete"
 ] as const;
 
@@ -84,6 +85,7 @@ export function classifyBrowserFailure(errors: ReadonlyArray<{ message?: string 
   if (/WebKit encountered an internal error/i.test(messages)) return "browser-internal-error";
   if (/Target page, context or browser has been closed/i.test(messages)) return "target-lost";
   if (state.timedOut || /Test timeout of \d+ms exceeded/i.test(messages)) return "test-timeout";
+  if (/(?:Error:\s*)?expect\([^\n]*\)\.(?:to|not\.)|expect\([^\n]*\) failed/i.test(messages)) return "product-failure";
   return "harness-incomplete";
 }
 

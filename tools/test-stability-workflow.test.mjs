@@ -27,6 +27,7 @@ test("given a required build failure, when collecting evidence, then backend and
   assert.match(build, /frontend\/test-results\/\*\*\/\*\.png/);
   assert.match(build, /frontend\/test-results\/browser-diagnostics\/\*\.json/);
   assert.match(browserOrder, /frontend\/test-results\/browser-diagnostics\/\*\.json/);
+  assert.match(browserOrder, /frontend\/test-results\/browser-gate-outcome\.json/);
   assert.match(browserOrder, /frontend\/test-results\/\*\*\/trace\.zip/);
   assert.match(browserOrder, /frontend\/test-results\/\*\*\/error-context\.md/);
   assert.doesNotMatch(build, /frontend\/playwright-report/);

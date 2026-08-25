@@ -161,6 +161,14 @@ baseline would go unnoticed. The pull request must expose the changed PNG baseli
 Unreviewed dimension-only screenshots remain diagnostic artifacts and never replace these
 assertions.
 
+The pull-request browser gate makes two separate product claims. Chromium runs the blocking
+automated WCAG 2.2 AA rule scan, while WebKit runs blocking core compatibility journeys. WebKit
+plus axe remains a qualification signal until retained first-attempt evidence supports admitting
+that combination. Browser process loss, an internal engine error, a lost target or a test-level
+timeout makes the harness outcome incomplete. A failed product assertion remains a product
+failure. The retained browser outcome records those claims separately, and neither class can turn
+the other green.
+
 ### Operations and release
 
 | ID | Impact | Likelihood | Invariant | Positive boundaries | Negative boundaries | Level | Frequency | Environment | Synthetic data | Evidence | Owner | Residual risk |

@@ -1,8 +1,10 @@
 # Browser and PWA qualification
 
-Courtside treats Chromium and WebKit as required desktop engines. The merge gate runs the full
-Chromium suite, the WebKit accessibility suite and core member and administration journeys in
-WebKit. The scheduled stability workflow adds Firefox, iPhone/Safari emulation and Android/Chrome
+Courtside treats Chromium and WebKit as required desktop engines. The merge gate runs Chromium
+core and accessibility projects plus core member and administration journeys in WebKit. Chromium
+owns the blocking automated WCAG rule scan. The WebKit plus axe combination remains in the
+scheduled reliability and release qualification path until first-attempt evidence qualifies it.
+The scheduled stability workflow adds Firefox, iPhone/Safari emulation and Android/Chrome
 emulation. Emulation exercises layout, touch input and browser-engine behaviour; it is not evidence
 for operating-system integration or a physical device.
 
