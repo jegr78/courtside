@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "run": {
+    "runId": "issue471-closed",
+    "attempt": 1,
+    "subject": "commit:918011b8c863e27e9e4a1c2fd17f4fbc6127e172",
+    "profile": "safe",
+    "outcome": "incomplete",
+    "targetFingerprint": "sha256:0373e1ced3045b6ff5a4c49e9e77131ff794b60e43c0bbbfd600b6a455169874",
+    "catalogVersion": "1.2.0",
+    "recordedAt": "2026-08-25T16:51:11.945Z"
+  },
+  "outcome": {
+    "outcome": "incomplete",
+    "reason": "16 candidates await reproducible validation"
+  },
+  "counts": {
+    "candidates": 16,
+    "findings": 1,
+    "regressions": 0
+  },
+  "candidates": [
+    {
+      "fingerprint": "sha256:72d463ad328d30debba156877a337ed12dfe24bdc80618cd7a55a5770d04cb5c",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:9c73255b8d13ec2a6f513d36bcee03e22d02e36b993ea6c0c87c2db632265a59",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:b9e12358e2e013416507e4b258f3e43f334a9523bc2837d4100b351af8309efa",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:5f2e3bdd3862370b5dddcba7c097d6f318c9f4fdcea99d9cec5f84bc78b74164",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:cd72fbb0d93d406d3346215bf2c8852e1be8be15f2ac98c8dc2bce1bd4a0cd6e",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:6744ae243ecc24def5606740af614410a70a72e0569fd5dec781f41a7b9d77d6",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:a9fc632afa43aef6c029bf3637dd2fa28eba77ecd9c055553f31146bcc48d63c",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:709aca5ed4cf5b6aa77441e22f5442588f29a38ff43739e9de5cc68d30d4999c",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:2b3411455c863a0abe4941dfa9d695ea5ae6833bfe27098aa4f4b34b44210156",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:d0cf267d035b732644df536ce3697ec06d21f221f1be8f8d6b8cf5996b4ab4f6",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:108032a24f79b0628f05edfdd22b3d996ca4a2c8fae7ec6eee9c4d17f741bdf2",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:19e44d60d9d6f5c78367509375d51e70fcc8f6bfe12e2e274e9a7c08818a9ed0",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:7ab39a7d7cecf5f588ba44d03ea2a5be158f42dcbcec59708c5332fd1dbfec68",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:2176e227ce4a272db3b56df72f808aac6e9b51b386cc21379b19caae9d749fbf",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:a4fd238ee4d552bc1381e2c9b399f36036e8ae16ff499bf58ada5beb776cb20e",
+      "state": "candidate",
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:e9d569b4fa31f833c4bddbb2da00b4ef14f66b1e02718f2ee40dc51342e1573b",
+      "state": "candidate",
+      "regression": false
+    }
+  ],
+  "findings": [
+    {
+      "fingerprint": "sha256:971c33107d4bf2efa1ba8cf7eccee04bc287bea807d095b46f782e87e37ca6e2",
+      "state": "accepted-risk",
+      "priority": "P3",
+      "mappings": {
+        "cwe": [
+          "CWE-693"
+        ],
+        "wstg": [
+          "WSTG-CONF-12"
+        ],
+        "asvs": [
+          "ASVS-V3.1.1"
+        ],
+        "apiTop10": [
+          "API8:2023"
+        ]
+      },
+      "regression": false
+    }
+  ]
+}

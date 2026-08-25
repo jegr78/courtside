@@ -65,8 +65,14 @@ ZAP still reported rule `10055` once for `GET /`. Its stable fingerprint
 `sha256:971c33107d4bf2efa1ba8cf7eccee04bc287bea807d095b46f782e87e37ca6e2` matches the
 time-bounded acceptance in `security/exceptions.json`: arbitrary HTTPS images remain necessary for
 administrator-selected club branding until same-origin asset hosting exists. No scanner rule was
-disabled. The attempt remains `incomplete` because the other passive candidates still await the
-rule-specific evidence tracked in #472.
+disabled. The provenance-bound lifecycle validates it as a P3 finding and transitions it to
+`accepted-risk` with that acceptance as its reference. Its protected record has digest
+`sha256:337874e6daaf6b696e3ad97b4f977ac8d4dc5155c79b85a0bbe7c8b268571247` and remains
+local until 24 September 2026. The redacted
+[`passive-baseline-finding-summary.json`](../security/passive-baseline-finding-summary.json) has
+digest `sha256:b959f93623401bbe18c13ee1715050e2bd70c9dad4296c50b1963015ea6d6ac3`.
+The attempt remains `incomplete` because 16 other passive candidates still await the rule-specific
+evidence tracked in #472.
 
 The active attempt retained 66 OpenAPI candidates. They reduce to three attributable classes:
 
