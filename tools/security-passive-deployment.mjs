@@ -29,6 +29,10 @@ const securityHeaders = [
 ];
 const publicPaths = ["/", "/api/source", "/login", "/does-not-exist", "/icon.svg"];
 const exposurePaths = ["/actuator", "/actuator/health", "/swagger-ui/index.html", "/.git/config", "/assets/app.js.map"];
+const suspiciousCommentPatterns = [
+  "todo", "fixme", "bug", "bugs", "xxx", "query", "db", "admin", "administrator", "user", "username",
+  "select", "where", "from", "later", "debug"
+];
 export const requiredPassiveCheckIds = Object.freeze([
   ...publicPaths.map((path) => `headers-${pathId(path)}`),
   ...exposurePaths.map((path) => `exposure-${pathId(path)}`),
@@ -38,7 +42,7 @@ export const requiredPassiveCheckIds = Object.freeze([
   "qualified-image-evidence"
 ].toSorted());
 
-export function normalizeZapAlerts(report) {
+export function normalizeZapAlerts(report, imageDigest) {
   if (report == null || typeof report !== "object" || Array.isArray(report)
       || !Array.isArray(report.site) || report.site.length === 0
       || report.site.some((site) => site == null || typeof site !== "object" || Array.isArray(site)
@@ -68,19 +72,116 @@ export function normalizeZapAlerts(report) {
       const method = instance.method.toUpperCase();
       if (!["GET", "HEAD"].includes(method)) throw new Error("ZAP produced an invalid alert record");
       const routeTemplate = passiveRouteTemplate(instance.uri);
+      const fingerprint = passiveAlertFingerprint(pluginId, method, routeTemplate);
+      const ruleEvidence = passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest);
       const key = `${pluginId}\0${method}\0${routeTemplate}`;
       const existing = normalized.get(key);
       if (existing && (existing.riskCode !== riskCode || existing.confidence !== confidence)) {
         throw new Error("ZAP produced a contradictory alert record");
       }
-      if (existing) existing.count++;
+      if (existing) {
+        existing.ruleEvidence = mergeRuleEvidence(existing.ruleEvidence, ruleEvidence, imageDigest, fingerprint);
+        existing.count++;
+      }
       else normalized.set(key, { pluginId, riskCode, confidence, method, routeTemplate,
-        fingerprint: passiveAlertFingerprint(pluginId, method, routeTemplate), count: 1 });
+        fingerprint, count: 1, ruleEvidence });
     }
   }
   return [...normalized.values()].toSorted((left, right) =>
     left.pluginId.localeCompare(right.pluginId) || left.method.localeCompare(right.method)
       || left.routeTemplate.localeCompare(right.routeTemplate));
+}
+
+function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest) {
+  const unsupported = () => new Error(`ZAP rule ${pluginId} produced unsupported rule evidence`);
+  const param = instance.param;
+  const evidence = instance.evidence;
+  const otherInfo = instance.otherinfo;
+  if (![param, evidence, otherInfo].every((value) => typeof value === "string")) {
+    throw unsupported();
+  }
+  if (["10010", "10054"].includes(pluginId)) {
+    if (param !== "XSRF-TOKEN" || evidence !== "Set-Cookie: XSRF-TOKEN" || otherInfo !== "") {
+      throw unsupported();
+    }
+    return { kind: "cookie-attribute", cookieName: "xsrf-token",
+      missingAttribute: pluginId === "10010" ? "http-only" : "same-site" };
+  }
+  if (pluginId === "10027") {
+    const pathname = new URL(instance.uri).pathname;
+    if (!/\.(?:css|js)$/.test(pathname)) {
+      throw new Error("ZAP attributed textual evidence to a non-textual resource");
+    }
+    if (evidence.length === 0) throw new Error("ZAP rule 10027 produced no match evidence");
+    const patternSource = /pattern was used:/i.test(otherInfo)
+      ? otherInfo : typeof alert.otherinfo === "string" ? alert.otherinfo : "";
+    const patternWindow = /pattern was used:([\s\S]{1,80})/i.exec(patternSource)?.[1].toLowerCase() ?? "";
+    const matchedPatterns = suspiciousCommentPatterns.filter((pattern) => patternWindow.includes(`\\b${pattern}\\b`));
+    if (matchedPatterns.length !== 1) {
+      throw new Error("ZAP rule 10027 produced an unsupported pattern identifier");
+    }
+    const patternId = `comment-${matchedPatterns[0]}`;
+    const resourceDigest = sha256(pathname);
+    return { kind: "text-pattern", matches: [{ patternId, resourceDigest, occurrenceCount: 1,
+      locationDigest: passiveRuleLocationDigest(imageDigest, fingerprint, patternId, resourceDigest, 1) }] };
+  }
+  if (pluginId === "10036") {
+    if (param !== "" || evidence.length === 0 || otherInfo !== "") {
+      throw unsupported();
+    }
+    return { kind: "response-header", headerName: "server" };
+  }
+  if (pluginId === "10055") {
+    const directives = [...otherInfo.matchAll(/(?:^|\n)([a-z][a-z-]*)(?:\n|$)/g)].map((match) => match[1]);
+    if (param.toLowerCase() !== "content-security-policy" || evidence.length === 0
+        || directives.length === 0 || directives.some((directive) => directive !== "img-src")) {
+      throw unsupported();
+    }
+    return { kind: "policy-directive", headerName: "content-security-policy", directives: [...new Set(directives)] };
+  }
+  if (pluginId === "10109") {
+    if (param !== "" || !evidence.includes("<script")
+        || !otherInfo.startsWith("No links have been found while there are scripts")) {
+      throw unsupported();
+    }
+    return { kind: "application-signal", signal: "scripts-without-links" };
+  }
+  if (pluginId === "10112") {
+    const tokenNames = otherInfo.split("\n").map((line) => /^cookie:(SESSION|XSRF-TOKEN)$/.exec(line)?.[1])
+      .filter(Boolean).map((name) => name === "SESSION" ? "session" : "xsrf-token").toSorted();
+    const expected = param === "SESSION" ? "SESSION" : param === "XSRF-TOKEN" ? "XSRF-TOKEN" : null;
+    const expectedToken = expected === "SESSION" ? "session" : expected === "XSRF-TOKEN" ? "xsrf-token" : null;
+    if (!expected || evidence !== expected || tokenNames.length === 0
+        || tokenNames.length !== otherInfo.split("\n").length || !tokenNames.includes(expectedToken)) {
+      throw unsupported();
+    }
+    return { kind: "session-signal", tokenNames: [...new Set(tokenNames)] };
+  }
+  throw new Error(`ZAP produced an unsupported passive rule: ${pluginId}`);
+}
+
+function mergeRuleEvidence(existing, incoming, imageDigest, fingerprint) {
+  if (existing.kind !== "text-pattern" || incoming.kind !== "text-pattern") {
+    if (JSON.stringify(existing) !== JSON.stringify(incoming)) {
+      throw new Error("ZAP produced contradictory rule evidence");
+    }
+    return existing;
+  }
+  const matches = existing.matches.map((match) => ({ ...match }));
+  for (const incomingMatch of incoming.matches) {
+    const current = matches.find((match) => match.patternId === incomingMatch.patternId
+      && match.resourceDigest === incomingMatch.resourceDigest);
+    if (current) {
+      current.occurrenceCount++;
+      current.locationDigest = passiveRuleLocationDigest(imageDigest, fingerprint, current.patternId,
+        current.resourceDigest, current.occurrenceCount);
+    } else {
+      matches.push(incomingMatch);
+    }
+  }
+  matches.sort((left, right) => left.patternId.localeCompare(right.patternId)
+    || left.resourceDigest.localeCompare(right.resourceDigest));
+  return { kind: "text-pattern", matches };
 }
 
 function passiveAlertFingerprint(pluginId, method, routeTemplate) {
@@ -131,11 +232,11 @@ export function buildPassiveDeploymentEvidence({
       || JSON.stringify(checkIds) !== JSON.stringify(requiredPassiveCheckIds)) {
     throw new Error("The passive assessment evidence is missing required checks");
   }
-  const alerts = normalizeZapAlerts(zapReport);
+  const alerts = normalizeZapAlerts(zapReport, imageDigest);
   const failed = checks.some((check) => check.outcome === "failed");
   const incomplete = !failed && alerts.length > 0;
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     testId: "CSA-DEPLOY-001",
     targetFingerprint,
     imageDigest,
@@ -194,11 +295,56 @@ export function assertPassiveDeploymentEvidence(evidence) {
     if (alert.fingerprint !== passiveAlertFingerprint(alert.pluginId, alert.method, alert.routeTemplate)) {
       throw new Error("The passive assessment evidence contains a mismatched alert fingerprint");
     }
+    if (!retainedRuleEvidenceMatches(alert, evidence.imageDigest)) {
+      throw new Error("The passive assessment evidence contains mismatched rule evidence");
+    }
     if (fingerprints.has(alert.fingerprint)) {
       throw new Error("The passive assessment evidence contains a duplicate alert fingerprint");
     }
     fingerprints.add(alert.fingerprint);
   }
+}
+
+function sha256(value) {
+  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+function passiveRuleLocationDigest(imageDigest, fingerprint, patternId, resourceDigest, occurrenceCount) {
+  const manifestDigest = imageDigest?.includes("@") ? imageDigest.slice(imageDigest.indexOf("@") + 1) : imageDigest;
+  if (typeof manifestDigest !== "string" || !/^sha256:[a-f0-9]{64}$/.test(manifestDigest)) {
+    throw new Error("ZAP textual evidence has no qualified image digest");
+  }
+  return sha256(`${manifestDigest}\0${fingerprint}\0${patternId}\0${resourceDigest}\0${occurrenceCount}`);
+}
+
+function retainedRuleEvidenceMatches(alert, imageDigest) {
+  const evidence = alert.ruleEvidence;
+  if (alert.pluginId === "10010") return evidence.kind === "cookie-attribute"
+    && evidence.cookieName === "xsrf-token" && evidence.missingAttribute === "http-only";
+  if (alert.pluginId === "10054") return evidence.kind === "cookie-attribute"
+    && evidence.cookieName === "xsrf-token" && evidence.missingAttribute === "same-site";
+  if (alert.pluginId === "10027") return evidence.kind === "text-pattern"
+    && evidence.matches.length > 0
+    && new Set(evidence.matches.map((match) => `${match.patternId}\0${match.resourceDigest}`)).size
+      === evidence.matches.length
+    && evidence.matches.reduce((total, match) => total + match.occurrenceCount, 0) === alert.count
+    && evidence.matches.every((match) =>
+      suspiciousCommentPatterns.map((pattern) => `comment-${pattern}`).includes(match.patternId)
+      && match.locationDigest === passiveRuleLocationDigest(imageDigest, alert.fingerprint, match.patternId,
+        match.resourceDigest, match.occurrenceCount))
+    && JSON.stringify(evidence.matches) === JSON.stringify(evidence.matches.toSorted((left, right) =>
+      left.patternId.localeCompare(right.patternId) || left.resourceDigest.localeCompare(right.resourceDigest)));
+  if (alert.pluginId === "10036") return evidence.kind === "response-header" && evidence.headerName === "server";
+  if (alert.pluginId === "10055") return evidence.kind === "policy-directive"
+    && evidence.headerName === "content-security-policy"
+    && JSON.stringify(evidence.directives) === JSON.stringify(["img-src"]);
+  if (alert.pluginId === "10109") return evidence.kind === "application-signal"
+    && evidence.signal === "scripts-without-links";
+  if (alert.pluginId === "10112") return evidence.kind === "session-signal"
+    && evidence.tokenNames.length > 0
+    && evidence.tokenNames.every((tokenName) => ["session", "xsrf-token"].includes(tokenName))
+    && JSON.stringify(evidence.tokenNames) === JSON.stringify(evidence.tokenNames.toSorted());
+  return false;
 }
 
 export async function runPassiveDeploymentAssessment(plan, context) {

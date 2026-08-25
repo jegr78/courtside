@@ -45,13 +45,29 @@ repository or an ordinary CI artifact.
 
 The safe attempt retained 22 route-specific observations. The readable CSRF cookie explains five
 missing-`HttpOnly` observations; it is not the session cookie and is required by the double-submit
-design. Modern-application and session-response detection are informational classifications. One
-suspicious-comment observation still lacks the bounded match evidence needed for reproduction. The
+design. Modern-application and session-response detection are informational classifications. The
 remaining observations led to explicit work rather than scanner suppression:
 
 - explicit cookie isolation: #470;
 - CSP and proxy capability disclosure: #471;
 - reproducible passive-alert evidence: #472.
+
+### Passive-alert evidence retest
+
+The final #472 retest reused the qualified #471 image and its deployment qualification, so only the
+evidence adapter changed. Attempt 1 of run `issue472-evidence-v2` completed all 28 native checks and
+30 bounded requests. Its protected passive record has digest
+`sha256:01181917cdb95172213faa218f85bc3b7b334a62a9391af3e43c56f039b9c714` and remains local until
+8 September 2026.
+
+Every alert now carries closed rule-specific evidence. The suspicious-comment candidate retains
+`comment-query`, resource digest
+`sha256:bb96b04aa0cac7748510cfc97e78f1bcdf38de3993c8a5f0bb91e3a344b62ea1` and location digest
+`sha256:8ff01140999a6ee57840fa0d39d7381ecd2a8fe3f1a737efd26e2ed7f693d449`, without the resource path,
+matched comment or scanner prose. The earlier `SELECT` observation shares the stable route-level
+finding fingerprint but does not match the current rule evidence and therefore is not silently
+confirmed. The attempt remains `incomplete` because the retained candidates still require lifecycle
+dispositions, not because their scanner evidence is missing.
 
 ### Browser and proxy disclosure retest
 
@@ -71,8 +87,8 @@ disabled. The provenance-bound lifecycle validates it as a P3 finding and transi
 local until 24 September 2026. The redacted
 [`passive-baseline-finding-summary.json`](../security/passive-baseline-finding-summary.json) has
 digest `sha256:b959f93623401bbe18c13ee1715050e2bd70c9dad4296c50b1963015ea6d6ac3`.
-The attempt remains `incomplete` because 16 other passive candidates still await the rule-specific
-evidence tracked in #472.
+The attempt remains `incomplete` because 16 other passive candidates still require lifecycle
+dispositions. Their rule-specific evidence is now available through the #472 evidence format.
 
 The active attempt retained 66 OpenAPI candidates. They reduce to three attributable classes:
 

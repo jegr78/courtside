@@ -40,7 +40,7 @@
     },
     {
       "id": "passive-deployment",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "testIds": ["CSA-DEPLOY-001"]
     },
     {

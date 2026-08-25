@@ -22,7 +22,7 @@ function manifest(overrides = {}) {
     catalogVersion: "1.2.0",
     tools: [
       { id: "target-identity", version: "1.0.0", testIds: [] },
-      { id: "passive-deployment", version: "1.2.0", testIds: ["CSA-DEPLOY-001"] }
+      { id: "passive-deployment", version: "1.3.0", testIds: ["CSA-DEPLOY-001"] }
     ],
     selectedTests: ["CSA-DEPLOY-001"],
     budgets: {
@@ -33,7 +33,7 @@ function manifest(overrides = {}) {
     finishedAt: "2026-08-22T00:01:00.000Z",
     toolResults: [
       { id: "target-identity", version: "1.0.0", outcome: "passed" },
-      { id: "passive-deployment", version: "1.2.0", outcome: "passed" }
+      { id: "passive-deployment", version: "1.3.0", outcome: "passed" }
     ],
     reason: null,
     usage: { requests: 1, generatedDataMegabytes: 0, evidenceBytes: 0 },
