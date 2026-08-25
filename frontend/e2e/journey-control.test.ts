@@ -65,7 +65,7 @@ describe("journey control", () => {
       expect(sql).toBe("result");
       expect(waiters).toBe("waiting");
       expect(calls.pinnedBrowser).toHaveBeenCalledWith("webkit");
-      expect(calls.browserDiagnostics).toHaveBeenCalledWith("webkit", "browser-disconnected");
+      expect(calls.browserDiagnostics).toHaveBeenCalledWith("webkit", "browser-disconnected", undefined);
       expect(calls.releasePinnedBrowser).toHaveBeenCalledWith("webkit");
       expect(calls.executeSql).toHaveBeenCalledWith("SELECT 1");
       expect(calls.holdDatabaseLock).toHaveBeenCalledWith("LOCK TABLE booking", expect.any(AbortSignal));
@@ -114,6 +114,60 @@ describe("journey control", () => {
       // then
       expect(response.status).toBe(500);
       await expect(response.json()).resolves.toEqual({ error: "Journey control command requires a browser failure reason" });
+      expect(calls.browserDiagnostics).not.toHaveBeenCalled();
+    } finally {
+      await control.close();
+    }
+  });
+
+  it("given a failed test, when its diagnostics cross the control endpoint, then the test travels with them", async () => {
+    // given
+    const { service, calls } = journeyService();
+    const control = await startJourneyControl(service);
+    const remote = connectJourneyService(control.reference);
+
+    try {
+      // when
+      await remote.browserDiagnostics("webkit", "product-failure", {
+        title: "an installed PWA preserves the signed-in journey",
+        projectName: "webkit-pwa",
+        status: "failed",
+        errors: ["expect(locator).toBeVisible() failed"]
+      });
+
+      // then — a retained file that cannot name the test is a file nobody can act on
+      expect(calls.browserDiagnostics).toHaveBeenCalledWith("webkit", "product-failure", {
+        title: "an installed PWA preserves the signed-in journey",
+        projectName: "webkit-pwa",
+        status: "failed",
+        errors: ["expect(locator).toBeVisible() failed"]
+      });
+    } finally {
+      await control.close();
+    }
+  });
+
+  it("given a malformed failed test, when it arrives at the control endpoint, then it is refused rather than stored", async () => {
+    // given
+    const { service, calls } = journeyService();
+    const control = await startJourneyControl(service);
+
+    try {
+      // when
+      const response = await fetch(control.reference.endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${control.reference.token}`
+        },
+        body: JSON.stringify({
+          operation: "browserDiagnostics", browserName: "webkit", reason: "product-failure",
+          failedTest: { title: 7, projectName: "webkit-pwa", status: "failed", errors: [] }
+        })
+      });
+
+      // then
+      expect(response.status).toBe(500);
       expect(calls.browserDiagnostics).not.toHaveBeenCalled();
     } finally {
       await control.close();

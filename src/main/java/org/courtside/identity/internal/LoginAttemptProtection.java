@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -25,12 +26,12 @@ class LoginAttemptProtection {
     private final Clock clock;
 
     @Transactional
-    Optional<Duration> registerAttempt(String address) {
+    Optional<LoginBlock> registerAttempt(String address) {
         String normalizedAddress = normalizeAddress(address);
         lock(Scope.ADDRESS, hash(normalizedAddress));
         lock(Scope.GLOBAL, hash("all"));
 
-        Optional<Duration> retryAfter = retryAfter(normalizedAddress);
+        Optional<LoginBlock> retryAfter = retryAfter(normalizedAddress);
         if (retryAfter.isPresent()) {
             return retryAfter;
         }
@@ -40,15 +41,16 @@ class LoginAttemptProtection {
         return Optional.empty();
     }
 
-    private Optional<Duration> retryAfter(String address) {
+    private Optional<LoginBlock> retryAfter(String address) {
         Instant now = clock.instant();
         return java.util.stream.Stream.of(
-                        blockedUntil(Scope.ADDRESS, address),
-                        blockedUntil(Scope.GLOBAL, "all"))
+                        blockedUntil(Scope.ADDRESS, address).map(until -> Map.entry(Scope.ADDRESS, until)),
+                        blockedUntil(Scope.GLOBAL, "all").map(until -> Map.entry(Scope.GLOBAL, until)))
                 .flatMap(Optional::stream)
-                .filter(until -> until.isAfter(now))
-                .max(Instant::compareTo)
-                .map(until -> Duration.between(now, until));
+                .filter(blocked -> blocked.getValue().isAfter(now))
+                .max(Map.Entry.comparingByValue())
+                .map(blocked -> new LoginBlock(blocked.getKey().name(),
+                        Duration.between(now, blocked.getValue())));
     }
 
     @Transactional

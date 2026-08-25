@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { type AddressInfo } from "node:net";
 import type { DatabaseLock, JourneyService } from "./global-setup";
-import { browserFailureReasons, type BrowserDiagnostics, type BrowserFailureReason } from "./browser-diagnostics";
+import { browserFailureReasons, type BrowserDiagnostics, type BrowserFailureReason, type FailedTest } from "./browser-diagnostics";
 
 export interface JourneyControlReference {
   endpoint: string;
@@ -18,6 +18,7 @@ interface JourneyCommand {
     | "releaseLock" | "publishServiceWorkerUpdate" | "reset" | "restart";
   browserName?: string;
   reason?: string;
+  failedTest?: unknown;
   sql?: string;
   lockId?: string;
   count?: number;
@@ -51,6 +52,18 @@ function requiredBrowserFailureReason(value: string | undefined): BrowserFailure
   return reason;
 }
 
+function optionalFailedTest(value: unknown): FailedTest | undefined {
+  if (value === undefined || value === null) return undefined;
+  const candidate = value as Partial<FailedTest>;
+  const errors = candidate.errors;
+  if (typeof candidate.title !== "string" || typeof candidate.projectName !== "string"
+    || typeof candidate.status !== "string" || !Array.isArray(errors)
+    || errors.some((error) => typeof error !== "string")) {
+    throw new Error("Journey control command carries a malformed failed test");
+  }
+  return { title: candidate.title, projectName: candidate.projectName, status: candidate.status, errors };
+}
+
 function requiredCount(value: number | undefined): number {
   if (value === undefined || !Number.isInteger(value) || value < 0) {
     throw new Error("Journey control command requires a non-negative count");
@@ -64,7 +77,7 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
     case "pinnedBrowser": return service.pinnedBrowser(requiredString(command.browserName, "browserName"));
     case "releasePinnedBrowser": return service.releasePinnedBrowser(requiredString(command.browserName, "browserName"));
     case "browserDiagnostics": return service.browserDiagnostics(requiredString(command.browserName, "browserName"),
-      requiredBrowserFailureReason(command.reason));
+      requiredBrowserFailureReason(command.reason), optionalFailedTest(command.failedTest));
     case "executeSql": return service.executeSql(requiredString(command.sql, "sql"));
     case "holdDatabaseLock": {
       const lockId = randomUUID();
@@ -163,8 +176,8 @@ export function connectJourneyService(reference: JourneyControlReference): Journ
     visualDate: reference.visualDate,
     pinnedBrowser: (browserName) => command(reference, { operation: "pinnedBrowser", browserName }),
     releasePinnedBrowser: (browserName) => command(reference, { operation: "releasePinnedBrowser", browserName }),
-    browserDiagnostics: (browserName, reason) => command<BrowserDiagnostics>(reference,
-      { operation: "browserDiagnostics", browserName, reason }),
+    browserDiagnostics: (browserName, reason, failedTest) => command<BrowserDiagnostics>(reference,
+      { operation: "browserDiagnostics", browserName, reason, failedTest }),
     executeSql: (sql) => command(reference, { operation: "executeSql", sql }),
     holdDatabaseLock: async (sql) => {
       const lockId = await command<string>(reference, { operation: "holdDatabaseLock", sql });

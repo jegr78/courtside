@@ -1,8 +1,13 @@
 package org.courtside.identity;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.courtside.AbstractIntegrationTest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,8 +17,10 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -42,11 +49,46 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
+    private final ListAppender<ILoggingEvent> recorded = new ListAppender<>();
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        recorded.start();
+        blockLog().addAppender(recorded);
+    }
+
+    @AfterEach
+    void tearDown() {
+        blockLog().detachAppender(recorded);
+        recorded.stop();
+    }
+
+    @Test
+    void givenAnAddressThatIsBlocked_whenItTriesAgain_thenTheRefusalNamesTheLimitThatHolds()
+            throws Exception {
+        // given
+        failLogin("first", "192.0.2.60");
+        failLogin("second", "192.0.2.60");
+
+        // when
+        mockMvc.perform(login("third", "wrong", "192.0.2.60"))
+                .andExpect(status().isTooManyRequests());
+
+        // then — which limit holds decides whether one client or the whole instance is affected
+        assertThat(blockMessages()).anySatisfy(message -> assertThat(message)
+                .contains("ADDRESS")
+                .doesNotContain("192.0.2.60"));
+    }
+
+    private List<String> blockMessages() {
+        return recorded.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+    }
+
+    private static Logger blockLog() {
+        return (Logger) LoggerFactory.getLogger("org.courtside.identity.internal.LoginAttemptFilter");
     }
 
     @Test

@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { rmSync } from "node:fs";
+import type { DockerDiagnosticCommand } from "./browser-diagnostics";
 import {
+  applicationLogBuffer,
   classifyBrowserFailure,
   collectBrowserDiagnostics,
   diagnoseUnexpectedBrowserTest,
@@ -302,5 +304,124 @@ describe("browser diagnostics", () => {
       for (const path of new Set([first, second])) rmSync(path);
       vi.restoreAllMocks();
     }
+  });
+
+  it("given an application that logged, when diagnostics are collected, then the log travels with them", async () => {
+    // given
+    const command: DockerDiagnosticCommand = () => Promise.resolve("{}");
+    const log = applicationLogBuffer(3);
+    log.append(Buffer.from("first line\nsecond li"));
+    log.append(Buffer.from("ne\nthird line\nfourth line\n"));
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("container-1", "webkit", "product-failure",
+      command, 5_000, { applicationState: { exitCode: null, signalCode: null, killed: false }, applicationLog: () => log.text() });
+
+    // then — the oldest line fell out of the window, the newest is the one a failure needs
+    expect(diagnostics.applicationState?.recentLog).toBe("second line\nthird line\nfourth line");
+    expect(diagnostics.diagnosticErrors).toEqual([]);
+  });
+
+  it("given a log carrying a credential, when diagnostics are collected, then the artefact hides it", async () => {
+    // given
+    const command: DockerDiagnosticCommand = () => Promise.resolve("{}");
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("container-1", "webkit", "product-failure",
+      command, 5_000, {
+        applicationState: { exitCode: null, signalCode: null, killed: false },
+        applicationLog: () => 'password="hunter2-and-then-some" done'
+      });
+
+    // then
+    expect(diagnostics.applicationState?.recentLog).toContain('password="<redacted>"');
+    expect(diagnostics.applicationState?.recentLog).not.toContain("hunter2-and-then-some");
+  });
+
+  it("given a log that cannot be read, when diagnostics are collected, then they still arrive and say why", async () => {
+    // given
+    const command: DockerDiagnosticCommand = () => Promise.resolve("{}");
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("container-1", "webkit", "product-failure",
+      command, 5_000, {
+        applicationState: { exitCode: null, signalCode: null, killed: false },
+        applicationLog: () => { throw new Error("log stream closed"); }
+      });
+
+    // then
+    expect(diagnostics.applicationState?.recentLog).toBeUndefined();
+    expect(diagnostics.diagnosticErrors).toContain("log stream closed");
+  });
+
+  it("given a failed test, when diagnostics are collected, then they name it and quote its errors", async () => {
+    // given
+    const command: DockerDiagnosticCommand = () => Promise.resolve("{}");
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("container-1", "webkit", "product-failure",
+      command, 5_000, {
+        failedTest: {
+          title: "an installed PWA preserves the signed-in journey",
+          projectName: "webkit-pwa",
+          status: "failed",
+          errors: ["expect(locator).toBeVisible() failed", "Timeout: 3000ms"]
+        }
+      });
+
+    // then — without it, a retained file says which browser failed but never which test
+    expect(diagnostics.failedTest).toEqual({
+      title: "an installed PWA preserves the signed-in journey",
+      projectName: "webkit-pwa",
+      status: "failed",
+      errors: ["expect(locator).toBeVisible() failed", "Timeout: 3000ms"]
+    });
+  });
+
+  it("given a test error carrying a credential, when it is retained, then the artefact hides it", async () => {
+    // given
+    const command: DockerDiagnosticCommand = () => Promise.resolve("{}");
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("container-1", "webkit", "product-failure",
+      command, 5_000, {
+        failedTest: {
+          title: "signing in",
+          projectName: "webkit-pwa",
+          status: "failed",
+          errors: ['expected password="hunter2-and-then-some"']
+        }
+      });
+
+    // then
+    expect(diagnostics.failedTest?.errors[0]).toContain('password="<redacted>"');
+    expect(diagnostics.failedTest?.errors[0]).not.toContain("hunter2-and-then-some");
+  });
+
+  it("given a coloured assertion failure, when it is classified, then the product carries the blame", () => {
+    // given — Playwright dresses its own message in ANSI, whatever the reporter is told about colour
+    const coloured = "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m)."
+      + "\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('x')";
+
+    // when / then — without stripping it, every product failure is filed as a harness problem
+    expect(classifyBrowserFailure([{ message: coloured }],
+      { pageCrashed: false, browserConnected: true })).toBe("product-failure");
+  });
+
+  it("given a coloured error, when it is retained, then the artefact reads as text", async () => {
+    // given
+    const command: DockerDiagnosticCommand = () => Promise.resolve("{}");
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("container-1", "webkit", "product-failure",
+      command, 5_000, {
+        failedTest: {
+          title: "signing in", projectName: "webkit-pwa", status: "failed",
+          errors: ["\u001b[31mexpected visible\u001b[39m"]
+        }
+      });
+
+    // then
+    expect(diagnostics.failedTest?.errors[0]).toBe("expected visible");
   });
 });

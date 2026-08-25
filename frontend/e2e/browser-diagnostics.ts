@@ -7,10 +7,18 @@ import { promisify } from "node:util";
 
 const executeFile = promisify(execFile);
 
+export interface FailedTest {
+  title: string;
+  projectName: string;
+  status: string;
+  errors: string[];
+}
+
 export interface BrowserDiagnostics {
   schemaVersion: 1;
   browserName: string;
   reason: BrowserFailureReason;
+  failedTest?: FailedTest;
   recordedAt: string;
   containerId: string;
   containerState?: Record<string, unknown>;
@@ -37,6 +45,7 @@ export interface ContainerDiagnostics {
 
 export interface ApplicationProcessState {
   pid?: number;
+  recentLog?: string;
   exitCode: number | null;
   signalCode: NodeJS.Signals | null;
   killed: boolean;
@@ -73,8 +82,10 @@ interface BrowserError {
 }
 
 interface DiagnosticContext {
+  failedTest?: FailedTest;
   relatedContainers?: Record<string, string>;
   applicationState?: ApplicationProcessState;
+  applicationLog?: () => string;
 }
 
 export type DockerDiagnosticCommand = (args: string[], signal: AbortSignal) => Promise<string>;
@@ -84,10 +95,18 @@ interface DisconnectSource {
   removeListener(event: "disconnected", listener: () => void): unknown;
 }
 
+// Playwright colours its own failure messages, so a pattern matching them has to read past the
+// escapes rather than treat a product failure as a harness one.
+const ANSI_STYLE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
+export function plainText(value: string): string {
+  return value.replaceAll(ANSI_STYLE, "");
+}
+
 export function classifyBrowserFailure(errors: ReadonlyArray<BrowserError>, state: FailureState): BrowserFailureReason {
   if (!state.browserConnected) return "browser-disconnected";
   if (state.pageCrashed) return "page-crashed";
-  const messages = errors.map(({ message }) => message ?? "").join("\n");
+  const messages = errors.map(({ message }) => plainText(message ?? "")).join("\n");
   if (/WebKit encountered an internal error/i.test(messages)) return "browser-internal-error";
   if (/Target page, context or browser has been closed/i.test(messages)) return "target-lost";
   if (state.timedOut || /Test timeout of \d+ms exceeded/i.test(messages)) return "test-timeout";
@@ -168,20 +187,62 @@ export async function collectBrowserDiagnostics(containerId: string, browserName
     Object.entries(context.relatedContainers ?? {}).map(async ([name, id]) =>
       [name, await collectContainerDiagnostics(id, command, timeoutMs)] as const)
   ));
+  const applicationState = context.applicationState === undefined ? undefined : {
+    ...context.applicationState,
+    recentLog: applicationLog(context.applicationLog, browser.diagnosticErrors)
+  };
   return {
     schemaVersion: 1,
     browserName,
     reason,
+    failedTest: context.failedTest === undefined ? undefined : {
+      ...context.failedTest,
+      errors: context.failedTest.errors.map((error) => safeLogs(plainText(error)))
+    },
     recordedAt: new Date().toISOString(),
     ...browser,
     relatedContainers: Object.keys(relatedContainers).length === 0 ? undefined : relatedContainers,
-    applicationState: context.applicationState,
+    applicationState,
     host: {
       freeMemoryBytes: freemem(),
       totalMemoryBytes: totalmem(),
       loadAverage: loadavg(),
       processMemory: process.memoryUsage()
     }
+  };
+}
+
+function applicationLog(read: (() => string) | undefined, errors: string[]): string | undefined {
+  if (read === undefined) return undefined;
+  try {
+    return safeLogs(plainText(read()));
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : "The application log could not be read");
+    return undefined;
+  }
+}
+
+export interface ApplicationLogBuffer {
+  append(chunk: Buffer | string): void;
+  text(): string;
+}
+
+// The application is a process rather than a container, so the lines a failure needs are kept
+// here instead of being fetched with docker logs.
+export function applicationLogBuffer(limit: number): ApplicationLogBuffer {
+  const lines: string[] = [];
+  let pending = "";
+  return {
+    append(chunk) {
+      pending += chunk.toString();
+      const complete = pending.split("\n");
+      pending = complete.pop() ?? "";
+      for (const line of complete) {
+        lines.push(line);
+        if (lines.length > limit) lines.shift();
+      }
+    },
+    text: () => lines.join("\n")
   };
 }
 

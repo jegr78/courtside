@@ -34,13 +34,13 @@ class LoginAttemptProtectionConcurrencyTest extends AbstractIntegrationTest {
     void givenConcurrentAttemptsFromOneAddress_whenTheyRegister_thenTheLimitIsAtomic()
             throws Exception {
         // given
-        List<Callable<Optional<Duration>>> attempts = List.of(
+        List<Callable<Optional<LoginBlock>>> attempts = List.of(
                 () -> protection.registerAttempt("192.0.2.40"),
                 () -> protection.registerAttempt("192.0.2.40"),
                 () -> protection.registerAttempt("192.0.2.40"));
 
         // when
-        List<Optional<Duration>> results;
+        List<Optional<LoginBlock>> results;
         try (var executor = Executors.newFixedThreadPool(3)) {
             results = attempts.stream().map(executor::submit).map(future -> {
                 try {

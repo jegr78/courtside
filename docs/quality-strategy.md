@@ -169,6 +169,14 @@ timeout makes the harness outcome incomplete. A failed product assertion remains
 failure. The retained browser outcome records those claims separately, and neither class can turn
 the other green.
 
+A failed test retains what an analysis needs after the run is over: which test failed, its errors as
+text rather than as the colour codes Playwright writes them in, the last lines the application
+logged, and the state of the browser, proxy and database containers — one JSON file per failure
+under `frontend/test-results/browser-diagnostics`, uploaded with the run. The application log is
+kept in memory while the run proceeds and redacted like a container log before it is written, so a
+credential a test typed does not reach the artefact. A run that goes red for reasons nobody can
+reproduce is answered from that file, not from a rerun.
+
 ### Operations and release
 
 | ID | Impact | Likelihood | Invariant | Positive boundaries | Negative boundaries | Level | Frequency | Environment | Synthetic data | Evidence | Owner | Residual risk |
