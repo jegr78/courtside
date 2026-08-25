@@ -849,6 +849,13 @@ the season. A single booking can also occupy **several courts at once** — a tr
 spanning three adjacent courts is one `booking` with one `court_allocation` row per court,
 not three separate bookings that happen to share a time.
 
+The API accepts several courts from anybody the rules allow; the browser offers the choice only to
+an account holding a role beyond `MEMBER`, and states the chosen court to everyone else. Which
+roles those are is the club's own decision, so the client derives the question from the role model
+rather than from a list this product freezes into a release. Spanning three courts is what an
+officer does deliberately and what a member does by accident, and the day plan already put them one
+click from four checkboxes.
+
 `booking_series` stores the rule: frequency, interval, weekdays, start time and duration,
 and an end defined either by **date or by occurrence count**. `SeriesRule` rejects a rule
 that gives neither or both, that names no weekday, or whose occurrence count is zero or

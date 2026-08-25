@@ -30,14 +30,16 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await page.evaluate(() => window.scrollTo(0, 0));
 
   // then
-  await stableScreenshot(page.getByTestId("booking-dialog"), "booking-dialog.png", dynamicDates(page));
+  // The dialog carries no dynamic content of its own - the journey date and slot are pinned - so
+  // masking the day strip behind it would only hide the controls this baseline exists to guard.
+  await stableScreenshot(page.getByTestId("booking-dialog"), "booking-dialog.png");
 
   // when
   await page.getByTestId("booking-submit").click();
   await expect(page.getByTestId("booking-dialog").locator("[data-code]")).toBeVisible();
 
   // then
-  await stableScreenshot(page.getByTestId("booking-dialog"), "booking-validation.png", dynamicDates(page));
+  await stableScreenshot(page.getByTestId("booking-dialog"), "booking-validation.png");
 
   // when
   await page.getByTestId("booking-close").click();

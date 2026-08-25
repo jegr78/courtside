@@ -174,6 +174,7 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   await selectJourneyDate(page, journeyService.visualDate);
   await freeSlot(page, 3, "13:00").click();
   await page.getByTestId("booking-card").selectOption({ label: "Restricted event" });
+  await page.getByTestId("booking-more-summary").click();
   await page.getByTestId("guest-name").fill("John Roe");
 
   // when

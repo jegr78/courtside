@@ -15,6 +15,7 @@ interface WeekViewProps {
   today?: Date;
   clock?: () => Date;
   canBook?: boolean;
+  canChooseSeveralCourts?: boolean;
 }
 
 interface WeekData {
@@ -27,7 +28,8 @@ interface WeekData {
 const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 const systemClock = () => new Date();
 
-export function WeekView({ today, clock = systemClock, canBook = true }: WeekViewProps) {
+export function WeekView({ today, clock = systemClock, canBook = true,
+  canChooseSeveralCourts = false }: WeekViewProps) {
   const { t, i18n } = useTranslation();
   const [referenceInstant] = useState(() => today ?? clock());
   const [currentInstant, setCurrentInstant] = useState(referenceInstant);
@@ -317,6 +319,7 @@ export function WeekView({ today, clock = systemClock, canBook = true }: WeekVie
       grid={data.grid}
       courts={data.courts}
       allocations={data.allocations.get(bookingSelection.date) ?? []}
+      canChooseSeveralCourts={canChooseSeveralCourts}
       closed={() => setBookingSelection(undefined)}
       created={async () => {
         setBookingSelection(undefined);
