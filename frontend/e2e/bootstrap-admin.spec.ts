@@ -114,6 +114,23 @@ test("a barred member sees the refusal before a booking dialog can open", async 
   await expect(page.getByRole("dialog")).not.toBeVisible();
 });
 
+test("the plan reaches the current time inside its own frame and leaves the page where it was",
+  async ({ page }) => {
+    // given
+    await page.goto("/login");
+    await page.getByTestId("username").fill("doe.jane");
+    await page.getByTestId("password").fill("temporary-password");
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("court-plan-view")).toBeVisible();
+
+    // when
+    await expect.poll(() => page.getByTestId("week-grid").evaluate((plan) => plan.scrollTop)).toBeGreaterThan(0);
+
+    // then — a page that scrolls itself takes the navigation out from under whoever reaches for it
+    expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
+    await expect(page.getByTestId("my-bookings-link")).toBeInViewport();
+  });
+
 test("a member drags across the grid and the dialog opens on the period they drew",
   async ({ page, journeyService }) => {
     // given

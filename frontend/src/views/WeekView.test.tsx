@@ -806,6 +806,38 @@ it("given the document owns scrolling, when another day is chosen, then the plan
   expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
 });
 
+it("given the plan owns its scrolling, when it moves to the current time, then the page is left alone", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const plan = await screen.findByTestId("week-grid");
+  const row = plan.querySelector('[data-slot="12:00"]') as HTMLElement;
+  const scrollIntoView = vi.fn();
+  row.scrollIntoView = scrollIntoView;
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ overflowY: "auto" } as CSSStyleDeclaration);
+
+  // when
+  await userEvent.click(screen.getByTestId("current-time"));
+
+  // then — scrollIntoView takes every scrollable ancestor with it, the page included
+  expect(scrollIntoView).not.toHaveBeenCalled();
+});
+
+it("given the document owns scrolling, when the plan moves to the current time, then it asks the document", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const plan = await screen.findByTestId("week-grid");
+  const row = plan.querySelector('[data-slot="12:00"]') as HTMLElement;
+  const scrollIntoView = vi.fn();
+  row.scrollIntoView = scrollIntoView;
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ overflowY: "visible" } as CSSStyleDeclaration);
+
+  // when
+  await userEvent.click(screen.getByTestId("current-time"));
+
+  // then
+  expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+});
+
 it("given another day is shown, when today is chosen again, then the current time keeps the position", async () => {
   // given
   render(<WeekView today={clubInstant("12:00")} />);

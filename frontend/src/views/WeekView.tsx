@@ -484,11 +484,17 @@ function currentLineOffset(currentTime: string, opensAt: string, slotMinutes: nu
   return Math.max(0, (timeToMinutes(currentTime) - timeToMinutes(opensAt)) / slotMinutes * slotHeight);
 }
 
+// Bringing the slot into view would take the page with it and pull the navigation out from under
+// whoever is reaching for it, so the plan travels inside its own frame wherever it has one.
 function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
   const target = slot ? plan?.querySelector(`[data-slot="${slot}"]`) : undefined;
-  if (target instanceof HTMLElement && typeof target.scrollIntoView === "function") {
-    target.scrollIntoView({ block: "center" });
+  if (!plan || !(target instanceof HTMLElement)) return;
+  if (window.getComputedStyle(plan).overflowY === "visible") {
+    if (typeof target.scrollIntoView === "function") target.scrollIntoView({ block: "center" });
+    return;
   }
+  plan.scrollTop += target.getBoundingClientRect().top - plan.getBoundingClientRect().top
+    - (plan.clientHeight - target.clientHeight) / 2;
 }
 
 function scrollToStart(plan: HTMLDivElement | null) {
