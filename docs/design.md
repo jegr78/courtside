@@ -129,8 +129,9 @@ decision rather than a gap.
 
 A booking now writes to the people it concerns: the member who made it gets a confirmation carrying
 the day, the period, every court it holds and the kind of booking, in the account's own language;
-a member somebody recorded as a co-player is told without being asked first; and whoever booked is
-told when that member takes themselves out again. All of them are recorded in the same message log
+a member somebody recorded as a co-player is told without being asked first; whoever booked is told
+when that member takes themselves out again; and when a court, a booking card or a weekday goes out
+of service, everybody in a booking that sits on it hears so, with what was closed. All of them are recorded in the same message log
 as a credential. A series stays one decision and gets no message per occurrence. Of section 6's
 table, the booking confirmation is the row that is built; the rest are designed.
 
@@ -842,22 +843,29 @@ All templates are i18n message bundles and editable per instance:
 | Booking confirmed | Booking member + participating members |
 | Booking cancelled | Booking member + participating members |
 | Booking cancelled by an admin | Affected members, with reason |
+| Court, card or weekday out of service | Everybody in a booking that sits on it |
 | Series created | Creator, with the list of skipped occurrences |
 
 Per-notification opt-out where legally permissible; transactional messages about one's own
 bookings are not opt-out.
 
-**Built:** the booking confirmation to the booking member, and both directions of a co-player
-record — the member somebody recorded is told, and whoever booked is told when that member takes
-themselves out again. All three are sent after the booking's own transaction commits, so a message
-never describes a court nobody holds, and a booking is never refused because a message could not go
-out — an account whose address is empty is logged by its id and nothing is sent. The events that
-carry them name the booking and the person by identifier; what a message says about them is read
+**Built:** three things a booking says for itself. The member who made it gets a confirmation. A
+member somebody recorded as a co-player is told, and whoever booked is told when that member takes
+themselves out again. And a court, a booking card or a weekday going out of service tells everybody
+in every future booking that sits on it — the booker and the recorded players alike — naming what
+was closed; taking something out of service cancels nothing, and the message says so, because the
+impact list beside the control is information for the board and the booking stands until the board
+acts on it.
+
+All of them are sent after the transaction that caused them commits, so a message never describes a
+court nobody holds, and nothing a member does is refused because a message could not go out — an
+account whose address is empty is logged by its id and nothing is sent. The events that carry them
+name the booking, the person and the closure by identifier; what a message says about them is read
 when the message is written, so neither the audit trail nor the message log learns where anybody
-plays. Neither participation message names more than its reader already has: the notice about being
-recorded names the booking and not the booker, and the notice about a withdrawal carries the name
-the booker chose from the directory. A member who holds no account is not written to, because the
-message log is keyed by the account that erases it.
+plays. No message names more than its reader already has: the notice about being recorded names the
+booking and not the booker, and the notice about a withdrawal carries the name the booker chose from
+the directory. A member who holds no account is not written to, because the message log is keyed by
+the account that erases it.
 
 ---
 
