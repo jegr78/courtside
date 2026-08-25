@@ -25,6 +25,7 @@ const configuredProjects = [
   { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "webkit-core", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, metadata: { plainOrigin: true }, use: { browserName: "webkit" as const } },
+  { name: "webkit-pwa", testMatch: /pwa-browser-compatibility\.spec\.ts/, use: { browserName: "webkit" as const } },
   ...qualificationProjects,
   ...periodicProjects
 ];

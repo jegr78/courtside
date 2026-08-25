@@ -28,6 +28,17 @@ class SecurityConfigurationTest {
         assertThat(cookie.getSecure()).isFalse();
     }
 
+    @Test
+    void whenTheCsrfTokenIsIssued_thenTheCookieUsesExplicitLaxIsolation() {
+        // when
+        Cookie cookie = issueCsrfCookie(true);
+
+        // then
+        assertThat(cookie.getAttribute("SameSite")).isEqualTo("Lax");
+        assertThat(cookie.isHttpOnly()).isFalse();
+        assertThat(cookie.getPath()).isEqualTo("/");
+    }
+
     private Cookie issueCsrfCookie(boolean secureCookies) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();

@@ -24,6 +24,16 @@ class SecureCookieDefaultTest {
     }
 
     @Test
+    void whenReadingProductionConfiguration_thenSessionCookiesUseExplicitLaxIsolation() throws IOException {
+        // when
+        Object sameSite = load("src/main/resources/application.yaml")
+                .getProperty("server.servlet.session.cookie.same-site");
+
+        // then
+        assertThat(sameSite).isEqualTo("lax");
+    }
+
+    @Test
     void whenReadingTestConfiguration_thenSessionCookiesSupportPlainHttp() throws IOException {
         // when
         Object secure = load("src/test/resources/application-test.yaml")

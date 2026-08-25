@@ -1,5 +1,51 @@
 import { expect, selectJourneyDate, test } from "./fixtures";
 
+interface CookieFacts {
+  name: string;
+  path: string | null;
+  sameSite: string | null;
+  secure: boolean;
+  httpOnly: boolean;
+  maxAge: string | null;
+  isEmpty: boolean;
+}
+
+async function cookieFacts(response: import("@playwright/test").Response): Promise<CookieFacts[]> {
+  return (await response.headersArray())
+    .filter((header) => header.name.toLowerCase() === "set-cookie")
+    .map((header) => {
+      const [pair, ...rawAttributes] = header.value.split(";").map((part) => part.trim());
+      const separator = pair.indexOf("=");
+      const attributes = new Map(rawAttributes.map((attribute) => {
+        const attributeSeparator = attribute.indexOf("=");
+        return attributeSeparator < 0
+          ? [attribute.toLowerCase(), ""]
+          : [attribute.slice(0, attributeSeparator).toLowerCase(), attribute.slice(attributeSeparator + 1)];
+      }));
+      return {
+        name: pair.slice(0, separator),
+        path: attributes.get("path") ?? null,
+        sameSite: attributes.get("samesite") ?? null,
+        secure: attributes.has("secure"),
+        httpOnly: attributes.has("httponly"),
+        maxAge: attributes.get("max-age") ?? null,
+        isEmpty: pair.slice(separator + 1).length === 0
+      };
+    });
+}
+
+function expectIssuedCookie(cookie: CookieFacts, name: "SESSION" | "XSRF-TOKEN") {
+  expect(cookie).toEqual({
+    name,
+    path: "/",
+    sameSite: "Lax",
+    secure: false,
+    httpOnly: name === "SESSION",
+    maxAge: null,
+    isEmpty: false
+  });
+}
+
 async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.goto("/login");
   await page.getByTestId("username").fill(username);
@@ -7,10 +53,20 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   const allocationResponses = allocationResponseWaiter(page, 7);
   const sessionResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/session") && response.request().method() === "POST");
+  const csrfResponse = page.waitForResponse(async (response) =>
+    (await cookieFacts(response)).some((cookie) => cookie.name === "XSRF-TOKEN" && !cookie.isEmpty));
   try {
     await page.getByTestId("login-submit").click();
-    expect((await sessionResponse).status()).toBe(200);
+    const response = await sessionResponse;
+    expect(response.status()).toBe(200);
+    const sessionCookie = (await cookieFacts(response)).find((cookie) => cookie.name === "SESSION");
+    expect(sessionCookie).toBeDefined();
+    expectIssuedCookie(sessionCookie!, "SESSION");
     await allocationResponses.completion;
+    const csrfCookie = (await cookieFacts(await csrfResponse))
+      .find((cookie) => cookie.name === "XSRF-TOKEN" && !cookie.isEmpty);
+    expect(csrfCookie).toBeDefined();
+    expectIssuedCookie(csrfCookie!, "XSRF-TOKEN");
     await expect(page.getByTestId("logout")).toBeVisible();
     await expect(page.getByTestId("court-plan-legend")).toBeVisible();
   } finally {
@@ -64,7 +120,12 @@ test("a member can navigate the core signed-in journey", async ({ page }) => {
   const logoutResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/session/logout") && response.request().method() === "POST");
   await page.getByTestId("logout").click();
-  expect((await logoutResponse).status()).toBe(204);
+  const response = await logoutResponse;
+  expect(response.status()).toBe(204);
+  expect(await cookieFacts(response)).toEqual(expect.arrayContaining([
+    { name: "SESSION", path: "/", sameSite: "Lax", secure: false, httpOnly: true, maxAge: "0", isEmpty: true },
+    { name: "XSRF-TOKEN", path: "/", sameSite: "Lax", secure: false, httpOnly: false, maxAge: null, isEmpty: true }
+  ]));
   await expect(page.getByTestId("my-bookings-page")).not.toBeVisible();
   await expect(page.getByTestId("logout")).not.toBeVisible();
   await expect(page.getByTestId("sign-in-link").or(page.getByTestId("login-submit"))).toBeVisible();
@@ -108,7 +169,9 @@ test("a member books a court with an idempotency key the browser could generate"
   await page.getByTestId("booking-submit").click();
 
   // then
-  expect((await created).status()).toBe(201);
-  expect(await (await created).request().headerValue("Idempotency-Key"))
+  const response = await created;
+  expect(response.status()).toBe(201);
+  expect(await response.request().headerValue("X-XSRF-TOKEN")).toBeTruthy();
+  expect(await response.request().headerValue("Idempotency-Key"))
     .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });

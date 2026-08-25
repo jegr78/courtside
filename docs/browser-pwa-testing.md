@@ -1,8 +1,8 @@
 # Browser and PWA qualification
 
 Courtside treats Chromium and WebKit as required desktop engines. The merge gate runs Chromium
-core and accessibility projects plus core member and administration journeys in WebKit. Chromium
-owns the blocking automated WCAG rule scan. The WebKit plus axe combination remains in the
+core and accessibility projects plus core member, administration and installed-PWA journeys in
+WebKit. Chromium owns the blocking automated WCAG rule scan. The WebKit plus axe combination remains in the
 scheduled reliability and release qualification path until first-attempt evidence qualifies it.
 The scheduled stability workflow adds Firefox, iPhone/Safari emulation and Android/Chrome
 emulation. Emulation exercises layout, touch input and browser-engine behaviour; it is not evidence
@@ -29,6 +29,11 @@ the documented plain-HTTP client boundary. It still inventories cookie names and
 `SameSite` and path attributes without retaining values. The default `Secure=true` contract is
 proved by the backend cookie test and by the passive SECURITY/UAT deployment checks; this browser
 journey does not replace or weaken those gates.
+
+The installed-PWA compatibility journey uses the trusted TLS origin in Chromium and WebKit. It
+proves service-worker registration, sign-in, an authenticated mutation and logout. Chromium alone
+runs the offline navigation and worker-update lifecycle because WebKit's remote browser process
+does not complete the cached offline navigation reliably enough for a merge gate.
 
 A separate CSP probe creates a blocked inline script and requires an attributable
 `securitypolicyviolation` event. Chromium runs the complete projection, storage, cache and CSP

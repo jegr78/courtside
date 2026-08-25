@@ -49,6 +49,7 @@ server:
     session:
       cookie:
         secure: ${COURTSIDE_COOKIE_SECURE:true}
+        same-site: lax
 
 courtside:
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}
