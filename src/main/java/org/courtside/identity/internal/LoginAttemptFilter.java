@@ -9,7 +9,6 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -27,9 +26,9 @@ class LoginAttemptFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        Optional<Duration> retryAfter = protection.registerAttempt(request.getRemoteAddr());
-        if (retryAfter.isPresent()) {
-            handler.handle(response, retryAfter.orElseThrow());
+        Optional<LoginBlock> blocked = protection.registerAttempt(request.getRemoteAddr());
+        if (blocked.isPresent()) {
+            handler.handle(response, blocked.orElseThrow().retryAfter());
             return;
         }
         filterChain.doFilter(request, response);
