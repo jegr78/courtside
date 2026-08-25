@@ -2,6 +2,7 @@ package org.courtside.audit;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
@@ -17,15 +19,18 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -33,7 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({CardTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class})
 class AuditAdminControllerTest extends AbstractIntegrationTest {
 
     private static final int MAX_PAGES = 10;
@@ -45,6 +50,9 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
+    private CardTestFixture cards;
+
+    @Autowired
     private IdentityTestFixture identity;
 
     @Autowired
@@ -52,6 +60,9 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private Clock clock;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private MockMvc mockMvc;
     private UserDetails administrator;
@@ -126,6 +137,66 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries[0].subjectId").value(courtId.toString()))
                 .andExpect(jsonPath("$.entries[0].subjectName").value("11"));
+    }
+
+    @Test
+    void givenARecordedEventWithANullableValue_whenTheLogIsRead_thenNullRemainsPartOfThePayload()
+            throws Exception {
+        // given
+        UUID cardId = cards.createUnlimitedParticipantCard("Unlimited guests");
+
+        // when
+        String body = mockMvc.perform(get("/api/admin/audit").param("subjectId", cardId.toString())
+                        .with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].eventType").value("card.participantCard.added"))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        Map<String, Object> parameters = JsonPath.read(body, "$.entries[0].parameters");
+        assertThat(parameters).containsEntry("capacity", null);
+    }
+
+    @Test
+    void givenAStoredEntryWithANestedNull_whenTheLogIsRead_thenTheNestedValueRemainsReadable()
+            throws Exception {
+        // given
+        UUID eventId = UUID.randomUUID();
+        UUID subjectId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO domain_event (id, event_type, subject_id, occurred_at, payload)
+                VALUES (?, ?, ?, ?, CAST(? AS jsonb))
+                """, eventId, "audit.nullable.recorded", subjectId, Timestamp.from(clock.instant()),
+                "{\"nested\":{\"value\":null},\"retained\":\"present\"}");
+
+        // when
+        String body = mockMvc.perform(get("/api/admin/audit").param("subjectId", subjectId.toString())
+                        .with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].eventType").value("audit.nullable.recorded"))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        Map<String, Object> parameters = JsonPath.read(body, "$.entries[0].parameters");
+        assertThat(parameters).containsEntry("retained", "present");
+        Map<String, Object> nested = JsonPath.read(body, "$.entries[0].parameters.nested");
+        assertThat(nested).containsEntry("value", null);
+    }
+
+    @Test
+    void givenAStoredEntryWithAnArrayPayload_whenTheLogIsRead_thenTheCorruptPayloadFailsClosed() {
+        // given
+        UUID subjectId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO domain_event (id, event_type, subject_id, occurred_at, payload)
+                VALUES (?, ?, ?, ?, CAST(? AS jsonb))
+                """, UUID.randomUUID(), "audit.invalid.recorded", subjectId, Timestamp.from(clock.instant()), "[]");
+
+        // when / then
+        assertThatThrownBy(() -> mockMvc.perform(get("/api/admin/audit")
+                        .param("subjectId", subjectId.toString()).with(user(administrator))))
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Stored audit payload must be a JSON object");
     }
 
     @Test
