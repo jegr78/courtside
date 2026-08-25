@@ -248,9 +248,15 @@ describe("AdminConfigurationView", () => {
     const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
       ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
     });
+    const loadedRules = deferred<Awaited<ReturnType<typeof api.rules>>>();
+    vi.mocked(api.rules).mockReturnValueOnce(loadedRules.promise);
     const configurationChanged = vi.fn();
     render(<MemoryRouter><AdminConfigurationView configurationChanged={configurationChanged} /></MemoryRouter>);
     await screen.findByTestId("club-name");
+    const saveRuleButton = screen.getByTestId("save-rule-ADVANCE_WINDOW");
+    expect(saveRuleButton).toBeDisabled();
+    loadedRules.resolve([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]);
+    await waitFor(() => expect(saveRuleButton).toBeEnabled());
 
     // when
     fireEvent.change(screen.getByTestId("club-name"), { target: { value: "Example Racquet Club" } });
@@ -259,7 +265,7 @@ describe("AdminConfigurationView", () => {
     fireEvent.change(screen.getByTestId("time-zone"), { target: { value: "Pacific/Auckland" } });
     fireEvent.click(screen.getByTestId("save-club-config"));
     fireEvent.change(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), { target: { value: "14" } });
-    fireEvent.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
+    fireEvent.click(saveRuleButton);
 
     // then
     await waitFor(() => {

@@ -71,7 +71,8 @@ test("given generated status failures, when the deployment contract explains the
   ];
 
   // when
-  const documented = normalizeSchemathesisEvents(events(entry("listRoster"), "positive", 400),
+  const documented = normalizeSchemathesisEvents(events(entry("listRoster"), "positive", 400,
+    "positive_data_acceptance"),
     [entry("listRoster")], "positive", 1);
   const proxyRejection = normalizeSchemathesisEvents(events(entry("getCourt"), "negative", 421,
     "negative_data_rejection"), [entry("getCourt")], "negative", 1);
@@ -81,24 +82,50 @@ test("given generated status failures, when the deployment contract explains the
     "not_a_server_error"), [entry("listRoster")], "positive", 1);
   const positive421 = normalizeSchemathesisEvents(events(entry("listRoster"), "positive", 421),
     [entry("listRoster")], "positive", 1);
+  const unqualifiedDocumented = normalizeSchemathesisEvents(events(entry("listRoster"), "positive", 400),
+    [entry("listRoster")], "positive", 1);
+  const unqualifiedProxyRejection = normalizeSchemathesisEvents(events(entry("getCourt"), "negative", 421,
+    "positive_data_acceptance"), [entry("getCourt")], "negative", 1);
+  const relatedProxyEvents = events(entry("getCourt"), "negative", 421, "negative_data_rejection");
+  relatedProxyEvents[1].ScenarioFinished.recorder.checks.one.push({ name: "status_code_conformance",
+    status: "failure", failure_info: {
+      reason: { kind: "status", observedStatus: 421, expectedStatuses: ["2xx"] }
+    } });
+  const relatedProxyRejections = normalizeSchemathesisEvents(relatedProxyEvents,
+    [entry("getCourt")], "negative", 1);
+  const acceptedNegative = normalizeSchemathesisEvents(events(entry("listRoster"), "negative", 200,
+    "negative_data_rejection"), [entry("listRoster")], "negative", 1);
+  const controlFailures = [401, 403, 429].map((status) => normalizeSchemathesisEvents(
+    events(entry("listRoster"), "positive", status, "positive_data_acceptance"),
+    [entry("listRoster")], "positive", 1));
 
   // then
   assert.equal(documented.operationResults[0].outcome, "passed");
   assert.equal(proxyRejection.operationResults[0].outcome, "passed");
   assert.equal(documented.counterexamples.length, 0);
   assert.equal(proxyRejection.counterexamples.length, 0);
+  assert.equal(relatedProxyRejections.counterexamples.length, 0);
   assert.deepEqual(documented.dispositions.map(({ disposition, reason }) =>
     ({ disposition, observedStatus: reason.observedStatus })),
   [{ disposition: "documented-status", observedStatus: 400 }]);
   assert.deepEqual(proxyRejection.dispositions.map(({ disposition, reason }) =>
     ({ disposition, observedStatus: reason.observedStatus })),
   [{ disposition: "proxy-negative-input-rejection", observedStatus: 421 }]);
+  assert.equal(relatedProxyRejections.dispositions.length, 2);
   assert.equal(undocumented.dispositions.length, 0);
   assert.equal(serverError.dispositions.length, 0);
   assert.equal(positive421.dispositions.length, 0);
+  assert.equal(unqualifiedDocumented.dispositions.length, 0);
+  assert.equal(unqualifiedProxyRejection.dispositions.length, 0);
+  assert.equal(acceptedNegative.dispositions.length, 0);
+  assert.equal(controlFailures.every(({ dispositions }) => dispositions.length === 0), true);
   assert.equal(undocumented.counterexamples.length, 1);
   assert.equal(serverError.counterexamples.length, 1);
   assert.equal(positive421.counterexamples.length, 1);
+  assert.equal(unqualifiedDocumented.counterexamples.length, 1);
+  assert.equal(unqualifiedProxyRejection.counterexamples.length, 1);
+  assert.equal(acceptedNegative.counterexamples.length, 1);
+  assert.equal(controlFailures.every(({ counterexamples }) => counterexamples.length === 1), true);
 });
 
 test("given minimized Schemathesis events, when normalizing them, then failures retain no raw traffic", () => {
@@ -342,6 +369,10 @@ test("given repeated and distinct failures, when retaining lifecycle evidence, t
   const invalidDisposition = structuredClone(evidence);
   invalidDisposition.dispositions = [{ ...evidence.counterexamples[0], disposition: "documented-status" }];
   assert.throws(() => validateOpenApiFuzzEvidence(invalidDisposition), /disposition/i);
+  const incompleteCandidateEvidence = structuredClone(evidence);
+  const mergedCandidate = incompleteCandidateEvidence.candidates.find(({ evidence: values }) => values.length === 2);
+  mergedCandidate.evidence.pop();
+  assert.throws(() => validateOpenApiFuzzEvidence(incompleteCandidateEvidence), /candidate evidence/i);
 });
 
 test("given every state-changing operation, when building negative probes, then each is rejected", async () => {

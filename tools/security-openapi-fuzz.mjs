@@ -99,9 +99,11 @@ export function normalizeSchemathesisEvents(events, inventory, mode, contractOpe
     for (const { scenario, caseIds } of matching) {
       let recordedFailure = false;
       for (const caseId of caseIds) {
-        for (const check of (scenario.recorder?.checks?.[caseId] ?? []).filter(({ status }) => status === "failure")) {
-          const generatedCase = scenario.recorder.cases[caseId].value;
-          const counterexample = safeCounterexample(entry, mode, ++sequence, check, generatedCase);
+        const generatedCase = scenario.recorder.cases[caseId].value;
+        const failures = (scenario.recorder?.checks?.[caseId] ?? [])
+          .filter(({ status }) => status === "failure")
+          .map((check) => safeCounterexample(entry, mode, ++sequence, check, generatedCase));
+        for (const counterexample of failures) {
           recordedFailure = true;
           const disposition = counterexampleDisposition(counterexample);
           if (disposition === null) {
@@ -417,17 +419,24 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
   if (new Set(candidateFingerprints).size !== candidateFingerprints.length) {
     throw new Error("OpenAPI fuzz evidence contains duplicate lifecycle candidates");
   }
-  const expectedFingerprints = new Set([
+  const expectedCandidates = mergeCandidates([
     ...evidence.counterexamples.map((counterexample) => counterexampleCandidate(counterexample,
       { runId: "validation", targetFingerprint: evidence.targetFingerprint }, { attempt: 1 },
-      "2000-01-01T00:00:00.000Z").fingerprint),
+      "2000-01-01T00:00:00.000Z")),
     ...evidence.undocumentedRoutes.map((route) => undocumentedRouteCandidate(route,
       { runId: "validation", targetFingerprint: evidence.targetFingerprint }, { attempt: 1 },
-      "2000-01-01T00:00:00.000Z").fingerprint)
+      "2000-01-01T00:00:00.000Z"))
   ]);
+  const expectedFingerprints = new Set(expectedCandidates.map(({ fingerprint }) => fingerprint));
   if (expectedFingerprints.size !== candidateFingerprints.length
       || candidateFingerprints.some((fingerprint) => !expectedFingerprints.has(fingerprint))) {
     throw new Error("OpenAPI fuzz evidence omits a lifecycle candidate");
+  }
+  const expectedEvidence = new Map(expectedCandidates.map((candidate) => [candidate.fingerprint,
+    candidate.evidence.map(candidateEvidenceIdentity).toSorted()]));
+  if (evidence.candidates.some((candidate) => JSON.stringify(candidate.evidence
+    .map(candidateEvidenceIdentity).toSorted()) !== JSON.stringify(expectedEvidence.get(candidate.fingerprint)))) {
+    throw new Error("OpenAPI fuzz lifecycle candidate evidence is incomplete");
   }
   const expectedImportCases = ["invalid-utf8", "duplicate-columns", "oversized-cell", "conflicting-reference"];
   if (JSON.stringify(evidence.importCases.map(({ id }) => id).toSorted())
@@ -496,10 +505,17 @@ function counterexampleDisposition(counterexample) {
   if (counterexample.reason.kind !== "status") return null;
   const status = counterexample.reason.observedStatus;
   if (status >= 500) return null;
-  if (counterexample.mode === "negative" && openApiFuzzPolicy.negativeInputProxyStatuses.includes(status)) {
+  const qualifiedProxyRejection = ["negative-data-rejection", "status-code-conformance"]
+    .includes(counterexample.check);
+  if (counterexample.mode === "negative" && qualifiedProxyRejection
+      && openApiFuzzPolicy.negativeInputProxyStatuses.includes(status)) {
     return "proxy-negative-input-rejection";
   }
-  return operationAcceptsStatus(counterexample.operationId, status) ? "documented-status" : null;
+  const businessRejection = counterexample.mode === "positive"
+    && counterexample.check === "positive-data-acceptance"
+    && status >= 400 && status < 500 && ![401, 403, 421, 429].includes(status);
+  return businessRejection && operationAcceptsStatus(counterexample.operationId, status)
+    ? "documented-status" : null;
 }
 
 function dispositionProjection(counterexample, disposition) {
@@ -753,6 +769,10 @@ function mergeCandidates(candidates) {
     existing.evidence.push(...candidate.evidence.filter(({ id }) => !evidenceIds.has(id)));
   }
   return [...merged.values()];
+}
+
+function candidateEvidenceIdentity(evidence) {
+  return JSON.stringify({ id: evidence.id, digest: evidence.digest });
 }
 
 function inputCase(id, method, path, body, expectedStatus = 400) {
