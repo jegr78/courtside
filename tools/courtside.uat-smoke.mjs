@@ -129,6 +129,9 @@ try {
   assert.equal(sharedActuator.statusCode, 404);
   assert.equal(sharedSession.headers["strict-transport-security"], "max-age=31536000");
   assert.equal(sharedSession.headers["x-robots-tag"], "noindex, nofollow");
+  assert.equal(sharedSession.headers.via, undefined);
+  assert.match(sharedSession.headers["content-security-policy"], /img-src 'self' https:;/);
+  assert.doesNotMatch(sharedSession.headers["content-security-policy"], /(?:http:|data:)/);
   assert.match(csrfCookie, /; Secure/i);
   assert.equal(login.statusCode, 200);
   assert.match(login.headers["set-cookie"].find((cookie) => cookie.startsWith("SESSION=")), /; Secure; HttpOnly/i);

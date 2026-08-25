@@ -16,6 +16,7 @@ https://localhost:443 {
 		Referrer-Policy strict-origin-when-cross-origin
 		Permissions-Policy "geolocation=(), camera=(), microphone=()"
 		-Server
+		-Via
 	}
 
 	handle /api-ui* {
@@ -52,6 +53,7 @@ http://:8083 {
 		Referrer-Policy strict-origin-when-cross-origin
 		X-Robots-Tag "noindex, nofollow"
 		-Server
+		-Via
 	}
 
 	@private path /api-ui* /actuator* /api/openapi.yaml

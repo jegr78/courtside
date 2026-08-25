@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import {
   assertPassiveDeploymentEvidence, assertQualifiedImageEvidence, buildPassiveDeploymentEvidence, createAssessmentControl,
-  normalizeZapAlerts, passiveDeploymentSummary, passiveScannerOrigin, requiredPassiveCheckIds,
+  evaluatePublicResponseHeaders, normalizeZapAlerts, passiveDeploymentSummary, passiveScannerOrigin, requiredPassiveCheckIds,
   runOwnedProcess
 } from "./security-passive-deployment.mjs";
 
@@ -39,6 +39,30 @@ function passingObservations() {
     return { id, layer, passed: true, outcome, observation };
   });
 }
+
+test("given the public response boundary, when CSP or proxy disclosure is broader than intended, then it fails closed", () => {
+  // given
+  const headers = new Map([
+    ["content-security-policy", "default-src 'self'; object-src 'none'; img-src 'self' https:; "
+      + "style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"],
+    ["x-content-type-options", "nosniff"], ["x-frame-options", "DENY"],
+    ["referrer-policy", "strict-origin-when-cross-origin"],
+    ["permissions-policy", "geolocation=(), camera=(), microphone=()"]
+  ]);
+  const response = { headers, cacheProtected: true };
+
+  // when / then
+  assert.deepEqual(evaluatePublicResponseHeaders(response), {
+    passed: true, observation: "security-and-cache-headers-valid"
+  });
+  assert.deepEqual(evaluatePublicResponseHeaders({ ...response,
+    headers: new Map([...headers, ["via", "1.1 Caddy"]])
+  }), { passed: false, observation: "proxy-implementation-disclosed" });
+  assert.deepEqual(evaluatePublicResponseHeaders({ ...response,
+    headers: new Map([...headers, ["content-security-policy",
+      headers.get("content-security-policy").replace("https:", "https: http: data:")]])
+  }), { passed: false, observation: "security-or-cache-headers-invalid" });
+});
 
 test("given passing layer observations, when building passive evidence, then only closed redacted facts remain", () => {
   // given

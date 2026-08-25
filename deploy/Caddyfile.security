@@ -16,6 +16,7 @@
 		Referrer-Policy strict-origin-when-cross-origin
 		Permissions-Policy "geolocation=(), camera=(), microphone=()"
 		-Server
+		-Via
 	}
 	@private path /api-ui* /actuator* /api/openapi.yaml /swagger-ui* /.git* *.map
 	respond @private 404

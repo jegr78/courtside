@@ -1,4 +1,8 @@
 :8080 {
+	header {
+		-Via
+	}
+
 	handle /api-ui* {
 		reverse_proxy api-ui:8080
 	}

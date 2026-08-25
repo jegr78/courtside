@@ -37,6 +37,11 @@ The configured club logo and club name lead the application. If no logo exists, 
 Courtside court mark is the neutral fallback. Courtside's own identity remains subordinate in an
 installed single-club instance.
 
+A root-relative logo keeps the request within the club instance and is preferred. An HTTPS logo on
+another origin remains supported for clubs without a local asset route, but its host receives the
+visitor's IP address and the Courtside origin through the browser request. Plain HTTP logos are
+rejected.
+
 ## Language and theme
 
 German is the initial language and English is available at every point in the application. An

@@ -149,6 +149,29 @@ export function buildPassiveDeploymentEvidence({
   return evidence;
 }
 
+export function evaluatePublicResponseHeaders(response) {
+  const contentSecurityPolicy = response.headers.get("content-security-policy") ?? "";
+  const permissionsPolicy = response.headers.get("permissions-policy") ?? "";
+  const passed = securityHeaders.every((header) => response.headers.has(header))
+    && response.headers.get("x-content-type-options") === "nosniff"
+    && response.headers.get("x-frame-options") === "DENY"
+    && response.headers.get("referrer-policy") === "strict-origin-when-cross-origin"
+    && ["default-src 'self'", "script-src 'self'", "object-src 'none'", "img-src 'self' https:",
+      "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'"].every((directive) =>
+      contentSecurityPolicy.includes(directive))
+    && !contentSecurityPolicy.includes("'unsafe-eval'") && !contentSecurityPolicy.includes("*")
+    && !contentSecurityPolicy.includes("http:") && !contentSecurityPolicy.includes("data:")
+    && ["geolocation=()", "camera=()", "microphone=()"].every((directive) =>
+      permissionsPolicy.includes(directive))
+    && !response.headers.has("server") && !response.headers.has("via") && response.cacheProtected;
+  return {
+    passed,
+    observation: response.headers.has("server") ? "server-header-exposed"
+      : response.headers.has("via") ? "proxy-implementation-disclosed"
+        : passed ? "security-and-cache-headers-valid" : "security-or-cache-headers-invalid"
+  };
+}
+
 export function assertPassiveDeploymentEvidence(evidence) {
   if (!validateEvidence(evidence)) {
     throw new Error(`The passive assessment evidence is invalid: ${JSON.stringify(validateEvidence.errors)}`);
@@ -180,22 +203,11 @@ export async function runPassiveDeploymentAssessment(plan, context) {
     const response = await passiveRequest(plan.target, path, { ca: context.ca, signal: control.signal,
       timeoutMilliseconds: control.remainingMilliseconds() });
     requestCount++;
-    const contentSecurityPolicy = response.headers.get("content-security-policy") ?? "";
-    const permissionsPolicy = response.headers.get("permissions-policy") ?? "";
-    const headersValid = securityHeaders.every((header) => response.headers.has(header))
-      && response.headers.get("x-content-type-options") === "nosniff"
-      && response.headers.get("x-frame-options") === "DENY"
-      && response.headers.get("referrer-policy") === "strict-origin-when-cross-origin"
-      && ["default-src 'self'", "script-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "base-uri 'self'",
-        "form-action 'self'"].every((directive) => contentSecurityPolicy.includes(directive))
-      && !contentSecurityPolicy.includes("'unsafe-eval'") && !contentSecurityPolicy.includes("*")
-      && ["geolocation=()", "camera=()", "microphone=()"].every((directive) => permissionsPolicy.includes(directive))
-      && !response.headers.has("server") && response.cacheProtected;
+    const headerAssessment = evaluatePublicResponseHeaders(response);
     observations.push({
       id: `headers-${pathId(path)}`, layer: "proxy",
-      passed: headersValid,
-      observation: response.headers.has("server") ? "server-header-exposed"
-        : headersValid ? "security-and-cache-headers-valid" : "security-or-cache-headers-invalid"
+      passed: headerAssessment.passed,
+      observation: headerAssessment.observation
     });
     if (path === "/") observations.push({ id: "secure-cookie-delivery", layer: "proxy",
       passed: response.cookiesSecure,

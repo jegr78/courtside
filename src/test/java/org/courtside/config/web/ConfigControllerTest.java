@@ -409,6 +409,36 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnInsecureRemoteLogoUrl_whenChangingTheConfig_thenTheLogoFieldIsRejected()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club")
+                                .replace("/branding/logo.svg", "http://images.example.org/logo.svg"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("logoUrl"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenASecureRemoteLogoUrl_whenChangingTheConfig_thenItRemainsSupported()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club")
+                                .replace("/branding/logo.svg", "https://images.example.org/logo.svg"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logoUrl").value("https://images.example.org/logo.svg"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAClubNameLongerThanTheLimit_whenChangingTheConfig_thenTheViolationCarriesSizeParams()
             throws Exception {
         // when / then

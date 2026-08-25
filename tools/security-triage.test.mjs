@@ -427,7 +427,7 @@ test("given an untriaged lifecycle file, when evaluating it through the CLI, the
     },
     candidates: [candidate()], findings: [], riskAcceptances: []
   }));
-  writeFileSync(policyPath, JSON.stringify(exceptionPolicy));
+  writeFileSync(policyPath, JSON.stringify({ ...exceptionPolicy, riskAcceptances: [] }));
 
   try {
     // when

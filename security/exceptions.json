@@ -1,5 +1,16 @@
 {
   "schemaVersion": 1,
   "exceptions": [],
-  "riskAcceptances": []
+  "riskAcceptances": [
+    {
+      "id": "remote-https-club-logo-2026",
+      "fingerprint": "sha256:971c33107d4bf2efa1ba8cf7eccee04bc287bea807d095b46f782e87e37ca6e2",
+      "owner": "maintainer",
+      "rationale": "Club branding currently supports an administrator-selected HTTPS logo while no same-origin asset upload exists.",
+      "compensatingControl": "The policy grants only image loading over HTTPS; scripts, styles, connections, frames and forms remain same-origin, active URL schemes are rejected, and the referrer policy limits cross-origin disclosure to the Courtside origin.",
+      "expiresOn": "2026-11-30",
+      "acceptedAt": "2026-08-25T16:10:00.000Z",
+      "independentReview": false
+    }
+  ]
 }
