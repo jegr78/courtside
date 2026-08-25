@@ -31,7 +31,9 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.match(fixtures, /if \(!browser\.isConnected\(\)\) return;/);
   assert.match(fixtures, /diagnoseUnexpectedBrowserTest\(\{/);
   assert.match(fixtures, /status: testInfo\.status/);
-  assert.match(fixtures, /\(reason\) => journeyService\.browserDiagnostics\(browserName, reason\)/);
+  assert.match(fixtures, /\(reason\) => journeyService\.browserDiagnostics\(browserName, reason, \{/);
+  assert.match(fixtures, /title: testInfo\.title/);
+  assert.match(fixtures, /errors: testInfo\.errors\.map/);
   assert.doesNotMatch(fixtures, /\.launch\(/);
 });
 

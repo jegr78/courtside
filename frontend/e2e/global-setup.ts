@@ -11,9 +11,11 @@ import { GenericContainer, Network, Wait,
 import type { FullConfig } from "@playwright/test";
 import { requireBuiltAfterItsSources } from "./build-freshness";
 import {
+  applicationLogBuffer,
   collectBrowserDiagnostics,
   retainBrowserDiagnostics,
   type BrowserDiagnostics,
+  type FailedTest,
   type BrowserFailureReason
 } from "./browser-diagnostics";
 import { startJourneyControl } from "./journey-control";
@@ -264,7 +266,8 @@ export interface JourneyService {
   visualDate: string;
   pinnedBrowser(browserName: string): Promise<string>;
   releasePinnedBrowser(browserName: string): Promise<void>;
-  browserDiagnostics(browserName: string, reason: BrowserFailureReason): Promise<BrowserDiagnostics>;
+  browserDiagnostics(browserName: string, reason: BrowserFailureReason,
+    failedTest?: FailedTest): Promise<BrowserDiagnostics>;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string, signal?: AbortSignal): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): Promise<void>;
@@ -399,6 +402,8 @@ async function emptyMailbox(mailboxURL: string): Promise<void> {
 export async function startJourneyService(): Promise<StartedJourneyService> {
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
+  // As many lines as a container hands over, so both sides of a failed run read alike.
+  const applicationLog = applicationLogBuffer(200);
   let staticDirectory: string | undefined;
   const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string }>();
   let clubNetwork: StartedNetwork | undefined;
@@ -475,8 +480,14 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     const startApplication = async () => {
       application = spawn(java, ["-jar", applicationJar()], {
         env: applicationEnvironment,
-        stdio: "inherit"
+        stdio: ["ignore", "pipe", "pipe"]
       });
+      for (const stream of [application.stdout, application.stderr]) {
+        stream?.on("data", (chunk: Buffer) => {
+          process.stdout.write(chunk);
+          applicationLog.append(chunk);
+        });
+      }
       await waitForApplication(application, baseURL);
     };
     const stopApplication = async () => {
@@ -608,7 +619,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       visualDate,
       pinnedBrowser: startPinnedBrowser,
       releasePinnedBrowser,
-      browserDiagnostics: async (browserName, reason) => {
+      browserDiagnostics: async (browserName, reason, failedTest) => {
         const browser = browserServers.get(browserName);
         if (!browser) throw new Error(`No pinned ${browserName} browser exists`);
         const diagnostics = await collectBrowserDiagnostics(browser.container.getId(), browserName, reason, undefined, 5_000, {
@@ -616,6 +627,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
             proxy: clubProxy!.getId(),
             postgres: postgres!.getId()
           },
+          failedTest,
+          applicationLog: () => applicationLog.text(),
           applicationState: {
             pid: application?.pid,
             exitCode: application?.exitCode ?? null,

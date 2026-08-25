@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.session.jdbc.autoconfigure.JdbcSessionProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.Duration;
@@ -31,6 +32,9 @@ class SessionCleanupTest extends AbstractIntegrationTest {
     @Autowired
     private ApplicationContext context;
 
+    @Autowired
+    private JdbcIndexedSessionRepository sessions;
+
     @Test
     void whenTheDeploymentNamesACadence_thenTheCleanupIsTheThingItConfigures() {
         // when / then
@@ -50,41 +54,20 @@ class SessionCleanupTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenASessionPastItsExpiry_whenNobodyTouchesIt_thenItIsRemovedWithoutAnybodyAskingTo() {
+    void givenASessionPastItsExpiry_whenTheCleanupRuns_thenItGoesWhileALiveOneStays() {
         // given
         String expired = storedSession(Duration.ofDays(-1));
         String live = storedSession(Duration.ofDays(1));
 
-        // when
-        awaitRemovalOf(expired);
+        // when — what the cadence above reaches, called rather than waited for: a sweep firing on
+        // its own would race the truncate every other test does between cases
+        sessions.cleanUpExpiredSessions();
 
         // then
         assertThat(rowsFor(expired)).isZero();
         assertThat(rowsFor(live))
                 .as("a session that has not expired is not swept along with one that has")
                 .isEqualTo(1);
-    }
-
-    // Every cached context in the suite sweeps the same database, so this holds that an expired row
-    // goes — not which schedule got there first. The cadence itself is held by the test above.
-    private void awaitRemovalOf(String sessionId) {
-        long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
-        while (rowsFor(sessionId) > 0) {
-            if (System.nanoTime() > deadline) {
-                throw new AssertionError("An expired session survived every cleanup schedule running"
-                        + " against this database");
-            }
-            pause();
-        }
-    }
-
-    private static void pause() {
-        try {
-            TimeUnit.MILLISECONDS.sleep(200);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while waiting for the cleanup", e);
-        }
     }
 
     private String storedSession(Duration untilExpiry) {

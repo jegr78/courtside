@@ -75,7 +75,12 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       errors: testInfo.errors,
       pageCrashed,
       browserConnected: true
-    }, (reason) => journeyService.browserDiagnostics(browserName, reason));
+    }, (reason) => journeyService.browserDiagnostics(browserName, reason, {
+      title: testInfo.title,
+      projectName: testInfo.project.name,
+      status: testInfo.status ?? "unknown",
+      errors: testInfo.errors.map((error) => error.message ?? error.value ?? "")
+    }));
   }, { auto: true }],
   resetJourney: [async ({ journeyService }, provide) => {
     await journeyService.reset();

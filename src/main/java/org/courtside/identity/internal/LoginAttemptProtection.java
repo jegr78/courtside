@@ -1,6 +1,7 @@
 package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,8 +15,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 class LoginAttemptProtection {
@@ -25,12 +28,12 @@ class LoginAttemptProtection {
     private final Clock clock;
 
     @Transactional
-    Optional<Duration> registerAttempt(String address) {
+    Optional<LoginBlock> registerAttempt(String address) {
         String normalizedAddress = normalizeAddress(address);
         lock(Scope.ADDRESS, hash(normalizedAddress));
         lock(Scope.GLOBAL, hash("all"));
 
-        Optional<Duration> retryAfter = retryAfter(normalizedAddress);
+        Optional<LoginBlock> retryAfter = retryAfter(normalizedAddress);
         if (retryAfter.isPresent()) {
             return retryAfter;
         }
@@ -40,15 +43,16 @@ class LoginAttemptProtection {
         return Optional.empty();
     }
 
-    private Optional<Duration> retryAfter(String address) {
+    private Optional<LoginBlock> retryAfter(String address) {
         Instant now = clock.instant();
         return java.util.stream.Stream.of(
-                        blockedUntil(Scope.ADDRESS, address),
-                        blockedUntil(Scope.GLOBAL, "all"))
+                        blockedUntil(Scope.ADDRESS, address).map(until -> Map.entry(Scope.ADDRESS, until)),
+                        blockedUntil(Scope.GLOBAL, "all").map(until -> Map.entry(Scope.GLOBAL, until)))
                 .flatMap(Optional::stream)
-                .filter(until -> until.isAfter(now))
-                .max(Instant::compareTo)
-                .map(until -> Duration.between(now, until));
+                .filter(blocked -> blocked.getValue().isAfter(now))
+                .max(Map.Entry.comparingByValue())
+                .map(blocked -> new LoginBlock(blocked.getKey().name(),
+                        Duration.between(now, blocked.getValue())));
     }
 
     @Transactional
@@ -102,6 +106,11 @@ class LoginAttemptProtection {
         int attempts = windowExpired ? 1 : current.attemptCount() + 1;
         Instant windowStartedAt = windowExpired ? now : current.windowStartedAt();
         Instant blockedUntil = attempts >= limit.maxFailures() ? now.plus(limit.block()) : null;
+        if (blockedUntil != null && (current == null || current.blockedUntil() == null
+                || !current.blockedUntil().isAfter(now))) {
+            log.info("The {} limit now refuses sign-ins for {} seconds", scope,
+                    limit.block().toSeconds());
+        }
 
         jdbc.sql("""
                         INSERT INTO login_attempt_limit

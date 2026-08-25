@@ -1343,7 +1343,11 @@ whether it is built or designed. **Designed means absent today.**
   absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;
   both are stored in PostgreSQL. There is deliberately no username lockout: an anonymous attacker
   could renew it against a known administrator indefinitely. Success clears its address counter,
-  while `Retry-After` tells a client when an address or instance cooldown ends.
+  while `Retry-After` tells a client when an address or instance cooldown ends. A refused sign-in is
+  logged with what refused it — the credential, a deactivated account, or which of the two limits
+  holds — carrying the account id where one exists and never the username, the address or a name, so
+  an operator can tell an attack from a member who mistypes without the log itself becoming a list of
+  who tried to sign in.
 - **Credential issuing:** limited per account over a configurable window, counted in PostgreSQL.
   *Built.* The account is the unit because the account is what the abuse targets: somebody holding a
   board member's session filling one member's mailbox with credentials that each invalidate the
