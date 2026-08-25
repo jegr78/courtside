@@ -66,9 +66,10 @@ validated vulnerability. No critical or high vulnerability was validated in thes
 
 ## Coverage gaps
 
-The catalog contains 15 implemented automated entries and one explicitly blocked entry. Administrative
-multi-factor authentication remains blocked by #69; it was not silently counted as executed.
-Destructive resource-abuse testing is outside this safe-and-active baseline and remains manual-only.
+The catalog contains 15 implemented entries: 12 automated and three hybrid. One additional entry is
+explicitly blocked. Administrative multi-factor authentication remains blocked by #69; it was not
+silently counted as executed. Destructive resource-abuse testing is outside this safe-and-active
+baseline and remains manual-only.
 
 The control-specific manual WSTG 4.2 and ASVS 5.0.0 Level 2 record is not complete. In particular,
 physical-device client review, operational evidence review and the independent-assessment intake
@@ -86,12 +87,13 @@ may not be replaced by a unit test of the lifecycle helper.
   journeys. Network assessment is too slow and stateful for every pull request.
 - The bounded safe profile remains scheduled weekly. Any incomplete attempt is investigated; it is
   not retried over or called flaky.
-- The active profile remains manually dispatched against a freshly qualified immutable image and
-  becomes a release-candidate gate only after this baseline passes.
+- The active profile remains manually dispatched for ordinary assessments. The release workflow
+  also runs it against the qualified immutable candidate and blocks publication when that automated
+  assessment gate does not pass.
 - Destructive resource-abuse, manual procedures and independent penetration testing remain explicit
   release activities, never scheduled against a production instance.
-- Release gating must not be enabled while candidates, manual controls or the successful lifecycle
-  retest remain incomplete.
+- That automated release gate does not complete this broader baseline. Release readiness remains
+  incomplete while candidates, manual controls or the successful lifecycle retest remain open.
 
 ## Reproduction
 
