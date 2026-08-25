@@ -9,7 +9,8 @@ public enum MessageKind {
     BOOKING_CONFIRMED("booking.confirmed"),
     BOOKING_PLAYER_RECORDED("booking.playerRecorded"),
     BOOKING_PLAYER_WITHDREW("booking.playerWithdrew"),
-    BOOKING_DISPLACED("booking.displaced");
+    BOOKING_DISPLACED("booking.displaced"),
+    BOOKING_REMINDER("booking.reminder");
 
     private final String templateKey;
 

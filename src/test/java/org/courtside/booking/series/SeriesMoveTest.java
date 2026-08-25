@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -58,6 +59,9 @@ class SeriesMoveTest extends AbstractIntegrationTest {
     @Autowired
     private FacilityTestFixture facilityFixture;
 
+    @Autowired
+    private TransactionTemplate transactions;
+
     private UUID courtOne;
     private UUID courtTwo;
     private final UUID trainer = UUID.randomUUID();
@@ -86,6 +90,24 @@ class SeriesMoveTest extends AbstractIntegrationTest {
         assertThat(moved).isEqualTo(3);
         assertThat(startOf(series.bookingIds().getFirst()))
                 .isEqualTo(Instant.parse("2026-04-07T18:00:00Z"));
+    }
+
+    @Test
+    void givenAnOccurrenceAlreadyReminded_whenTheSeriesMoves_thenItCanRemindAgain() {
+        // given
+        SeriesCreationResult series = createSeries(3);
+        UUID reminded = series.bookingIds().getFirst();
+        transactions.executeWithoutResult(status ->
+                assertThat(bookings.claimReminder(reminded, Instant.parse("2026-04-06T18:00:00Z")))
+                        .isEqualTo(1));
+
+        // when
+        seriesService.move(new MoveRequest(
+                series.seriesId(), reminded, CancelScope.WHOLE_SERIES,
+                LocalTime.of(20, 0), null, null), trainer, Set.of(Role.TRAINER));
+
+        // then — the appointment it was reminded of is not the appointment it now holds
+        assertThat(bookings.findById(reminded).orElseThrow().getRemindedAt()).isNull();
     }
 
     @Test

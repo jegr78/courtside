@@ -7,7 +7,7 @@ import org.courtside.identity.UserAccount;
 import org.courtside.notification.MessageKind;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
-import org.courtside.shared.BookingDisplaced;
+import org.courtside.shared.BookingReminderDue;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -21,7 +21,7 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class DisplacementMailer {
+class ReminderMailer {
 
     private final BookingAnnouncer bookings;
     private final BookingAudience audience;
@@ -33,31 +33,20 @@ class DisplacementMailer {
     @Async("bookingMailExecutor")
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener
-    void on(BookingDisplaced displaced) {
-        bookings.describe(displaced.bookingId()).ifPresent(booking ->
-                audience.of(booking).forEach(account -> send(booking, account, displaced.closure())));
+    void on(BookingReminderDue due) {
+        bookings.describe(due.bookingId())
+                .ifPresent(booking -> audience.of(booking).forEach(account -> send(booking, account)));
     }
 
-    private void send(BookingAnnouncement booking, UserAccount account,
-                      BookingDisplaced.Closure closure) {
-        String address = account.getPerson().getEmail();
+    private void send(BookingAnnouncement booking, UserAccount account) {
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
-        String key = MessageKind.BOOKING_DISPLACED.templateKey();
+        String key = MessageKind.BOOKING_REMINDER.templateKey();
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
-        values.put("closure", templates.render(key + "." + closureKey(closure), locale, values));
-        handover.handOver(account.getId(), MessageKind.BOOKING_DISPLACED, address,
+        handover.handOver(account.getId(), MessageKind.BOOKING_REMINDER,
+                account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values));
-        log.info("Handed over a closure notice for account {}", account.getId());
-    }
-
-    private static String closureKey(BookingDisplaced.Closure closure) {
-        return switch (closure) {
-            case COURT_OUT_OF_SERVICE -> "court";
-            case CARD_OUT_OF_SERVICE -> "card";
-            case DAY_CLOSED -> "day";
-            case HOURS_NARROWED -> "hours";
-        };
+        log.info("Handed over a booking reminder for account {}", account.getId());
     }
 }

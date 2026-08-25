@@ -128,12 +128,14 @@ cannot reach from a browser is listed with the endpoints that have no surface, i
 decision rather than a gap.
 
 A booking now writes to the people it concerns: the member who made it gets a confirmation carrying
-the day, the period, every court it holds and the kind of booking, in the account's own language;
-a member somebody recorded as a co-player is told without being asked first; whoever booked is told
-when that member takes themselves out again; and and when a court, a booking card or a weekday goes out of
-service, or opening hours no longer cover a booking, everybody in it hears so, with what was closed. All of them are recorded in the same message log
-as a credential. A series stays one decision and gets no message per occurrence. Of section 6's
-table, the booking confirmation is the row that is built; the rest are designed.
+the day, the period, every court it holds and the kind of booking, in the account's own language; a
+member somebody recorded as a co-player is told without being asked first; whoever booked is told
+when that member takes themselves out again; and when a court, a booking card or a weekday goes out
+of service, or opening hours no longer cover a booking, everybody in it hears so, with what was
+closed; and a booking coming up reminds everybody in it, as many hours ahead as the club sets. All
+of them are recorded in the same message log as a credential. A series stays one decision and gets
+no message per occurrence. Of section 6's table, the booking confirmation is the row that is built;
+the rest are designed.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
 container image scanning, reports and exports, and the self-service password reset of section 4 — a
@@ -653,6 +655,7 @@ All rule categories are configurable per club, per membership type or role:
 | Category | Examples |
 |---|---|
 | Time grid and opening hours | Slot granularity (30/60 min), opening hours per weekday, season start/end, holiday handling, per-court deviations |
+| Messages | How many hours before a booking its people are reminded, and zero for a club that wants no reminders |
 | Per-member limits | Max concurrent open bookings, max hours per week, advance booking window, min/max booking duration |
 | Cancellation and no-show | Free cancellation deadline, automatic release on no-show, lockout after repeated no-shows |
 | Role and group dependent | Juniors only until 18:00, trainers may block slots, restricted rights for passive members, different advance windows per membership type |
@@ -844,18 +847,23 @@ All templates are i18n message bundles and editable per instance:
 | Booking cancelled | Booking member + participating members |
 | Booking cancelled by an admin | Affected members, with reason |
 | Court, card, weekday or opening hours closed under a booking | Everybody in a booking it displaces |
+| A booking coming up | Everybody in it, the lead time set by the club |
 | Series created | Creator, with the list of skipped occurrences |
 
 Per-notification opt-out where legally permissible; transactional messages about one's own
 bookings are not opt-out.
 
-**Built:** three things a booking says for itself. The member who made it gets a confirmation. A
+**Built:** four things a booking says for itself. The member who made it gets a confirmation. A
 member somebody recorded as a co-player is told, and whoever booked is told when that member takes
 themselves out again. And a court, a booking card, a weekday going out of service or opening hours
 narrowed under a booking tells everybody in every future booking it displaces — the booker and the
-recorded players alike — naming what was closed; taking something out of service cancels nothing, and the message says so, because the
-impact list beside the control is information for the board and the booking stands until the board
-acts on it.
+recorded players alike — naming what was closed; taking something out of service cancels nothing,
+and the message says so, because the impact list beside the control is information for the board and
+the booking stands until the board acts on it. And a booking coming up reminds everybody in it, as
+many hours ahead as the club sets — zero switches reminders off, a booking made when it already
+stood inside that window keeps its confirmation instead of hearing the same thing twice, one that
+moves is reminded again for the appointment it now holds, and a booking is claimed before its
+reminder goes out, so a second sweep, or a second instance, finds nothing left to do.
 
 All of them are sent after the transaction that caused them commits, so a message never describes a
 court nobody holds, and nothing a member does is refused because a message could not go out — an

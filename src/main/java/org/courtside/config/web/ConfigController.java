@@ -10,6 +10,7 @@ import org.courtside.api.ApiWebManifest;
 import org.courtside.api.ApiWebManifestIcon;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
+import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
@@ -51,6 +52,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 new BookingSlotDuration(request.getSlotMinutes()), request.getTimeZone(),
                 new CredentialLifetime(request.getNewAccountCredentialHours()),
                 new CredentialLifetime(request.getPasswordResetCredentialHours()),
+                new ReminderLeadTime(request.getBookingReminderHours()),
                 request.getNoMembershipTypeRuleSetId()))));
     }
 
@@ -85,7 +87,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 languages.tags(),
                 configuration.slotMinutes(), configuration.timeZone(),
                 configuration.newAccountCredentialHours(),
-                configuration.passwordResetCredentialHours())
+                configuration.passwordResetCredentialHours(),
+                configuration.bookingReminderHours())
                 .logoUrl(configuration.logoUrl())
                 .imprintUrl(configuration.imprintUrl())
                 .noMembershipTypeRuleSetId(configuration.noMembershipTypeRuleSetId());

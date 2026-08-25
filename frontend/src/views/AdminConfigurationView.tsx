@@ -35,6 +35,7 @@ function editable(loaded: AdminClubConfig): ClubConfigRequest {
     timeZone: loaded.timeZone,
     newAccountCredentialHours: loaded.newAccountCredentialHours,
     passwordResetCredentialHours: loaded.passwordResetCredentialHours,
+    bookingReminderHours: loaded.bookingReminderHours,
     noMembershipTypeRuleSetId: loaded.noMembershipTypeRuleSetId ?? null
   };
 }
@@ -227,6 +228,10 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
           <TextField data-testid="new-account-credential-hours" type="number" min={1} max={8760} label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => changeConfig({ newAccountCredentialHours: Number(event.target.value) })} />
           <TextField data-testid="password-reset-credential-hours" type="number" min={1} max={8760} label={t("admin.config.passwordResetCredentialHours")} value={config.passwordResetCredentialHours} onChange={(event) => changeConfig({ passwordResetCredentialHours: Number(event.target.value) })} />
+          <div className="grid gap-1">
+            <TextField data-testid="booking-reminder-hours" type="number" min={0} max={168} label={t("admin.config.bookingReminderHours")} value={config.bookingReminderHours} onChange={(event) => changeConfig({ bookingReminderHours: Number(event.target.value) })} />
+            <p className="text-muted text-sm">{t("admin.config.bookingReminderHoursHelp")}</p>
+          </div>
           <div className="grid gap-1">
             <label className="grid gap-2 font-medium">
               {t("admin.config.noMembershipTypeRuleSet")}

@@ -49,6 +49,7 @@ class AuditedOperationCoverageTest {
             "ConfigService#clubName",
             "ConfigService#current",
             "ConfigService#defaultLocale",
+            "ConfigService#leadTime",
             "ConfigService#lock",
             "ConfigService#slotDuration",
             "ConfigService#update",

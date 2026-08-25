@@ -3,6 +3,7 @@ package org.courtside.config.internal;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
+import org.courtside.config.ReminderLeadTime;
 import org.courtside.rules.testfixture.RulesTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,7 +85,7 @@ class NoMembershipTypeRuleSetAssignmentTest extends AbstractIntegrationTest {
                 current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
-                new CredentialLifetime(current.passwordResetCredentialHours()), ruleSetId);
+                new CredentialLifetime(current.passwordResetCredentialHours()), new ReminderLeadTime(24), ruleSetId);
     }
 
     private ChangeClubConfigurationCommand bindingTo(UUID ruleSetId) {
@@ -94,6 +95,6 @@ class NoMembershipTypeRuleSetAssignmentTest extends AbstractIntegrationTest {
                 current.logoUrl(), current.imprintUrl(), current.defaultLocale(),
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
-                new CredentialLifetime(current.passwordResetCredentialHours()), ruleSetId);
+                new CredentialLifetime(current.passwordResetCredentialHours()), new ReminderLeadTime(24), ruleSetId);
     }
 }
