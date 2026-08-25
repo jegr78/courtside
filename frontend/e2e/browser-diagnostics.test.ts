@@ -72,11 +72,13 @@ describe("browser diagnostics", () => {
     [false, true, ["page.goto: WebKit encountered an internal error"], "browser-internal-error"],
     [false, true, ["frame.evaluate: Target page, context or browser has been closed"], "target-lost"],
     [false, true, ["Test timeout of 60000ms exceeded"], "test-timeout"],
+    [false, true, ["Error: expect(locator).toBeVisible() failed"], "product-failure"],
+    [false, true, [{ message: "Keyboard focus did not reach the control", cause: { message: "courtside-product-failure" } }], "product-failure"],
     [false, true, ["Expected the control to be visible"], "harness-incomplete"]
   ])("given observed browser state, when a test fails, then its failure class is derived",
-    (pageCrashed, browserConnected, messages, expected) => {
+    (pageCrashed, browserConnected, failures, expected) => {
       // given
-      const errors = messages.map((message) => ({ message }));
+      const errors = failures.map((failure) => typeof failure === "string" ? { message: failure } : failure);
 
       // when
       const reason = classifyBrowserFailure(errors, { pageCrashed, browserConnected });

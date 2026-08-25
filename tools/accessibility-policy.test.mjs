@@ -11,13 +11,17 @@ const documentation = readFileSync(join(root, "docs/accessibility-testing.md"), 
 const fixtures = readFileSync(join(root, "frontend/e2e/fixtures.ts"), "utf8");
 const playwright = readFileSync(join(root, "frontend/playwright.config.ts"), "utf8");
 const pom = readFileSync(join(root, "pom.xml"), "utf8");
+const stability = readFileSync(join(root, ".github/workflows/test-stability.yml"), "utf8");
 
-test("given the required accessibility gate, when inspecting its browser coverage, then axe runs in Chromium and WebKit", () => {
+test("given the required accessibility gate, when inspecting its browser coverage, then axe blocks in Chromium only", () => {
   assert.match(accessibility, /wcag22aa/);
   assert.match(accessibility, /initial password change is operable using only the keyboard/);
   assert.match(accessibility, /a booking is operable using only the keyboard/);
+  assert.match(playwright, /name: "chromium-accessibility"/);
   assert.match(playwright, /name: "webkit-accessibility"/);
-  assert.match(playwright, /testMatch: \/accessibility\\\.spec/);
+  assert.match(playwright, /COURTSIDE_WEBKIT_AXE/);
+  assert.match(stability, /COURTSIDE_WEBKIT_AXE: 'true'/);
+  assert.doesNotMatch(pom, /COURTSIDE_WEBKIT_AXE/);
   // Every browser draws in the pinned image, so the build installs none of them.
   assert.doesNotMatch(pom, /playwright install/);
   assert.match(fixtures, /connect\(await journeyService\.pinnedBrowser\(browserName\)\)/);
@@ -29,6 +33,13 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.match(fixtures, /status: testInfo\.status/);
   assert.match(fixtures, /\(reason\) => journeyService\.browserDiagnostics\(browserName, reason\)/);
   assert.doesNotMatch(fixtures, /\.launch\(/);
+});
+
+test("given browser gates fail, when reporting their outcome, then product and harness claims remain distinct", () => {
+  assert.match(playwright, /browser-gate-reporter/);
+  assert.match(playwright, /name: "webkit-core"/);
+  assert.match(playwright, /name: "chromium-accessibility"/);
+  assert.match(playwright, /name: "webkit-accessibility"/);
 });
 
 test("given automation cannot decide assistive-technology usability, when qualifying a release, then the manual evidence stays explicit", () => {

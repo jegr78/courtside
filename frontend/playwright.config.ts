@@ -16,11 +16,16 @@ if (projectOrder !== undefined && projectOrder !== "configured" && projectOrder 
   throw new Error(`Unsupported browser project order: ${projectOrder}`);
 }
 
+const qualificationProjects = process.env.COURTSIDE_WEBKIT_AXE === "true" ? [
+  { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" as const } }
+] : [];
+
 const configuredProjects = [
-  { name: "chromium", testIgnore: /responsive-mobile\.spec\.ts|visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
+  { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
+  { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
-  { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" as const } },
   { name: "webkit-core", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, metadata: { plainOrigin: true }, use: { browserName: "webkit" as const } },
+  ...qualificationProjects,
   ...periodicProjects
 ];
 
@@ -39,6 +44,7 @@ export default defineConfig({
   // Pinned so nobody reaches "changed" or "all", under which a missing baseline passes silently.
   // "missing" writes the new baseline for collection and still fails the run that needed it.
   updateSnapshots: "missing",
+  reporter: [["line"], ["./e2e/browser-gate-reporter.ts"]],
   use: {
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
