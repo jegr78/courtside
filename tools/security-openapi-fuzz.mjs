@@ -12,6 +12,7 @@ const yaml = require("js-yaml");
 const Ajv = require("ajv/dist/2020").default;
 const specification = readFileSync(apiDocumentPath());
 const api = yaml.load(specification.toString("utf8"));
+const operationResponses = collectOperationResponses(api);
 const publicPropertyNames = collectPropertyNames(api.components?.schemas ?? {});
 const publicMediaTypes = collectMediaTypes(api);
 const evidenceSchema = JSON.parse(readFileSync(
@@ -84,6 +85,8 @@ export function normalizeSchemathesisEvents(events, inventory, mode, contractOpe
     scenarios.set(entry.operationId, recorded);
   }
   const counterexamples = [];
+  const dispositions = [];
+  let sequence = 0;
   const operationResults = expected.map((entry) => {
     const operationScenarios = scenarios.get(entry.operationId) ?? [];
     const matching = operationScenarios.flatMap((scenario) => {
@@ -94,20 +97,28 @@ export function normalizeSchemathesisEvents(events, inventory, mode, contractOpe
     if (!matching.length) throw new Error(`Schemathesis omitted ${mode} inputs for ${entry.operationId}`);
     let failed = false;
     for (const { scenario, caseIds } of matching) {
+      let recordedFailure = false;
       for (const caseId of caseIds) {
         for (const check of (scenario.recorder?.checks?.[caseId] ?? []).filter(({ status }) => status === "failure")) {
           const generatedCase = scenario.recorder.cases[caseId].value;
-          counterexamples.push(safeCounterexample(entry, mode, counterexamples.length + 1, check, generatedCase));
-          failed = true;
+          const counterexample = safeCounterexample(entry, mode, ++sequence, check, generatedCase);
+          recordedFailure = true;
+          const disposition = counterexampleDisposition(counterexample);
+          if (disposition === null) {
+            counterexamples.push(counterexample);
+            failed = true;
+          } else {
+            dispositions.push(dispositionProjection(counterexample, disposition));
+          }
         }
       }
-      if (scenario.status !== "success") failed = true;
+      if (scenario.status !== "success" && !recordedFailure) failed = true;
     }
     const outcome = failed ? "incomplete" : "passed";
     return { operationId: entry.operationId, mode, outcome,
       observation: outcome === "passed" ? "generated-inputs-conform" : "candidate-requires-triage" };
   });
-  return { operationResults, counterexamples, undocumentedRoutes: [...undocumentedRoutes.values()] };
+  return { operationResults, counterexamples, dispositions, undocumentedRoutes: [...undocumentedRoutes.values()] };
 }
 
 export async function runOpenApiFuzzAssessment(plan, context) {
@@ -140,6 +151,7 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     ...scanner.mutationCases.map(({ operationId, outcome }) => ({ operationId, mode: "negative", outcome,
       observation: outcome === "passed" ? "curated-invalid-input-rejected" : "candidate-requires-triage" }))];
   const counterexamples = normalized.flatMap(({ counterexamples: values }) => values);
+  const dispositions = normalized.flatMap(({ dispositions: values }) => values);
   const undocumentedRoutes = [...normalized.flatMap(({ undocumentedRoutes: values }) => values),
     ...undocumentedRuntimeRoutes(scanner.observedRoutes, inventory)]
     .filter((value, index, values) => values.findIndex((candidate) =>
@@ -160,7 +172,7 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     || scanner.importCases.some(({ outcome }) => outcome === "incomplete")
     || scanner.mutationCases.some(({ outcome }) => outcome === "incomplete");
   const evidence = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     testIds: ["CSA-API-001", "CSA-IMPORT-001"],
     targetFingerprint: plan.targetFingerprint,
     image: openApiFuzzPolicy.image,
@@ -169,6 +181,7 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     seed: openApiFuzzPolicy.seed,
     operations,
     counterexamples,
+    dispositions,
     undocumentedRoutes,
     inputCases: scanner.inputCases,
     importCases: scanner.importCases,
@@ -380,11 +393,23 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
     }
   }
   const operationById = new Map(evidence.operations.map((operation) => [operation.operationId, operation]));
-  if (evidence.counterexamples.some((counterexample) => {
-    const operation = operationById.get(counterexample.operationId);
-    return operation == null || operation.method !== counterexample.method
-      || operation.path !== counterexample.pathTemplate || !operation.modes.includes(counterexample.mode);
-  })) throw new Error("OpenAPI fuzz evidence contains an unbound counterexample");
+  const observations = [...evidence.counterexamples, ...evidence.dispositions];
+  if (observations.some((observation) => {
+    const operation = operationById.get(observation.operationId);
+    return operation == null || operation.method !== observation.method
+      || operation.path !== observation.pathTemplate || !operation.modes.includes(observation.mode);
+  })) throw new Error("OpenAPI fuzz evidence contains an unbound observation");
+  if (observations.some((observation) => observation.reproductionDigest !== reproductionDigestFor(observation))) {
+    throw new Error("OpenAPI fuzz evidence contains an invalid reproduction digest");
+  }
+  if (evidence.dispositions.some((disposition) => disposition.reason.kind !== "status"
+      || counterexampleDisposition(disposition) !== disposition.disposition)) {
+    throw new Error("OpenAPI fuzz evidence contains an invalid disposition");
+  }
+  const actionableDigests = new Set(evidence.counterexamples.map(({ reproductionDigest }) => reproductionDigest));
+  if (evidence.dispositions.some(({ reproductionDigest }) => actionableDigests.has(reproductionDigest))) {
+    throw new Error("OpenAPI fuzz evidence classifies one observation twice");
+  }
   const candidateFingerprints = evidence.candidates.map(({ fingerprint }) => fingerprint);
   if (evidence.inputCases.some((entry) => (entry.status === undefined) === (entry.transportError === undefined))) {
     throw new Error("OpenAPI input evidence must contain exactly one transport outcome");
@@ -437,10 +462,15 @@ function retainOpenApiFuzzEvidence(directory, evidence) {
 }
 
 function counterexampleCandidate(counterexample, plan, context, observedAt) {
-  const reasonDigest = createHash("sha256").update(JSON.stringify(counterexample.reason)).digest("hex");
+  const statusObservation = counterexample.reason.kind === "status";
+  const identity = statusObservation
+    ? JSON.stringify({ mode: counterexample.mode, observedStatus: counterexample.reason.observedStatus,
+      requestShape: counterexample.requestShape })
+    : JSON.stringify(counterexample.reason);
+  const reasonDigest = createHash("sha256").update(identity).digest("hex");
   return createCandidate({
     scanner: "schemathesis",
-    ruleId: counterexample.check,
+    ruleId: statusObservation ? "http-status-observation" : counterexample.check,
     normalizedSurface: `${counterexample.method} ${counterexample.pathTemplate}`,
     parameter: `reason-${reasonDigest.slice(0, 16)}`,
     attackClass: "contract-boundary",
@@ -460,6 +490,45 @@ function counterexampleCandidate(counterexample, plan, context, observedAt) {
       expiresOn: new Date(new Date(observedAt).getTime() + 30 * 86_400_000).toISOString().slice(0, 10)
     }]
   });
+}
+
+function counterexampleDisposition(counterexample) {
+  if (counterexample.reason.kind !== "status") return null;
+  const status = counterexample.reason.observedStatus;
+  if (status >= 500) return null;
+  if (counterexample.mode === "negative" && openApiFuzzPolicy.negativeInputProxyStatuses.includes(status)) {
+    return "proxy-negative-input-rejection";
+  }
+  return operationAcceptsStatus(counterexample.operationId, status) ? "documented-status" : null;
+}
+
+function dispositionProjection(counterexample, disposition) {
+  return {
+    operationId: counterexample.operationId,
+    mode: counterexample.mode,
+    caseId: counterexample.caseId,
+    check: counterexample.check,
+    method: counterexample.method,
+    pathTemplate: counterexample.pathTemplate,
+    reason: counterexample.reason,
+    requestShape: counterexample.requestShape,
+    reproductionDigest: counterexample.reproductionDigest,
+    disposition
+  };
+}
+
+function operationAcceptsStatus(operationId, status) {
+  const responses = operationResponses.get(operationId);
+  if (!responses) throw new Error(`OpenAPI operation ${operationId} has no response contract`);
+  return responses.has(String(status)) || responses.has(`${Math.floor(status / 100)}XX`) || responses.has("DEFAULT");
+}
+
+function reproductionDigestFor(counterexample) {
+  return `sha256:${createHash("sha256")
+    .update(JSON.stringify({ seed: openApiFuzzPolicy.seed, operationId: counterexample.operationId,
+      mode: counterexample.mode, check: counterexample.check, reason: counterexample.reason,
+      requestShape: counterexample.requestShape }))
+    .digest("hex")}`;
 }
 
 function undocumentedRouteCandidate(route, plan, context, observedAt) {
@@ -523,11 +592,7 @@ function safeCounterexample(operation, mode, sequence, check, generatedCase) {
   const normalizedCheck = String(check.name).replaceAll("_", "-").toLowerCase();
   const reason = failureReasonProjection(normalizedCheck, check.failure_info?.reason);
   const requestShape = requestShapeProjection(generatedCase);
-  const reproductionDigest = `sha256:${createHash("sha256")
-    .update(JSON.stringify({ seed: openApiFuzzPolicy.seed, operationId: operation.operationId,
-      mode, check: normalizedCheck, reason, requestShape }))
-    .digest("hex")}`;
-  return {
+  const counterexample = {
     operationId: operation.operationId,
     mode,
     caseId: `case-${sequence}`,
@@ -536,8 +601,10 @@ function safeCounterexample(operation, mode, sequence, check, generatedCase) {
     pathTemplate: operation.path,
     reason,
     requestShape,
-    reproductionDigest
+    reproductionDigest: ""
   };
+  counterexample.reproductionDigest = reproductionDigestFor(counterexample);
+  return counterexample;
 }
 
 function failureReasonProjection(check, reason) {
@@ -650,6 +717,19 @@ function collectMediaTypes(value, mediaTypes = new Set()) {
     }
   }
   return mediaTypes;
+}
+
+function collectOperationResponses(document) {
+  const responses = new Map();
+  for (const pathItem of Object.values(document.paths ?? {})) {
+    for (const [method, operation] of Object.entries(pathItem)) {
+      if (!methods.has(method) || !operation.operationId) continue;
+      const declared = new Set(Object.keys(operation.responses ?? {}).map((status) => status.toUpperCase()));
+      if (declared.size === 0) throw new Error(`OpenAPI operation ${operation.operationId} has no responses`);
+      responses.set(operation.operationId, declared);
+    }
+  }
+  return responses;
 }
 
 function requestShapeProjection(generatedCase) {
