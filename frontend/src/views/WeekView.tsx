@@ -120,10 +120,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   function isBookable(courtId: string, slot: string): boolean {
     if (!data || !selectedDate) return false;
     if (isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant)) return false;
-    const minute = timeToMinutes(slot);
-    return !selectedAllocations.some((entry) => entry.courtId === courtId
-      && timeToMinutes(formatTime(entry.startsAt, data.grid.timeZone)) <= minute
-      && timeToMinutes(formatTime(entry.endsAt, data.grid.timeZone)) > minute);
+    return !isOccupied(selectedAllocations, courtId, slot, data.grid.timeZone);
   }
 
   // The run stops at the first slot the court cannot give, so the highlight a member drags over
@@ -140,17 +137,18 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     }
     return step > 0 ? span : span.reverse();
   }
+
+  const dragSpan = drag ? bookableSpan(drag.courtId, drag.anchor, drag.head) : [];
   const language = i18n.resolvedLanguage ?? i18n.language;
   const courtCount = data?.courts.length ?? 0;
   useEffect(() => {
     if (!drag) return;
     const finish = () => {
-      const span = bookableSpan(drag.courtId, drag.anchor, drag.head);
       setDrag(undefined);
       // A pointer that never left its cell is a click, and that path is also the keyboard's.
-      if (drag.head !== drag.anchor && span.length > 0 && selectedDate && data) {
-        setBookingSelection({ date: selectedDate, slot: span[0], courtId: drag.courtId,
-          durationMinutes: span.length * data.grid.slotMinutes });
+      if (drag.head !== drag.anchor && dragSpan.length > 0 && selectedDate && data) {
+        setBookingSelection({ date: selectedDate, slot: dragSpan[0], courtId: drag.courtId,
+          durationMinutes: dragSpan.length * data.grid.slotMinutes });
       }
     };
     window.addEventListener("pointerup", finish);
@@ -336,9 +334,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
               bookingAllowed,
               selectedCourtId === court.id,
               {
-                selected: drag?.courtId === court.id
-                  && bookableSpan(court.id, drag.anchor, drag.head).includes(slot),
-                start: (pointerType: string) => pointerType !== "touch"
+                selected: drag?.courtId === court.id && dragSpan.includes(slot),
+                start: (pointerType: string) => pointerType === "mouse"
                   && setDrag({ courtId: court.id, anchor: slot, head: slot }),
                 extend: () => setDrag((current) => current?.courtId === court.id
                   ? { ...current, head: slot } : current)
@@ -396,6 +393,13 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   </section>;
 }
 
+function isOccupied(allocations: Allocation[], courtId: string, slot: string, timeZone: string): boolean {
+  const minute = timeToMinutes(slot);
+  return allocations.some((entry) => entry.courtId === courtId
+    && timeToMinutes(formatTime(entry.startsAt, timeZone)) <= minute
+    && timeToMinutes(formatTime(entry.endsAt, timeZone)) > minute);
+}
+
 function renderCell(
   court: PublicCourt,
   slot: string,
@@ -437,10 +441,7 @@ function renderCell(
       ><span className="block">{label}</span><span className="block text-xs">{period}</span></button> : <div data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}><span className="block">{label}</span><span className="block text-xs">{period}</span></div>}
     </td>;
   }
-  const minute = timeToMinutes(slot);
-  const isCovered = allocations.some((entry) => entry.courtId === court.id
-    && timeToMinutes(formatTime(entry.startsAt, timeZone)) < minute
-    && timeToMinutes(formatTime(entry.endsAt, timeZone)) > minute);
+  const isCovered = isOccupied(allocations, court.id, slot, timeZone);
   const courtName = court.name || t("court.number", { number: court.number });
   if (isCovered) return null;
   const content = canBook ? <button
