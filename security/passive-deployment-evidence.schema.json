@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:security:passive-deployment-evidence:v1",
+  "$id": "urn:courtside:security:passive-deployment-evidence:v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "testId", "targetFingerprint", "imageDigest", "layers", "checks", "zap", "requestCount", "outcome"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "testId": { "const": "CSA-DEPLOY-001" },
     "targetFingerprint": { "$ref": "#/$defs/digest" },
     "imageDigest": { "type": "string", "pattern": "^(?:sha256:[a-f0-9]{64}|[^\\s@]+@sha256:[a-f0-9]{64})$" },
@@ -45,7 +45,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["pluginId", "riskCode", "confidence", "method", "routeTemplate", "fingerprint", "count"],
+            "required": ["pluginId", "riskCode", "confidence", "method", "routeTemplate", "fingerprint", "count", "ruleEvidence"],
             "properties": {
               "pluginId": { "type": "string", "pattern": "^[0-9]+$" },
               "riskCode": { "type": "integer", "minimum": 0, "maximum": 3 },
@@ -57,7 +57,8 @@
                   "/workbox-{asset}.js"]
               },
               "fingerprint": { "$ref": "#/$defs/digest" },
-              "count": { "type": "integer", "minimum": 1 }
+              "count": { "type": "integer", "minimum": 1 },
+              "ruleEvidence": { "$ref": "#/$defs/ruleEvidence" }
             }
           }
         }
@@ -68,6 +69,57 @@
   },
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "ruleEvidence": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "cookieName", "missingAttribute"],
+          "properties": {
+            "kind": { "const": "cookie-attribute" }, "cookieName": { "const": "xsrf-token" },
+            "missingAttribute": { "enum": ["http-only", "same-site"] }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "patternId", "locationDigest"],
+          "properties": {
+            "kind": { "const": "text-pattern" },
+            "patternId": { "enum": ["comment-admin", "comment-administrator", "comment-bug", "comment-bugs",
+              "comment-db", "comment-debug", "comment-fixme", "comment-from", "comment-later", "comment-query",
+              "comment-select", "comment-todo", "comment-user", "comment-username", "comment-where", "comment-xxx"] },
+            "locationDigest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "headerName"],
+          "properties": { "kind": { "const": "response-header" }, "headerName": { "const": "server" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "headerName", "directives"],
+          "properties": {
+            "kind": { "const": "policy-directive" },
+            "headerName": { "const": "content-security-policy" },
+            "directives": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "const": "img-src" } }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "signal"],
+          "properties": { "kind": { "const": "application-signal" }, "signal": { "const": "scripts-without-links" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "tokenNames"],
+          "properties": {
+            "kind": { "const": "session-signal" },
+            "tokenNames": { "type": "array", "minItems": 1, "uniqueItems": true,
+              "items": { "enum": ["session", "xsrf-token"] } }
+          }
+        }
+      ]
+    },
     "checkId": {
       "enum": ["body-limit", "certificate-trust", "direct-forwarded-behavior", "exposure--git-config",
         "exposure-actuator", "exposure-actuator-health", "exposure-assets-app-js-map",
