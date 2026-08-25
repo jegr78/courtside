@@ -15,15 +15,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.FormatStyle;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -34,6 +29,7 @@ class BookingMailer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final BookingWording wording;
     private final RecordedHandover handover;
 
     @Async("bookingMailExecutor")
@@ -59,39 +55,11 @@ class BookingMailer {
     private void send(BookingAnnouncement booking, UserAccount account, String address) {
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_CONFIRMED.templateKey();
-        Map<String, String> values = Map.of(
-                "clubName", club.clubName(),
-                "firstName", account.getPerson().getFirstName(),
-                "day", day(booking.startsAt(), locale),
-                "from", time(booking.startsAt()),
-                "to", time(booking.endsAt()),
-                "courts", courts(booking, locale),
-                "card", booking.cardLabel());
+        Map<String, String> values = new HashMap<>(wording.of(booking, locale));
+        values.put("firstName", account.getPerson().getFirstName());
         handover.handOver(account.getId(), MessageKind.BOOKING_CONFIRMED, address,
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values));
         log.info("Handed over the booking confirmation for account {}", account.getId());
-    }
-
-    private String courts(BookingAnnouncement booking, Locale locale) {
-        return booking.courts().stream()
-                .map(court -> court.name() == null || court.name().isBlank()
-                        ? templates.render("booking.court", locale,
-                                Map.of("number", String.valueOf(court.number())))
-                        : court.name())
-                .collect(Collectors.joining(", "));
-    }
-
-    private String day(Instant startsAt, Locale locale) {
-        return DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale)
-                .format(ZonedDateTime.ofInstant(startsAt, zone()));
-    }
-
-    private String time(Instant instant) {
-        return DateTimeFormatter.ofPattern("HH:mm").format(ZonedDateTime.ofInstant(instant, zone()));
-    }
-
-    private ZoneId zone() {
-        return club.zoneId();
     }
 }

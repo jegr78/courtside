@@ -127,10 +127,12 @@ cannot reach from a browser is listed with the endpoints that have no surface, i
 `tools/surfaceless-endpoints.json`; every entry left in it now names a
 decision rather than a gap.
 
-A booking now writes to the member who made it: the confirmation carries the day, the period, every
-court it holds and the kind of booking, in the account's own language, and it is recorded in the
-same message log as a credential. A series stays one decision and gets no message per occurrence.
-Of section 6's table, that is the row that is built; the rest are designed.
+A booking now writes to the people it concerns: the member who made it gets a confirmation carrying
+the day, the period, every court it holds and the kind of booking, in the account's own language;
+a member somebody recorded as a co-player is told without being asked first; and whoever booked is
+told when that member takes themselves out again. All of them are recorded in the same message log
+as a credential. A series stays one decision and gets no message per occurrence. Of section 6's
+table, the booking confirmation is the row that is built; the rest are designed.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
 container image scanning, reports and exports, and the self-service password reset of section 4 — a
@@ -845,12 +847,17 @@ All templates are i18n message bundles and editable per instance:
 Per-notification opt-out where legally permissible; transactional messages about one's own
 bookings are not opt-out.
 
-**Built:** the booking confirmation to the booking member. It is sent after the booking's own
-transaction commits, so a message never describes a court nobody holds, and a booking is never
-refused because a message could not go out — an account whose address is empty is logged by its id
-and nothing is sent. The event that carries it names the booking and nothing else; what the message
-says about it is read when the message is written, so neither the audit trail nor the message log
-learns where anybody plays.
+**Built:** the booking confirmation to the booking member, and both directions of a co-player
+record — the member somebody recorded is told, and whoever booked is told when that member takes
+themselves out again. All three are sent after the booking's own transaction commits, so a message
+never describes a court nobody holds, and a booking is never refused because a message could not go
+out — an account whose address is empty is logged by its id and nothing is sent. The events that
+carry them name the booking and the person by identifier; what a message says about them is read
+when the message is written, so neither the audit trail nor the message log learns where anybody
+plays. Neither participation message names more than its reader already has: the notice about being
+recorded names the booking and not the booker, and the notice about a withdrawal carries the name
+the booker chose from the directory. A member who holds no account is not written to, because the
+message log is keyed by the account that erases it.
 
 ---
 
@@ -1459,14 +1466,16 @@ Consequences for the model and the API:
   other participants standing — a booking left below its card's player count is not corrected,
   because an objection is not a rebooking. The list resolves no name at all, not the booker's and
   not the other participants', so exercising the objection reveals nothing the grid would not.
-  **Built.**
+  Being recorded now reaches the member as a message, and it names the booking rather than the
+  booker — the same nothing the list resolves. **Built.**
 - **The objection has no time limit and no card exception.** It reaches a booking that has already
   happened as readily as one still ahead — a member usually learns of the record after the fact, so
   the past is the case it exists for. It reaches whatever card recorded them, though as shipped only
   the member booking card records anybody: `allowed_player_counts` is empty for training, league
   match and court closure, so those carry no roster to leave. A club that gives a managed card
-  player counts gets the objection there too, and the managing role learns of it by reading the
-  appointment detail — there is no notification. **Built.**
+  player counts gets the objection there too. Whoever made the booking is told that somebody left
+  it, by the name they entered themselves; a managing role who did not make it learns of the
+  withdrawal by reading the appointment detail, as before. **Built.**
 - Guest names are personal data too and follow the same rule.
 - The managed-appointment detail is not the grid. It resolves every participant of the booking,
   guests included, for a card's managing roles and for an admin. Widening a card's managing roles

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Locale;
 import java.util.Map;
+
+import static java.util.Map.entry;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -22,11 +24,12 @@ class MailTemplatesTest {
             .collect(Collectors.toSet());
 
     // Every value any message names, so a template that reaches for a new one is caught here.
-    private static final Map<String, String> VALUES = Map.of("clubName", "Example Tennis Club",
-            "firstName", "Jane", "username", "doe.jane",
-            "credential", "a-credential", "expiresOn", "1 May 2026",
-            "day", "Wednesday, 13 May 2026", "from", "18:00", "to", "19:00",
-            "courts", "Court 1", "card", "Member booking");
+    private static final Map<String, String> VALUES = Map.ofEntries(
+            entry("clubName", "Example Tennis Club"), entry("firstName", "Jane"),
+            entry("username", "doe.jane"), entry("credential", "a-credential"),
+            entry("expiresOn", "1 May 2026"), entry("day", "Wednesday, 13 May 2026"),
+            entry("from", "18:00"), entry("to", "19:00"), entry("courts", "Court 1"),
+            entry("card", "Member booking"), entry("player", "John Roe"));
 
     private final MailTemplates templates = new MailTemplates();
 
@@ -67,6 +70,15 @@ class MailTemplatesTest {
         assertThat(templates.render("booking.confirmed.body", Locale.GERMAN, VALUES))
                 .contains("Wednesday, 13 May 2026").contains("18:00").contains("19:00")
                 .contains("Court 1").contains("Member booking");
+    }
+
+    @Test
+    void givenTheNoticeAboutBeingRecorded_whenRendered_thenItNamesNobodyButItsReader() {
+        // when / then — the participation list resolves no name, and neither may this message
+        assertThat(templates.render("booking.playerRecorded.body", Locale.GERMAN, VALUES))
+                .contains("Jane").doesNotContain("John Roe");
+        assertThat(templates.render("booking.playerWithdrew.body", Locale.ENGLISH, VALUES))
+                .contains("John Roe");
     }
 
     @Test

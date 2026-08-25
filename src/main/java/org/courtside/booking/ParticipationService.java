@@ -3,6 +3,8 @@ package org.courtside.booking;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.CursorPage;
+import org.courtside.shared.ParticipantWithdrew;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -19,6 +21,7 @@ public class ParticipationService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final BookingRepository bookings;
+    private final ApplicationEventPublisher events;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ParticipationPage participations(UUID personId, UUID accountId, UUID cursor, int limit) {
@@ -48,6 +51,7 @@ public class ParticipationService {
             throw notRecorded(bookingId);
         }
         bookings.saveAndFlush(booking);
+        events.publishEvent(new ParticipantWithdrew(bookingId, personId));
         log.info("Member {} withdrew from booking {}", personId, bookingId);
     }
 
