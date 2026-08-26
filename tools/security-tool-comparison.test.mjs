@@ -105,6 +105,62 @@ test("given paired immutable runs, when comparing a tool update, then new findin
   assert.match(comparison.candidate.runtimeDigest, /^[a-f0-9]{64}$/);
 });
 
+test("given an unattributed incomplete baseline, when the candidate passes, then the repair can be compared", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const baseRoot = runtimeRoot(root, "base-runtime");
+  const candidateRoot = runtimeRoot(root, "candidate-runtime");
+  const base = runFixture(root, "base", {
+    toolResults: tools.map(({ id, version }) => ({ id, version,
+      outcome: id === "openapi-fuzzer" ? "incomplete" : "passed" }))
+  });
+  const candidate = runFixture(root, "candidate", {
+    outcome: "passed", reason: null,
+    toolResults: tools.map(({ id, version }) => ({ id, version, outcome: "passed" }))
+  });
+  for (const evidenceName of evidenceNames) {
+    writeFileSync(join(base.evidence, evidenceName), JSON.stringify({
+      outcome: evidenceName === "openapi-fuzz.json" ? "incomplete" : "passed", candidates: []
+    }));
+    writeFileSync(join(candidate.evidence, evidenceName), JSON.stringify({ outcome: "passed", candidates: [] }));
+  }
+
+  // when
+  const comparison = compareSecurityToolRuns({
+    baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
+    baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
+    candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
+    candidateRef: "b".repeat(40), candidateContract: contractPath, candidateCatalog: catalogPath
+  });
+
+  // then
+  assert.equal(comparison.base.outcome, "incomplete");
+  assert.equal(comparison.candidate.outcome, "passed");
+  assert.deepEqual(comparison.newFindings, []);
+  assert.deepEqual(comparison.resolvedFindings, []);
+});
+
+test("given an unattributed incomplete baseline, when the candidate stays incomplete, then comparison fails closed", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const baseRoot = runtimeRoot(root, "base-runtime");
+  const candidateRoot = runtimeRoot(root, "candidate-runtime");
+  const base = runFixture(root, "base");
+  const candidate = runFixture(root, "candidate");
+  writeFileSync(join(base.evidence, "openapi-fuzz.json"),
+    JSON.stringify({ outcome: "incomplete", candidates: [] }));
+  writeFileSync(join(candidate.evidence, "openapi-fuzz.json"),
+    JSON.stringify({ outcome: "incomplete", candidates: [] }));
+
+  // when / then
+  assert.throws(() => compareSecurityToolRuns({
+    baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
+    baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
+    candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
+    candidateRef: "b".repeat(40), candidateContract: contractPath, candidateCatalog: catalogPath
+  }), /incomplete without retained finding candidates/);
+});
+
 test("given runs for different fixtures or incomplete tool evidence, when comparing them, then the report fails closed", () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));

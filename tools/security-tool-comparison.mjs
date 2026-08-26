@@ -87,7 +87,8 @@ function expectedPlan(contractPath, catalogPath, profile) {
   return { catalogVersion: catalog.catalogVersion, budgets: contract.profiles[profile], selectedTests, tools };
 }
 
-function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, contractPath, catalogPath) {
+function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, contractPath, catalogPath,
+  allowUnattributedIncomplete = false) {
   const bytes = readFileSync(manifestPath, "utf8");
   const manifest = JSON.parse(bytes);
   if (!validateManifest(manifest)) fail(JSON.stringify(validateManifest.errors));
@@ -112,6 +113,7 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
   if (JSON.stringify(actualEvidence) !== JSON.stringify(expectedEvidence)) {
     fail("evidence files differ from the executed tool set");
   }
+  let unattributedIncomplete = false;
   for (const result of manifest.toolResults) {
     if (result.id === "target-identity") {
       if (result.outcome !== "passed") fail("target identity must pass in both runs");
@@ -120,9 +122,11 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
     const evidence = JSON.parse(readFileSync(join(evidenceDirectory, evidenceFiles[result.id]), "utf8"));
     validateEvidence(root, result.id, evidence);
     if (evidence.outcome !== result.outcome) fail(`${result.id} evidence outcome differs from its tool result`);
-    if (result.outcome === "incomplete" && (!Array.isArray(evidence.candidates) || evidence.candidates.length === 0)) {
+    if (result.outcome === "incomplete" && (!Array.isArray(evidence.candidates) || evidence.candidates.length === 0)
+        && !allowUnattributedIncomplete) {
       fail(`${result.id} is incomplete without retained finding candidates`);
     }
+    if (result.outcome === "incomplete" && evidence.candidates.length === 0) unattributedIncomplete = true;
   }
   const toolOutcomes = manifest.toolResults.map(({ outcome }) => outcome);
   const expectedOutcome = toolOutcomes.includes("failed") ? "failed"
@@ -132,6 +136,7 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
   const finishedAt = Date.parse(manifest.finishedAt);
   if (!Number.isFinite(startedAt) || !Number.isFinite(finishedAt) || finishedAt < startedAt) fail("run chronology is invalid");
   return {
+    unattributedIncomplete,
     identity: {
       profile: manifest.profile,
       application: manifest.application,
@@ -161,7 +166,7 @@ export function compareSecurityToolRuns(input) {
   const baseRuntimeDigest = runtimeDigest(input.baseRoot, input.candidateRoot);
   const candidateRuntimeDigest = runtimeDigest(input.candidateRoot, input.baseRoot);
   const base = normalizeRun(input.baseRoot, input.baseManifest, input.baseEvidence, baseRuntimeDigest,
-    input.baseContract, input.baseCatalog);
+    input.baseContract, input.baseCatalog, true);
   const candidate = normalizeRun(input.candidateRoot, input.candidateManifest, input.candidateEvidence, candidateRuntimeDigest,
     input.candidateContract, input.candidateCatalog);
   if (!["active", "destructive"].includes(base.identity.profile) || base.identity.profile !== candidate.identity.profile) {
@@ -178,6 +183,9 @@ export function compareSecurityToolRuns(input) {
     fail("both runs must assess the application of the base revision");
   }
   if (candidate.result.outcome === "failed") fail("the candidate runtime produced a failed assessment");
+  if (base.unattributedIncomplete && candidate.result.outcome !== "passed") {
+    fail("an incomplete baseline without finding candidates requires a passing candidate runtime");
+  }
   const comparison = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),

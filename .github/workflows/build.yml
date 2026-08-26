@@ -105,7 +105,8 @@ jobs:
         run: |
           BASE_ROOT="$RUNNER_TEMP/courtside-security-base"
           COMPARATOR_ROOT="$BASE_ROOT"
-          if [[ ! -f "$COMPARATOR_ROOT/tools/security-tool-comparison.mjs" ]]; then
+          if [[ ! -f "$COMPARATOR_ROOT/tools/security-tool-comparison.mjs" ]] \
+              || ! cmp -s "$COMPARATOR_ROOT/tools/security-tool-comparison.mjs" tools/security-tool-comparison.mjs; then
             COMPARATOR_ROOT="$GITHUB_WORKSPACE"
           fi
           "$COMPARATOR_ROOT/frontend/node/node" "$COMPARATOR_ROOT/tools/security-tool-comparison.mjs" \
