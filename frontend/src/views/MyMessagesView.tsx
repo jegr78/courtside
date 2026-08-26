@@ -42,7 +42,6 @@ export function MyMessagesView() {
   const [pending, setPending] = useState(false);
   const error = failure && problemMessage(failure.cause, t);
 
-
   // The failure is held as it arrived rather than as a sentence, so switching language re-reads it
   // instead of re-reading the choices and dropping whatever is ticked but not yet saved.
   useEffect(() => {

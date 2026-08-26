@@ -118,7 +118,10 @@ of them. Three kinds cannot be switched off, because doing so would take away so
 path replaces: the credentials an account needs to sign in at all, the notice that a closure
 displaced a booking, and being told somebody wrote you into one. The instance refuses those by name
 instead of ignoring the request, and the constraint that lists them is read back out of the database
-and compared against the enum at build time.
+and compared against the enum at build time. A message somebody declined is not a message that
+failed, so it leaves no row in `message_record` and the log says it was not sent — which also means
+the message log cannot tell a board that somebody declined, and is not meant to: what a member
+chose is the member's, not the board's.
 
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers — including creating a recurring

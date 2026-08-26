@@ -26,8 +26,8 @@ test("a member switches confirmations off, and the booking they make no longer w
   await expect(page.getByTestId("message-choice-BOOKING_CONFIRMED")).not.toBeChecked();
   await expect(page.getByTestId("message-choice-BOOKING_REMINDER")).toBeChecked();
 
-  // when — one booking writes to both of them, so the message that still goes out bounds the wait
-  // for the one that must not: they are written in the same commit.
+  // when — the player's message is the signal that the booking's mail has been worked through. It
+  // does not order the two: they are separate listeners on a two-to-four thread pool.
   await page.getByTestId("court-plan-link").click();
   await selectJourneyDate(page, journeyService.visualDate);
   await page.locator('[data-testid="free-slot"][data-court-number="3"][data-slot="15:00"][data-state="free"]').click();
@@ -36,7 +36,8 @@ test("a member switches confirmations off, and the booking they make no longer w
   await page.getByTestId("booking-submit").click();
   await expect(page.locator('tr[data-slot="15:00"] [data-testid="own-allocation"]')).toBeVisible();
 
-  // then
+  // then — that a declined kind is dropped is DeclinedMessageTest's claim; what this proves is the
+  // path a member walks to make the choice stick.
   await messageTo(journeyService.mailboxURL, "jane.roe@example.org");
   expect(await messagesTo(journeyService.mailboxURL, "jane.doe@example.org"))
     .toHaveLength(beforeTheChoice);

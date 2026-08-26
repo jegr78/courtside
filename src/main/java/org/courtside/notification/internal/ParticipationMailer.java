@@ -80,7 +80,6 @@ class ParticipationMailer {
         handover.handOver(account.getId(), kind, address,
                 templates.render(kind.templateKey() + ".subject", locale, values),
                 templates.render(kind.templateKey() + ".body", locale, values));
-        log.info("Handed over the {} message for account {}", kind, account.getId());
     }
 
     private Optional<UserAccount> accountOf(UUID personId) {

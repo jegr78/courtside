@@ -110,6 +110,17 @@ class MessageChoiceControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenTheRequestNamesNothingWhereAKindBelongs_thenItIsRefusedAsInvalid() throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/account/messages").with(member()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"declined\": [null]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("declined[0]"));
+        assertThat(declinedRows()).isZero();
+    }
+
+    @Test
     void whenNobodyIsSignedIn_thenTheChoicesAreNotServed() throws Exception {
         // when / then
         mockMvc.perform(get("/api/account/messages")).andExpect(status().isUnauthorized());

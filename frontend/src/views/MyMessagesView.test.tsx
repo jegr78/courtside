@@ -98,7 +98,7 @@ describe("MyMessagesView", () => {
 
     // then
     await waitFor(() => expect(screen.getByRole("alert"))
-      .toHaveTextContent("This message cannot be switched off."));
+      .toHaveTextContent("“Closure under a booking” cannot be switched off."));
     expect(screen.queryByTestId("my-messages-saved")).toBeNull();
   });
 });

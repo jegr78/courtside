@@ -37,6 +37,7 @@ class RecordedHandover {
             throw failure;
         }
         messages.handedOver(record);
+        log.info("Handed over a {} message for account {}", kind, accountId);
     }
 
     // Every escape, not a list of types: an exception this method does not know about would

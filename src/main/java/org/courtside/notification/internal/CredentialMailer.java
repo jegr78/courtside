@@ -1,7 +1,6 @@
 package org.courtside.notification.internal;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.CredentialValidity;
 import org.courtside.notification.MessageKind;
@@ -23,7 +22,6 @@ import java.time.format.FormatStyle;
 import java.util.Locale;
 import java.util.Map;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 class CredentialMailer {
@@ -55,7 +53,6 @@ class CredentialMailer {
         handover.handOver(requested.accountId(), kind, issued.recipientAddress(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values));
-        log.info("Handed over the {} message for account {}", requested.reason(), requested.accountId());
     }
 
     private String expiresOn(Instant expiresAt, Locale locale) {

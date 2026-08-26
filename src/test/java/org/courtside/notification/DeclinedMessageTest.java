@@ -1,5 +1,9 @@
 package org.courtside.notification;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import jakarta.mail.internet.MimeMessage;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingService;
@@ -11,8 +15,10 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -59,6 +65,8 @@ class DeclinedMessageTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
+    private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
+
     private UUID courtId;
     private UUID bookerPersonId;
     private UUID bookerAccountId;
@@ -74,6 +82,19 @@ class DeclinedMessageTest extends AbstractIntegrationTest {
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         bookerAccountId = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
         playerPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
+        logged.start();
+        ownLogger().addAppender(logged);
+    }
+
+    @AfterEach
+    void stopListening() {
+        ownLogger().detachAppender(logged);
+    }
+
+    private static Logger ownLogger() {
+        Logger logger = (Logger) LoggerFactory.getLogger("org.courtside");
+        logger.setLevel(Level.DEBUG);
+        return logger;
     }
 
     @Test
@@ -88,6 +109,7 @@ class DeclinedMessageTest extends AbstractIntegrationTest {
         // then — a message nobody wanted is not a message that failed, so the log stays empty too
         verify(sender, never()).send(any(MimeMessage.class));
         assertThat(kindsRecorded()).isEmpty();
+        assertThat(logLines()).noneMatch(line -> line.startsWith("Handed over"));
     }
 
     @Test
@@ -101,6 +123,8 @@ class DeclinedMessageTest extends AbstractIntegrationTest {
         // then
         verify(sender).send(any(MimeMessage.class));
         assertThat(kindsRecorded()).containsExactly("BOOKING_CONFIRMED");
+        assertThat(logLines()).anyMatch(line ->
+                line.equals("Handed over a BOOKING_CONFIRMED message for account " + bookerAccountId));
     }
 
     @Test
@@ -121,6 +145,10 @@ class DeclinedMessageTest extends AbstractIntegrationTest {
         bookings.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,
                 new TimeSlot(SIX_PM, SEVEN_PM), bookerAccountId, bookerPersonId, Set.of(Role.MEMBER),
                 null, List.of(ParticipantSpec.member(playerPersonId)), null));
+    }
+
+    private List<String> logLines() {
+        return logged.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
     }
 
     private List<String> kindsRecorded() {
