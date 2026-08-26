@@ -106,6 +106,8 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /security-image-inventory\.mjs active \| xargs -n1 docker pull/);
   assert.match(build, /security-tool-comparison\.mjs/);
   assert.match(build, /COMPARATOR_ROOT="\$BASE_ROOT"/);
+  assert.match(build, /cmp -s "\$COMPARATOR_ROOT\/tools\/security-tool-comparison\.mjs" tools\/security-tool-comparison\.mjs/);
+  assert.match(build, /COMPARATOR_ROOT="\$GITHUB_WORKSPACE"/);
   assert.match(build, /--base-contract "\$BASE_ROOT\/security\/run-contract\.json"/);
   assert.match(build, /--candidate-contract security\/run-contract\.json/);
   assert.match(build, /security-cleanup "\$BASE_RUN_ID"[\s\S]+\) \|\| BASE_CLEANUP=\$\?/);

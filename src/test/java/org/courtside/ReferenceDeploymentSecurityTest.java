@@ -189,6 +189,22 @@ class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void givenTheApiHasNoPatchOperation_whenReadingProxiedDeployments_thenUnknownMethodsReachSpringAsPatch()
+            throws IOException {
+        // given
+        String api = Files.readString(Path.of("src/main/resources/api/openapi.yaml"));
+
+        // when / then
+        assertThat(api).doesNotContain("    patch:");
+        for (String name : List.of(
+                "Caddyfile", "Caddyfile.dev", "Caddyfile.perf", "Caddyfile.security", "Caddyfile.uat")) {
+            assertThat(Files.readString(Path.of("deploy", name)))
+                    .as(name)
+                    .contains("@unknownMethod {", "method QUERY", "path /api/*", "method @unknownMethod PATCH");
+        }
+    }
+
+    @Test
     void whenReadingCaddyfile_thenTheApplicationContentSecurityPolicyIsNotReplaced() throws IOException {
         // when
         String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));

@@ -2,6 +2,11 @@
 	header {
 		-Via
 	}
+	@unknownMethod {
+		method QUERY
+		path /api/*
+	}
+	method @unknownMethod PATCH
 
 	handle /api-ui* {
 		reverse_proxy api-ui:8080

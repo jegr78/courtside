@@ -152,6 +152,14 @@ try {
   const cards = await requestWithCookies(cookies, { path: "/api/public/booking-cards" });
   assert.equal(courts.statusCode, 200);
   assert.equal(cards.statusCode, 200);
+  const unsupportedMethod = await requestWithCookies(cookies, {
+    path: "/api/public/courts", method: "QUERY", headers: mutationHeaders(cookies)
+  });
+  assert.equal(unsupportedMethod.statusCode, 405, unsupportedMethod.body);
+  assert.match(unsupportedMethod.headers["content-type"], /^application\/problem\+json/);
+  assert.equal(unsupportedMethod.headers.allow, "GET");
+  assert.equal(JSON.parse(unsupportedMethod.body).type, "urn:courtside:error:method-not-supported");
+  assert.equal(JSON.parse(unsupportedMethod.body).title, "Method not allowed");
   const booking = await requestWithCookies(cookies, {
     path: "/api/bookings", method: "POST",
     headers: mutationHeaders(cookies, { "Content-Type": "application/json", "Idempotency-Key": "uat-image-smoke" }),
