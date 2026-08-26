@@ -141,6 +141,30 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnUndeclaredFieldWithAVeryLongName_whenPutting_thenTheNameComesBackShortened()
+            throws Exception {
+        // given
+        String invented = "x".repeat(500);
+
+        // when
+        ResultActions result = mockMvc.perform(put(
+                "/api/admin/rule-sets/{id}/rules/{type}", UUID.randomUUID(), "ADVANCE_WINDOW")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"" + invented + "\":\"nope\"}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        result.andExpect(jsonPath("$.fieldErrors[0].code").value("validation.UnknownField"));
+        String body = result.andReturn().getResponse().getContentAsString();
+        assertThat(body)
+                .as("the name is the caller's own text, so it goes back bounded rather than"
+                        + " however long they made it")
+                .doesNotContain(invented)
+                .contains("x".repeat(60));
+    }
+
+    @Test
     void givenAnUnreadableValueUnderAKeyTheCallerInvented_whenPutting_thenOnlyTheObjectIsNamed()
             throws Exception {
         // given

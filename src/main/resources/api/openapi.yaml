@@ -29,6 +29,29 @@ info:
     the values that message interpolates, and the client resolves the pair against its own message
     catalogue. This is what makes the API usable in a language the server does not ship.
 
+    Most codes belong to the field they name and are listed with it. Six are written by the error
+    handling itself, so no field declares them. Four describe how a **JSON** body is read — the
+    form-encoded login and the multipart import upload are parsed by neither of them, and an extra
+    field there is ignored rather than refused:
+
+    - `validation.NotNull` — a field this operation requires was left out.
+    - `validation.TypeMismatch` — a field holds no value of the type it declares.
+    - `validation.NoDuplicates` — an array whose entries must be distinct holds one of them twice.
+      `field` names the array.
+    - `validation.UnknownField` — the body names a field this operation does not define. An
+      unknown field is refused rather than ignored, so a misspelt name is answered instead of
+      silently taking effect as the omission of the field that was meant. `field` repeats the
+      name the request sent, shortened if it was long: it is the caller's own text and no client
+      should render it as anything else.
+
+    Two more can arrive from any request the server validates, whatever it is encoded as:
+
+    - `validation.SizeAtLeast` — a list is shorter than its lower bound, and it has no upper one.
+    - `validation.rejected` — a check refused the field without a code of its own. A client that
+      cannot do better than a generic message has one here.
+
+    All six arrive as `400` with type `urn:courtside:error:validation-failed`.
+
     ## Authentication
 
     Anonymous callers may read the public court plan and its anonymised occupancy. Creating,

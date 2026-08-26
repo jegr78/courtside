@@ -45,13 +45,15 @@ class ValidationMessageCoverageTest {
 
     private static final List<Pattern> CODE_LITERAL_PATTERNS = buildCodeLiteralPatterns();
 
+    private static final List<Path> ADVICE_SOURCES = List.of(
+            Path.of("src/main/java/org/courtside/shared/web/SharedExceptionHandler.java"),
+            Path.of("src/main/java/org/courtside/shared/web/DomainFailureHandler.java"));
+
     // What toMap's "validation." + AnnotationSimpleName can produce today.
     private static final List<String> KNOWN_CONSTRAINT_ANNOTATION_SIMPLE_NAMES =
             List.of("DurationMax", "DurationMin", "Email", "Max", "Min", "NotNull", "Pattern", "Size");
 
-    // Minted by an advice rather than by a constraint, so no literal search reaches them.
-    private static final List<String> ADVICE_MINTED_CODES =
-            List.of("validation.NoDuplicates", "validation.TypeMismatch");
+    private static final Pattern ADVICE_MINTED_CODE = Pattern.compile("\"(validation\\.\\w+)\"");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
@@ -119,8 +121,8 @@ class ValidationMessageCoverageTest {
         assertThat(codes).isNotEmpty();
         codes.forEach(code -> assertBothBundlesDefine(english, german,
                 code, "passed as a problem code literal in src/main"));
-        ADVICE_MINTED_CODES.forEach(code -> assertBothBundlesDefine(english, german,
-                code, "minted by an advice"));
+        adviceMintedCodes().forEach(code -> assertBothBundlesDefine(english, german,
+                code, "written as a literal by an advice"));
     }
 
     @Test
@@ -148,6 +150,63 @@ class ValidationMessageCoverageTest {
                 .isNotEmpty();
         codes.forEach(code -> assertBothBundlesDefine(english, german,
                 "validation." + code, "rejected by a Spring Validator in src/main"));
+    }
+
+    @Test
+    void everyCodeAnAdviceWritesAsALiteralIsNamedInTheApiDocument() throws IOException {
+        // given
+        String document = Files.readString(Path.of("src/main/resources/api/openapi.yaml"));
+        TreeSet<String> minted = adviceMintedCodes();
+
+        // when
+        List<String> undocumented = minted.stream()
+                .filter(code -> !namedIn(document, code))
+                .toList();
+
+        // then
+        assertThat(minted)
+                .as("the advices must write codes as literals, or this check reads nothing")
+                .isNotEmpty();
+        assertThat(undocumented)
+                .as("a code an advice writes itself is named by no field, so a client learns of it"
+                        + " from the document or from nowhere. The codes are read out of the advice"
+                        + " sources rather than listed here, because a list is only ever as"
+                        + " complete as the last person to remember it.")
+                .isEmpty();
+    }
+
+    // Only the literals: a code an advice composes from a Validator's own is covered by the check
+    // above it, which reads those from the Validators.
+    private static TreeSet<String> adviceMintedCodes() {
+        TreeSet<String> codes = new TreeSet<>();
+        for (Path advice : ADVICE_SOURCES) {
+            Matcher literal = ADVICE_MINTED_CODE.matcher(readSource(advice));
+            while (literal.find()) {
+                codes.add(literal.group(1));
+            }
+        }
+        return codes;
+    }
+
+    private static boolean namedIn(String document, String code) {
+        return Pattern.compile("\\b" + Pattern.quote(code) + "\\b").matcher(errorSectionOf(document)).find();
+    }
+
+    // The codes belong to the error section; a mention anywhere else is not documentation of one.
+    private static String errorSectionOf(String document) {
+        int opens = document.indexOf("## Errors");
+        int closes = document.indexOf("## Authentication");
+        assertThat(opens).as("the document must carry an error section").isNotNegative();
+        assertThat(closes).as("the error section must end somewhere").isGreaterThan(opens);
+        return document.substring(opens, closes);
+    }
+
+    private static String readSource(Path source) {
+        try {
+            return Files.readString(source);
+        } catch (IOException unreadable) {
+            throw new UncheckedIOException(unreadable);
+        }
     }
 
     @Test

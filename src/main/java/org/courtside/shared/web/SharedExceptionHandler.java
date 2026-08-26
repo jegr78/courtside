@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.DuplicateItemException;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -129,11 +130,26 @@ class SharedExceptionHandler {
         }
 
         ProblemDetail problem = validationFailed(List.of(
-                exception.getCause() instanceof DuplicateItemException
-                        ? Map.of("field", field, "code", "validation.NoDuplicates", "params", Map.of())
-                        : Map.of("field", field, "code", "validation.TypeMismatch", "params", Map.of())));
+                Map.of("field", field, "code", codeFor(exception.getCause()), "params", Map.of())));
         logAnswered(problem, List.of(field));
         return problem;
+    }
+
+    // A field nobody declared holds no value of the wrong type; it holds no value at all.
+    private static String codeFor(Throwable cause) {
+        return switch (cause) {
+            case DuplicateItemException duplicate -> "validation.NoDuplicates";
+            case UnrecognizedPropertyException undeclared -> "validation.UnknownField";
+            case null, default -> "validation.TypeMismatch";
+        };
+    }
+
+    private static final int LONGEST_NAME_WORTH_REPEATING = 60;
+
+    // A name this API does not define is the caller's own text, so it goes back bounded.
+    private static String shortened(String name) {
+        return name.length() <= LONGEST_NAME_WORTH_REPEATING
+                ? name : name.substring(0, LONGEST_NAME_WORTH_REPEATING) + "…";
     }
 
     // The keys of an additionalProperties object are whatever the caller sent.
@@ -160,7 +176,7 @@ class SharedExceptionHandler {
             if (!field.isEmpty()) {
                 field.append('.');
             }
-            field.append(name);
+            field.append(shortened(name));
         }
         return field.isEmpty() ? null : field.toString();
     }
