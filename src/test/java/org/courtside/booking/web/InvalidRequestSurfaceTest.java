@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,6 +36,8 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
     private static final UUID MEMBER_BOOKING_CARD =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final String VALIDATION_FAILED = "urn:courtside:error:validation-failed";
+    private static final String PARAMETER_TYPE_MISMATCH =
+            "urn:courtside:error:parameter-type-mismatch";
 
     @Autowired
     private WebApplicationContext context;
@@ -270,6 +273,50 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("newStartTime"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.MoveChangesSomething"));
+    }
+
+    @Test
+    void whenAPersonalPageIsAskedForWithACursorThatIsNotAnId_thenTheParameterIsNamed()
+            throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/my/bookings").param("cursor", "not-an-id"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(PARAMETER_TYPE_MISMATCH))
+                .andExpect(jsonPath("$.violations[0].code").value("request.parameterTypeMismatch"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("cursor"));
+    }
+
+    @Test
+    void whenAPersonalPageIsAskedForWithALimitBeyondTheBound_thenItIsAFieldErrorOnLimit()
+            throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/my/bookings").param("limit", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("limit"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Min"));
+    }
+
+    @Test
+    void whenAManagedPageIsAskedForWithACursorThatIsNotAnId_thenTheParameterIsNamed()
+            throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings").param("cursor", "not-an-id"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(PARAMETER_TYPE_MISMATCH))
+                .andExpect(jsonPath("$.violations[0].code").value("request.parameterTypeMismatch"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("cursor"));
+    }
+
+    @Test
+    void whenAManagedPageIsAskedForWithALimitBeyondTheBound_thenItIsAFieldErrorOnLimit()
+            throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings").param("limit", "101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("limit"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Max"));
     }
 
     private org.springframework.test.web.servlet.ResultActions postBooking(String body)

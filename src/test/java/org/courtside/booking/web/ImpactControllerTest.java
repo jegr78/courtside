@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,6 +33,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -226,7 +228,19 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/admin/impact/courts/" + UUID.randomUUID()))
                 .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:court-not-found"))
                 .andExpect(jsonPath("$.title").value("Court not found"));
+    }
+
+    @Test
+    void givenAnUnknownCard_whenAskingWhatRetiringItWouldAffect_thenItIsNotFound() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/impact/booking-cards/" + UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:card-not-found"))
+                .andExpect(jsonPath("$.title").value("Card not found"));
     }
 
     @Test
