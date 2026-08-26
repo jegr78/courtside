@@ -265,7 +265,7 @@ test("given the scanner gateway, when enforcing budgets, then target access is c
   assert.match(gateway, /request_count >= MAX_REQUESTS/);
   assert.match(gateway, /request_bytes \+= content_length/);
   assert.match(gateway, /request_bytes \+ content_length > MAX_GENERATED_BYTES/);
-  assert.match(gateway, /def do_PUT[\s\S]*def do_PATCH[\s\S]*def do_DELETE/);
+  assert.match(gateway, /def __getattr__[\s\S]*startswith\("do_"\)[\s\S]*return self\.forward/);
   assert.match(gateway, /security-gateway-metrics/);
   assert.match(gateway, /latencies = collections\.deque\(maxlen=2048\)/);
   assert.match(gateway, /upstream_outcomes = collections\.deque\(maxlen=2048\)/);

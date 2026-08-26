@@ -33,26 +33,12 @@ upstream_outcomes = collections.deque(maxlen=2048)
 class RequestHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
-    def do_GET(self):
-        self.forward()
-
-    def do_HEAD(self):
-        self.forward()
-
-    def do_POST(self):
-        self.forward()
-
-    def do_PUT(self):
-        self.forward()
-
-    def do_PATCH(self):
-        self.forward()
-
-    def do_DELETE(self):
-        self.forward()
-
-    def do_OPTIONS(self):
-        self.forward()
+    # Every method reaches forward(), where the cap decides. Left to the base class, one it has no
+    # do_ handler for would be answered 501 - a server error the assessment reads as the target's.
+    def __getattr__(self, name):
+        if name.startswith("do_"):
+            return self.forward
+        raise AttributeError(name)
 
     def forward(self):
         global request_count, request_bytes
@@ -195,5 +181,7 @@ def target_allowed(parsed, method, canonical_path=None):
 
 
 if __name__ == "__main__":
-    server = http.server.ThreadingHTTPServer(("0.0.0.0", 8090), RequestHandler)
+    server = http.server.ThreadingHTTPServer(
+        ("0.0.0.0", int(os.environ.get("COURTSIDE_SECURITY_GATEWAY_PORT", "8090"))), RequestHandler)
+    print(f"listening {server.server_address[1]}", flush=True)
     server.serve_forever()
