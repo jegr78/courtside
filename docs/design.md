@@ -832,6 +832,21 @@ A second array, `fieldErrors`, carries what Bean Validation rejected. Its entrie
 `{ field, code, params }` — the same violation, plus the name of the input it came from — so a
 client that can render a violation can render these by ignoring one key.
 
+**An omitted array is not the empty one.** A container the document requires arrives as `null` when
+a body leaves it out, so the generated `@NotNull` refuses the request and names the missing field
+rather than letting the omission act as "you chose nothing" — which for a list of opt-outs would
+silently erase the choices already stored. One the document leaves optional arrives as an empty
+container instead, so the code that reads it needs no null check. One whose type admits `null`
+arrives as `null`, because absence there carries a meaning of its own: `MoveRequest.newCourtIds`
+left out leaves the courts as they are. The three are held apart at the wire by
+`OmittedContainerWireTest`, because which one a field falls under is decided by the document and
+delivered by the deserialiser, and nothing in between states it.
+
+A misspelt field name never reaches that rule: `fail-on-unknown-properties` is on, so the request is
+refused naming the field nobody declared. The two defences answer `400` for different reasons and
+neither substitutes for the other — turning the setting off would leave a typo to be read as an
+omission, and only the required container's `@NotNull` would still refuse it.
+
 **Every error carries that shape, including the ones no handler ever sees.** A method the servlet
 container refuses, a request the filter chain's firewall turns away before authentication runs, a
 filter that throws: none of them reach a `@RestControllerAdvice`, and the framework's own answer for

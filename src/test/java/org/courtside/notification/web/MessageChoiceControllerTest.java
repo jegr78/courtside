@@ -121,6 +121,38 @@ class MessageChoiceControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenTheRequestNamesNoChoicesAtAll_thenItIsRefusedRatherThanReadAsNone() throws Exception {
+        // given
+        choose("[\"BOOKING_REMINDER\"]");
+
+        // when / then
+        mockMvc.perform(put("/api/account/messages").with(member()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("declined"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
+        assertThat(switchedOff()).containsExactly("BOOKING_REMINDER");
+    }
+
+    @Test
+    void whenTheFieldNamingTheChoicesIsMisspelt_thenItIsRefusedNamingTheFieldNobodyDeclared()
+            throws Exception {
+        // given
+        choose("[\"BOOKING_REMINDER\"]");
+
+        // when / then
+        mockMvc.perform(put("/api/account/messages").with(member()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"declned\": []}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("declned"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
+        assertThat(switchedOff()).containsExactly("BOOKING_REMINDER");
+    }
+
+    @Test
     void whenNobodyIsSignedIn_thenTheChoicesAreNotServed() throws Exception {
         // when / then
         mockMvc.perform(get("/api/account/messages")).andExpect(status().isUnauthorized());
