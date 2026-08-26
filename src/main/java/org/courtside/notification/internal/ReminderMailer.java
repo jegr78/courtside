@@ -1,7 +1,6 @@
 package org.courtside.notification.internal;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.courtside.config.ClubIdentity;
 import org.courtside.identity.UserAccount;
 import org.courtside.notification.MessageKind;
@@ -18,7 +17,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 class ReminderMailer {
@@ -47,6 +45,5 @@ class ReminderMailer {
                 account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values));
-        log.info("Handed over a booking reminder for account {}", account.getId());
     }
 }

@@ -1,6 +1,7 @@
 package org.courtside.notification.internal;
 
 import org.courtside.config.ClubIdentity;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.courtside.config.CredentialValidity;
 import org.courtside.notification.MessageKind;
 import org.courtside.shared.CredentialIssuer;
@@ -40,9 +41,12 @@ class CredentialMailerTest {
 
     private final MessageLog messages = mock(MessageLog.class);
 
+    // A credential is not declinable, so the choice is asked and always answers yes.
+    private final MessageChoices choices = new MessageChoices(mock(JdbcClient.class));
+
     private final CredentialMailer mailer = new CredentialMailer(credentials, validity, club,
             new MailTemplates(),
-            new RecordedHandover(dispatch, new MailHandover(gap -> { }), properties, messages),
+            new RecordedHandover(dispatch, new MailHandover(gap -> { }), properties, choices, messages),
             Clock.fixed(NOW, ZONE));
 
     @Test

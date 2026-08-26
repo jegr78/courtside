@@ -60,6 +60,5 @@ class BookingMailer {
         handover.handOver(account.getId(), MessageKind.BOOKING_CONFIRMED, address,
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values));
-        log.info("Handed over the booking confirmation for account {}", account.getId());
     }
 }

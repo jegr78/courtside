@@ -81,6 +81,7 @@ public class SecurityConfiguration {
                                 new AuthorizationDecision(performanceTelemetryEnabled))
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
+                                "/my-messages",
                                 "/admin/configuration", "/admin/facility", "/admin/roster",
                                 "/admin/roster/{personId}", "/admin/membership-types", "/admin/import",
                                 "/admin/audit",

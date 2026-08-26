@@ -154,7 +154,7 @@ server accepts any number of connections and offers no way to cap them, so the e
 unguessable per-run value, is the only thing standing in front of it.
 
 A deliberate UI change updates the baselines the same way anywhere:
-`npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots`, then
+`npx playwright test visual-regression.spec.ts --project=visual --update-snapshots`, then
 commit what changed. The suite pins `updateSnapshots: "missing"`; the values nobody may reach are
 `changed` and `all`, under which a missing baseline is created and the run **passes**, so a deleted
 baseline would go unnoticed. The pull request must expose the changed PNG baselines for review.

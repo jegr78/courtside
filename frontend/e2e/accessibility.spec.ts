@@ -53,6 +53,9 @@ for (const locale of ["de", "en"]) {
     await page.getByTestId("my-bookings-link").click();
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
     await expectNoWcagViolations(page);
+    await page.getByTestId("my-messages-link").click();
+    await expect(page.getByTestId("my-messages-view")).toBeVisible();
+    await expectNoWcagViolations(page);
   });
 
   test(`${locale} the series form meets automated WCAG 2.2 AA checks`, async ({ page }) => {

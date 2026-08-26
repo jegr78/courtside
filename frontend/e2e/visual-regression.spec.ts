@@ -50,6 +50,17 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await stableScreenshot(page.getByTestId("my-bookings-page"), "personal-bookings.png", page.locator("time"));
 
   // when
+  await page.getByTestId("my-messages-link").click();
+  await expect(page.getByTestId("my-messages-view")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("my-messages-view"), "my-messages.png");
+
+  // when
+  await page.getByTestId("my-bookings-link").click();
+  await expect(page.getByTestId("my-bookings-page")).toBeVisible();
+
+  // when
   await page.getByTestId("move-booking").click();
   await page.getByTestId("move-start-time").fill("11:00");
   await page.getByTestId("preview-move").click();
