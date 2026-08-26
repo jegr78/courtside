@@ -58,6 +58,14 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   assert.match(openApiFuzzPolicyDigest(), /^sha256:[a-f0-9]{64}$/);
 });
 
+test("given the coverage phase probes unexpected methods, when one is answered by a layer other than the deployment, then it is not probed here", () => {
+  // when / then
+  assert.deepEqual(openApiFuzzPolicy.unexpectedMethods.filter(
+    (method) => ["TRACE", "CONNECT", "TRACK"].includes(method)), []);
+  // The allow-header check judges an OPTIONS response, and only this phase generates one.
+  assert.ok(openApiFuzzPolicy.unexpectedMethods.includes("OPTIONS"));
+});
+
 test("given generated status failures, when the deployment contract explains them, then only actionable ones remain", () => {
   // given
   const inventory = buildOpenApiFuzzInventory(api);

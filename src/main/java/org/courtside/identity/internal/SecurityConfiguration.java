@@ -3,6 +3,8 @@ package org.courtside.identity.internal;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
 
+import jakarta.servlet.DispatcherType;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -64,6 +66,8 @@ public class SecurityConfiguration {
 
         return http
                 .authorizeHttpRequests(auth -> auth
+                        // The error dispatch is the tail of a request already decided, not a new one.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/public/booking-cards", "/api/public/participant-cards",
                                 "/api/public/participant-members")
                         .access((authentication, context) -> new AuthorizationDecision(

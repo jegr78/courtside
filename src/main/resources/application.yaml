@@ -43,8 +43,6 @@ spring:
 
 server:
   forward-headers-strategy: framework
-  error:
-    include-message: never
   servlet:
     session:
       cookie:

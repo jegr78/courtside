@@ -97,12 +97,14 @@ class ProblemTypeUriTest {
             "urn:courtside:error:access-denied",
             "urn:courtside:error:concurrent-modification",
             "urn:courtside:error:constraint-violation",
+            "urn:courtside:error:internal-error",
             "urn:courtside:error:malformed-request-body",
             "urn:courtside:error:method-not-supported",
             "urn:courtside:error:missing-parameter",
             "urn:courtside:error:not-acceptable",
             "urn:courtside:error:parameter-type-mismatch",
             "urn:courtside:error:payload-too-large",
+            "urn:courtside:error:request-rejected",
             "urn:courtside:error:unauthenticated",
             "urn:courtside:error:unmapped-path",
             "urn:courtside:error:unsupported-media-type",
@@ -132,11 +134,13 @@ class ProblemTypeUriTest {
         assertThat(failureSlugs()).containsExactlyInAnyOrderElementsOf(KNOWN_FAILURE_SLUGS);
     }
 
+    // Distinct: two places may answer with the same type, and a client reads the type, not the place.
     @Test
     void whenReadingEveryProblemTypeAnAdviceSets_thenTheSlugSetMatchesKnownSlugsExactly()
             throws IOException {
         // when / then
-        assertThat(adviceTypeLiterals()).containsExactlyInAnyOrderElementsOf(KNOWN_ADVICE_SLUGS);
+        assertThat(adviceTypeLiterals().stream().distinct().toList())
+                .containsExactlyInAnyOrderElementsOf(KNOWN_ADVICE_SLUGS);
     }
 
     @Test

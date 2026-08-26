@@ -23,6 +23,9 @@ class GeneratedApiImplementationTest extends AbstractIntegrationTest {
     // SessionApi. The document describes them because a client has to know they exist.
     private static final Set<String> ANSWERED_BY_THE_FILTER_CHAIN = Set.of("SessionApi");
 
+    // The servlet container dispatches to this one, so its route cannot come from the API document.
+    private static final Set<String> ROUTED_BY_THE_CONTAINER = Set.of("ContainerErrorController.java");
+
     private static final Set<String> MAPPING_ANNOTATIONS = Set.of(
             "@RequestMapping", "@GetMapping", "@PostMapping", "@PutMapping", "@DeleteMapping",
             "@PatchMapping");
@@ -63,6 +66,7 @@ class GeneratedApiImplementationTest extends AbstractIntegrationTest {
             sources.filter(path -> path.toString().endsWith("Controller.java"))
                     .filter(GeneratedApiImplementationTest::declaresAMapping)
                     .map(path -> path.getFileName().toString())
+                    .filter(name -> !ROUTED_BY_THE_CONTAINER.contains(name))
                     .forEach(offenders::add);
         }
 
