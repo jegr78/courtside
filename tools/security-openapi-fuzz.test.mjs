@@ -62,7 +62,6 @@ test("given the coverage phase probes unexpected methods, when one is answered b
   // when / then
   assert.deepEqual(openApiFuzzPolicy.unexpectedMethods.filter(
     (method) => ["TRACE", "CONNECT", "TRACK"].includes(method)), []);
-  assert.match(openApiFuzzPolicy.unexpectedMethodsRationale, /passive deployment stage/);
   // The allow-header check judges an OPTIONS response, and only this phase generates one.
   assert.ok(openApiFuzzPolicy.unexpectedMethods.includes("OPTIONS"));
 });

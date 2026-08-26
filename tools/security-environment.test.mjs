@@ -10,6 +10,7 @@ import {
   isMissingDockerResource,
   mergeSecurityProcessEnvironment,
   prometheusMetric,
+  relayableMethods,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
@@ -255,6 +256,17 @@ test("given the security Compose file, when inspecting boundaries, then resource
   assert.match(compose, /proxy:[\s\S]*networks:[\s\S]*- scanner-upstream/);
   assert.doesNotMatch(compose, /zap:[\s\S]*networks:[\s\S]*- frontend/);
   assert.doesNotMatch(compose, /^volumes:/m);
+});
+
+test("given a policy that probes a method the gateway refuses, when deriving the relay cap, then it is refused", () => {
+  // given
+  const policy = { unexpectedMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] };
+
+  // when / then
+  assert.deepEqual(relayableMethods(policy),
+    ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]);
+  assert.throws(() => relayableMethods({ unexpectedMethods: ["GET", "TRACE"] }),
+    /may not probe methods the gateway refuses to relay: TRACE/);
 });
 
 test("given the scanner gateway, when enforcing budgets, then target access is counted synchronously", () => {

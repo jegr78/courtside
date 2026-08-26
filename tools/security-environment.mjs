@@ -493,6 +493,19 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan) {
   }
 }
 
+// The cap the gateway relays under is stated here, not derived from what the scanner may probe:
+// widening the probe set must not widen the boundary that is meant to bound it.
+const GATEWAY_RELAYABLE_METHODS = ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
+
+export function relayableMethods(policy) {
+  const beyondTheCap = policy.unexpectedMethods
+    .filter((method) => !GATEWAY_RELAYABLE_METHODS.includes(method));
+  if (beyondTheCap.length > 0) {
+    throw new Error(`The scanner may not probe methods the gateway refuses to relay: ${beyondTheCap.join(", ")}`);
+  }
+  return GATEWAY_RELAYABLE_METHODS;
+}
+
 export async function runOpenApiFuzzer(plan, stopFile, limits) {
   if (limits.maxRequests <= limits.policy.nativeRequestReserve) {
     throw new Error("The OpenAPI fuzz request budget cannot reserve native fixture requests");
@@ -500,7 +513,7 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
   const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
     COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests - limits.policy.nativeRequestReserve),
     COURTSIDE_SECURITY_MAX_CONCURRENCY: "1",
-    COURTSIDE_SECURITY_ALLOWED_METHODS: ["HEAD", ...limits.policy.unexpectedMethods].join(","),
+    COURTSIDE_SECURITY_ALLOWED_METHODS: relayableMethods(limits.policy).join(","),
     COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api,/manifest.webmanifest",
     COURTSIDE_SECURITY_CANARY_ENABLED: "false",
     COURTSIDE_SECURITY_MAX_TARGET_BYTES: "8192",
@@ -539,8 +552,6 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
       throw new Error("The mounted OpenAPI document differs from the planned contract");
     }
     fixture = await limits.prepareFixtures();
-    // The gateway relays exactly what the scanner may probe, plus the HEAD the coverage phase
-    // treats as implicit and never generates as an unexpected method.
     const config = `headers = { Cookie = ${JSON.stringify(fixture.client.header())}, X-XSRF-TOKEN = ${JSON.stringify(fixture.client.csrfToken())} }\n`
       + `\n[phases.coverage]\nunexpected-methods = ${JSON.stringify(limits.policy.unexpectedMethods)}\n`;
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-schemathesis.toml"],

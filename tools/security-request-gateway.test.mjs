@@ -9,9 +9,9 @@ import test from "node:test";
 const gateway = fileURLToPath(new URL("security-request-gateway.py", import.meta.url));
 
 async function startGateway() {
-  const process = spawn("python3", [gateway], {
+  const gatewayProcess = spawn("python3", [gateway], {
     env: {
-      ...globalThis.process.env,
+      ...process.env,
       COURTSIDE_SECURITY_GATEWAY_PORT: "0",
       COURTSIDE_SECURITY_MAX_REQUESTS: "50",
       COURTSIDE_SECURITY_MAX_CONCURRENCY: "2",
@@ -21,10 +21,10 @@ async function startGateway() {
     },
     stdio: ["ignore", "pipe", "inherit"]
   });
-  const lines = createInterface({ input: process.stdout });
+  const lines = createInterface({ input: gatewayProcess.stdout });
   const [announcement] = await once(lines, "line");
   lines.close();
-  return { process, port: Number(announcement.split(" ")[1]) };
+  return { gatewayProcess, port: Number(announcement.split(" ")[1]) };
 }
 
 async function send(port, method) {
@@ -35,26 +35,31 @@ async function send(port, method) {
   return response.statusCode;
 }
 
-test("a method the gateway does not relay is refused rather than answered as a server error",
+test("given a method the gateway does not relay, when it arrives, then it is refused rather than answered as a server error",
   async () => {
-    const { process, port } = await startGateway();
+    // given
+    const { gatewayProcess, port } = await startGateway();
+
+    // when / then
     try {
       assert.equal(await send(port, "TRACE"), 421);
       assert.equal(await send(port, "PROPFIND"), 421);
       assert.equal(await send(port, "QUERY"), 421);
     } finally {
-      process.kill();
-      await once(process, "exit");
+      gatewayProcess.kill();
+      await once(gatewayProcess, "exit");
     }
   });
 
-test("a method the gateway relays reaches for its upstream", async () => {
-  const { process, port } = await startGateway();
+test("given a method the gateway relays, when it arrives, then it reaches for its upstream", async () => {
+  // given
+  const { gatewayProcess, port } = await startGateway();
+
+  // when / then - no upstream is running, so the relay attempt is what 502 reports
   try {
-    // No upstream is running, so the relay attempt is what 502 reports.
     assert.equal(await send(port, "GET"), 502);
   } finally {
-    process.kill();
-    await once(process, "exit");
+    gatewayProcess.kill();
+    await once(gatewayProcess, "exit");
   }
 });
