@@ -276,6 +276,20 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenABookingNamesNoCourtsFieldAtAll_thenItIsRefusedRatherThanReadAsNoCourts()
+            throws Exception {
+        // when / then
+        postBooking("""
+                {"cardId": "%s", "startsAt": "2026-05-12T18:00:00+02:00",
+                 "endsAt": "2026-05-12T19:00:00+02:00"}
+                """.formatted(MEMBER_BOOKING_CARD))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("courtIds"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
+    }
+
+    @Test
     void whenAPersonalPageIsAskedForWithACursorThatIsNotAnId_thenTheParameterIsNamed()
             throws Exception {
         // when / then

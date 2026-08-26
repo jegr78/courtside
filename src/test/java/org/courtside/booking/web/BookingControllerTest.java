@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -60,6 +61,9 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingRepository bookings;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     @Autowired
     private CardService cards;
@@ -123,6 +127,18 @@ class BookingControllerTest extends AbstractIntegrationTest {
                         .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void whenABookingOmitsParticipants_thenItIsJudgedExactlyAsIfItHadNamedNone() throws Exception {
+        // when
+        String omitted = participantAnswerFor("");
+        String named = participantAnswerFor(", \"participants\": []");
+
+        // then
+        assertThat(omitted).isEqualTo(named);
+        assertThat(participantRows()).isZero();
     }
 
     @Test
@@ -1026,6 +1042,28 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return UUID.fromString(response.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+    }
+
+    // The card wants two or four players, so the empty set is refused — the point is that omitting
+    // the field reaches that rule at all rather than answering 500.
+    private String participantAnswerFor(String participants) throws Exception {
+        return mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courtIds": ["%s"], "cardId": "%s",
+                                 "startsAt": "2026-05-12T18:00:00+02:00",
+                                 "endsAt": "2026-05-12T19:00:00+02:00"%s}
+                                """.formatted(courtId, MEMBER_BOOKING_CARD, participants))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:participants-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("booking.participants.slotCount"))
+                .andReturn().getResponse().getContentAsString()
+                .replaceAll("\"(traceId|spanId)\":\"[0-9a-f]+\",?", "");
+    }
+
+    private int participantRows() {
+        return jdbc.sql("SELECT count(*) FROM booking_participant").query(Integer.class).single();
     }
 
     private String bookingJson(String start, String end) {

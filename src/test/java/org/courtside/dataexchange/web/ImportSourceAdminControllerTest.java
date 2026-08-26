@@ -51,6 +51,23 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void whenASourceNamesNeitherOwnedFieldsNorMembershipTypes_thenItHoldsNeither() throws Exception {
+        // when / then
+        mockMvc.perform(create("""
+                        {"sourceKey":"roster-system","displayName":"Membership system",
+                         "separator":";","encoding":"UTF-8",
+                         "columns":{"Member number":"EXTERNAL_ID","First name":"FIRST_NAME",
+                                    "Last name":"LAST_NAME","Email":"EMAIL"},
+                         "defaultMembershipTypeId":"%s",
+                         "removalWarningPercent":10}
+                        """.formatted(ACTIVE_TYPE)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.membershipTypes.length()").value(0))
+                .andExpect(jsonPath("$.ownedFields.length()").value(0));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void whenASourceIsCreated_thenItIsAddressableAndReadsBackWhole() throws Exception {
         // when
         String body = mockMvc.perform(create(COMPLETE))

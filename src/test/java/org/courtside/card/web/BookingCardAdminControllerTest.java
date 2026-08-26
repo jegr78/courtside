@@ -79,6 +79,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.allowedRoles[1]").value("SPORT_DIRECTOR"))
                 .andExpect(jsonPath("$.allowedPlayerCounts[0]").value(2))
                 .andExpect(jsonPath("$.allowedPlayerCounts[1]").value(4))
+                .andExpect(jsonPath("$.managingRoles.length()").value(0))
                 .andExpect(jsonPath("$.tracksPlayers").value(true))
                 .andExpect(jsonPath("$.showGenericOccupancy").value(true))
                 .andExpect(jsonPath("$.active").value(true));
