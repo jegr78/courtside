@@ -106,7 +106,7 @@ class UnsupportedMethodTest extends AbstractIntegrationTest {
     @Test
     void givenNobodyIsSignedIn_whenTheyAskForAProtectedResource_thenTheyAreStillTurnedAway()
             throws Exception {
-        // when / then - permitting the error dispatch decides nothing about the request itself
+        // when - permitting the error dispatch decides nothing about the request itself
         HttpResponse<String> response = send("GET", "/api/my/bookings", null);
 
         // then

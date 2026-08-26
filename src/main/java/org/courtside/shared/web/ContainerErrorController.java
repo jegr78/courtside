@@ -36,7 +36,7 @@ class ContainerErrorController implements ErrorController {
                 .body(problem);
     }
 
-    private static ProblemDetail problemFor(HttpStatus status) {
+    static ProblemDetail problemFor(HttpStatus status) {
         if (status == HttpStatus.METHOD_NOT_ALLOWED) {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     status, "This HTTP method is not supported for this resource");
@@ -66,9 +66,13 @@ class ContainerErrorController implements ErrorController {
     }
 
     private static HttpStatus statusOf(HttpServletRequest request) {
-        HttpStatus status = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE) instanceof Integer code
-                ? HttpStatus.resolve(code)
-                : null;
-        return status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status;
+        return request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE) instanceof Integer code
+                ? resolve(code)
+                : HttpStatus.INTERNAL_SERVER_ERROR;
+    }
+
+    static HttpStatus resolve(int status) {
+        HttpStatus resolved = HttpStatus.resolve(status);
+        return resolved == null ? HttpStatus.INTERNAL_SERVER_ERROR : resolved;
     }
 }

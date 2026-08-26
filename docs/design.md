@@ -842,6 +842,13 @@ itself, as `application/problem+json` with a `urn:courtside:error:` type —
 far. That dispatch is permitted in the filter chain, because it is the tail of a request that has
 already been decided; re-authorising it would report a 405 as a 401.
 
+One layer sits below even that. A request target carrying a character the HTTP grammar does not
+allow — `|`, `^`, `[`, a broken percent escape — is refused by the connector while it is still
+parsing the request line, so no dispatch of any kind follows and the server's own answer is an HTML
+page. The error report the connector falls back to is replaced with one that writes the same
+`request-rejected` problem detail, which is why the shape holds for every answer this application
+gives and not only for the ones a servlet saw.
+
 ### Three failure modes that are easy to get wrong
 
 **Concurrent booking of the same slot.** Rule evaluation in step 3 cannot prevent this in
@@ -1394,8 +1401,9 @@ whether it is built or designed. **Designed means absent today.**
   fixed. The reference proxy answers `TRACE`, `CONNECT` and `TRACK` itself with 405 and forwards
   nothing else it does not relay. Every other method reaches the application, which answers 405 with
   the `Allow` header RFC 9110 requires when the route does not declare it, and 400 when the request
-  firewall does not recognise it at all. Both answers are RFC 9457, so a club running without the
-  reference proxy loses nothing: the application is what answers. *Built.*
+  firewall does not recognise it at all — as it does for a request target the HTTP grammar does not
+  allow, which the connector refuses before any dispatch. All of those answers are RFC 9457, so a
+  club running without the reference proxy loses nothing: the application is what answers. *Built.*
 - **Security headers and TLS** are terminated at the reverse proxy (Caddy in the reference
   deployment, which sets HSTS, `X-Content-Type-Options`, `X-Frame-Options` and a referrer policy
   and obtains its own certificate). An operator without a public address can use Tailscale Funnel
