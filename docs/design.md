@@ -832,6 +832,16 @@ A second array, `fieldErrors`, carries what Bean Validation rejected. Its entrie
 `{ field, code, params }` — the same violation, plus the name of the input it came from — so a
 client that can render a violation can render these by ignoring one key.
 
+**Every error carries that shape, including the ones no handler ever sees.** A method the servlet
+container refuses, a request the filter chain's firewall turns away before authentication runs, a
+filter that throws: none of them reach a `@RestControllerAdvice`, and the framework's own answer for
+them is an untyped JSON body. The application therefore answers the container's error dispatch
+itself, as `application/problem+json` with a `urn:courtside:error:` type —
+`method-not-supported` for a refused method, `request-rejected` for a request the firewall rejected,
+`unmapped-path` for an address that does not exist and `internal-error` for a failure that got that
+far. That dispatch is permitted in the filter chain, because it is the tail of a request that has
+already been decided; re-authorising it would report a 405 as a 401.
+
 ### Three failure modes that are easy to get wrong
 
 **Concurrent booking of the same slot.** Rule evaluation in step 3 cannot prevent this in
@@ -1380,6 +1390,12 @@ whether it is built or designed. **Designed means absent today.**
 - **Source offer:** `GET /api/source` reports the running version, the commit it was built from
   and where its source can be obtained, unauthenticated. *Built.* An operator who forked sets
   `COURTSIDE_SOURCE_URL`; unset, it names this repository.
+- **Unsupported HTTP methods** are rejected without a server error, and which layer rejects them is
+  fixed. The reference proxy answers `TRACE`, `CONNECT` and `TRACK` itself with 405 and forwards
+  nothing else it does not relay. Every other method reaches the application, which answers 405 with
+  the `Allow` header RFC 9110 requires when the route does not declare it, and 400 when the request
+  firewall does not recognise it at all. Both answers are RFC 9457, so a club running without the
+  reference proxy loses nothing: the application is what answers. *Built.*
 - **Security headers and TLS** are terminated at the reverse proxy (Caddy in the reference
   deployment, which sets HSTS, `X-Content-Type-Options`, `X-Frame-Options` and a referrer policy
   and obtains its own certificate). An operator without a public address can use Tailscale Funnel
