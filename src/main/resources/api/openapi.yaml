@@ -2367,6 +2367,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PersonalBookingPage"
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
 
@@ -2460,6 +2462,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ManagedAppointmentPage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
 
@@ -4703,6 +4707,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/admin/impact/booking-cards/{cardId}:
     get:
@@ -4728,6 +4734,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/admin/impact/opening-hours/{day}:
     get:

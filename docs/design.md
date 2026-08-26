@@ -849,6 +849,17 @@ page. The error report the connector falls back to is replaced with one that wri
 `request-rejected` problem detail, which is why the shape holds for every answer this application
 gives and not only for the ones a servlet saw.
 
+**The client errors a request's own parameters can provoke are in the document.** They are declared
+on the operation that answers them, and build-time checks keep that true: an operation with a path
+parameter declares `400`, because a path parameter can always arrive malformed; one whose path
+parameter is not an enum declares `404`, because such a parameter names something that may not
+exist — a uuid names a row, an external identifier names a reference — and what names nothing is
+answered `404`; and one carrying a query parameter it can refuse — one whose schema states a type,
+a format, an enum or a bound — declares `400`. An enum path parameter is exempt from the `404` rule
+on purpose: every value it accepts exists, so there is no unknown one to answer. A declared status
+is never a bare key: every error this document declares answers `application/problem+json` with the
+`Problem` schema, so what a client is promised is the shape above.
+
 ### Three failure modes that are easy to get wrong
 
 **Concurrent booking of the same slot.** Rule evaluation in step 3 cannot prevent this in
