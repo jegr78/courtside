@@ -37,6 +37,7 @@ public class OwnMessageChoices {
                 });
         UUID accountId = accountId();
         for (MessageKind kind : MessageKind.values()) {
+            if (!kind.isDeclinable()) continue;
             if (declined.contains(kind)) {
                 choices.decline(accountId, kind);
             } else {

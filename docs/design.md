@@ -110,6 +110,16 @@ rather than failing where only a log would carry it. Correcting a person's addre
 issued to the address it replaces, because a message already sent cannot be recalled from a mailbox
 that was never theirs.
 
+Which of those messages a member receives is theirs to choose. `/my-messages` lists every kind the
+instance sends and a member switches off what they do not want; `message_optout` holds one row per
+declined kind, and the absence of a row is a yes, so a kind added later reaches everybody who chose
+before it existed. The check sits in the one funnel every mailer passes through rather than in each
+of them. Three kinds cannot be switched off, because doing so would take away something no other
+path replaces: the credentials an account needs to sign in at all, the notice that a closure
+displaced a booking, and being told somebody wrote you into one. The instance refuses those by name
+instead of ignoring the request, and the constraint that lists them is read back out of the database
+and compared against the enum at build time.
+
 The web client is built and covered by tests too: the court plan as the public landing page,
 personal booking management, managed appointments for officers — including creating a recurring
 series, which is previewed before anything is written and reports what it had to skip — and the
@@ -850,8 +860,8 @@ All templates are i18n message bundles and editable per instance:
 | A booking coming up | Everybody in it, the lead time set by the club |
 | Series created | Creator, with the list of skipped occurrences |
 
-Per-notification opt-out where legally permissible; transactional messages about one's own
-bookings are not opt-out.
+Per-notification opt-out where legally permissible; what a member cannot switch off is what no
+other path replaces.
 
 **Built:** four things a booking says for itself. The member who made it gets a confirmation. A
 member somebody recorded as a co-player is told, and whoever booked is told when that member takes
@@ -875,6 +885,12 @@ booking and not the booker, and the notice about a withdrawal carries the name t
 the directory. A member who holds no account is not written to, because the message log is keyed by
 the account that erases it, and neither is an account that has been deactivated — somebody who has
 left the club is refused a credential for the same reason.
+
+**Built:** a member chooses per kind what reaches them, on a page of their own. Booking
+confirmations, the notice that somebody took themselves out of a booking, and reminders are
+switched off and on again; credentials, the notice that a closure displaced a booking, and being
+recorded as a player stay on, and asking for one of them to go off is refused naming the kind. A
+kind nobody chose about is received, so choosing once does not silence what the club adds later.
 
 ---
 

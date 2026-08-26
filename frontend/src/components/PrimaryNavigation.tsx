@@ -18,6 +18,7 @@ const isAdmin = (session: SessionStatus) => session.roles.includes("ADMIN");
 const destinations: Destination[] = [
   { to: "/", testId: "court-plan-link", label: "nav.courts", visible: () => true },
   { to: "/my-bookings", testId: "my-bookings-link", label: "nav.myBookings", visible: (session) => session.authenticated },
+  { to: "/my-messages", testId: "my-messages-link", label: "nav.myMessages", visible: (session) => session.authenticated },
   { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration", visible: isAdmin },
   { to: "/admin/facility", testId: "admin-facility-link", label: "nav.adminFacility", visible: isAdmin },
   { to: "/admin/roster", testId: "admin-roster-link", label: "nav.adminRoster", visible: isAdmin },

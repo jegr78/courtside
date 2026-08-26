@@ -64,6 +64,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
 
     private static final Set<String> AUTHENTICATED_PATHS = Set.of(
             "/api/account/locale",
+            "/api/account/messages",
             "/api/public/booking-cards",
             "/api/public/participant-cards",
             "/api/public/participant-members",
