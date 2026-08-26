@@ -875,7 +875,7 @@ on purpose: every value it accepts exists, so there is no unknown one to answer.
 is never a bare key: every error this document declares answers `application/problem+json` with the
 `Problem` schema, so what a client is promised is the shape above.
 
-### Three failure modes that are easy to get wrong
+### Four failure modes that are easy to get wrong
 
 **Concurrent booking of the same slot.** Rule evaluation in step 3 cannot prevent this in
 principle — time passes between check and insert. The database decides: the constraint
@@ -889,6 +889,18 @@ with poor mobile reception.
 **Email delivery failure.** Handled by the Modulith event publication registry (section 3):
 the confirmation is written in the same transaction as an event, and a worker delivers it
 with retry afterwards.
+
+**A paging cursor that outlives the caller's sight.** The booking lists are cursor-paged, and the
+cursor names a booking rather than an offset — so resolving it is itself a read, and it carries the
+same visibility predicate the list carries. A cursor naming a booking the caller may no longer see
+resolves against nothing and the page ends, which is the answer the personal list already promises
+in the API document. Resolving it unconditionally would answer two questions nobody asked: whether
+that id names a booking at all, and roughly when it starts, because the page boundary is that
+booking's first start instant. A cursor orders by start instant and breaks ties by id, so the naive
+clause is two comparisons that each repeat the predicate — and the tie-break is the half a repeat
+forgets, silently leaving the disclosure open for bookings that start together. The clause is one
+row comparison instead, `(start, id) < (cursorStart, cursor)`, which states the predicate once and
+has no second branch to forget. It is also the faster of the two shapes.
 
 ### Notifications in Release 1
 
