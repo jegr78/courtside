@@ -21,6 +21,8 @@
     "date-time-boundary",
     "malformed-idempotency-key"
   ],
+  "unexpectedMethods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  "unexpectedMethodsRationale": "The coverage phase probes each documented path with methods it does not declare. It may send only what the scanner gateway relays, because a method the gateway refuses is answered by the harness rather than by the deployment under assessment. TRACE, CONNECT and TRACK are rejected at the proxy and observed there by the passive deployment stage instead.",
   "checks": [
     "not_a_server_error",
     "status_code_conformance",

@@ -500,7 +500,7 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
   const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
     COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests - limits.policy.nativeRequestReserve),
     COURTSIDE_SECURITY_MAX_CONCURRENCY: "1",
-    COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
+    COURTSIDE_SECURITY_ALLOWED_METHODS: ["HEAD", ...limits.policy.unexpectedMethods].join(","),
     COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api,/manifest.webmanifest",
     COURTSIDE_SECURITY_CANARY_ENABLED: "false",
     COURTSIDE_SECURITY_MAX_TARGET_BYTES: "8192",
@@ -539,7 +539,10 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
       throw new Error("The mounted OpenAPI document differs from the planned contract");
     }
     fixture = await limits.prepareFixtures();
-    const config = `headers = { Cookie = ${JSON.stringify(fixture.client.header())}, X-XSRF-TOKEN = ${JSON.stringify(fixture.client.csrfToken())} }\n`;
+    // The gateway relays exactly what the scanner may probe, plus the HEAD the coverage phase
+    // treats as implicit and never generates as an unexpected method.
+    const config = `headers = { Cookie = ${JSON.stringify(fixture.client.header())}, X-XSRF-TOKEN = ${JSON.stringify(fixture.client.csrfToken())} }\n`
+      + `\n[phases.coverage]\nunexpected-methods = ${JSON.stringify(limits.policy.unexpectedMethods)}\n`;
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-schemathesis.toml"],
       { input: config });
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/sitecustomize.py"],
