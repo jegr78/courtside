@@ -14,6 +14,11 @@
 		-Server
 		-Via
 	}
+	@unknownMethod {
+		method QUERY
+		path /api/*
+	}
+	method @unknownMethod PATCH
 
 	reverse_proxy app:8080 {
 		header_up -Forwarded
