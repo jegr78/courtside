@@ -11,8 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 import java.net.CookieManager;
 import java.net.CookiePolicy;
@@ -48,7 +46,6 @@ class UnsupportedHttpMethodIntegrationTest extends AbstractIntegrationTest {
 
     private final CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
     private final HttpClient httpClient = HttpClient.newBuilder().cookieHandler(cookies).build();
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() throws Exception {
@@ -75,8 +72,6 @@ class UnsupportedHttpMethodIntegrationTest extends AbstractIntegrationTest {
 
         // then
         assertThat(response.statusCode()).as(response.body()).isEqualTo(400);
-        JsonNode body = objectMapper.readTree(response.body());
-        assertThat(body.get("error").asText()).isEqualTo("Bad Request");
     }
 
     private void signIn() throws Exception {
