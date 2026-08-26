@@ -2451,6 +2451,11 @@ paths:
         - name: cursor
           in: query
           required: false
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor naming an appointment
+            these roles do not currently manage yields an empty page rather than an error: the
+            roles that manage a card are configuration a board may change, so a cursor collected
+            while the card was still in reach names an appointment that has since left it.
           schema: { type: string, format: uuid }
         - name: limit
           in: query

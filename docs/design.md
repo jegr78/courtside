@@ -875,7 +875,7 @@ on purpose: every value it accepts exists, so there is no unknown one to answer.
 is never a bare key: every error this document declares answers `application/problem+json` with the
 `Problem` schema, so what a client is promised is the shape above.
 
-### Three failure modes that are easy to get wrong
+### Four failure modes that are easy to get wrong
 
 **Concurrent booking of the same slot.** Rule evaluation in step 3 cannot prevent this in
 principle — time passes between check and insert. The database decides: the constraint
@@ -889,6 +889,20 @@ with poor mobile reception.
 **Email delivery failure.** Handled by the Modulith event publication registry (section 3):
 the confirmation is written in the same transaction as an event, and a worker delivers it
 with retry afterwards.
+
+**A paging cursor that outlives the caller's sight.** The booking lists are cursor-paged, and the
+cursor names a booking rather than an offset — so resolving it is itself a read, and it carries the
+same visibility predicate the list carries. A cursor naming a booking the caller may no longer see
+resolves against nothing and the page ends, which is the answer the personal list already promises
+in the API document. Resolving it unconditionally would answer two questions nobody asked: whether
+that id names a booking at all, and roughly when it starts, because the page boundary is that
+booking's first start instant. A cursor orders by start instant and breaks ties by id, so the naive
+clause is two comparisons that each repeat the predicate — and the tie-break is the half a repeat
+forgets, silently leaving the disclosure open for bookings that start together. The clause is one
+row comparison instead, `(start, id) < (cursorStart, cursor)`, which states the predicate once and
+has no second branch to forget. It is also faster than the clause it replaces, which
+matters most on the managed list, where an administrator's page scans every booking the
+club has.
 
 ### Notifications in Release 1
 
@@ -1480,6 +1494,16 @@ whether it is built or designed. **Designed means absent today.**
   credential grants the roles that account already had and no others. It stays open because closing
   it would mean forbidding a shared address, which is the case the schema exists to serve.
   *Built, as described.*
+- **Accepted: a booking's existence is observable through the managed-appointment detail.**
+  `GET /api/managed/bookings/{id}` loads the booking before it authorises the caller, so it answers
+  `404` for an id that names nothing and `403` for one it names but the caller may not manage. The
+  path is authenticated rather than admin-gated, so any member reaches it. What an observer needs:
+  an id they already hold, which is a version 4 uuid and not enumerable. What bounds it: existence
+  is all it discloses — not when the booking starts, not who made it, not who is in it — and the
+  three cursor-paged booking lists disclose neither half, because a cursor now resolves only
+  against what the caller may see. It stays open because closing it means answering `404` after a
+  failed authorisation, which changes a response that operation documents as its own and belongs to
+  that operation's change rather than to the paging fix that surfaced it. *Built, as described.*
 
 ### Roles
 

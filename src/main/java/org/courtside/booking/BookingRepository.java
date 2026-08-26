@@ -113,13 +113,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             SELECT b.id FROM Booking b
             WHERE b.bookedBy = :bookedBy
               AND (:cursor IS NULL
-                OR (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
-                    < (SELECT min(ca.startsAt) FROM CourtAllocation ca
-                       WHERE ca.booking.id = :cursor AND ca.booking.bookedBy = :bookedBy)
-                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
-                    = (SELECT min(ca.startsAt) FROM CourtAllocation ca
-                       WHERE ca.booking.id = :cursor AND ca.booking.bookedBy = :bookedBy)
-                    AND b.id < :cursor))
+                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b), b.id)
+                    < ((SELECT min(ca.startsAt) FROM CourtAllocation ca
+                        WHERE ca.booking.id = :cursor
+                          AND ca.booking.bookedBy = :bookedBy), :cursor))
             ORDER BY (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b) DESC,
                      b.id DESC
             """)
@@ -134,11 +131,13 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 WHERE c.id = b.cardId AND role IN :roles
             ))
               AND (:cursor IS NULL
-                OR (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
-                    < (SELECT min(ca.startsAt) FROM CourtAllocation ca WHERE ca.booking.id = :cursor)
-                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
-                    = (SELECT min(ca.startsAt) FROM CourtAllocation ca WHERE ca.booking.id = :cursor)
-                    AND b.id < :cursor))
+                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b), b.id)
+                    < ((SELECT min(ca.startsAt) FROM CourtAllocation ca
+                        WHERE ca.booking.id = :cursor
+                          AND (:administrator = true OR EXISTS (
+                            SELECT cc.id FROM BookingCard cc JOIN cc.managingRoles cursorRole
+                            WHERE cc.id = ca.booking.cardId AND cursorRole IN :roles
+                          ))), :cursor))
             ORDER BY (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b) DESC,
                      b.id DESC
             """)
@@ -153,11 +152,13 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                           WHERE p.booking = b AND p.personId = :personId)
               AND (b.bookedBy IS NULL OR b.bookedBy <> :accountId)
               AND (:cursor IS NULL
-                OR (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
-                    < (SELECT min(ca.startsAt) FROM CourtAllocation ca WHERE ca.booking.id = :cursor)
-                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b)
-                    = (SELECT min(ca.startsAt) FROM CourtAllocation ca WHERE ca.booking.id = :cursor)
-                    AND b.id < :cursor))
+                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b), b.id)
+                    < ((SELECT min(ca.startsAt) FROM CourtAllocation ca
+                        WHERE ca.booking.id = :cursor
+                          AND EXISTS (SELECT cp.id FROM BookingParticipant cp
+                                      WHERE cp.booking = ca.booking AND cp.personId = :personId)
+                          AND (ca.booking.bookedBy IS NULL
+                               OR ca.booking.bookedBy <> :accountId)), :cursor))
             ORDER BY (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b) DESC,
                      b.id DESC
             """)
