@@ -51,7 +51,7 @@ class ValidationMessageCoverageTest {
 
     // Minted by an advice rather than by a constraint, so no literal search reaches them.
     private static final List<String> ADVICE_MINTED_CODES =
-            List.of("validation.NoDuplicates", "validation.TypeMismatch");
+            List.of("validation.NoDuplicates", "validation.TypeMismatch", "validation.UnknownField");
 
     private static List<Pattern> buildCodeLiteralPatterns() {
         List<Pattern> patterns = new ArrayList<>();
@@ -148,6 +148,27 @@ class ValidationMessageCoverageTest {
                 .isNotEmpty();
         codes.forEach(code -> assertBothBundlesDefine(english, german,
                 "validation." + code, "rejected by a Spring Validator in src/main"));
+    }
+
+    @Test
+    void everyCodeMintedByAnAdviceIsNamedInTheApiDocument() throws IOException {
+        // given
+        String document = Files.readString(Path.of("src/main/resources/api/openapi.yaml"));
+
+        // when
+        List<String> undocumented = ADVICE_MINTED_CODES.stream()
+                .filter(code -> !document.contains(code))
+                .toList();
+
+        // then
+        assertThat(ADVICE_MINTED_CODES).isNotEmpty();
+        assertThat(undocumented)
+                .as("a code no field declares belongs to every operation that takes a body, so a"
+                        + " client learns of it from the document or from nowhere. The document is"
+                        + " the source of truth for what a caller receives, and a code minted in an"
+                        + " advice is the one kind that reaches a caller without any field naming"
+                        + " it.")
+                .isEmpty();
     }
 
     @Test

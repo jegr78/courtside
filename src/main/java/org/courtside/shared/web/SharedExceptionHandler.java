@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -129,11 +130,18 @@ class SharedExceptionHandler {
         }
 
         ProblemDetail problem = validationFailed(List.of(
-                exception.getCause() instanceof DuplicateItemException
-                        ? Map.of("field", field, "code", "validation.NoDuplicates", "params", Map.of())
-                        : Map.of("field", field, "code", "validation.TypeMismatch", "params", Map.of())));
+                Map.of("field", field, "code", codeFor(exception.getCause()), "params", Map.of())));
         logAnswered(problem, List.of(field));
         return problem;
+    }
+
+    private static String codeFor(Throwable cause) {
+        if (cause instanceof DuplicateItemException) {
+            return "validation.NoDuplicates";
+        }
+        // A field nobody declared holds no value of the wrong type; it holds no value at all.
+        return cause instanceof UnrecognizedPropertyException
+                ? "validation.UnknownField" : "validation.TypeMismatch";
     }
 
     // The keys of an additionalProperties object are whatever the caller sent.

@@ -29,6 +29,21 @@ info:
     the values that message interpolates, and the client resolves the pair against its own message
     catalogue. This is what makes the API usable in a language the server does not ship.
 
+    Most codes belong to the field they name and are listed with it. Four belong to every
+    operation that takes a request body, because they describe how a body is read rather than what
+    an individual field means:
+
+    - `validation.NotNull` — a field this operation requires was left out.
+    - `validation.TypeMismatch` — a field holds no value of the type it declares.
+    - `validation.NoDuplicates` — an array whose entries must be distinct holds one of them twice.
+      `field` names the array.
+    - `validation.UnknownField` — the body names a field this operation does not define. An
+      unknown field is refused rather than ignored, so a misspelt name is answered instead of
+      silently taking effect as the omission of the field that was meant. `field` carries the
+      name as it was sent.
+
+    All four arrive as `400` with type `urn:courtside:error:validation-failed`.
+
     ## Authentication
 
     Anonymous callers may read the public court plan and its anonymised occupancy. Creating,

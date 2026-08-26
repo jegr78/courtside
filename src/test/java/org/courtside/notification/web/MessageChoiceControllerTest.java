@@ -148,7 +148,7 @@ class MessageChoiceControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("declned"))
-                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.UnknownField"));
         assertThat(switchedOff()).containsExactly("BOOKING_REMINDER");
     }
 
