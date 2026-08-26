@@ -75,7 +75,7 @@ test("given two members and an administrator, when substituting owned identifier
     if (probe.path.includes("00000000-0000-0000-0000-000000000000")) {
       return { status: 404, problemType: "urn:courtside:error:booking-not-found" };
     }
-    return { status: 403, problemType: "urn:courtside:error:booking-not-owned" };
+    return { status: 404, problemType: "urn:courtside:error:booking-not-found" };
   });
 
   // then

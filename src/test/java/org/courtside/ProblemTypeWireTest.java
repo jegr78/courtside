@@ -459,7 +459,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "roe.john", roles = "TRAINER")
-    void givenAnUnknownSeries_whenCancellingIt_thenTheResponseCarriesItsOwnType() throws Exception {
+    void givenAnUnknownSeriesAndBooking_whenCancellingIt_thenTheBookingDecidesTheType() throws Exception {
         // given
         createAccount("roe.john", Role.TRAINER);
 
@@ -470,7 +470,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
                 .with(csrf()));
 
         // then
-        assertProblem(result, HttpStatus.NOT_FOUND, "urn:courtside:error:series-not-found");
+        assertProblem(result, HttpStatus.NOT_FOUND, "urn:courtside:error:booking-not-found");
     }
 
     @Test

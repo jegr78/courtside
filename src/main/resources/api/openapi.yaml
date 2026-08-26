@@ -2343,6 +2343,9 @@ paths:
         The creator, an administrator, or an account currently allowed by the booking card may
         cancel the booking. Cards without role restrictions do not grant management access to
         unrelated accounts.
+        A booking the caller may not act on is answered `404` with
+        `urn:courtside:error:booking-not-found`, the same answer an id naming no booking
+        gets: whether an id is real is not something a refusal discloses.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2500,7 +2503,11 @@ paths:
       tags: [bookings]
       operationId: getManagedAppointment
       summary: Management details for one appointment.
-      description: Internal notes and participant display names are returned only after authorization.
+      description: |
+        Internal notes and participant display names are returned only after authorization.
+        A booking the caller may not act on is answered `404` with
+        `urn:courtside:error:booking-not-found`, the same answer an id naming no booking
+        gets: whether an id is real is not something a refusal discloses.
       parameters:
         - name: id
           in: path
@@ -2589,6 +2596,11 @@ paths:
       description: |
         Calendar semantics — this one, this and all following, or the whole series. The creator,
         an administrator, or an account currently allowed by the booking card may cancel them.
+        A booking the caller may not act on is answered `404` with
+        `urn:courtside:error:booking-not-found`, the same answer an id naming no booking
+        gets: whether an id is real is not something a refusal discloses.
+        The series is read only after that: a `seriesId` naming nothing and one the booking is
+        not part of are both answered `400` with `booking.series.bookingNotInSeries`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2626,6 +2638,9 @@ paths:
         Available to the creator, an administrator, or an account currently allowed by the
         booking card. Authorization uses the card's current configuration. Each occurrence keeps
         its original local date; the request defines its target time of day, duration and courts.
+        A booking the caller may not act on is answered `404` with
+        `urn:courtside:error:booking-not-found`, the same answer an id naming no booking
+        gets: whether an id is real is not something a refusal discloses.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2664,6 +2679,9 @@ paths:
         or an account currently allowed by the booking card may move the occurrences. Each one
         keeps its original local date; the request defines its target time of day, duration and
         courts.
+        A booking the caller may not act on is answered `404` with
+        `urn:courtside:error:booking-not-found`, the same answer an id naming no booking
+        gets: whether an id is real is not something a refusal discloses.
       security:
         - sessionCookie: []
           csrfToken: []

@@ -3,7 +3,7 @@ package org.courtside.booking.series;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.facility.CourtNotBookableException;
-import org.courtside.booking.internal.BookingNotOwnedException;
+import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.Booking;
@@ -189,7 +189,8 @@ class SeriesMoveTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> seriesService.move(new MoveRequest(
                 series.seriesId(), series.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
                 LocalTime.of(20, 0), null, null), UUID.randomUUID(), Set.of(Role.MEMBER)))
-                .isInstanceOf(BookingNotOwnedException.class);
+                .isInstanceOf(BookingNotFoundException.class)
+                        .hasMessageContaining("may not manage");
 
         assertThat(startOf(series.bookingIds().getFirst())).isEqualTo(unchanged);
     }

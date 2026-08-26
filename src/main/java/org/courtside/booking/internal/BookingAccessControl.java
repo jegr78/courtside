@@ -1,6 +1,7 @@
 package org.courtside.booking.internal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.courtside.booking.Booking;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
@@ -11,6 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class BookingAccessControl {
@@ -38,7 +40,9 @@ public class BookingAccessControl {
         if (card.permitsManagement(managementRoles(actorRoles))) {
             return;
         }
-        throw new BookingNotOwnedException(
+        // The answer hides the refusal from the caller, so the log is where it stays visible.
+        log.info("Account {} may not manage booking {}", actor, booking.getId());
+        throw new BookingNotFoundException(
                 "Account %s may not manage booking %s".formatted(actor, booking.getId()));
     }
 

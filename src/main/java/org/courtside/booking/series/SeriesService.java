@@ -348,10 +348,9 @@ public class SeriesService {
                 .toList();
     }
 
-    private void requireSeriesAndBooking(UUID seriesId, UUID fromBookingId) {
-        if (!seriesRepository.existsById(seriesId)) {
-            throw new SeriesNotFoundException("No booking series with id " + seriesId);
-        }
+    // A series the caller names is answered the same way whether it does not exist or simply does
+    // not hold this booking, so no series id is confirmable through a booking somebody else's.
+    private void requireBookingInSeries(UUID seriesId, UUID fromBookingId) {
         if (!bookingRepository.existsByIdAndSeriesId(fromBookingId, seriesId)) {
             throw new SeriesRequestInvalidException("booking.series.bookingNotInSeries",
                     Map.of("field", "fromBookingId"));
@@ -369,10 +368,10 @@ public class SeriesService {
 
     private void requireManagementAccessTo(UUID seriesId, UUID fromBookingId,
                                            UUID actor, Set<Role> actorRoles) {
-        requireSeriesAndBooking(seriesId, fromBookingId);
         Booking from = bookingRepository.findWithAllocationsById(fromBookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + fromBookingId));
         accessControl.requireManagementAccess(from, actor, actorRoles);
+        requireBookingInSeries(seriesId, fromBookingId);
     }
 
     private List<Booking> affectedBookings(UUID seriesId, UUID fromBookingId, CancelScope scope) {

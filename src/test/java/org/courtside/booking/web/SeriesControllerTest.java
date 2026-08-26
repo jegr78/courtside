@@ -287,7 +287,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
-    void givenASeriesOwnedBySomeoneElse_whenAMemberTriesToMoveIt_thenForbidden() throws Exception {
+    void givenASeriesOwnedBySomeoneElse_whenAMemberTriesToMoveIt_thenItIsNotFound() throws Exception {
         // given
         String created = createSeriesAs("trainer.john");
         UUID seriesId = UUID.fromString(JsonPath.read(created, "$.seriesId"));
@@ -298,16 +298,15 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(moveJson(firstBookingId))
                         .with(csrf()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.title").value("Not allowed"))
-                .andExpect(jsonPath("$.detail").value(
-                        "You may only change bookings you own or are authorized to manage"))
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-owned"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Booking not found"))
+                .andExpect(jsonPath("$.detail").value("No such booking"))
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
     }
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
-    void givenASeriesOwnedBySomeoneElse_whenAMemberPreviewsAMoveOfIt_thenForbidden() throws Exception {
+    void givenASeriesOwnedBySomeoneElse_whenAMemberPreviewsAMoveOfIt_thenItIsNotFound() throws Exception {
         // given
         String created = createSeriesAs("trainer.john");
         UUID seriesId = UUID.fromString(JsonPath.read(created, "$.seriesId"));
@@ -318,7 +317,8 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(moveJson(firstBookingId))
                         .with(csrf()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
     }
 
     @Test

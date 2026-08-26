@@ -2,7 +2,7 @@ package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
-import org.courtside.booking.internal.BookingNotOwnedException;
+import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingStatus;
 import org.courtside.shared.OpeningWindow;
@@ -134,11 +134,27 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnUnknownSeries_whenCancelling_thenItIsRejected() {
+    void givenAnUnknownSeries_whenCancelling_thenTheBookingItNamesDecidesTheAnswer() {
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(UUID.randomUUID(), UUID.randomUUID(),
                 CancelScope.THIS, trainer, Set.of(Role.TRAINER)))
-                .isInstanceOf(SeriesNotFoundException.class);
+                .as("the booking is looked up before the series is spoken of, so an unknown series"
+                        + " cannot be told apart from one this caller may not reach")
+                .isInstanceOf(BookingNotFoundException.class);
+    }
+
+    @Test
+    void givenABookingHeldByAnotherSeries_whenCancellingThroughThisOne_thenItIsRejected() {
+        // given
+        SeriesCreationResult theirs = createSeries(2);
+        SeriesCreationResult other = createSeries(2, LocalDate.of(2026, 6, 2));
+
+        // when / then
+        assertThatThrownBy(() -> seriesService.cancel(theirs.seriesId(),
+                other.bookingIds().getFirst(), CancelScope.THIS, trainer, Set.of(Role.TRAINER)))
+                .as("the caller manages the booking, so the series may be spoken of — and it says"
+                        + " the booking is not in it, which is also what an unknown series says")
+                .isInstanceOf(SeriesRequestInvalidException.class);
     }
 
     @Test
@@ -149,7 +165,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), UUID.randomUUID(),
                 CancelScope.THIS_AND_FOLLOWING, trainer, Set.of(Role.TRAINER)))
-                .isInstanceOf(SeriesRequestInvalidException.class);
+                .isInstanceOf(BookingNotFoundException.class);
     }
 
     @Test
@@ -160,7 +176,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), UUID.randomUUID(),
                 CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER)))
-                .isInstanceOf(SeriesRequestInvalidException.class);
+                .isInstanceOf(BookingNotFoundException.class);
     }
 
     @Test
@@ -175,7 +191,8 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), result.bookingIds().getFirst(),
                 CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER)))
-                .isInstanceOf(BookingNotOwnedException.class);
+                .isInstanceOf(BookingNotFoundException.class)
+                .hasMessageContaining("may not manage");
         assertThat(statusesOf(result)).allMatch(BookingStatus.CONFIRMED::equals);
     }
 
@@ -190,7 +207,8 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), cancelledOccurrence,
                 CancelScope.THIS, UUID.randomUUID(), Set.of(Role.MEMBER)))
-                .isInstanceOf(BookingNotOwnedException.class);
+                .isInstanceOf(BookingNotFoundException.class)
+                .hasMessageContaining("may not manage");
     }
 
     private List<BookingStatus> statusesOf(SeriesCreationResult result) {
@@ -204,9 +222,13 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
     }
 
     private SeriesCreationResult createSeries(int count) {
+        return createSeries(count, LocalDate.of(2026, 4, 7));
+    }
+
+    private SeriesCreationResult createSeries(int count, LocalDate from) {
         SeriesRule rule = new SeriesRule(
                 List.of(courtOne), TRAINING_CARD,
-                LocalDate.of(2026, 4, 7), LocalTime.of(18, 0), 120,
+                from, LocalTime.of(18, 0), 120,
                 1, Set.of(DayOfWeek.TUESDAY), null, count);
         List<Instant> starts = previewAsTrainer(rule).occurrences().stream()
                 .map(occurrence -> occurrence.slot().start())
