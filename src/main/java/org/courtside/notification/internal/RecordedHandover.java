@@ -1,11 +1,13 @@
 package org.courtside.notification.internal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.courtside.notification.MessageKind;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class RecordedHandover {
@@ -13,9 +15,16 @@ class RecordedHandover {
     private final MailDispatch dispatch;
     private final MailHandover handover;
     private final MailProperties properties;
+    private final MessageChoices choices;
     private final MessageLog messages;
 
+    // Every message this instance sends passes here, so a kind somebody switched off cannot be
+    // written by a mailer that forgot to ask.
     void handOver(UUID accountId, MessageKind kind, String address, String subject, String body) {
+        if (!choices.wants(accountId, kind)) {
+            log.info("A {} message was not sent: account {} does not want it", kind, accountId);
+            return;
+        }
         String messageId = MailDispatch.newMessageId(senderDomain());
         UUID record = messages.queued(accountId, kind, messageId);
         try {

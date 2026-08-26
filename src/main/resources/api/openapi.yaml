@@ -1750,6 +1750,29 @@ components:
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER]
 
+    MessageChoice:
+      type: object
+      required: [kind, declinable, enabled]
+      properties:
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        declinable:
+          type: boolean
+          description: |
+            False for what the club must be able to send: the credentials an account needs to sign
+            in at all, the notice that a closure hit a booking, and being told somebody wrote you
+            into one.
+        enabled:
+          type: boolean
+          description: Whether this account currently receives the kind.
+
+    MessageChoiceRequest:
+      type: object
+      required: [declined]
+      properties:
+        declined:
+          type: array
+          items: { $ref: "#/components/schemas/MessageKind" }
+
     MessageState:
       type: string
       description: |
@@ -2011,6 +2034,53 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+
+  /api/account/messages:
+    get:
+      tags: [account-messages]
+      operationId: listOwnMessageChoices
+      summary: Which kinds of message this account receives.
+      description: |
+        Every kind the instance sends, with whether it may be switched off at all and whether this
+        account currently receives it. A kind nobody chose about is received: the absence of a
+        choice is a yes, so a kind added later reaches people who chose before it existed.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The choices.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MessageChoice" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+    put:
+      tags: [account-messages]
+      operationId: chooseOwnMessages
+      summary: Switch kinds of message off for this account.
+      description: |
+        The request names every kind this account declines; anything absent from it is received.
+        A kind the club must be able to send is refused with
+        `urn:courtside:error:message-not-declinable` rather than silently ignored.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MessageChoiceRequest" }
+      responses:
+        "204":
+          description: Chosen.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   /api/public/courts:
     get:
