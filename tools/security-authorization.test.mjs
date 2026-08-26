@@ -222,7 +222,34 @@ test("given path query and body parameters, when creating a harmless probe, then
   assert.match(upload.body, /name="file"; filename="empty.csv"/);
 });
 
-test("given authorization evidence, when one operation actor pair is absent, then validation fails closed", () => {
+// The producer decides which object boundaries exist; a list repeated here would only ever be as
+// current as the last person to edit both of them.
+async function producedObjectCheckIds() {
+  const personId = "30000000-0000-0000-0000-000000000001";
+  const bookings = { items: [
+    { id: "10000000-0000-0000-0000-000000000001", seriesId: null, status: "CONFIRMED" },
+    { id: "10000000-0000-0000-0000-000000000002",
+      seriesId: "20000000-0000-0000-0000-000000000001", status: "CONFIRMED" }
+  ] };
+  const roster = { entries: [{ personId, username: "security.member.1", firstName: "Security",
+    lastName: "Member1", email: "security.member.1@example.org", enabled: true, roles: ["MEMBER"],
+    accountId: "40000000-0000-0000-0000-000000000001",
+    membershipTypeId: "50000000-0000-0000-0000-000000000001" }] };
+  const checks = await executeObjectAuthorizationChecks(async (actor, probe) => {
+    if (probe.path === "/api/my/bookings?limit=100") return { status: 200, json: bookings };
+    if (probe.path === "/api/admin/roster?limit=200" && probe.method === "GET") {
+      return { status: 200, json: roster };
+    }
+    if (probe.path === `/api/admin/roster/${personId}` && probe.method === "PUT") {
+      return { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    }
+    if (actor === "ADMIN") return { status: 200 };
+    return { status: 404, problemType: "urn:courtside:error:booking-not-found" };
+  });
+  return checks.map(({ id }) => id);
+}
+
+test("given authorization evidence, when one operation actor pair is absent, then validation fails closed", async () => {
   // given
   const matrix = buildOperationAuthorizationMatrix({ paths: {
     "/api/public/example": { get: { operationId: "readExample", security: [] } }
@@ -231,8 +258,7 @@ test("given authorization evidence, when one operation actor pair is absent, the
     operationId: "readExample", actor, expected: "allow", status: 200, outcome: "passed",
     observation: "authorization-gate-passed"
   }));
-  const objectChecks = ["horizontal-booking-cancel", "horizontal-managed-detail", "horizontal-series-cancel",
-    "identifier-substitution", "vertical-admin-management", "mass-assignment", "rejected-attacks-preserve-bookings"]
+  const objectChecks = (await producedObjectCheckIds())
     .map((id) => ({ id, status: 200, outcome: "passed", observation: "boundary-proven" }));
   const bruteForce = { outcome: "passed", attemptsBeforeLimit: 5, status: 429,
     problemType: "urn:courtside:error:login-rate-limited",

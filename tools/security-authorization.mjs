@@ -398,7 +398,8 @@ export function validateAuthorizationEvidence(evidence, matrix) {
     return result.outcome !== evaluated.outcome || result.observation !== evaluated.observation;
   })) throw new Error("The authorization evidence contains an invalid operation result");
   const expectedObjects = ["horizontal-booking-cancel", "horizontal-managed-detail", "horizontal-series-cancel",
-    "identifier-substitution", "vertical-admin-management", "mass-assignment", "rejected-attacks-preserve-bookings"];
+    "identifier-substitution", "existence-not-disclosed", "vertical-admin-management", "mass-assignment",
+    "rejected-attacks-preserve-bookings"];
   if (JSON.stringify(evidence.objectChecks.map(({ id }) => id).toSorted())
       !== JSON.stringify(expectedObjects.toSorted())) {
     throw new Error("The authorization evidence is missing an object boundary");
