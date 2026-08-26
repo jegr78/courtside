@@ -900,7 +900,9 @@ booking's first start instant. A cursor orders by start instant and breaks ties 
 clause is two comparisons that each repeat the predicate — and the tie-break is the half a repeat
 forgets, silently leaving the disclosure open for bookings that start together. The clause is one
 row comparison instead, `(start, id) < (cursorStart, cursor)`, which states the predicate once and
-has no second branch to forget. It is also the faster of the two shapes.
+has no second branch to forget. It is also faster than the clause it replaces, which
+matters most on the managed list, where an administrator's page scans every booking the
+club has.
 
 ### Notifications in Release 1
 
@@ -1492,6 +1494,16 @@ whether it is built or designed. **Designed means absent today.**
   credential grants the roles that account already had and no others. It stays open because closing
   it would mean forbidding a shared address, which is the case the schema exists to serve.
   *Built, as described.*
+- **Accepted: a booking's existence is observable through the managed-appointment detail.**
+  `GET /api/managed/bookings/{id}` loads the booking before it authorises the caller, so it answers
+  `404` for an id that names nothing and `403` for one it names but the caller may not manage. The
+  path is authenticated rather than admin-gated, so any member reaches it. What an observer needs:
+  an id they already hold, which is a version 4 uuid and not enumerable. What bounds it: existence
+  is all it discloses — not when the booking starts, not who made it, not who is in it — and the
+  three cursor-paged booking lists disclose neither half, because a cursor now resolves only
+  against what the caller may see. It stays open because closing it means answering `404` after a
+  failed authorisation, which changes a response that operation documents as its own and belongs to
+  that operation's change rather than to the paging fix that surfaced it. *Built, as described.*
 
 ### Roles
 

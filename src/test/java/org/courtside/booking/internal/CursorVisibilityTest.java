@@ -6,6 +6,7 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.ParticipationService;
+import org.courtside.booking.PersonalBookingPage;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
@@ -21,8 +22,12 @@ import org.springframework.context.annotation.Import;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -98,6 +103,30 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTwoOwnBookingsStartingTogether_whenPagingAcrossTheTie_thenEachIsWalkedExactlyOnce() {
+        // given
+        List<UUID> together = List.of(
+                bookedByJane(firstCourt, SIX_PM, SEVEN_PM),
+                bookedByJane(secondCourt, SIX_PM, SEVEN_PM));
+        UUID sortsAfter = lastInPageOrder(together);
+        UUID sortsBefore = otherThan(together, sortsAfter);
+
+        // when
+        List<UUID> firstPage = personalPageOfOne(null);
+        List<UUID> secondPage = personalPageOfOne(sortsAfter);
+
+        // then
+        assertThat(firstPage)
+                .as("a tie is broken by the id, and the page of one must land on the same side of"
+                        + " it that the cursor then continues from")
+                .containsExactly(sortsAfter);
+        assertThat(secondPage).containsExactly(sortsBefore);
+        assertThat(personalPageOfOne(sortsBefore))
+                .as("the walk ends after the second of the pair rather than repeating it")
+                .isEmpty();
+    }
+
+    @Test
     void givenABookingTheyWithdrewFrom_whenItsIdIsUsedAsAParticipationCursor_thenThePageIsEmpty() {
         // given
         UUID stillNamed = bookedByJaneNaming(johnPersonId, firstCourt, TWO_PM, THREE_PM);
@@ -123,16 +152,22 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
         List<UUID> together = List.of(
                 bookedByJaneNaming(johnPersonId, firstCourt, SIX_PM, SEVEN_PM),
                 bookedByJaneNaming(johnPersonId, secondCourt, SIX_PM, SEVEN_PM));
-        UUID later = together.stream().max(Comparator.naturalOrder()).orElseThrow();
-        participations.withdraw(later, johnPersonId, johnAccountId);
+        UUID sortsAfter = lastInPageOrder(together);
+        UUID sortsBefore = otherThan(together, sortsAfter);
+        participations.withdraw(sortsAfter, johnPersonId, johnAccountId);
 
         // when
-        List<UUID> page = participationPageFor(later);
+        List<UUID> page = participationPageFor(sortsAfter);
 
         // then
+        assertThat(participationPageFor(null))
+                .as("the booking that decides the case has to be in the list, or an empty page"
+                        + " would prove nothing")
+                .containsExactly(sortsBefore);
         assertThat(page)
-                .as("both start at the same moment, so only the tie-break branch of the cursor"
-                        + " clause can answer — and it must resolve against nothing too")
+                .as("both start at the same moment, so the id decides — and the cursor names the"
+                        + " one that sorts after %s, which an unguarded clause would page past",
+                        sortsBefore)
                 .isEmpty();
     }
 
@@ -179,24 +214,26 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     @Test
     void givenTwoManagedAppointmentsStartingTogether_whenTheCursorNamesTheHandedOverOne_thenThePageIsEmpty() {
         // given
-        BookingCard stillManaged = trainerCard("Fitness session");
-        BookingCard handedOver = trainerCard("Youth practice");
-        UUID onOne = bookedOnCard(stillManaged, firstCourt, SIX_PM, SEVEN_PM);
-        UUID onTheOther = bookedOnCard(handedOver, secondCourt, SIX_PM, SEVEN_PM);
-        if (onOne.compareTo(onTheOther) > 0) {
-            managedByNobody(stillManaged);
-            trainerManages(handedOver);
-        } else {
-            managedByNobody(handedOver);
+        Map<UUID, BookingCard> byBooking = new LinkedHashMap<>();
+        for (String label : List.of("Fitness session", "Youth practice")) {
+            BookingCard card = trainerCard(label);
+            byBooking.put(bookedOnCard(card, courtFor(byBooking.size()), SIX_PM, SEVEN_PM), card);
         }
-        UUID later = onOne.compareTo(onTheOther) > 0 ? onOne : onTheOther;
+        UUID sortsAfter = lastInPageOrder(byBooking.keySet());
+        UUID sortsBefore = otherThan(byBooking.keySet(), sortsAfter);
+        managedByNobody(byBooking.get(sortsAfter));
 
         // when
-        List<UUID> page = managedPageFor(later);
+        List<UUID> page = managedPageFor(sortsAfter);
 
         // then
+        assertThat(managedPageFor(null))
+                .as("the appointment that decides the case has to be in the list, or an empty page"
+                        + " would prove nothing")
+                .containsExactly(sortsBefore);
         assertThat(page)
-                .as("both start at the same moment, so only the tie-break branch can answer")
+                .as("both start at the same moment, so the id decides — and the cursor names the"
+                        + " one that sorts after %s", sortsBefore)
                 .isEmpty();
     }
 
@@ -226,8 +263,9 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
         bookings.cancel(cancelled, janeAccountId, Set.of(Role.MEMBER));
 
         // when
-        List<UUID> firstPage = idsOf(bookings.personalBookings(janeAccountId, null, 1).bookings());
-        UUID cursor = bookings.personalBookings(janeAccountId, null, 1).nextCursor();
+        PersonalBookingPage first = bookings.personalBookings(janeAccountId, null, 1);
+        List<UUID> firstPage = idsOf(first.bookings());
+        UUID cursor = first.nextCursor();
 
         // then
         assertThat(firstPage)
@@ -247,7 +285,7 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
         UUID onTheOther = bookedOnCard(card, secondCourt, SIX_PM, SEVEN_PM);
 
         // when
-        List<UUID> walked = new java.util.ArrayList<>();
+        List<UUID> walked = new ArrayList<>();
         UUID cursor = null;
         for (int page = 0; page < 3; page += 1) {
             ManagedAppointmentQuery.Page current = managed.list(Set.of(Role.TRAINER), cursor, 1);
@@ -259,6 +297,27 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
         assertThat(walked).containsExactlyInAnyOrder(earlier, onOneCourt, onTheOther);
         assertThat(walked.getLast()).isEqualTo(earlier);
         assertThat(cursor).isNull();
+    }
+
+    // Java orders a uuid by two signed longs, Postgres by sixteen unsigned bytes, and the two
+    // disagree on roughly half of all pairs — the page order is the database's.
+    private static UUID lastInPageOrder(Collection<UUID> candidates) {
+        return candidates.stream().max(Comparator.comparing(UUID::toString)).orElseThrow();
+    }
+
+    private static UUID otherThan(Collection<UUID> candidates, UUID excluded) {
+        return candidates.stream().filter(candidate -> !candidate.equals(excluded))
+                .reduce((only, second) -> {
+                    throw new IllegalStateException("expected exactly one other booking");
+                }).orElseThrow();
+    }
+
+    private UUID courtFor(int index) {
+        return index == 0 ? firstCourt : secondCourt;
+    }
+
+    private List<UUID> personalPageOfOne(UUID cursor) {
+        return idsOf(bookings.personalBookings(janeAccountId, cursor, 1).bookings());
     }
 
     private List<UUID> personalPageFor(UUID accountId, UUID cursor) {
@@ -288,10 +347,6 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
 
     private void managedByNobody(BookingCard card) {
         changeManagingRoles(card, Set.of());
-    }
-
-    private void trainerManages(BookingCard card) {
-        changeManagingRoles(card, Set.of(Role.TRAINER));
     }
 
     private void changeManagingRoles(BookingCard card, Set<Role> managingRoles) {
