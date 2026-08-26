@@ -250,22 +250,31 @@ export function securityImportSourceRequest(runId, attempt) {
   };
 }
 
-export async function runOpenApiImportCases(plan, fixture, context) {
-  const cases = [
+export function securityImportCases() {
+  const separator = securityImportSourceRequest("separator-contract", 1).separator;
+  const row = (...cells) => `${cells.join(separator)}\n`;
+  const header = row("Member number", "First name", "Last name", "Email");
+  return [
     { id: "invalid-utf8", content: Buffer.from([0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0xff]),
       status: 400, problemType: "urn:courtside:error:import-snapshot-unreadable",
       observation: "typed-upload-rejection" },
     { id: "duplicate-columns", content: Buffer.from(
-      "Member number,First name,Last name,Email,First name\n4711,Jane,Doe,jane.doe@example.org,Jane\n"),
+      row("Member number", "First name", "Last name", "Email", "First name")
+        + row("4711", "Jane", "Doe", "jane.doe@example.org", "Jane")),
       status: 400, problemType: "urn:courtside:error:import-snapshot-unreadable",
       observation: "typed-upload-rejection" },
     { id: "oversized-cell", content: Buffer.from(
-      `Member number,First name,Last name,Email\n4711,${"J".repeat(4096)},Doe,jane.doe@example.org\n`),
+      header + row("4711", "J".repeat(4096), "Doe", "jane.doe@example.org")),
       status: 201, observation: "row-level-rejection" },
     { id: "conflicting-reference", content: Buffer.from(
-      "Member number,First name,Last name,Email\n4711,Jane,Doe,jane.doe@example.org\n4711,John,Roe,john.roe@example.org\n"),
+      header + row("4711", "Jane", "Doe", "jane.doe@example.org")
+        + row("4711", "John", "Roe", "john.roe@example.org")),
       status: 201, observation: "row-level-rejection" }
   ];
+}
+
+export async function runOpenApiImportCases(plan, fixture, context) {
+  const cases = securityImportCases();
   const results = [];
   let generatedBytes = 0;
   for (const entry of cases) {

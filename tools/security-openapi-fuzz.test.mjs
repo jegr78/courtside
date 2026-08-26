@@ -16,6 +16,8 @@ import {
   runOpenApiMutationCases,
   runOpenApiFuzzAssessment,
   runtimeOperations,
+  securityImportCases,
+  securityImportSourceRequest,
   undocumentedRuntimeRoutes,
   validateOpenApiFuzzEvidence
 } from "./security-openapi-fuzz.mjs";
@@ -24,6 +26,20 @@ const require = createRequire(new URL("../frontend/package.json", import.meta.ur
 const yaml = require("js-yaml");
 const api = yaml.load(readFileSync(new URL(
   "../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
+
+test("given the synthetic import source, when building curated CSV cases, then every header uses its separator", () => {
+  // given
+  const source = securityImportSourceRequest("run-0001", 1);
+
+  // when
+  const csvCases = securityImportCases().filter(({ id }) => id !== "invalid-utf8");
+
+  // then
+  assert.equal(source.separator, ";");
+  assert.equal(csvCases.every(({ content }) => content.toString("utf8")
+    .split("\n")[0].split(source.separator).includes("Member number")), true);
+  assert.equal(csvCases.every(({ content }) => !content.toString("utf8").split("\n")[0].includes(",")), true);
+});
 
 test("given the current contract, when inventorying fuzz coverage, then every operation has an explicit mode", () => {
   // when
