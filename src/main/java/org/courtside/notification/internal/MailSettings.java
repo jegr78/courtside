@@ -5,6 +5,7 @@ import jakarta.mail.internet.InternetAddress;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 // A club board sets environment variables in .env, so a startup failure names those and not the
 // Spring property they happen to bind to.
@@ -36,10 +37,8 @@ final class MailSettings {
             problems.add(variable + " is not set");
             return;
         }
-        try {
-            new InternetAddress(value, true).validate();
-        } catch (Exception malformed) {
-            problems.add(variable + " is not a mail address (\"" + value + "\")");
+        if (!accepts(value)) {
+            problems.add(variable + " is not one mail address with a host (\"" + value + "\")");
         }
     }
 
@@ -54,20 +53,35 @@ final class MailSettings {
                 : "COURTSIDE_MAIL_PASSWORD is set without COURTSIDE_MAIL_USERNAME");
     }
 
-    // A mail client accepts a display form and so does the relay, so the domain comes from the
-    // address inside the value rather than from whatever follows its first @.
+    // A display form names a club and still carries one address, which both a mail client and the
+    // relay accept. A group like "board: a@example.org;" parses and names no host at all.
+    private static final Pattern ONE_ADDRESS_NAMING_A_HOST =
+            Pattern.compile("[^\\s:;,<>]+@[^\\s:;,<>]+");
+
+    static boolean accepts(String value) {
+        return addressIn(value) != null;
+    }
+
+    // The domain comes from the address inside the value rather than from whatever follows its
+    // first @, which can sit inside a quoted local part.
     static String senderDomain(String configured) {
+        String address = addressIn(configured);
+        if (address == null) {
+            throw new IllegalStateException("COURTSIDE_MAIL_FROM does not name one address with a"
+                    + " host, which startup verification refuses: " + configured);
+        }
+        return address.substring(address.lastIndexOf('@') + 1);
+    }
+
+    private static String addressIn(String value) {
         try {
-            String address = new InternetAddress(configured, true).getAddress();
-            int at = address == null ? -1 : address.indexOf('@');
-            if (at < 0) {
-                throw new AddressException("no domain");
-            }
-            return address.substring(at + 1);
+            InternetAddress parsed = new InternetAddress(value, true);
+            parsed.validate();
+            String address = parsed.getAddress();
+            return address != null && ONE_ADDRESS_NAMING_A_HOST.matcher(address).matches()
+                    ? address : null;
         } catch (AddressException malformed) {
-            throw new IllegalStateException("COURTSIDE_MAIL_FROM is not a mail address, which"
-                    + " startup verification refuses, so nothing should reach this: " + configured,
-                    malformed);
+            return null;
         }
     }
 

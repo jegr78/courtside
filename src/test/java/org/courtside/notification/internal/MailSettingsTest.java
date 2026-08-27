@@ -88,6 +88,44 @@ class MailSettingsTest {
     }
 
     @Test
+    void givenTheDisplayFormAMailClientAccepts_whenTheContextStarts_thenTheClubMayNameItself() {
+        // given
+        ApplicationContextRunner runner = contextRunner.withPropertyValues(
+                "courtside.mail.host=mail",
+                "courtside.mail.from=Example Tennis Club <no-reply@courts.example.org>",
+                "courtside.mail.reply-to=board@courts.example.org");
+
+        // when / then — a club may put its own name in the sender a member sees, and the
+        // Message-ID is built from the address inside that rather than from the whole value
+        runner.run(context -> assertThat(context).hasNotFailed());
+    }
+
+    @Test
+    void givenASenderNamingNoSingleHost_whenTheContextStarts_thenItRefusesRatherThanFailAtTheFirstMail() {
+        // given
+        ApplicationContextRunner runner = contextRunner.withPropertyValues(
+                "courtside.mail.host=mail", "courtside.mail.from=board: a@courts.example.org;",
+                "courtside.mail.reply-to=board@courts.example.org");
+
+        // when / then — a group parses as an address but names no host, so a Message-ID cannot be
+        // built from it. Refusing at startup is what makes the extraction's assumption true.
+        runner.run(context -> assertThat(context).getFailure().rootCause()
+                .hasMessageContaining("COURTSIDE_MAIL_FROM"));
+    }
+
+    @Test
+    void givenASenderWithNoDomainAtAll_whenTheContextStarts_thenItRefuses() {
+        // given
+        ApplicationContextRunner runner = contextRunner.withPropertyValues(
+                "courtside.mail.host=mail", "courtside.mail.from=undisclosed:;",
+                "courtside.mail.reply-to=board@courts.example.org");
+
+        // when / then
+        runner.run(context -> assertThat(context).getFailure().rootCause()
+                .hasMessageContaining("COURTSIDE_MAIL_FROM"));
+    }
+
+    @Test
     void givenAUsernameWithoutAPassword_whenTheContextStarts_thenItRefusesAndNamesThePassword() {
         // given
         ApplicationContextRunner runner = contextRunner.withPropertyValues(
