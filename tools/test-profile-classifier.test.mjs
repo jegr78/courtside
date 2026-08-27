@@ -95,13 +95,19 @@ test("givenNullDelimitedGitEvidence_whenParsing_thenRenamesKeepBothPathsAndMalfo
 
 test("givenARepositoryPathContainsMarkdown_whenRenderingReasons_thenItCannotInjectSummaryContent", () => {
   // given
-  const plan = classifyChanges([{ status: "M", path: "unknown/<b>@team|`[open](https://example.org)\n.md" }], []);
+  const plan = classifyChanges([{
+    status: "M", path: "unknown/<b>@team|`![open](https://example.org)\n\u202e\u200freversed.md"
+  }], []);
 
   // when
   const rendered = profileSummary(plan);
 
   // then
-  assert.doesNotMatch(rendered, /<b>|@team|\)\n\.md/);
-  assert.match(rendered,
-    /<code>unknown\/&lt;b&gt;&#64;team&#124;`\[open\]\(https:\/\/example\.org\)\\u000a\.md<\/code>/);
+  const code = rendered.match(/<code>([^<]*)<\/code>/)?.[1];
+  assert.ok(code);
+  assert.match(code, /^(?:&#x[0-9a-f]+;)+$/);
+  const visible = code.replace(/&#x([0-9a-f]+);/g,
+    (_entity, point) => String.fromCodePoint(Number.parseInt(point, 16)));
+  assert.match(visible, /\\u\{202e\}\\u\{200f\}/);
+  assert.doesNotMatch(rendered, /<b>|@team|\[open\]|\u202e|\u200f|\nreversed/);
 });

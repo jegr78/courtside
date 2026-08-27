@@ -79,6 +79,11 @@ export function profileSummary(plan) {
     .replaceAll(">", "&gt;").replaceAll("|", "&#124;").replaceAll("@", "&#64;")
     .replace(/[\u0000-\u001f\u007f]/g,
       (character) => `\\u${character.codePointAt(0).toString(16).padStart(4, "0")}`);
+  const inertCode = (value) => {
+    const visible = String(value).replace(/[@\u0000-\u001f\u007f-\u009f\p{Bidi_Control}]/gu,
+      (character) => `\\u{${character.codePointAt(0).toString(16)}}`);
+    return `<code>${[...visible].map((character) => `&#x${character.codePointAt(0).toString(16)};`).join("")}</code>`;
+  };
   return [
     "# Observed test profiles",
     "",
@@ -88,7 +93,7 @@ export function profileSummary(plan) {
     "",
     "| Status | Path | Profile | Reason |",
     "| --- | --- | --- | --- |",
-    ...plan.reasons.map((reason) => `| ${safe(reason.status ?? "label")} | <code>${safe(reason.path ?? "ci:full")}</code> | ${safe(reason.profile)} | ${safe(reason.code)} |`),
+    ...plan.reasons.map((reason) => `| ${safe(reason.status ?? "label")} | ${inertCode(reason.path ?? "ci:full")} | ${safe(reason.profile)} | ${safe(reason.code)} |`),
     ""
   ].join("\n");
 }
