@@ -8,5 +8,6 @@ export function downloadJson(fileName: string, content: unknown): void {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  // Not revoked here: WebKit reads the blob after the click returns, and a board member on an
+  // iPad would get an empty file. One object URL per answer lives as long as the page does.
 }

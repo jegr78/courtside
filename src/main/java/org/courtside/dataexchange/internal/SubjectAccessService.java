@@ -23,7 +23,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -52,18 +54,29 @@ public class SubjectAccessService {
                         "No person with id " + personId));
         Instant now = clock.instant();
         Optional<UserAccount> account = accounts.findByPersonId(personId);
+        List<PersonBookingHistory.Made> made =
+                account.map(UserAccount::getId).map(bookings::madeBy).orElse(List.of());
         SubjectAccessRecord answer = new SubjectAccessRecord(now, person.getId(),
                 person.getFirstName(), person.getLastName(), person.getEmail(),
                 account.map(held -> accountOf(held, now)).orElse(null),
-                membershipsOf(personId),
-                account.map(UserAccount::getId).map(bookings::madeBy).orElse(List.of()),
-                bookings.recordedIn(personId),
+                membershipsOf(personId), made, recordedInSomebodyElses(personId, made),
                 referencesOf(personId),
                 changesAbout(personId, account.map(UserAccount::getId).orElse(null)),
                 account.map(UserAccount::getId).map(auditTrail::recordedBy).orElse(List.of()));
         events.publishEvent(new DataExchangeEvent.SubjectAccessAnswered(personId));
         log.info("Answered a subject access request about person {}", personId);
         return answer;
+    }
+
+    // A booking is answered once: whoever makes one is recorded in it as its first participant,
+    // and the list of what somebody else recorded them in is not the place to say so a second time.
+    private List<PersonBookingHistory.Recorded> recordedInSomebodyElses(
+            UUID personId, List<PersonBookingHistory.Made> made) {
+        Set<UUID> own = made.stream().map(PersonBookingHistory.Made::bookingId)
+                .collect(Collectors.toSet());
+        return bookings.recordedIn(personId).stream()
+                .filter(booking -> !own.contains(booking.bookingId()))
+                .toList();
     }
 
     private SubjectAccessRecord.Account accountOf(UserAccount account, Instant now) {
