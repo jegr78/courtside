@@ -17,6 +17,8 @@ public interface ExternalReferenceRepository extends JpaRepository<ExternalRefer
 
     List<ExternalReference> findBySourceId(UUID sourceId);
 
+    List<ExternalReference> findByPersonIdOrderByLinkedAtAscIdAsc(UUID personId);
+
     boolean existsBySourceId(UUID sourceId);
 
     @Query("""

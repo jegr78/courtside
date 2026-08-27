@@ -29,6 +29,22 @@ public class BookingTestFixture {
                 List.of(ParticipantSpec.guest(guestName)), null));
     }
 
+    public UUID createBookingWithGuest(UUID courtId, UUID cardId, TimeSlot slot, UUID bookedBy,
+                                       UUID bookerPersonId, Set<Role> roles, String note,
+                                       String guestName) {
+        return bookingService.create(new CreateBookingCommand(
+                List.of(courtId), cardId, slot, bookedBy, bookerPersonId, roles, note,
+                List.of(ParticipantSpec.guest(guestName)), null));
+    }
+
+    public UUID createBookingNamingMember(UUID courtId, UUID cardId, TimeSlot slot, UUID bookedBy,
+                                          UUID bookerPersonId, Set<Role> roles, String note,
+                                          UUID namedPersonId) {
+        return bookingService.create(new CreateBookingCommand(
+                List.of(courtId), cardId, slot, bookedBy, bookerPersonId, roles, note,
+                List.of(ParticipantSpec.member(namedPersonId)), null));
+    }
+
     // What the scheduler calls, so a test elsewhere can watch what a due reminder produces
     // without reaching into this module.
     public void remindWhatIsDue() {

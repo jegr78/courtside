@@ -9,7 +9,6 @@ import org.courtside.shared.CursorPage;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -53,7 +52,7 @@ public class AuditService implements PersonAuditTrail {
         requireIdentifier(subjectId, "subject");
         return events.findBySubjectIdOrderByOccurredAtAscIdAsc(subjectId).stream()
                 .map(event -> new SubjectEntry(event.getOccurredAt(), event.getEventType(),
-                        parametersOf(event.getPayload())))
+                        payloadOf(event.getPayload())))
                 .toList();
     }
 
@@ -65,11 +64,6 @@ public class AuditService implements PersonAuditTrail {
         return events.findByActorAccountIdOrderByOccurredAtAscIdAsc(actorAccountId).stream()
                 .map(event -> new ActorEntry(event.getOccurredAt(), event.getEventType()))
                 .toList();
-    }
-
-    private Map<String, Object> parametersOf(String payload) {
-        Map<String, Object> parameters = json.readValue(payload, new TypeReference<>() { });
-        return Collections.unmodifiableMap(parameters);
     }
 
     private static void requireIdentifier(UUID identifier, String what) {

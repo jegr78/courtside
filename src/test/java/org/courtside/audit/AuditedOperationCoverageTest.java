@@ -77,6 +77,7 @@ class AuditedOperationCoverageTest {
             "MemberService#knowsMembershipType",
             "MemberService#membershipTypeIdOf",
             "MemberService#membershipTypeIdsGrantingAnAccount",
+            "MemberService#membershipTypeNameOf",
             "MemberService#requireMembershipType",
             "MemberService#setMembershipTypeActive",
             "RosterService#changePerson",

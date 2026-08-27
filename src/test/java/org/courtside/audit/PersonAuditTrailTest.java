@@ -51,8 +51,9 @@ class PersonAuditTrailTest extends AbstractIntegrationTest {
         assertThat(entries).filteredOn(entry -> entry.eventType().equals("roster.person.corrected"))
                 .singleElement()
                 .extracting(PersonAuditTrail.SubjectEntry::parameters, as(MAP))
-                .containsEntry("personId", personId.toString())
-                .containsKey("fields");
+                .containsKeys("personId", "fields")
+                .extractingByKey("personId")
+                .hasToString("\"" + personId + "\"");
     }
 
     @Test
