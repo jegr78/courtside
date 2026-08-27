@@ -23,7 +23,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
+import java.util.function.Function;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,6 +32,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SubjectAccessService {
+
+    private static final Comparator<UserAccount> ACCOUNT_PRECEDENCE =
+            Comparator.comparing(UserAccount::isEnabled, Comparator.reverseOrder())
+                    .thenComparing(UserAccount::getCreatedAt)
+                    .thenComparing(UserAccount::getId);
 
     private final PersonRepository persons;
     private final UserAccountRepository accounts;
@@ -55,22 +60,34 @@ public class SubjectAccessService {
                 .orElseThrow(() -> new SubjectAccessPersonNotFoundException(
                         "No person with id " + personId));
         Instant now = clock.instant();
-        Optional<UserAccount> account = accounts.findByPersonId(personId);
-        List<PersonBookingHistory.Made> made =
-                account.map(UserAccount::getId).map(bookings::madeBy).orElse(List.of());
+        // Every account, not the one that represents the person elsewhere: this instance holds
+        // both, and an answer that named one of them would be the incomplete kind.
+        List<UUID> accountIds = accounts.findByPersonIdIn(List.of(personId)).stream()
+                .sorted(ACCOUNT_PRECEDENCE)
+                .map(UserAccount::getId)
+                .toList();
+        List<PersonBookingHistory.Made> made = eachAccount(accountIds, bookings::madeBy);
         SubjectAccessRecord answer = new SubjectAccessRecord(now, person.getId(),
                 person.getFirstName(), person.getLastName(), person.getEmail(),
-                account.map(held -> accountOf(held, now)).orElse(null),
+                accounts.findByPersonIdIn(List.of(personId)).stream()
+                        .sorted(ACCOUNT_PRECEDENCE)
+                        .map(held -> accountOf(held, now))
+                        .toList(),
                 membershipsOf(personId), made, recordedInSomebodyElses(personId, made),
-                account.map(UserAccount::getId).map(bookings::seriesCreatedBy).orElse(List.of()),
-                account.map(UserAccount::getId).map(messages::sentTo).orElse(List.of()),
-                account.map(UserAccount::getId).map(messages::declinedBy).orElse(List.of()),
+                eachAccount(accountIds, bookings::seriesCreatedBy),
+                eachAccount(accountIds, messages::sentTo),
+                eachAccount(accountIds, messages::declinedBy),
                 referencesOf(personId),
-                changesAbout(personId, account.map(UserAccount::getId).orElse(null)),
-                account.map(UserAccount::getId).map(auditTrail::recordedBy).orElse(List.of()));
+                changesAbout(personId, accountIds),
+                eachAccount(accountIds, auditTrail::recordedBy));
         events.publishEvent(new DataExchangeEvent.SubjectAccessAnswered(personId));
         log.info("Answered a subject access request about person {}", personId);
         return answer;
+    }
+
+    private static <T> List<T> eachAccount(List<UUID> accountIds,
+                                           Function<UUID, List<T>> read) {
+        return accountIds.stream().map(read).flatMap(List::stream).toList();
     }
 
     // A booking is answered once: whoever makes one is recorded in it as its first participant,
@@ -113,12 +130,10 @@ public class SubjectAccessService {
 
     // The account is a subject of its own: a credential this person was sent is recorded against
     // the account id, not against the person the account belongs to.
-    private List<PersonAuditTrail.SubjectEntry> changesAbout(UUID personId, UUID accountId) {
+    private List<PersonAuditTrail.SubjectEntry> changesAbout(UUID personId, List<UUID> accountIds) {
         List<PersonAuditTrail.SubjectEntry> entries =
                 new ArrayList<>(auditTrail.recordedAbout(personId));
-        if (accountId != null) {
-            entries.addAll(auditTrail.recordedAbout(accountId));
-        }
+        accountIds.forEach(accountId -> entries.addAll(auditTrail.recordedAbout(accountId)));
         entries.sort(Comparator.comparing(PersonAuditTrail.SubjectEntry::occurredAt)
                 .thenComparing(PersonAuditTrail.SubjectEntry::eventType));
         return List.copyOf(entries);

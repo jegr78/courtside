@@ -2044,7 +2044,7 @@ components:
 
     SubjectAccessExport:
       type: object
-      required: [producedAt, personId, firstName, lastName, memberships, bookingsMade,
+      required: [producedAt, personId, firstName, lastName, accounts, memberships, bookingsMade,
                  bookingsRecordedIn, bookingSeries, messages, declinedMessages,
                  externalReferences, changesAsSubject, changesAsActor]
       description: |
@@ -2055,11 +2055,14 @@ components:
         firstName: { type: string }
         lastName: { type: string }
         email: { type: [string, "null"], format: email }
-        account:
-          oneOf:
-            - $ref: "#/components/schemas/SubjectAccessAccount"
-            - type: "null"
-          description: The account this person holds, and `null` for a person who holds none.
+        accounts:
+          type: array
+          description: |
+            Every account this person holds, and empty for a person who holds none. Usually one,
+            but this instance permits a person to hold a dormant account beside a current one, and
+            an answer that named only the one representing them elsewhere would leave the other
+            out. Ordered as the roster orders them: the enabled ones first, oldest first within.
+          items: { $ref: "#/components/schemas/SubjectAccessAccount" }
         memberships:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessMembership" }
@@ -5182,7 +5185,7 @@ paths:
         call: there is no list form and no bulk form, because a shape that answers a subject
         access request must not double as a way to read the roster.
 
-        The answer holds this person's record, the account they hold, the membership they hold or
+        The answer holds this person's record, every account they hold, the membership they hold or
         last held, the bookings they made and the bookings somebody else recorded them in, the
         member numbers an import linked them by, and the change log from both sides — the changes
         made to them, and the changes they made.

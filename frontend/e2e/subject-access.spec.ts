@@ -54,13 +54,13 @@ test("a board answers what the club holds about one member, and about nobody els
     expect(download.suggestedFilename()).toBe(`courtside-subject-access-${personId}.json`);
     const held = JSON.parse(answer) as {
       personId: string; firstName: string; lastName: string; email: string | null;
-      account: { username: string } | null;
+      accounts: { username: string }[];
     };
     expect(held.personId).toBe(personId);
     expect(held.firstName).toBe("Richard");
     expect(held.lastName).toBe("Miles");
     expect(held.email).toBe("richard.miles@example.org");
-    expect(held.account?.username).toBe("miles.richard");
+    expect(held.accounts.map((account) => account.username)).toEqual(["miles.richard"]);
 
     // and about nobody else
     expect(answer).not.toContain(otherPersonId);

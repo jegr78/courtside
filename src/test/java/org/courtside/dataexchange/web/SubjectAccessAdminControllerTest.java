@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -114,10 +115,10 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.personId").value(personId.toString()))
                 .andExpect(jsonPath("$.firstName").value("Jane"))
                 .andExpect(jsonPath("$.email").value("jane.doe@example.org"))
-                .andExpect(jsonPath("$.account.accountId").value(accountId.toString()))
-                .andExpect(jsonPath("$.account.username").value("jane.doe"))
-                .andExpect(jsonPath("$.account.roles[0]").value("MEMBER"))
-                .andExpect(jsonPath("$.account.credentialState").value("CREDENTIAL_ISSUED"))
+                .andExpect(jsonPath("$.accounts[0].accountId").value(accountId.toString()))
+                .andExpect(jsonPath("$.accounts[0].username").value("jane.doe"))
+                .andExpect(jsonPath("$.accounts[0].roles[0]").value("MEMBER"))
+                .andExpect(jsonPath("$.accounts[0].credentialState").value("CREDENTIAL_ISSUED"))
                 .andExpect(jsonPath("$.memberships[0].membershipTypeId")
                         .value(membershipTypeId.toString()))
                 .andExpect(jsonPath("$.memberships[0].membershipType").value("Adult"))
@@ -144,7 +145,7 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(export(personId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.account").doesNotExist())
+                .andExpect(jsonPath("$.accounts").value(hasSize(0)))
                 .andExpect(jsonPath("$.bookingsMade").value(hasSize(0)))
                 .andExpect(jsonPath("$.changesAsActor").value(hasSize(0)))
                 .andExpect(jsonPath("$.changesAsSubject").value(hasSize(1)));
@@ -164,6 +165,22 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.messages").value(hasSize(0)))
                 .andExpect(jsonPath("$.declinedMessages").value(hasSize(0)))
                 .andExpect(jsonPath("$.bookingSeries").value(hasSize(0)));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonHoldingADormantAccountBesideACurrentOne_whenABoardAsks_thenBothAreAnswered()
+            throws Exception {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(personId, "jane.doe.dormant", Set.of(Role.MEMBER));
+        identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.TRAINER));
+
+        // when / then
+        mockMvc.perform(export(personId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accounts[*].username")
+                        .value(contains("jane.doe", "jane.doe.dormant")));
     }
 
     @Test

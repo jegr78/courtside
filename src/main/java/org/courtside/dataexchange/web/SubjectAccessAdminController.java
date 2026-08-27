@@ -46,6 +46,7 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
     private static ApiSubjectAccessExport toResponse(SubjectAccessRecord answer) {
         return new ApiSubjectAccessExport(WireTypes.toOffsetDateTime(answer.producedAt()),
                 answer.personId(), answer.firstName(), answer.lastName(),
+                answer.accounts().stream().map(SubjectAccessAdminController::toAccount).toList(),
                 answer.memberships().stream().map(SubjectAccessAdminController::toMembership).toList(),
                 answer.bookingsMade().stream().map(SubjectAccessAdminController::toBooking).toList(),
                 answer.bookingsRecordedIn().stream()
@@ -58,8 +59,7 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                         .map(SubjectAccessAdminController::toReference).toList(),
                 answer.changesAsSubject().stream().map(SubjectAccessAdminController::toChange).toList(),
                 answer.changesAsActor().stream().map(SubjectAccessAdminController::toAction).toList())
-                .email(address(answer.email()))
-                .account(toAccount(answer.account()));
+                .email(address(answer.email()));
     }
 
     // A person the club has no address for carries an empty one, and the document promises an
@@ -94,9 +94,6 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
     }
 
     private static ApiSubjectAccessAccount toAccount(SubjectAccessRecord.Account account) {
-        if (account == null) {
-            return null;
-        }
         return new ApiSubjectAccessAccount(account.accountId(), account.username(), account.locale(),
                 account.enabled(), WireTypes.toOffsetDateTime(account.createdAt()),
                 ApiSubjectAccessAccount.CredentialStateEnum.fromValue(account.credentialState().name()),

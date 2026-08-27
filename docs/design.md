@@ -1708,7 +1708,7 @@ deliver the implementation.
   would leave the club unable to answer why a member never heard from the instance. **Built.**
 - **Subject access and portability** (Art. 15/20), answered by the board from the person's
   page. `POST /api/admin/export/person/{personId}` produces, as one JSON file, the person and
-  their address, the account they hold with its roles and its state, the membership and the
+  their address, every account they hold with its roles and its state, the membership and the
   period it ran, the bookings they made and the bookings somebody else recorded them in, the
   recurring bookings they set up, what became of every message this instance addressed to them
   and which kinds they asked not to receive, the member numbers an import linked them by, and the

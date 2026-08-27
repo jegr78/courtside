@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public record SubjectAccessRecord(Instant producedAt, UUID personId, String firstName,
-                                  String lastName, @Nullable String email, @Nullable Account account,
+                                  String lastName, @Nullable String email, List<Account> accounts,
                                   List<Membership> memberships,
                                   List<PersonBookingHistory.Made> bookingsMade,
                                   List<PersonBookingHistory.Recorded> bookingsRecordedIn,
