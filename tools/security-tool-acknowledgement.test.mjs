@@ -41,6 +41,7 @@ const finding = {
 
 const comparison = {
   baseRef: "1".repeat(40), candidateRef: "2".repeat(40),
+  base: { outcome: "failed" }, candidate: { outcome: "passed" },
   newFindings: [finding.fingerprint], resolvedFindings: []
 };
 

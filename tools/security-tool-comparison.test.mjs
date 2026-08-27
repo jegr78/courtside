@@ -53,7 +53,7 @@ function runFixture(root, name, overrides = {}) {
     profile: "active",
     target: "https://127.0.0.1:8443",
     environment: "SECURITY",
-    application: { imageDigest: fingerprint("a"), commit: "2".repeat(40) },
+    application: { imageDigest: fingerprint("a"), commit: "b".repeat(40) },
     targetFingerprint: fingerprint("c"),
     seedFingerprint: fingerprint("d"),
     instanceFingerprint: fingerprint("e"),
@@ -214,14 +214,34 @@ test("given a run that assessed another revision's application, when comparing, 
   const base = runFixture(root, "base", { application: elsewhere });
   const candidate = runFixture(root, "candidate", { application: elsewhere });
 
-  // when / then — the constant both runs share has to be the protected revision, not just equal
+  // when / then — the constant both runs share has to be the revision being merged, not just equal
   assert.throws(() => compareSecurityToolRuns({
     baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
     baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
     candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
     candidateRef: "b".repeat(40),
     candidateContract: contractPath, candidateCatalog: catalogPath
-  }), /application of the base revision/);
+  }), /application of the candidate revision/);
+});
+
+test("given runs that assessed the base revision's application, when comparing, then the report fails closed", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const baseRoot = runtimeRoot(root, "base-runtime");
+  const candidateRoot = runtimeRoot(root, "candidate-runtime");
+  const beforeTheChange = { imageDigest: fingerprint("a"), commit: "2".repeat(40) };
+  const base = runFixture(root, "base", { application: beforeTheChange });
+  const candidate = runFixture(root, "candidate", { application: beforeTheChange });
+
+  // when / then — a tool that detects what this branch repairs can never pass against the
+  // application it repairs, so the application both runs share is the one being merged.
+  assert.throws(() => compareSecurityToolRuns({
+    baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
+    baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
+    candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
+    candidateRef: "b".repeat(40),
+    candidateContract: contractPath, candidateCatalog: catalogPath
+  }), /application of the candidate revision/);
 });
 
 test("given a finding difference the acknowledgement does not name, when comparing, then it is reported", () => {
@@ -237,18 +257,22 @@ test("given a finding difference the acknowledgement does not name, when compari
     { newFindings: [], resolvedFindings: [] }, { acknowledged: [] }), []);
 });
 
-test("given a comparison, when summarising it, then the constant and both toolchains are named", () => {
+test("given a comparison, when summarising it, then the constant, both toolchains and both outcomes are named", () => {
   // when
   const summary = comparisonSummary({
     baseRef: "2".repeat(40), candidateRef: "b".repeat(40),
+    base: { outcome: "failed" }, candidate: { outcome: "passed" },
     newFindings: [fingerprint("9")], resolvedFindings: []
   });
 
   // then — the artifact nobody downloads is why this exists
-  assert.match(summary, new RegExp(`assessed the application of .${"2".repeat(40)}`));
-  assert.match(summary, new RegExp("b".repeat(40)));
+  assert.match(summary, new RegExp(`assessed the application of .${"b".repeat(40)}`));
+  assert.match(summary, new RegExp("2".repeat(40)));
   assert.match(summary, new RegExp(`New findings: .${fingerprint("9")}`));
   assert.match(summary, /Resolved findings: none/);
+  // A base run the comparison tolerates is silent unless the summary says it fell.
+  assert.match(summary, /base toolchain ended failed/);
+  assert.match(summary, /candidate toolchain ended passed/);
 });
 
 // The parser pairs tokens positionally, so an argument whose value is missing silently takes the

@@ -116,18 +116,21 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
-// A finding difference is only attributable to the tools while the application is the constant, so
-// both runs assess the base revision's image. The base environment can always start it, which is
-// what a candidate image took away: a setting the pull request makes mandatory stopped it dead.
-test("given a paired comparison, when both sides run, then they assess the base revision's target", () => {
+// The base leg keeps its own compose on purpose, so an image needing a setting only the candidate's
+// compose grants stops it. That stop is deliberate: nothing is compared without both toolchains.
+test("given a paired comparison, when both sides run, then they assess the candidate revision's target", () => {
   // given
   const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
 
   // when / then
-  assert.match(comparison, /BASE_IMAGE=\$\(docker image inspect courtside:uat-local/);
-  assert.match(comparison, /security "\$BASE_RUN_ID" "\$BASE_IMAGE"/);
-  assert.match(comparison, /security "\$CANDIDATE_RUN_ID" "\$BASE_IMAGE"/);
-  assert.equal(comparison.match(/--qualification "\$BASE_ROOT\/build\/uat-smoke/g)?.length, 2);
+  assert.match(comparison, /TARGET_IMAGE=\$\(docker image inspect courtside:uat-local/);
+  assert.match(comparison, /security "\$BASE_RUN_ID" "\$TARGET_IMAGE"/);
+  assert.match(comparison, /security "\$CANDIDATE_RUN_ID" "\$TARGET_IMAGE"/);
+  assert.doesNotMatch(comparison, /cd "\$RUNNER_TEMP\/courtside-security-base"\n *frontend\/node\/node tools\/courtside\.uat-smoke/,
+    "a tool that detects what a branch repairs cannot pass against the application it repairs, so "
+    + "the one target both toolchains share is built from the candidate, not from the base.");
+  assert.equal(comparison.match(/--qualification "\$QUALIFICATION"/g)?.length, 2);
+  assert.match(comparison, /QUALIFICATION="\$GITHUB_WORKSPACE\/build\/uat-smoke/);
   assert.doesNotMatch(comparison, /cp deploy\/compose\.security\.yaml/,
     "the base run reads its own compose file. It declares the mounts that supply the assessment "
     + "code and the bounds the scanners keep, so a copy from the candidate hands a pull request "
@@ -147,7 +150,7 @@ test("given a protected base, when it is prepared, then no candidate code has ru
   // then
   assert.ok(prepared > 0 && candidateRan > prepared,
     "npm ci runs the candidate's lifecycle scripts and mvnw runs its wrapper. Both come after the "
-    + "base worktree exists and after the image both runs assess has been built from it.");
+    + "base worktree exists, so the checkout that supplies the previous toolchain predates them.");
 });
 
 // The report already decides this from the digest of what a paired run varies. A second path list in
@@ -180,9 +183,9 @@ test("given a produced comparison, when the job ends, then its difference is rea
     "the difference belongs where a reviewer already looks, not in an artifact they have to fetch");
 });
 
-// Both runs assess the base revision's application, so both must be driven by the base revision's
-// contract; a candidate's own document turns its API change into a finding blamed on the tools.
-test("given a paired assessment, when both runs start, then they are driven by the base revision's contract", () => {
+// Both runs assess one application, so both read that application's document; a second spelling
+// turns an API change into a finding blamed on whichever toolchain read the older one.
+test("given a paired assessment, when both runs start, then they are driven by the assessed revision's document", () => {
   // given
   const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
   const paired = comparison.slice(comparison.indexOf("Run paired active assessments"),
@@ -190,7 +193,7 @@ test("given a paired assessment, when both runs start, then they are driven by t
 
   // when / then
   assert.match(paired,
-    /COURTSIDE_SECURITY_API_DOCUMENT: \$\{\{ runner\.temp \}\}\/courtside-security-base\/src\/main\/resources\/api\/openapi\.yaml/);
+    /COURTSIDE_SECURITY_API_DOCUMENT: \$\{\{ github\.workspace \}\}\/src\/main\/resources\/api\/openapi\.yaml/);
   assert.equal((paired.match(/COURTSIDE_SECURITY_API_DOCUMENT/g) ?? []).length, 1,
     "one setting on the step, not one per command — a second spelling is how the legs drift apart");
   assert.equal((paired.match(/courtside\.mjs security /g) ?? []).length, 2,

@@ -89,14 +89,20 @@ The required pull-request build runs contract, schema, safety and secret checks 
 assessment traffic. It retains a comparison of security contracts, policies, report schemas and
 pinned tool versions against the pull-request base. The comparison includes the images and adapters
 that actually execute. When those bytes change, the required build runs the protected-base and
-candidate assessment runtimes against one target: the image the **base** revision builds and
+candidate assessment runtimes against one target: the image the **candidate** revision builds and
 qualifies, and the same synthetic fixture. The application is the constant, which is what makes a
-finding difference attributable to the tools rather than to anything else that moved, and the base
-environment can always start the base image — a setting the candidate makes mandatory cannot stop
-the run. The comparator refuses a pair whose application is not the base revision's. Each side
-reads its own deployment description; the base worktree is created and its image built before any
-candidate code runs, though both still share the workspace's git directory, so the independence of
-the base run rests on that ordering rather than on isolation. The workflow
+finding difference attributable to the tools rather than to anything else that moved. It is the
+candidate's application because a tool that detects a weakness the same branch repairs can never
+pass against the application it repairs, and a gate that cannot accept such a branch forces the
+detector and the repair apart. The comparator refuses a pair whose application is not the candidate
+revision's. The previous toolchain therefore meets an application it predates: when the branch
+changes a behaviour that toolchain asserts, the base run fails, which the comparison tolerates and
+the job summary names. Only a failed candidate run fails the build. A base environment that cannot
+start the candidate's image at all is different and stops the job, because a comparison needs both
+toolchains to have met the application; tolerating an absent base run would let a branch suppress
+the difference it is being measured by. Each side reads its own deployment description; the base worktree is created before any candidate code runs, though both
+still share the workspace's git directory, so the independence of the previous toolchain rests on
+that ordering rather than on isolation. The workflow
 uses the comparator from the protected base revision after its initial bootstrap. It computes both
 runtime digests itself rather than trusting run input. The introductory comparator change requires
 the normal whole-branch review because no earlier trusted comparator exists. The workflow, not a

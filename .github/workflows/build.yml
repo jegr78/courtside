@@ -55,15 +55,14 @@ jobs:
         working-directory: ${{ runner.temp }}/courtside-security-base/frontend
         run: ./node/node ./node/node_modules/npm/bin/npm-cli.js ci --ignore-scripts
       - if: steps.runtime.outputs.changed == 'true'
-        name: Build and qualify the target both runs assess
-        run: |
-          cd "$RUNNER_TEMP/courtside-security-base"
-          frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
-          echo "BASE_IMAGE=$(docker image inspect courtside:uat-local --format '{{.Id}}')" \
-            >> "$GITHUB_ENV"
-      - if: steps.runtime.outputs.changed == 'true'
         name: Install candidate assessment dependencies
         run: ./mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci
+      - if: steps.runtime.outputs.changed == 'true'
+        name: Build and qualify the target both runs assess
+        run: |
+          frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+          echo "TARGET_IMAGE=$(docker image inspect courtside:uat-local --format '{{.Id}}')" \
+            >> "$GITHUB_ENV"
       - if: steps.runtime.outputs.changed == 'true'
         name: Pull pinned assessment images
         run: node tools/security-image-inventory.mjs active | xargs -n1 docker pull
@@ -81,19 +80,20 @@ jobs:
         env:
           BASE_RUN_ID: compare-base-${{ github.run_id }}-${{ github.run_attempt }}
           CANDIDATE_RUN_ID: compare-head-${{ github.run_id }}-${{ github.run_attempt }}
-          COURTSIDE_SECURITY_API_DOCUMENT: ${{ runner.temp }}/courtside-security-base/src/main/resources/api/openapi.yaml
+          COURTSIDE_SECURITY_API_DOCUMENT: ${{ github.workspace }}/src/main/resources/api/openapi.yaml
         run: |
           BASE_ROOT="$RUNNER_TEMP/courtside-security-base"
+          QUALIFICATION="$GITHUB_WORKSPACE/build/uat-smoke/qualification.json"
           (
             cd "$BASE_ROOT"
-            frontend/node/node tools/courtside.mjs security "$BASE_RUN_ID" "$BASE_IMAGE"
+            frontend/node/node tools/courtside.mjs security "$BASE_RUN_ID" "$TARGET_IMAGE"
             frontend/node/node tools/courtside.mjs security-run "$BASE_RUN_ID" active \
-              --qualification "$BASE_ROOT/build/uat-smoke/qualification.json" \
+              --qualification "$QUALIFICATION" \
               --authorize "authorize-active-$BASE_RUN_ID" || true
           )
-          frontend/node/node tools/courtside.mjs security "$CANDIDATE_RUN_ID" "$BASE_IMAGE"
+          frontend/node/node tools/courtside.mjs security "$CANDIDATE_RUN_ID" "$TARGET_IMAGE"
           frontend/node/node tools/courtside.mjs security-run "$CANDIDATE_RUN_ID" active \
-            --qualification "$BASE_ROOT/build/uat-smoke/qualification.json" \
+            --qualification "$QUALIFICATION" \
             --authorize "authorize-active-$CANDIDATE_RUN_ID" || true
       - if: steps.runtime.outputs.changed == 'true'
         name: Compare immutable run evidence
