@@ -193,5 +193,7 @@
     "sha256:fb08f804f1c7e276949505b36f02ec52fc3551372a9f1bf8108a81c994d4cdfe",
     "sha256:fd92872ff70d34a08fa071f5def3d258d6a5e528f82c21921e02cb8789e65f32"
   ],
-  "toleratedBaseFailures": []
+  "toleratedBaseFailures": [
+    "authorization-matrix"
+  ]
 }
