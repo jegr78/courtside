@@ -1,0 +1,52 @@
+name: CI timing
+
+on:
+  workflow_run:
+    workflows: [build]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  record:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Read completed run evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          mkdir -p build/ci-timing
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}" > build/ci-timing/run.json
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100" \
+            --slurp | jq '{jobs: map(.jobs[]) }' > build/ci-timing/jobs.json
+      - name: Record timing
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          node tools/ci-timing.mjs \
+            --run build/ci-timing/run.json \
+            --jobs build/ci-timing/jobs.json \
+            --repository "$GITHUB_REPOSITORY" \
+            --expected-run-id "$RUN_ID" \
+            --expected-attempt "$ATTEMPT" \
+            --output build/ci-timing/record.json \
+            --summary build/ci-timing/summary.md
+          cp ci/ci-timing.schema.json build/ci-timing/ci-timing.schema.json
+          cat build/ci-timing/summary.md >> "$GITHUB_STEP_SUMMARY"
+          rm build/ci-timing/run.json build/ci-timing/jobs.json build/ci-timing/summary.md
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ci-timing-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: build/ci-timing
+          retention-days: 90
+          if-no-files-found: error

@@ -244,6 +244,8 @@ New material gaps are added here or linked to an existing authoritative issue be
 
 A flaky test is a product-quality defect. The first attempt remains visible and a retry is recorded separately; retries never convert a failed required check into clean evidence. Quarantine requires a linked issue, owner, affected risk IDs, containment, expiry and a replacement signal. P0 tests are not quarantined. Periodic order variation and repeated concurrency runs measure flake rate; the target is below 0.5% first-attempt failures per gate and zero unexplained failures in release qualification.
 
+Pull-request feedback has a p95 target of 15 minutes for normal change profiles. CI timing records keep the first attempt separate from reruns and report run duration, time to first failure and runner minutes. A sample with fewer than twenty first attempts is explicitly insufficient for a reliability or duration conclusion.
+
 ## Maintenance
 
 Pull requests update this contract when they add a product surface, alter an invariant, change supported environments, introduce an accepted risk or move evidence between gates. A release review checks every row whose frequency includes `release`. The document stays at risk level: individual classes, methods and scanner rules remain discoverable from executable configuration and must not be copied here.
