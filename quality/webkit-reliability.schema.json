@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://courtside.example/quality/webkit-reliability.schema.json",
+  "title": "Courtside WebKit reliability first-attempt record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "attemptId", "sourceCommit", "sourceTreeState", "startedAt", "finishedAt", "durationMs", "maxDurationMs", "toolchain", "matrix", "host", "outcome"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "attemptId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sourceTreeState": { "enum": ["clean", "modified"] },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "finishedAt": { "type": "string", "format": "date-time" },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "maxDurationMs": { "const": 1500000 },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["playwrightVersion", "browserImage", "browserImageDigest"],
+      "properties": {
+        "playwrightVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "browserImage": { "type": "string", "pattern": "^mcr\\.microsoft\\.com/playwright:v[0-9]+\\.[0-9]+\\.[0-9]+-[a-z0-9.-]+@sha256:[0-9a-f]{64}$" },
+        "browserImageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectOrder", "isolationVariant", "resourceProfile"],
+      "properties": {
+        "projectOrder": { "enum": ["configured", "reversed"] },
+        "isolationVariant": { "const": "fresh-project-browser" },
+        "resourceProfile": { "enum": ["local-default", "github-hosted-default"] }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "platform", "architecture", "cpuCount", "totalMemoryBytes"],
+      "properties": {
+        "provider": { "enum": ["local", "github-hosted"] },
+        "platform": { "enum": ["linux", "darwin", "win32"] },
+        "architecture": { "enum": ["x64", "arm64"] },
+        "cpuCount": { "type": "integer", "minimum": 1 },
+        "totalMemoryBytes": { "type": "integer", "minimum": 1 },
+        "runnerImage": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 128 }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "classifications", "exitCode"],
+      "properties": {
+        "status": { "enum": ["passed", "failed", "incomplete"] },
+        "classifications": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["none", "product", "harness", "environment"] }
+        },
+        "exitCode": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

@@ -19,6 +19,17 @@ test("given periodic stability evidence, when reading its workflow, then backend
   assert.match(workflow, /Upload first-attempt browser evidence/);
 });
 
+test("given the WebKit reliability matrix, when comparing local and hosted execution, then both use the bounded orchestrator", () => {
+  assert.match(browserOrder, /npm run reliability:webkit -- --order \"\$\{COURTSIDE_PROJECT_ORDER\}\"/);
+  assert.match(browserOrder, /quality\/webkit-reliability\.schema\.json/);
+  assert.match(browserOrder, /frontend\/test-results\/webkit-reliability\/\*\.json/);
+  assert.match(browserOrder, /if: \$\{\{ always\(\) && steps\.validate-webkit-record\.outcome == 'success' \}\}/);
+  assert.doesNotMatch(browserOrder, /npm run test:e2e/);
+  assert.doesNotMatch(browserOrder, /continue-on-error/);
+  assert.match(browserOrder, /Upload first-attempt browser evidence[\s\S]*retention-days: 14/);
+  assert.match(browserOrder, /Upload redacted WebKit reliability history[\s\S]*retention-days: 90/);
+});
+
 test("given a required build failure, when collecting evidence, then backend and browser diagnostics survive", () => {
   assert.match(build, /timeout-minutes: 30/);
   assert.match(build, /target\/surefire-reports\/\*\.xml/);

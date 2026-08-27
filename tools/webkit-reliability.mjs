@@ -1,0 +1,249 @@
+import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { arch, cpus, platform, totalmem } from "node:os";
+import { basename, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const frontend = resolve(root, "frontend");
+const schemaPath = resolve(root, "quality", "webkit-reliability.schema.json");
+const frontendRequire = createRequire(resolve(frontend, "package.json"));
+const maxDurationMs = 25 * 60 * 1_000;
+
+function validator() {
+  const Ajv = frontendRequire("ajv/dist/2020").default;
+  const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+  return new Ajv({ strict: true, allErrors: true, formats: { "date-time": true } }).compile(schema);
+}
+
+function outcome(execution) {
+  if (execution.launchError === true) return { status: "incomplete", classifications: ["environment"], exitCode: null };
+  const claims = execution.gateOutcome?.claims;
+  if (!Array.isArray(claims)) {
+    return { status: "incomplete", classifications: ["harness"], exitCode: execution.exitCode };
+  }
+  const claim = (id) => claims.find((candidate) => candidate.id === id)?.status;
+  const classifications = [];
+  if ([claim("webkit-core-compatibility"), claim("webkit-axe-qualification")].includes("failed")) classifications.push("product");
+  if (claim("browser-harness") !== "passed") classifications.push("harness");
+  if (classifications.length > 0) return {
+    status: classifications.includes("harness") ? "incomplete" : "failed",
+    classifications,
+    exitCode: execution.exitCode
+  };
+  if (execution.exitCode === 0
+    && claim("webkit-core-compatibility") === "passed"
+    && claim("webkit-axe-qualification") === "passed") {
+    return { status: "passed", classifications: ["none"], exitCode: 0 };
+  }
+  return { status: "incomplete", classifications: ["harness"], exitCode: execution.exitCode };
+}
+
+export function buildReliabilityRecord(input) {
+  const imageDigest = /@(?<digest>sha256:[0-9a-f]{64})$/.exec(input.browserImage)?.groups?.digest;
+  if (imageDigest === undefined) throw new Error("The browser image is not pinned by digest");
+  const started = Date.parse(input.startedAt);
+  const finished = Date.parse(input.finishedAt);
+  if (!Number.isFinite(started) || !Number.isFinite(finished) || finished < started) {
+    throw new Error("The reliability attempt timestamps are invalid");
+  }
+  return {
+    schemaVersion: 1,
+    attemptId: input.attemptId,
+    sourceCommit: input.sourceCommit,
+    sourceTreeState: input.sourceTreeState,
+    startedAt: input.startedAt,
+    finishedAt: input.finishedAt,
+    durationMs: finished - started,
+    maxDurationMs,
+    toolchain: {
+      playwrightVersion: input.playwrightVersion,
+      browserImage: input.browserImage,
+      browserImageDigest: imageDigest
+    },
+    matrix: {
+      projectOrder: input.projectOrder,
+      isolationVariant: input.isolationVariant,
+      resourceProfile: input.resourceProfile
+    },
+    host: {
+      provider: process.env.GITHUB_ACTIONS === "true" ? "github-hosted" : "local",
+      ...input.host
+    },
+    outcome: outcome(input.execution)
+  };
+}
+
+export function retainReliabilityRecord(record, directory) {
+  mkdirSync(directory, { recursive: true });
+  const path = resolve(directory, `${record.attemptId}.json`);
+  try {
+    writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (error?.code === "EEXIST") throw new Error(`Reliability attempt ${record.attemptId} already exists`);
+    throw error;
+  }
+  return path;
+}
+
+export function summarizeReliability(records) {
+  for (const record of records) validateReliabilityRecord(record);
+  const ordered = [...records].sort((left, right) => left.startedAt.localeCompare(right.startedAt));
+  if (new Set(ordered.map(({ attemptId }) => attemptId)).size !== ordered.length) {
+    throw new Error("Reliability history contains a duplicate attempt identity");
+  }
+  let consecutiveSuccesses = 0;
+  for (const record of ordered.toReversed()) {
+    if (record.outcome.status !== "passed") break;
+    consecutiveSuccesses += 1;
+  }
+  const hosted = ordered.filter(({ host, sourceTreeState }) => host.provider === "github-hosted" && sourceTreeState === "clean");
+  let hostedConsecutiveSuccesses = 0;
+  for (const record of hosted.toReversed()) {
+    if (record.outcome.status !== "passed") break;
+    hostedConsecutiveSuccesses += 1;
+  }
+  return {
+    schemaVersion: 1,
+    attemptCount: ordered.length,
+    consecutiveSuccesses,
+    hostedAttemptCount: hosted.length,
+    hostedConsecutiveSuccesses,
+    firstAttemptFailureRate: ordered.length === 0
+      ? null
+      : ordered.filter(({ outcome: result }) => result.status !== "passed").length / ordered.length,
+    hostedFirstAttemptFailureRate: hosted.length === 0
+      ? null
+      : hosted.filter(({ outcome: result }) => result.status !== "passed").length / hosted.length
+  };
+}
+
+function readPinnedBrowserImage() {
+  const setup = readFileSync(resolve(frontend, "e2e", "global-setup.ts"), "utf8");
+  const image = /mcr\.microsoft\.com\/playwright:v[^"\s]+@sha256:[0-9a-f]{64}/.exec(setup)?.[0];
+  if (image === undefined) throw new Error("The pinned Playwright browser image could not be read");
+  return image;
+}
+
+function sourceCommit() {
+  if (/^[0-9a-f]{40}$/.test(process.env.GITHUB_SHA ?? "")) return process.env.GITHUB_SHA;
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+  if (result.status !== 0 || !/^[0-9a-f]{40}$/.test(result.stdout.trim())) {
+    throw new Error("The source commit could not be determined");
+  }
+  return result.stdout.trim();
+}
+
+function sourceTreeState() {
+  const result = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
+  if (result.status !== 0) throw new Error("The source tree state could not be determined");
+  return result.stdout.trim() === "" ? "clean" : "modified";
+}
+
+function gateOutcome() {
+  const path = resolve(frontend, "test-results", "browser-gate-outcome.json");
+  if (!existsSync(path)) return undefined;
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+function runAttempt(options) {
+  const commit = sourceCommit();
+  const treeState = sourceTreeState();
+  const packageJson = JSON.parse(readFileSync(resolve(frontend, "package.json"), "utf8"));
+  const browserImage = readPinnedBrowserImage();
+  const startedAt = new Date().toISOString();
+  const cli = resolve(frontend, "node_modules", "@playwright", "test", "cli.js");
+  rmSync(resolve(frontend, "test-results", "browser-gate-outcome.json"), { force: true });
+  const execution = spawnSync(process.execPath, [cli, "test", "--project=webkit-core", "--project=webkit-pwa",
+    "--project=webkit-accessibility"], {
+    cwd: frontend,
+    env: { ...process.env, COURTSIDE_PROJECT_ORDER: options.order, COURTSIDE_WEBKIT_AXE: "true",
+      COURTSIDE_WEBKIT_RELIABILITY: "true" },
+    stdio: "inherit",
+    timeout: maxDurationMs
+  });
+  const finishedAt = new Date().toISOString();
+  const record = buildReliabilityRecord({
+    attemptId: randomUUID(),
+    sourceCommit: commit,
+    sourceTreeState: treeState,
+    startedAt,
+    finishedAt,
+    playwrightVersion: packageJson.devDependencies["@playwright/test"],
+    browserImage,
+    projectOrder: options.order,
+    isolationVariant: "fresh-project-browser",
+    resourceProfile: process.env.GITHUB_ACTIONS === "true" ? "github-hosted-default" : "local-default",
+    host: {
+      platform: platform(), architecture: arch(), cpuCount: cpus().length, totalMemoryBytes: totalmem(),
+      ...process.env.ImageOS && process.env.ImageVersion
+        ? { runnerImage: `${process.env.ImageOS}-${process.env.ImageVersion}` }
+        : {}
+    },
+    execution: execution.error === undefined || execution.error.code === "ETIMEDOUT"
+      ? { exitCode: execution.status, gateOutcome: gateOutcome() }
+      : { exitCode: null, launchError: true }
+  });
+  validateReliabilityRecord(record);
+  const path = retainReliabilityRecord(record, options.output);
+  process.stdout.write(`WebKit first-attempt record: ${path}\n`);
+  process.exitCode = record.outcome.status === "passed" ? 0 : 1;
+}
+
+export function validateReliabilityRecord(record) {
+  const validate = validator();
+  if (!validate(record)) throw new Error(`Invalid WebKit reliability record: ${JSON.stringify(validate.errors)}`);
+  const imageDigest = /@(?<digest>sha256:[0-9a-f]{64})$/.exec(record.toolchain.browserImage)?.groups?.digest;
+  if (imageDigest !== record.toolchain.browserImageDigest) throw new Error("The browser image digest does not match its reference");
+  if (Date.parse(record.finishedAt) - Date.parse(record.startedAt) !== record.durationMs) {
+    throw new Error("The reliability duration does not match its timestamps");
+  }
+  const classifications = new Set(record.outcome.classifications);
+  const isPassed = record.outcome.status === "passed" && classifications.size === 1
+    && classifications.has("none") && record.outcome.exitCode === 0;
+  const isFailed = record.outcome.status === "failed" && classifications.has("product")
+    && !classifications.has("none") && record.outcome.exitCode !== 0 && record.outcome.exitCode !== null;
+  const isIncomplete = record.outcome.status === "incomplete" && !classifications.has("none")
+    && (classifications.has("harness") || classifications.has("environment"));
+  if (!isPassed && !isFailed && !isIncomplete) throw new Error("The reliability outcome is contradictory");
+}
+
+export function reliabilityOptions(args) {
+  const values = { order: "configured", output: resolve(frontend, "test-results", "webkit-reliability") };
+  for (let index = 0; index < args.length; index += 2) {
+    const name = args[index];
+    const value = args[index + 1];
+    if (value === undefined) throw new Error(`Missing value for ${name}`);
+    if (name === "--order") values.order = value;
+    else if (name === "--output") values.output = resolve(value);
+    else throw new Error(`Unsupported option: ${name}`);
+  }
+  if (!new Set(["configured", "reversed"]).has(values.order)) throw new Error("Unsupported project order");
+  return values;
+}
+
+function validateFile(path) {
+  const record = JSON.parse(readFileSync(resolve(path), "utf8"));
+  validateReliabilityRecord(record);
+  process.stdout.write(`Valid WebKit reliability record: ${basename(path)}\n`);
+}
+
+function summarizeDirectory(path) {
+  const records = readdirSync(resolve(path)).filter((name) => name.endsWith(".json"))
+    .map((name) => JSON.parse(readFileSync(resolve(path, name), "utf8")));
+  process.stdout.write(`${JSON.stringify(summarizeReliability(records), null, 2)}\n`);
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [command, ...args] = process.argv.slice(2);
+  if (command === "run") runAttempt(reliabilityOptions(args));
+  else if (command === "validate" && args.length === 1) validateFile(args[0]);
+  else if (command === "summarize" && args.length === 1) summarizeDirectory(args[0]);
+  else throw new Error("Usage: webkit-reliability.mjs run|validate|summarize");
+}
