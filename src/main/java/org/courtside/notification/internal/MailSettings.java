@@ -1,5 +1,6 @@
 package org.courtside.notification.internal;
 
+import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
 
 import java.util.ArrayList;
@@ -51,6 +52,23 @@ final class MailSettings {
         problems.add(isSet(properties.username())
                 ? "COURTSIDE_MAIL_USERNAME is set without COURTSIDE_MAIL_PASSWORD"
                 : "COURTSIDE_MAIL_PASSWORD is set without COURTSIDE_MAIL_USERNAME");
+    }
+
+    // A mail client accepts a display form and so does the relay, so the domain comes from the
+    // address inside the value rather than from whatever follows its first @.
+    static String senderDomain(String configured) {
+        try {
+            String address = new InternetAddress(configured, true).getAddress();
+            int at = address == null ? -1 : address.indexOf('@');
+            if (at < 0) {
+                throw new AddressException("no domain");
+            }
+            return address.substring(at + 1);
+        } catch (AddressException malformed) {
+            throw new IllegalStateException("COURTSIDE_MAIL_FROM is not a mail address, which"
+                    + " startup verification refuses, so nothing should reach this: " + configured,
+                    malformed);
+        }
     }
 
     static boolean isSet(String value) {
