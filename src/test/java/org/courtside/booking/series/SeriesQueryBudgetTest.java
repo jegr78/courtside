@@ -84,7 +84,7 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         // then
         assertThat(preview.occurrences()).hasSize(count);
         assertStableRuleQueriesAreBounded(snapshot);
-        assertThat(snapshot.total()).as(snapshot.toString()).isLessThanOrEqualTo(count + 15L);
+        assertThat(snapshot.total()).as(snapshot.toString()).isLessThanOrEqualTo(count + 16L);
     }
 
     @ParameterizedTest
@@ -143,8 +143,8 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         assertThat(snapshot.category("membership")).as(snapshot.toString()).isLessThanOrEqualTo(1);
         assertThat(snapshot.category("opening-hours")).as(snapshot.toString())
                 .isLessThanOrEqualTo(openingHoursBudget);
-        // One per membership-scoped rule and no more: the advance window, the open-booking cap and
-        // the booking bar each ask once for the whole batch, which is what prepare() is for.
-        assertThat(snapshot.category("rule-parameter")).as(snapshot.toString()).isLessThanOrEqualTo(3);
+        // One per membership-scoped rule and no more: each asks once for the whole batch rather than
+        // once per occurrence, which is what prepare() is for.
+        assertThat(snapshot.category("rule-parameter")).as(snapshot.toString()).isLessThanOrEqualTo(4);
     }
 }

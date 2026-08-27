@@ -22,6 +22,12 @@ public class RulesTestFixture {
         return ruleSetId;
     }
 
+    public UUID ruleSetBoundingBookingDuration(String name, int maxMinutes) {
+        UUID ruleSetId = activeRuleSet(name);
+        rules.setRule(ruleSetId, RuleType.MAX_BOOKING_DURATION, Map.of("maxMinutes", maxMinutes));
+        return ruleSetId;
+    }
+
     public void deactivate(UUID ruleSetId) {
         rules.setRuleSetActive(ruleSetId, false);
     }

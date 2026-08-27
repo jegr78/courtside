@@ -205,7 +205,8 @@ components:
 
     RuleType:
       type: string
-      enum: [OPENING_HOURS, SLOT_GRID, ADVANCE_WINDOW, MAX_OPEN_BOOKINGS, NO_COURT_BOOKING]
+      enum: [OPENING_HOURS, SLOT_GRID, ADVANCE_WINDOW, MAX_OPEN_BOOKINGS, MAX_BOOKING_DURATION,
+             NO_COURT_BOOKING]
 
     CancelScope:
       type: string
@@ -233,12 +234,21 @@ components:
 
     BookingEligibility:
       type: object
-      description: Standing rule violations that prevent the signed-in account from booking a court.
+      description: |
+        Standing rule violations that prevent the signed-in account from booking a court, and the
+        bound its rule set puts on one booking's length.
       required: [violations]
       properties:
         violations:
           type: array
           items: { $ref: "#/components/schemas/Violation" }
+        maxBookingMinutes:
+          type: [integer, "null"]
+          description: |
+            The longest single booking this account may take, in minutes, or absent where nothing
+            bounds it. A client offers no longer period than this; the server refuses one anyway
+            with `booking.rule.maxBookingDuration.exceeded`, so the field shortens a list rather
+            than deciding anything.
 
     FieldError:
       type: object

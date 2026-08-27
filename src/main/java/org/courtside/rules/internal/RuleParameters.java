@@ -19,6 +19,7 @@ public final class RuleParameters {
     private static final Map<RuleType, Map<String, Bounds>> CONTRACT = Map.of(
             RuleType.ADVANCE_WINDOW, Map.of("maxDays", new Bounds(1, 365)),
             RuleType.MAX_OPEN_BOOKINGS, Map.of("limit", new Bounds(1, 99)),
+            RuleType.MAX_BOOKING_DURATION, Map.of("maxMinutes", new Bounds(5, 1440)),
             RuleType.NO_COURT_BOOKING, Map.of());
 
     private RuleParameters() {

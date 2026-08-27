@@ -68,6 +68,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [cards, setCards] = useState<PublicBookingCard[]>([]);
+  const [maxBookingMinutes, setMaxBookingMinutes] = useState<number>();
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [preview, setPreview] = useState<SeriesPreview>();
   const [chosen, setChosen] = useState<string[]>([]);
@@ -77,6 +78,11 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
   useEffect(() => {
     if (!open) return;
     api.bookingCards().then(setCards).catch(reportError);
+    // A bound that cannot be read leaves the maximum unset; the server holds the rule regardless,
+    // so failing to fill in a field's ceiling is not worth an error in front of the form.
+    api.bookingEligibility()
+      .then((eligibility) => setMaxBookingMinutes(eligibility.maxBookingMinutes ?? undefined))
+      .catch(() => setMaxBookingMinutes(undefined));
   }, [open, reportError]);
 
   // A preview answers one rule, so editing the rule afterwards takes its confirmation with it.
@@ -150,7 +156,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
     <div className="grid gap-3 sm:grid-cols-2">
       <TextField data-testid="series-starts-on" disabled={pending} type="date" label={t("series.startsOn")} value={draft.startsOn} onChange={(event) => change({ startsOn: event.target.value })} />
       <TextField data-testid="series-start-time" disabled={pending} type="time" label={t("series.startTime")} value={draft.startTime} onChange={(event) => change({ startTime: event.target.value })} />
-      <TextField data-testid="series-duration" disabled={pending} type="number" min={1} max={1440} label={t("series.duration")} value={draft.durationMinutes} onChange={(event) => change({ durationMinutes: Number(event.target.value) })} />
+      <TextField data-testid="series-duration" disabled={pending} type="number" min={1} max={maxBookingMinutes ?? 1440} label={t("series.duration")} value={draft.durationMinutes} onChange={(event) => change({ durationMinutes: Number(event.target.value) })} />
       <TextField data-testid="series-interval-weeks" disabled={pending} type="number" min={1} max={52} label={t("series.intervalWeeks")} value={draft.intervalWeeks} onChange={(event) => change({ intervalWeeks: Number(event.target.value) })} />
     </div>
 

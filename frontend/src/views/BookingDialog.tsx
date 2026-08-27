@@ -16,12 +16,13 @@ export interface BookingSelection {
 }
 
 export function BookingDialog({ selection, grid, courts, allocations, canChooseSeveralCourts,
-  closed, created, conflicted }: {
+  maxBookingMinutes, closed, created, conflicted }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
   allocations: Allocation[];
   canChooseSeveralCourts: boolean;
+  maxBookingMinutes?: number;
   closed: () => void;
   created: () => Promise<void>;
   conflicted: () => Promise<void>;
@@ -119,7 +120,10 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
   const fieldViolations = (field: string) => violations.filter((violation) => violation.field === field);
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
-  const durations = availableDurations(selection, grid, courtIds, allocations);
+  const durations = availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes);
+  // A list emptied by the bound is a different thing from one emptied by an occupied court: the
+  // second is the conflict the server reports on submit, and saying so is its job and not ours.
+  const boundLeavesNoPeriod = maxBookingMinutes != null && maxBookingMinutes < grid.slotMinutes;
   const selectedDuration = durations.includes(durationMinutes) ? durationMinutes : durations[0] ?? grid.slotMinutes;
   const period = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration);
   // The booker takes a slot too, which is what BookingWriter counts, so an empty dialog stands at one.
@@ -139,6 +143,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           {durations.map((minutes) => <option key={minutes} value={minutes}>{t("booking.durationMinutes", { count: minutes })}</option>)}
         </select>
       </label>
+      {boundLeavesNoPeriod && <Alert testId="booking-no-duration">{t("booking.boundBelowSlotGrid")}</Alert>}
       {canChooseSeveralCourts
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
           <legend className="font-semibold">{t("booking.courts")}</legend>
@@ -209,19 +214,22 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button type="button" data-testid="booking-close" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>
-        <Button type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId}>{t("booking.submit")}</Button>
+        <Button type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod}>{t("booking.submit")}</Button>
       </div>
     </form>
   </Modal>;
 }
 
-function availableDurations(selection: BookingSelection, grid: BookingGrid, courtIds: string[], allocations: Allocation[]): number[] {
+function availableDurations(selection: BookingSelection, grid: BookingGrid, courtIds: string[], allocations: Allocation[], maxBookingMinutes?: number): number[] {
   const start = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, grid.slotMinutes).startsAt;
   const openingHours = grid.openingHours.find((window) => window.dayOfWeek === dayOfWeek(selection.date));
   const closesAt = openingHours?.closesAt
     ? zonedDateTime(selection.date, openingHours.closesAt.slice(0, 5), grid.timeZone)
     : new Date(Date.parse(start) + grid.slotMinutes * 60_000).toISOString();
-  const maximum = Math.max(grid.slotMinutes, Math.floor((Date.parse(closesAt) - Date.parse(start)) / 60_000));
+  // The floor is one slot only where nothing else bounds the day; a rule set that bounds a booking
+  // shorter than a slot offers no period at all rather than one the server refuses.
+  const untilClosing = Math.max(grid.slotMinutes, Math.floor((Date.parse(closesAt) - Date.parse(start)) / 60_000));
+  const maximum = maxBookingMinutes == null ? untilClosing : Math.min(untilClosing, maxBookingMinutes);
   const durations: number[] = [];
   for (let minutes = grid.slotMinutes; minutes <= maximum; minutes += grid.slotMinutes) {
     const end = Date.parse(start) + minutes * 60_000;
