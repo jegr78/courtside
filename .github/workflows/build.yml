@@ -9,12 +9,14 @@ permissions:
   contents: read
 
 jobs:
-  tool-update-comparison:
+  assessment-runtime:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 10
     permissions:
       contents: read
+    outputs:
+      changed: ${{ steps.runtime.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -36,38 +38,52 @@ jobs:
             *) echo "the runtime decision was $REQUIRED, which is neither" >&2; exit 1 ;;
           esac
           echo "changed=$REQUIRED" >> "$GITHUB_OUTPUT"
-      - if: steps.runtime.outputs.changed == 'true'
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: security-runtime-identity-${{ github.run_id }}
+          path: build/security-update/source.md
+          retention-days: 14
+          if-no-files-found: error
+
+  tool-update-comparison:
+    needs: assessment-runtime
+    if: needs.assessment-runtime.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           java-version: '25'
           distribution: temurin
           cache: maven
-      - if: steps.runtime.outputs.changed == 'true'
-        name: Prepare the protected-base assessment runtime
+      - name: Prepare the protected-base assessment runtime
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: |
           git worktree add --detach "$RUNNER_TEMP/courtside-security-base" "$BASE_REF"
           "$RUNNER_TEMP/courtside-security-base/mvnw" -B \
             -f "$RUNNER_TEMP/courtside-security-base/pom.xml" frontend:install-node-and-npm
-      - if: steps.runtime.outputs.changed == 'true'
-        name: Install protected-base assessment dependencies
+      - name: Install protected-base assessment dependencies
         working-directory: ${{ runner.temp }}/courtside-security-base/frontend
         run: ./node/node ./node/node_modules/npm/bin/npm-cli.js ci --ignore-scripts
-      - if: steps.runtime.outputs.changed == 'true'
-        name: Install candidate assessment dependencies
+      - name: Install candidate assessment dependencies
         run: ./mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci
-      - if: steps.runtime.outputs.changed == 'true'
-        name: Build and qualify the target both runs assess
+      - name: Build and qualify the target both runs assess
         run: |
           frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
           echo "TARGET_IMAGE=$(docker image inspect courtside:uat-local --format '{{.Id}}')" \
             >> "$GITHUB_ENV"
-      - if: steps.runtime.outputs.changed == 'true'
-        name: Pull pinned assessment images
+      - name: Pull pinned assessment images
         run: node tools/security-image-inventory.mjs active | xargs -n1 docker pull
-      - if: steps.runtime.outputs.changed == 'true'
-        name: Verify the Schemathesis reason adapter
+      - name: Verify the Schemathesis reason adapter
         run: |
           IMAGE=$(jq -r .image security/openapi-fuzz-policy.json)
           docker run --rm --entrypoint python \
@@ -75,8 +91,7 @@ jobs:
             -v "$PWD/security/schemathesis_reason.py:/projection/sitecustomize.py:ro" \
             -v "$PWD/security/schemathesis_reason_integration.py:/projection/integration.py:ro" \
             "$IMAGE" /projection/integration.py
-      - if: steps.runtime.outputs.changed == 'true'
-        name: Run paired active assessments
+      - name: Run paired active assessments
         env:
           BASE_RUN_ID: compare-base-${{ github.run_id }}-${{ github.run_attempt }}
           CANDIDATE_RUN_ID: compare-head-${{ github.run_id }}-${{ github.run_attempt }}
@@ -95,14 +110,14 @@ jobs:
           frontend/node/node tools/courtside.mjs security-run "$CANDIDATE_RUN_ID" active \
             --qualification "$QUALIFICATION" \
             --authorize "authorize-active-$CANDIDATE_RUN_ID" || true
-      - if: steps.runtime.outputs.changed == 'true'
-        name: Compare immutable run evidence
+      - name: Compare immutable run evidence
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.event.pull_request.head.sha }}
           BASE_RUN_ID: compare-base-${{ github.run_id }}-${{ github.run_attempt }}
           CANDIDATE_RUN_ID: compare-head-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
+          mkdir -p build/security-update
           BASE_ROOT="$RUNNER_TEMP/courtside-security-base"
           COMPARATOR_ROOT="$BASE_ROOT"
           if [[ ! -f "$COMPARATOR_ROOT/tools/security-tool-comparison.mjs" ]] \
@@ -123,8 +138,7 @@ jobs:
             --candidate-contract security/run-contract.json \
             --candidate-catalog security/assessment-catalog.json \
             --output build/security-update/runtime.json
-      - if: steps.runtime.outputs.changed == 'true'
-        name: Read what the comparison found
+      - name: Read what the comparison found
         env:
           BASE_RUN_ID: compare-base-${{ github.run_id }}-${{ github.run_attempt }}
           CANDIDATE_RUN_ID: compare-head-${{ github.run_id }}-${{ github.run_attempt }}
@@ -138,7 +152,7 @@ jobs:
             --base-evidence "$BASE_ROOT/build/security/$BASE_RUN_ID/assessment/attempt-1/evidence"
           cat build/security-update/summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Remove comparison environments
-        if: always() && steps.runtime.outputs.changed == 'true'
+        if: always()
         env:
           BASE_RUN_ID: compare-base-${{ github.run_id }}-${{ github.run_attempt }}
           CANDIDATE_RUN_ID: compare-head-${{ github.run_id }}-${{ github.run_attempt }}
@@ -157,7 +171,6 @@ jobs:
         with:
           name: security-tool-update-${{ github.run_id }}
           path: |
-            build/security-update/source.md
             build/security-update/runtime.json
             build/security-update/summary.md
           retention-days: 14
@@ -277,13 +290,15 @@ jobs:
 
   build:
     if: always()
-    needs: [quality, tool-update-comparison]
+    needs: [quality, assessment-runtime, tool-update-comparison]
     runs-on: ubuntu-latest
     steps:
       - name: Enforce required build results
         env:
           QUALITY_RESULT: ${{ needs.quality.result }}
+          IDENTITY_RESULT: ${{ needs.assessment-runtime.result }}
           COMPARISON_RESULT: ${{ needs.tool-update-comparison.result }}
         run: |
           test "$QUALITY_RESULT" = success
+          [[ "$IDENTITY_RESULT" = success || "$IDENTITY_RESULT" = skipped ]]
           [[ "$COMPARISON_RESULT" = success || "$COMPARISON_RESULT" = skipped ]]
