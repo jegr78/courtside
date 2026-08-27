@@ -46,6 +46,7 @@ export type ExternalReference = components["schemas"]["ExternalReference"];
 export type ExternalReferencePage = components["schemas"]["ExternalReferencePage"];
 export type ExternalReferenceRequest = components["schemas"]["ExternalReferenceRequest"];
 export type AccountRequest = components["schemas"]["AccountRequest"];
+export type SubjectAccessExport = components["schemas"]["SubjectAccessExport"];
 export type SourceOffer = components["schemas"]["SourceOffer"];
 export type Problem = components["schemas"]["Problem"];
 export type PublicCourt = components["schemas"]["PublicCourt"];
@@ -236,6 +237,9 @@ export const api = {
   ),
   requestAccountCredentials: (personId: string) => request<RosterEntry>(
     `/api/admin/roster/${personId}/account/credentials`, { method: "POST" }
+  ),
+  exportPersonData: (personId: string) => request<SubjectAccessExport>(
+    `/api/admin/export/person/${personId}`, { method: "POST" }
   ),
   setAccountActive: (personId: string, active: boolean) => request<RosterEntry>(
     `/api/admin/roster/${personId}/account/active`, {

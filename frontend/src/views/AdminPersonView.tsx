@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { LocaleSelect } from "../components/LocaleSelect";
 import { Modal } from "../components/Modal";
 import { TextField } from "../components/TextField";
+import { downloadJson } from "../downloads/downloadJson";
 import { formString } from "../forms/formString";
 
 const roles: Role[] = [
@@ -61,6 +62,20 @@ export function AdminPersonView() {
     }
   }
 
+  async function exportData() {
+    if (pending) return;
+    setPending(true);
+    try {
+      downloadJson(`courtside-subject-access-${personId}.json`, await api.exportPersonData(personId));
+      setError(undefined);
+      setSuccess(t("admin.person.subjectAccessProduced"));
+    } catch (failure) {
+      reportError(failure);
+    } finally {
+      setPending(false);
+    }
+  }
+
   return <section data-testid="admin-person-view" className="surface-panel grid w-full max-w-5xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-3xl font-bold">{entry ? `${entry.firstName} ${entry.lastName}` : t("admin.person.title")}</h1>
@@ -94,6 +109,13 @@ export function AdminPersonView() {
             disabled={pending}
             create={(request) => mutate(() => api.createAccount(personId, request))}
           />}
+        <section className="surface-subtle grid gap-3 rounded-xl border p-4">
+          <h2 className="text-2xl font-bold">{t("admin.person.subjectAccess")}</h2>
+          <p className="text-muted text-sm">{t("admin.person.subjectAccessExplain")}</p>
+          <Button data-testid="export-person-data" disabled={pending} className="justify-self-start" type="button" onClick={() => void exportData()}>
+            {t("admin.person.subjectAccessProduce")}
+          </Button>
+        </section>
         <Link data-testid="person-audit-link" className="font-semibold underline" to={`/admin/audit?subjectId=${personId}`}>
           {t("admin.person.auditLink")}
         </Link>
