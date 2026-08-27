@@ -121,6 +121,9 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const fieldViolations = (field: string) => violations.filter((violation) => violation.field === field);
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
   const durations = availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes);
+  // A list emptied by the bound is a different thing from one emptied by an occupied court: the
+  // second is the conflict the server reports on submit, and saying so is its job and not ours.
+  const boundLeavesNoPeriod = maxBookingMinutes != null && maxBookingMinutes < grid.slotMinutes;
   const selectedDuration = durations.includes(durationMinutes) ? durationMinutes : durations[0] ?? grid.slotMinutes;
   const period = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration);
   // The booker takes a slot too, which is what BookingWriter counts, so an empty dialog stands at one.
@@ -140,7 +143,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           {durations.map((minutes) => <option key={minutes} value={minutes}>{t("booking.durationMinutes", { count: minutes })}</option>)}
         </select>
       </label>
-      {durations.length === 0 && <Alert testId="booking-no-duration">{t("booking.noDurationWithinBound")}</Alert>}
+      {boundLeavesNoPeriod && <Alert testId="booking-no-duration">{t("booking.noDurationWithinBound")}</Alert>}
       {canChooseSeveralCourts
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
           <legend className="font-semibold">{t("booking.courts")}</legend>
@@ -211,7 +214,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button type="button" data-testid="booking-close" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>
-        <Button type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || durations.length === 0}>{t("booking.submit")}</Button>
+        <Button type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod}>{t("booking.submit")}</Button>
       </div>
     </form>
   </Modal>;

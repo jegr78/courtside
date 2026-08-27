@@ -1148,3 +1148,28 @@ it("given a bound shorter than one slot, when the dialog opens, then it offers n
   expect(screen.getByTestId("booking-duration")).toBeEmptyDOMElement();
   expect(screen.getByTestId("booking-submit")).toBeDisabled();
 });
+
+it("given an occupied court leaves no period, when the dialog opens, then it says nothing about a bound", async () => {
+  // given — an empty list means the court is taken, and saying that is the server's job on submit
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[1].id,
+    startsAt: "2026-08-10T08:00:00+02:00",
+    endsAt: "2026-08-10T08:30:00+02:00",
+    cardLabel: "Training",
+    cardColor: "#176b55",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: 2
+  }] : []));
+  render(<WeekView today={clubInstant("07:00")} canChooseSeveralCourts />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // when
+  await userEvent.click(screen.getByTestId(`booking-court-${courts[1].id}`));
+
+  // then
+  expect(screen.getByTestId("booking-duration")).toBeEmptyDOMElement();
+  expect(screen.queryByTestId("booking-no-duration")).not.toBeInTheDocument();
+  expect(screen.getByTestId("booking-submit")).toBeEnabled();
+});
