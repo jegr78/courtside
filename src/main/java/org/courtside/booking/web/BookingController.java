@@ -87,7 +87,9 @@ class BookingController implements BookingsApi {
                         personIdOf(account), account.getRoles()).stream()
                 .map(violation -> new ApiViolation(violation.code(), violation.params()))
                 .toList();
-        return ResponseEntity.ok(new ApiBookingEligibility(violations));
+        return ResponseEntity.ok(new ApiBookingEligibility(violations)
+                .maxBookingMinutes(ruleGate.maxBookingMinutesFor(
+                        personIdOf(account), account.getRoles())));
     }
 
     @InitBinder

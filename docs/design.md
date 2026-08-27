@@ -692,9 +692,10 @@ ending a membership loosens what its holder may book rather than tightening it, 
 ends memberships in bulk has to take the account's permission away in the same step.
 
 The configuration answers it: `club_config.no_membership_type_rule_set_id` names the rule set
-measured against a person who holds no current membership type, and the two membership-scoped rules
-— the advance window and the open-booking cap — resolve through it. The obvious repair, reading "no
-membership" as "no booking", stays rejected: it would change what every installation already permits
+measured against a person who holds no current membership type, and every membership-scoped rule —
+the advance window, the open-booking cap, the bound on one booking's length and the bar on booking
+at all — resolves through it. The obvious repair, reading "no membership" as "no booking", stays
+rejected: it would change what every installation already permits
 and decide for the club rather than asking it. So the column is nullable and starts unset, and while
 it is unset the state below is what holds.
 
@@ -753,11 +754,11 @@ question — who may *play* — and the product does not answer it today.
 
 Rules split along a line that matters more than it first appears:
 
-**Overridable rules restrict who may book.** Advance window, maximum open bookings, the bar on
-booking at all, and the roles a booking card allows are all statements about a person's
-entitlement. `ADMIN` sets them aside — no flag, no per-request opt-in, the role itself is the
-override. An admin placing a training block six weeks out is doing their job, not circumventing
-anything.
+**Overridable rules restrict who may book.** Advance window, maximum open bookings, the longest a
+single booking may run, the bar on booking at all, and the roles a booking card allows are all
+statements about a person's entitlement. `ADMIN` sets them aside — no flag, no per-request opt-in,
+the role itself is the override. An admin placing a training block six weeks out is doing their job,
+not circumventing anything.
 
 **Non-overridable rules describe the grid itself.** Opening hours and the slot granularity
 are properties of the facility, not of the person booking. The booking UI renders exactly
@@ -1401,10 +1402,10 @@ whether it is built or designed. **Designed means absent today.**
   next request is refused rather than served with the rights or the credential it was signed in
   with. A membership is not a role, and no session carries a stale copy of one — a booking resolves
   the membership as it evaluates the rules — so the epoch moves here for the second reason above
-  and not the first. Neither direction is harmless: the advance window and the open-booking cap
-  are looked up through a membership type and, unless the club named a rule set for people holding
-  none, are found for nobody without one; and a person without one drops out of
-  participant search, so ending a membership takes as much away as assigning one does. The policy
+  and not the first. Neither direction is harmless: the advance window, the open-booking cap and the
+  bound on one booking's length are looked up through a membership type and, unless the club named a
+  rule set for people holding none, are found for nobody without one; and a person without one drops
+  out of participant search, so ending a membership takes as much away as assigning one does. The policy
   is about what an account is, not about what the club has configured: repointing a membership type
   at another rule set changes what every member holding it may book and leaves every session
   standing, as a rule set's own parameters, a court's opening hours and a card's roles do, because

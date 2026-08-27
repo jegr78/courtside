@@ -14,6 +14,12 @@ const ruleTypes = () => readFileSync(join(root, "src/main/resources/api/openapi.
   .filter((line) => line.includes("enum: [OPENING_HOURS"))
   .flatMap((line) => line.slice(line.indexOf("[") + 1, line.indexOf("]")).split(",").map((v) => v.trim()));
 
+// A parameter's label is looked up by its name, so a parameter the bundles do not name reaches a
+// board as the raw key above the input it is supposed to describe.
+const ruleParameters = () => [...readFileSync(
+  join(root, "src/main/java/org/courtside/rules/internal/RuleParameters.java"), "utf8")
+  .matchAll(/Map\.of\("(\w+)", new Bounds\(/g)].map((match) => match[1]);
+
 const backendKeys = () => readFileSync(join(root, "src/main/resources/messages.properties"), "utf8")
   .split("\n")
   .filter((line) => line.trim() && !line.trim().startsWith("#"))
@@ -48,4 +54,20 @@ test("given every rule type the contract names, when checking both client bundle
   // then
   assert.ok(types.length > 0, "the contract must name at least one rule type");
   assert.deepEqual(missing, [], `these rule cards would show their key as a heading: ${missing.join(", ")}`);
+});
+
+test("given every rule parameter the contract names, when checking both client bundles, then each has a label", () => {
+  // given
+  const { de, en } = localeKeys();
+  const parameters = ruleParameters();
+
+  // when
+  const missing = parameters.flatMap((name) => [
+    ...(de.has(`admin.rules.parameter.${name}`) ? [] : [`de:${name}`]),
+    ...(en.has(`admin.rules.parameter.${name}`) ? [] : [`en:${name}`])
+  ]);
+
+  // then
+  assert.ok(parameters.length > 0, "the contract must name at least one rule parameter");
+  assert.deepEqual(missing, [], `these inputs would be labelled with their key: ${missing.join(", ")}`);
 });

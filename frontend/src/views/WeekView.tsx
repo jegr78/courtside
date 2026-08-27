@@ -124,7 +124,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   }
 
   // The run stops at the first slot the court cannot give, so the highlight a member drags over
-  // is what they get - a span silently clamped on release would surprise them instead.
+  // is what they get - a span silently clamped on release would surprise them instead. The rule
+  // set's bound on one booking's length stops it for the same reason.
   function bookableSpan(courtId: string, anchor: string, head: string): string[] {
     const from = slots.indexOf(anchor);
     const to = slots.indexOf(head);
@@ -133,9 +134,15 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     const span: string[] = [];
     for (let index = from; step > 0 ? index <= to : index >= to; index += step) {
       if (!isBookable(courtId, slots[index])) break;
+      if (data && exceedsTheBound((span.length + 1) * data.grid.slotMinutes)) break;
       span.push(slots[index]);
     }
     return step > 0 ? span : span.reverse();
+  }
+
+  function exceedsTheBound(minutes: number): boolean {
+    const bound = eligibility?.maxBookingMinutes;
+    return bound != null && minutes > bound;
   }
 
   const dragSpan = drag ? bookableSpan(drag.courtId, drag.anchor, drag.head) : [];
@@ -365,6 +372,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       courts={data.courts}
       allocations={data.allocations.get(bookingSelection.date) ?? []}
       canChooseSeveralCourts={canChooseSeveralCourts}
+      maxBookingMinutes={eligibility?.maxBookingMinutes ?? undefined}
       closed={() => setBookingSelection(undefined)}
       created={async () => {
         setBookingSelection(undefined);

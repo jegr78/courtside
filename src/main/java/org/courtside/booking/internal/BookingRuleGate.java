@@ -5,6 +5,7 @@ import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberService;
+import org.courtside.rules.BookingDurationLimit;
 import org.courtside.rules.RuleContext;
 import org.courtside.rules.CourtBookingPermission;
 import org.courtside.rules.RuleEngine;
@@ -25,6 +26,7 @@ public class BookingRuleGate {
 
     private final RuleEngine ruleEngine;
     private final CourtBookingPermission bookingPermission;
+    private final BookingDurationLimit durationLimit;
     private final MemberService members;
     private final UserAccountRepository accounts;
 
@@ -74,10 +76,16 @@ public class BookingRuleGate {
         if (roles.contains(Role.ADMIN)) {
             return List.of();
         }
-        UUID membershipTypeId = personId == null
-                ? null
-                : members.membershipTypeIdOf(personId).orElse(null);
-        return bookingPermission.violationsFor(membershipTypeId);
+        return bookingPermission.violationsFor(membershipTypeOf(personId));
+    }
+
+    // An ADMIN overrides the bound, so reporting one to them would be a length the server accepts
+    // past anyway.
+    public Integer maxBookingMinutesFor(UUID personId, Set<Role> roles) {
+        if (roles.contains(Role.ADMIN)) {
+            return null;
+        }
+        return durationLimit.maxMinutesFor(membershipTypeOf(personId)).orElse(null);
     }
 
     public void requireNoViolations(BookingRuleCheck check) {
@@ -89,13 +97,13 @@ public class BookingRuleGate {
         return !check.callerRoles().contains(Role.ADMIN);
     }
 
-    private RuleContext contextOf(BookingRuleCheck check) {
-        UUID membershipTypeId = check.bookedByPersonId() == null
-                ? null
-                : members.membershipTypeIdOf(check.bookedByPersonId()).orElse(null);
+    private UUID membershipTypeOf(UUID personId) {
+        return personId == null ? null : members.membershipTypeIdOf(personId).orElse(null);
+    }
 
+    private RuleContext contextOf(BookingRuleCheck check) {
         return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
-                check.bookedBy(), membershipTypeId);
+                check.bookedBy(), membershipTypeOf(check.bookedByPersonId()));
     }
 
     private RuleContext contextOf(BookingRuleCheck check, Map<UUID, Optional<UUID>> membershipTypes) {

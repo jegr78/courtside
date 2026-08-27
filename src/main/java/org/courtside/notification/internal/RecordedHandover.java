@@ -49,7 +49,6 @@ class RecordedHandover {
     }
 
     private String senderDomain() {
-        String from = properties.from();
-        return from.substring(from.indexOf('@') + 1);
+        return MailSettings.senderDomain(properties.from());
     }
 }

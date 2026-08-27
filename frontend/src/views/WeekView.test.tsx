@@ -1081,3 +1081,95 @@ it("given a drag in progress, when passing over cells, then the span it would ta
   expect(freeSlot(1, "08:30").dataset.state).toBe("selected");
   expect(freeSlot(1, "09:00").dataset.state).toBe("free");
 });
+
+it("given a rule set bounds the booking duration, when the dialog opens, then it offers nothing longer", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], maxBookingMinutes: 60 });
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  const duration = await screen.findByTestId("booking-duration");
+  expect(duration).toContainHTML('value="60"');
+  expect(duration).not.toContainHTML('value="90"');
+});
+
+it("given a bound that is not a multiple of the slot, when the dialog opens, then it stops below the bound", async () => {
+  // given — a club may bound at 45 while the grid runs in 30s, and 60 is over the bound
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], maxBookingMinutes: 45 });
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  const duration = await screen.findByTestId("booking-duration");
+  expect(duration).toContainHTML('value="30"');
+  expect(duration).not.toContainHTML('value="60"');
+});
+
+it("given no bound is reported, when the dialog opens, then the closing time is still what bounds it", async () => {
+  // given — the field is absent for anybody no rule set bounds, and absence must change nothing
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  const duration = await screen.findByTestId("booking-duration");
+  expect(duration).toContainHTML('value="120"');
+});
+
+it("given a rule set bounds the booking duration, when dragging past it, then the period stops at the bound", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], maxBookingMinutes: 60 });
+  render(<WeekView today={clubInstant("07:00")} />);
+  const start = await findFreeSlot(2, "08:00");
+
+  // when — a span silently clamped on release would surprise a member, so the drag stops itself
+  dragAcross(start, [freeSlot(2, "08:30"), freeSlot(2, "09:00")]);
+
+  // then
+  expect(await screen.findByTestId("booking-duration")).toHaveValue("60");
+});
+
+it("given a bound shorter than one slot, when the dialog opens, then it offers no period and refuses to submit", async () => {
+  // given — a club can bound below its own grid, and a submit that is certain to be refused is a trap
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], maxBookingMinutes: 15 });
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  expect(await screen.findByTestId("booking-no-duration")).toBeVisible();
+  expect(screen.getByTestId("booking-duration")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("booking-submit")).toBeDisabled();
+});
+
+it("given an occupied court leaves no period, when the dialog opens, then it says nothing about a bound", async () => {
+  // given — an empty list means the court is taken, and saying that is the server's job on submit
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[1].id,
+    startsAt: "2026-08-10T08:00:00+02:00",
+    endsAt: "2026-08-10T08:30:00+02:00",
+    cardLabel: "Training",
+    cardColor: "#176b55",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: 2
+  }] : []));
+  render(<WeekView today={clubInstant("07:00")} canChooseSeveralCourts />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // when
+  await userEvent.click(screen.getByTestId(`booking-court-${courts[1].id}`));
+
+  // then
+  expect(screen.getByTestId("booking-duration")).toBeEmptyDOMElement();
+  expect(screen.queryByTestId("booking-no-duration")).not.toBeInTheDocument();
+  expect(screen.getByTestId("booking-submit")).toBeEnabled();
+});

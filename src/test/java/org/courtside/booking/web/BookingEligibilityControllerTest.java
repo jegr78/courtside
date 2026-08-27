@@ -1,6 +1,7 @@
 package org.courtside.booking.web;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
@@ -22,7 +23,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({IdentityTestFixture.class, MemberTestFixture.class, RulesTestFixture.class})
+@Import({ConfigTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class,
+        RulesTestFixture.class})
 class BookingEligibilityControllerTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -36,6 +38,9 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private RulesTestFixture rules;
+
+    @Autowired
+    private ConfigTestFixture clubConfiguration;
 
     private MockMvc mockMvc;
 
@@ -91,6 +96,67 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/bookings/eligibility"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.violations").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "miles.richard", roles = "MEMBER")
+    void givenAMemberWhoseRuleSetBoundsDuration_whenReadingEligibility_thenTheBoundIsReturned()
+            throws Exception {
+        // given
+        UUID personId = identity.createPerson("Richard", "Miles", "miles.richard@example.org");
+        identity.createEnabledAccount(personId, "miles.richard", Set.of(Role.MEMBER));
+        members.assignMembership(personId, members.membershipTypeMeasuredBy("Short slots",
+                rules.ruleSetBoundingBookingDuration("Short slots", 90)));
+
+        // when / then
+        mockMvc.perform(get("/api/bookings/eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maxBookingMinutes").value(90));
+    }
+
+    @Test
+    @WithMockUser(username = "roe.john", roles = "MEMBER")
+    void givenAMemberWhoseRuleSetBoundsNothing_whenReadingEligibility_thenNoBoundIsReturned()
+            throws Exception {
+        // given
+        createAccountWithMembership("John", "Roe", "roe.john", Role.MEMBER, false);
+
+        // when / then
+        mockMvc.perform(get("/api/bookings/eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maxBookingMinutes").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "major.mary", roles = "ADMIN")
+    void givenAnAdministratorWhoseRuleSetBoundsDuration_whenReadingEligibility_thenNoBoundIsReturned()
+            throws Exception {
+        // given — the role sets every restriction aside, so a bound the client honours would be a lie
+        UUID personId = identity.createPerson("Mary", "Major", "major.mary@example.org");
+        identity.createEnabledAccount(personId, "major.mary", Set.of(Role.ADMIN));
+        members.assignMembership(personId, members.membershipTypeMeasuredBy("Short slots",
+                rules.ruleSetBoundingBookingDuration("Short slots", 90)));
+
+        // when / then
+        mockMvc.perform(get("/api/bookings/eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maxBookingMinutes").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "public.peter", roles = "MEMBER")
+    void givenTheClubRuleSetBoundsDuration_whenSomebodyHoldsNoMembershipType_thenTheBoundIsReturned()
+            throws Exception {
+        // given — holding no membership type is where a bound is easiest to lose
+        UUID personId = identity.createPerson("Peter", "Public", "public.peter@example.org");
+        identity.createEnabledAccount(personId, "public.peter", Set.of(Role.MEMBER));
+        clubConfiguration.bindPeopleWithoutAMembershipTypeTo(
+                rules.ruleSetBoundingBookingDuration("Short slots", 90));
+
+        // when / then
+        mockMvc.perform(get("/api/bookings/eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maxBookingMinutes").value(90));
     }
 
     private void createAccountWithMembership(String firstName, String lastName, String username,
