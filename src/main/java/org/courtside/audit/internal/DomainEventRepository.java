@@ -19,6 +19,8 @@ public interface DomainEventRepository extends Repository<DomainEvent, UUID> {
 
     List<DomainEvent> findByEventTypeOrderByOccurredAtAscIdAsc(String eventType);
 
+    List<DomainEvent> findByActorAccountIdOrderByOccurredAtAscIdAsc(UUID actorAccountId);
+
     Optional<DomainEvent> findById(UUID id);
 
     List<DomainEvent> findAllByIdIn(Collection<UUID> ids);
