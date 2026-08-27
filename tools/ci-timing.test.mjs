@@ -180,6 +180,23 @@ test("givenMalformedOrContradictoryRecords_whenAggregating_thenTheyCannotInfluen
   assert.throws(() => aggregateTimingRecords([valid, valid]), /duplicate run attempt/);
 });
 
+test("givenDuplicateOrUnboundedJobEvidence_whenAggregating_thenRunnerTimeCannotBeInflated", () => {
+  // given
+  const valid = createTimingRecord(run, jobs, "jegr78/courtside");
+  const duplicateJob = { ...valid, jobs: [valid.jobs[0], valid.jobs[0]] };
+  const jobOutsideRun = structuredClone(valid);
+  jobOutsideRun.jobs[0].startedAt = "2026-08-27T09:59:50Z";
+  jobOutsideRun.jobs[0].durationMilliseconds = 720_000;
+  const stepOutsideJob = structuredClone(valid);
+  stepOutsideJob.jobs[0].steps[0].startedAt = "2026-08-27T10:00:00Z";
+  stepOutsideJob.jobs[0].steps[0].durationMilliseconds = 20_000;
+
+  // when / then
+  assert.throws(() => aggregateTimingRecords([duplicateJob]), /duplicate job/);
+  assert.throws(() => aggregateTimingRecords([jobOutsideRun]), /outside the run/);
+  assert.throws(() => aggregateTimingRecords([stepOutsideJob]), /outside its job/);
+});
+
 test("givenLooseJavaScriptDates_whenRecordingTiming_thenOnlyRfc3339UtcEvidenceIsAccepted", () => {
   // given
   const looseRun = { ...run, run_started_at: "1", updated_at: "2" };

@@ -160,7 +160,9 @@ export function validateTimingRecord(record) {
   if (!Array.isArray(record.jobs) || record.jobs.length < 1 || record.jobs.length > 100) {
     throw new Error("Timing record jobs are invalid");
   }
-  for (const job of record.jobs) validateRecordedJob(job);
+  const jobIds = record.jobs.map((job) => job.id);
+  if (new Set(jobIds).size !== jobIds.length) throw new Error("Timing record contains a duplicate job id");
+  for (const job of record.jobs) validateRecordedJob(job, runStarted, runCompleted);
   const failedAt = record.jobs.flatMap((job) => [
     ...(job.outcome === "failure" || job.outcome === "timed_out" ? [timestamp(job.completedAt, "job failure")] : []),
     ...job.steps.filter((step) => step.outcome === "failure" || step.outcome === "timed_out")
@@ -172,7 +174,7 @@ export function validateTimingRecord(record) {
   }
 }
 
-function validateRecordedJob(job) {
+function validateRecordedJob(job, runStarted, runCompleted) {
   closedObject(job, new Set(["id", "name", "outcome", "startedAt", "completedAt", "durationMilliseconds",
     "runner", "steps"]), "Timing job");
   if (!Number.isSafeInteger(job.id) || job.id < 1 || typeof job.name !== "string"
@@ -184,6 +186,9 @@ function validateRecordedJob(job) {
   const expectedDuration = job.outcome === "skipped" ? 0 : completed - started;
   if (job.durationMilliseconds !== expectedDuration || (job.outcome !== "skipped" && expectedDuration < 0)) {
     throw new Error(`Job ${job.name} duration is inconsistent`);
+  }
+  if (job.outcome !== "skipped" && (started < runStarted || completed > runCompleted)) {
+    throw new Error(`Job ${job.name} is outside the run`);
   }
   closedObject(job.runner, new Set(["kind", "labels"]), `Job ${job.name} runner`);
   if (!new Set(["github-hosted", "self-hosted", "not-assigned"]).has(job.runner.kind)
@@ -203,6 +208,9 @@ function validateRecordedJob(job) {
     nonNegativeInteger(step.durationMilliseconds, `job ${job.name} step duration`);
     if (step.durationMilliseconds !== stepCompleted - stepStarted || stepCompleted < stepStarted) {
       throw new Error(`Job ${job.name} step duration is inconsistent`);
+    }
+    if (stepStarted < started || stepCompleted > completed) {
+      throw new Error(`Job ${job.name} step is outside its job`);
     }
   }
 }
