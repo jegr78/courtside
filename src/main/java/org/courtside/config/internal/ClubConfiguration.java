@@ -36,6 +36,9 @@ public class ClubConfiguration {
     @Column(name = "imprint_url")
     private String imprintUrl;
 
+    @Column(name = "privacy_url")
+    private String privacyUrl;
+
     @Column(name = "default_locale", nullable = false)
     private String defaultLocale;
 
@@ -58,13 +61,14 @@ public class ClubConfiguration {
     private UUID noMembershipTypeRuleSetId;
 
     public void changeTo(String clubName, String primaryColor, String accentColor,
-                         String logoUrl, String imprintUrl, String defaultLocale, int slotMinutes,
-                         String timeZone) {
+                         String logoUrl, String imprintUrl, String privacyUrl,
+                         String defaultLocale, int slotMinutes, String timeZone) {
         this.clubName = clubName;
         this.primaryColor = primaryColor;
         this.accentColor = accentColor;
         this.logoUrl = logoUrl;
         this.imprintUrl = imprintUrl;
+        this.privacyUrl = privacyUrl;
         this.defaultLocale = defaultLocale;
         this.slotMinutes = slotMinutes;
         this.timeZone = timeZone;
