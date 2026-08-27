@@ -1,4 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
 
@@ -43,7 +45,10 @@ test("a board answers what the club holds about one member, and about nobody els
     const saved = page.waitForEvent("download");
     await page.getByTestId("export-person-data").click();
     const download = await saved;
-    const answer = await readFile(await download.path(), "utf8");
+    // The browser runs in the pinned image, so the file has to be fetched over the connection.
+    const saveTo = join(await mkdtemp(join(tmpdir(), "courtside-answer-")), "answer.json");
+    await download.saveAs(saveTo);
+    const answer = await readFile(saveTo, "utf8");
 
     // then the file answers about that member
     expect(download.suggestedFilename()).toBe(`courtside-subject-access-${personId}.json`);
