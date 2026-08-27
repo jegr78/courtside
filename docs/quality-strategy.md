@@ -62,6 +62,14 @@ Property tests use fixed, printed QuickTheories seeds and automatic shrinking so
 
 The repository pull-request template requires affected risk IDs, positive and negative evidence, residual risk and any contract change. The required build result is linked from the pull request rather than copied into this document.
 
+The pull-request workflow records a conservative test-profile plan without using it to skip any
+part of the full quality gate. Modified, explicitly classified paths may select `docs`, `backend`,
+`frontend`, or an additive combination. Build, workflow, security, deployment, migration, OpenAPI,
+and shared test-infrastructure changes select `full`. Unknown paths and every added, deleted,
+renamed, copied, or otherwise structural change also select `full`. The `ci:full` label can only
+escalate a plan. Profile activation requires the separate observation period and review defined in
+the CI planning issues.
+
 ### Release checklist
 
 - [ ] Identify the candidate commit and immutable image digest.

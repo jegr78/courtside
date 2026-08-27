@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "profiles": {
+    "full": {
+      "exact": [
+        ".dockerignore",
+        ".gitignore",
+        "CLAUDE.md",
+        "Dockerfile",
+        "SECURITY.md",
+        "frontend/.npmrc",
+        "frontend/eslint.config.js",
+        "frontend/package-lock.json",
+        "frontend/package.json",
+        "frontend/playwright.config.ts",
+        "frontend/tsconfig.app.json",
+        "frontend/tsconfig.e2e.json",
+        "frontend/tsconfig.json",
+        "frontend/tsconfig.node.json",
+        "frontend/vite.config.ts",
+        "mvnw",
+        "mvnw.cmd",
+        "pom.xml",
+        "src/main/resources/META-INF/spring.factories",
+        "src/main/resources/application-demo.yaml",
+        "src/main/resources/application-perf.yaml",
+        "src/main/resources/application-security.yaml",
+        "src/main/resources/application.yaml",
+        "src/main/resources/security-assessment-dataset.properties",
+        "src/test/java/org/courtside/AbstractIntegrationTest.java",
+        "src/test/java/org/courtside/TestcontainersConfiguration.java",
+        "src/test/java/org/courtside/TestcontainersConfigurationTest.java"
+      ],
+      "prefixes": [
+        ".codex/",
+        ".github/",
+        ".mvn/",
+        "ci/",
+        "deploy/",
+        "frontend/e2e/",
+        "performance/",
+        "quality/",
+        "security/",
+        "src/main/resources/api/",
+        "src/main/resources/db/",
+        "src/test/resources/",
+        "tools/",
+        "upgrade/"
+      ]
+    },
+    "docs": {
+      "exact": ["LICENSE", "NOTICE", "README.md"],
+      "prefixes": ["bruno/", "docs/"]
+    },
+    "backend": {
+      "exact": [],
+      "prefixes": ["src/"]
+    },
+    "frontend": {
+      "exact": [],
+      "prefixes": ["frontend/"]
+    }
+  }
+}
