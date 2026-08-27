@@ -5,5 +5,6 @@ public enum RuleType {
     SLOT_GRID,
     ADVANCE_WINDOW,
     MAX_OPEN_BOOKINGS,
+    MAX_BOOKING_DURATION,
     NO_COURT_BOOKING
 }
