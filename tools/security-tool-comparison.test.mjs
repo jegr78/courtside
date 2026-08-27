@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
-import { compareSecurityToolRuns, comparisonSummary, unacknowledgedFindings } from "./security-tool-comparison.mjs";
+import { compareSecurityToolRuns, comparisonSummary, unacknowledgedFindings,
+  untoleratedBaseFailures } from "./security-tool-comparison.mjs";
 
 const fingerprint = (character) => `sha256:${character.repeat(64)}`;
 const contractPath = new URL("../security/run-contract.json", import.meta.url);
@@ -53,7 +54,7 @@ function runFixture(root, name, overrides = {}) {
     profile: "active",
     target: "https://127.0.0.1:8443",
     environment: "SECURITY",
-    application: { imageDigest: fingerprint("a"), commit: "2".repeat(40) },
+    application: { imageDigest: fingerprint("a"), commit: "b".repeat(40) },
     targetFingerprint: fingerprint("c"),
     seedFingerprint: fingerprint("d"),
     instanceFingerprint: fingerprint("e"),
@@ -103,6 +104,8 @@ test("given paired immutable runs, when comparing a tool update, then new findin
   assert.deepEqual(comparison.resolvedFindings, [fingerprint("f")]);
   assert.equal(comparison.baseRef, "2".repeat(40));
   assert.match(comparison.candidate.runtimeDigest, /^[a-f0-9]{64}$/);
+  assert.deepEqual(comparison.base.toolResults.map(({ outcome }) => outcome).toSorted(),
+    ["incomplete", "incomplete", "incomplete", "passed"]);
 });
 
 test("given an unattributed incomplete baseline, when the candidate passes, then the repair can be compared", () => {
@@ -214,14 +217,62 @@ test("given a run that assessed another revision's application, when comparing, 
   const base = runFixture(root, "base", { application: elsewhere });
   const candidate = runFixture(root, "candidate", { application: elsewhere });
 
-  // when / then — the constant both runs share has to be the protected revision, not just equal
+  // when / then — the constant both runs share has to be the revision being merged, not just equal
   assert.throws(() => compareSecurityToolRuns({
     baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
     baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
     candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
     candidateRef: "b".repeat(40),
     candidateContract: contractPath, candidateCatalog: catalogPath
-  }), /application of the base revision/);
+  }), /application of the candidate revision/);
+});
+
+test("given runs that assessed the base revision's application, when comparing, then the report fails closed", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const baseRoot = runtimeRoot(root, "base-runtime");
+  const candidateRoot = runtimeRoot(root, "candidate-runtime");
+  const beforeTheChange = { imageDigest: fingerprint("a"), commit: "2".repeat(40) };
+  const base = runFixture(root, "base", { application: beforeTheChange });
+  const candidate = runFixture(root, "candidate", { application: beforeTheChange });
+
+  // when / then — a tool that detects what this branch repairs can never pass against the
+  // application it repairs, so the application both runs share is the one being merged.
+  assert.throws(() => compareSecurityToolRuns({
+    baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
+    baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
+    candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
+    candidateRef: "b".repeat(40),
+    candidateContract: contractPath, candidateCatalog: catalogPath
+  }), /application of the candidate revision/);
+});
+
+// A base toolchain that finishes and does not pass is the one judgement in the pair the branch did
+// not write itself, so tolerating it is a named decision rather than a rule that always applies.
+test("given a base toolchain that failed, when nobody named it, then the difference is reported", () => {
+  // given
+  const failedThere = { base: { toolResults: [
+    { id: "authenticated-zap", version: "2.17.0", outcome: "passed" },
+    { id: "authorization-matrix", version: "1.0.0", outcome: "failed" }] } };
+
+  // when / then
+  assert.deepEqual(untoleratedBaseFailures(failedThere, { toleratedBaseFailures: [] }),
+    ["authorization-matrix"]);
+  assert.deepEqual(untoleratedBaseFailures(failedThere, {}), ["authorization-matrix"]);
+  assert.deepEqual(untoleratedBaseFailures(failedThere,
+    { toleratedBaseFailures: ["authorization-matrix"] }), []);
+});
+
+test("given a candidate toolchain that failed, when the base names it, then the toleration does not reach it", () => {
+  // given
+  const failedHere = {
+    base: { toolResults: [{ id: "authorization-matrix", version: "1.0.0", outcome: "passed" }] },
+    candidate: { toolResults: [{ id: "authorization-matrix", version: "1.0.0", outcome: "failed" }] }
+  };
+
+  // when / then — the candidate's own failure is fatal in the comparator and nothing here softens it
+  assert.deepEqual(untoleratedBaseFailures(failedHere,
+    { toleratedBaseFailures: ["authorization-matrix"] }), []);
 });
 
 test("given a finding difference the acknowledgement does not name, when comparing, then it is reported", () => {
@@ -237,18 +288,27 @@ test("given a finding difference the acknowledgement does not name, when compari
     { newFindings: [], resolvedFindings: [] }, { acknowledged: [] }), []);
 });
 
-test("given a comparison, when summarising it, then the constant and both toolchains are named", () => {
+test("given a comparison, when summarising it, then the constant, both toolchains and both outcomes are named", () => {
   // when
   const summary = comparisonSummary({
     baseRef: "2".repeat(40), candidateRef: "b".repeat(40),
+    base: { outcome: "failed", findingFingerprints: [fingerprint("1"), fingerprint("2")] },
+    candidate: { outcome: "passed", findingFingerprints: [fingerprint("1"), fingerprint("2"),
+      fingerprint("3"), fingerprint("4"), fingerprint("5")] },
     newFindings: [fingerprint("9")], resolvedFindings: []
   });
 
   // then — the artifact nobody downloads is why this exists
-  assert.match(summary, new RegExp(`assessed the application of .${"2".repeat(40)}`));
-  assert.match(summary, new RegExp("b".repeat(40)));
+  assert.match(summary, new RegExp(`assessed the application of .${"b".repeat(40)}`));
+  assert.match(summary, new RegExp("2".repeat(40)));
   assert.match(summary, new RegExp(`New findings: .${fingerprint("9")}`));
   assert.match(summary, /Resolved findings: none/);
+  // A base run the comparison tolerates is silent unless the summary says it fell.
+  assert.match(summary, /base toolchain ended failed/);
+  assert.match(summary, /candidate toolchain ended passed/);
+  // Weakening a tool and the surface it reads together removes a finding from both legs at once,
+  // so the difference stays empty and only these two counts show the corpus shrinking.
+  assert.match(summary, /base toolchain produced 2 finding fingerprints, the candidate 5/);
 });
 
 // The parser pairs tokens positionally, so an argument whose value is missing silently takes the

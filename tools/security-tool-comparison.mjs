@@ -151,6 +151,7 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
       tools: manifest.tools,
       selectedTests: manifest.selectedTests,
       outcome: manifest.outcome,
+      toolResults: manifest.toolResults,
       durationMilliseconds: finishedAt - startedAt,
       findingFingerprints: fingerprints(evidenceDirectory)
     }
@@ -176,11 +177,11 @@ export function compareSecurityToolRuns(input) {
       || base.identity.seedFingerprint !== candidate.identity.seedFingerprint) {
     fail("paired runs must assess the same application and synthetic fixture");
   }
-  // Both runs assess the base revision's application on purpose: it is the constant that makes a
-  // finding difference attributable to the tools, and the base environment can always start it.
-  if (base.identity.application.commit !== input.baseRef
-      || candidate.identity.application.commit !== input.baseRef) {
-    fail("both runs must assess the application of the base revision");
+  // One application under both toolchains is what makes a finding difference attributable to the
+  // tools; it is the candidate's, because a tool detecting what this branch repairs must pass.
+  if (base.identity.application.commit !== input.candidateRef
+      || candidate.identity.application.commit !== input.candidateRef) {
+    fail("both runs must assess the application of the candidate revision");
   }
   if (candidate.result.outcome === "failed") fail("the candidate runtime produced a failed assessment");
   if (base.unattributedIncomplete && candidate.result.outcome !== "passed") {
@@ -204,6 +205,17 @@ export function compareSecurityToolRuns(input) {
 }
 
 // The run exists to produce this difference, so it has to be seen before the branch passes. An
+// The base toolchain is the one judgement in the pair a branch did not write, so its failure is
+// tolerated only where somebody named the tool it came from.
+export function untoleratedBaseFailures(comparison, acknowledgement) {
+  const tolerated = new Set(acknowledgement?.toleratedBaseFailures ?? []);
+  return (comparison.base?.toolResults ?? [])
+    .filter(({ outcome }) => outcome === "failed")
+    .map(({ id }) => id)
+    .filter((id) => !tolerated.has(id))
+    .toSorted();
+}
+
 // acknowledgement names the fingerprints somebody looked at, and it is read in the pull request.
 export function unacknowledgedFindings(comparison, acknowledgement) {
   const acknowledged = new Set(acknowledgement?.acknowledged ?? []);
@@ -217,8 +229,13 @@ export function comparisonSummary(comparison) {
   return [
     "## Security tool update comparison",
     "",
-    `Both runs assessed the application of \`${comparison.baseRef}\`.`,
+    `Both runs assessed the application of \`${comparison.candidateRef}\`.`,
     `The tools came from \`${comparison.baseRef}\` and from \`${comparison.candidateRef}\`.`,
+    "",
+    `The base toolchain ended ${comparison.base.outcome}`
+      + ` and the candidate toolchain ended ${comparison.candidate.outcome}.`,
+    `The base toolchain produced ${comparison.base.findingFingerprints.length} finding fingerprints,`
+      + ` the candidate ${comparison.candidate.findingFingerprints.length}.`,
     "",
     `New findings: ${named(comparison.newFindings)}`,
     `Resolved findings: ${named(comparison.resolvedFindings)}`,

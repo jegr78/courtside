@@ -1504,6 +1504,21 @@ whether it is built or designed. **Designed means absent today.**
   against what the caller may see. It stays open because closing it means answering `404` after a
   failed authorisation, which changes a response that operation documents as its own and belongs to
   that operation's change rather than to the paging fix that surfaced it. *Built, as described.*
+- **Accepted: a change to the application alone is not measured against the active suites until the
+  weekly run.** The paired comparison is triggered by the digest of what a paired run varies — the
+  assessment's code, its contract, the deployment description and the lockfile — so a pull request
+  that only changes the application skips it, and the authorization suite's assertions about
+  concrete answers are not re-checked against what that pull request built. What an observer needs:
+  nothing. This is a gap in when a weakness would be noticed, not one a caller can reach. What
+  bounds it: the required build still runs contract, schema, safety and secret checks on every pull
+  request, the weekly scheduled assessment runs the **safe** profile against the image `main`
+  builds, and any change to the assessment runtime itself triggers the paired comparison
+  immediately. What does not bound it: nothing runs the **active** suites on a schedule. That
+  profile is reachable only through `workflow_dispatch`, so the authorization matrix and the
+  authenticated scanners meet a pull request that changes the application alone whenever somebody
+  starts them by hand, and not before. It stays open because closing it means either a full active
+  assessment on every pull request that touches the application, which is most of them, or a second
+  scheduled run whose cost nobody has weighed yet. *Built, as described.*
 
 ### Roles
 

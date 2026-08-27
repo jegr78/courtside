@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const checkout = () => fileURLToPath(new URL("../src/main/resources/api/openapi.yaml", import.meta.url));
 
-// A paired comparison runs both toolchains against the base revision's application, so both must be
-// driven by that revision's contract — a candidate's own document reports its API change as a tool one.
+// A paired comparison runs both toolchains against one application, so both must be driven by that
+// application's own document — a second spelling reports its API change as a tool difference.
 export function apiDocumentPath(environment = process.env) {
   const chosen = environment.COURTSIDE_SECURITY_API_DOCUMENT;
   if (chosen === undefined || chosen === "") return checkout();
