@@ -39,9 +39,12 @@ const finding = {
   regression: false
 };
 
+const passingToolchain = [{ id: "authorization-matrix", version: "1.0.0", outcome: "passed" }];
 const comparison = {
   baseRef: "1".repeat(40), candidateRef: "2".repeat(40),
-  base: { outcome: "failed" }, candidate: { outcome: "passed" },
+  base: { outcome: "passed", toolResults: passingToolchain, findingFingerprints: [] },
+  candidate: { outcome: "passed", toolResults: passingToolchain,
+    findingFingerprints: [finding.fingerprint] },
   newFindings: [finding.fingerprint], resolvedFindings: []
 };
 
@@ -147,7 +150,7 @@ test("given every difference acknowledged, when writing the report, then it name
   assert.match(report, /Unacknowledged: none/);
 });
 
-function runCli(acknowledged, contracts = {}) {
+function runCli(acknowledged, contracts = {}, record = comparison, tolerated = undefined) {
   const root = workspace();
   const directories = {
     candidate: evidenceDirectory(root, "candidate", [finding], contracts.candidate),
@@ -156,8 +159,9 @@ function runCli(acknowledged, contracts = {}) {
   const comparisonFile = join(root, "runtime.json");
   const acknowledgementFile = join(root, "acknowledgement.json");
   const summaryFile = join(root, "summary.md");
-  writeFileSync(comparisonFile, JSON.stringify(comparison));
-  writeFileSync(acknowledgementFile, JSON.stringify({ acknowledged }));
+  writeFileSync(comparisonFile, JSON.stringify(record));
+  writeFileSync(acknowledgementFile, JSON.stringify(tolerated === undefined
+    ? { acknowledged } : { acknowledged, toleratedBaseFailures: tolerated }));
   try {
     execFileSync(process.execPath, [cli, "--comparison", comparisonFile,
       "--acknowledgement", acknowledgementFile, "--summary", summaryFile,
@@ -184,6 +188,23 @@ test("given the difference acknowledged, when the command runs, then it passes",
 
   // then
   assert.equal(result.status, 0);
+});
+
+// The base toolchain meets an application it predates, so its failure is the pair's only outside
+// judgement. Tolerating it is a named decision that shows up in the diff, not a standing rule.
+test("given a base toolchain that failed, when nobody named the tool, then the command refuses", () => {
+  // given
+  const baseFell = { ...comparison, base: { ...comparison.base, outcome: "failed",
+    toolResults: [{ id: "authorization-matrix", version: "1.0.0", outcome: "failed" }] } };
+
+  // when
+  const unnamed = runCli([finding.fingerprint], {}, baseFell);
+  const named = runCli([finding.fingerprint], {}, baseFell, ["authorization-matrix"]);
+
+  // then
+  assert.equal(unnamed.status, 1);
+  assert.match(unnamed.stderr, /authorization-matrix/);
+  assert.equal(named.status, 0);
 });
 
 test("given an option used where a value belongs, when the command runs, then it refuses instead of accepting it", () => {

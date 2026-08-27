@@ -97,18 +97,27 @@ pass against the application it repairs, and a gate that cannot accept such a br
 detector and the repair apart. The comparator refuses a pair whose application is not the candidate
 revision's. The previous toolchain therefore meets an application it predates: when the branch
 changes a behaviour that toolchain asserts, the base run fails, which the comparison tolerates and
-the job summary names. Only a failed candidate run fails the build. A base environment that cannot
+the job summary names — and tolerating it is a named decision: every base tool that ends `failed`
+has to appear in `toleratedBaseFailures` in `security/tool-update-acknowledgement.json`, which puts
+it in the diff a reviewer reads. The previous toolchain is the one judgement in the pair the branch
+did not write, so discarding it silently is not available. Only a failed candidate run fails the
+build, and no entry there softens that. A base environment that cannot
 start the candidate's image at all is different and stops the job, because a comparison needs both
 toolchains to have met the application; tolerating an absent base run would let a branch suppress
 the difference it is being measured by. Each side reads its own deployment description; the base worktree is created before any candidate code runs, though both
 still share the workspace's git directory, so the independence of the previous toolchain rests on
 that ordering rather than on isolation. The workflow
-uses the comparator from the protected base revision after its initial bootstrap. It computes both
-runtime digests itself rather than trusting run input. The introductory comparator change requires
-the normal whole-branch review because no earlier trusted comparator exists. The workflow, not a
+uses the comparator from the protected base revision whenever the two are byte-identical, so a
+branch that changes the comparator is judged by its own and the whole-branch review is what stands
+behind that. It computes both
+runtime digests itself rather than trusting run input. The workflow, not a
 committed self-attestation, creates the closed comparison record. It binds both commits,
 runtime digests, original manifest digests, image identity, catalog and tool versions, elapsed time
-and normalized finding fingerprints. Missing tools, tests or evidence files, mismatched fixtures and
+and normalized finding fingerprints. Because both toolchains now read one application, weakening a
+detection rule and the surface it reads in the same branch removes the finding from both legs at
+once and leaves the difference empty. The summary therefore states how many finding fingerprints
+each leg produced; a corpus that shrinks is visible there and in the whole-branch review, and
+nowhere else. Missing tools, tests or evidence files, mismatched fixtures and
 a failed candidate assessment fail the pull-request build. So does a finding the comparison gained
 or lost that `security/tool-update-acknowledgement.json` does not name: the difference is what the
 run exists to produce, so it is written to the job summary and has to be recorded in the pull

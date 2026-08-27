@@ -2,7 +2,8 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { comparisonSummary, unacknowledgedFindings } from "./security-tool-comparison.mjs";
+import { comparisonSummary, unacknowledgedFindings,
+  untoleratedBaseFailures } from "./security-tool-comparison.mjs";
 
 const namingFields = ["scanner", "ruleId", "normalizedSurface", "parameter", "attackClass"];
 
@@ -106,6 +107,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const comparison = JSON.parse(readFileSync(values.comparison, "utf8"));
   const acknowledgement = JSON.parse(readFileSync(values.acknowledgement, "utf8"));
   writeFileSync(values.summary, findingReport(comparison, acknowledgement, directories), { mode: 0o600 });
+  const untolerated = untoleratedBaseFailures(comparison, acknowledgement);
+  if (untolerated.length > 0) {
+    process.stderr.write("The previous toolchain does not pass the application this branch builds, and"
+      + ` nobody named that: ${untolerated.join(", ")}.\nIt is the one judgement in the pair this`
+      + " branch did not write, so tolerating it is a decision that belongs in"
+      + ` toleratedBaseFailures in ${values.acknowledgement}.\n`);
+    process.exit(1);
+  }
   const unacknowledged = unacknowledgedFindings(comparison, acknowledgement);
   if (unacknowledged.length > 0) {
     process.stderr.write("The comparison changed findings nobody recorded. What they are:\n"

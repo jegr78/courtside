@@ -126,7 +126,9 @@ test("given a paired comparison, when both sides run, then they assess the candi
   assert.match(comparison, /TARGET_IMAGE=\$\(docker image inspect courtside:uat-local/);
   assert.match(comparison, /security "\$BASE_RUN_ID" "\$TARGET_IMAGE"/);
   assert.match(comparison, /security "\$CANDIDATE_RUN_ID" "\$TARGET_IMAGE"/);
-  assert.doesNotMatch(comparison, /cd "\$RUNNER_TEMP\/courtside-security-base"\n *frontend\/node\/node tools\/courtside\.uat-smoke/,
+  const target = comparison.slice(comparison.indexOf("Build and qualify the target both runs assess"),
+    comparison.indexOf("Pull pinned assessment images"));
+  assert.doesNotMatch(target, /courtside-security-base/,
     "a tool that detects what a branch repairs cannot pass against the application it repairs, so "
     + "the one target both toolchains share is built from the candidate, not from the base.");
   assert.equal(comparison.match(/--qualification "\$QUALIFICATION"/g)?.length, 2);
@@ -144,7 +146,7 @@ test("given a protected base, when it is prepared, then no candidate code has ru
   const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
 
   // when
-  const prepared = comparison.indexOf("Prepare the protected-base assessment runtime");
+  const prepared = comparison.indexOf("Install protected-base assessment dependencies");
   const candidateRan = comparison.indexOf("Install candidate assessment dependencies");
 
   // then
@@ -181,6 +183,29 @@ test("given a produced comparison, when the job ends, then its difference is rea
   assert.match(comparison, /--acknowledgement security\/tool-update-acknowledgement\.json/);
   assert.match(comparison, /GITHUB_STEP_SUMMARY/,
     "the difference belongs where a reviewer already looks, not in an artifact they have to fetch");
+});
+
+// Building an environment and judging what it answers are different failures. The first means the
+// pair cannot be compared at all, so only the second is allowed to end without stopping the job.
+test("given a base environment that cannot start, when the pair runs, then the job stops before judging", () => {
+  // given
+  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const paired = comparison.slice(comparison.indexOf("Run paired active assessments"),
+    comparison.indexOf("Compare immutable run evidence"));
+
+  // when
+  const environments = paired.match(/courtside\.mjs security "\$(?:BASE|CANDIDATE)_RUN_ID"[^\n]*/g) ?? [];
+
+  // then
+  assert.equal(environments.length, 2, "both legs create their environment in this step");
+  for (const environment of environments) {
+    assert.doesNotMatch(environment, /\|\| true/,
+      "an environment that refuses the target leaves nothing to compare, so it must not be swallowed."
+      + " Tolerating it would let a branch suppress the difference it is being measured by.");
+  }
+  assert.equal((paired.match(/--authorize "authorize-active-\$[A-Z_]+_RUN_ID" \|\| true/g) ?? []).length, 2,
+    "a run that finishes and does not pass is judged by the comparator, so only that is tolerated");
+  assert.equal((paired.match(/\|\| true/g) ?? []).length, 2, "and nothing else in the step is");
 });
 
 // Both runs assess one application, so both read that application's document; a second spelling

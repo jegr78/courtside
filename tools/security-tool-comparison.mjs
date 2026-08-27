@@ -151,6 +151,7 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
       tools: manifest.tools,
       selectedTests: manifest.selectedTests,
       outcome: manifest.outcome,
+      toolResults: manifest.toolResults,
       durationMilliseconds: finishedAt - startedAt,
       findingFingerprints: fingerprints(evidenceDirectory)
     }
@@ -204,6 +205,17 @@ export function compareSecurityToolRuns(input) {
 }
 
 // The run exists to produce this difference, so it has to be seen before the branch passes. An
+// The base toolchain is the one judgement in the pair a branch did not write, so its failure is
+// tolerated only where somebody named the tool it came from.
+export function untoleratedBaseFailures(comparison, acknowledgement) {
+  const tolerated = new Set(acknowledgement?.toleratedBaseFailures ?? []);
+  return (comparison.base?.toolResults ?? [])
+    .filter(({ outcome }) => outcome === "failed")
+    .map(({ id }) => id)
+    .filter((id) => !tolerated.has(id))
+    .toSorted();
+}
+
 // acknowledgement names the fingerprints somebody looked at, and it is read in the pull request.
 export function unacknowledgedFindings(comparison, acknowledgement) {
   const acknowledged = new Set(acknowledgement?.acknowledged ?? []);
@@ -222,6 +234,8 @@ export function comparisonSummary(comparison) {
     "",
     `The base toolchain ended ${comparison.base.outcome}`
       + ` and the candidate toolchain ended ${comparison.candidate.outcome}.`,
+    `The base toolchain produced ${comparison.base.findingFingerprints.length} finding fingerprints,`
+      + ` the candidate ${comparison.candidate.findingFingerprints.length}.`,
     "",
     `New findings: ${named(comparison.newFindings)}`,
     `Resolved findings: ${named(comparison.resolvedFindings)}`,
