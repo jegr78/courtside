@@ -13,6 +13,7 @@ import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
 import org.courtside.member.MemberService;
+import org.courtside.notification.PersonMessageHistory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class SubjectAccessService {
     private final ExternalReferenceRepository references;
     private final PersonBookingHistory bookings;
     private final PersonAuditTrail auditTrail;
+    private final PersonMessageHistory messages;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
@@ -60,6 +62,9 @@ public class SubjectAccessService {
                 person.getFirstName(), person.getLastName(), person.getEmail(),
                 account.map(held -> accountOf(held, now)).orElse(null),
                 membershipsOf(personId), made, recordedInSomebodyElses(personId, made),
+                account.map(UserAccount::getId).map(bookings::seriesCreatedBy).orElse(List.of()),
+                account.map(UserAccount::getId).map(messages::sentTo).orElse(List.of()),
+                account.map(UserAccount::getId).map(messages::declinedBy).orElse(List.of()),
                 referencesOf(personId),
                 changesAbout(personId, account.map(UserAccount::getId).orElse(null)),
                 account.map(UserAccount::getId).map(auditTrail::recordedBy).orElse(List.of()));

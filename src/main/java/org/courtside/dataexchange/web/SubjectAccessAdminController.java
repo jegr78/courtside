@@ -3,24 +3,32 @@ package org.courtside.dataexchange.web;
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminSubjectAccessApi;
 import org.courtside.api.ApiBookingStatus;
+import org.courtside.api.ApiMessageKind;
+import org.courtside.api.ApiMessageState;
 import org.courtside.api.ApiRole;
 import org.courtside.api.ApiSubjectAccessAccount;
 import org.courtside.api.ApiSubjectAccessAction;
 import org.courtside.api.ApiSubjectAccessBooking;
 import org.courtside.api.ApiSubjectAccessChange;
+import org.courtside.api.ApiSubjectAccessDeclinedMessage;
 import org.courtside.api.ApiSubjectAccessExport;
 import org.courtside.api.ApiSubjectAccessExternalReference;
 import org.courtside.api.ApiSubjectAccessMembership;
+import org.courtside.api.ApiSubjectAccessMessage;
 import org.courtside.api.ApiSubjectAccessParticipation;
 import org.courtside.api.ApiSubjectAccessReservation;
+import org.courtside.api.ApiSubjectAccessSeries;
 import org.courtside.audit.PersonAuditTrail;
 import org.courtside.booking.PersonBookingHistory;
+import org.courtside.identity.Role;
+import org.courtside.notification.PersonMessageHistory;
 import org.courtside.dataexchange.internal.SubjectAccessRecord;
 import org.courtside.dataexchange.internal.SubjectAccessService;
 import org.courtside.shared.WireTypes;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.DayOfWeek;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,12 +50,47 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 answer.bookingsMade().stream().map(SubjectAccessAdminController::toBooking).toList(),
                 answer.bookingsRecordedIn().stream()
                         .map(SubjectAccessAdminController::toParticipation).toList(),
+                answer.bookingSeries().stream().map(SubjectAccessAdminController::toSeries).toList(),
+                answer.messages().stream().map(SubjectAccessAdminController::toMessage).toList(),
+                answer.declinedMessages().stream()
+                        .map(SubjectAccessAdminController::toDeclined).toList(),
                 answer.externalReferences().stream()
                         .map(SubjectAccessAdminController::toReference).toList(),
                 answer.changesAsSubject().stream().map(SubjectAccessAdminController::toChange).toList(),
                 answer.changesAsActor().stream().map(SubjectAccessAdminController::toAction).toList())
-                .email(answer.email())
+                .email(address(answer.email()))
                 .account(toAccount(answer.account()));
+    }
+
+    // A person the club has no address for carries an empty one, and the document promises an
+    // address or nothing.
+    private static String address(String email) {
+        return email == null || email.isEmpty() ? null : email;
+    }
+
+    private static ApiSubjectAccessSeries toSeries(PersonBookingHistory.Series series) {
+        return new ApiSubjectAccessSeries(series.seriesId(),
+                WireTypes.toOffsetDateTime(series.createdAt()), series.startsOn(),
+                series.startTime().toString(), series.durationMinutes(), series.intervalWeeks(),
+                series.weekdays().stream().map(DayOfWeek::getValue).sorted().toList())
+                .endsOn(series.endsOn())
+                .occurrenceCount(series.occurrenceCount())
+                .note(series.note());
+    }
+
+    private static ApiSubjectAccessMessage toMessage(PersonMessageHistory.Message message) {
+        return new ApiSubjectAccessMessage(WireTypes.toOffsetDateTime(message.queuedAt()),
+                ApiMessageKind.fromValue(message.kind().name()),
+                ApiMessageState.fromValue(message.state().name()))
+                .settledAt(WireTypes.toOffsetDateTime(message.settledAt()))
+                .reason(message.reason())
+                .statusCode(message.statusCode())
+                .messageId(message.messageId());
+    }
+
+    private static ApiSubjectAccessDeclinedMessage toDeclined(PersonMessageHistory.Declined declined) {
+        return new ApiSubjectAccessDeclinedMessage(ApiMessageKind.fromValue(declined.kind().name()),
+                WireTypes.toOffsetDateTime(declined.declinedAt()));
     }
 
     private static ApiSubjectAccessAccount toAccount(SubjectAccessRecord.Account account) {
@@ -57,7 +100,7 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
         return new ApiSubjectAccessAccount(account.accountId(), account.username(), account.locale(),
                 account.enabled(), WireTypes.toOffsetDateTime(account.createdAt()),
                 ApiSubjectAccessAccount.CredentialStateEnum.fromValue(account.credentialState().name()),
-                account.roles().stream().map(role -> ApiRole.fromValue(role.name())).sorted().toList())
+                account.roles().stream().map(Role::name).sorted().map(ApiRole::fromValue).toList())
                 .passwordChangeRequired(account.passwordChangeRequired())
                 .credentialsExpireAt(WireTypes.toOffsetDateTime(account.credentialsExpireAt()));
     }

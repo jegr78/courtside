@@ -1710,10 +1710,17 @@ deliver the implementation.
   page. `POST /api/admin/export/person/{personId}` produces, as one JSON file, the person and
   their address, the account they hold with its roles and its state, the membership and the
   period it ran, the bookings they made and the bookings somebody else recorded them in, the
-  member numbers an import linked them by, and the change log from both sides — what was done to
-  them, and what they did. The club is the controller and a request may arrive by letter, so the
-  board is who produces the answer; people exist in the roster without an account, and
-  self-service would leave them with no way to ask.
+  recurring bookings they set up, what became of every message this instance addressed to them
+  and which kinds they asked not to receive, the member numbers an import linked them by, and the
+  change log from both sides — what was done to them, and what they did. The club is the
+  controller and a request may arrive by letter, so the board is who produces the answer; people
+  exist in the roster without an account, and self-service would leave them with no way to ask.
+
+  **The answer is produced whole.** No section of it is paged or capped, because a subject access
+  answer that stops at a hundred entries is not one — a board member who has administered the club
+  for years is the actor of every configuration change it ever recorded, and all of them are
+  theirs. The cost is a single response held in memory, bounded by one club's own history and
+  reachable only by an administrator asking about one person.
 
   **It answers about one person and nobody else, and the shapes carry that rather than a
   condition.** A booking they made lists its courts and its times and has no field for the people

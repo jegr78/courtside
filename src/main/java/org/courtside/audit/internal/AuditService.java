@@ -56,8 +56,6 @@ public class AuditService implements PersonAuditTrail {
                 .toList();
     }
 
-    // Without the guard a missing account id matches every entry recorded without an actor, which
-    // is the whole unattended change log rather than one person's part in it.
     @Override
     public List<ActorEntry> recordedBy(UUID actorAccountId) {
         requireIdentifier(actorAccountId, "actor account");
@@ -66,6 +64,8 @@ public class AuditService implements PersonAuditTrail {
                 .toList();
     }
 
+    // A missing id would not narrow the query, it would widen it: an actor column that is null
+    // matches every change nobody is recorded as making.
     private static void requireIdentifier(UUID identifier, String what) {
         if (identifier == null) {
             throw new IllegalStateException("An audit trail needs a " + what + " id");

@@ -1997,10 +1997,56 @@ components:
         occurredAt: { type: string, format: date-time }
         eventType: { type: string }
 
+    SubjectAccessSeries:
+      type: object
+      required: [seriesId, createdAt, startsOn, startTime, durationMinutes, intervalWeeks,
+                 weekdays]
+      description: A recurring booking this person set up.
+      properties:
+        seriesId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        startsOn: { type: string, format: date }
+        startTime: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        durationMinutes: { type: integer }
+        intervalWeeks: { type: integer }
+        weekdays:
+          type: array
+          description: Ascending ISO day numbers, Monday being 1.
+          items: { type: integer, minimum: 1, maximum: 7 }
+        endsOn: { type: [string, "null"], format: date }
+        occurrenceCount: { type: [integer, "null"] }
+        note: { type: [string, "null"] }
+
+    SubjectAccessMessage:
+      type: object
+      required: [queuedAt, kind, state]
+      description: |
+        What became of one message this instance addressed to this person. It says what was sent
+        and how it went, never what it said: the record holds no body and no address of its own.
+      properties:
+        queuedAt: { type: string, format: date-time }
+        settledAt: { type: [string, "null"], format: date-time }
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        state: { $ref: "#/components/schemas/MessageState" }
+        reason:
+          type: [string, "null"]
+          description: The kinds of failure the mail library reported, where a handover failed.
+        statusCode: { type: [string, "null"] }
+        messageId: { type: [string, "null"] }
+
+    SubjectAccessDeclinedMessage:
+      type: object
+      required: [kind, declinedAt]
+      description: A kind of message this person asked not to receive.
+      properties:
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        declinedAt: { type: string, format: date-time }
+
     SubjectAccessExport:
       type: object
       required: [producedAt, personId, firstName, lastName, memberships, bookingsMade,
-                 bookingsRecordedIn, externalReferences, changesAsSubject, changesAsActor]
+                 bookingsRecordedIn, bookingSeries, messages, declinedMessages,
+                 externalReferences, changesAsSubject, changesAsActor]
       description: |
         Everything this instance holds about one person, and nothing it holds about anybody else.
       properties:
@@ -2023,6 +2069,15 @@ components:
         bookingsRecordedIn:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessParticipation" }
+        bookingSeries:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessSeries" }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessMessage" }
+        declinedMessages:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessDeclinedMessage" }
         externalReferences:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessExternalReference" }

@@ -132,6 +132,23 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
+  test(`${locale} one person's administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await page.locator("#locale-preference").selectOption(locale);
+    await signIn(page, "configuration-admin");
+    await page.goto("/admin/roster");
+    await expect(page.getByTestId("create-person")).toBeVisible();
+
+    // when — the page a board spends its time on, with every control a person can carry
+    await page.locator('[data-testid^="person-link-"]').first().click();
+    await expect(page.getByTestId("admin-person-view")).toBeVisible();
+    await expect(page.getByTestId("export-person-data")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+  });
+
   test(`${locale} membership type administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");

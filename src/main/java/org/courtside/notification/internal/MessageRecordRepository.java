@@ -14,6 +14,8 @@ interface MessageRecordRepository extends JpaRepository<MessageRecord, UUID> {
 
     List<MessageRecord> findAllByIdIn(Collection<UUID> ids);
 
+    List<MessageRecord> findByAccountIdOrderByQueuedAtAscQueuedSeqAsc(UUID accountId);
+
     @Query("""
             SELECT record.id FROM MessageRecord record
             WHERE (:restricted = FALSE OR record.accountId IN :accountIds)

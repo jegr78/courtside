@@ -2,6 +2,7 @@ package org.courtside.dataexchange.internal;
 
 import org.courtside.audit.PersonAuditTrail;
 import org.courtside.booking.PersonBookingHistory;
+import org.courtside.notification.PersonMessageHistory;
 import org.courtside.identity.CredentialState;
 import org.courtside.identity.Role;
 import org.jspecify.annotations.Nullable;
@@ -17,6 +18,9 @@ public record SubjectAccessRecord(Instant producedAt, UUID personId, String firs
                                   List<Membership> memberships,
                                   List<PersonBookingHistory.Made> bookingsMade,
                                   List<PersonBookingHistory.Recorded> bookingsRecordedIn,
+                                  List<PersonBookingHistory.Series> bookingSeries,
+                                  List<PersonMessageHistory.Message> messages,
+                                  List<PersonMessageHistory.Declined> declinedMessages,
                                   List<Reference> externalReferences,
                                   List<PersonAuditTrail.SubjectEntry> changesAsSubject,
                                   List<PersonAuditTrail.ActorEntry> changesAsActor) {

@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -147,6 +148,22 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.bookingsMade").value(hasSize(0)))
                 .andExpect(jsonPath("$.changesAsActor").value(hasSize(0)))
                 .andExpect(jsonPath("$.changesAsSubject").value(hasSize(1)));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonTheClubHasNoAddressFor_whenABoardAsks_thenTheAnswerSaysSoRatherThanEmpty()
+            throws Exception {
+        // given
+        UUID personId = roster.addPerson("John", "Roe", null);
+
+        // when / then
+        mockMvc.perform(export(personId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(nullValue()))
+                .andExpect(jsonPath("$.messages").value(hasSize(0)))
+                .andExpect(jsonPath("$.declinedMessages").value(hasSize(0)))
+                .andExpect(jsonPath("$.bookingSeries").value(hasSize(0)));
     }
 
     @Test

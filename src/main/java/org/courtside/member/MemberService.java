@@ -70,7 +70,9 @@ public class MemberService {
     }
 
     public Optional<String> membershipTypeNameOf(UUID membershipTypeId) {
-        return membershipTypes.findById(membershipTypeId).map(MembershipType::getName);
+        return membershipTypeId == null
+                ? Optional.empty()
+                : membershipTypes.findById(membershipTypeId).map(MembershipType::getName);
     }
 
     public List<MembershipType> allMembershipTypes() {

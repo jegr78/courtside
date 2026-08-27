@@ -1,8 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { downloadJson } from "./downloadJson";
 
 describe("downloadJson", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -36,5 +41,16 @@ describe("downloadJson", () => {
 
     // then
     expect(revoked()).toBe(0);
+  });
+
+  it("given the file has been read long since, when time has passed, then the answer stops being addressable", () => {
+    // given
+    const { revoked } = offer();
+
+    // when
+    vi.advanceTimersByTime(60_000);
+
+    // then
+    expect(revoked()).toBe(1);
   });
 });

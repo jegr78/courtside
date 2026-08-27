@@ -1,7 +1,11 @@
 package org.courtside.booking;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public interface PersonBookingHistory {
@@ -26,7 +30,18 @@ public interface PersonBookingHistory {
         }
     }
 
+    record Series(UUID seriesId, Instant createdAt, LocalDate startsOn, LocalTime startTime,
+                  int durationMinutes, int intervalWeeks, Set<DayOfWeek> weekdays,
+                  LocalDate endsOn, Integer occurrenceCount, String note) {
+
+        public Series {
+            weekdays = Set.copyOf(weekdays);
+        }
+    }
+
     List<Made> madeBy(UUID accountId);
+
+    List<Series> seriesCreatedBy(UUID accountId);
 
     List<Recorded> recordedIn(UUID personId);
 }

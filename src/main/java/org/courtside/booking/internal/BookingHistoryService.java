@@ -5,6 +5,8 @@ import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.PersonBookingHistory;
+import org.courtside.booking.series.BookingSeries;
+import org.courtside.booking.series.BookingSeriesRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,7 @@ import java.util.UUID;
 public class BookingHistoryService implements PersonBookingHistory {
 
     private final BookingRepository bookings;
+    private final BookingSeriesRepository series;
 
     @Override
     public List<Made> madeBy(UUID accountId) {
@@ -35,6 +38,22 @@ public class BookingHistoryService implements PersonBookingHistory {
                 .map(booking -> new Recorded(booking.getId(), booking.getStatus(),
                         reservationsOf(booking)))
                 .toList();
+    }
+
+    @Override
+    public List<Series> seriesCreatedBy(UUID accountId) {
+        requireIdentifier(accountId, "account");
+        return series.findByCreatedByOrderByCreatedAtAscIdAsc(accountId).stream()
+                .map(BookingHistoryService::toSeries)
+                .toList();
+    }
+
+    private static Series toSeries(BookingSeries recurrence) {
+        return new Series(recurrence.getId(), recurrence.getCreatedAt(),
+                recurrence.getRule().startsOn(), recurrence.getRule().startTime(),
+                recurrence.getRule().durationMinutes(), recurrence.getRule().intervalWeeks(),
+                recurrence.getRule().weekdays(), recurrence.getRule().endsOn(),
+                recurrence.getRule().occurrenceCount(), recurrence.getNote());
     }
 
     private static List<Reservation> reservationsOf(Booking booking) {
