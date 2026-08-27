@@ -76,8 +76,8 @@ function argument(name) {
 
 export function profileSummary(plan) {
   const safe = (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;").replaceAll("\\", "\\\\").replaceAll("`", "\\`")
-    .replaceAll("|", "\\|").replaceAll("@", "&#64;").replace(/[\u0000-\u001f\u007f]/g,
+    .replaceAll(">", "&gt;").replaceAll("|", "&#124;").replaceAll("@", "&#64;")
+    .replace(/[\u0000-\u001f\u007f]/g,
       (character) => `\\u${character.codePointAt(0).toString(16).padStart(4, "0")}`);
   return [
     "# Observed test profiles",
@@ -88,7 +88,7 @@ export function profileSummary(plan) {
     "",
     "| Status | Path | Profile | Reason |",
     "| --- | --- | --- | --- |",
-    ...plan.reasons.map((reason) => `| ${safe(reason.status ?? "label")} | \`${safe(reason.path ?? "ci:full")}\` | ${safe(reason.profile)} | ${safe(reason.code)} |`),
+    ...plan.reasons.map((reason) => `| ${safe(reason.status ?? "label")} | <code>${safe(reason.path ?? "ci:full")}</code> | ${safe(reason.profile)} | ${safe(reason.code)} |`),
     ""
   ].join("\n");
 }

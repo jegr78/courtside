@@ -95,12 +95,13 @@ test("givenNullDelimitedGitEvidence_whenParsing_thenRenamesKeepBothPathsAndMalfo
 
 test("givenARepositoryPathContainsMarkdown_whenRenderingReasons_thenItCannotInjectSummaryContent", () => {
   // given
-  const plan = classifyChanges([{ status: "M", path: "unknown/<b>@team|`name\n.md" }], []);
+  const plan = classifyChanges([{ status: "M", path: "unknown/<b>@team|`[open](https://example.org)\n.md" }], []);
 
   // when
   const rendered = profileSummary(plan);
 
   // then
-  assert.doesNotMatch(rendered, /<b>|@team|name\n\.md/);
-  assert.match(rendered, /&lt;b&gt;.*&#64;team.*\\\|.*\\`name\\u000a\.md/);
+  assert.doesNotMatch(rendered, /<b>|@team|\)\n\.md/);
+  assert.match(rendered,
+    /<code>unknown\/&lt;b&gt;&#64;team&#124;`\[open\]\(https:\/\/example\.org\)\\u000a\.md<\/code>/);
 });
