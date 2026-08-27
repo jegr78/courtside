@@ -111,10 +111,10 @@ async function whileDatabaseLockIsContended<T>(
   return outcomes.map((outcome) => (outcome as PromiseFulfilledResult<T>).value);
 }
 
-test("two members receive one booking and one actionable conflict for the same slot", async ({ browser, journeyService }, testInfo) => {
+test("two members receive one booking and one actionable conflict for the same slot", async ({ pinnedBrowser, journeyService }, testInfo) => {
   // given
-  const first = await journeyContext(browser);
-  const second = await journeyContext(browser);
+  const first = await journeyContext(pinnedBrowser);
+  const second = await journeyContext(pinnedBrowser);
   const firstPage = await first.newPage();
   const secondPage = await second.newPage();
   await Promise.all([
@@ -157,9 +157,9 @@ test("two members receive one booking and one actionable conflict for the same s
   await Promise.all([first.close(), second.close()]);
 });
 
-test("duplicate browser delivery with one idempotency key creates one logical booking", async ({ browser, journeyService }, testInfo) => {
+test("duplicate browser delivery with one idempotency key creates one logical booking", async ({ pinnedBrowser, journeyService }, testInfo) => {
   // given
-  const context = await memberContext(browser, journeyService, "roe.jane");
+  const context = await memberContext(pinnedBrowser, journeyService, "roe.jane");
   const pages = context.pages();
   const page = pages[0];
   const time = await slot(journeyService);
@@ -225,10 +225,10 @@ test("a court and a member role changed behind an open dialog fail closed", asyn
   expect(await journeyService.executeSql("SELECT count(*) FROM booking WHERE idempotency_key IS NOT NULL")).toBe("0");
 });
 
-test("concurrent participant-card claims leave exactly one capacity owner", async ({ browser, journeyService }, testInfo) => {
+test("concurrent participant-card claims leave exactly one capacity owner", async ({ pinnedBrowser, journeyService }, testInfo) => {
   // given
-  const first = await memberContext(browser, journeyService, "roe.jane");
-  const second = await memberContext(browser, journeyService, "keeper.roe");
+  const first = await memberContext(pinnedBrowser, journeyService, "roe.jane");
+  const second = await memberContext(pinnedBrowser, journeyService, "keeper.roe");
   const firstPage = first.pages()[0];
   const secondPage = second.pages()[0];
   const time = await slot(journeyService);
@@ -270,10 +270,10 @@ test("concurrent participant-card claims leave exactly one capacity owner", asyn
   await Promise.all([first.close(), second.close()]);
 });
 
-test("a series move and scoped cancellation serialize without a partial occurrence", async ({ browser, journeyService }, testInfo) => {
+test("a series move and scoped cancellation serialize without a partial occurrence", async ({ pinnedBrowser, journeyService }, testInfo) => {
   // given
-  const first = await memberContext(browser, journeyService, "doe.jane");
-  const second = await memberContext(browser, journeyService, "doe.jane");
+  const first = await memberContext(pinnedBrowser, journeyService, "doe.jane");
+  const second = await memberContext(pinnedBrowser, journeyService, "doe.jane");
   const movePage = first.pages()[0];
   const cancelPage = second.pages()[0];
   let arrivals = 0;
@@ -316,9 +316,9 @@ test("a series move and scoped cancellation serialize without a partial occurren
   await Promise.all([first.close(), second.close()]);
 });
 
-test("logout invalidates every tab and browser history reveals no personal view", async ({ browser, journeyService }) => {
+test("logout invalidates every tab and browser history reveals no personal view", async ({ pinnedBrowser, journeyService }) => {
   // given
-  const context = await journeyContext(browser);
+  const context = await journeyContext(pinnedBrowser);
   const first = await context.newPage();
   await context.addCookies([{
     name: "SESSION", value: "attacker-fixed-session", url: journeyService.baseURL
@@ -370,11 +370,11 @@ test("an expired session rejects a mutation from an open dialog", async ({ page,
   expect(await journeyService.executeSql("SELECT count(*) FROM booking WHERE idempotency_key IS NOT NULL")).toBe("0");
 });
 
-test("an initial password change ends every active session for the account", async ({ browser, journeyService }) => {
+test("an initial password change ends every active session for the account", async ({ pinnedBrowser, journeyService }) => {
   // given
   await journeyService.executeSql("UPDATE user_account SET password_change_required = true WHERE username = 'roe.jane'");
-  const first = await journeyContext(browser);
-  const second = await journeyContext(browser);
+  const first = await journeyContext(pinnedBrowser);
+  const second = await journeyContext(pinnedBrowser);
   const firstPage = await first.newPage();
   const secondPage = await second.newPage();
   const restrictedLogin = async (page: Page) => {

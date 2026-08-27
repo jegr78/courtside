@@ -11,6 +11,7 @@ function journeyService(): { service: JourneyService; calls: Record<string, Retu
     pinnedBrowser: vi.fn().mockResolvedValue("ws://127.0.0.1/browser"),
     releasePinnedBrowser: vi.fn().mockResolvedValue(undefined),
     browserDiagnostics: vi.fn().mockResolvedValue({ browserName: "webkit", containerState: { OOMKilled: false } }),
+    recordBrowserTest: vi.fn().mockResolvedValue(undefined),
     executeSql: vi.fn().mockResolvedValue("result"),
     holdDatabaseLock: vi.fn().mockResolvedValue(lock),
     publishServiceWorkerUpdate: vi.fn().mockResolvedValue(undefined),
@@ -25,6 +26,7 @@ function journeyService(): { service: JourneyService; calls: Record<string, Retu
     pinnedBrowser: calls.pinnedBrowser,
     releasePinnedBrowser: calls.releasePinnedBrowser,
     browserDiagnostics: calls.browserDiagnostics,
+    recordBrowserTest: calls.recordBrowserTest,
     executeSql: calls.executeSql,
     holdDatabaseLock: calls.holdDatabaseLock,
     publishServiceWorkerUpdate: calls.publishServiceWorkerUpdate,
@@ -45,6 +47,7 @@ describe("journey control", () => {
       // when
       const browser = await remote.pinnedBrowser("webkit");
       const diagnostics = await remote.browserDiagnostics("webkit", "browser-disconnected");
+      await remote.recordBrowserTest("webkit", "webkit-accessibility", 1, "start");
       await remote.releasePinnedBrowser("webkit");
       const sql = await remote.executeSql("SELECT 1");
       const lock = await remote.holdDatabaseLock("LOCK TABLE booking");
@@ -66,6 +69,7 @@ describe("journey control", () => {
       expect(waiters).toBe("waiting");
       expect(calls.pinnedBrowser).toHaveBeenCalledWith("webkit");
       expect(calls.browserDiagnostics).toHaveBeenCalledWith("webkit", "browser-disconnected", undefined);
+      expect(calls.recordBrowserTest).toHaveBeenCalledWith("webkit", "webkit-accessibility", 1, "start");
       expect(calls.releasePinnedBrowser).toHaveBeenCalledWith("webkit");
       expect(calls.executeSql).toHaveBeenCalledWith("SELECT 1");
       expect(calls.holdDatabaseLock).toHaveBeenCalledWith("LOCK TABLE booking", expect.any(AbortSignal));

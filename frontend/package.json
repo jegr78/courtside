@@ -28,8 +28,10 @@
     "test:uat": "node ../tools/courtside.uat-smoke.mjs",
     "test:e2e": "playwright test",
     "reliability:webkit": "node ../tools/webkit-reliability.mjs run",
+    "reliability:webkit-experiment": "node ../tools/webkit-reliability.mjs experiment",
     "reliability:validate": "node ../tools/webkit-reliability.mjs validate",
-    "reliability:summarize": "node ../tools/webkit-reliability.mjs summarize"
+    "reliability:summarize": "node ../tools/webkit-reliability.mjs summarize",
+    "reliability:compare": "node ../tools/webkit-reliability.mjs compare"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "5.3.0",

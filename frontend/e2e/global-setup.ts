@@ -1,11 +1,12 @@
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { execFile, spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
-import { appendFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { appendFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomUUID, X509Certificate } from "node:crypto";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { promisify } from "node:util";
 import { GenericContainer, Network, Wait,
   type StartedNetwork, type StartedTestContainer } from "testcontainers";
 import type { FullConfig } from "@playwright/test";
@@ -19,6 +20,10 @@ import {
   type BrowserFailureReason
 } from "./browser-diagnostics";
 import { startJourneyControl } from "./journey-control";
+import { browserExitState, BrowserLifecycleRecorder, browserResourceUsage } from "./browser-lifecycle";
+import { completeCleanup } from "./resource-cleanup";
+
+const executeFile = promisify(execFile);
 
 const PINNED_BROWSER_IMAGE =
   "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e";
@@ -268,6 +273,8 @@ export interface JourneyService {
   releasePinnedBrowser(browserName: string): Promise<void>;
   browserDiagnostics(browserName: string, reason: BrowserFailureReason,
     failedTest?: FailedTest): Promise<BrowserDiagnostics>;
+  recordBrowserTest(browserName: string, projectName: string, testPosition: number,
+    phase: "start" | "end"): Promise<void>;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string, signal?: AbortSignal): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): Promise<void>;
@@ -406,16 +413,45 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const applicationLog = applicationLogBuffer(200);
   let staticDirectory: string | undefined;
   const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string }>();
+  const browserLifecycle = new BrowserLifecycleRecorder();
+  const browserLifecyclePath = resolve("test-results", "browser-lifecycle.json");
+  rmSync(browserLifecyclePath, { force: true });
+  const retainBrowserLifecycle = () => {
+    writeFileSync(browserLifecyclePath, `${JSON.stringify(browserLifecycle.evidence(), null, 2)}\n`, { mode: 0o600 });
+  };
+  const dockerJson = async (args: string[]): Promise<unknown> => {
+    const result = await executeFile("docker", args, { maxBuffer: 1024 * 1024, timeout: 5_000 });
+    return JSON.parse(result.stdout);
+  };
+  const stopBrowser = async (browserName: string): Promise<void> => {
+    const browser = browserServers.get(browserName);
+    if (!browser) return;
+    const id = browser.container.getId();
+    try {
+      await completeCleanup([
+        async () => {
+          await browser.container.stop({ remove: false });
+          browserLifecycle.finish(browserName,
+            browserExitState(await dockerJson(["inspect", "--format", "{{json .State}}", id])), new Date().toISOString());
+          retainBrowserLifecycle();
+        },
+        () => executeFile("docker", ["rm", "-f", id], { timeout: 5_000 })
+      ]);
+    } finally {
+      browserServers.delete(browserName);
+    }
+  };
   let clubNetwork: StartedNetwork | undefined;
   let clubProxy: StartedTestContainer | undefined;
   let mailSink: StartedTestContainer | undefined;
   const stopContainers = async () => {
-    await Promise.all([...browserServers.values()].map((server) => server.container.stop()));
-    browserServers.clear();
-    await clubProxy?.stop();
-    await mailSink?.stop();
-    await postgres?.stop();
-    await clubNetwork?.stop();
+    await completeCleanup([
+      () => completeCleanup([...browserServers.keys()].map((browserName) => () => stopBrowser(browserName))),
+      async () => { await clubProxy?.stop(); },
+      async () => { await mailSink?.stop(); },
+      async () => { await postgres?.stop(); },
+      async () => { await clubNetwork?.stop(); }
+    ]);
   };
   try {
     const visualDate = journeyDate;
@@ -604,13 +640,12 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         .start();
       const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
       browserServers.set(browserName, { container, endpoint });
+      browserLifecycle.start(browserName, container.getId(), new Date().toISOString());
+      retainBrowserLifecycle();
       return endpoint;
     };
     const releasePinnedBrowser = async (browserName: string): Promise<void> => {
-      const browser = browserServers.get(browserName);
-      if (!browser) return;
-      await browser.container.stop();
-      browserServers.delete(browserName);
+      await stopBrowser(browserName);
     };
     return {
       baseURL: `https://${CLUB_HOST}`,
@@ -638,6 +673,14 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         });
         retainBrowserDiagnostics(diagnostics);
         return diagnostics;
+      },
+      recordBrowserTest: async (browserName, projectName, testPosition, phase) => {
+        const browser = browserServers.get(browserName);
+        if (!browser) throw new Error(`No pinned ${browserName} browser exists`);
+        browserLifecycle.sample(browserName, projectName, testPosition, phase,
+          browserResourceUsage(await dockerJson(["stats", "--no-stream", "--format", "{{json .}}",
+            browser.container.getId()])), new Date().toISOString());
+        retainBrowserLifecycle();
       },
       executeSql,
       holdDatabaseLock,

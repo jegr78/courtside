@@ -7,6 +7,7 @@ import test from "node:test";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const accessibility = readFileSync(join(root, "frontend/e2e/accessibility.spec.ts"), "utf8");
+const concurrentSession = readFileSync(join(root, "frontend/e2e/concurrent-session.spec.ts"), "utf8");
 const documentation = readFileSync(join(root, "docs/accessibility-testing.md"), "utf8");
 const fixtures = readFileSync(join(root, "frontend/e2e/fixtures.ts"), "utf8");
 const playwright = readFileSync(join(root, "frontend/playwright.config.ts"), "utf8");
@@ -27,14 +28,16 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.match(fixtures, /connect\(await journeyService\.pinnedBrowser\(browserName\)\)/);
   assert.match(fixtures, /observeBrowserDisconnect\(pinned/);
   assert.match(fixtures, /journeyService\.browserDiagnostics\(browserName, "browser-disconnected"\)/);
-  assert.match(fixtures, /failureDiagnostics: \[async \(\{ browser, browserName, journeyService, page \}/);
-  assert.match(fixtures, /if \(!browser\.isConnected\(\)\) return;/);
+  assert.match(fixtures, /failureDiagnostics: \[async \(\{ pinnedBrowser, browserName, journeyService, page \}/);
+  assert.match(fixtures, /if \(!pinnedBrowser\.isConnected\(\)\) return;/);
   assert.match(fixtures, /diagnoseUnexpectedBrowserTest\(\{/);
   assert.match(fixtures, /status: testInfo\.status/);
   assert.match(fixtures, /\(reason\) => journeyService\.browserDiagnostics\(browserName, reason, \{/);
   assert.match(fixtures, /title: testInfo\.title/);
   assert.match(fixtures, /errors: testInfo\.errors\.map/);
   assert.doesNotMatch(fixtures, /\.launch\(/);
+  assert.doesNotMatch(concurrentSession, /async \(\{ browser[, }]/);
+  assert.match(concurrentSession, /async \(\{ pinnedBrowser, journeyService \}/);
 });
 
 test("given browser gates fail, when reporting their outcome, then product and harness claims remain distinct", () => {
