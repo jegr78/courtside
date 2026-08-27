@@ -4,7 +4,7 @@
   "title": "Courtside WebKit reliability first-attempt record",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "attemptId", "sourceCommit", "sourceTreeState", "startedAt", "finishedAt", "durationMs", "executionDeadlineMs", "terminationGraceMs", "toolchain", "matrix", "host", "outcome"],
+  "required": ["schemaVersion", "attemptId", "sourceCommit", "sourceTreeState", "startedAt", "finishedAt", "durationMs", "executionDeadlineMs", "terminationGraceMs", "toolchain", "matrix", "host", "testPopulation", "browserLifecycle", "outcome"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "attemptId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
@@ -28,11 +28,12 @@
     "matrix": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["projectOrder", "isolationVariant", "resourceProfile"],
+      "required": ["projectOrder", "isolationVariant", "resourceProfile", "seedFingerprint"],
       "properties": {
         "projectOrder": { "enum": ["configured", "reversed"] },
-        "isolationVariant": { "const": "fresh-project-browser" },
-        "resourceProfile": { "enum": ["local-default", "github-hosted-default"] }
+        "isolationVariant": { "enum": ["fresh-project-browser", "fresh-test-browser"] },
+        "resourceProfile": { "enum": ["local-default", "github-hosted-default"] },
+        "seedFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
       }
     },
     "host": {
@@ -46,6 +47,64 @@
         "cpuCount": { "type": "integer", "minimum": 1 },
         "totalMemoryBytes": { "type": "integer", "minimum": 1 },
         "runnerImage": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 128 }
+      }
+    },
+    "testPopulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "fingerprint"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "browserLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "processes"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "processes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["processId", "browserName", "startedAt", "samples"],
+            "properties": {
+              "processId": { "type": "string", "pattern": "^[a-f0-9]{12,64}$|^browser-[0-9]+$" },
+              "browserName": { "enum": ["webkit"] },
+              "projectName": { "enum": ["webkit-core", "webkit-pwa", "webkit-accessibility"] },
+              "startedAt": { "type": "string", "format": "date-time" },
+              "finishedAt": { "type": "string", "format": "date-time" },
+              "durationMs": { "type": "integer", "minimum": 0 },
+              "samples": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["recordedAt", "testPosition", "phase", "memoryUsageBytes", "cpuPercent"],
+                  "properties": {
+                    "recordedAt": { "type": "string", "format": "date-time" },
+                    "testPosition": { "type": "integer", "minimum": 1 },
+                    "phase": { "enum": ["start", "end"] },
+                    "memoryUsageBytes": { "type": "integer", "minimum": 0 },
+                    "cpuPercent": { "type": "number", "minimum": 0 }
+                  }
+                }
+              },
+              "exitState": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["exitCode", "oomKilled", "hasError"],
+                "properties": {
+                  "exitCode": { "type": "integer", "minimum": 0 },
+                  "oomKilled": { "type": "boolean" },
+                  "hasError": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "outcome": {

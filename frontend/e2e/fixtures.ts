@@ -2,6 +2,7 @@ import { expect, test as base, type Browser, type BrowserContext, type Metadata,
 import { journeyInstant, type JourneyService } from "./global-setup";
 import { connectJourneyService, type JourneyControlReference } from "./journey-control";
 import { diagnoseUnexpectedBrowserTest, observeBrowserDisconnect } from "./browser-diagnostics";
+import { browserFixtureScope, browserIsolationVariant } from "./browser-isolation";
 
 // Every browser is drawn from the pinned image, so a run compares like for like anywhere.
 // A project on the plain origin covers the club that serves Courtside without TLS.
@@ -10,9 +11,11 @@ const usesPlainOrigin = (project: { metadata: Metadata }): boolean =>
 
 interface WorkerFixtures {
   journeyService: JourneyService;
+  pinnedBrowser: Browser;
 }
 
 interface TestFixtures {
+  browserLifecycle: void;
   failureDiagnostics: void;
   resetJourney: void;
 }
@@ -23,9 +26,38 @@ export async function journeyContext(browser: Browser): Promise<BrowserContext> 
   return context;
 }
 
+const browserScope = browserFixtureScope(browserIsolationVariant());
+let testPosition = 0;
+
 async function pinJourneyClock(context: BrowserContext): Promise<void> {
   // Date.now stands still with it.
   await context.clock.setFixedTime(new Date(journeyInstant));
+}
+
+async function pinnedBrowserFixture(
+  { playwright, browserName, journeyService }: {
+    playwright: typeof import("playwright-core");
+    browserName: "chromium" | "firefox" | "webkit";
+    journeyService: JourneyService;
+  },
+  provide: (browser: Browser) => Promise<void>
+): Promise<void> {
+  const pinned = await playwright[browserName].connect(await journeyService.pinnedBrowser(browserName));
+  const finishDiagnostics = observeBrowserDisconnect(pinned,
+    () => journeyService.browserDiagnostics(browserName, "browser-disconnected"));
+  try {
+    await provide(pinned);
+  } finally {
+    try {
+      await finishDiagnostics();
+    } finally {
+      try {
+        if (pinned.isConnected()) await pinned.close();
+      } finally {
+        await journeyService.releasePinnedBrowser(browserName);
+      }
+    }
+  }
 }
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
@@ -35,40 +67,37 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     if (!serialized) throw new Error("Global setup did not publish the journey control endpoint");
     await provide(connectJourneyService(JSON.parse(serialized) as JourneyControlReference));
   }, { scope: "worker" }],
-  browser: [async ({ playwright, browserName, journeyService }, provide) => {
-    const pinned = await playwright[browserName].connect(await journeyService.pinnedBrowser(browserName));
-    const finishDiagnostics = observeBrowserDisconnect(pinned,
-      () => journeyService.browserDiagnostics(browserName, "browser-disconnected"));
-    try {
-      await provide(pinned);
-    } finally {
-      try {
-        await finishDiagnostics();
-      } finally {
-        try {
-          if (pinned.isConnected()) await pinned.close();
-        } finally {
-          await journeyService.releasePinnedBrowser(browserName);
-        }
-      }
-    }
-  }, { scope: "worker" }],
+  pinnedBrowser: [pinnedBrowserFixture, { scope: browserScope }] as never,
   baseURL: async ({ journeyService }, provide, testInfo) => {
     await provide(usesPlainOrigin(testInfo.project)
       ? journeyService.plainBaseURL
       : journeyService.baseURL);
   },
-  context: async ({ context }, provide) => {
-    await pinJourneyClock(context);
-    await provide(context);
+  context: async ({ pinnedBrowser }, provide) => {
+    const context = await journeyContext(pinnedBrowser);
+    try {
+      await provide(context);
+    } finally {
+      await context.close();
+    }
   },
-  failureDiagnostics: [async ({ browser, browserName, journeyService, page }, provide, testInfo) => {
+  browserLifecycle: [async ({ pinnedBrowser, browserName, journeyService }, provide, testInfo) => {
+    void pinnedBrowser;
+    const position = ++testPosition;
+    await journeyService.recordBrowserTest(browserName, testInfo.project.name, position, "start");
+    try {
+      await provide();
+    } finally {
+      await journeyService.recordBrowserTest(browserName, testInfo.project.name, position, "end");
+    }
+  }, { auto: true }],
+  failureDiagnostics: [async ({ pinnedBrowser, browserName, journeyService, page }, provide, testInfo) => {
     let pageCrashed = false;
     const crashed = () => { pageCrashed = true; };
     page.on("crash", crashed);
     await provide();
     page.removeListener("crash", crashed);
-    if (!browser.isConnected()) return;
+    if (!pinnedBrowser.isConnected()) return;
     await diagnoseUnexpectedBrowserTest({
       status: testInfo.status,
       expectedStatus: testInfo.expectedStatus,

@@ -14,7 +14,7 @@ export interface JourneyControlReference {
 }
 
 interface JourneyCommand {
-  operation: "pinnedBrowser" | "releasePinnedBrowser" | "browserDiagnostics" | "executeSql" | "holdDatabaseLock" | "waitForWaiters"
+  operation: "pinnedBrowser" | "releasePinnedBrowser" | "browserDiagnostics" | "recordBrowserTest" | "executeSql" | "holdDatabaseLock" | "waitForWaiters"
     | "releaseLock" | "publishServiceWorkerUpdate" | "reset" | "restart";
   browserName?: string;
   reason?: string;
@@ -22,6 +22,9 @@ interface JourneyCommand {
   sql?: string;
   lockId?: string;
   count?: number;
+  projectName?: string;
+  testPosition?: number;
+  phase?: string;
 }
 
 interface JourneyResponse {
@@ -71,6 +74,18 @@ function requiredCount(value: number | undefined): number {
   return value;
 }
 
+function requiredTestPosition(value: number | undefined): number {
+  if (value === undefined || !Number.isInteger(value) || value < 1) {
+    throw new Error("Journey control command requires a positive test position");
+  }
+  return value;
+}
+
+function requiredLifecyclePhase(value: string | undefined): "start" | "end" {
+  if (value !== "start" && value !== "end") throw new Error("Journey control command requires a lifecycle phase");
+  return value;
+}
+
 async function executeCommand(command: JourneyCommand, service: JourneyService,
   locks: Map<string, DatabaseLock>, signal: AbortSignal): Promise<unknown> {
   switch (command.operation) {
@@ -78,6 +93,9 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
     case "releasePinnedBrowser": return service.releasePinnedBrowser(requiredString(command.browserName, "browserName"));
     case "browserDiagnostics": return service.browserDiagnostics(requiredString(command.browserName, "browserName"),
       requiredBrowserFailureReason(command.reason), optionalFailedTest(command.failedTest));
+    case "recordBrowserTest": return service.recordBrowserTest(requiredString(command.browserName, "browserName"),
+      requiredString(command.projectName, "projectName"), requiredTestPosition(command.testPosition),
+      requiredLifecyclePhase(command.phase));
     case "executeSql": return service.executeSql(requiredString(command.sql, "sql"));
     case "holdDatabaseLock": {
       const lockId = randomUUID();
@@ -178,6 +196,8 @@ export function connectJourneyService(reference: JourneyControlReference): Journ
     releasePinnedBrowser: (browserName) => command(reference, { operation: "releasePinnedBrowser", browserName }),
     browserDiagnostics: (browserName, reason, failedTest) => command<BrowserDiagnostics>(reference,
       { operation: "browserDiagnostics", browserName, reason, failedTest }),
+    recordBrowserTest: (browserName, projectName, testPosition, phase) => command(reference,
+      { operation: "recordBrowserTest", browserName, projectName, testPosition, phase }),
     executeSql: (sql) => command(reference, { operation: "executeSql", sql }),
     holdDatabaseLock: async (sql) => {
       const lockId = await command<string>(reference, { operation: "holdDatabaseLock", sql });

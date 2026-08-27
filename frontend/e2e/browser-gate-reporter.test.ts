@@ -96,6 +96,23 @@ describe("browser gate reporter", () => {
     expect(outcome.claims).toContainEqual({ id: "accessibility-rule-conformance", status: "not-run" });
     expect(outcome.claims).toContainEqual({ id: "webkit-axe-qualification", status: "passed" });
     expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "passed" });
+    expect(outcome.testPopulation.count).toBe(3);
+    expect(outcome.testPopulation.fingerprint).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
+  it("givenTheSameTestsInAnotherOrder_whenFingerprintingThePopulation_thenTheFingerprintStaysEqual", () => {
+    // given
+    const results = [
+      { identity: "e2e/one.spec.ts:1:1", projectName: "webkit-core", status: "passed", errors: [] },
+      { identity: "e2e/two.spec.ts:2:1", projectName: "webkit-pwa", status: "passed", errors: [] }
+    ];
+
+    // when
+    const first = browserGateOutcome(results);
+    const reversed = browserGateOutcome(results.toReversed());
+
+    // then
+    expect(first.testPopulation).toEqual(reversed.testPopulation);
   });
 
   it("given a WebKit assertion fails, when reporting the run, then compatibility fails as a product claim", () => {
