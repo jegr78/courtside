@@ -7,7 +7,7 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.card.CardService;
 import org.courtside.card.BookingCard;
-import org.courtside.booking.internal.BookingNotOwnedException;
+import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.rules.RuleViolation;
@@ -203,7 +203,7 @@ class BookingServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenALeagueMatchCreatedByASportDirector_whenAnUnrelatedMemberCancels_thenItIsForbidden() {
+    void givenALeagueMatchCreatedByASportDirector_whenAnUnrelatedMemberCancels_thenItReadsAsNotFound() {
         // given
         UUID bookingId = bookingService.create(new CreateBookingCommand(
                 List.of(courtId), LEAGUE_MATCH_CARD, new TimeSlot(SIX_PM, SEVEN_PM),
@@ -212,11 +212,12 @@ class BookingServiceTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> bookingService.cancel(
                 bookingId, UUID.randomUUID(), Set.of(Role.MEMBER)))
-                .isInstanceOf(BookingNotOwnedException.class);
+                .isInstanceOf(BookingNotFoundException.class)
+                        .hasMessageContaining("may not manage");
     }
 
     @Test
-    void givenAYouthDirectorsCardAccessWasRevoked_whenCancellingAnotherOfficersBooking_thenItIsForbidden() {
+    void givenAYouthDirectorsCardAccessWasRevoked_whenCancellingAnotherOfficersBooking_thenItReadsAsNotFound() {
         // given
         BookingCard card = cards.createCard("Club championship", "#3A4A5C",
                 Set.of(Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR),
@@ -231,7 +232,8 @@ class BookingServiceTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> bookingService.cancel(
                 bookingId, UUID.randomUUID(), Set.of(Role.YOUTH_DIRECTOR)))
-                .isInstanceOf(BookingNotOwnedException.class);
+                .isInstanceOf(BookingNotFoundException.class)
+                        .hasMessageContaining("may not manage");
     }
 
     @Test

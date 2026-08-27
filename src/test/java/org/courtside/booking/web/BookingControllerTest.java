@@ -495,8 +495,8 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.items").isEmpty());
         mockMvc.perform(get("/api/managed/bookings/{id}", bookingId)
                         .with(user("major.mary").roles("MEMBER")))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-owned"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
     }
 
     @Test
@@ -538,8 +538,8 @@ class BookingControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/managed/bookings/{id}", bookingId)
                         .with(user("trainer.john").roles("TRAINER")))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-owned"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
     }
 
     @Test
@@ -588,8 +588,8 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.participants").isEmpty());
         mockMvc.perform(get("/api/managed/bookings/{id}", bookingId)
                         .with(user("doe.jane").roles("MEMBER")))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-owned"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
     }
 
     @Test
@@ -615,16 +615,16 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "major.mary", roles = "MEMBER")
-    void givenAForeignBooking_whenAMemberCancelsIt_thenForbiddenAndItStaysConfirmed()
+    void givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed()
             throws Exception {
         // given
         UUID id = bookingOf("doe.jane");
 
         // when
         mockMvc.perform(delete("/api/bookings/{id}", id).with(csrf()))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-owned"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
 
         // then
         assertThat(bookings.findById(id).orElseThrow().getStatus())

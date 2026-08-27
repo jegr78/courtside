@@ -157,24 +157,31 @@ export async function executeObjectAuthorizationChecks(send) {
     method: "DELETE", path: `/api/bookings/${standalone.id}`, headers: {}
   });
   checks.push(objectCheck("horizontal-booking-cancel", horizontalCancel,
-    typedResponse(horizontalCancel, 403, "urn:courtside:error:booking-not-owned"), "non-owner-cancel-rejected"));
+    typedResponse(horizontalCancel, 404, "urn:courtside:error:booking-not-found"), "non-owner-cancel-rejected"));
   const managedDetail = await send("MEMBER_NON_OWNER", {
     method: "GET", path: `/api/managed/bookings/${standalone.id}`, headers: {}
   });
   checks.push(objectCheck("horizontal-managed-detail", managedDetail,
-    typedResponse(managedDetail, 403, "urn:courtside:error:booking-not-owned"), "non-manager-detail-rejected"));
+    typedResponse(managedDetail, 404, "urn:courtside:error:booking-not-found"), "non-manager-detail-rejected"));
   const seriesCancel = await send("MEMBER_NON_OWNER", {
     method: "DELETE",
     path: `/api/booking-series/${seriesOccurrence.seriesId}?fromBookingId=${seriesOccurrence.id}&scope=WHOLE_SERIES`,
     headers: {}
   });
   checks.push(objectCheck("horizontal-series-cancel", seriesCancel,
-    typedResponse(seriesCancel, 403, "urn:courtside:error:booking-not-owned"), "non-owner-series-rejected"));
+    typedResponse(seriesCancel, 404, "urn:courtside:error:booking-not-found"), "non-owner-series-rejected"));
   const unknown = await send("MEMBER_NON_OWNER", {
     method: "DELETE", path: "/api/bookings/00000000-0000-0000-0000-000000000000", headers: {}
   });
   checks.push(objectCheck("identifier-substitution", unknown,
     typedResponse(unknown, 404, "urn:courtside:error:booking-not-found"), "unknown-identifier-rejected"));
+  // Refusing a booking somebody else holds has to read like refusing one nobody holds; the
+  // difference between the two answers used to be what told a caller the identifier was real.
+  const sameAnswer = ({ status, problemType }) => `${status} ${problemType}`;
+  checks.push(objectCheck("existence-not-disclosed", horizontalCancel,
+    [horizontalCancel, managedDetail, seriesCancel]
+      .every((refusal) => sameAnswer(refusal) === sameAnswer(unknown)),
+    "refusal-indistinguishable-from-unknown-identifier"));
   const adminDetail = await send("ADMIN", {
     method: "GET", path: `/api/managed/bookings/${standalone.id}`, headers: {}
   });
@@ -391,7 +398,8 @@ export function validateAuthorizationEvidence(evidence, matrix) {
     return result.outcome !== evaluated.outcome || result.observation !== evaluated.observation;
   })) throw new Error("The authorization evidence contains an invalid operation result");
   const expectedObjects = ["horizontal-booking-cancel", "horizontal-managed-detail", "horizontal-series-cancel",
-    "identifier-substitution", "vertical-admin-management", "mass-assignment", "rejected-attacks-preserve-bookings"];
+    "identifier-substitution", "existence-not-disclosed", "vertical-admin-management", "mass-assignment",
+    "rejected-attacks-preserve-bookings"];
   if (JSON.stringify(evidence.objectChecks.map(({ id }) => id).toSorted())
       !== JSON.stringify(expectedObjects.toSorted())) {
     throw new Error("The authorization evidence is missing an object boundary");

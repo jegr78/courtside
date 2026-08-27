@@ -1494,18 +1494,31 @@ whether it is built or designed. **Designed means absent today.**
   credential grants the roles that account already had and no others. It stays open because closing
   it would mean forbidding a shared address, which is the case the schema exists to serve.
   *Built, as described.*
-- **Accepted: a booking's existence is observable through the managed-appointment detail.**
-  `GET /api/managed/bookings/{id}` loads the booking before it authorises the caller, so it answers
-  `404` for an id that names nothing and `403` for one it names but the caller may not manage. The
-  path is authenticated rather than admin-gated, so any member reaches it. What an observer needs:
-  an id they already hold, which is a version 4 uuid and not enumerable. What bounds it: existence
-  is all it discloses — not when the booking starts, not who made it, not who is in it — and the
-  three cursor-paged booking lists disclose neither half, because a cursor now resolves only
-  against what the caller may see. It stays open because closing it means answering `404` after a
-  failed authorisation, which changes a response that operation documents as its own and belongs to
-  that operation's change rather than to the paging fix that surfaced it. *Built, as described.*
-- **Accepted: a change to the application alone is not measured against the active suites until the
-  weekly run.** The paired comparison is triggered by the digest of what a paired run varies — the
+- **A booking a caller may not reach answers as though it did not exist.** Authorisation on a
+  booking runs after it is loaded, so refusing it could have said `403` where an unknown id says
+  `404` — and the difference is itself an answer, given to anybody authenticated, about an id they
+  hold but should not be able to confirm. Both now answer `404` on the managed-appointment detail,
+  on cancellation and on the three series operations, which is what
+  `DELETE /api/my/participations/{id}` already did for its three cases. The series operations
+  needed their order changed for it: they used to name the series before authorising the booking,
+  so an unknown series, a series the booking is not in, and a booking nobody may reach were three
+  distinguishable answers. The series is spoken of only after the caller has proved they manage the
+  booking they named, and a series that does not exist reads like one the booking is simply not in.
+  `403` stays declared on all five for the reasons that are not the domain's: a missing CSRF token,
+  and the `anyRequest` rule turning away an authenticated account that still owes its first password
+  change. Refusals are logged with the account and booking id, because the answer no longer shows an
+  operator the difference between an attempt and a stale bookmark. *Built.*
+- **What this does not hide.** `GET /api/bookings` is anonymous by design and carries the booking id
+  of every confirmed allocation, so the existence of a booking that occupies a court on a known day
+  was never a secret and is not one now. What the change withholds is existence for cancelled
+  bookings, for bookings holding no court, and for any id whose day an observer cannot guess — and,
+  on every one of them, the start instant. Inside a series a caller who manages the occurrence they
+  named is still refused with `404` when a *different* occurrence of that series is beyond them; the
+  answer is then imprecise rather than disclosing, and correcting it would either distort the
+  single-booking cancellation that shares the code path or hand back the difference this section
+  exists to remove.
+- **Accepted: a change to the application alone is not measured against the active suites until
+  somebody starts them.** The paired comparison is triggered by the digest of what a paired run varies — the
   assessment's code, its contract, the deployment description and the lockfile — so a pull request
   that only changes the application skips it, and the authorization suite's assertions about
   concrete answers are not re-checked against what that pull request built. What an observer needs:
