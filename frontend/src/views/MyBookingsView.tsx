@@ -19,6 +19,7 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
   const [participations, setParticipations] = useState<Participation[]>([]);
   const [courts, setCourts] = useState<PublicCourt[]>([]);
   const [grid, setGrid] = useState<BookingGrid>();
+  const [maxBookingMinutes, setMaxBookingMinutes] = useState<number>();
   const [nextCursor, setNextCursor] = useState<string>();
   const [managedNextCursor, setManagedNextCursor] = useState<string>();
   const [participationsNextCursor, setParticipationsNextCursor] = useState<string>();
@@ -53,6 +54,14 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
   }, [showManaged]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // The bound only fills in a field's maximum, and the server holds the rule either way, so a
+  // reading that fails leaves the maximum unset rather than taking the bookings down with it.
+  useEffect(() => {
+    void api.bookingEligibility()
+      .then((eligibility) => setMaxBookingMinutes(eligibility.maxBookingMinutes ?? undefined))
+      .catch(() => setMaxBookingMinutes(undefined));
+  }, []);
 
   async function loadMore() {
     if (!nextCursor) return;
@@ -126,7 +135,7 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
     </section>}
     {!loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={load} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={(action.managed ? managed : bookings).filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={(action.managed ? managedNextCursor : nextCursor) !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
-    {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
+    {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} maxBookingMinutes={maxBookingMinutes} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); }} />}
     {grid && action?.kind === "detail" && <ManagedAppointmentDialog bookingId={action.booking.id} locale={i18n.language} timeZone={grid.timeZone} closed={() => setAction(undefined)} />}
   </section>;
 }
@@ -245,7 +254,7 @@ function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, clos
   </div></Modal>;
 }
 
-function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking: Appointment; courts: PublicCourt[]; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
+function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, closed, completed }: { booking: Appointment; courts: PublicCourt[]; timeZone: string; maxBookingMinutes?: number; closed: () => void; completed: () => Promise<void> }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<CancelScope>("THIS");
   const [startTime, setStartTime] = useState("");
@@ -272,7 +281,7 @@ function MoveDialog({ booking, courts, timeZone, closed, completed }: { booking:
     <h2 id="move-personal-title" className="text-xl font-bold">{t("myBookings.moveTitle")}</h2>
     <ScopeFields scope={scope} changed={(value) => { setScope(value); setPreview(undefined); }} t={t} />
     <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<input data-testid="move-start-time" type="time" value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
-    <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input data-testid="move-duration" type="number" min="1" value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
+    <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input data-testid="move-duration" type="number" min="1" max={maxBookingMinutes} value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
     <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
     {error && <Alert>{error}</Alert>}
     {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatBookingPeriod(move.fromStartsAt, move.fromEndsAt, i18n.language, timeZone)} → {formatBookingPeriod(move.toStartsAt, move.toEndsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}

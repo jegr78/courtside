@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type PublicCourt, type SeriesPreview } from "../api/client";
@@ -39,6 +39,30 @@ describe("SeriesForm", () => {
     vi.spyOn(api, "bookingCards").mockResolvedValue([
       { id: "card-1", label: "Training", color: "#b85c38", allowedPlayerCounts: [], guestAllowed: false }
     ]);
+  });
+
+  it("given a rule set bounds the booking duration, when the form opens, then the duration field carries that ceiling", async () => {
+    // given
+    vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [], maxBookingMinutes: 90 });
+
+    // when
+    show();
+    await userEvent.click(await screen.findByTestId("new-series"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("series-duration")).toHaveAttribute("max", "90"));
+  });
+
+  it("given no bound is reported, when the form opens, then the duration field keeps the day-long ceiling", async () => {
+    // given — absence must leave the form exactly as it was
+    vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [] });
+
+    // when
+    show();
+    await userEvent.click(await screen.findByTestId("new-series"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("series-duration")).toHaveAttribute("max", "1440"));
   });
 
   it("given a rule nobody has previewed, when the form is read, then there is nothing to confirm", async () => {

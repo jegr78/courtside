@@ -447,3 +447,28 @@ it("given a series that was just created, when the managed list reloads, then it
   releaseReload();
   await waitFor(() => expect(screen.getByTestId("series-created")).toBeInTheDocument());
 });
+
+it("given a rule set bounds the booking duration, when moving a booking, then the duration field carries that ceiling", async () => {
+  // given
+  vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [], maxBookingMinutes: 90 });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("move-booking"));
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("move-duration")).toHaveAttribute("max", "90"));
+});
+
+it("given the bound cannot be read, when the bookings load, then they are shown and the ceiling stays unset", async () => {
+  // given — the field's maximum is a convenience and the server holds the rule, so a failed
+  // reading must not take the bookings down with it
+  vi.spyOn(api, "bookingEligibility").mockRejectedValue(new Error("unreachable"));
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("move-booking"));
+
+  // then
+  expect(screen.getByTestId("move-duration")).not.toHaveAttribute("max");
+});

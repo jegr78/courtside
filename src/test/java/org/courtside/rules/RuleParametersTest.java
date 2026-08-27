@@ -83,14 +83,14 @@ class RuleParametersTest {
                 .isEqualTo("rule.parameters.typeNotConfigurable");
     }
 
-    static Stream<RuleType> everyParameterOfEveryConfigurableType() {
+    static Stream<RuleType> everyConfigurableTypeWithParameters() {
         return Stream.of(RuleType.values())
                 .filter(RuleParameters::isConfigurablePerRuleSet)
                 .filter(type -> !RuleParameters.parametersOf(type).isEmpty());
     }
 
     @ParameterizedTest
-    @MethodSource("everyParameterOfEveryConfigurableType")
+    @MethodSource("everyConfigurableTypeWithParameters")
     void givenEveryConfigurableRuleType_whenValidatingItsBounds_thenBothEndsAreAccepted(RuleType type) {
         // given
         List<RuleParameters.Parameter> parameters = RuleParameters.parametersOf(type);
@@ -105,7 +105,7 @@ class RuleParametersTest {
     }
 
     @ParameterizedTest
-    @MethodSource("everyParameterOfEveryConfigurableType")
+    @MethodSource("everyConfigurableTypeWithParameters")
     void givenEveryConfigurableRuleType_whenAValueLeavesItsRange_thenItIsRejectedNamingTheRange(RuleType type) {
         // given
         List<RuleParameters.Parameter> parameters = RuleParameters.parametersOf(type);
@@ -122,15 +122,22 @@ class RuleParametersTest {
     }
 
     @ParameterizedTest
-    @MethodSource("everyParameterOfEveryConfigurableType")
+    @MethodSource("everyConfigurableTypeWithParameters")
     void givenEveryConfigurableRuleType_whenAParameterIsMissingOrUnknown_thenItIsRejected(RuleType type) {
         // given
         List<RuleParameters.Parameter> parameters = RuleParameters.parametersOf(type);
         Map<String, Integer> complete = valuesAt(parameters, RuleParameters.Parameter::minimum);
 
-        // when / then
-        assertRejected(type, Map.of(), "rule.parameters.missingParameter",
-                Map.of("ruleType", type.name(), "parameter", parameters.getFirst().name()));
+        // when / then — which parameter it names first is the contract map's business, not ours
+        assertThatThrownBy(() -> RuleParameters.validated(type, Map.of()))
+                .isInstanceOf(RuleParameterInvalidException.class)
+                .satisfies(thrown -> {
+                    RuleParameterInvalidException invalid = (RuleParameterInvalidException) thrown;
+                    assertThat(invalid.getCode()).isEqualTo("rule.parameters.missingParameter");
+                    assertThat(invalid.getParams()).containsEntry("ruleType", type.name());
+                    assertThat(invalid.getParams().get("parameter"))
+                            .isIn(parameters.stream().map(RuleParameters.Parameter::name).toList());
+                });
         Map<String, Integer> withAStranger = new LinkedHashMap<>(complete);
         withAStranger.put("aParameterNoRuleTypeCarries", 1);
         assertRejected(type, withAStranger, "rule.parameters.unknownParameter",

@@ -143,7 +143,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           {durations.map((minutes) => <option key={minutes} value={minutes}>{t("booking.durationMinutes", { count: minutes })}</option>)}
         </select>
       </label>
-      {boundLeavesNoPeriod && <Alert testId="booking-no-duration">{t("booking.noDurationWithinBound")}</Alert>}
+      {boundLeavesNoPeriod && <Alert testId="booking-no-duration">{t("booking.boundBelowSlotGrid")}</Alert>}
       {canChooseSeveralCourts
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
           <legend className="font-semibold">{t("booking.courts")}</legend>

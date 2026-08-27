@@ -244,7 +244,6 @@ components:
           items: { $ref: "#/components/schemas/Violation" }
         maxBookingMinutes:
           type: [integer, "null"]
-          minimum: 5
           description: |
             The longest single booking this account may take, in minutes, or absent where nothing
             bounds it. A client offers no longer period than this; the server refuses one anyway

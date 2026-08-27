@@ -41,8 +41,9 @@ public class MaxBookingDurationRule implements BookingRule {
         if (maxMinutes.isEmpty()) {
             return List.of();
         }
-        long minutes = Duration.between(context.slot().start(), context.slot().end()).toMinutes();
-        if (minutes > maxMinutes.get()) {
+        // Compared as a Duration rather than as whole minutes: toMinutes() truncates, so a booking
+        // carrying seconds would measure short against a bound this rule is the only one holding.
+        if (context.slot().duration().compareTo(Duration.ofMinutes(maxMinutes.get())) > 0) {
             return List.of(new RuleViolation("booking.rule.maxBookingDuration.exceeded",
                     Map.of("maxMinutes", maxMinutes.get())));
         }

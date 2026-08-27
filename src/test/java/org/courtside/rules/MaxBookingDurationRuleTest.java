@@ -182,6 +182,23 @@ class MaxBookingDurationRuleTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenARuleSetBoundingDuration_whenABookingOvershootsItBySeconds_thenTheBoundIsReported() {
+        // given
+        ruleAdmin.setRule(YOUTH_RULE_SET, RuleType.MAX_BOOKING_DURATION, Map.of("maxMinutes", 90));
+        Instant start = Instant.parse("2026-05-13T09:00:00Z");
+        RuleContext overshooting = new RuleContext(UUID.randomUUID(), UUID.randomUUID(),
+                new TimeSlot(start, start.plus(90, ChronoUnit.MINUTES).plusSeconds(1)),
+                UUID.randomUUID(), YOUTH);
+
+        // when — the slot grid keeps seconds out today, and this rule must not be the reason why
+        List<RuleViolation> violations = rule.check(overshooting);
+
+        // then
+        assertThat(violations).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.maxBookingDuration.exceeded");
+    }
+
+    @Test
     void whenAskingTheRuleWhetherItJudgesAMove_thenItDoes() {
         // when / then — a move may lengthen a booking, so a bound that skips it is no bound
         assertThat(rule.appliesToAMove()).isTrue();
