@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { arch, cpus, platform, totalmem } from "node:os";
@@ -10,7 +10,8 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const frontend = resolve(root, "frontend");
 const schemaPath = resolve(root, "quality", "webkit-reliability.schema.json");
 const frontendRequire = createRequire(resolve(frontend, "package.json"));
-const maxDurationMs = 25 * 60 * 1_000;
+const executionDeadlineMs = 25 * 60 * 1_000;
+const terminationGraceMs = 10_000;
 
 function validator() {
   const Ajv = frontendRequire("ajv/dist/2020").default;
@@ -19,7 +20,7 @@ function validator() {
 }
 
 function outcome(execution) {
-  if (execution.launchError === true) return { status: "incomplete", classifications: ["environment"], exitCode: null };
+  if (execution.environmentFailure === true) return { status: "incomplete", classifications: ["environment"], exitCode: null };
   const claims = execution.gateOutcome?.claims;
   if (!Array.isArray(claims)) {
     return { status: "incomplete", classifications: ["harness"], exitCode: execution.exitCode };
@@ -27,7 +28,7 @@ function outcome(execution) {
   const claim = (id) => claims.find((candidate) => candidate.id === id)?.status;
   const classifications = [];
   if ([claim("webkit-core-compatibility"), claim("webkit-axe-qualification")].includes("failed")) classifications.push("product");
-  if (claim("browser-harness") !== "passed") classifications.push("harness");
+  if (execution.timedOut === true || claim("browser-harness") !== "passed") classifications.push("harness");
   if (classifications.length > 0) return {
     status: classifications.includes("harness") ? "incomplete" : "failed",
     classifications,
@@ -57,7 +58,8 @@ export function buildReliabilityRecord(input) {
     startedAt: input.startedAt,
     finishedAt: input.finishedAt,
     durationMs: finished - started,
-    maxDurationMs,
+    executionDeadlineMs,
+    terminationGraceMs,
     toolchain: {
       playwrightVersion: input.playwrightVersion,
       browserImage: input.browserImage,
@@ -152,25 +154,95 @@ function gateOutcome() {
   }
 }
 
-function runAttempt(options) {
+function completionOf(child) {
+  return new Promise((resolveCompletion) => {
+    let completed = false;
+    const finish = (result) => {
+      if (completed) return;
+      completed = true;
+      resolveCompletion(result);
+    };
+    child.once("error", () => finish({ exitCode: null, launchError: true }));
+    child.once("close", (exitCode, signal) => finish({ exitCode, signal }));
+  });
+}
+
+async function waitWithin(completion, durationMs) {
+  const elapsed = Symbol("elapsed");
+  let timer;
+  try {
+    return await Promise.race([completion, new Promise((resolveWait) => {
+      timer = setTimeout(() => resolveWait(elapsed), durationMs);
+    })]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function terminateProcessTree(child, signal) {
+  if (child.pid === undefined) return;
+  if (platform() !== "win32") {
+    try {
+      process.kill(-child.pid, signal);
+    } catch (error) {
+      if (error?.code !== "ESRCH") throw error;
+    }
+    return;
+  }
+  if (signal === "SIGTERM") {
+    child.kill();
+    return;
+  }
+  const taskkill = resolve(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe");
+  const terminated = spawnSync(taskkill, ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+  if ((terminated.error !== undefined || terminated.status !== 0) && child.exitCode === null) child.kill("SIGKILL");
+}
+
+export async function runBoundedProcess(command, args, options, limits = {}) {
+  const deadlineMs = limits.deadlineMs ?? executionDeadlineMs;
+  const graceMs = limits.terminationGraceMs ?? terminationGraceMs;
+  const child = spawn(command, args, { ...options, detached: platform() !== "win32", shell: false });
+  const completion = completionOf(child);
+  const first = await waitWithin(completion, deadlineMs);
+  if (typeof first !== "symbol") return { ...first, timedOut: false };
+  terminateProcessTree(child, "SIGTERM");
+  const graceful = await waitWithin(completion, graceMs);
+  if (typeof graceful !== "symbol") return { ...graceful, timedOut: true };
+  terminateProcessTree(child, "SIGKILL");
+  return { ...await completion, timedOut: true };
+}
+
+export async function environmentPrerequisites(execute = runBoundedProcess, cliAvailable = true) {
+  if (!cliAvailable) return { isReady: false, classification: "environment" };
+  const docker = await execute("docker", ["info", "--format", "{{.ServerVersion}}"],
+    { cwd: root, env: process.env, stdio: "ignore" }, { deadlineMs: 10_000, terminationGraceMs: 1_000 });
+  return docker.exitCode === 0 && docker.timedOut !== true && docker.launchError !== true
+    ? { isReady: true }
+    : { isReady: false, classification: "environment" };
+}
+
+async function runAttempt(options) {
   const commit = sourceCommit();
   const treeState = sourceTreeState();
   const packageJson = JSON.parse(readFileSync(resolve(frontend, "package.json"), "utf8"));
   const browserImage = readPinnedBrowserImage();
   const startedAt = new Date().toISOString();
+  const attemptId = randomUUID();
   const cli = resolve(frontend, "node_modules", "@playwright", "test", "cli.js");
   rmSync(resolve(frontend, "test-results", "browser-gate-outcome.json"), { force: true });
-  const execution = spawnSync(process.execPath, [cli, "test", "--project=webkit-core", "--project=webkit-pwa",
-    "--project=webkit-accessibility"], {
-    cwd: frontend,
-    env: { ...process.env, COURTSIDE_PROJECT_ORDER: options.order, COURTSIDE_WEBKIT_AXE: "true",
-      COURTSIDE_WEBKIT_RELIABILITY: "true" },
-    stdio: "inherit",
-    timeout: maxDurationMs
-  });
+  const prerequisites = await environmentPrerequisites(undefined, existsSync(cli));
+  const execution = prerequisites.isReady
+    ? await runBoundedProcess(process.execPath, [cli, "test", "--project=webkit-core", "--project=webkit-pwa",
+      "--project=webkit-accessibility"], {
+      cwd: frontend,
+      env: { ...process.env, COURTSIDE_PROJECT_ORDER: options.order, COURTSIDE_WEBKIT_AXE: "true",
+        COURTSIDE_WEBKIT_RELIABILITY: "true" },
+      stdio: "inherit"
+    })
+    : { exitCode: null, environmentFailure: true };
   const finishedAt = new Date().toISOString();
   const record = buildReliabilityRecord({
-    attemptId: randomUUID(),
+    attemptId,
     sourceCommit: commit,
     sourceTreeState: treeState,
     startedAt,
@@ -186,9 +258,9 @@ function runAttempt(options) {
         ? { runnerImage: `${process.env.ImageOS}-${process.env.ImageVersion}` }
         : {}
     },
-    execution: execution.error === undefined || execution.error.code === "ETIMEDOUT"
-      ? { exitCode: execution.status, gateOutcome: gateOutcome() }
-      : { exitCode: null, launchError: true }
+    execution: execution.environmentFailure === true || execution.launchError === true
+      ? { exitCode: null, environmentFailure: true }
+      : { exitCode: execution.exitCode, timedOut: execution.timedOut, gateOutcome: gateOutcome() }
   });
   validateReliabilityRecord(record);
   const path = retainReliabilityRecord(record, options.output);
@@ -242,7 +314,7 @@ function summarizeDirectory(path) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [command, ...args] = process.argv.slice(2);
-  if (command === "run") runAttempt(reliabilityOptions(args));
+  if (command === "run") await runAttempt(reliabilityOptions(args));
   else if (command === "validate" && args.length === 1) validateFile(args[0]);
   else if (command === "summarize" && args.length === 1) summarizeDirectory(args[0]);
   else throw new Error("Usage: webkit-reliability.mjs run|validate|summarize");

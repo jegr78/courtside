@@ -188,6 +188,11 @@ order. The command runs WebKit core, installed-PWA and axe projects without a re
 immutable record below `test-results/webkit-reliability`. A diagnostic repetition gets a new
 attempt identity and cannot replace the original result.
 
+The runner verifies Docker before Playwright starts. It owns the test process tree, first requests
+an orderly stop at its execution deadline and then ends the tree after a short cleanup grace period.
+The hosted job reserves separate budgets for packaging, execution, validation and artifact upload,
+so its outer limit cannot normally erase the bounded runner's result.
+
 The closed record retains the commit and whether its working tree was clean, the pinned toolchain,
 non-identifying host capacity, project order, browser-isolation variant, resource-profile name,
 duration and outcome classes. It retains

@@ -43,7 +43,7 @@ jobs:
 
   browser-order:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -56,11 +56,13 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - name: Package application
+        timeout-minutes: 10
         run: |
           ./mvnw -B package -DskipTests
           cd frontend
           npm ci --ignore-scripts
       - name: Prove browser isolation under varied project order
+        timeout-minutes: 27
         working-directory: frontend
         env:
           COURTSIDE_PROJECT_ORDER: ${{ matrix.project_order }}

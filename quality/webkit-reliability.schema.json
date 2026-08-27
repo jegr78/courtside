@@ -4,7 +4,7 @@
   "title": "Courtside WebKit reliability first-attempt record",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "attemptId", "sourceCommit", "sourceTreeState", "startedAt", "finishedAt", "durationMs", "maxDurationMs", "toolchain", "matrix", "host", "outcome"],
+  "required": ["schemaVersion", "attemptId", "sourceCommit", "sourceTreeState", "startedAt", "finishedAt", "durationMs", "executionDeadlineMs", "terminationGraceMs", "toolchain", "matrix", "host", "outcome"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "attemptId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
@@ -13,7 +13,8 @@
     "startedAt": { "type": "string", "format": "date-time" },
     "finishedAt": { "type": "string", "format": "date-time" },
     "durationMs": { "type": "integer", "minimum": 0 },
-    "maxDurationMs": { "const": 1500000 },
+    "executionDeadlineMs": { "const": 1500000 },
+    "terminationGraceMs": { "const": 10000 },
     "toolchain": {
       "type": "object",
       "additionalProperties": false,

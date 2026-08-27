@@ -6,8 +6,10 @@ import test from "node:test";
 import { createRequire } from "node:module";
 import {
   buildReliabilityRecord,
+  environmentPrerequisites,
   reliabilityOptions,
   retainReliabilityRecord,
+  runBoundedProcess,
   summarizeReliability,
   validateReliabilityRecord
 } from "./webkit-reliability.mjs";
@@ -48,7 +50,8 @@ test("given a completed first attempt_whenBuildingItsRecord_thenTheClosedSchemaA
   assert.equal(JSON.stringify(result).includes("cookie"), false);
   assert.deepEqual(result.outcome.classifications, ["none"]);
   assert.equal(result.durationMs, 120_000);
-  assert.equal(result.maxDurationMs, 1_500_000);
+  assert.equal(result.executionDeadlineMs, 1_500_000);
+  assert.equal(result.terminationGraceMs, 10_000);
 });
 
 test("givenAProductAssertionFailure_whenBuildingItsRecord_thenItRemainsAProductFailure", () => {
@@ -70,12 +73,39 @@ test("givenAnIncompleteHarnessOrMissingExecution_whenBuildingItsRecord_thenTheFa
     { id: "webkit-axe-qualification", status: "not-established" },
     { id: "browser-harness", status: "incomplete" }
   ] } } });
-  const environment = record({ execution: { exitCode: null, launchError: true } });
+  const environment = record({ execution: { exitCode: null, environmentFailure: true } });
 
   // then
   assert.deepEqual(harness.outcome.classifications, ["harness"]);
   assert.deepEqual(environment.outcome.classifications, ["environment"]);
   assert.equal(environment.outcome.status, "incomplete");
+});
+
+test("givenDockerIsUnavailable_whenCheckingTheEnvironment_thenTheAttemptIsClassifiedBeforePlaywrightStarts", async () => {
+  // given
+  const unavailable = () => ({ status: 1, error: undefined });
+
+  // when
+  const result = await environmentPrerequisites(unavailable, true);
+
+  // then
+  assert.equal(result.isReady, false);
+  assert.equal(result.classification, "environment");
+});
+
+test("givenAChildIgnoresTheGracefulSignal_whenItsDeadlineExpires_thenTheOwnedProcessIsKilled", async () => {
+  // given
+  const startedAt = Date.now();
+
+  // when
+  const result = await runBoundedProcess(process.execPath,
+    ["-e", "process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"],
+    { cwd: process.cwd(), env: process.env, stdio: "ignore" },
+    { deadlineMs: 30, terminationGraceMs: 30 });
+
+  // then
+  assert.equal(result.timedOut, true);
+  assert.ok(Date.now() - startedAt < 2_000);
 });
 
 test("givenProductAndHarnessFailures_whenBuildingTheRecord_thenNeitherClassificationIsLost", () => {
@@ -88,6 +118,18 @@ test("givenProductAndHarnessFailures_whenBuildingTheRecord_thenNeitherClassifica
 
   // then
   assert.deepEqual(result.outcome, { status: "incomplete", classifications: ["product", "harness"], exitCode: 1 });
+});
+
+test("givenTheDeadlineExpiresAfterPassingClaims_whenBuildingTheRecord_thenTheHarnessRemainsIncomplete", () => {
+  // given / when
+  const result = record({ execution: { exitCode: null, timedOut: true, gateOutcome: { schemaVersion: 1, claims: [
+    { id: "webkit-core-compatibility", status: "passed" },
+    { id: "webkit-axe-qualification", status: "passed" },
+    { id: "browser-harness", status: "passed" }
+  ] } } });
+
+  // then
+  assert.deepEqual(result.outcome, { status: "incomplete", classifications: ["harness"], exitCode: null });
 });
 
 test("givenAnExistingFirstAttempt_whenRetainingADiagnosticRun_thenTheOriginalCannotBeOverwritten", () => {
