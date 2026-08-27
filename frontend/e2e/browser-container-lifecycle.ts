@@ -69,11 +69,12 @@ export async function startOwnedBrowserContainer<T>(
   }
 }
 
-export async function ownedBrowserContainerIds(journeyId: string, networkId: string,
+export async function ownedBrowserContainerIds(journeyId: string, networkId: string | undefined,
   docker: DockerLifecycleCommand, startupId?: string): Promise<string[]> {
-  const filters = ["ps", "-aq", "--filter", `network=${networkId}`,
-    "--filter", `label=${JOURNEY_LABEL}=${journeyId}`,
-    "--filter", `label=${RESOURCE_LABEL}=browser`];
+  const filters = ["ps", "-aq"];
+  if (networkId !== undefined) filters.push("--filter", `network=${networkId}`);
+  filters.push("--filter", `label=${JOURNEY_LABEL}=${journeyId}`,
+    "--filter", `label=${RESOURCE_LABEL}=browser`);
   if (startupId !== undefined) filters.push("--filter", `label=${STARTUP_LABEL}=${startupId}`);
   const listed = await docker(filters);
   const containerIds = listed.split("\n").map((value) => value.trim()).filter(Boolean);
@@ -94,7 +95,13 @@ export async function ownedBrowserContainerIds(journeyId: string, networkId: str
 export async function removeOwnedBrowserContainers(journeyId: string, networkId: string,
   docker: DockerLifecycleCommand): Promise<void> {
   const containerIds = await ownedBrowserContainerIds(journeyId, networkId, docker);
+  const failures: unknown[] = [];
   for (const containerId of containerIds) {
-    await docker(["rm", "-f", containerId]);
+    try {
+      await docker(["rm", "-f", containerId]);
+    } catch (error) {
+      failures.push(error);
+    }
   }
+  if (failures.length > 0) throw new AggregateError(failures, "Browser container cleanup failed");
 }

@@ -129,6 +129,49 @@ describe("browser container lifecycle", () => {
       "--filter", "label=org.courtside.e2e.startup-id=startup-1"]);
   });
 
+  it("givenAContainerWasCreatedBeforeNetworkAttachment_whenRecoveringTheStartup_thenLabelsStillFindIt", async () => {
+    // given
+    const containerId = "1".repeat(64);
+    const docker = vi.fn((args: string[]) => Promise.resolve(args[0] === "ps" ? `${containerId}\n` : JSON.stringify({
+      "org.courtside.e2e.journey-id": "journey-1",
+      "org.courtside.e2e.resource": "browser",
+      "org.courtside.e2e.startup-id": "startup-1"
+    })));
+
+    // when
+    const found = await ownedBrowserContainerIds("journey-1", undefined, docker, "startup-1");
+
+    // then
+    expect(found).toEqual([containerId]);
+    expect(docker).toHaveBeenCalledWith(["ps", "-aq",
+      "--filter", "label=org.courtside.e2e.journey-id=journey-1",
+      "--filter", "label=org.courtside.e2e.resource=browser",
+      "--filter", "label=org.courtside.e2e.startup-id=startup-1"]);
+  });
+
+  it("givenRemovingOneOwnedContainerFails_whenCleaningUp_thenEveryOtherContainerIsStillRemoved", async () => {
+    // given
+    const first = "2".repeat(64);
+    const second = "3".repeat(64);
+    const docker = vi.fn((args: string[]) => {
+      if (args[0] === "ps") return Promise.resolve(`${first}\n${second}\n`);
+      if (args[0] === "inspect") return Promise.resolve(JSON.stringify({
+        "org.courtside.e2e.journey-id": "journey-1",
+        "org.courtside.e2e.resource": "browser"
+      }));
+      if (args[0] === "rm" && args[2] === first) return Promise.reject(new Error("first removal failed"));
+      return Promise.resolve("");
+    });
+
+    // when / then
+    await expect(removeOwnedBrowserContainers("journey-1", "network-1", docker)).rejects.toMatchObject({
+      message: "Browser container cleanup failed",
+      errors: [expect.objectContaining({ message: "first removal failed" })]
+    });
+    expect(docker).toHaveBeenCalledWith(["rm", "-f", first]);
+    expect(docker).toHaveBeenCalledWith(["rm", "-f", second]);
+  });
+
   it.each([
     [new Error("Timed out after 10000ms while waiting for container ports to be bound"), "port-publication"],
     [new Error("Log message not received"), "wait-strategy"],

@@ -681,7 +681,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
           .withExposedPorts(3000)
           .withWaitStrategy(Wait.forLogMessage(/ws:\/\//))
           .start(),
-        () => ownedBrowserContainerIds(journeyId, clubNetwork!.getId(), dockerText, startupId),
+        () => ownedBrowserContainerIds(journeyId, undefined, dockerText, startupId),
         startupDiagnostics,
         (containerId) => executeFile("docker", ["rm", "-f", containerId], { timeout: 5_000 })
       );
