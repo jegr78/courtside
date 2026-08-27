@@ -201,6 +201,17 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenStoringAPrivacyLinkABrowserWouldStripOffThisOrigin_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE club_config SET privacy_url = E'/\\t/evil.example'
+                WHERE id = '00000000-0000-0000-0000-000000000001'
+                """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("club_config_privacy_url_safe");
+    }
+
+    @Test
     void whenInsertingARuleDefinitionThatIsNotAKnownRuleType_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""

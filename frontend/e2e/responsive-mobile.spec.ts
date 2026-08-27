@@ -43,6 +43,17 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await expect(page.getByTestId("save-club-config")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
+  // when — the footer carries its legal links only once a club has set them, so without this the
+  // overflow guard never sees the row it exists to protect
+  await page.getByTestId("imprint-url").fill("/imprint");
+  await page.getByTestId("privacy-url").fill("/privacy");
+  await page.getByTestId("save-club-config").tap();
+
+  // then
+  await expect(page.getByTestId("footer-imprint")).toBeVisible();
+  await expect(page.getByTestId("footer-privacy")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
   // when
   await page.goto("/admin/facility");
 

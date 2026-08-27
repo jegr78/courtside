@@ -1087,7 +1087,10 @@ default locale. Colours are applied as CSS custom properties on `:root` — no r
 The two legal links are rendered side by side in the footer, and each is left out where the club
 has set none. Both accept a root-relative path or an absolute HTTP or HTTPS URL: they are
 navigation targets rather than subresources, and a club serving Courtside without TLS still has
-to be able to link the pages German law requires it to publish.
+to be able to link the pages it publishes. All three URL settings refuse tab, newline and carriage
+return anywhere in the value. A browser strips those three before it parses a URL, so `/<TAB>/host`
+would otherwise reach the same off-origin target as `//host` — the one thing the leading-slash rule
+exists to refuse.
 Logo URLs are either root-relative or HTTPS. A remote logo necessarily tells its operator the
 visitor's IP address and the Courtside origin, so clubs should serve the image from their own
 instance where possible. The CSP grants remote HTTPS only to images; every executable resource and

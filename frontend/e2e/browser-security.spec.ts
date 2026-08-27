@@ -241,6 +241,10 @@ test("URL configuration rejects active schemes and renders accepted relative tar
     expect.objectContaining({ field: "imprintUrl", code: "validation.Pattern" }),
     expect.objectContaining({ field: "privacyUrl", code: "validation.Pattern" })
   ]));
+  // the rejected values are still on the page as form values — what must never happen is one of
+  // them becoming a URL attribute, which is what a live preview of the draft would do
+  await expect(page.getByTestId("logo-url")).toHaveValue("javascript:globalThis.__courtsideXss='executed'");
+  await expect(page.getByTestId("privacy-url")).toHaveValue("vbscript:msgbox(1)");
   await expect(page.locator('img[src^="javascript:"]')).toHaveCount(0);
   await expect(page.locator('a[href^="data:"]')).toHaveCount(0);
   await expect(page.locator('a[href^="vbscript:"]')).toHaveCount(0);
@@ -249,6 +253,17 @@ test("URL configuration rejects active schemes and renders accepted relative tar
   await page.getByTestId("logo-url").fill("/icon.svg");
   await page.getByTestId("imprint-url").fill("/imprint");
   await page.getByTestId("privacy-url").fill("/privacy");
+  const smuggledResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/config") && response.request().method() === "PUT");
+  await page.getByTestId("imprint-url").fill("/\t/evil.example");
+  await page.getByTestId("save-club-config").click();
+
+  // then — a browser strips the tab before parsing, so this names the same target as "//evil.example"
+  expect((await smuggledResponse).status()).toBe(400);
+  await expect(page.locator('a[href*="evil.example"]')).toHaveCount(0);
+
+  // when
+  await page.getByTestId("imprint-url").fill("/imprint");
   const acceptedResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/config") && response.request().method() === "PUT");
   await page.getByTestId("save-club-config").click();

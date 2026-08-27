@@ -649,6 +649,42 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPrivacyUrlABrowserWouldStripOffThisOrigin_whenChangingTheConfig_thenItIsRejected()
+            throws Exception {
+        // when / then — a browser removes the tab before parsing, so this would reach the same
+        // target as "//evil.example", which the leading-slash rule exists to refuse
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "https://example-tennis-club.example/privacy", "/\\t/evil.example"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("privacyUrl"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPrivacyUrlLongerThanTheLimit_whenChangingTheConfig_thenTheViolationCarriesSizeParams()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "https://example-tennis-club.example/privacy",
+                                "/" + "p".repeat(500)))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("privacyUrl"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"))
+                .andExpect(jsonPath("$.fieldErrors[0].params.min").value(0))
+                .andExpect(jsonPath("$.fieldErrors[0].params.max").value(500));
+    }
+
+    @Test
     void whenReadingThePublicConfiguration_thenItNamesTheLanguagesThisImageCanWriteIn()
             throws Exception {
         // when / then — a client offers a choice from this rather than from a list of its own

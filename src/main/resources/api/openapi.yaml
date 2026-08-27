@@ -380,12 +380,22 @@ components:
         logoUrl:
           type: [string, "null"]
           maxLength: 500
-          pattern: "^(https://.+|/[^/\\\\].*|/)$"
+          pattern: "^(https://\\S+|/[^/\\\\\\s]\\S*|/)$"
           description: |
             A same-origin path or an HTTPS image URL. A remote image discloses the visitor's IP
             address and the Courtside origin to its operator.
-        imprintUrl: { type: [string, "null"] }
-        privacyUrl: { type: [string, "null"] }
+        imprintUrl:
+          type: [string, "null"]
+          maxLength: 500
+          pattern: "^(https?://\\S+|/[^/\\\\\\s]\\S*|/)$"
+        privacyUrl:
+          type: [string, "null"]
+          maxLength: 500
+          pattern: "^(https?://\\S+|/[^/\\\\\\s]\\S*|/)$"
+          description: |
+            Where this club publishes its privacy policy, beside the imprint. Both are navigation
+            targets rather than subresources, so unlike the logo they also accept plain HTTP: a club
+            that serves Courtside without TLS still has to be able to link them.
         defaultLocale: { type: string }
         supportedLocales:
           type: array
@@ -434,7 +444,7 @@ components:
         logoUrl:
           type: [string, "null"]
           maxLength: 500
-          pattern: "^(https://.+|/[^/\\\\].*|/)$"
+          pattern: "^(https://\\S+|/[^/\\\\\\s]\\S*|/)$"
           description: |
             A same-origin path or an HTTPS image URL. A remote image discloses the visitor's IP
             address and the Courtside origin to its operator, so clubs should prefer a path they
@@ -442,16 +452,17 @@ components:
         imprintUrl:
           type: [string, "null"]
           maxLength: 500
-          pattern: "^(https?://.+|/[^/\\\\].*|/)$"
+          pattern: "^(https?://\\S+|/[^/\\\\\\s]\\S*|/)$"
         privacyUrl:
           type: [string, "null"]
           maxLength: 500
-          pattern: "^(https?://.+|/[^/\\\\].*|/)$"
+          pattern: "^(https?://\\S+|/[^/\\\\\\s]\\S*|/)$"
           description: |
             Where this club publishes its privacy policy: a same-origin path or an absolute URL.
             Unlike the logo it is a navigation target rather than a subresource, so plain HTTP is
-            accepted — a club that serves Courtside without TLS would otherwise have no way to
-            link the page it is legally required to publish.
+            accepted — a club that serves Courtside without TLS still has to be able to link it.
+            Tab, newline and carriage return are refused throughout: a browser strips them before
+            parsing, so `/<TAB>/host` would otherwise reach the same off-origin target as `//host`.
         defaultLocale: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone:
