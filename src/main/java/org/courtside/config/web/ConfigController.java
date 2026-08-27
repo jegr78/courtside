@@ -48,7 +48,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
     public ResponseEntity<ApiAdminClubConfig> changeClubConfig(ApiClubConfigRequest request) {
         return ResponseEntity.ok(toAdminResponse(config.update(new ChangeClubConfigurationCommand(
                 request.getClubName(), request.getPrimaryColor(), request.getAccentColor(),
-                request.getLogoUrl(), request.getImprintUrl(), request.getDefaultLocale(),
+                request.getLogoUrl(), request.getImprintUrl(), request.getPrivacyUrl(),
+                request.getDefaultLocale(),
                 new BookingSlotDuration(request.getSlotMinutes()), request.getTimeZone(),
                 new CredentialLifetime(request.getNewAccountCredentialHours()),
                 new CredentialLifetime(request.getPasswordResetCredentialHours()),
@@ -77,7 +78,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 languages.tags(),
                 configuration.slotMinutes(), configuration.timeZone())
                 .logoUrl(configuration.logoUrl())
-                .imprintUrl(configuration.imprintUrl());
+                .imprintUrl(configuration.imprintUrl())
+                .privacyUrl(configuration.privacyUrl());
     }
 
     private ApiAdminClubConfig toAdminResponse(ClubConfigurationSnapshot configuration) {
@@ -91,6 +93,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.bookingReminderHours())
                 .logoUrl(configuration.logoUrl())
                 .imprintUrl(configuration.imprintUrl())
+                .privacyUrl(configuration.privacyUrl())
                 .noMembershipTypeRuleSetId(configuration.noMembershipTypeRuleSetId());
     }
 }

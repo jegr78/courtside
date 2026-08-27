@@ -296,6 +296,54 @@ describe("App build identity", () => {
     expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
   });
 
+  it("givenBothLegalLinks_whenTheShellLoads_thenThePrivacyPolicySitsBesideTheImprint", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      imprintUrl: "/imprint",
+      privacyUrl: "https://example-tennis-club.example/privacy",
+      defaultLocale: "en",
+      supportedLocales: ["de", "en"],
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("footer-privacy"))
+      .toHaveAttribute("href", "https://example-tennis-club.example/privacy");
+    expect(screen.getByTestId("footer-imprint")).toHaveAttribute("href", "/imprint");
+  });
+
+  it("givenNoPrivacyPolicyLink_whenTheShellLoads_thenTheFooterOffersNoEmptyTarget", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      imprintUrl: "/imprint",
+      defaultLocale: "en",
+      supportedLocales: ["de", "en"],
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("footer-imprint")).toBeInTheDocument();
+    expect(screen.queryByTestId("footer-privacy")).not.toBeInTheDocument();
+  });
+
   it("givenAMidLuminanceClubColour_whenTheShellLoads_thenTheHigherContrastTextColourIsUsed", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);

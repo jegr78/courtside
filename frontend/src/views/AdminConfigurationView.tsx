@@ -30,6 +30,7 @@ function editable(loaded: AdminClubConfig): ClubConfigRequest {
     accentColor: loaded.accentColor,
     logoUrl: loaded.logoUrl,
     imprintUrl: loaded.imprintUrl,
+    privacyUrl: loaded.privacyUrl,
     defaultLocale: loaded.defaultLocale,
     slotMinutes: loaded.slotMinutes,
     timeZone: loaded.timeZone,
@@ -220,6 +221,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             <TextField label={t("admin.config.accentColor")} value={config.accentColor} onChange={(event) => changeConfig({ accentColor: event.target.value })} />
             <TextField data-testid="logo-url" label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""} onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
             <TextField data-testid="imprint-url" label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
+            <TextField data-testid="privacy-url" label={t("admin.config.privacyUrl")} value={config.privacyUrl ?? ""} onChange={(event) => changeConfig({ privacyUrl: event.target.value || null })} />
           </div>
           <label className="grid gap-2 font-medium">
             {t("admin.config.defaultLocale")}

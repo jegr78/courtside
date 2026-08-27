@@ -207,9 +207,10 @@ export function App() {
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} configurationChanged={configurationChanged} />
         : <p role="status">{t("status.loading")}</p>}
     </main>
-    <footer className="text-muted flex justify-center gap-5 px-5 py-4 text-sm">
+    <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 py-4 text-sm">
       <BuildIdentity source={source} />
-      {config?.imprintUrl && <a className="underline hover:no-underline" href={config.imprintUrl}>{t("footer.imprint")}</a>}
+      {config?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={config.imprintUrl}>{t("footer.imprint")}</a>}
+      {config?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={config.privacyUrl}>{t("footer.privacy")}</a>}
     </footer>
   </div>;
 }
