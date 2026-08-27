@@ -62,6 +62,20 @@ class ConfigAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheConfiguration_whenOnlyThePrivacyLinkChanges_thenTheEventNamesTheFieldAndNoValue() {
+        // given
+        ClubConfigurationSnapshot current = config.current();
+
+        // when
+        config.update(withPrivacyUrl(current, "https://example-tennis-club.example/privacy"));
+
+        // then
+        Map<String, Object> payload = latestPayloadOf(ConfigEvent.ClubChanged.TYPE);
+        assertThat(payload).containsEntry("changedFields", List.of("privacyUrl"));
+        assertThat(payload.toString()).doesNotContain("example-tennis-club.example");
+    }
+
+    @Test
     void givenTheConfiguration_whenTheDefaultLocaleChanges_thenItsOwnEventCarriesTheNewLocale() {
         // given
         ClubConfigurationSnapshot current = config.current();
@@ -173,6 +187,17 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 current.timeZone(), ruleSetId);
     }
 
+    private static ChangeClubConfigurationCommand withPrivacyUrl(
+            ClubConfigurationSnapshot current, String privacyUrl) {
+        return new ChangeClubConfigurationCommand(current.clubName(), current.primaryColor(),
+                current.accentColor(), current.logoUrl(), current.imprintUrl(), privacyUrl,
+                current.defaultLocale(), new BookingSlotDuration(current.slotMinutes()),
+                current.timeZone(), new CredentialLifetime(current.newAccountCredentialHours()),
+                new CredentialLifetime(current.passwordResetCredentialHours()),
+                new ReminderLeadTime(current.bookingReminderHours()),
+                current.noMembershipTypeRuleSetId());
+    }
+
     private static ChangeClubConfigurationCommand change(ClubConfigurationSnapshot current, String clubName,
                                                          String locale, int minutes, String timeZone) {
         return change(current, clubName, locale, minutes, timeZone,
@@ -183,7 +208,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                                                          String locale, int minutes, String timeZone,
                                                          UUID noMembershipTypeRuleSetId) {
         return new ChangeClubConfigurationCommand(clubName, current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), locale,
+                current.logoUrl(), current.imprintUrl(), current.privacyUrl(), locale,
                 new BookingSlotDuration(minutes), timeZone,
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()), new ReminderLeadTime(24),

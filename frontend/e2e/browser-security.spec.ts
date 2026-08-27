@@ -224,6 +224,7 @@ test("URL configuration rejects active schemes and renders accepted relative tar
   await page.goto("/admin/configuration");
   await page.getByTestId("logo-url").fill("javascript:globalThis.__courtsideXss='executed'");
   await page.getByTestId("imprint-url").fill("data:text/html,cross-role");
+  await page.getByTestId("privacy-url").fill("vbscript:msgbox(1)");
 
   // when
   const rejectedResponse = page.waitForResponse((response) =>
@@ -237,14 +238,17 @@ test("URL configuration rejects active schemes and renders accepted relative tar
   expect(problem.type).toBe("urn:courtside:error:validation-failed");
   expect(problem.fieldErrors).toEqual(expect.arrayContaining([
     expect.objectContaining({ field: "logoUrl", code: "validation.Pattern" }),
-    expect.objectContaining({ field: "imprintUrl", code: "validation.Pattern" })
+    expect.objectContaining({ field: "imprintUrl", code: "validation.Pattern" }),
+    expect.objectContaining({ field: "privacyUrl", code: "validation.Pattern" })
   ]));
   await expect(page.locator('img[src^="javascript:"]')).toHaveCount(0);
   await expect(page.locator('a[href^="data:"]')).toHaveCount(0);
+  await expect(page.locator('a[href^="vbscript:"]')).toHaveCount(0);
 
   // when
   await page.getByTestId("logo-url").fill("/icon.svg");
   await page.getByTestId("imprint-url").fill("/imprint");
+  await page.getByTestId("privacy-url").fill("/privacy");
   const acceptedResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/config") && response.request().method() === "PUT");
   await page.getByTestId("save-club-config").click();
@@ -253,7 +257,8 @@ test("URL configuration rejects active schemes and renders accepted relative tar
   expect((await acceptedResponse).status()).toBe(200);
   await expect(page.getByTestId("club-logo")).toHaveAttribute("src", "/icon.svg");
   await expect(page.locator('a[href="/imprint"]')).toHaveCount(1);
-  await expectRenderingContexts("url-attributes", ["logo-url", "imprint-url"]);
+  await expect(page.locator('a[href="/privacy"]')).toHaveCount(1);
+  await expectRenderingContexts("url-attributes", ["logo-url", "imprint-url", "privacy-url"]);
 });
 
 test("a blocked inline script produces an attributable CSP violation", async ({ page }) => {

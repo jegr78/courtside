@@ -209,7 +209,8 @@ export function App() {
     </main>
     <footer className="text-muted flex justify-center gap-5 px-5 py-4 text-sm">
       <BuildIdentity source={source} />
-      {config?.imprintUrl && <a className="underline hover:no-underline" href={config.imprintUrl}>{t("footer.imprint")}</a>}
+      {config?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={config.imprintUrl}>{t("footer.imprint")}</a>}
+      {config?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={config.privacyUrl}>{t("footer.privacy")}</a>}
     </footer>
   </div>;
 }

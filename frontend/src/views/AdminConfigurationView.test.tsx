@@ -75,6 +75,52 @@ describe("AdminConfigurationView", () => {
       expect.objectContaining({ noMembershipTypeRuleSetId: "rule-set" })));
   });
 
+  it("given a privacy policy the club publishes, when saving, then the link is written", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      bookingReminderHours: 24, privacyUrl: "/privacy"
+    });
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("privacy-url");
+
+    // when
+    await userEvent.type(screen.getByTestId("privacy-url"), "/privacy");
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(
+      expect.objectContaining({ privacyUrl: "/privacy" })));
+  });
+
+  it("given a stored privacy policy link, when it is cleared, then the club is not stuck with it", async () => {
+    // given
+    vi.spyOn(api, "adminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      bookingReminderHours: 24, privacyUrl: "/privacy"
+    });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      bookingReminderHours: 24
+    });
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("privacy-url");
+
+    // when
+    await userEvent.clear(screen.getByTestId("privacy-url"));
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(
+      expect.objectContaining({ privacyUrl: null })));
+  });
+
   it("given an assigned rule set that has since been deactivated, when the configuration is loaded, then it is still the selected one", async () => {
     // given
     vi.spyOn(api, "ruleSets").mockResolvedValue([

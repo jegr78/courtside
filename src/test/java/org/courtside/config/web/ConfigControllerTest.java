@@ -586,6 +586,69 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPrivacyUrl_whenChangingTheConfig_thenThePublicConfigurationCarriesItBesideTheImprint()
+            throws Exception {
+        // given
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.privacyUrl")
+                        .value("https://example-tennis-club.example/privacy"));
+
+        // when / then
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imprintUrl")
+                        .value("https://example-tennis-club.example/imprint"))
+                .andExpect(jsonPath("$.privacyUrl")
+                        .value("https://example-tennis-club.example/privacy"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAStoredPrivacyUrl_whenItIsClearedAgain_thenTheFooterHasNothingLeftToRender()
+            throws Exception {
+        // given
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club"))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "\"privacyUrl\": \"https://example-tennis-club.example/privacy\"",
+                                "\"privacyUrl\": null"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.privacyUrl").doesNotExist());
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(jsonPath("$.privacyUrl").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPrivacyUrlWithAnActiveScheme_whenChangingTheConfig_thenTheRejectionNamesTheField()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "https://example-tennis-club.example/privacy", "javascript:alert(1)"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("privacyUrl"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+    }
+
+    @Test
     void whenReadingThePublicConfiguration_thenItNamesTheLanguagesThisImageCanWriteIn()
             throws Exception {
         // when / then — a client offers a choice from this rather than from a list of its own
@@ -598,6 +661,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
         return """
                 {"clubName": "%s", "primaryColor": "#004f2d", "accentColor": "#c8a415",
                  "logoUrl": "/branding/logo.svg", "imprintUrl": "https://example-tennis-club.example/imprint",
+                 "privacyUrl": "https://example-tennis-club.example/privacy",
                  "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
                  "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
                 """.formatted(clubName);

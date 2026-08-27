@@ -97,6 +97,12 @@
       "sink": "anchor-href"
     },
     {
+      "id": "privacy-url",
+      "journey": "url-attributes",
+      "field": "privacyUrl",
+      "sink": "anchor-href"
+    },
+    {
       "id": "location-input",
       "journey": "location-input",
       "field": "location.search-and-hash",

@@ -385,6 +385,7 @@ components:
             A same-origin path or an HTTPS image URL. A remote image discloses the visitor's IP
             address and the Courtside origin to its operator.
         imprintUrl: { type: [string, "null"] }
+        privacyUrl: { type: [string, "null"] }
         defaultLocale: { type: string }
         supportedLocales:
           type: array
@@ -442,6 +443,15 @@ components:
           type: [string, "null"]
           maxLength: 500
           pattern: "^(https?://.+|/[^/\\\\].*|/)$"
+        privacyUrl:
+          type: [string, "null"]
+          maxLength: 500
+          pattern: "^(https?://.+|/[^/\\\\].*|/)$"
+          description: |
+            Where this club publishes its privacy policy: a same-origin path or an absolute URL.
+            Unlike the logo it is a navigation target rather than a subresource, so plain HTTP is
+            accepted — a club that serves Courtside without TLS would otherwise have no way to
+            link the page it is legally required to publish.
         defaultLocale: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone:

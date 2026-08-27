@@ -1082,8 +1082,12 @@ and the admin UI. Anything requiring a restart belongs in `.env`. Nothing functi
 belongs in code.
 
 **Branding** is served from a public endpoint `/api/public/config` that the PWA fetches at
-startup: club name, primary and accent colour, logo URL, imprint link, default locale.
-Colours are applied as CSS custom properties on `:root` — no rebuild per club.
+startup: club name, primary and accent colour, logo URL, imprint link, privacy-policy link,
+default locale. Colours are applied as CSS custom properties on `:root` — no rebuild per club.
+The two legal links are rendered side by side in the footer, and each is left out where the club
+has set none. Both accept a root-relative path or an absolute HTTP or HTTPS URL: they are
+navigation targets rather than subresources, and a club serving Courtside without TLS still has
+to be able to link the pages German law requires it to publish.
 Logo URLs are either root-relative or HTTPS. A remote logo necessarily tells its operator the
 visitor's IP address and the Courtside origin, so clubs should serve the image from their own
 instance where possible. The CSP grants remote HTTPS only to images; every executable resource and
