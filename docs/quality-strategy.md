@@ -203,8 +203,9 @@ so its outer limit cannot normally erase the bounded runner's result.
 
 The closed record retains the commit and whether its working tree was clean, the pinned toolchain,
 non-identifying host capacity, project order, browser-isolation variant, resource-profile name,
-planned test-population fingerprint, browser-process identity, lifetime, test position, bounded
-CPU and memory samples, exit state, duration and outcome classes. It retains
+experiment and pair identity, planned test-population fingerprint, browser-process identity,
+lifetime, test position, bounded CPU and memory samples, exit state, duration and outcome classes.
+It retains
 no test title, URL, log, request, cookie or credential. Raw traces and diagnostics expire after 14
 days; the safe records remain available for 90 days. Validate one record with
 `npm run reliability:validate -- <record>` and summarize downloaded records with

@@ -42,6 +42,47 @@ function outcome(execution) {
   return { status: "incomplete", classifications: ["harness"], exitCode: execution.exitCode };
 }
 
+function lifecycleEvidenceIsComplete(lifecycle, isolationVariant, testCount) {
+  const expectedProcesses = isolationVariant === "fresh-test-browser" ? testCount : 3;
+  if (lifecycle?.processes?.length !== expectedProcesses) return false;
+  const observedPositions = new Set();
+  const observedProjects = new Set();
+  for (const process of lifecycle.processes) {
+    const startedAt = Date.parse(process.startedAt);
+    const finishedAt = Date.parse(process.finishedAt);
+    if (!Number.isFinite(startedAt) || !Number.isFinite(finishedAt) || finishedAt < startedAt
+      || process.durationMs !== finishedAt - startedAt || process.projectName === undefined
+      || observedProjects.has(process.projectName) && isolationVariant === "fresh-project-browser"
+      || process.exitState === undefined || process.exitState.oomKilled || process.exitState.hasError) {
+      return false;
+    }
+    observedProjects.add(process.projectName);
+    const samplesByPosition = new Map();
+    let previousSample = startedAt;
+    for (const sample of process.samples) {
+      const recordedAt = Date.parse(sample.recordedAt);
+      if (!Number.isFinite(recordedAt) || recordedAt < previousSample || recordedAt > finishedAt) return false;
+      previousSample = recordedAt;
+      const samples = samplesByPosition.get(sample.testPosition) ?? [];
+      samples.push(sample);
+      samplesByPosition.set(sample.testPosition, samples);
+    }
+    for (const [position, samples] of samplesByPosition) {
+      if (samples.length !== 2 || samples[0].phase !== "start" || samples[1].phase !== "end"
+        || observedPositions.has(position)) {
+        return false;
+      }
+      observedPositions.add(position);
+    }
+    if (samplesByPosition.size === 0
+      || isolationVariant === "fresh-test-browser" && samplesByPosition.size !== 1) return false;
+  }
+  return (isolationVariant === "fresh-test-browser" || observedProjects.size === 3)
+    && observedPositions.size === testCount
+    && [...observedPositions].toSorted((left, right) => left - right)
+      .every((position, index) => position === index + 1);
+}
+
 export function buildReliabilityRecord(input) {
   const imageDigest = /@(?<digest>sha256:[0-9a-f]{64})$/.exec(input.browserImage)?.groups?.digest;
   if (imageDigest === undefined) throw new Error("The browser image is not pinned by digest");
@@ -49,6 +90,17 @@ export function buildReliabilityRecord(input) {
   const finished = Date.parse(input.finishedAt);
   if (!Number.isFinite(started) || !Number.isFinite(finished) || finished < started) {
     throw new Error("The reliability attempt timestamps are invalid");
+  }
+  const testPopulation = input.execution.gateOutcome?.testPopulation ?? {
+    count: 0,
+    fingerprint: `sha256:${"0".repeat(64)}`
+  };
+  let result = outcome(input.execution);
+  if (result.status !== "incomplete"
+    && !lifecycleEvidenceIsComplete(input.execution.browserLifecycle, input.isolationVariant, testPopulation.count)) {
+    result = { status: "incomplete",
+      classifications: [...new Set([...result.classifications.filter((classification) => classification !== "none"), "harness"])],
+      exitCode: input.execution.exitCode };
   }
   return {
     schemaVersion: 1,
@@ -69,18 +121,20 @@ export function buildReliabilityRecord(input) {
       projectOrder: input.projectOrder,
       isolationVariant: input.isolationVariant,
       resourceProfile: input.resourceProfile,
-      seedFingerprint: input.seedFingerprint
+      seedFingerprint: input.seedFingerprint,
+      ...input.experimentId === undefined ? {} : {
+        experimentId: input.experimentId,
+        pairIndex: input.pairIndex,
+        pairPosition: input.pairPosition
+      }
     },
     host: {
       provider: process.env.GITHUB_ACTIONS === "true" ? "github-hosted" : "local",
       ...input.host
     },
-    testPopulation: input.execution.gateOutcome?.testPopulation ?? {
-      count: 0,
-      fingerprint: `sha256:${"0".repeat(64)}`
-    },
+    testPopulation,
     browserLifecycle: input.execution.browserLifecycle ?? { schemaVersion: 1, processes: [] },
-    outcome: outcome(input.execution)
+    outcome: result
   };
 }
 
@@ -166,6 +220,9 @@ export function compareIsolationVariants(records) {
   if (records.some(({ sourceTreeState }) => sourceTreeState !== "clean")) {
     throw new Error("Isolation comparison requires a clean source tree for every attempt");
   }
+  const experimentId = oneValue(records, ({ matrix }) => matrix.experimentId,
+    "Isolation comparison requires the same experiment identity");
+  if (experimentId === undefined) throw new Error("Isolation comparison requires paired experiment provenance");
   const sourceCommit = oneValue(records, ({ sourceCommit: value }) => value,
     "Isolation comparison requires the same source commit");
   oneValue(records, ({ toolchain }) => toolchain.playwrightVersion,
@@ -186,6 +243,27 @@ export function compareIsolationVariants(records) {
     "Isolation comparison requires the same test population");
   oneValue(records, ({ testPopulation }) => testPopulation.count,
     "Isolation comparison requires the same test population");
+  const pairs = new Map();
+  for (const record of records) {
+    const pair = pairs.get(record.matrix.pairIndex) ?? [];
+    pair.push(record);
+    pairs.set(record.matrix.pairIndex, pair);
+  }
+  if (pairs.size !== project.length) throw new Error("Isolation comparison contains an invalid pair index set");
+  let previousPairFinishedAt = Number.NEGATIVE_INFINITY;
+  for (let pairIndex = 1; pairIndex <= project.length; pairIndex += 1) {
+    const pair = pairs.get(pairIndex);
+    if (pair?.length !== 2) throw new Error("Isolation comparison requires two attempts in every pair");
+    const first = pair.find(({ matrix }) => matrix.pairPosition === "first");
+    const second = pair.find(({ matrix }) => matrix.pairPosition === "second");
+    const expectedFirst = pairIndex % 2 === 1 ? "fresh-project-browser" : "fresh-test-browser";
+    if (first === undefined || second === undefined || first.matrix.isolationVariant !== expectedFirst
+      || second.matrix.isolationVariant === expectedFirst || Date.parse(first.startedAt) < previousPairFinishedAt
+      || Date.parse(first.finishedAt) > Date.parse(second.startedAt)) {
+      throw new Error("Isolation comparison contains an invalid alternating pair sequence");
+    }
+    previousPairFinishedAt = Date.parse(second.finishedAt);
+  }
   const variants = {
     "fresh-project-browser": variantResult(project),
     "fresh-test-browser": variantResult(test)
@@ -194,6 +272,7 @@ export function compareIsolationVariants(records) {
   const testFailures = variants["fresh-test-browser"].failed + variants["fresh-test-browser"].incomplete;
   return {
     schemaVersion: 1,
+    experimentId,
     pairs: project.length,
     sourceCommit,
     browserImageDigest,
@@ -361,6 +440,9 @@ async function runAttempt(options, updateExitCode = true) {
     isolationVariant: options.isolation,
     resourceProfile: process.env.GITHUB_ACTIONS === "true" ? "github-hosted-default" : "local-default",
     seedFingerprint: journeySeedFingerprint(),
+    experimentId: options.experimentId,
+    pairIndex: options.pairIndex,
+    pairPosition: options.pairPosition,
     host: {
       platform: platform(), architecture: arch(), cpuCount: cpus().length, totalMemoryBytes: totalmem(),
       ...process.env.ImageOS && process.env.ImageVersion
@@ -387,22 +469,10 @@ export function validateReliabilityRecord(record) {
   if (Date.parse(record.finishedAt) - Date.parse(record.startedAt) !== record.durationMs) {
     throw new Error("The reliability duration does not match its timestamps");
   }
-  if (record.outcome.status !== "incomplete") {
-    const expectedProcesses = record.matrix.isolationVariant === "fresh-test-browser"
-      ? record.testPopulation.count
-      : 3;
-    if (record.browserLifecycle.processes.length !== expectedProcesses) {
-      throw new Error("The browser process count does not match the declared isolation");
-    }
-    for (const process of record.browserLifecycle.processes) {
-      if (process.finishedAt === undefined || process.exitState === undefined || process.projectName === undefined) {
-        throw new Error("A completed reliability run has unfinished browser lifecycle evidence");
-      }
-      const phases = new Set(process.samples.map(({ phase }) => phase));
-      if (!phases.has("start") || !phases.has("end")) {
-        throw new Error("A browser process is missing start or end resource evidence");
-      }
-    }
+  if (record.outcome.status !== "incomplete"
+    && !lifecycleEvidenceIsComplete(record.browserLifecycle, record.matrix.isolationVariant,
+      record.testPopulation.count)) {
+    throw new Error("A completed reliability run has contradictory browser lifecycle evidence");
   }
   const classifications = new Set(record.outcome.classifications);
   const isPassed = record.outcome.status === "passed" && classifications.size === 1
@@ -455,6 +525,7 @@ export function comparisonOptions(args) {
 
 async function runComparison(options) {
   const records = [];
+  const experimentId = randomUUID();
   mkdirSync(options.output, { recursive: true });
   if (readdirSync(options.output).length > 0) {
     throw new Error("Isolation experiment output directory must be empty");
@@ -463,8 +534,9 @@ async function runComparison(options) {
     const variants = pair % 2 === 0
       ? ["fresh-project-browser", "fresh-test-browser"]
       : ["fresh-test-browser", "fresh-project-browser"];
-    for (const isolation of variants) {
-      records.push(await runAttempt({ ...options, isolation }, false));
+    for (const [position, isolation] of variants.entries()) {
+      records.push(await runAttempt({ ...options, isolation, experimentId, pairIndex: pair + 1,
+        pairPosition: position === 0 ? "first" : "second" }, false));
     }
   }
   process.stdout.write(`${JSON.stringify(compareIsolationVariants(records), null, 2)}\n`);

@@ -21,6 +21,7 @@ import {
 } from "./browser-diagnostics";
 import { startJourneyControl } from "./journey-control";
 import { browserExitState, BrowserLifecycleRecorder, browserResourceUsage } from "./browser-lifecycle";
+import { completeCleanup } from "./resource-cleanup";
 
 const executeFile = promisify(execFile);
 
@@ -427,12 +428,16 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     if (!browser) return;
     const id = browser.container.getId();
     try {
-      await browser.container.stop({ remove: false });
-      browserLifecycle.finish(browserName,
-        browserExitState(await dockerJson(["inspect", "--format", "{{json .State}}", id])), new Date().toISOString());
-      retainBrowserLifecycle();
+      await completeCleanup([
+        async () => {
+          await browser.container.stop({ remove: false });
+          browserLifecycle.finish(browserName,
+            browserExitState(await dockerJson(["inspect", "--format", "{{json .State}}", id])), new Date().toISOString());
+          retainBrowserLifecycle();
+        },
+        () => executeFile("docker", ["rm", "-f", id], { timeout: 5_000 })
+      ]);
     } finally {
-      await executeFile("docker", ["rm", "-f", id], { timeout: 5_000 });
       browserServers.delete(browserName);
     }
   };
@@ -440,11 +445,13 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   let clubProxy: StartedTestContainer | undefined;
   let mailSink: StartedTestContainer | undefined;
   const stopContainers = async () => {
-    await Promise.all([...browserServers.keys()].map(stopBrowser));
-    await clubProxy?.stop();
-    await mailSink?.stop();
-    await postgres?.stop();
-    await clubNetwork?.stop();
+    await completeCleanup([
+      () => completeCleanup([...browserServers.keys()].map((browserName) => () => stopBrowser(browserName))),
+      async () => { await clubProxy?.stop(); },
+      async () => { await mailSink?.stop(); },
+      async () => { await postgres?.stop(); },
+      async () => { await clubNetwork?.stop(); }
+    ]);
   };
   try {
     const visualDate = journeyDate;

@@ -33,7 +33,15 @@
         "projectOrder": { "enum": ["configured", "reversed"] },
         "isolationVariant": { "enum": ["fresh-project-browser", "fresh-test-browser"] },
         "resourceProfile": { "enum": ["local-default", "github-hosted-default"] },
-        "seedFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+        "seedFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "experimentId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+        "pairIndex": { "type": "integer", "minimum": 1 },
+        "pairPosition": { "enum": ["first", "second"] }
+      },
+      "dependentRequired": {
+        "experimentId": ["pairIndex", "pairPosition"],
+        "pairIndex": ["experimentId", "pairPosition"],
+        "pairPosition": ["experimentId", "pairIndex"]
       }
     },
     "host": {

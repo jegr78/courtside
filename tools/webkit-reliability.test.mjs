@@ -67,6 +67,29 @@ function record(overrides = {}) {
   });
 }
 
+function comparisonRecords(overrides = () => ({})) {
+  const experimentId = "018f47a2-9e4c-7a61-8000-999999999999";
+  return Array.from({ length: 40 }, (_, index) => {
+    const pairIndex = Math.floor(index / 2) + 1;
+    const pairPosition = index % 2 === 0 ? "first" : "second";
+    const firstIsolation = pairIndex % 2 === 1 ? "fresh-project-browser" : "fresh-test-browser";
+    const isolationVariant = pairPosition === "first" ? firstIsolation
+      : firstIsolation === "fresh-project-browser" ? "fresh-test-browser" : "fresh-project-browser";
+    const startedAt = new Date(Date.UTC(2026, 7, 1, 0, index * 3)).toISOString();
+    const finishedAt = new Date(Date.parse(startedAt) + 120_000).toISOString();
+    return record({
+      attemptId: `018f47a2-9e4c-7a61-8000-${String(index).padStart(12, "0")}`,
+      startedAt,
+      finishedAt,
+      isolationVariant,
+      experimentId,
+      pairIndex,
+      pairPosition,
+      ...overrides(index)
+    });
+  });
+}
+
 test("given a completed first attempt_whenBuildingItsRecord_thenTheClosedSchemaAcceptsOnlySafeMetadata", () => {
   // given / when
   const result = record();
@@ -83,12 +106,15 @@ test("given a completed first attempt_whenBuildingItsRecord_thenTheClosedSchemaA
 });
 
 test("givenAProductAssertionFailure_whenBuildingItsRecord_thenItRemainsAProductFailure", () => {
-  // given / when
+  // given
+  const evidence = record();
+
+  // when
   const result = record({ execution: { exitCode: 1, gateOutcome: { schemaVersion: 1, claims: [
     { id: "webkit-core-compatibility", status: "failed" },
     { id: "webkit-axe-qualification", status: "passed" },
     { id: "browser-harness", status: "passed" }
-  ] } } });
+  ], testPopulation: evidence.testPopulation }, browserLifecycle: evidence.browserLifecycle } });
 
   // then
   assert.deepEqual(result.outcome, { status: "failed", classifications: ["product"], exitCode: 1 });
@@ -252,33 +278,52 @@ test("givenLifecycleEvidenceDoesNotMatchTheDeclaredIsolation_whenValidating_then
   wrongTestCount.browserLifecycle.processes.pop();
 
   // when / then
-  assert.throws(() => validateReliabilityRecord(wrongProjectCount), /process count/);
-  assert.throws(() => validateReliabilityRecord(wrongTestCount), /process count/);
+  assert.throws(() => validateReliabilityRecord(wrongProjectCount), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(wrongTestCount), /contradictory browser lifecycle/);
+});
+
+test("givenUnsafeOrIncompleteLifecycleEvidence_whenTheRunClaimsSuccess_thenItFailsClosed", () => {
+  // given
+  const oom = record();
+  oom.browserLifecycle.processes[0].exitState.oomKilled = true;
+  const dockerError = record();
+  dockerError.browserLifecycle.processes[0].exitState.hasError = true;
+  const duplicateStart = record();
+  duplicateStart.browserLifecycle.processes[0].samples[1].phase = "start";
+  const duplicateProject = record();
+  duplicateProject.browserLifecycle.processes[1].projectName = duplicateProject.browserLifecycle.processes[0].projectName;
+  const builtEvidence = record();
+  builtEvidence.browserLifecycle.processes[0].exitState.oomKilled = true;
+
+  // when
+  const built = record({ execution: {
+    exitCode: 0,
+    gateOutcome: { schemaVersion: 1, testPopulation: builtEvidence.testPopulation, claims: [
+      { id: "webkit-core-compatibility", status: "passed" },
+      { id: "webkit-axe-qualification", status: "passed" },
+      { id: "browser-harness", status: "passed" }
+    ] },
+    browserLifecycle: builtEvidence.browserLifecycle
+  } });
+
+  // then
+  assert.deepEqual(built.outcome, { status: "incomplete", classifications: ["harness"], exitCode: 0 });
+  assert.throws(() => validateReliabilityRecord(oom), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(dockerError), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(duplicateStart), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(duplicateProject), /contradictory browser lifecycle/);
 });
 
 test("givenTwentyPairedAttemptsPerVariant_whenComparingIsolation_thenConditionsAndResultsStayVisible", () => {
   // given
-  const records = Array.from({ length: 40 }, (_, index) => record({
-    attemptId: `018f47a2-9e4c-7a61-8000-${String(index).padStart(12, "0")}`,
-    startedAt: `2026-08-${String(Math.floor(index / 2) + 1).padStart(2, "0")}T${String(index % 2).padStart(2, "0")}:00:00.000Z`,
-    finishedAt: `2026-08-${String(Math.floor(index / 2) + 1).padStart(2, "0")}T${String(index % 2).padStart(2, "0")}:02:00.000Z`,
-    isolationVariant: index % 2 === 0 ? "fresh-project-browser" : "fresh-test-browser",
-    execution: {
-      exitCode: 0,
-      gateOutcome: { schemaVersion: 1, testPopulation: { count: 3, fingerprint: `sha256:${"c".repeat(64)}` }, claims: [
-        { id: "webkit-core-compatibility", status: "passed" },
-        { id: "webkit-axe-qualification", status: "passed" },
-        { id: "browser-harness", status: "passed" }
-      ] },
-      browserLifecycle: record().browserLifecycle
-    }
-  }));
+  const records = comparisonRecords();
 
   // when
   const comparison = compareIsolationVariants(records);
 
   // then
   assert.equal(comparison.pairs, 20);
+  assert.equal(comparison.experimentId, "018f47a2-9e4c-7a61-8000-999999999999");
   assert.equal(comparison.variants["fresh-project-browser"].attemptCount, 20);
   assert.equal(comparison.variants["fresh-test-browser"].attemptCount, 20);
   assert.equal(comparison.selectedVariant, "fresh-project-browser");
@@ -290,19 +335,22 @@ test("givenTooFewOrNonComparableAttempts_whenComparingIsolation_thenTheConclusio
     attemptId: "018f47a2-9e4c-7a61-8000-123456789abd",
     isolationVariant: "fresh-test-browser"
   })];
-  const differentCommit = Array.from({ length: 40 }, (_, index) => record({
-    attemptId: `018f47a2-9e4c-7a61-8000-${String(index).padStart(12, "0")}`,
-    sourceCommit: index === 39 ? "d".repeat(40) : "a".repeat(40),
-    isolationVariant: index % 2 === 0 ? "fresh-project-browser" : "fresh-test-browser"
+  const differentCommit = comparisonRecords((index) => ({
+    sourceCommit: index === 39 ? "d".repeat(40) : "a".repeat(40)
   }));
-  const modifiedTree = Array.from({ length: 40 }, (_, index) => record({
-    attemptId: `028f47a2-9e4c-7a61-8000-${String(index).padStart(12, "0")}`,
-    sourceTreeState: index === 39 ? "modified" : "clean",
-    isolationVariant: index % 2 === 0 ? "fresh-project-browser" : "fresh-test-browser"
+  const modifiedTree = comparisonRecords((index) => ({
+    sourceTreeState: index === 39 ? "modified" : "clean"
   }));
+  const unpaired = comparisonRecords();
+  unpaired[1].matrix.pairPosition = "first";
+  const overlappingPairs = comparisonRecords();
+  overlappingPairs[2].startedAt = overlappingPairs[1].startedAt;
+  overlappingPairs[2].finishedAt = overlappingPairs[1].finishedAt;
 
   // when / then
   assert.throws(() => compareIsolationVariants(tooFew), /twenty attempts/);
   assert.throws(() => compareIsolationVariants(differentCommit), /same source commit/);
   assert.throws(() => compareIsolationVariants(modifiedTree), /clean source tree/);
+  assert.throws(() => compareIsolationVariants(unpaired), /alternating pair sequence/);
+  assert.throws(() => compareIsolationVariants(overlappingPairs), /alternating pair sequence/);
 });
