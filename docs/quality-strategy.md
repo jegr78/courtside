@@ -201,6 +201,13 @@ an orderly stop at its execution deadline and then ends the tree after a short c
 The hosted job reserves separate budgets for packaging, execution, validation and artifact upload,
 so its outer limit cannot normally erase the bounded runner's result.
 
+Every browser container carries a random journey identity and a separate startup-attempt identity.
+Creation becomes visible before port publication, so a failed start retains its bounded failure
+class, container state and network attachment before the exact container is removed. Global teardown
+also inventories every browser with that journey identity on the journey network before removing the
+network. A failed diagnostic or removal remains a harness failure; it cannot skip the remaining
+cleanup or turn the first attempt green.
+
 The closed record retains the commit and whether its working tree was clean, the pinned toolchain,
 non-identifying host capacity, project order, browser-isolation variant, resource-profile name,
 experiment and pair identity, planned test-population fingerprint, browser-process identity,
