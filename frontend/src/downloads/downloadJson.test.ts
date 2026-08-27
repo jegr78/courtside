@@ -13,8 +13,8 @@ describe("downloadJson", () => {
       createObjectURL: () => "blob:courtside/answer", revokeObjectURL
     });
     let anchor: HTMLAnchorElement | undefined;
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
-      anchor = this;
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {
+      anchor = document.querySelector("a") ?? undefined;
     });
     downloadJson("courtside-subject-access-person-1.json", { personId: "person-1" });
     return { revoked: () => revokeObjectURL.mock.calls.length, anchor };
