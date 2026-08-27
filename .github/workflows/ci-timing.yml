@@ -22,17 +22,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
         run: |
           mkdir -p build/ci-timing
-          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" > build/ci-timing/run.json
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs?filter=latest&per_page=100" \
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}" > build/ci-timing/run.json
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100" \
             --slurp | jq '{jobs: map(.jobs[]) }' > build/ci-timing/jobs.json
       - name: Record timing
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
         run: |
           node tools/ci-timing.mjs \
             --run build/ci-timing/run.json \
             --jobs build/ci-timing/jobs.json \
             --repository "$GITHUB_REPOSITORY" \
+            --expected-run-id "$RUN_ID" \
+            --expected-attempt "$ATTEMPT" \
             --output build/ci-timing/record.json \
             --summary build/ci-timing/summary.md
           cp ci/ci-timing.schema.json build/ci-timing/ci-timing.schema.json

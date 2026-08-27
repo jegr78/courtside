@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { aggregateTimingRecords, createTimingRecord } from "./ci-timing.mjs";
+import { aggregateTimingRecords, assertRunIdentity, createTimingRecord } from "./ci-timing.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = require("ajv/dist/2020").default;
@@ -78,6 +78,27 @@ test("givenCancelledAndMalformedJobs_whenRecordingTiming_thenTheRecordFailsClose
   assert.throws(() => createTimingRecord(cancelled, malformedJobs, "jegr78/courtside"), /completed_at/);
 });
 
+test("givenACancelledJobWithUnstartedSteps_whenRecordingTiming_thenCancellationRemainsAttributable", () => {
+  // given
+  const cancelledJob = {
+    ...jobs[0],
+    conclusion: "cancelled",
+    steps: [
+      { name: "Build and test", conclusion: "cancelled", started_at: "2026-08-27T10:00:20Z", completed_at: "2026-08-27T10:03:20Z" },
+      { name: "Upload evidence", conclusion: "skipped", started_at: null, completed_at: null }
+    ]
+  };
+
+  // when
+  const record = createTimingRecord({ ...run, conclusion: "cancelled" }, [cancelledJob], "jegr78/courtside");
+
+  // then
+  assert.equal(record.outcome, "cancelled");
+  assert.equal(record.jobs[0].outcome, "cancelled");
+  assert.deepEqual(record.jobs[0].steps.map((step) => step.outcome), ["cancelled"]);
+  assert.equal(record.timeToFirstFailureMilliseconds, null);
+});
+
 test("givenGitHubReportsASkippedJobBeforeItsStart_whenRecordingTiming_thenNoRunnerTimeIsInvented", () => {
   // given
   const skipped = {
@@ -111,17 +132,21 @@ test("givenAJobFailsOutsideANamedStep_whenRecordingTiming_thenItsCompletionMarks
 
 test("givenFirstAttemptRecords_whenAggregating_thenMedianP95AndRunnerMinutesAreReported", () => {
   // given
-  const records = [600_000, 900_000, 1_200_000, 1_500_000].map((duration, index) => ({
-    ...createTimingRecord({
+  const records = [600_000, 900_000, 1_200_000, 1_500_000].map((duration, index) => {
+    const completedAt = new Date(Date.parse(run.run_started_at) + duration).toISOString();
+    return createTimingRecord({
       ...run,
       id: 101 + index,
       conclusion: "success",
-      updated_at: new Date(Date.parse(run.created_at) + duration).toISOString()
-    }, [{ ...jobs[0], conclusion: "success", steps: jobs[0].steps.map((step) => ({ ...step, conclusion: "success" })) }],
-    "jegr78/courtside"),
-    durationMilliseconds: duration,
-    jobs: [{ ...createTimingRecord(run, jobs, "jegr78/courtside").jobs[0], durationMilliseconds: duration }]
-  }));
+      updated_at: completedAt
+    }, [{
+      ...jobs[0],
+      conclusion: "success",
+      started_at: run.run_started_at,
+      completed_at: completedAt,
+      steps: []
+    }], "jegr78/courtside");
+  });
 
   // when
   const aggregate = aggregateTimingRecords(records);
@@ -142,6 +167,34 @@ test("givenOnlyReruns_whenAggregating_thenTheSampleIsExplicitlyInsufficient", ()
 
   // then
   assert.deepEqual(aggregate, { sampleSize: 0, status: "insufficient-sample" });
+});
+
+test("givenMalformedOrContradictoryRecords_whenAggregating_thenTheyCannotInfluenceTheBaseline", () => {
+  // given
+  const valid = createTimingRecord(run, jobs, "jegr78/courtside");
+
+  // when / then
+  assert.throws(() => aggregateTimingRecords([{ ...valid, durationMilliseconds: -1 }]), /duration/);
+  assert.throws(() => aggregateTimingRecords([{ ...valid, attempt: 2 }]), /first-attempt identity/);
+  assert.throws(() => aggregateTimingRecords([{ ...valid, environment: { token: "secret" } }]), /unknown fields/);
+  assert.throws(() => aggregateTimingRecords([valid, valid]), /duplicate run attempt/);
+});
+
+test("givenLooseJavaScriptDates_whenRecordingTiming_thenOnlyRfc3339UtcEvidenceIsAccepted", () => {
+  // given
+  const looseRun = { ...run, run_started_at: "1", updated_at: "2" };
+
+  // when / then
+  assert.throws(() => createTimingRecord(looseRun, jobs, "jegr78/courtside"), /RFC 3339/);
+});
+
+test("givenFetchedEvidenceFromAnotherAttempt_whenBindingTheEvent_thenCollectionFailsClosed", () => {
+  // given
+  const fetched = { ...run, run_attempt: 2 };
+
+  // when / then
+  assert.throws(() => assertRunIdentity(fetched, 101, 1), /does not match the triggering event/);
+  assert.doesNotThrow(() => assertRunIdentity(run, 101, 1));
 });
 
 test("givenARecordedRun_whenValidatingTheRetainedArtifact_thenItsShapeIsClosed", () => {

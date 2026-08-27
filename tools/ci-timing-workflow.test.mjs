@@ -19,3 +19,11 @@ test("whenTimingEvidenceIsUploaded_thenRetentionAndFirstAttemptIdentityAreExplic
   assert.match(workflow, /ci-timing\.schema\.json/);
   assert.match(workflow, /GITHUB_STEP_SUMMARY/);
 });
+
+test("givenARunIsRerunWhileCollectionStarts_whenReadingEvidence_thenTheTriggeringAttemptRemainsBound", () => {
+  // when / then
+  assert.match(workflow, /attempts\/\$\{ATTEMPT\}/);
+  assert.doesNotMatch(workflow, /jobs\?filter=latest/);
+  assert.match(workflow, /--expected-run-id "\$RUN_ID"/);
+  assert.match(workflow, /--expected-attempt "\$ATTEMPT"/);
+});
