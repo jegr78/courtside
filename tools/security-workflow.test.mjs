@@ -112,7 +112,7 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /--candidate-contract security\/run-contract\.json/);
   assert.match(build, /security-cleanup "\$BASE_RUN_ID"[\s\S]+\) \|\| BASE_CLEANUP=\$\?/);
   assert.match(build, /security-cleanup "\$CANDIDATE_RUN_ID" \|\| CANDIDATE_CLEANUP=\$\?/);
-  assert.match(build, /needs: \[quality, tool-update-comparison\]/);
+  assert.match(build, /needs: \[quality, assessment-runtime, tool-update-comparison\]/);
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
@@ -155,19 +155,49 @@ test("given a protected base, when it is prepared, then no candidate code has ru
     + "base worktree exists, so the checkout that supplies the previous toolchain predates them.");
 });
 
+function jobIn(workflow, name) {
+  const start = workflow.indexOf(`\n  ${name}:\n`);
+  assert.ok(start > 0, `the workflow has no job named ${name}`);
+  const rest = workflow.slice(start + 1);
+  const next = rest.slice(1).search(/\n {2}[a-z][a-z-]*:\n/);
+  return next < 0 ? rest : rest.slice(0, next + 1);
+}
+
+// A job that runs and skips every step reports success, which reads in a pull request exactly like
+// a comparison that ran. Only a job GitHub never starts is shown as skipped.
+test("given nothing the assessment runtime varies, when the required build runs, then the comparison is not started at all", () => {
+  // given
+  const identity = jobIn(build, "assessment-runtime");
+  const comparison = jobIn(build, "tool-update-comparison");
+
+  // when / then
+  assert.match(identity, /outputs:\n\s+changed: \$\{\{ steps\.runtime\.outputs\.changed \}\}/);
+  assert.match(comparison, /needs: assessment-runtime/);
+  assert.match(comparison, /\n {4}if: needs\.assessment-runtime\.outputs\.changed == 'true'\n/,
+    "four spaces, so this is the job's own condition. A step carrying the same expression would "
+    + "satisfy a looser check while the job still starts and still reports success.");
+  assert.equal((comparison.match(/assessment-runtime\.outputs\.changed/g) ?? []).length, 1,
+    "once, on the job. Every step carrying the decision itself is what made a skipped comparison "
+    + "indistinguishable from one that ran.");
+  assert.doesNotMatch(comparison, /steps\.runtime\.outputs\.changed/);
+  assert.match(jobIn(build, "build"), /needs: \[quality, assessment-runtime, tool-update-comparison\]/,
+    "a runtime identification that fails must not leave the comparison silently unstarted");
+  assert.match(jobIn(build, "build"), /IDENTITY_RESULT: \$\{\{ needs\.assessment-runtime\.result \}\}/);
+});
+
 // The report already decides this from the digest of what a paired run varies. A second path list in
 // the workflow is a second definition, and the one that stood here started two stacks for a compose
 // line and for every dependency bump.
 test("given one definition of the assessment runtime, when the job decides whether to run, then it asks for that decision", () => {
   // given
-  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const identity = jobIn(build, "assessment-runtime");
 
   // when / then
-  assert.match(comparison, /--identity-output build\/security-update\/identity\.json/);
-  assert.match(comparison, /comparisonRequired/);
-  assert.match(comparison, /case "\$REQUIRED" in[\s\S]*?true\|false\)[\s\S]*?exit 1/,
-    "a value that is neither skips every later step while the job still reports success");
-  assert.doesNotMatch(comparison, /git diff --quiet/,
+  assert.match(identity, /--identity-output build\/security-update\/identity\.json/);
+  assert.match(identity, /comparisonRequired/);
+  assert.match(identity, /case "\$REQUIRED" in[\s\S]*?true\|false\)[\s\S]*?exit 1/,
+    "a value that is neither would otherwise become an output nothing starts the comparison on");
+  assert.doesNotMatch(identity, /git diff --quiet/,
     "the decision belongs to runtimeComparisonRequired in security-update-report.mjs, which the "
     + "report already prints. Deriving it a second time here lets the two drift apart.");
 });
