@@ -22,6 +22,14 @@ import {
 import { startJourneyControl } from "./journey-control";
 import { browserExitState, BrowserLifecycleRecorder, browserResourceUsage } from "./browser-lifecycle";
 import { completeCleanup } from "./resource-cleanup";
+import {
+  browserContainerLabels,
+  ObservableGenericContainer,
+  ownedBrowserContainerIds,
+  removeOwnedBrowserContainers,
+  startOwnedBrowserContainer,
+  type BrowserStartupFailureClass
+} from "./browser-container-lifecycle";
 
 const executeFile = promisify(execFile);
 
@@ -412,6 +420,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   // As many lines as a container hands over, so both sides of a failed run read alike.
   const applicationLog = applicationLogBuffer(200);
   let staticDirectory: string | undefined;
+  const journeyId = randomUUID();
   const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string }>();
   const browserLifecycle = new BrowserLifecycleRecorder();
   const browserLifecyclePath = resolve("test-results", "browser-lifecycle.json");
@@ -419,10 +428,11 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const retainBrowserLifecycle = () => {
     writeFileSync(browserLifecyclePath, `${JSON.stringify(browserLifecycle.evidence(), null, 2)}\n`, { mode: 0o600 });
   };
-  const dockerJson = async (args: string[]): Promise<unknown> => {
+  const dockerText = async (args: string[]): Promise<string> => {
     const result = await executeFile("docker", args, { maxBuffer: 1024 * 1024, timeout: 5_000 });
-    return JSON.parse(result.stdout);
+    return result.stdout;
   };
+  const dockerJson = async (args: string[]): Promise<unknown> => JSON.parse(await dockerText(args));
   const stopBrowser = async (browserName: string): Promise<void> => {
     const browser = browserServers.get(browserName);
     if (!browser) return;
@@ -447,6 +457,9 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const stopContainers = async () => {
     await completeCleanup([
       () => completeCleanup([...browserServers.keys()].map((browserName) => () => stopBrowser(browserName))),
+      async () => {
+        if (clubNetwork) await removeOwnedBrowserContainers(journeyId, clubNetwork.getId(), dockerText);
+      },
       async () => { await clubProxy?.stop(); },
       async () => { await mailSink?.stop(); },
       async () => { await postgres?.stop(); },
@@ -615,29 +628,63 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       // Docker publishes the mapped port on every interface and the server has no authentication,
       // so the unguessable endpoint path is what keeps a reachable port from being a browser.
       const wsPath = `/${randomUUID()}`;
+      const startupId = randomUUID();
       const options = {
         port: 3000, host: "0.0.0.0", wsPath,
         args: browserName === "chromium"
           ? [`--ignore-certificate-errors-spki-list=${servedKeys.join(",")}`] : []
       };
-      const container = await new GenericContainer(PINNED_BROWSER_IMAGE)
-        .withNetwork(clubNetwork!)
-        .withCopyDirectoriesToContainer([
-          { source: resolve("node_modules/playwright"), target: "/opt/courtside/node_modules/playwright" },
-          { source: resolve("node_modules/playwright-core"), target: "/opt/courtside/node_modules/playwright-core" }
-        ])
-        .withCopyContentToContainer([
-          { content: rootCertificate, target: "/usr/local/share/ca-certificates/courtside-club.crt" },
-          { content: JSON.stringify(options), target: "/tmp/launch-options.json" }
-        ])
-        // Baking the arguments into the server keeps the mode out of the picture under which a
-        // connecting client may set launch options, an executable path among them.
-        .withCommand(["bash", "-c", "update-ca-certificates >/dev/null"
-          + ` && node /opt/courtside/node_modules/playwright/cli.js launch-server --browser ${browserName}`
-          + " --config /tmp/launch-options.json"])
-        .withExposedPorts(3000)
-        .withWaitStrategy(Wait.forLogMessage(/ws:\/\//))
-        .start();
+      const startupDiagnostics = async (containerId: string, failureClass: BrowserStartupFailureClass) => {
+        let networkAttachments: string[] | undefined;
+        let networkAttachmentInspectionFailed = false;
+        try {
+          const networks = await dockerJson(["inspect", "--format", "{{json .NetworkSettings.Networks}}", containerId]) as
+            Record<string, { NetworkID?: unknown }>;
+          networkAttachments = Object.values(networks)
+            .map(({ NetworkID }) => NetworkID).filter((value): value is string => typeof value === "string");
+        } catch {
+          networkAttachments = undefined;
+          networkAttachmentInspectionFailed = true;
+        }
+        retainBrowserDiagnostics(await collectBrowserDiagnostics(containerId, browserName,
+          "browser-startup-failure", undefined, 5_000, {
+            relatedContainers: { proxy: clubProxy!.getId(), postgres: postgres!.getId() },
+            applicationLog: () => applicationLog.text(),
+            applicationState: {
+              pid: application?.pid,
+              exitCode: application?.exitCode ?? null,
+              signalCode: application?.signalCode ?? null,
+              killed: application?.killed ?? false
+            },
+            startupFailureClass: failureClass,
+            networkAttachments,
+            networkAttachmentInspectionFailed
+          }));
+      };
+      const container = await startOwnedBrowserContainer(
+        async (created) => new ObservableGenericContainer(PINNED_BROWSER_IMAGE, created)
+          .withLabels(browserContainerLabels(journeyId, startupId))
+          .withNetwork(clubNetwork!)
+          .withCopyDirectoriesToContainer([
+            { source: resolve("node_modules/playwright"), target: "/opt/courtside/node_modules/playwright" },
+            { source: resolve("node_modules/playwright-core"), target: "/opt/courtside/node_modules/playwright-core" }
+          ])
+          .withCopyContentToContainer([
+            { content: rootCertificate, target: "/usr/local/share/ca-certificates/courtside-club.crt" },
+            { content: JSON.stringify(options), target: "/tmp/launch-options.json" }
+          ])
+          // Baking the arguments into the server keeps the mode out of the picture under which a
+          // connecting client may set launch options, an executable path among them.
+          .withCommand(["bash", "-c", "update-ca-certificates >/dev/null"
+            + ` && node /opt/courtside/node_modules/playwright/cli.js launch-server --browser ${browserName}`
+            + " --config /tmp/launch-options.json"])
+          .withExposedPorts(3000)
+          .withWaitStrategy(Wait.forLogMessage(/ws:\/\//))
+          .start(),
+        () => ownedBrowserContainerIds(journeyId, undefined, dockerText, startupId),
+        startupDiagnostics,
+        (containerId) => executeFile("docker", ["rm", "-f", containerId], { timeout: 5_000 })
+      );
       const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
       browserServers.set(browserName, { container, endpoint });
       browserLifecycle.start(browserName, container.getId(), new Date().toISOString());
@@ -714,8 +761,13 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     };
   } catch (error) {
     application?.kill();
-    await stopContainers();
-    if (staticDirectory) rmSync(staticDirectory, { recursive: true, force: true });
+    try {
+      await stopContainers();
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], "Journey startup and cleanup failed", { cause: cleanupError });
+    } finally {
+      if (staticDirectory) rmSync(staticDirectory, { recursive: true, force: true });
+    }
     throw error;
   }
 }

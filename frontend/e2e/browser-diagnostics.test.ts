@@ -200,6 +200,40 @@ describe("browser diagnostics", () => {
     expect(command).toHaveBeenCalledTimes(9);
   });
 
+  it("givenBrowserStartupFails_whenCollectingDiagnostics_thenItsBoundedClassAndNetworkAttachmentAreRetained", async () => {
+    // given
+    const command = vi.fn((args: string[]) => Promise.resolve(args[0] === "inspect"
+      ? JSON.stringify({ Status: "running" }) : "{}"));
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("browser-2", "webkit", "browser-startup-failure",
+      command, 5_000, {
+        startupFailureClass: "port-publication",
+        networkAttachments: ["d".repeat(64)]
+      });
+
+    // then
+    expect(diagnostics).toMatchObject({
+      reason: "browser-startup-failure",
+      startupFailureClass: "port-publication",
+      networkAttachments: ["d".repeat(64)]
+    });
+  });
+
+  it("givenStartupNetworkInspectionFails_whenCollectingDiagnostics_thenTheMissingEvidenceIsExplicit", async () => {
+    // given
+    const command = vi.fn((args: string[]) => Promise.resolve(args[0] === "inspect"
+      ? JSON.stringify({ Status: "running" }) : "{}"));
+
+    // when
+    const diagnostics = await collectBrowserDiagnostics("browser-3", "webkit", "browser-startup-failure",
+      command, 5_000, { startupFailureClass: "docker-api", networkAttachmentInspectionFailed: true });
+
+    // then
+    expect(diagnostics.networkAttachments).toBeUndefined();
+    expect(diagnostics.diagnosticErrors).toContain("Browser network attachments could not be inspected");
+  });
+
   it("given Docker does not answer, when collecting diagnostics, then every command is aborted and reported", async () => {
     // given
     const command = vi.fn((_args: string[], signal: AbortSignal) => new Promise<string>((_resolve, reject) => {

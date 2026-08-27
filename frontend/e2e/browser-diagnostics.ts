@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { freemem, loadavg, totalmem } from "node:os";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
+import type { BrowserStartupFailureClass } from "./browser-container-lifecycle";
 
 const executeFile = promisify(execFile);
 
@@ -24,6 +25,9 @@ export interface BrowserDiagnostics {
   containerState?: Record<string, unknown>;
   containerStats?: Record<string, unknown>;
   containerLogs?: string;
+  startupFailureClass?: BrowserStartupFailureClass;
+  networkAttachments?: string[];
+  networkAttachmentInspectionFailed?: boolean;
   diagnosticErrors: string[];
   relatedContainers?: Record<string, ContainerDiagnostics>;
   applicationState?: ApplicationProcessState;
@@ -58,7 +62,8 @@ export const browserFailureReasons = [
   "target-lost",
   "test-timeout",
   "product-failure",
-  "harness-incomplete"
+  "harness-incomplete",
+  "browser-startup-failure"
 ] as const;
 
 export type BrowserFailureReason = typeof browserFailureReasons[number];
@@ -86,6 +91,9 @@ interface DiagnosticContext {
   relatedContainers?: Record<string, string>;
   applicationState?: ApplicationProcessState;
   applicationLog?: () => string;
+  startupFailureClass?: BrowserStartupFailureClass;
+  networkAttachments?: string[];
+  networkAttachmentInspectionFailed?: boolean;
 }
 
 export type DockerDiagnosticCommand = (args: string[], signal: AbortSignal) => Promise<string>;
@@ -179,10 +187,22 @@ function json(value: string | undefined, errors: string[]): Record<string, unkno
   }
 }
 
+function safeNetworkAttachments(values: string[] | undefined, errors: string[]): string[] | undefined {
+  if (values === undefined) return undefined;
+  if (values.some((value) => !/^[a-f0-9]{12,64}$/.test(value))) {
+    errors.push("Docker reported an invalid network attachment identity");
+    return undefined;
+  }
+  return [...new Set(values)];
+}
+
 export async function collectBrowserDiagnostics(containerId: string, browserName: string, reason: BrowserFailureReason,
   command: DockerDiagnosticCommand = dockerCommand, timeoutMs = 5_000,
   context: DiagnosticContext = {}): Promise<BrowserDiagnostics> {
   const browser = await collectContainerDiagnostics(containerId, command, timeoutMs);
+  if (context.networkAttachmentInspectionFailed) {
+    browser.diagnosticErrors.push("Browser network attachments could not be inspected");
+  }
   const relatedContainers = Object.fromEntries(await Promise.all(
     Object.entries(context.relatedContainers ?? {}).map(async ([name, id]) =>
       [name, await collectContainerDiagnostics(id, command, timeoutMs)] as const)
@@ -203,6 +223,8 @@ export async function collectBrowserDiagnostics(containerId: string, browserName
     },
     recordedAt: new Date().toISOString(),
     ...browser,
+    startupFailureClass: context.startupFailureClass,
+    networkAttachments: safeNetworkAttachments(context.networkAttachments, browser.diagnosticErrors),
     relatedContainers: Object.keys(relatedContainers).length === 0 ? undefined : relatedContainers,
     applicationState,
     host: {
