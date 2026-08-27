@@ -22,6 +22,7 @@ interface BrowserGateOutcome {
 }
 
 interface BrowserGateOptions {
+  chromiumAccessibilityRequired?: boolean;
   webkitAxeRequired?: boolean;
   globalErrors?: ReadonlyArray<TestError>;
 }
@@ -47,7 +48,7 @@ function claimStatus(results: GateResult[], projectNames: string | string[], req
 
 export function browserGateOutcome(results: GateResult[], runStatus: FullResult["status"] = "passed",
   options: BrowserGateOptions = {}): BrowserGateOutcome {
-  const accessibility = claimStatus(results, "chromium-accessibility", true);
+  const accessibility = claimStatus(results, "chromium-accessibility", options.chromiumAccessibilityRequired !== false);
   const webkitProjects = ["webkit-core", "webkit-pwa"];
   const webkit = claimStatus(results, webkitProjects, true);
   const webkitAxe = claimStatus(results, "webkit-accessibility", options.webkitAxeRequired === true);
@@ -92,6 +93,7 @@ export default class BrowserGateReporter implements Reporter {
     const directory = resolve("test-results");
     mkdirSync(directory, { recursive: true });
     const outcome = browserGateOutcome(this.results, result.status, {
+      chromiumAccessibilityRequired: process.env.COURTSIDE_WEBKIT_RELIABILITY !== "true",
       webkitAxeRequired: process.env.COURTSIDE_WEBKIT_AXE === "true",
       globalErrors: this.globalErrors
     });

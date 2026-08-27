@@ -26,7 +26,10 @@
     "test": "npm run generate-api && vitest run --coverage && npm run test:tools",
     "test:tools": "node --test ../tools/*.test.mjs",
     "test:uat": "node ../tools/courtside.uat-smoke.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "reliability:webkit": "node ../tools/webkit-reliability.mjs run",
+    "reliability:validate": "node ../tools/webkit-reliability.mjs validate",
+    "reliability:summarize": "node ../tools/webkit-reliability.mjs summarize"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "5.3.0",

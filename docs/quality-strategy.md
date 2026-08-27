@@ -180,6 +180,32 @@ the application itself prints, not every shape a browser harness can quote — t
 fixtures this repository publishes, so what it types is not a secret to begin with. A run that goes
 red for reasons nobody can reproduce is answered from that file, not from a rerun.
 
+#### WebKit reliability evidence
+
+Run `npm run reliability:webkit -- --order configured` from `frontend` for the same bounded
+first-attempt sequence used by the scheduled workflow. Use `reversed` for the alternate project
+order. The command runs WebKit core, installed-PWA and axe projects without a retry and writes one
+immutable record below `test-results/webkit-reliability`. A diagnostic repetition gets a new
+attempt identity and cannot replace the original result.
+
+The runner verifies Docker before Playwright starts. It owns the test process tree, first requests
+an orderly stop at its execution deadline and then ends the tree after a short cleanup grace period.
+The hosted job reserves separate budgets for packaging, execution, validation and artifact upload,
+so its outer limit cannot normally erase the bounded runner's result.
+
+The closed record retains the commit and whether its working tree was clean, the pinned toolchain,
+non-identifying host capacity, project order, browser-isolation variant, resource-profile name,
+duration and outcome classes. It retains
+no test title, URL, log, request, cookie or credential. Raw traces and diagnostics expire after 14
+days; the safe records remain available for 90 days. Validate one record with
+`npm run reliability:validate -- <record>` and summarize downloaded records with
+`npm run reliability:summarize -- <directory>`.
+
+Thirty consecutive hosted successes satisfy the streak input for the later admission decision.
+They do not demonstrate a failure rate below 0.5 percent: zero failures in thirty trials still
+leave substantial statistical uncertainty. Admission remains governed by its separate criteria
+and decision rather than being inferred by this command.
+
 ### Operations and release
 
 | ID | Impact | Likelihood | Invariant | Positive boundaries | Negative boundaries | Level | Frequency | Environment | Synthetic data | Evidence | Owner | Residual risk |

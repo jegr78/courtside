@@ -78,6 +78,26 @@ describe("browser gate reporter", () => {
     expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "incomplete" });
   });
 
+  it("given a WebKit-only reliability run, when all selected projects pass, then Chromium is not required", () => {
+    // given
+    const results = [
+      { projectName: "webkit-core", status: "passed", errors: [] },
+      webkitPwaPass,
+      { projectName: "webkit-accessibility", status: "passed", errors: [] }
+    ];
+
+    // when
+    const outcome = browserGateOutcome(results, "passed", {
+      chromiumAccessibilityRequired: false,
+      webkitAxeRequired: true
+    });
+
+    // then
+    expect(outcome.claims).toContainEqual({ id: "accessibility-rule-conformance", status: "not-run" });
+    expect(outcome.claims).toContainEqual({ id: "webkit-axe-qualification", status: "passed" });
+    expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "passed" });
+  });
+
   it("given a WebKit assertion fails, when reporting the run, then compatibility fails as a product claim", () => {
     // given
     const results = [{
