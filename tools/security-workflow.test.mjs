@@ -182,7 +182,25 @@ test("given nothing the assessment runtime varies, when the required build runs,
   assert.doesNotMatch(comparison, /steps\.runtime\.outputs\.changed/);
   assert.match(jobIn(build, "build"), /needs: \[quality, assessment-runtime, tool-update-comparison\]/,
     "a runtime identification that fails must not leave the comparison silently unstarted");
-  assert.match(jobIn(build, "build"), /IDENTITY_RESULT: \$\{\{ needs\.assessment-runtime\.result \}\}/);
+  assert.match(identity, /- uses: actions\/upload-artifact@[a-f0-9]{40}\n\s+if: always\(\)/,
+    "the report naming what changed is the only account of why no comparison was needed, and a"
+    + " decision that came out invalid is exactly when somebody reads it");
+});
+
+// Naming the result of a job and requiring something of it are different things. A check that only
+// reads the assignment stays green while the line that judges it is deleted.
+test("given the results the required build depends on, when it enforces them, then each one is judged", () => {
+  // given
+  const gate = jobIn(build, "build");
+
+  // when / then
+  for (const result of ["IDENTITY_RESULT", "COMPARISON_RESULT"]) {
+    assert.match(gate, new RegExp(`${result}: \\$\\{\\{ needs\\.[a-z-]+\\.result \\}\\}`));
+    assert.match(gate, new RegExp(`\\[\\[ "\\$${result}" = success \\|\\| "\\$${result}" = skipped \\]\\]`),
+      `${result} is assigned and never judged, which is a gate that reports whatever it is given`);
+  }
+  assert.match(gate, /test "\$QUALITY_RESULT" = success/,
+    "quality has no state in which it may be absent, so it is the one required to have passed");
 });
 
 // The report already decides this from the digest of what a paired run varies. A second path list in
