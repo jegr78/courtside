@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { api, type MembershipType, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
 import { AdminRosterView } from "./AdminRosterView";
@@ -27,6 +27,14 @@ const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, 
 
 function row(personId: string): HTMLElement {
   return screen.getByTestId(`roster-row-${personId}`);
+}
+
+function OpenedPerson() {
+  const location = useLocation();
+  const state = location.state as unknown;
+  const created = typeof state === "object" && state !== null && "personCreated" in state
+    && state.personCreated === true;
+  return <div data-testid="opened-person" data-created={created}>opened</div>;
 }
 
 describe("AdminRosterView", () => {
@@ -148,7 +156,7 @@ describe("AdminRosterView", () => {
     render(<MemoryRouter initialEntries={["/admin/roster"]}>
       <Routes>
         <Route path="/admin/roster" element={<AdminRosterView />} />
-        <Route path="/admin/roster/:personId" element={<div data-testid="opened-person">opened</div>} />
+        <Route path="/admin/roster/:personId" element={<OpenedPerson />} />
       </Routes>
     </MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
@@ -163,7 +171,7 @@ describe("AdminRosterView", () => {
     expect(api.createPerson).toHaveBeenCalledWith({
       firstName: "Mary", lastName: "Major", email: "mary.major@example.org"
     });
-    expect(await screen.findByTestId("opened-person")).toBeInTheDocument();
+    expect(await screen.findByTestId("opened-person")).toHaveAttribute("data-created", "true");
   });
 
   it("given a club with no address for somebody, when adding them, then no empty address is sent", async () => {

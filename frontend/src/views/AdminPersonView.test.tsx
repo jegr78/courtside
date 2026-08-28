@@ -55,6 +55,19 @@ describe("AdminPersonView", () => {
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
   });
 
+  it("given navigation from person creation, when the new page loads, then creation is confirmed consistently", async () => {
+    // given
+    vi.spyOn(api, "person").mockResolvedValue(jane);
+
+    // when
+    render(<MemoryRouter initialEntries={[{ pathname: "/admin/roster/person-1", state: { personCreated: true } }]}>
+      <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
+    </MemoryRouter>);
+
+    // then
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Person created."));
+  });
+
   it("given the person cannot load, when opening the page, then the failure replaces the loading state", async () => {
     // given
     vi.spyOn(api, "person").mockRejectedValue(new Error("unavailable"));

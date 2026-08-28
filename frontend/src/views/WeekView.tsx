@@ -4,6 +4,7 @@ import { api, type Allocation, type BookingEligibility, type BookingGrid, type P
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
+import { SuccessFeedback } from "../components/SuccessFeedback";
 import { BookingDialog, type BookingSelection } from "./BookingDialog";
 import { CancellationDialog } from "./CancellationDialog";
 import {
@@ -38,6 +39,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const [selectedCourtId, setSelectedCourtId] = useState<string>();
   const [data, setData] = useState<WeekData>();
   const [error, setError] = useState<string>();
+  const [success, setSuccess] = useState<string>();
   const [eligibility, setEligibility] = useState<BookingEligibility>();
   const [eligibilityError, setEligibilityError] = useState<string>();
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
@@ -292,6 +294,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     </div>}
 
     {error && <Alert>{error}</Alert>}
+    {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {eligibilityError && <Alert testId="booking-eligibility-error">{eligibilityError}</Alert>}
     {eligibility && eligibility.violations.length > 0 && <Alert testId="booking-eligibility">
       <ul>
@@ -335,8 +338,14 @@ export function WeekView({ today, clock = systemClock, canBook = true,
             </th>
             {data.courts.map((court) => renderCell(
               court, slot, selectedDate, selectedAllocations, data.grid.slotMinutes, data.grid.timeZone, language, t,
-              () => selectedDate && setBookingSelection({ date: selectedDate, slot, courtId: court.id }),
-              setCancellation,
+              () => {
+                setSuccess(undefined);
+                if (selectedDate) setBookingSelection({ date: selectedDate, slot, courtId: court.id });
+              },
+              (allocation) => {
+                setSuccess(undefined);
+                setCancellation(allocation);
+              },
               selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false,
               bookingAllowed,
               selectedCourtId === court.id,
@@ -376,6 +385,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       closed={() => setBookingSelection(undefined)}
       created={async () => {
         setBookingSelection(undefined);
+        setSuccess(t("booking.created"));
         try {
           await refreshDate(bookingSelection.date);
         } catch (failure) {
@@ -391,6 +401,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       closed={() => setCancellation(undefined)}
       cancelled={async () => {
         setCancellation(undefined);
+        setSuccess(t("booking.cancelledSuccess"));
         try {
           await refreshDate(selectedDate);
         } catch (failure) {

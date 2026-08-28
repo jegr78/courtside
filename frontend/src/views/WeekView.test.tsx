@@ -571,6 +571,7 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
     participants: [{ guestName: "John Roe" }]
   }), expect.any(String)));
   expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You");
+  expect(screen.getByRole("status")).toHaveTextContent("Booking created.");
 });
 
 it("given adjacent time is free, when selecting sixty minutes, then one booking covers the complete period", async () => {
@@ -775,6 +776,7 @@ it("given an occupied slot, when cancelling it, then the API decides and the day
   // then
   await waitFor(() => expect(api.cancelBooking).toHaveBeenCalledWith("33333333-3333-3333-3333-333333333333"));
   await waitFor(() => expect(screen.queryByTestId("own-allocation")).not.toBeInTheDocument());
+  expect(screen.getByRole("status")).toHaveTextContent("Booking cancelled.");
 });
 
 it("given today scrolled to the current time, when another day is chosen, then the plan opens at its start", async () => {

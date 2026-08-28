@@ -170,7 +170,7 @@ describe("SeriesForm", () => {
     await userEvent.click(await screen.findByTestId("confirm-series"));
 
     // then — one blocked date does not undo the rest, and the caller has to see which one it was
-    expect(await screen.findByTestId("series-created")).toBeInTheDocument();
+    expect(await screen.findByTestId("series-created")).toHaveRole("status");
     expect(screen.getByTestId("series-skipped")).toHaveTextContent("14");
   });
 

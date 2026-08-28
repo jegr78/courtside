@@ -5,6 +5,7 @@ import {
   type PublicCourt, type SeriesCreated, type SeriesPreview, type SeriesRuleRequest
 } from "../api/client";
 import { Button } from "../components/Button";
+import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { formatBookingPeriod } from "../time/clubZone";
 
@@ -211,7 +212,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
       </Button>
     </div>}
 
-    {result && <div data-testid="series-created" className="grid gap-1 border-t pt-4">
+    {result && <SuccessFeedback testId="series-created"><div className="grid gap-1">
       <p>{t("series.created", { created: result.bookingIds.length })}</p>
       {result.skipped.length > 0 && <div data-testid="series-skipped">
         <p>{t("series.skipped", { skipped: result.skipped.length })}</p>
@@ -221,7 +222,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
           </li>)}
         </ul>
       </div>}
-    </div>}
+    </div></SuccessFeedback>}
   </section>;
 }
 

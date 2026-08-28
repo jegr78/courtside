@@ -5,6 +5,7 @@ import { api, type MembershipType, type MembershipTypeRequest, type RuleSet } fr
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
+import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 
@@ -86,7 +87,7 @@ export function AdminMembershipTypesView() {
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert>{error}</Alert>}
-        {success && <Alert tone="success">{success}</Alert>}
+        {success && <SuccessFeedback>{success}</SuccessFeedback>}
         <section className="grid gap-4">
           {types.length === 0 && <p data-testid="membership-types-empty">{t("admin.membershipTypes.empty")}</p>}
           {types.map((type) => <MembershipTypeCard
@@ -170,4 +171,3 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
     </div>
   </article>;
 }
-

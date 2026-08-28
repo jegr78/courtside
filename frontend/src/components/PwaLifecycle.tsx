@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { registerSW } from "virtual:pwa-register";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
+import { SuccessFeedback } from "./SuccessFeedback";
 
 export function PwaLifecycle() {
   const { t } = useTranslation();
@@ -27,13 +28,13 @@ export function PwaLifecycle() {
     return null;
   }
   return <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl shadow-xl" data-testid="pwa-update-prompt">
-    <Alert tone="success">
+    <SuccessFeedback>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span>{t("pwa.updateAvailable")}</span>
         <Button data-testid="pwa-update" type="button" onClick={() => void update.current?.(true)}>
           {t("pwa.update")}
         </Button>
       </div>
-    </Alert>
+    </SuccessFeedback>
   </div>;
 }

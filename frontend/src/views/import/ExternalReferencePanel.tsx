@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api, type ExternalReference, type RosterEntry } from "../../api/client";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
+import { SuccessFeedback } from "../../components/SuccessFeedback";
 
 const SEARCH_RESULTS = 10;
 const NUMBER_LENGTH = 120;
@@ -20,6 +21,7 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
   const [chosen, setChosen] = useState<RosterEntry>();
   const [externalId, setExternalId] = useState("");
   const [pending, setPending] = useState(false);
+  const [success, setSuccess] = useState<string>();
 
   const read = useCallback(async (after?: string) => {
     const page = await api.externalReferences(sourceId, after);
@@ -43,6 +45,7 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
 
   async function link() {
     if (pending || !chosen || !externalId.trim()) return;
+    setSuccess(undefined);
     setPending(true);
     try {
       const written = await api.linkExternalReference(sourceId,
@@ -51,6 +54,7 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
       setExternalId("");
       setChosen(undefined);
       setQuery("");
+      setSuccess(t("admin.import.referenceLinked"));
     } catch (failure) {
       reportError(failure);
     } finally {
@@ -61,11 +65,13 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
   // Linking again restores exactly what unlinking removed, so this is not a confirmed action.
   async function unlink(reference: ExternalReference) {
     if (pending) return;
+    setSuccess(undefined);
     setPending(true);
     try {
       await api.unlinkExternalReference(sourceId, reference.externalId);
       setReferences((current) =>
         (current ?? []).filter((held) => held.referenceId !== reference.referenceId));
+      setSuccess(t("admin.import.referenceUnlinked"));
     } catch (failure) {
       reportError(failure);
     } finally {
@@ -78,6 +84,7 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
   return <section className="surface-subtle grid gap-4 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.import.references")}</h2>
     <p className="text-sm">{t("admin.import.referencesExplain")}</p>
+    {success && <SuccessFeedback>{success}</SuccessFeedback>}
 
     {references && (references.length === 0
       ? <p data-testid="no-references">{t("admin.import.noReferences")}</p>
