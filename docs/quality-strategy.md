@@ -73,6 +73,8 @@ the CI planning issues.
 Each completed pull-request run joins its exact-attempt profile plan with the full job outcomes.
 The follow-up workflow recomputes that plan with the protected-branch classifier and the immutable
 base and head commits; it never trusts the plan artifact produced by pull-request code.
+It resolves the pull request from the recorded head commit so a completed merge cannot erase the
+association before evidence collection.
 It deliberately excludes the mutable `ci:full` label so a later label change cannot rewrite the
 natural classification of a completed run. The observed jobs still show that the full suite ran.
 The retained record distinguishes jobs proposed by the classifier from jobs that ran only because
