@@ -114,7 +114,7 @@ test("a barred member sees the refusal before a booking dialog can open", async 
   await expect(page.getByRole("dialog")).not.toBeVisible();
 });
 
-test("the plan reaches the current time inside its own frame and leaves the page where it was",
+test("the plan keeps the current time visible and leaves the page where it was",
   async ({ page }) => {
     // given
     await page.goto("/login");
@@ -124,9 +124,9 @@ test("the plan reaches the current time inside its own frame and leaves the page
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
 
     // when
-    await expect.poll(() => page.getByTestId("week-grid").evaluate((plan) => plan.scrollTop)).toBeGreaterThan(0);
+    await expect(page.getByTestId("current-time-line")).toBeInViewport();
 
-    // then — a page that scrolls itself takes the navigation out from under whoever reaches for it
+    // then
     expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
     await expect(page.getByTestId("my-bookings-link")).toBeInViewport();
   });
