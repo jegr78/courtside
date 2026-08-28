@@ -152,7 +152,7 @@ test("givenAFullJobDoesNotReachAResult_whenObservingCoverage_thenTheAttemptIsInc
   assert.equal(observation.classificationOutcome, "observation-incomplete");
 });
 
-test("givenTwoWeeksOfFirstAttempts_whenSummarizing_thenSampleLimitsAndMissesStayVisible", () => {
+test("givenHistoricalFirstAttempts_whenSummarizing_thenSampleLimitsAndMissesStayVisible", () => {
   // given
   const observations = Array.from({ length: 20 }, (_, index) => ({
     ...createProfileObservation(plan, timing),
@@ -241,10 +241,14 @@ test("givenRerunsOrContradictoryRecords_whenSummarizing_thenTheyCannotImproveThe
 
 test("givenAQualifiedSummary_whenRenderingTheFinalReport_thenSampleWindowAndLimitationsAreExplicit", () => {
   // given
+  const frontendPlan = {
+    ...plan, profiles: ["frontend"],
+    reasons: [{ code: "prefix:frontend/", path: "frontend/src/App.tsx", profile: "frontend", status: "M" }]
+  };
   const observations = Array.from({ length: 20 }, (_, index) => ({
-    ...createProfileObservation(plan, timing),
+    ...createProfileObservation(index === 0 ? frontendPlan : plan, timing),
     runId: 301 + index,
-    startedAt: new Date(Date.parse("2026-08-28T10:00:00.000Z") + index * 24 * 60 * 60 * 1000).toISOString()
+    startedAt: new Date(Date.parse("2026-08-28T10:00:00.000Z") + index * 6 * 60 * 60 * 1000).toISOString()
   }));
   const summary = summarizeProfileObservations(observations, inventoryFor(observations));
 
@@ -253,9 +257,25 @@ test("givenAQualifiedSummary_whenRenderingTheFinalReport_thenSampleWindowAndLimi
 
   // then
   assert.match(report, /First-attempt sample: 20/);
+  assert.match(report, /Naturally reduced first attempts: 20/);
   assert.match(report, /Observation window: 19 days/);
   assert.match(report, /Full-profile rate: 0\.00%/);
   for (const limitation of summary.limitations) assert.match(report, new RegExp(limitation.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("givenReducedEvidenceFromOnlyOneProfile_whenSummarizing_thenTheOtherProfileRemainsUnqualified", () => {
+  // given
+  const observations = Array.from({ length: 20 }, (_, index) => ({
+    ...createProfileObservation(plan, timing), runId: 501 + index
+  }));
+
+  // when
+  const summary = summarizeProfileObservations(observations, inventoryFor(observations));
+
+  // then
+  assert.equal(summary.profileCounts.backend, 20);
+  assert.equal(summary.profileCounts.frontend, 0);
+  assert.equal(summary.status, "collecting");
 });
 
 test("givenCompletedGitHubRuns_whenCreatingTheInventory_thenEveryFirstAttemptInTheWindowIsRequired", () => {
@@ -278,4 +298,20 @@ test("givenCompletedGitHubRuns_whenCreatingTheInventory_thenEveryFirstAttemptInT
   assert.equal(validateInventory(inventory), true, JSON.stringify(validateInventory.errors));
   assert.throws(() => createObservationInventory([{ total_count: 200, workflow_runs: pages[0].workflow_runs }],
     "example/courtside", "2026-08-01T00:00:00.000Z", "2026-09-17T00:00:00.000Z"), /incomplete/);
+});
+
+test("givenOnlyFullPlans_whenTheSampleThresholdIsMet_thenActivationStillCollectsReducedEvidence", () => {
+  // given
+  const fullPlan = { ...plan, profiles: ["full"], isFull: true };
+  const observations = Array.from({ length: 20 }, (_, index) => ({
+    ...createProfileObservation(fullPlan, timing), runId: 401 + index
+  }));
+
+  // when
+  const summary = summarizeProfileObservations(observations, inventoryFor(observations));
+
+  // then
+  assert.equal(summary.sampleSize, 20);
+  assert.equal(summary.reducedProfileCount, 0);
+  assert.equal(summary.status, "collecting");
 });

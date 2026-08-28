@@ -3,7 +3,7 @@
   "$id": "urn:courtside:ci:test-profile-observation-summary:v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["sampleSize", "repository", "policyFingerprint", "windowStartedAt", "observedFirstAttemptCount", "rerunCount", "windowDays", "fullProfileCount", "fullProfileRate", "profileCounts", "candidateMissCount", "classificationErrorCount", "incompleteObservationCount", "assessedAt", "limitations", "status"],
+  "required": ["sampleSize", "repository", "policyFingerprint", "windowStartedAt", "observedFirstAttemptCount", "rerunCount", "windowDays", "fullProfileCount", "reducedProfileCount", "fullProfileRate", "profileCounts", "candidateMissCount", "classificationErrorCount", "incompleteObservationCount", "assessedAt", "limitations", "status"],
   "properties": {
     "sampleSize": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$" },
@@ -13,6 +13,7 @@
     "rerunCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "windowDays": { "type": "integer", "minimum": 0 },
     "fullProfileCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "reducedProfileCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "fullProfileRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
     "profileCounts": {
       "type": "object",
