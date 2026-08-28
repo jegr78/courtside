@@ -4,7 +4,13 @@ import { pathToFileURL } from "node:url";
 
 const contract = JSON.parse(readFileSync(
   new URL("../ci/test-profile-observation.json", import.meta.url), "utf8"));
-const controlledJobs = ["backend", "frontend", "security"];
+const controlledJobs = contract.profiles.full;
+if (!Array.isArray(controlledJobs) || controlledJobs.length < 1
+    || new Set(controlledJobs).size !== controlledJobs.length
+    || Object.values(contract.profiles).some((jobs) => !Array.isArray(jobs)
+      || jobs.some((job) => !controlledJobs.includes(job)))) {
+  throw new Error("Profile observation job topology is invalid");
+}
 const outcomes = new Set(["success", "failure", "cancelled", "timed_out", "action_required", "neutral",
   "skipped", "startup_failure", "stale"]);
 const failureOutcomes = new Set(["failure", "timed_out", "startup_failure"]);
@@ -263,11 +269,15 @@ export function summarizeProfileObservations(observations, inventory) {
   const classificationErrorCount = firstAttempts.filter((entry) =>
     entry.classificationOutcome === "classification-error").length;
   const fullProfileCount = qualifyingAttempts.filter((entry) => entry.proposedProfiles.includes("full")).length;
+  const reducedProfileCount = qualifyingAttempts.length - fullProfileCount;
   const profileCounts = Object.fromEntries(Object.keys(contract.profiles).map((profile) => [profile,
     qualifyingAttempts.filter((entry) => entry.proposedProfiles.includes(profile)).length]));
   const incompleteObservationCount = firstAttempts.filter((entry) =>
     entry.classificationOutcome === "observation-incomplete").length;
-  const enoughEvidence = qualifyingAttempts.length >= contract.minimumFirstAttempts && windowDays >= contract.minimumDays;
+  const enoughEvidence = qualifyingAttempts.length >= contract.minimumFirstAttempts
+    && reducedProfileCount >= contract.minimumReducedFirstAttempts
+    && contract.requiredReducedProfiles.every((profile) => profileCounts[profile] > 0)
+    && windowDays >= contract.minimumDays;
   return {
     sampleSize: qualifyingAttempts.length,
     repository: inventory.repository,
@@ -277,6 +287,7 @@ export function summarizeProfileObservations(observations, inventory) {
     rerunCount: observations.length - firstAttempts.length,
     windowDays,
     fullProfileCount,
+    reducedProfileCount,
     fullProfileRate: qualifyingAttempts.length === 0 ? null
       : Math.round(fullProfileCount / qualifyingAttempts.length * 10_000) / 10_000,
     profileCounts,
@@ -309,6 +320,7 @@ export function profileObservationReport(summary) {
     `- Reruns excluded: ${summary.rerunCount}`,
     `- Observation window: ${summary.windowDays} days`,
     `- Full-profile rate: ${rate}`,
+    `- Naturally reduced first attempts: ${summary.reducedProfileCount}`,
     `- Candidate misses: ${summary.candidateMissCount}`,
     `- Classification errors: ${summary.classificationErrorCount}`,
     `- Incomplete observations excluded: ${summary.incompleteObservationCount}`,

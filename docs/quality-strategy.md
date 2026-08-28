@@ -78,8 +78,11 @@ natural classification of a completed run. The observed jobs still show that the
 The retained record distinguishes jobs proposed by the classifier from jobs that ran only because
 the classifier is still observational. A failure in an unselected job is an under-classification
 candidate. A green unselected job proves only that this attempt exposed no miss. Activation review
-requires at least fourteen days and twenty first attempts, and any candidate miss requires a rule
-correction plus a regression test before a new observation window can qualify.
+requires at least twenty comparable first attempts, including three naturally reduced plans and at
+least one observation of both the backend and frontend profiles.
+Only records produced by the protected follow-up workflow count. Locally assembled historical
+records and older aggregate `quality` runs are not comparable and do not count. Any candidate miss
+requires a rule correction plus a regression test before a new observation window can qualify.
 
 After downloading the retained `profile-observation.json` files, produce the review input and final
 report with:

@@ -1,7 +1,9 @@
 {
   "schemaVersion": 1,
-  "minimumDays": 14,
+  "minimumDays": 0,
   "minimumFirstAttempts": 20,
+  "minimumReducedFirstAttempts": 3,
+  "requiredReducedProfiles": ["backend", "frontend"],
   "profiles": {
     "docs": [],
     "backend": ["backend", "security"],
