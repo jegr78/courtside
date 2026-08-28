@@ -112,7 +112,7 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /--candidate-contract security\/run-contract\.json/);
   assert.match(build, /security-cleanup "\$BASE_RUN_ID"[\s\S]+\) \|\| BASE_CLEANUP=\$\?/);
   assert.match(build, /security-cleanup "\$CANDIDATE_RUN_ID" \|\| CANDIDATE_CLEANUP=\$\?/);
-  assert.match(build, /needs: \[quality, assessment-runtime, tool-update-comparison\]/);
+  assert.match(build, /needs: \[quality, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
@@ -180,7 +180,8 @@ test("given nothing the assessment runtime varies, when the required build runs,
     "once, on the job. Every step carrying the decision itself is what made a skipped comparison "
     + "indistinguishable from one that ran.");
   assert.doesNotMatch(comparison, /steps\.runtime\.outputs\.changed/);
-  assert.match(jobIn(build, "build"), /needs: \[quality, assessment-runtime, tool-update-comparison\]/,
+  assert.match(jobIn(build, "build"),
+    /needs: \[quality, assessment-runtime, tool-update-comparison, test-profile-plan\]/,
     "a runtime identification that fails must not leave the comparison silently unstarted");
   assert.match(identity, /- uses: actions\/upload-artifact@[a-f0-9]{40}\n\s+if: always\(\)/,
     "the report naming what changed is the only account of why no comparison was needed, and a"

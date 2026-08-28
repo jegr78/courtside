@@ -9,6 +9,38 @@ permissions:
   contents: read
 
 jobs:
+  test-profile-plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Observe conservative test profiles
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.sha }}
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          node tools/test-profile-classifier.mjs \
+            --base "$BASE_REF" \
+            --head "$HEAD_REF" \
+            --labels "$LABELS_JSON" \
+            --output build/test-profile/plan.json \
+            --summary build/test-profile/summary.md
+          cat build/test-profile/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: test-profile-plan-${{ github.run_id }}
+          path: build/test-profile
+          retention-days: 14
+          if-no-files-found: error
+
   assessment-runtime:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -290,7 +322,7 @@ jobs:
 
   build:
     if: always()
-    needs: [quality, assessment-runtime, tool-update-comparison]
+    needs: [quality, assessment-runtime, tool-update-comparison, test-profile-plan]
     runs-on: ubuntu-latest
     steps:
       - name: Enforce required build results
@@ -298,7 +330,14 @@ jobs:
           QUALITY_RESULT: ${{ needs.quality.result }}
           IDENTITY_RESULT: ${{ needs.assessment-runtime.result }}
           COMPARISON_RESULT: ${{ needs.tool-update-comparison.result }}
+          PROFILE_PLAN_RESULT: ${{ needs.test-profile-plan.result }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           test "$QUALITY_RESULT" = success
           [[ "$IDENTITY_RESULT" = success || "$IDENTITY_RESULT" = skipped ]]
           [[ "$COMPARISON_RESULT" = success || "$COMPARISON_RESULT" = skipped ]]
+          case "$EVENT_NAME" in
+            pull_request) test "$PROFILE_PLAN_RESULT" = success ;;
+            push) test "$PROFILE_PLAN_RESULT" = skipped ;;
+            *) exit 1 ;;
+          esac
