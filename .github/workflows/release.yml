@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+      issues: read
       security-events: write
     outputs:
       upgrade-origins: ${{ steps.upgrade-origins.outputs.origins }}
@@ -30,6 +31,16 @@ jobs:
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD \
             || { echo "::error::$GITHUB_REF_NAME does not point at a commit on main"; exit 1; }
+
+      - name: Refuse unresolved nightly failures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues?state=open&labels=bug&per_page=100" \
+            --slurp | jq '[map(.[])[] | select(.pull_request == null) |
+              select(.title | startswith("[nightly] ")) |
+              select(.body | contains("courtside-nightly-fingerprint"))] | length')
+          test "$count" = 0 || { echo "::error::$count nightly failure issue(s) remain open"; exit 1; }
 
       - name: Take the version from the tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"

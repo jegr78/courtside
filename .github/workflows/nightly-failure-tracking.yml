@@ -1,0 +1,47 @@
+name: nightly failure tracking
+
+on:
+  workflow_run:
+    workflows: [build]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-failure-tracking
+  cancel-in-progress: false
+
+jobs:
+  track:
+    if: github.event.workflow_run.event == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Read immutable first-attempt evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          mkdir -p build/nightly-tracker
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/1" \
+            > build/nightly-tracker/run.json
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/1/jobs?per_page=100" \
+            --slurp | jq '{jobs: map(.jobs[]) }' > build/nightly-tracker/jobs.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?event=schedule&status=completed&per_page=7" \
+            > build/nightly-tracker/recent.json
+      - name: Create or update actionable failures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          node tools/nightly-failure-tracker.mjs
+          --repository "$GITHUB_REPOSITORY"
+          --run build/nightly-tracker/run.json
+          --jobs build/nightly-tracker/jobs.json
+          --recent build/nightly-tracker/recent.json
