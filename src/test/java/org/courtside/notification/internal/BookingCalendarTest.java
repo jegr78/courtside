@@ -21,16 +21,20 @@ class BookingCalendarTest {
     @Test
     void givenCalendarTextWithReservedCharacters_whenItIsRendered_thenItIsEscaped() {
         // given
-        BookingAnnouncement booking = booking("Training; adults", "Court 1, indoor\\north\nlevel 2");
+        String courts = "Court 1, indoor\\north\nDESCRIPTION:level 2\rURL:https://example.org";
+        BookingAnnouncement booking = booking("Training;\r\nATTENDEE:adults", courts);
 
         // when
-        String content = content(calendar.create(BOOKING_ID, booking, "Court 1, indoor\\north\nlevel 2"));
+        String content = content(calendar.create(BOOKING_ID, booking, courts));
 
         // then
-        assertThat(content)
+        String unfolded = content.replace("\r\n ", "");
+        assertThat(unfolded)
                 .contains("DTSTAMP:20260512T120000Z\r\n")
-                .contains("SUMMARY:Training\\; adults - Court 1\\, indoor\\\\north\\nlevel 2\r\n")
-                .contains("LOCATION:Court 1\\, indoor\\\\north\\nlevel 2\r\n");
+                .contains("SUMMARY:Training\\;\\nATTENDEE:adults - Court 1\\, indoor\\\\north\\nDESCRIPTION:level 2\\n")
+                .contains("LOCATION:Court 1\\, indoor\\\\north\\nDESCRIPTION:level 2\\n");
+        assertThat(content.lines()).noneMatch(line -> line.matches("^(ATTENDEE|DESCRIPTION|URL):.*"));
+        assertThat(content.replace("\r\n", "")).doesNotContain("\r", "\n");
     }
 
     @Test
