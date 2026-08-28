@@ -112,7 +112,8 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /--candidate-contract security\/run-contract\.json/);
   assert.match(build, /security-cleanup "\$BASE_RUN_ID"[\s\S]+\) \|\| BASE_CLEANUP=\$\?/);
   assert.match(build, /security-cleanup "\$CANDIDATE_RUN_ID" \|\| CANDIDATE_CLEANUP=\$\?/);
-  assert.match(build, /needs: \[quality, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
+  assert.match(build,
+    /needs: \[backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
@@ -120,7 +121,7 @@ test("given changed assessment bytes, when the required build runs, then paired 
 // compose grants stops it. That stop is deliberate: nothing is compared without both toolchains.
 test("given a paired comparison, when both sides run, then they assess the candidate revision's target", () => {
   // given
-  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const comparison = jobIn(build, "tool-update-comparison");
 
   // when / then
   assert.match(comparison, /TARGET_IMAGE=\$\(docker image inspect courtside:uat-local/);
@@ -143,7 +144,7 @@ test("given a paired comparison, when both sides run, then they assess the candi
 // run could have left something behind for its checkout to pick up.
 test("given a protected base, when it is prepared, then no candidate code has run yet", () => {
   // given
-  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const comparison = jobIn(build, "tool-update-comparison");
 
   // when
   const prepared = comparison.indexOf("Install protected-base assessment dependencies");
@@ -181,7 +182,7 @@ test("given nothing the assessment runtime varies, when the required build runs,
     + "indistinguishable from one that ran.");
   assert.doesNotMatch(comparison, /steps\.runtime\.outputs\.changed/);
   assert.match(jobIn(build, "build"),
-    /needs: \[quality, assessment-runtime, tool-update-comparison, test-profile-plan\]/,
+    /needs: \[backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/,
     "a runtime identification that fails must not leave the comparison silently unstarted");
   assert.match(identity, /- uses: actions\/upload-artifact@[a-f0-9]{40}\n\s+if: always\(\)/,
     "the report naming what changed is the only account of why no comparison was needed, and a"
@@ -200,8 +201,10 @@ test("given the results the required build depends on, when it enforces them, th
     assert.match(gate, new RegExp(`\\[\\[ "\\$${result}" = success \\|\\| "\\$${result}" = skipped \\]\\]`),
       `${result} is assigned and never judged, which is a gate that reports whatever it is given`);
   }
-  assert.match(gate, /test "\$QUALITY_RESULT" = success/,
-    "quality has no state in which it may be absent, so it is the one required to have passed");
+  for (const result of ["BACKEND_RESULT", "FRONTEND_RESULT", "SECURITY_RESULT"]) {
+    assert.match(gate, new RegExp(`test "\\$${result}" = success`),
+      `${result} has no state in which it may be absent, so it is required to have passed`);
+  }
 });
 
 // The report already decides this from the digest of what a paired run varies. A second path list in
@@ -225,7 +228,7 @@ test("given one definition of the assessment runtime, when the job decides wheth
 // newFindings, and the job blocked a merge on whether the comparison could be produced at all.
 test("given a produced comparison, when the job ends, then its difference is read and has to be acknowledged", () => {
   // given
-  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const comparison = jobIn(build, "tool-update-comparison");
 
   // when / then
   assert.match(comparison, /security-tool-acknowledgement\.mjs/);
@@ -238,7 +241,7 @@ test("given a produced comparison, when the job ends, then its difference is rea
 // pair cannot be compared at all, so only the second is allowed to end without stopping the job.
 test("given a base environment that cannot start, when the pair runs, then the job stops before judging", () => {
   // given
-  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const comparison = jobIn(build, "tool-update-comparison");
   const paired = comparison.slice(comparison.indexOf("Run paired active assessments"),
     comparison.indexOf("Compare immutable run evidence"));
 
@@ -261,7 +264,7 @@ test("given a base environment that cannot start, when the pair runs, then the j
 // turns an API change into a finding blamed on whichever toolchain read the older one.
 test("given a paired assessment, when both runs start, then they are driven by the assessed revision's document", () => {
   // given
-  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const comparison = jobIn(build, "tool-update-comparison");
   const paired = comparison.slice(comparison.indexOf("Run paired active assessments"),
     comparison.indexOf("Compare immutable run evidence"));
 
@@ -278,7 +281,7 @@ test("given a paired assessment, when both runs start, then they are driven by t
 // they cannot read is the rubber stamp the acknowledgement exists to prevent.
 test("given a difference to acknowledge, when the job reports it, then both runs' findings are there to name it", () => {
   // given
-  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const comparison = jobIn(build, "tool-update-comparison");
 
   // when / then
   assert.match(comparison, /--candidate-evidence "build\/security\/\$CANDIDATE_RUN_ID\/assessment\/attempt-1\/evidence"/);
@@ -308,10 +311,10 @@ test("given a workflow step reaching the CLI, when it runs node, then it is the 
 test("given a job that only needs the artefact, when it builds one, then the suite does not run again", () => {
   // given
   const pom = readFileSync(join(repository, "pom.xml"), "utf8");
-  const comparison = build.slice(build.indexOf("  tool-update-comparison:"), build.indexOf("  quality:"));
+  const comparison = jobIn(build, "tool-update-comparison");
 
   // when / then
-  assert.match(pom, /<id>npm-test<\/id>[\s\S]*?<skip>\$\{skipTests}<\/skip>/,
+  assert.match(pom, /<id>npm-test<\/id>[\s\S]*?<skip>\$\{frontend\.test\.skip}<\/skip>/,
     "mvn package -DskipTests skips surefire and nothing else unless npm-test is told to, so every "
     + "tool that packages the application drags the whole frontend suite along with it");
   assert.doesNotMatch(comparison, /mvnw -B verify/,

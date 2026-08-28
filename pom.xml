@@ -35,6 +35,8 @@
         <lombok.version>1.18.46</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
         <skipTests>false</skipTests>
+        <frontend.skip>false</frontend.skip>
+        <frontend.test.skip>${skipTests}</frontend.test.skip>
         <openapi-generator.version>7.24.0</openapi-generator.version>
         <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
         <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
@@ -206,6 +208,7 @@
                     <workingDirectory>frontend</workingDirectory>
                     <nodeVersion>${node.version}</nodeVersion>
                     <npmVersion>${npm.version}</npmVersion>
+                    <skip>${frontend.skip}</skip>
                 </configuration>
                 <executions>
                     <execution>
@@ -231,7 +234,7 @@
                         <goals><goal>npm</goal></goals>
                         <configuration>
                             <arguments>run test</arguments>
-                            <skip>${skipTests}</skip>
+                            <skip>${frontend.test.skip}</skip>
                         </configuration>
                     </execution>
                     <execution>
@@ -263,6 +266,7 @@
                         <phase>prepare-package</phase>
                         <goals><goal>copy-resources</goal></goals>
                         <configuration>
+                            <skip>${frontend.skip}</skip>
                             <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
                             <resources>
                                 <resource>
@@ -417,6 +421,13 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>java-only</id>
+            <properties>
+                <frontend.skip>true</frontend.skip>
+                <frontend.test.skip>true</frontend.test.skip>
+            </properties>
+        </profile>
         <profile>
             <id>mutation</id>
             <build>
