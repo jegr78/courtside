@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   track:
-    if: github.event.workflow_run.event == 'schedule'
+    if: contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event.workflow_run.event)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

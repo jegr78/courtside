@@ -251,7 +251,7 @@ describe("App build identity", () => {
     expect(screen.getByTestId("environment-warning")).toHaveAttribute("role", "alert");
   });
 
-  it("givenShortRoute_whenShellRenders_thenContentStartsBelowHeader", async () => {
+  it("givenShortRoute_whenShellRenders_thenTheShellAnchorsContentToTheTop", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));

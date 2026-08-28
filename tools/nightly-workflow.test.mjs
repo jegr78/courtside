@@ -8,13 +8,13 @@ const stability = readFileSync(new URL("../.github/workflows/test-stability.yml"
 
 test("given scheduled verification, when main is checked, then the full build records immutable first-attempt evidence", () => {
   assert.match(build, /cron: '37 0 \* \* \*'/);
-  assert.match(build, /github\.event_name == 'schedule'/);
+  assert.match(build, /github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch'/);
   assert.match(build, /github\.run_attempt/);
   assert.match(build, /github\.sha/);
   assert.match(build, /nightly-verification-/);
   assert.match(build, /retention-days: 90/);
-  assert.match(build, /push\|schedule\) test "\$PROFILE_PLAN_RESULT" = skipped/);
-  assert.match(build, /github\.event_name == 'schedule' && 7 \|\| 14/);
+  assert.match(build, /push\|schedule\|workflow_dispatch\) test "\$PROFILE_PLAN_RESULT" = skipped/);
+  assert.match(build, /github\.event_name == 'schedule' && 30 \|\| 14/);
 });
 
 test("given specialized periodic checks, when nightly runs, then their existing workflow retains ownership", () => {

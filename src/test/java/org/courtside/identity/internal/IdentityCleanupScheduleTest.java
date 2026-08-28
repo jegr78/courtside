@@ -1,31 +1,33 @@
 package org.courtside.identity.internal;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 class IdentityCleanupScheduleTest {
 
-    private final CredentialIssueLimit credentialIssues = mock(CredentialIssueLimit.class);
-    private final LoginAttemptCleanup loginAttempts = mock(LoginAttemptCleanup.class);
-    private final IdentityCleanupSchedule schedule = new IdentityCleanupSchedule(credentialIssues, loginAttempts);
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withBean(CredentialIssueLimit.class, () -> mock(CredentialIssueLimit.class))
+            .withBean(LoginAttemptCleanup.class, () -> mock(LoginAttemptCleanup.class))
+            .withUserConfiguration(IdentityCleanupSchedule.class);
 
     @Test
-    void whenCredentialIssueCleanupRuns_thenExpiredWindowsAreDeleted() {
-        // when
-        schedule.deleteExpiredCredentialIssues();
-
-        // then
-        verify(credentialIssues).deleteExpiredWindows();
+    void whenAnInstanceRuns_thenExpiredCredentialWindowsAndLoginAttemptsAreSweptOnACadence() {
+        // when / then
+        contextRunner.run(context -> assertThat(context).hasSingleBean(IdentityCleanupSchedule.class));
     }
 
+    // The journey world resets the database underneath a live application, and a sweep landing in
+    // the middle of that reset deadlocks against it.
     @Test
-    void whenLoginAttemptCleanupRuns_thenExpiredAttemptsAreDeleted() {
-        // when
-        schedule.deleteExpiredLoginAttempts();
+    void givenTheJourneyWorld_whenItStarts_thenNoSweepFallsDueBesideItsDatabaseReset() {
+        // given
+        ApplicationContextRunner runner = contextRunner
+                .withPropertyValues("spring.profiles.active=journey");
 
-        // then
-        verify(loginAttempts).deleteExpiredAttempts();
+        // when / then
+        runner.run(context -> assertThat(context).doesNotHaveBean(IdentityCleanupSchedule.class));
     }
 }

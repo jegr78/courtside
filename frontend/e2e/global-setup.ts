@@ -40,6 +40,10 @@ const PINNED_PROXY_IMAGE =
 // The name the certificate is issued for, so browsers reach the proxy the way a member reaches a club.
 const CLUB_HOST = "courtside.test";
 
+// A cadence a journey never reaches, rather than "-": that switches the cleanup off, and
+// an instance is built to refuse to start when it is off.
+const JOURNEY_SESSION_CLEANUP_CRON = "0 0 0 29 2 *";
+
 // Qualifying against a database a club does not run proves nothing about the one it does, so the
 // reference is read from the deployment rather than repeated beside it.
 function deployedPostgresImage(): string {
@@ -513,7 +517,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       SPRING_DATASOURCE_USERNAME: "courtside",
       SPRING_DATASOURCE_PASSWORD: "courtside",
       SPRING_PROFILES_ACTIVE: "journey",
-      COURTSIDE_SESSION_CLEANUP_CRON: "-",
+      COURTSIDE_SESSION_CLEANUP_CRON: JOURNEY_SESSION_CLEANUP_CRON,
       LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_ERROR: "ERROR",
       COURTSIDE_ENVIRONMENT: "DEVELOPMENT",
       COURTSIDE_CLOCK_FIXED_INSTANT: journeyInstant,

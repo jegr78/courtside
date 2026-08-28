@@ -7,7 +7,7 @@ const release = readFileSync(new URL("../.github/workflows/release.yml", import.
 
 test("given a completed nightly, when tracking it, then only scheduled build first-attempt evidence is fetched", () => {
   assert.match(workflow, /workflow_run:[\s\S]*workflows: \[build\][\s\S]*types: \[completed\]/);
-  assert.match(workflow, /github\.event\.workflow_run\.event == 'schedule'/);
+  assert.match(workflow, /fromJSON\('\["schedule", "workflow_dispatch"\]'\), github\.event\.workflow_run\.event/);
   assert.match(workflow, /attempts\/1\/jobs/);
 });
 

@@ -75,6 +75,15 @@ The follow-up workflow recomputes that plan with the protected-branch classifier
 base and head commits; it never trusts the plan artifact produced by pull-request code.
 It resolves the pull request from the recorded head commit so a completed merge cannot erase the
 association before evidence collection.
+
+A release demands a nightly that verified it, rather than the absence of a complaint about one. The
+tag is refused unless a scheduled `build` run succeeded on its first attempt over a commit the
+tagged one builds on, and unless that run's retained verification record says the run was complete.
+Open nightly failure issues are refused as well, but only as a complement: a tracker that threw, a
+schedule GitHub disabled after sixty quiet days and a label somebody removed all look identical
+from the release job, and every one of them would leave the absence check green. The nightly build
+also answers to `workflow_dispatch`, so the whole chain — verification record, failure tracker,
+issue — can be summoned and watched rather than waited for.
 It deliberately excludes the mutable `ci:full` label so a later label change cannot rewrite the
 natural classification of a completed run. The observed jobs still show that the full suite ran.
 The retained record distinguishes jobs proposed by the classifier from jobs that ran only because

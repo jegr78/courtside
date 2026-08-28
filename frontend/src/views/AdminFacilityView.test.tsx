@@ -65,6 +65,23 @@ describe("AdminFacilityView", () => {
     expect(control).not.toHaveClass("bg-(--club-primary)");
   });
 
+  it("given the court changed since the impact was read, when the disclosure is opened again, then it is asked again", async () => {
+    // given
+    const ask = vi.spyOn(api, "courtImpact")
+      .mockResolvedValue({ affectedCount: 2, truncated: false, bookings: [] });
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    const control = await screen.findByTestId("court-impact-court-1");
+    await userEvent.click(control);
+    await screen.findByTestId("impact-court-1");
+
+    // when
+    await userEvent.click(control);
+    await userEvent.click(control);
+
+    // then
+    expect(ask).toHaveBeenCalledTimes(2);
+  });
+
   it("given a court in use, when its impact is asked for, then the bookings it would displace are named", async () => {
     // given
     vi.spyOn(api, "courtImpact").mockResolvedValue({

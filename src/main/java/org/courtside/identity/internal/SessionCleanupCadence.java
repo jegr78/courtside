@@ -3,11 +3,9 @@ package org.courtside.identity.internal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.session.jdbc.autoconfigure.JdbcSessionProperties;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("!journey")
 @RequiredArgsConstructor
 public class SessionCleanupCadence implements InitializingBean {
 
