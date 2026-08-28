@@ -131,7 +131,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     return !isOccupied(selectedAllocations, courtId, slot, data.grid.timeZone);
   }
 
-  // Stop at the first unavailable or overlong slot so the highlighted span stays honest.
+  // The run stops at the first slot the court cannot give, so the highlight a member drags
+  // over is what they get - a span silently clamped on release would surprise them instead.
   function bookableSpan(courtId: string, anchor: string, head: string): string[] {
     const from = slots.indexOf(anchor);
     const to = slots.indexOf(head);

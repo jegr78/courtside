@@ -39,9 +39,9 @@ test("given a mutable PWA asset and database, when the next test starts, then bo
   assert.match(setup, /resetJourneyData\(postgres!, tables\)/);
 });
 
-test("given journey data is restored while the application stays live, when the test world starts, then scheduled database work is disabled", () => {
+test("given journey data is restored while the application stays live, when the test world starts, then scheduled database work never falls due", () => {
   assert.match(setup, /SPRING_PROFILES_ACTIVE: "journey"/);
-  assert.match(setup, /COURTSIDE_SESSION_CLEANUP_CRON: "-"/);
+  assert.match(setup, /const JOURNEY_SESSION_CLEANUP_CRON = "0 0 0 29 2 \*"/);
   assert.doesNotMatch(bookingReminders, /@Scheduled/);
   assert.doesNotMatch(previewExpiry, /@Scheduled/);
   assert.match(bookingReminderSchedule, /@Profile\("!journey"\)/);
@@ -52,6 +52,7 @@ test("given journey data is restored while the application stays live, when the 
   assert.doesNotMatch(loginAttemptCleanup, /@Scheduled/);
   assert.match(identityCleanupSchedule, /@Profile\("!journey"\)/);
   assert.equal(identityCleanupSchedule.match(/@Scheduled/g)?.length, 2);
-  assert.match(sessionCleanupCadence, /@Profile\("!journey"\)/);
+  assert.doesNotMatch(sessionCleanupCadence, /@Profile/);
+  assert.doesNotMatch(setup, /COURTSIDE_SESSION_CLEANUP_CRON: "-"/);
   assert.match(setup, /Scheduled preview expiry ran in the shared journey world/);
 });

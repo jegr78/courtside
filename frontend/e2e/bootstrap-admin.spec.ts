@@ -126,7 +126,7 @@ test("the plan keeps the current time visible and leaves the page where it was",
     // when
     await expect(page.getByTestId("current-time-line")).toBeInViewport();
 
-    // then
+    // then — a page that scrolls itself takes the navigation out from under whoever reaches for it
     expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
     await expect(page.getByTestId("my-bookings-link")).toBeInViewport();
   });

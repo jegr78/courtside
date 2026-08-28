@@ -23,8 +23,11 @@ export function ImpactPanel({ kind, subject, timeZone, ask, reportError }: {
     }
   }
 
+  // Asked again on every open, and forgotten on close: the panel sits beside the controls that
+  // change what it counted, so a kept answer would soon be a wrong one.
   return <details className="grid gap-2" onToggle={(event) => {
-    if (event.currentTarget.open && !impact) void load();
+    if (event.currentTarget.open) void load();
+    else setImpact(undefined);
   }}>
     <summary data-testid={`${kind}-impact-${subject}`} className="cursor-pointer justify-self-start font-semibold underline underline-offset-4">
       {t("admin.impact.ask")}
