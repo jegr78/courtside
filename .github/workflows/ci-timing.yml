@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
       - name: Read completed run evidence
         env:
           GH_TOKEN: ${{ github.token }}
@@ -28,6 +30,27 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}" > build/ci-timing/run.json
           gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100" \
             --slurp | jq '{jobs: map(.jobs[]) }' > build/ci-timing/jobs.json
+          PR_NUMBER=$(jq -er '.pull_requests | select(length == 1) | .[0].number |
+            select(type == "number" and . >= 1 and floor == .)' build/ci-timing/run.json)
+          BASE_REF=$(jq -er '.pull_requests[0].base.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/run.json)
+          HEAD_REF=$(jq -er '.pull_requests[0].head.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/run.json)
+          RUN_HEAD=$(jq -er '.head_sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/run.json)
+          test "$HEAD_REF" = "$RUN_HEAD"
+          git fetch --no-tags origin "$BASE_REF" \
+            "pull/${PR_NUMBER}/head:refs/remotes/origin/observed-pr-head"
+          test "$(git rev-parse refs/remotes/origin/observed-pr-head)" = "$HEAD_REF"
+          mkdir -p build/ci-timing/profile-plan
+          node tools/test-profile-classifier.mjs \
+            --base "$BASE_REF" \
+            --head "$HEAD_REF" \
+            --labels '[]' \
+            --run-id "$RUN_ID" \
+            --attempt "$ATTEMPT" \
+            --fallback-on-error \
+            --output build/ci-timing/profile-plan/plan.json \
+            --summary build/ci-timing/profile-plan/summary.md \
+            || test "$(jq -r .plannerOutcome build/ci-timing/profile-plan/plan.json)" = failed
+          test -f build/ci-timing/profile-plan/plan.json
       - name: Record timing
         env:
           RUN_ID: ${{ github.event.workflow_run.id }}
@@ -41,9 +64,18 @@ jobs:
             --expected-attempt "$ATTEMPT" \
             --output build/ci-timing/record.json \
             --summary build/ci-timing/summary.md
+          node tools/test-profile-observation.mjs \
+            --plan build/ci-timing/profile-plan/plan.json \
+            --timing build/ci-timing/record.json \
+            --output build/ci-timing/profile-observation.json \
+            --summary build/ci-timing/profile-summary.md
           cp ci/ci-timing.schema.json build/ci-timing/ci-timing.schema.json
-          cat build/ci-timing/summary.md >> "$GITHUB_STEP_SUMMARY"
-          rm build/ci-timing/run.json build/ci-timing/jobs.json build/ci-timing/summary.md
+          cp ci/test-profile-plan.schema.json build/ci-timing/test-profile-plan.schema.json
+          cp ci/test-profile-observation.schema.json build/ci-timing/test-profile-observation.schema.json
+          cat build/ci-timing/summary.md build/ci-timing/profile-summary.md >> "$GITHUB_STEP_SUMMARY"
+          rm build/ci-timing/run.json build/ci-timing/jobs.json \
+            build/ci-timing/summary.md build/ci-timing/profile-summary.md \
+            build/ci-timing/profile-plan/summary.md
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ci-timing-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}

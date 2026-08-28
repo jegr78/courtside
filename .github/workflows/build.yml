@@ -26,17 +26,23 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.event.pull_request.head.sha }}
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          RUN_ID: ${{ github.run_id }}
+          ATTEMPT: ${{ github.run_attempt }}
         run: |
           node tools/test-profile-classifier.mjs \
             --base "$BASE_REF" \
             --head "$HEAD_REF" \
             --labels "$LABELS_JSON" \
+            --run-id "$RUN_ID" \
+            --attempt "$ATTEMPT" \
+            --fallback-on-error \
             --output build/test-profile/plan.json \
             --summary build/test-profile/summary.md
           cat build/test-profile/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
         with:
-          name: test-profile-plan-${{ github.run_id }}
+          name: test-profile-plan-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/test-profile
           retention-days: 14
           if-no-files-found: error

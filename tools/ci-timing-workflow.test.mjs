@@ -27,3 +27,25 @@ test("givenARunIsRerunWhileCollectionStarts_whenReadingEvidence_thenTheTriggerin
   assert.match(workflow, /--expected-run-id "\$RUN_ID"/);
   assert.match(workflow, /--expected-attempt "\$ATTEMPT"/);
 });
+
+test("givenAnObservedProfilePlan_whenCollectingTheRun_thenProtectedCodeRecomputesIt", () => {
+  // when / then
+  assert.match(workflow, /ref:\s*\$\{\{ github\.event\.repository\.default_branch \}\}/);
+  assert.doesNotMatch(workflow, /gh run download|test-profile-plan-\$\{RUN_ID\}/);
+  assert.doesNotMatch(workflow, /issues\/\$\{PR_NUMBER\}|LABELS_JSON/);
+  assert.match(workflow, /--labels '\[\]'/);
+  assert.match(workflow, /pull\/\$\{PR_NUMBER\}\/head/);
+  assert.match(workflow, /test-profile-classifier\.mjs/);
+  assert.match(workflow, /pull_requests\[0\]\.base\.sha/);
+  assert.match(workflow, /test-profile-observation\.mjs/);
+  assert.match(workflow, /test-profile-observation\.schema\.json/);
+});
+
+test("givenTheProfileClassifierFails_whenTheBuildContinues_thenItsFailClosedPlanIsStillRetained", () => {
+  // given
+  const build = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
+
+  // when / then
+  assert.match(build, /fallbackPlanToRun|--fallback-on-error/);
+  assert.match(build, /name: test-profile-plan-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}[\s\S]+if: always\(\)/);
+});

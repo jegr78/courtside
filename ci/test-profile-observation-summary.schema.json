@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:ci:test-profile-observation-summary:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sampleSize", "repository", "policyFingerprint", "windowStartedAt", "observedFirstAttemptCount", "rerunCount", "windowDays", "fullProfileCount", "fullProfileRate", "profileCounts", "candidateMissCount", "classificationErrorCount", "incompleteObservationCount", "assessedAt", "limitations", "status"],
+  "properties": {
+    "sampleSize": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$" },
+    "policyFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "windowStartedAt": { "type": "string", "format": "date-time" },
+    "observedFirstAttemptCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "rerunCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "windowDays": { "type": "integer", "minimum": 0 },
+    "fullProfileCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "fullProfileRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "profileCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["docs", "backend", "frontend", "full"],
+      "properties": {
+        "docs": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "backend": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "frontend": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "full": { "type": "integer", "minimum": 0, "maximum": 10000 }
+      }
+    },
+    "candidateMissCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "classificationErrorCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "incompleteObservationCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "assessedAt": { "type": "string", "format": "date-time" },
+    "limitations": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 },
+      "uniqueItems": true
+    },
+    "status": { "enum": ["collecting", "ready-for-review", "under-classification-observed"] }
+  }
+}
