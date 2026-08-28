@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { classifyChanges, classifyPath, parseNameStatus, profileSummary } from "./test-profile-classifier.mjs";
+import { bindPlanToRun, classifyChanges, classifyPath, fallbackPlanToRun, parseNameStatus,
+  profilePolicyFingerprint, profileSummary } from "./test-profile-classifier.mjs";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
+const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+const Ajv = require("ajv/dist/2020").default;
+const planSchema = JSON.parse(readFileSync(
+  new URL("../ci/test-profile-plan.schema.json", import.meta.url), "utf8"));
+const validatePlan = new Ajv({ strict: true }).compile(planSchema);
 
 test("givenTrackedRepositoryPaths_whenClassifyingEachPath_thenNoneDependsOnTheUnknownFallback", () => {
   // given
@@ -110,4 +118,49 @@ test("givenARepositoryPathContainsMarkdown_whenRenderingReasons_thenItCannotInje
     (_entity, point) => String.fromCodePoint(Number.parseInt(point, 16)));
   assert.match(visible, /\\u\{202e\}\\u\{200f\}/);
   assert.doesNotMatch(rendered, /<b>|@team|\[open\]|\u202e|\u200f|\nreversed/);
+});
+
+test("givenAProfilePlan_whenBindingItToTheWorkflowRun_thenEveryIdentityIsRetained", () => {
+  // given
+  const plan = classifyChanges([{ status: "M", path: "docs/design.md" }], []);
+
+  // when
+  const bound = bindPlanToRun(plan, {
+    runId: 101,
+    attempt: 1,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40)
+  });
+
+  // then
+  assert.equal(bound.schemaVersion, 3);
+  assert.match(bound.policyFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(bound.policyFingerprint, profilePolicyFingerprint());
+  assert.equal(bound.runId, 101);
+  assert.equal(bound.attempt, 1);
+  assert.equal(bound.baseCommit, "a".repeat(40));
+  assert.equal(bound.headCommit, "b".repeat(40));
+  assert.equal(bound.plannerOutcome, "passed");
+  assert.deepEqual(bound.profiles, ["docs"]);
+  assert.equal(validatePlan(bound), true, JSON.stringify(validatePlan.errors));
+  assert.throws(() => bindPlanToRun(plan, { ...bound, runId: 0 }), /identity/);
+});
+
+test("givenTheClassifierFails_whenBindingFallbackEvidence_thenThePlanFailsClosedWithoutRawErrors", () => {
+  // when
+  const fallback = fallbackPlanToRun({
+    runId: 101,
+    attempt: 1,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40)
+  });
+
+  // then
+  assert.equal(fallback.plannerOutcome, "failed");
+  assert.deepEqual(fallback.profiles, ["full"]);
+  assert.deepEqual(fallback.reasons, [
+    { code: "classifier-error", path: null, profile: "full", status: null }
+  ]);
+  assert.equal(validatePlan(fallback), true, JSON.stringify(validatePlan.errors));
+  assert.doesNotMatch(JSON.stringify(fallback), /message|stack|error.*error/i);
 });

@@ -70,6 +70,35 @@ renamed, copied, or otherwise structural change also select `full`. The `ci:full
 escalate a plan. Profile activation requires the separate observation period and review defined in
 the CI planning issues.
 
+Each completed pull-request run joins its exact-attempt profile plan with the full job outcomes.
+The follow-up workflow recomputes that plan with the protected-branch classifier and the immutable
+base and head commits; it never trusts the plan artifact produced by pull-request code.
+It deliberately excludes the mutable `ci:full` label so a later label change cannot rewrite the
+natural classification of a completed run. The observed jobs still show that the full suite ran.
+The retained record distinguishes jobs proposed by the classifier from jobs that ran only because
+the classifier is still observational. A failure in an unselected job is an under-classification
+candidate. A green unselected job proves only that this attempt exposed no miss. Activation review
+requires at least fourteen days and twenty first attempts, and any candidate miss requires a rule
+correction plus a regression test before a new observation window can qualify.
+
+After downloading the retained `profile-observation.json` files, produce the review input and final
+report with:
+
+```bash
+jq -s . observations/*/profile-observation.json > observations.json
+gh api --paginate \
+  'repos/jegr78/courtside/actions/workflows/build.yml/runs?event=pull_request&status=completed&per_page=100' \
+  --slurp > workflow-runs.json
+node tools/test-profile-observation.mjs --observations observations.json \
+  --github-runs workflow-runs.json \
+  --repository jegr78/courtside --window-start 2026-09-01T10:00:00Z \
+  --assessed-at 2026-09-16T10:00:00Z --inventory-output observation-inventory.json \
+  --output observation-report.json --summary observation-report.md
+```
+
+The inventory comes directly from the paginated Actions API. Missing first
+attempts, mixed repositories, or mixed classifier-policy fingerprints prevent a ready report.
+
 ### Release checklist
 
 - [ ] Identify the candidate commit and immutable image digest.

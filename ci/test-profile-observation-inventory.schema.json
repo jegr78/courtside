@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:ci:test-profile-observation-inventory:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "repository", "windowStartedAt", "windowEndedAt", "firstAttempts"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$" },
+    "windowStartedAt": { "type": "string", "format": "date-time" },
+    "windowEndedAt": { "type": "string", "format": "date-time" },
+    "firstAttempts": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["runId", "commit"],
+        "properties": {
+          "runId": { "type": "integer", "minimum": 1 },
+          "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+        }
+      }
+    }
+  }
+}

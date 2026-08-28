@@ -1,10 +1,14 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
-const rules = JSON.parse(readFileSync(new URL("../ci/test-profiles.json", import.meta.url), "utf8"));
+const rulesUrl = new URL("../ci/test-profiles.json", import.meta.url);
+const observationContractUrl = new URL("../ci/test-profile-observation.json", import.meta.url);
+const observationToolUrl = new URL("./test-profile-observation.mjs", import.meta.url);
+const rules = JSON.parse(readFileSync(rulesUrl, "utf8"));
 const reducedProfiles = ["docs", "backend", "frontend"];
 
 function matchingRule(path, profile) {
@@ -21,6 +25,18 @@ export function classifyPath(path) {
     if (rule !== null) return { profile, rule };
   }
   return null;
+}
+
+export function profilePolicyFingerprint() {
+  const hash = createHash("sha256");
+  for (const source of [new URL(import.meta.url), rulesUrl, observationContractUrl, observationToolUrl]) {
+    const content = readFileSync(source);
+    hash.update(String(content.length));
+    hash.update("\0");
+    hash.update(content);
+    hash.update("\0");
+  }
+  return hash.digest("hex");
 }
 
 export function parseNameStatus(value) {
@@ -68,6 +84,37 @@ export function classifyChanges(changes, labels) {
   return { schemaVersion: 1, profiles, isFull: requiresFull, reasons };
 }
 
+export function bindPlanToRun(plan, identity) {
+  if (plan === null || typeof plan !== "object" || plan.schemaVersion !== 1
+      || identity === null || typeof identity !== "object"
+      || !Number.isSafeInteger(identity.runId) || identity.runId < 1
+      || !Number.isSafeInteger(identity.attempt) || identity.attempt < 1
+      || !/^[a-f0-9]{40}$/.test(identity.baseCommit)
+      || !/^[a-f0-9]{40}$/.test(identity.headCommit)) {
+    throw new Error("Profile plan run identity is invalid");
+  }
+  return {
+    ...plan,
+    schemaVersion: 3,
+    runId: identity.runId,
+    attempt: identity.attempt,
+    baseCommit: identity.baseCommit,
+    headCommit: identity.headCommit,
+    policyFingerprint: profilePolicyFingerprint(),
+    plannerOutcome: "passed"
+  };
+}
+
+export function fallbackPlanToRun(identity) {
+  const fallback = bindPlanToRun({
+    schemaVersion: 1,
+    profiles: ["full"],
+    isFull: true,
+    reasons: [{ code: "classifier-error", path: null, profile: "full", status: null }]
+  }, identity);
+  return { ...fallback, plannerOutcome: "failed" };
+}
+
 function argument(name) {
   const index = process.argv.indexOf(name);
   if (index < 0 || index + 1 >= process.argv.length) throw new Error(`Missing ${name}`);
@@ -102,17 +149,31 @@ function main() {
   const base = argument("--base");
   const head = argument("--head");
   if (!/^[a-f0-9]{40}$/.test(base) || !/^[a-f0-9]{40}$/.test(head)) throw new Error("Commit identity is invalid");
-  const labels = JSON.parse(argument("--labels"));
-  const evidence = execFileSync("git", ["diff", "--name-status", "-z", "--find-renames", base, head, "--"], {
-    cwd: repository, encoding: "utf8", maxBuffer: 10 * 1024 * 1024
-  });
-  const plan = classifyChanges(parseNameStatus(evidence), labels);
+  const identity = {
+    runId: Number(argument("--run-id")),
+    attempt: Number(argument("--attempt")),
+    baseCommit: base,
+    headCommit: head
+  };
   const output = resolve(argument("--output"));
   const summaryOutput = resolve(argument("--summary"));
   mkdirSync(dirname(output), { recursive: true });
   mkdirSync(dirname(summaryOutput), { recursive: true });
-  writeFileSync(output, `${JSON.stringify(plan, null, 2)}\n`, { mode: 0o600 });
-  writeFileSync(summaryOutput, profileSummary(plan), { mode: 0o600 });
+  try {
+    const labels = JSON.parse(argument("--labels"));
+    const evidence = execFileSync("git", ["diff", "--name-status", "-z", "--find-renames", base, head, "--"], {
+      cwd: repository, encoding: "utf8", maxBuffer: 10 * 1024 * 1024
+    });
+    const plan = bindPlanToRun(classifyChanges(parseNameStatus(evidence), labels), identity);
+    writeFileSync(output, `${JSON.stringify(plan, null, 2)}\n`, { mode: 0o600 });
+    writeFileSync(summaryOutput, profileSummary(plan), { mode: 0o600 });
+  } catch (error) {
+    if (!process.argv.includes("--fallback-on-error")) throw error;
+    const fallback = fallbackPlanToRun(identity);
+    writeFileSync(output, `${JSON.stringify(fallback, null, 2)}\n`, { mode: 0o600 });
+    writeFileSync(summaryOutput, profileSummary(fallback), { mode: 0o600 });
+    throw error;
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();
