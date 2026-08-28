@@ -204,7 +204,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     }
   }
 
-  return <section data-testid="admin-configuration-view" className="surface-panel grid w-full max-w-5xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+  return <section data-testid="admin-configuration-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-3xl font-bold">{t("admin.config.title")}</h1>
       <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
