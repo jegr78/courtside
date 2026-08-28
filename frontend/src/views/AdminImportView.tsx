@@ -84,7 +84,7 @@ export function AdminImportView() {
 
   const chosen = editing?.source;
 
-  return <section data-testid="admin-import-view" className="surface-panel grid w-full max-w-5xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+  return <section data-testid="admin-import-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.import.title")}</h1>
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}

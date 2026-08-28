@@ -20,6 +20,14 @@ function card(id: string): HTMLElement {
 }
 
 describe("AdminMembershipTypesView", () => {
+  it("when the page is shown, then it uses the full administration frame", () => {
+    // when
+    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("admin-membership-types-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
+  });
+
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");

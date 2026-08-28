@@ -7,6 +7,14 @@ import i18n from "../i18n";
 import { AdminConfigurationView } from "./AdminConfigurationView";
 
 describe("AdminConfigurationView", () => {
+  it("when the page is shown, then it uses the full administration frame", () => {
+    // when
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("admin-configuration-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
+  });
+
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");

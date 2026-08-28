@@ -26,6 +26,14 @@ function show() {
 }
 
 describe("AdminImportView", () => {
+  it("when the page is shown, then it uses the full administration frame", () => {
+    // when
+    show();
+
+    // then
+    expect(screen.getByTestId("admin-import-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
+  });
+
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");

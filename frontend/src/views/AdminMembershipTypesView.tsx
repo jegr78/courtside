@@ -81,7 +81,7 @@ export function AdminMembershipTypesView() {
     formElement.reset();
   }
 
-  return <section data-testid="admin-membership-types-view" className="surface-panel grid w-full max-w-5xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+  return <section data-testid="admin-membership-types-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.membershipTypes.title")}</h1>
     {!types
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)

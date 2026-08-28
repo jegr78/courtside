@@ -46,6 +46,16 @@ function showPerson(entry: RosterEntry = jane) {
 }
 
 describe("AdminPersonView", () => {
+  it("when the page is shown, then it uses the full administration frame", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}>
+      <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
+    </MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("admin-person-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
+  });
+
   beforeEach(async () => {
     vi.restoreAllMocks();
     vi.mocked(downloadJson).mockClear();
