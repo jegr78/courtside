@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -30,6 +31,7 @@ class BookingMailer {
     private final ClubIdentity club;
     private final MailTemplates templates;
     private final BookingWording wording;
+    private final BookingCalendar calendar;
     private final RecordedHandover handover;
 
     @Async("bookingMailExecutor")
@@ -49,16 +51,17 @@ class BookingMailer {
                     booking.bookedByAccountId());
             return;
         }
-        send(booking, recipient.get(), recipient.get().getPerson().getEmail());
+        send(confirmed.bookingId(), booking, recipient.get(), recipient.get().getPerson().getEmail());
     }
 
-    private void send(BookingAnnouncement booking, UserAccount account, String address) {
+    private void send(UUID bookingId, BookingAnnouncement booking, UserAccount account, String address) {
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_CONFIRMED.templateKey();
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
         handover.handOver(account.getId(), MessageKind.BOOKING_CONFIRMED, address,
                 templates.render(key + ".subject", locale, values),
-                templates.render(key + ".body", locale, values));
+                templates.render(key + ".body", locale, values),
+                calendar.create(bookingId, booking, values.get("courts")));
     }
 }

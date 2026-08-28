@@ -6,6 +6,7 @@ import org.courtside.notification.MessageKind;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -21,6 +22,16 @@ class RecordedHandover {
     // Every message this instance sends passes here, so a kind somebody switched off cannot be
     // written by a mailer that forgot to ask.
     void handOver(UUID accountId, MessageKind kind, String address, String subject, String body) {
+        handOver(accountId, kind, address, subject, body, Optional.empty());
+    }
+
+    void handOver(UUID accountId, MessageKind kind, String address, String subject, String body,
+                  MailAttachment attachment) {
+        handOver(accountId, kind, address, subject, body, Optional.of(attachment));
+    }
+
+    private void handOver(UUID accountId, MessageKind kind, String address, String subject, String body,
+                          Optional<MailAttachment> attachment) {
         if (!choices.wants(accountId, kind)) {
             log.info("A {} message was not sent: account {} does not want it", kind, accountId);
             return;
@@ -28,7 +39,9 @@ class RecordedHandover {
         String messageId = MailDispatch.newMessageId(senderDomain());
         UUID record = messages.queued(accountId, kind, messageId);
         try {
-            handover.attempt(messageId, () -> dispatch.send(address, subject, body, messageId));
+            handover.attempt(messageId, () -> attachment
+                    .map(file -> dispatch.send(address, subject, body, messageId, file))
+                    .orElseGet(() -> dispatch.send(address, subject, body, messageId)));
         } catch (MailRecipientRefusedException refusal) {
             messages.refused(record, refusal.diagnosis(), refusal.statusCode());
             throw refusal;
