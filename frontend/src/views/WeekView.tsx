@@ -9,7 +9,8 @@ import { BookingDialog, type BookingSelection } from "./BookingDialog";
 import { CancellationDialog } from "./CancellationDialog";
 import {
   addDays, calendarDayNumber, dateInTimeZone, dateInTimeZoneValue, formatBookingTimeRange,
-  formatDate, formatTime, isPastSlot, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes, weekDays
+  formatDate, formatTime, isPastSlot, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes,
+  weekDays, zonedDateTime
 } from "../time/clubZone";
 
 interface WeekViewProps {
@@ -117,7 +118,12 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const days = data?.days ?? [];
   const selectedDay = days.find((day) => formatDate(day) === selectedDate);
   const selectedAllocations = selectedDate ? data?.allocations.get(selectedDate) ?? [] : [];
-  const slots = selectedDay && data ? slotsFor(selectedDay, data.grid) : [];
+  const daySlots = selectedDay && data ? slotsFor(selectedDay, data.grid) : [];
+  const isToday = selectedDate === dateInTimeZoneValue(currentInstant, data?.grid.timeZone);
+  const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
+  const slots = isToday && data && selectedDate
+    ? daySlots.filter((slot) => !isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant))
+    : daySlots;
 
   function isBookable(courtId: string, slot: string): boolean {
     if (!data || !selectedDate) return false;
@@ -125,9 +131,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     return !isOccupied(selectedAllocations, courtId, slot, data.grid.timeZone);
   }
 
-  // The run stops at the first slot the court cannot give, so the highlight a member drags over
-  // is what they get - a span silently clamped on release would surprise them instead. The rule
-  // set's bound on one booking's length stops it for the same reason.
+  // Stop at the first unavailable or overlong slot so the highlighted span stays honest.
   function bookableSpan(courtId: string, anchor: string, head: string): string[] {
     const from = slots.indexOf(anchor);
     const to = slots.indexOf(head);
@@ -164,8 +168,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     return () => window.removeEventListener("pointerup", finish);
   });
 
-  const isToday = selectedDate === dateInTimeZoneValue(currentInstant, data?.grid.timeZone);
-  const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
   const slotHeight = data ? Math.max(32, data.grid.slotMinutes * 4 / 3) : 40;
   const currentSlot = currentTime && (slots.find((slot) => slot >= currentTime) ?? slots.at(-1));
   const bookingAllowed = canBook && eligibility?.violations.length === 0;
@@ -349,6 +351,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
               selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false,
               bookingAllowed,
               selectedCourtId === court.id,
+              slot === slots[0],
               {
                 selected: drag?.courtId === court.id && dragSpan.includes(slot),
                 start: (pointerType: string) => pointerType === "mouse"
@@ -433,12 +436,21 @@ function renderCell(
   isPast: boolean,
   canBook: boolean,
   isSelectedCourt: boolean,
+  isFirstVisibleSlot: boolean,
   drag: { selected: boolean; start: (pointerType: string) => void; extend: () => void }
 ) {
   const cellClass = `border-structural border-b ${isSelectedCourt ? "" : "mobile-court-hidden"}`;
-  const allocation = allocations.find((entry) => entry.courtId === court.id && formatTime(entry.startsAt, timeZone) === slot);
+  const visibleSlotStartsAt = date ? Date.parse(zonedDateTime(date, slot, timeZone)) : Number.NaN;
+  const allocation = allocations.find((entry) => entry.courtId === court.id
+    && (formatTime(entry.startsAt, timeZone) === slot
+      || (isFirstVisibleSlot && Date.parse(entry.startsAt) < visibleSlotStartsAt
+        && Date.parse(entry.endsAt) > visibleSlotStartsAt)));
   if (allocation) {
-    const duration = (Date.parse(allocation.endsAt) - Date.parse(allocation.startsAt)) / 60_000;
+    const visibleStartsAt = Number.isFinite(visibleSlotStartsAt)
+      ? Math.max(Date.parse(allocation.startsAt), visibleSlotStartsAt)
+      : Date.parse(allocation.startsAt);
+    const duration = (Date.parse(allocation.endsAt) - visibleStartsAt) / 60_000;
+    const startedBeforeVisibleSlot = Date.parse(allocation.startsAt) < visibleSlotStartsAt;
     const label = allocationLabel(allocation, t);
     const period = formatBookingTimeRange(allocation.startsAt, allocation.endsAt, locale, timeZone);
     const className = "h-full w-full rounded-md px-3 py-2 text-left font-semibold";
@@ -447,7 +459,7 @@ function renderCell(
       ? { backgroundColor: "var(--cs-ball)", color: "var(--cs-shade)" }
       : { backgroundColor: allocation.cardColor, color: contrastColor(allocation.cardColor) };
     return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className={`${cellClass} p-2 align-top`}>
-      {allocation.ownBooking && !isPast ? <button
+      {allocation.ownBooking && !isPast && !startedBeforeVisibleSlot ? <button
         type="button"
         data-testid="own-allocation"
         data-booking-id={allocation.bookingId}

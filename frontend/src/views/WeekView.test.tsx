@@ -91,13 +91,13 @@ it("given the current week, when it loads, then every day and active court is av
   expect(screen.getByTestId("court-heading-1")).toHaveTextContent("Centre Court");
   expect(screen.getByTestId("court-heading-2")).toHaveTextContent("Court 2");
   expect(screen.getByTestId("court-heading-1")).toHaveRole("columnheader");
-  expect(screen.getByTestId("slot-heading-08:00")).toHaveTextContent("08:00");
+  expect(screen.getByTestId("slot-heading-12:00")).toHaveTextContent("12:00");
   expect(screen.getByTestId("slot-heading-21:30")).toHaveTextContent("21:30");
   const booking = screen.getByTestId("allocation");
   expect(booking).toHaveStyle({ backgroundColor: "rgb(23, 107, 85)" });
   expect(booking).toHaveAttribute("data-state", "occupied");
   expect(booking.closest("td")).toHaveAttribute("rowspan", "2");
-  expect(screen.getByTestId("slot-heading-08:00").closest("tr")).toHaveStyle({ height: "40px" });
+  expect(screen.getByTestId("slot-heading-12:00").closest("tr")).toHaveStyle({ height: "40px" });
   expect(screen.getByTestId("court-plan-legend")).toHaveRole("list");
   expect(screen.getAllByTestId("allocation")).toHaveLength(1);
   expect(booking).toHaveTextContent("Booked · 2 participants");
@@ -115,7 +115,7 @@ it("given short booking slots, when rendering the plan, then rows retain their u
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  expect((await screen.findByTestId("slot-heading-08:00")).closest("tr"))
+  expect((await screen.findByTestId("slot-heading-12:00")).closest("tr"))
     .toHaveStyle({ height: "32px" });
 });
 
@@ -361,18 +361,16 @@ it("given a week before daylight saving starts, when choosing the next week, the
   expect(screen.getByTestId("selected-date")).toHaveValue("2026-03-30");
 });
 
-it("given a past slot, when showing today, then it remains visible but cannot be booked", async () => {
+it("given past slots, when showing today, then the plan starts with the first remaining slot", async () => {
   // when
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  const slot = await findFreeSlot(1, "08:00");
-  expect(slot).toBeDisabled();
-  expect(slot).toHaveTextContent("Past");
-  expect(slot).toHaveAttribute("data-state", "past");
+  expect(await screen.findByTestId("slot-heading-12:00")).toBeInTheDocument();
+  expect(screen.queryByTestId("slot-heading-11:30")).not.toBeInTheDocument();
 });
 
-it("given an own booking in the past, when showing today, then it remains visible without a cancellation action", async () => {
+it("given an own booking in the past, when showing today, then its collapsed row is absent", async () => {
   // given
   vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
     bookingId: "44444444-4444-4444-4444-444444444444",
@@ -391,8 +389,33 @@ it("given an own booking in the past, when showing today, then it remains visibl
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You");
-  expect(screen.getByTestId("own-allocation").tagName).toBe("DIV");
+  await screen.findByTestId("week-grid");
+  expect(screen.queryByTestId("own-allocation")).not.toBeInTheDocument();
+});
+
+it("given an allocation started before the first remaining slot, when showing today, then its occupancy remains visible", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T11:30:00+02:00",
+    endsAt: "2026-08-10T13:00:00+02:00",
+    cardLabel: "Member booking",
+    cardColor: "#b85c38",
+    ownBooking: true,
+    showGenericOccupancy: true,
+    participantLastNames: [],
+    participantCount: 2
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  const allocation = await screen.findByTestId("own-allocation");
+  expect(allocation.tagName).toBe("DIV");
+  expect(allocation.closest("td")).toHaveAttribute("rowspan", "2");
+  expect(screen.queryByTestId("slot-heading-11:30")).not.toBeInTheDocument();
 });
 
 it("given today, when showing the plan, then current time and a return action are available", async () => {
