@@ -4,6 +4,9 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import jakarta.mail.BodyPart;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
 import jakarta.mail.internet.MimeMessage;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingService;
@@ -32,6 +35,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -125,6 +129,26 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
         // then — a dialog nobody keeps is what this message replaces, so it carries the whole booking
         String body = body(theMessageHandedOver());
         assertThat(body).contains("13. Mai 2026", "18:00", "19:00", "Court 1", "Member booking");
+    }
+
+    @Test
+    void givenAConfirmedBooking_whenTheMessageIsRead_thenItCarriesAReusableCalendarEntry()
+            throws Exception {
+        // when
+        UUID bookingId = book(List.of(courtId));
+
+        // then
+        BodyPart calendar = attachment(theMessageHandedOver(), "booking.ics");
+        assertThat(calendar).isNotNull();
+        assertThat(calendar.getContentType()).startsWith("text/calendar").contains("method=PUBLISH");
+        assertThat(new String(calendar.getInputStream().readAllBytes(), StandardCharsets.UTF_8))
+                .contains("BEGIN:VCALENDAR\r\n", "BEGIN:VEVENT\r\n")
+                .contains("UID:booking-" + bookingId + "@courtside\r\n")
+                .contains("DTSTART:20260513T160000Z\r\n", "DTEND:20260513T170000Z\r\n")
+                .contains("SUMMARY:Member booking - Court 1\r\n")
+                .contains("LOCATION:Court 1\r\n")
+                .contains("END:VEVENT\r\n", "END:VCALENDAR\r\n")
+                .doesNotContain("\nBEGIN:VEVENT\n");
     }
 
     @Test
@@ -227,8 +251,8 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
         return logged.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
     }
 
-    private void book(List<UUID> courtIds) {
-        bookings.create(command(courtIds));
+    private UUID book(List<UUID> courtIds) {
+        return bookings.create(command(courtIds));
     }
 
     private void book(List<UUID> courtIds, String idempotencyKey) {
@@ -249,10 +273,54 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
     private MimeMessage theMessageHandedOver() {
         var captured = forClass(MimeMessage.class);
         verify(sender, timeout(10_000)).send(captured.capture());
-        return captured.getValue();
+        MimeMessage message = captured.getValue();
+        try {
+            String messageId = message.getHeader("Message-ID")[0];
+            message.saveChanges();
+            message.setHeader("Message-ID", messageId);
+        } catch (Exception failure) {
+            throw new AssertionError("Could not finalize captured message", failure);
+        }
+        return message;
     }
 
     private static String body(MimeMessage message) throws Exception {
-        return message.getContent().toString();
+        return textBody(message);
+    }
+
+    private static String textBody(Part part) throws Exception {
+        if (part.isMimeType("text/plain") && part.getFileName() == null) {
+            return part.getContent().toString();
+        }
+        if (part.getContent() instanceof Multipart multipart) {
+            for (int index = 0; index < multipart.getCount(); index++) {
+                String body = textBody(multipart.getBodyPart(index));
+                if (body != null) {
+                    return body;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static BodyPart attachment(MimeMessage message, String filename) throws Exception {
+        return attachment((Part) message, filename);
+    }
+
+    private static BodyPart attachment(Part part, String filename) throws Exception {
+        if (!(part.getContent() instanceof Multipart multipart)) {
+            return null;
+        }
+        for (int index = 0; index < multipart.getCount(); index++) {
+            BodyPart child = multipart.getBodyPart(index);
+            if (filename.equals(child.getFileName())) {
+                return child;
+            }
+            BodyPart nested = attachment(child, filename);
+            if (nested != null) {
+                return nested;
+            }
+        }
+        return null;
     }
 }
