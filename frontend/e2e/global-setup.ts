@@ -512,6 +512,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       SPRING_DATASOURCE_URL: `jdbc:postgresql://${postgres.getHost()}:${postgres.getMappedPort(5432)}/courtside`,
       SPRING_DATASOURCE_USERNAME: "courtside",
       SPRING_DATASOURCE_PASSWORD: "courtside",
+      SPRING_PROFILES_ACTIVE: "journey",
+      COURTSIDE_SESSION_CLEANUP_CRON: "-",
       LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_ERROR: "ERROR",
       COURTSIDE_ENVIRONMENT: "DEVELOPMENT",
       COURTSIDE_CLOCK_FIXED_INSTANT: journeyInstant,
@@ -754,9 +756,20 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
           if (!client.kill()) throw new Error("Database lock client could not be stopped");
           await stopped;
         }));
-        await stopApplication();
-        await stopContainers();
-        rmSync(staticDirectory!, { recursive: true, force: true });
+        await completeCleanup([
+          () => {
+            if (applicationLog.text().includes("Swept previews past their retention")) {
+              return Promise.reject(new Error("Scheduled preview expiry ran in the shared journey world"));
+            }
+            return Promise.resolve();
+          },
+          stopApplication,
+          stopContainers,
+          () => {
+            rmSync(staticDirectory!, { recursive: true, force: true });
+            return Promise.resolve();
+          }
+        ]);
       }
     };
   } catch (error) {
