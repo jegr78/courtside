@@ -203,13 +203,21 @@ function BookingSection({ testId, title, empty, bookings, courtNames, locale, ti
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
             {managed && <Button data-testid="managed-details" className="button-secondary px-3 py-2" onClick={() => action({ kind: "detail", booking, managed })}>{t("managedAppointments.details")}</Button>}
             {booking.status === "CONFIRMED" && <>
-              <Button data-testid={managed ? "managed-cancel" : "personal-cancel"} data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking, managed })}>{t("myBookings.cancel", { label: booking.cardLabel })}</Button>
-              {booking.seriesId && <Button data-testid="move-booking" className="px-3 py-2" onClick={() => action({ kind: "move", booking, managed })}>{t("myBookings.move", { label: booking.cardLabel })}</Button>}
+              <Button aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid={managed ? "managed-cancel" : "personal-cancel"} data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking, managed })}>{t("myBookings.cancel")}</Button>
+              {booking.seriesId && <Button aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" className="px-3 py-2" onClick={() => action({ kind: "move", booking, managed })}>{t("myBookings.move")}</Button>}
             </>}
           </div>}
         </li>)}</ul>
       </article>)}</div>}
   </section>;
+}
+
+function bookingActionName(key: string, booking: Appointment, courtNames: Map<string, string>, locale: string, timeZone: string, t: Translate) {
+  return t(key, {
+    label: booking.cardLabel,
+    period: formatBookingPeriod(booking.startsAt, booking.endsAt, locale, timeZone),
+    courts: booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")
+  });
 }
 
 function groupBookings(bookings: Appointment[]) {
