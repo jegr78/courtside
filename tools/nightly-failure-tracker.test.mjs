@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { classifyNightlyFailures, planFailureUpdates, readyForReview, applyIssuePlan,
-  bindCommitRange } from "./nightly-failure-tracker.mjs";
+  bindCommitRange, trustedCommentText } from "./nightly-failure-tracker.mjs";
 
 const run = {
   id: 42,
@@ -99,4 +99,54 @@ test("given the GitHub API rejects a write, when applying the plan, then the tra
       async () => ({ ok: false, status: 403, text: async () => "forbidden" })),
     /GitHub API returned 403/
   );
+});
+
+test("given a job the allowlist does not name, when it fails, then the failure is still reported", () => {
+  // given — a renamed or added job must not turn a red nightly into no issue at all
+  const renamed = [{ name: "backend (postgres 18)", conclusion: "failure", steps: [
+    { name: "Verify backend", conclusion: "failure" }
+  ] }];
+
+  // when
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, renamed);
+
+  // then
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].job, "backend (postgres 18)");
+});
+
+test("given a summoned run of the same workflow, when it is classified, then it is tracked like a nightly", () => {
+  // when
+  const failures = classifyNightlyFailures(
+    { ...run, run_attempt: 1, event: "workflow_dispatch" }, jobs);
+
+  // then
+  assert.equal(failures.length, 1);
+  assert.throws(() => classifyNightlyFailures({ ...run, run_attempt: 1, event: "push" }, jobs),
+    /workflow is invalid/);
+});
+
+test("given a summoned run, when counting consecutive green nights, then only scheduled ones count", () => {
+  // given
+  const nights = Array.from({ length: 7 }, () => (
+    { event: "schedule", run_attempt: 1, conclusion: "success" }));
+
+  // when / then
+  assert.equal(readyForReview(nights), true);
+  assert.equal(readyForReview([{ event: "workflow_dispatch", run_attempt: 1, conclusion: "success" },
+    ...nights.slice(1)]), false);
+});
+
+test("given a comment somebody else wrote, when the tracker reads its own state, then it is ignored", () => {
+  // given — a fingerprint is a hash over public values, so a marker can be written by anybody
+  const forged = { user: { type: "User", login: "passer-by" },
+    body: "<!-- courtside-nightly-occurrence:42:1 -->" };
+  const own = { user: { type: "Bot", login: "github-actions[bot]" }, body: "recorded by the tracker" };
+
+  // when
+  const trusted = trustedCommentText([forged, own]);
+
+  // then
+  assert.equal(trusted.includes("courtside-nightly-occurrence"), false);
+  assert.equal(trusted.includes("recorded by the tracker"), true);
 });

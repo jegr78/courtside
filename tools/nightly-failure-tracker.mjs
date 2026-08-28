@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const allowedJobs = new Set(["backend", "frontend", "security", "build", "tool-update-comparison"]);
+// A run that can be summoned is a path that can be proven; only a scheduled one counts
+// towards the consecutive green nights that make an issue ready for closure.
+const trackedEvents = new Set(["schedule", "workflow_dispatch"]);
 const readyMarker = "<!-- courtside-nightly-ready-for-review -->";
 
 function boundedText(value, field) {
@@ -17,7 +20,7 @@ function safeText(value) {
 }
 
 function validateRun(run) {
-  if (run?.name !== "build" || run.event !== "schedule") throw new Error("workflow is invalid");
+  if (run?.name !== "build" || !trackedEvents.has(run.event)) throw new Error("workflow is invalid");
   if (!Number.isSafeInteger(run.id) || run.id < 1) throw new Error("run id is invalid");
   if (run.run_attempt !== 1) throw new Error("only the first attempt is valid");
   if (!/^[a-f0-9]{40}$/.test(run.head_sha ?? "")) throw new Error("commit is invalid");
@@ -33,7 +36,6 @@ export function classifyNightlyFailures(run, jobs) {
   validateRun(run);
   if (!Array.isArray(jobs) || jobs.length > 100) throw new Error("jobs are invalid");
   return jobs.filter((job) => ["failure", "cancelled", "timed_out"].includes(job?.conclusion)).flatMap((job) => {
-    if (!allowedJobs.has(job.name)) throw new Error("job is invalid");
     const failedSteps = (job.steps ?? []).filter((step) =>
       ["failure", "cancelled", "timed_out"].includes(step?.conclusion));
     const classes = failedSteps.length > 0 ? failedSteps : [{ name: "job", conclusion: job.conclusion }];
@@ -41,12 +43,13 @@ export function classifyNightlyFailures(run, jobs) {
       const rawStep = boundedText(failedStep.name, "step");
       const step = safeText(rawStep);
       const failureClass = failedStep.conclusion;
-      const identity = JSON.stringify({ schemaVersion: 1, workflow: "build", job: job.name,
+      const jobName = allowedJobs.has(job.name) ? job.name : safeText(boundedText(job.name, "job"));
+      const identity = JSON.stringify({ schemaVersion: 1, workflow: "build", job: jobName,
         step: rawStep, failureClass });
       return {
         fingerprint: createHash("sha256").update(identity).digest("hex"),
         workflow: "build",
-        job: job.name,
+        job: jobName,
         step,
         failureClass,
         runId: run.id,
@@ -98,6 +101,15 @@ export function planFailureUpdates(failures, issues) {
       labels: ["bug"]
     }];
   });
+}
+
+// Anybody may comment on a public issue, and a fingerprint is a hash over values anybody can
+// enumerate. Only what this tracker wrote itself is its own state.
+export function trustedCommentText(comments) {
+  return (Array.isArray(comments) ? comments : [])
+    .filter((comment) => comment?.user?.type === "Bot")
+    .map((comment) => comment.body ?? "")
+    .join("\n");
 }
 
 export function readyForReview(runs) {
@@ -162,7 +174,7 @@ async function readTrackedIssues(repository, token) {
   for (const issue of issues) {
     const comments = await readPages(request,
       `https://api.github.com/repos/${repository}/issues/${issue.number}/comments?per_page=100`);
-    issue.comments = comments.map((comment) => comment.body ?? "").join("\n");
+    issue.comments = trustedCommentText(comments);
   }
   return issues;
 }

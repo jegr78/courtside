@@ -49,3 +49,13 @@ test("given a qualified manifest, when publishing it, then tags and signatures a
   assert.ok(publish.indexOf("security-supply-chain.mjs") < publish.indexOf("docker buildx imagetools create"));
   assert.ok(publish.indexOf("docker buildx imagetools create") < publish.indexOf("softprops/action-gh-release"));
 });
+
+test("given a tag, when the release runs, then it demands a nightly that verified the commit", () => {
+  // when / then
+  assert.match(workflow, /actions\/workflows\/build\.yml\/runs\?event=schedule&status=success/);
+  assert.match(workflow, /select\(\.run_attempt == 1\)/);
+  assert.match(workflow, /git merge-base --is-ancestor "\$head" "\$GITHUB_SHA"/);
+  assert.match(workflow, /releaseReadiness == "complete"/);
+  assert.match(workflow, /no green first-attempt nightly verified a commit this tag builds on/);
+  assert.match(workflow, /actions: read/);
+});

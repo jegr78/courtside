@@ -6,6 +6,7 @@ on:
   pull_request:
   schedule:
     - cron: '37 0 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -289,7 +290,9 @@ jobs:
             frontend/test-results/browser-diagnostics/*.json
             frontend/test-results/browser-gate-outcome.json
           if-no-files-found: warn
-          retention-days: ${{ github.event_name == 'schedule' && 7 || 14 }}
+          # A tracker issue may not close before seven consecutive green nights, so the
+          # diagnostics that opened it have to still be there when somebody looks.
+          retention-days: ${{ github.event_name == 'schedule' && 30 || 14 }}
 
   security:
     runs-on: ubuntu-latest
@@ -393,7 +396,7 @@ jobs:
       contents: read
     steps:
       - name: Record nightly verification
-        if: ${{ always() && github.event_name == 'schedule' }}
+        if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
         env:
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
@@ -431,11 +434,11 @@ jobs:
           [[ "$COMPARISON_RESULT" = success || "$COMPARISON_RESULT" = skipped ]]
           case "$EVENT_NAME" in
             pull_request) test "$PROFILE_PLAN_RESULT" = success ;;
-            push|schedule) test "$PROFILE_PLAN_RESULT" = skipped ;;
+            push|schedule|workflow_dispatch) test "$PROFILE_PLAN_RESULT" = skipped ;;
             *) exit 1 ;;
           esac
       - name: Upload nightly verification
-        if: ${{ always() && github.event_name == 'schedule' }}
+        if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: nightly-verification-${{ github.run_id }}-${{ github.run_attempt }}

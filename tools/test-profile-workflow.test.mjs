@@ -13,7 +13,7 @@ test("givenProfileClassificationIsObservational_whenThePullRequestRuns_thenSplit
   assert.match(workflow,
     /needs: \[backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(workflow, /pull_request\) test "\$PROFILE_PLAN_RESULT" = success ;;/);
-  assert.match(workflow, /push\|schedule\) test "\$PROFILE_PLAN_RESULT" = skipped ;;/);
+  assert.match(workflow, /push\|schedule\|workflow_dispatch\) test "\$PROFILE_PLAN_RESULT" = skipped ;;/);
   assert.match(workflow, /backend:[\s\S]+name: Verify backend[\s\S]+\.\/mvnw -B clean verify -Pjava-only/);
   assert.match(workflow,
     /frontend:[\s\S]+name: Verify frontend[\s\S]+npm-cli\.js run lint[\s\S]+npm-cli\.js run test[\s\S]+npm-cli\.js run build/);

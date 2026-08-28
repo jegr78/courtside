@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
+      actions: read
       contents: read
       issues: read
       security-events: write
@@ -31,6 +32,32 @@ jobs:
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD \
             || { echo "::error::$GITHUB_REF_NAME does not point at a commit on main"; exit 1; }
+
+      # Absence of a report is not evidence of a green night, so the verification is demanded
+      # first and the open issues below only complement it.
+      - name: Demand a nightly that verified this release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?event=schedule&status=success&per_page=100" \
+            --slurp | jq -r 'map(.workflow_runs[])[] | select(.run_attempt == 1) |
+              select(.head_sha | test("^[a-f0-9]{40}$")) | "\(.id) \(.head_sha)"' > nightly-runs.txt
+          verified=""
+          while read -r id head; do
+            git cat-file -e "${head}^{commit}" 2>/dev/null || continue
+            git merge-base --is-ancestor "$head" "$GITHUB_SHA" || continue
+            verified="$id"
+            break
+          done < nightly-runs.txt
+          test -n "$verified" \
+            || { echo "::error::no green first-attempt nightly verified a commit this tag builds on"; exit 1; }
+          gh run download "$verified" --dir nightly-evidence \
+            --name "nightly-verification-${verified}-1"
+          jq -e '.releaseReadiness == "complete"' \
+            nightly-evidence/verification.json > /dev/null \
+            || { echo "::error::the nightly that verified this tag did not record a complete run"; exit 1; }
+          rm -rf nightly-runs.txt nightly-evidence
 
       - name: Refuse unresolved nightly failures
         env:
