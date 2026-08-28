@@ -4,6 +4,7 @@ import { api, type MessageChoice, type MessageKind } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
+import { SuccessFeedback } from "../components/SuccessFeedback";
 
 function MessageChoiceGroup({ heading, note, choices, pending, receive }: {
   heading: string;
@@ -77,7 +78,7 @@ export function MyMessagesView() {
     <h1 className="text-3xl font-bold">{t("myMessages.title")}</h1>
     <p className="text-muted">{t("myMessages.description")}</p>
     {error && <Alert>{error}</Alert>}
-    {saved && <Alert tone="success" testId="my-messages-saved">{t("myMessages.saved")}</Alert>}
+    {saved && <SuccessFeedback testId="my-messages-saved">{t("myMessages.saved")}</SuccessFeedback>}
     {choices && <>
       <MessageChoiceGroup
         heading={t("myMessages.declinable")}

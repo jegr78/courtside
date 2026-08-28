@@ -66,6 +66,7 @@ describe("ExternalReferencePanel", () => {
     // then
     expect(linking).toHaveBeenCalledWith("source-1", { externalId: "4711", personId: "person-1" });
     expect(await screen.findByTestId("reference-4711")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Reference linked.");
   });
 
   it("given a link that was a mistake, when it is undone, then no dialog stands in the way", async () => {
@@ -80,6 +81,7 @@ describe("ExternalReferencePanel", () => {
     // then
     expect(unlinking).toHaveBeenCalledWith("source-1", "4711");
     expect(screen.queryByTestId("reference-4711")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Reference unlinked.");
   });
 
   it("given more references than one page holds, when the rest is asked for, then the cursor is passed on", async () => {

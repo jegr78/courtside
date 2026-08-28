@@ -263,6 +263,7 @@ it("given a series occurrence, when cancelling this and following, then the seri
 
   // then
   await waitFor(() => expect(api.cancelSeries).toHaveBeenCalledWith(seriesId, upcomingId, "THIS_AND_FOLLOWING"));
+  expect(screen.getByRole("status")).toHaveTextContent("Booking cancelled.");
 });
 
 it("given a series occurrence, when previewing and confirming a move, then the same scoped request is executed", async () => {
@@ -282,6 +283,7 @@ it("given a series occurrence, when previewing and confirming a move, then the s
   await waitFor(() => expect(api.moveSeries).toHaveBeenCalledWith(seriesId, expect.objectContaining({
     fromBookingId: upcomingId, scope: "WHOLE_SERIES", newStartTime: "19:00"
   })));
+  expect(screen.getByRole("status")).toHaveTextContent("Booking moved.");
 });
 
 it("given differently long occurrences, when previewing a move, then each returned period is shown", async () => {
@@ -375,6 +377,7 @@ it("given a listed participation, when the member withdraws, then it is sent and
 
   await waitFor(() => expect(withdraw).toHaveBeenCalledWith(participationId));
   await waitFor(() => expect(api.participations).toHaveBeenCalledTimes(2));
+  expect(screen.getByRole("status")).toHaveTextContent("Participation withdrawn.");
 });
 
 it("given the withdrawal fails, when the member tries, then the reason is shown rather than swallowed", async () => {

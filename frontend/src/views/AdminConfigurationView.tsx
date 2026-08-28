@@ -17,6 +17,7 @@ import { LocaleSelect } from "../components/LocaleSelect";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { SuccessFeedback } from "../components/SuccessFeedback";
 import { formString } from "../forms/formString";
 import { useFragmentTarget } from "../navigation/useFragmentTarget";
 
@@ -212,7 +213,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert>{error}</Alert>}
-        {success && <div data-testid="admin-save-success"><Alert tone="success">{success}</Alert></div>}
+        {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
         <form noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5">
           <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
           <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />

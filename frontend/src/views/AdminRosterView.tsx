@@ -99,7 +99,7 @@ export function AdminRosterView() {
         lastName: formString(form, "lastName"),
         email: formString(form, "email") || null
       });
-      await navigate(`/admin/roster/${created.personId}`);
+      await navigate(`/admin/roster/${created.personId}`, { state: { personCreated: true } });
     } catch (failure) {
       reportError(failure);
     } finally {
@@ -175,4 +175,3 @@ export function AdminRosterView() {
       </>}
   </section>;
 }
-

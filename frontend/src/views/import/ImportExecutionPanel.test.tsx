@@ -115,6 +115,7 @@ describe("ImportExecutionPanel", () => {
 
     // then — a result that reports only what went well is a result nobody can act on
     const result = await screen.findByTestId("run-result");
+    expect(result).toHaveRole("status");
     expect(result).toHaveTextContent("12");
     expect(result).toHaveTextContent("3");
     expect(result).toHaveTextContent("1");

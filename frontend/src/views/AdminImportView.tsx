@@ -5,6 +5,7 @@ import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
+import { SuccessFeedback } from "../components/SuccessFeedback";
 import { ExternalReferencePanel } from "./import/ExternalReferencePanel";
 import { ImportExecutionPanel } from "./import/ImportExecutionPanel";
 import { ImportPreviewPanel } from "./import/ImportPreviewPanel";
@@ -86,7 +87,7 @@ export function AdminImportView() {
   return <section data-testid="admin-import-view" className="surface-panel grid w-full max-w-5xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.import.title")}</h1>
     {error && <Alert>{error}</Alert>}
-    {success && <Alert tone="success">{success}</Alert>}
+    {success && <SuccessFeedback>{success}</SuccessFeedback>}
 
     {sources && <div className="grid gap-3">
       <h2 className="text-2xl font-bold">{t("admin.import.sources")}</h2>

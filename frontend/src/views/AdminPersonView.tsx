@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { api, type ClubConfig, type MembershipType, type MessageEntry, type PersonRequest, type Role, type RosterEntry } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { LocaleSelect } from "../components/LocaleSelect";
 import { Modal } from "../components/Modal";
+import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { downloadJson } from "../downloads/downloadJson";
 import { formString } from "../forms/formString";
@@ -19,14 +20,22 @@ const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
 const USERNAME_LENGTH = 60;
 
+function arrivedFromPersonCreation(state: unknown): boolean {
+  return typeof state === "object" && state !== null && "personCreated" in state
+    && state.personCreated === true;
+}
+
 export function AdminPersonView() {
   const { t } = useTranslation();
+  const location = useLocation();
   const { personId = "" } = useParams();
   const [entry, setEntry] = useState<RosterEntry>();
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [club, setClub] = useState<ClubConfig>();
   const [error, setError] = useState<string>();
-  const [success, setSuccess] = useState<string>();
+  const [success, setSuccess] = useState<string | undefined>(() => arrivedFromPersonCreation(location.state as unknown)
+    ? t("admin.roster.personCreated")
+    : undefined);
   const [pending, setPending] = useState(false);
 
   const reportError = useCallback((failure: unknown) => {
@@ -85,7 +94,7 @@ export function AdminPersonView() {
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert>{error}</Alert>}
-        {success && <Alert tone="success">{success}</Alert>}
+        {success && <SuccessFeedback>{success}</SuccessFeedback>}
         <PersonSection entry={entry} disabled={pending} save={(person) => mutate(() => api.changePerson(personId, person))} />
         <MembershipSection
           entry={entry}
@@ -366,4 +375,3 @@ function RoleCheckboxes({ name, selected, disabled, changed, testIdPrefix }: {
     </div>
   </fieldset>;
 }
-

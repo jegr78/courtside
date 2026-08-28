@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api, type ImportPreview, type ImportRun } from "../../api/client";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
+import { SuccessFeedback } from "../../components/SuccessFeedback";
 
 const NUMBERS = [
   "created", "corrected", "membershipsEnded", "accountsCreated", "accountsDisabled",
@@ -60,12 +61,12 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, executed, re
       </Button>
       : <p data-testid="not-executable">{t("admin.import.notExecutable")}</p>)}
 
-    {result && <div data-testid="run-result" className="grid gap-1 rounded-lg border p-3">
+    {result && <SuccessFeedback testId="run-result"><div className="grid gap-1">
       <h3 className="text-lg font-semibold">{t("admin.import.runResult")}</h3>
       {NUMBERS.map((number) => <p key={number} data-testid={`run-result-${number}`}>
         {t(`admin.import.run.${number}`, { value: result[number] })}
       </p>)}
-    </div>}
+    </div></SuccessFeedback>}
 
     <div className="grid gap-2 border-t pt-4">
       <h3 className="text-lg font-semibold">{t("admin.import.runLog")}</h3>

@@ -16,6 +16,7 @@ import { problemMessage } from "../api/problem-message";
 import { shortTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
+import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 import { useFragmentTarget } from "../navigation/useFragmentTarget";
@@ -275,7 +276,7 @@ export function AdminFacilityView() {
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert>{error}</Alert>}
-        {success && <Alert tone="success">{success}</Alert>}
+        {success && <SuccessFeedback>{success}</SuccessFeedback>}
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.facility.courts")}</h2>
           {courts.map((court) => <CourtEditor key={court.id} court={court} timeZone={timeZone} disabled={pending.has(`court:${court.id}`)} changed={(changed) => setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item))} save={saveCourt} toggle={toggleCourt} reportError={reportError} />)}
