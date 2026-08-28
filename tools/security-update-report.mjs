@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
@@ -162,17 +163,23 @@ export function securityUpdateReport(base) {
   ].join("\n");
 }
 
+export function writeSecurityUpdateReport(base, output, identityOutput) {
+  mkdirSync(dirname(output), { recursive: true });
+  writeFileSync(output, securityUpdateReport(base), { mode: 0o600 });
+  if (identityOutput) {
+    const identity = securityRuntimeIdentity(base);
+    mkdirSync(dirname(identityOutput), { recursive: true });
+    writeFileSync(identityOutput, `${JSON.stringify(
+      { ...identity, comparisonRequired: runtimeComparisonRequired(identity) }, null, 2)}\n`,
+    { mode: 0o600 });
+  }
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [baseOption, base, outputOption, output, identityOption, identityOutput] = process.argv.slice(2);
   if (baseOption !== "--base" || !base || outputOption !== "--output" || !output
       || (identityOption !== undefined && identityOption !== "--identity-output") || (identityOption && !identityOutput)) {
     throw new Error("Usage: security-update-report.mjs --base <commit> --output <file> [--identity-output <file>]");
   }
-  writeFileSync(output, securityUpdateReport(base), { mode: 0o600 });
-  if (identityOutput) {
-    const identity = securityRuntimeIdentity(base);
-    writeFileSync(identityOutput, `${JSON.stringify(
-      { ...identity, comparisonRequired: runtimeComparisonRequired(identity) }, null, 2)}\n`,
-    { mode: 0o600 });
-  }
+  writeSecurityUpdateReport(base, output, identityOutput);
 }

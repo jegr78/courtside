@@ -42,3 +42,11 @@ test("givenBackendAndSecurityJobs_whenTheyBuildJava_thenMavenSkipsEveryFrontendE
   assert.match(pom,
     /<id>java-only<\/id>[\s\S]+<frontend\.skip>true<\/frontend\.skip>[\s\S]+<frontend\.test\.skip>true<\/frontend\.test\.skip>/);
 });
+
+test("givenSplitCoverageArtifacts_whenTheAggregateDownloadsThem_thenItUsesTheirArchiveRoots", () => {
+  // when / then
+  assert.match(workflow, /--java build\/aggregate\/backend\/site\/jacoco\/jacoco\.xml/);
+  assert.match(workflow, /--frontend build\/aggregate\/frontend\/coverage\/lcov\.info/);
+  assert.doesNotMatch(workflow, /build\/aggregate\/backend\/target\/site/);
+  assert.doesNotMatch(workflow, /build\/aggregate\/frontend\/frontend\/coverage/);
+});

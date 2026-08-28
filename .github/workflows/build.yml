@@ -433,8 +433,8 @@ jobs:
         run: >
           frontend/node/node tools/coverage-diff.mjs
           --base ${{ github.event.pull_request.base.sha }}
-          --java build/aggregate/backend/target/site/jacoco/jacoco.xml
-          --frontend build/aggregate/frontend/frontend/coverage/lcov.info
+          --java build/aggregate/backend/site/jacoco/jacoco.xml
+          --frontend build/aggregate/frontend/coverage/lcov.info
           --output build/coverage/changed.md
       - name: Upload combined test evidence
         if: github.event_name == 'pull_request'
