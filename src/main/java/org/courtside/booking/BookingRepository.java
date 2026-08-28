@@ -170,6 +170,18 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @EntityGraph(attributePaths = "allocations")
     List<Booking> findAllByIdIn(Collection<UUID> ids);
 
+    @EntityGraph(attributePaths = "allocations")
+    List<Booking> findByBookedByOrderByCreatedAtAscIdAsc(UUID bookedBy);
+
+    @EntityGraph(attributePaths = "allocations")
+    @Query("""
+            SELECT b FROM Booking b
+            WHERE EXISTS (SELECT p.id FROM BookingParticipant p
+                          WHERE p.booking = b AND p.personId = :personId)
+            ORDER BY b.createdAt ASC, b.id ASC
+            """)
+    List<Booking> findNamingParticipant(@Param("personId") UUID personId);
+
     boolean existsByIdAndSeriesId(UUID id, UUID seriesId);
 
     Optional<Booking> findByBookedByAndIdempotencyKey(UUID bookedBy, String idempotencyKey);

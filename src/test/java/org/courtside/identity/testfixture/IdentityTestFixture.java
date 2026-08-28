@@ -152,6 +152,10 @@ public class IdentityTestFixture {
         return accounts.findById(accountId).orElseThrow().getSecurityEpoch();
     }
 
+    public UUID accountIdOf(UUID personId) {
+        return accounts.findByPersonId(personId).orElseThrow().getId();
+    }
+
     public UUID personIdForUsername(String username) {
         return accounts.findByUsername(username).orElseThrow().getPerson().getId();
     }

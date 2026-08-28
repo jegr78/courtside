@@ -61,8 +61,9 @@ touch has changed in the meantime. A membership type can be marked as granting a
 execution then opens one for every person it covers who does not already hold one, holding `MEMBER`
 alone and with its one-time password mailed to that member rather than shown to anybody; the
 preview names per row whether an account would be opened and, where it would not, why, and it
-reports every row whose mailbox more than one person reads. What is
-still missing is export. `/actuator/health` is exposed. The
+reports every row whose mailbox more than one person reads. A board can also answer, from a
+person's page, what the instance holds about that one person — the file described in section 11 —
+while the CSV export of the admin list views is still missing. `/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -190,7 +191,8 @@ in before it needs to take anything out, so the import is what Release 1 builds 
 follows in the release after it. The live, bidirectional sync stays deferred to its own project.
 
 The one export with a date attached to it is the per-member one that answers a subject access
-request. It is not a convenience, and section 8 marks it apart from the rest for that reason.
+request. It is not a convenience, and it is built ahead of the rest for that reason: a club owes
+that answer within a month of being asked, whatever release the list exports are in.
 
 ---
 
@@ -321,7 +323,7 @@ citizen.
 │ booking       Bookings, participants, series     │
 │ notification  Email templates and delivery       │
 │ reporting     Analytics and exports              │
-│ dataexchange  CSV import / export                │
+│ dataexchange  Import, export, subject access     │
 │ config        Branding, instance settings        │
 │ integration   Ports: Access · Payment · MemberSync│
 │ audit         Change log (cross-cutting)         │
@@ -1294,8 +1296,8 @@ Import and export:
   `ADMIN` keeps that role and stays enabled. An import cannot lock a club out of its instance.
 - **CSV export** for every list view in the admin backend, matching what existing booking
   systems offer today. *Designed.*
-- **Per-member JSON export** for subject access requests (section 11). *Designed.* This one is
-  not deferred by preference: a club is the controller, and a controller that cannot answer what
+- **Per-member JSON export** for subject access requests (section 11). *Built.* This one was
+  never deferred by preference: a club is the controller, and a controller that cannot answer what
   it holds about somebody is not compliant because its supplier ran out of release.
 
 ---
@@ -1704,8 +1706,31 @@ deliver the implementation.
   removed with the account by `ON DELETE CASCADE`. There is no second retention setting for it: a
   row that outlived the account would explain a message to nobody, and one that vanished earlier
   would leave the club unable to answer why a member never heard from the instance. **Built.**
-- **Subject access and portability** (Art. 15/20) as self-service: every member can export
-  their own data as JSON. The Release 1 export covers this.
+- **Subject access and portability** (Art. 15/20), answered by the board from the person's
+  page. `POST /api/admin/export/person/{personId}` produces, as one JSON file, the person and
+  their address, every account they hold with its roles and its state, the membership and the
+  period it ran, the bookings they made and the bookings somebody else recorded them in, the
+  recurring bookings they set up, what became of every message this instance addressed to them
+  and which kinds they asked not to receive, the member numbers an import linked them by, and the
+  change log from both sides — what was done to them, and what they did. The club is the
+  controller and a request may arrive by letter, so the board is who produces the answer; people
+  exist in the roster without an account, and self-service would leave them with no way to ask.
+
+  **The answer is produced whole.** No section of it is paged or capped, because a subject access
+  answer that stops at a hundred entries is not one — a board member who has administered the club
+  for years is the actor of every configuration change it ever recorded, and all of them are
+  theirs. The cost is a single response held in memory, bounded by one club's own history and
+  reachable only by an administrator asking about one person.
+
+  **It answers about one person and nobody else, and the shapes carry that rather than a
+  condition.** A booking they made lists its courts and its times and has no field for the people
+  they played with; a booking they were recorded in has none for who made it or what that person
+  wrote on it; a change they made names the operation and the moment and has none for the record
+  it touched. There is no list form and no bulk form, so the operation cannot become a way to read
+  the roster.
+
+  Answering is itself a processing activity: it writes `dataexchange.subjectAccess.answered` to
+  the change log, naming the person and nothing that was in the answer. **Built.**
 - **Documentation templates in the repository**: a pre-filled record of processing
   activities, a TOM list, and a privacy policy template for the application. For German
   clubs this is a genuine adoption argument and costs only writing.

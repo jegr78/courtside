@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
+import { downloadJson } from "../downloads/downloadJson";
 import { AdminPersonView } from "./AdminPersonView";
+
+vi.mock("../downloads/downloadJson", () => ({ downloadJson: vi.fn() }));
 
 const jane: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
@@ -45,6 +48,7 @@ function showPerson(entry: RosterEntry = jane) {
 describe("AdminPersonView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
+    vi.mocked(downloadJson).mockClear();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults, juniors]);
     vi.spyOn(api, "config").mockResolvedValue(club);
@@ -454,5 +458,34 @@ describe("AdminPersonView", () => {
     // then
     expect(screen.queryByTestId("last-message")).not.toBeInTheDocument();
     expect(messages).not.toHaveBeenCalled();
+  });
+  it("given a member asks what the club holds about them, when the board produces the answer, then it is saved as a file", async () => {
+    // given
+    showPerson();
+    const answer = { producedAt: "2026-08-27T10:00:00Z", personId: "person-1" };
+    const produce = vi.spyOn(api, "exportPersonData")
+      .mockResolvedValue(answer as never);
+    await screen.findByTestId("person-first-name");
+
+    // when
+    await userEvent.click(screen.getByTestId("export-person-data"));
+
+    // then
+    await waitFor(() => expect(produce).toHaveBeenCalledWith("person-1"));
+    expect(downloadJson).toHaveBeenCalledWith("courtside-subject-access-person-1.json", answer);
+  });
+
+  it("given the answer cannot be produced, when the board asks for it, then nothing is saved and the failure is shown", async () => {
+    // given
+    showPerson();
+    vi.spyOn(api, "exportPersonData").mockRejectedValue(new ApiError(404));
+    await screen.findByTestId("person-first-name");
+
+    // when
+    await userEvent.click(screen.getByTestId("export-person-data"));
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(downloadJson).not.toHaveBeenCalled();
   });
 });

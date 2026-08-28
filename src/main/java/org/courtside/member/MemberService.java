@@ -69,6 +69,12 @@ public class MemberService {
         return membershipTypeId != null && membershipTypes.existsById(membershipTypeId);
     }
 
+    public Optional<String> membershipTypeNameOf(UUID membershipTypeId) {
+        return membershipTypeId == null
+                ? Optional.empty()
+                : membershipTypes.findById(membershipTypeId).map(MembershipType::getName);
+    }
+
     public List<MembershipType> allMembershipTypes() {
         return membershipTypes.findAllByOrderByNameAsc();
     }

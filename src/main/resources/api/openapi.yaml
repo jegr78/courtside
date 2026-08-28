@@ -121,6 +121,8 @@ tags:
     description: The configuration changes this instance recorded.
   - name: admin-messages
     description: What became of the messages this instance sent.
+  - name: admin-subject-access
+    description: Answering what this instance holds about one named person.
 
 security:
   - sessionCookie: []
@@ -1891,6 +1893,203 @@ components:
           type: [string, "null"]
           format: uuid
           description: Pass this entry id as `cursor` to continue after the current page.
+
+
+    SubjectAccessReservation:
+      type: object
+      required: [courtId, startsAt, endsAt]
+      properties:
+        courtId: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+
+    SubjectAccessBooking:
+      type: object
+      required: [bookingId, createdAt, status, reservations]
+      properties:
+        bookingId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/BookingStatus" }
+        cancelledAt: { type: [string, "null"], format: date-time }
+        note:
+          type: [string, "null"]
+          description: What this person wrote on the booking, and `null` where they wrote nothing.
+        reservations:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessReservation" }
+
+    SubjectAccessParticipation:
+      type: object
+      required: [bookingId, status, reservations]
+      description: |
+        A booking this person is recorded in. It carries the court and the time and nothing about
+        whoever made it: who booked, what they wrote on it and who else they named are that
+        person's data, not this one's.
+      properties:
+        bookingId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/BookingStatus" }
+        reservations:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessReservation" }
+
+    SubjectAccessMembership:
+      type: object
+      required: [membershipTypeId, membershipType]
+      properties:
+        membershipTypeId: { type: string, format: uuid }
+        membershipType:
+          type: [string, "null"]
+          description: The type's name today, or `null` once the type itself is gone.
+        startedOn: { type: [string, "null"], format: date }
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: The date the membership ended, absent while it runs.
+
+    SubjectAccessAccount:
+      type: object
+      required: [accountId, username, locale, enabled, createdAt, credentialState, roles]
+      properties:
+        accountId: { type: string, format: uuid }
+        username: { type: string }
+        locale: { type: string }
+        enabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        passwordChangeRequired: { type: boolean }
+        credentialsExpireAt: { type: [string, "null"], format: date-time }
+        credentialState:
+          type: string
+          enum: [AWAITING_CREDENTIAL, CREDENTIAL_ISSUED, CREDENTIAL_EXPIRED, PASSWORD_CHOSEN]
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/Role" }
+
+    SubjectAccessExternalReference:
+      type: object
+      required: [sourceId, externalId, linkedAt]
+      properties:
+        sourceId: { type: string, format: uuid }
+        externalId:
+          type: string
+          description: The identifier the club's other system knows this person by.
+        linkedAt: { type: string, format: date-time }
+
+    SubjectAccessChange:
+      type: object
+      required: [occurredAt, eventType, parameters]
+      description: A recorded change this person is the subject of.
+      properties:
+        occurredAt: { type: string, format: date-time }
+        eventType: { type: string }
+        parameters:
+          type: object
+          additionalProperties: true
+          description: The recorded payload, which describes this person alone.
+
+    SubjectAccessAction:
+      type: object
+      required: [occurredAt, eventType]
+      description: |
+        A recorded change this person made. It names what they did and when, and never what was
+        changed: the subject of such an entry is usually somebody else, and their record is not
+        part of this answer.
+      properties:
+        occurredAt: { type: string, format: date-time }
+        eventType: { type: string }
+
+    SubjectAccessSeries:
+      type: object
+      required: [seriesId, createdAt, startsOn, startTime, durationMinutes, intervalWeeks,
+                 weekdays]
+      description: A recurring booking this person set up.
+      properties:
+        seriesId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        startsOn: { type: string, format: date }
+        startTime: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        durationMinutes: { type: integer }
+        intervalWeeks: { type: integer }
+        weekdays:
+          type: array
+          description: Ascending ISO day numbers, Monday being 1.
+          items: { type: integer, minimum: 1, maximum: 7 }
+        endsOn: { type: [string, "null"], format: date }
+        occurrenceCount: { type: [integer, "null"] }
+        note: { type: [string, "null"] }
+
+    SubjectAccessMessage:
+      type: object
+      required: [queuedAt, kind, state]
+      description: |
+        What became of one message this instance addressed to this person. It says what was sent
+        and how it went, never what it said: the record holds no body and no address of its own.
+      properties:
+        queuedAt: { type: string, format: date-time }
+        settledAt: { type: [string, "null"], format: date-time }
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        state: { $ref: "#/components/schemas/MessageState" }
+        reason:
+          type: [string, "null"]
+          description: The kinds of failure the mail library reported, where a handover failed.
+        statusCode: { type: [string, "null"] }
+        messageId: { type: [string, "null"] }
+
+    SubjectAccessDeclinedMessage:
+      type: object
+      required: [kind, declinedAt]
+      description: A kind of message this person asked not to receive.
+      properties:
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        declinedAt: { type: string, format: date-time }
+
+    SubjectAccessExport:
+      type: object
+      required: [producedAt, personId, firstName, lastName, accounts, memberships, bookingsMade,
+                 bookingsRecordedIn, bookingSeries, messages, declinedMessages,
+                 externalReferences, changesAsSubject, changesAsActor]
+      description: |
+        Everything this instance holds about one person, and nothing it holds about anybody else.
+      properties:
+        producedAt: { type: string, format: date-time }
+        personId: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: [string, "null"], format: email }
+        accounts:
+          type: array
+          description: |
+            Every account this person holds, and empty for a person who holds none. Usually one,
+            but this instance permits a person to hold a dormant account beside a current one, and
+            an answer that named only the one representing them elsewhere would leave the other
+            out. Ordered as the roster orders them: the enabled ones first, oldest first within.
+          items: { $ref: "#/components/schemas/SubjectAccessAccount" }
+        memberships:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessMembership" }
+        bookingsMade:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessBooking" }
+        bookingsRecordedIn:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessParticipation" }
+        bookingSeries:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessSeries" }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessMessage" }
+        declinedMessages:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessDeclinedMessage" }
+        externalReferences:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessExternalReference" }
+        changesAsSubject:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessChange" }
+        changesAsActor:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessAction" }
 
   headers:
     Location:
@@ -4975,3 +5174,49 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+
+  /api/admin/export/person/{personId}:
+    post:
+      tags: [admin-subject-access]
+      operationId: exportPersonData
+      summary: Answer what this instance holds about one person.
+      description: |
+        The club is the controller and owes this answer to whoever asks for it. One person per
+        call: there is no list form and no bulk form, because a shape that answers a subject
+        access request must not double as a way to read the roster.
+
+        The answer holds this person's record, every account they hold, the membership they hold or
+        last held, the bookings they made and the bookings somebody else recorded them in, the
+        member numbers an import linked them by, and the change log from both sides — the changes
+        made to them, and the changes they made.
+
+        Nothing in it describes anybody else. A booking they made lists its courts and times and
+        not the people they played with; a booking they were recorded in additionally omits who
+        made it and what that person wrote on it; and a change they made names the operation and
+        the moment, never the record it touched.
+
+        `POST` rather than `GET`: producing the answer is itself a processing activity and is
+        written to the change log, so the request is not one a client may repeat freely or a
+        browser may make on its own.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The answer.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubjectAccessExport" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
