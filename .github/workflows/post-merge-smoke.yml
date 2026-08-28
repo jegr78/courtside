@@ -1,0 +1,76 @@
+name: post-merge smoke
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-merge-smoke-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - id: policy
+        name: Verify policy state
+        continue-on-error: true
+        run: node --test tools/post-merge-policy.test.mjs
+      - id: application
+        name: Verify migration discovery and critical application paths
+        continue-on-error: true
+        run: >
+          ./mvnw -B test -Pjava-only
+          -Dtest=ConstraintNameTest,HealthEndpointTest,GeneratedApiImplementationTest
+      - name: Record first-attempt outcome
+        if: always()
+        env:
+          POLICY_OUTCOME: ${{ steps.policy.outcome }}
+          APPLICATION_OUTCOME: ${{ steps.application.outcome }}
+        run: |
+          mkdir -p build/post-merge
+          jq -n \
+            --arg commit "${{ github.sha }}" \
+            --argjson runId "${{ github.run_id }}" \
+            --argjson attempt "${{ github.run_attempt }}" \
+            --arg policy "$POLICY_OUTCOME" \
+            --arg application "$APPLICATION_OUTCOME" \
+            '{schemaVersion: 1, commit: $commit, runId: $runId, attempt: $attempt,
+              firstAttempt: ($attempt == 1), policy: $policy, application: $application,
+              outcome: (if $attempt == 1 and $policy == "success" and $application == "success"
+                then "passed" else "incomplete" end)}' \
+            > build/post-merge/result.json
+      - name: Upload structured result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: post-merge-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/post-merge/result.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: post-merge-smoke-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/surefire-reports/*.xml
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Enforce smoke result
+        if: always()
+        env:
+          POLICY_OUTCOME: ${{ steps.policy.outcome }}
+          APPLICATION_OUTCOME: ${{ steps.application.outcome }}
+        run: test "$POLICY_OUTCOME" = success && test "$APPLICATION_OUTCOME" = success
