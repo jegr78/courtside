@@ -71,6 +71,19 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   expect(screen.getByTestId("booking-44444444-4444-4444-4444-444444444444")).toHaveTextContent("Centre Court");
 });
 
+it("given an actionable booking, when actions are shown, then labels are concise and accessible names retain context", async () => {
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  const cancel = await screen.findByTestId("personal-cancel");
+  expect(cancel).toHaveTextContent(/^Cancel$/);
+  expect(cancel).toHaveAccessibleName("Cancel Member booking on Aug 12, 2026, 6:00 PM – 7:00 PM at Centre Court");
+  const move = screen.getByTestId("move-booking");
+  expect(move).toHaveTextContent(/^Move$/);
+  expect(move).toHaveAccessibleName("Move Member booking on Aug 12, 2026, 6:00 PM – 7:00 PM at Centre Court");
+});
+
 it("given loaded bookings, when translations rebind, then the data remains mounted without another load", async () => {
   // given
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
