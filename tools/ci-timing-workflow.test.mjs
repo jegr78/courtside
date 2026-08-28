@@ -34,9 +34,13 @@ test("givenAnObservedProfilePlan_whenCollectingTheRun_thenProtectedCodeRecompute
   assert.doesNotMatch(workflow, /gh run download|test-profile-plan-\$\{RUN_ID\}/);
   assert.doesNotMatch(workflow, /issues\/\$\{PR_NUMBER\}|LABELS_JSON/);
   assert.match(workflow, /--labels '\[\]'/);
-  assert.match(workflow, /pull\/\$\{PR_NUMBER\}\/head/);
+  assert.match(workflow, /commits\/\$\{RUN_HEAD\}\/pulls/);
+  assert.match(workflow, /select\(\.head\.sha == \$head\)/);
+  assert.match(workflow, /select\(length == 1\)/);
+  assert.match(workflow, /git fetch --no-tags origin "\$BASE_REF" "\$HEAD_REF"/);
+  assert.doesNotMatch(workflow, /pull\/\$\{PR_NUMBER\}\/head/);
   assert.match(workflow, /test-profile-classifier\.mjs/);
-  assert.match(workflow, /pull_requests\[0\]\.base\.sha/);
+  assert.doesNotMatch(workflow, /pull_requests\[0\]/);
   assert.match(workflow, /test-profile-observation\.mjs/);
   assert.match(workflow, /test-profile-observation\.schema\.json/);
 });

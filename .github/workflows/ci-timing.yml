@@ -30,15 +30,18 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}" > build/ci-timing/run.json
           gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100" \
             --slurp | jq '{jobs: map(.jobs[]) }' > build/ci-timing/jobs.json
-          PR_NUMBER=$(jq -er '.pull_requests | select(length == 1) | .[0].number |
-            select(type == "number" and . >= 1 and floor == .)' build/ci-timing/run.json)
-          BASE_REF=$(jq -er '.pull_requests[0].base.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/run.json)
-          HEAD_REF=$(jq -er '.pull_requests[0].head.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/run.json)
           RUN_HEAD=$(jq -er '.head_sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/run.json)
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${RUN_HEAD}/pulls?per_page=100" \
+            --slurp | jq 'add' > build/ci-timing/pulls.json
+          jq -e --arg head "$RUN_HEAD" \
+            '[.[] | select(.head.sha == $head)] | select(length == 1) | .[0]' \
+            build/ci-timing/pulls.json > build/ci-timing/pr.json
+          BASE_REF=$(jq -er '.base.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/pr.json)
+          HEAD_REF=$(jq -er '.head.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/pr.json)
           test "$HEAD_REF" = "$RUN_HEAD"
-          git fetch --no-tags origin "$BASE_REF" \
-            "pull/${PR_NUMBER}/head:refs/remotes/origin/observed-pr-head"
-          test "$(git rev-parse refs/remotes/origin/observed-pr-head)" = "$HEAD_REF"
+          git fetch --no-tags origin "$BASE_REF" "$HEAD_REF"
+          git cat-file -e "${BASE_REF}^{commit}"
+          git cat-file -e "${HEAD_REF}^{commit}"
           mkdir -p build/ci-timing/profile-plan
           node tools/test-profile-classifier.mjs \
             --base "$BASE_REF" \
@@ -74,6 +77,7 @@ jobs:
           cp ci/test-profile-observation.schema.json build/ci-timing/test-profile-observation.schema.json
           cat build/ci-timing/summary.md build/ci-timing/profile-summary.md >> "$GITHUB_STEP_SUMMARY"
           rm build/ci-timing/run.json build/ci-timing/jobs.json \
+            build/ci-timing/pulls.json build/ci-timing/pr.json \
             build/ci-timing/summary.md build/ci-timing/profile-summary.md \
             build/ci-timing/profile-plan/summary.md
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
