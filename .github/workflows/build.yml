@@ -311,7 +311,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - name: Install security toolchain
-        run: ./mvnw -B frontend:install-node-and-npm
+        run: ./mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci
       - name: Build security candidate
         run: ./mvnw -B clean package -DskipTests -Pjava-only
       - name: Compare security contracts and tool versions

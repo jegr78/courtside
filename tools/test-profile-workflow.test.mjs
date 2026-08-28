@@ -50,3 +50,9 @@ test("givenSplitCoverageArtifacts_whenTheAggregateDownloadsThem_thenItUsesTheirA
   assert.doesNotMatch(workflow, /build\/aggregate\/backend\/target\/site/);
   assert.doesNotMatch(workflow, /build\/aggregate\/frontend\/frontend\/coverage/);
 });
+
+test("givenSecurityFindingToolsNeedNodeModules_whenTheSecurityJobRuns_thenItInstallsLockedDependencies", () => {
+  // when / then
+  assert.match(workflow,
+    /security:[\s\S]+name: Install security toolchain[\s\S]+frontend:install-node-and-npm frontend:npm@npm-ci[\s\S]+tools\/security-findings\.mjs/);
+});
