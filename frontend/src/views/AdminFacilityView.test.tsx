@@ -54,6 +54,17 @@ describe("AdminFacilityView", () => {
     await vi.waitFor(() => expect(heading).toHaveFocus());
   });
 
+  it("whenImpactIsAvailable_thenItIsOfferedAsADisclosure", async () => {
+    // when
+    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+
+    // then
+    const control = await screen.findByTestId("court-impact-court-1");
+    expect(control.tagName).toBe("SUMMARY");
+    expect(control.closest("details")).toBeInTheDocument();
+    expect(control).not.toHaveClass("bg-(--club-primary)");
+  });
+
   it("given a court in use, when its impact is asked for, then the bookings it would displace are named", async () => {
     // given
     vi.spyOn(api, "courtImpact").mockResolvedValue({
