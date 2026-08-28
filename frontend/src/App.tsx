@@ -202,7 +202,7 @@ export function App() {
       <Preferences authenticated={session?.authenticated ?? false} supported={config?.supportedLocales} />
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
-    <main className="flex flex-1 items-center justify-center px-4 py-8">
+    <main className="flex flex-1 items-start justify-center px-4 py-8">
       {offline ? <div data-testid="offline-status"><Alert>{t("status.offline")}</Alert></div> : session
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} configurationChanged={configurationChanged} />
         : <p role="status">{t("status.loading")}</p>}

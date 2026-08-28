@@ -251,6 +251,21 @@ describe("App build identity", () => {
     expect(screen.getByTestId("environment-warning")).toHaveAttribute("role", "alert");
   });
 
+  it("givenShortRoute_whenShellRenders_thenContentStartsBelowHeader", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter initialEntries={["/login"]}><App /></MemoryRouter>);
+    await screen.findByTestId("login-view");
+
+    // then
+    expect(screen.getByRole("main")).toHaveClass("items-start");
+    expect(screen.getByRole("main")).not.toHaveClass("items-center");
+  });
+
   it("givenNoClubLogo_whenTheShellLoads_thenTheCourtsideMarkIsTheNeutralFallback", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
