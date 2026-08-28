@@ -208,7 +208,82 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-  quality:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - name: Verify backend
+        run: ./mvnw -B clean verify -Pjava-only
+      - name: Upload backend test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: backend-test-evidence-${{ github.run_id }}
+          path: |
+            target/surefire-reports/*.xml
+            target/site/jacoco
+          if-no-files-found: warn
+          retention-days: 14
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - name: Install frontend toolchain
+        run: ./mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci
+      - name: Verify frontend
+        working-directory: frontend
+        run: |
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run lint
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run test
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run build
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js audit --audit-level=high
+      - name: Package the E2E application
+        run: ./mvnw -B package -DskipTests -Pjava-only
+      - name: Run browser journeys
+        working-directory: frontend
+        run: ./node/node ./node/node_modules/npm/bin/npm-cli.js run test:e2e
+      - name: Upload frontend test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: frontend-test-evidence-${{ github.run_id }}
+          path: |
+            frontend/coverage
+            frontend/test-results/visual-journeys
+            frontend/test-results/browser-security/browser-storage-evidence.json
+            frontend/test-results/browser-security/browser-csp-evidence.json
+            frontend/test-results/**/trace.zip
+            !frontend/test-results/browser-security-*/trace.zip
+            frontend/test-results/**/*.png
+            frontend/test-results/browser-diagnostics/*.json
+            frontend/test-results/browser-gate-outcome.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  security:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -235,20 +310,14 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
-      - name: Build and test
-        run: ./mvnw -B verify
-      - name: Summarize changed coverage
-        if: github.event_name == 'pull_request'
-        run: >
-          node tools/coverage-diff.mjs
-          --base ${{ github.event.pull_request.base.sha }}
-          --java target/site/jacoco/jacoco.xml
-          --frontend frontend/coverage/lcov.info
-          --output build/coverage/changed.md
+      - name: Install security toolchain
+        run: ./mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci
+      - name: Build security candidate
+        run: ./mvnw -B clean package -DskipTests -Pjava-only
       - name: Compare security contracts and tool versions
         if: github.event_name == 'pull_request'
         run: >
-          node tools/security-update-report.mjs
+          frontend/node/node tools/security-update-report.mjs
           --base ${{ github.event.pull_request.base.sha }}
           --output build/security-update.md
       - name: Prepare security evidence
@@ -284,7 +353,7 @@ jobs:
           upload-database: false
       - name: Enforce security finding policy
         run: >
-          node tools/security-findings.mjs
+          frontend/node/node tools/security-findings.mjs
           --trivy build/security/trivy-runtime.json
           --trivy build/security/trivy-source.json
           --codeql build/security/codeql
@@ -297,24 +366,12 @@ jobs:
       - name: Remove raw security reports
         if: always()
         run: rm -rf build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql build/security/runtime
-      - name: Upload test evidence
+      - name: Upload security evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: test-evidence-${{ github.run_id }}
+          name: security-evidence-${{ github.run_id }}
           path: |
-            target/surefire-reports/*.xml
-            target/site/jacoco
-            frontend/coverage
-            build/coverage/changed.md
-            frontend/test-results/visual-journeys
-            frontend/test-results/browser-security/browser-storage-evidence.json
-            frontend/test-results/browser-security/browser-csp-evidence.json
-            frontend/test-results/**/trace.zip
-            !frontend/test-results/browser-security-*/trace.zip
-            frontend/test-results/**/*.png
-            frontend/test-results/browser-diagnostics/*.json
-            frontend/test-results/browser-gate-outcome.json
             build/security/summary.json
             build/security-update.md
           if-no-files-found: warn
@@ -322,18 +379,24 @@ jobs:
 
   build:
     if: always()
-    needs: [quality, assessment-runtime, tool-update-comparison, test-profile-plan]
+    needs: [backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Enforce required build results
         env:
-          QUALITY_RESULT: ${{ needs.quality.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
           IDENTITY_RESULT: ${{ needs.assessment-runtime.result }}
           COMPARISON_RESULT: ${{ needs.tool-update-comparison.result }}
           PROFILE_PLAN_RESULT: ${{ needs.test-profile-plan.result }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          test "$QUALITY_RESULT" = success
+          test "$BACKEND_RESULT" = success
+          test "$FRONTEND_RESULT" = success
+          test "$SECURITY_RESULT" = success
           [[ "$IDENTITY_RESULT" = success || "$IDENTITY_RESULT" = skipped ]]
           [[ "$COMPARISON_RESULT" = success || "$COMPARISON_RESULT" = skipped ]]
           case "$EVENT_NAME" in
@@ -341,3 +404,43 @@ jobs:
             push) test "$PROFILE_PLAN_RESULT" = skipped ;;
             *) exit 1 ;;
           esac
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - if: github.event_name == 'pull_request'
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - name: Install coverage toolchain
+        if: github.event_name == 'pull_request'
+        run: ./mvnw -B frontend:install-node-and-npm
+      - if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: backend-test-evidence-${{ github.run_id }}
+          path: build/aggregate/backend
+      - if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: frontend-test-evidence-${{ github.run_id }}
+          path: build/aggregate/frontend
+      - name: Summarize changed coverage
+        if: github.event_name == 'pull_request'
+        run: >
+          frontend/node/node tools/coverage-diff.mjs
+          --base ${{ github.event.pull_request.base.sha }}
+          --java build/aggregate/backend/site/jacoco/jacoco.xml
+          --frontend build/aggregate/frontend/coverage/lcov.info
+          --output build/coverage/changed.md
+      - name: Upload combined test evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: combined-test-evidence-${{ github.run_id }}
+          path: build/coverage/changed.md
+          if-no-files-found: error
+          retention-days: 14

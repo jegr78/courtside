@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runtimeComparisonRequired, securityRuntimeFiles, securityUpdateReport, semanticChanges,
-  semanticJsonChanges } from "./security-update-report.mjs";
+  semanticJsonChanges, writeSecurityUpdateReport } from "./security-update-report.mjs";
 
 test("given a proposed security-tool update, when comparing it with the base, then versions policies and schemas are visible", () => {
   // when
@@ -79,5 +81,24 @@ test("given the assessment runtime, when identifying a candidate, then execution
       `${path} describes the application, and each side of a paired run now builds its own. A `
       + "dependency bump is not a tool update, and starting two stacks for one is why a branch that "
       + "touched no scanner could hold up every other branch.");
+  }
+});
+
+test("givenAFreshOutputDirectory_whenWritingTheReport_thenItsParentIsCreated", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-security-update-"));
+  const output = join(directory, "nested", "report.md");
+  const identity = join(directory, "identity", "runtime.json");
+
+  // when
+  try {
+    writeSecurityUpdateReport("origin/main", output, identity);
+
+    // then
+    assert.equal(existsSync(output), true);
+    assert.match(readFileSync(output, "utf8"), /Security update comparison/);
+    assert.equal(typeof JSON.parse(readFileSync(identity, "utf8")).comparisonRequired, "boolean");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
