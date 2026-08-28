@@ -2,7 +2,6 @@ package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +36,6 @@ class CredentialIssueLimit implements CredentialIssuing {
                 windowExpired ? now : current.startedAt());
     }
 
-    @Scheduled(initialDelayString = "PT1H", fixedDelayString = "PT1H")
     @Transactional
     void deleteExpiredWindows() {
         jdbc.sql("DELETE FROM credential_issue_limit WHERE window_started_at < :cutoff")

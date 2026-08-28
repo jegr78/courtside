@@ -7,14 +7,12 @@ import org.courtside.config.BookingReminderPolicy;
 import org.courtside.config.ReminderLeadTime;
 import org.courtside.shared.BookingReminderDue;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -26,8 +24,6 @@ public class BookingReminders {
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
-    @Scheduled(initialDelay = 1, timeUnit = TimeUnit.MINUTES,
-            fixedDelayString = "${courtside.booking.reminder-sweep-interval}")
     @Transactional
     public void remindWhatIsDue() {
         ReminderLeadTime leadTime = policy.leadTime();
