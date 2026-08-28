@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '37 0 * * *'
 
 permissions:
   contents: read
@@ -287,7 +289,7 @@ jobs:
             frontend/test-results/browser-diagnostics/*.json
             frontend/test-results/browser-gate-outcome.json
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: ${{ github.event_name == 'schedule' && 7 || 14 }}
 
   security:
     runs-on: ubuntu-latest
@@ -390,6 +392,28 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Record nightly verification
+        if: ${{ always() && github.event_name == 'schedule' }}
+        env:
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
+        run: |
+          mkdir -p build/nightly
+          jq -n \
+            --arg commit "${{ github.sha }}" \
+            --argjson runId "${{ github.run_id }}" \
+            --argjson attempt "${{ github.run_attempt }}" \
+            --arg backend "$BACKEND_RESULT" \
+            --arg frontend "$FRONTEND_RESULT" \
+            --arg security "$SECURITY_RESULT" \
+            '{schemaVersion: 1, commit: $commit, runId: $runId, attempt: $attempt,
+              firstAttempt: ($attempt == 1), jobs: {backend: $backend, frontend: $frontend, security: $security},
+              releaseReadiness: (if $attempt == 1 and $backend == "success" and $frontend == "success"
+                and $security == "success" then "complete" else "incomplete" end)}' \
+            > build/nightly/verification.json
+          jq -r '"Nightly release readiness: **\(.releaseReadiness)** (`\(.commit)`, attempt \(.attempt))"' \
+            build/nightly/verification.json >> "$GITHUB_STEP_SUMMARY"
       - name: Enforce required build results
         env:
           BACKEND_RESULT: ${{ needs.backend.result }}
@@ -407,9 +431,17 @@ jobs:
           [[ "$COMPARISON_RESULT" = success || "$COMPARISON_RESULT" = skipped ]]
           case "$EVENT_NAME" in
             pull_request) test "$PROFILE_PLAN_RESULT" = success ;;
-            push) test "$PROFILE_PLAN_RESULT" = skipped ;;
+            push|schedule) test "$PROFILE_PLAN_RESULT" = skipped ;;
             *) exit 1 ;;
           esac
+      - name: Upload nightly verification
+        if: ${{ always() && github.event_name == 'schedule' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: nightly-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/nightly/verification.json
+          retention-days: 90
+          if-no-files-found: error
       - if: github.event_name == 'pull_request'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
