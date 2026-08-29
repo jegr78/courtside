@@ -58,6 +58,16 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   assert.equal(inventory.find(({ operationId }) => operationId === "listRoster").modes.join(","),
     "positive,negative");
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "createCourt").modes, ["negative"]);
+  assert.deepEqual(inventory.find(({ operationId }) => operationId === "deleteClubLogo"), {
+    operationId: "deleteClubLogo",
+    method: "DELETE",
+    path: "/api/admin/config/logo",
+    modes: [],
+    excludedModes: {
+      positive: openApiFuzzPolicy.positiveMutationRationale,
+      negative: "The operation has no request input to invalidate."
+    }
+  });
   assert.match(inventory.find(({ operationId }) => operationId === "createCourt").excludedModes.positive,
     /Valid mutations/);
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "logOut").modes, []);

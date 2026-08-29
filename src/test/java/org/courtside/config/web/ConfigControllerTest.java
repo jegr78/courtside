@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockMultipartFile;
@@ -829,5 +830,17 @@ class ConfigControllerTest extends AbstractIntegrationTest {
         } catch (java.io.IOException e) {
             throw new java.io.UncheckedIOException(e);
         }
+    }
+
+    @Test
+    @WithMockUser(username = "boardadmin", roles = "ADMIN")
+    void givenAnUploadWithoutItsPart_whenItIsRejected_thenTheProblemCarriesATypeTheDocumentAllows()
+            throws Exception {
+        // when / then
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/admin/config/logo").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:missing-request-part"))
+                .andExpect(jsonPath("$.violations[0].code").value("request.missingPart"))
+                .andExpect(jsonPath("$.violations[0].params.part").value("file"));
     }
 }
