@@ -18,13 +18,19 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+    outputs:
+      backend: ${{ steps.selection.outputs.backend }}
+      frontend: ${{ steps.selection.outputs.frontend }}
+      security: ${{ steps.selection.outputs.security }}
+      profiles: ${{ steps.selection.outputs.profiles }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Observe conservative test profiles
+      - id: selection
+        name: Select conservative test profiles
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.event.pull_request.head.sha }}
@@ -32,16 +38,62 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           ATTEMPT: ${{ github.run_attempt }}
         run: |
-          node tools/test-profile-classifier.mjs \
-            --base "$BASE_REF" \
-            --head "$HEAD_REF" \
-            --labels "$LABELS_JSON" \
-            --run-id "$RUN_ID" \
-            --attempt "$ATTEMPT" \
-            --fallback-on-error \
-            --output build/test-profile/plan.json \
-            --summary build/test-profile/summary.md
+          CLASSIFIER_EXIT=0
+          PROFILE_ROOT="$RUNNER_TEMP/courtside-profile-base"
+          git worktree add --detach "$PROFILE_ROOT" "$BASE_REF" || CLASSIFIER_EXIT=$?
+          if [[ "$CLASSIFIER_EXIT" = 0 ]]; then
+            node "$PROFILE_ROOT/tools/test-profile-classifier.mjs" \
+              --base "$BASE_REF" \
+              --head "$HEAD_REF" \
+              --labels "$LABELS_JSON" \
+              --run-id "$RUN_ID" \
+              --attempt "$ATTEMPT" \
+              --fallback-on-error \
+              --output build/test-profile/plan.json \
+              --summary build/test-profile/summary.md \
+              || CLASSIFIER_EXIT=$?
+          fi
+          # shellcheck disable=SC2016
+          if jq -e \
+            --argjson runId "$RUN_ID" \
+            --argjson attempt "$ATTEMPT" \
+            --argjson classifierExit "$CLASSIFIER_EXIT" \
+            --arg base "$BASE_REF" \
+            --arg head "$HEAD_REF" \
+            'type == "object" and .schemaVersion == 3 and .runId == $runId and
+              .attempt == $attempt and .baseCommit == $base and .headCommit == $head and
+              (.policyFingerprint | test("^[a-f0-9]{64}$")) and
+              (.profiles | type == "array" and length >= 1 and length <= 3 and
+                all(. == "docs" or . == "backend" or . == "frontend" or . == "full") and
+                (unique | length) == length) and
+              (.isFull | type == "boolean") and .isFull == (.profiles == ["full"]) and
+              (.plannerOutcome == "passed" or .plannerOutcome == "failed") and
+              (.reasons | type == "array" and length >= 1) and
+              (if .plannerOutcome == "failed" then .isFull and .profiles == ["full"]
+                else $classifierExit == 0 end)' \
+            build/test-profile/plan.json > /dev/null 2>&1; then
+            PROFILES=$(jq -cer '.profiles' build/test-profile/plan.json)
+          else
+            PROFILES='["full"]'
+            mkdir -p build/test-profile
+            {
+              echo '# Selected test profiles'
+              echo
+              echo 'Selected: `full`'
+              echo
+              echo 'The classifier did not produce a trustworthy plan, so every quality job is required.'
+            } > build/test-profile/summary.md
+          fi
           cat build/test-profile/summary.md >> "$GITHUB_STEP_SUMMARY"
+          echo "profiles=$PROFILES" >> "$GITHUB_OUTPUT"
+          for job in backend frontend security; do
+            SELECTED=$(jq -nr --argjson profiles "$PROFILES" --arg job "$job" '
+              ($profiles | index("full")) != null or
+              ($job == "backend" and ($profiles | index("backend")) != null) or
+              (($job == "frontend" or $job == "security") and
+                (($profiles | index("backend")) != null or ($profiles | index("frontend")) != null))')
+            echo "$job=$SELECTED" >> "$GITHUB_OUTPUT"
+          done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -218,6 +270,8 @@ jobs:
           if-no-files-found: error
 
   backend:
+    needs: test-profile-plan
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -246,6 +300,8 @@ jobs:
           retention-days: 14
 
   frontend:
+    needs: test-profile-plan
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.frontend == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -295,6 +351,8 @@ jobs:
           retention-days: ${{ github.event_name == 'schedule' && 30 || 14 }}
 
   security:
+    needs: test-profile-plan
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.security == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -425,18 +483,68 @@ jobs:
           IDENTITY_RESULT: ${{ needs.assessment-runtime.result }}
           COMPARISON_RESULT: ${{ needs.tool-update-comparison.result }}
           PROFILE_PLAN_RESULT: ${{ needs.test-profile-plan.result }}
+          PROFILES: ${{ needs.test-profile-plan.outputs.profiles }}
+          BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
+          FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
+          SECURITY_SELECTED: ${{ needs.test-profile-plan.outputs.security }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          test "$BACKEND_RESULT" = success
-          test "$FRONTEND_RESULT" = success
-          test "$SECURITY_RESULT" = success
           [[ "$IDENTITY_RESULT" = success || "$IDENTITY_RESULT" = skipped ]]
           [[ "$COMPARISON_RESULT" = success || "$COMPARISON_RESULT" = skipped ]]
           case "$EVENT_NAME" in
-            pull_request) test "$PROFILE_PLAN_RESULT" = success ;;
-            push|schedule|workflow_dispatch) test "$PROFILE_PLAN_RESULT" = skipped ;;
+            pull_request)
+              test "$PROFILE_PLAN_RESULT" = success
+              for job in backend frontend security; do
+                result_variable="${job^^}_RESULT"
+                selected_variable="${job^^}_SELECTED"
+                result="${!result_variable}"
+                selected="${!selected_variable}"
+                if [[ "$selected" = true ]]; then
+                  test "$result" = success
+                else
+                  test "$result" = skipped
+                fi
+              done
+              ;;
+            push|schedule|workflow_dispatch)
+              test "$PROFILE_PLAN_RESULT" = skipped
+              test "$BACKEND_RESULT" = success
+              test "$FRONTEND_RESULT" = success
+              test "$SECURITY_RESULT" = success
+              ;;
             *) exit 1 ;;
           esac
+      - name: Summarize selected build results
+        if: always() && github.event_name == 'pull_request'
+        env:
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
+          BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
+          FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
+          SECURITY_SELECTED: ${{ needs.test-profile-plan.outputs.security }}
+          PROFILES: ${{ needs.test-profile-plan.outputs.profiles }}
+        run: |
+          {
+            echo '# Required build result'
+            echo
+            echo "Profiles: \`$(jq -r 'join(" + ")' <<< "$PROFILES")\`"
+            echo
+            echo '| Job | Result | Reason |'
+            echo '| --- | --- | --- |'
+            for job in backend frontend security; do
+              result_variable="${job^^}_RESULT"
+              selected_variable="${job^^}_SELECTED"
+              result="${!result_variable}"
+              selected="${!selected_variable}"
+              if [[ "$selected" = true ]]; then
+                reason='required by the conservative profile plan'
+              else
+                reason='not selected by the conservative profile plan'
+              fi
+              echo "| $job | $result | $reason |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload nightly verification
         if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -445,40 +553,47 @@ jobs:
           path: build/nightly/verification.json
           retention-days: 90
           if-no-files-found: error
-      - if: github.event_name == 'pull_request'
+      - if: github.event_name == 'pull_request' && (needs.test-profile-plan.outputs.backend == 'true' || needs.test-profile-plan.outputs.frontend == 'true')
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           fetch-depth: 0
-      - if: github.event_name == 'pull_request'
+      - if: github.event_name == 'pull_request' && (needs.test-profile-plan.outputs.backend == 'true' || needs.test-profile-plan.outputs.frontend == 'true')
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
       - name: Install coverage toolchain
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && (needs.test-profile-plan.outputs.backend == 'true' || needs.test-profile-plan.outputs.frontend == 'true')
         run: ./mvnw -B frontend:install-node-and-npm
-      - if: github.event_name == 'pull_request'
+      - if: github.event_name == 'pull_request' && needs.test-profile-plan.outputs.backend == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: backend-test-evidence-${{ github.run_id }}
           path: build/aggregate/backend
-      - if: github.event_name == 'pull_request'
+      - if: github.event_name == 'pull_request' && needs.test-profile-plan.outputs.frontend == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: frontend-test-evidence-${{ github.run_id }}
           path: build/aggregate/frontend
       - name: Summarize changed coverage
-        if: github.event_name == 'pull_request'
-        run: >
-          frontend/node/node tools/coverage-diff.mjs
-          --base ${{ github.event.pull_request.base.sha }}
-          --java build/aggregate/backend/site/jacoco/jacoco.xml
-          --frontend build/aggregate/frontend/coverage/lcov.info
-          --output build/coverage/changed.md
+        if: github.event_name == 'pull_request' && (needs.test-profile-plan.outputs.backend == 'true' || needs.test-profile-plan.outputs.frontend == 'true')
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+          BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
+          FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
+        run: |
+          arguments=(--base "$BASE_REF" --output build/coverage/changed.md)
+          if [[ "$BACKEND_SELECTED" = true ]]; then
+            arguments+=(--java build/aggregate/backend/site/jacoco/jacoco.xml)
+          fi
+          if [[ "$FRONTEND_SELECTED" = true ]]; then
+            arguments+=(--frontend build/aggregate/frontend/coverage/lcov.info)
+          fi
+          frontend/node/node tools/coverage-diff.mjs "${arguments[@]}"
       - name: Upload combined test evidence
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && (needs.test-profile-plan.outputs.backend == 'true' || needs.test-profile-plan.outputs.frontend == 'true')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: combined-test-evidence-${{ github.run_id }}

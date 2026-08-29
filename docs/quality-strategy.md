@@ -62,13 +62,16 @@ Property tests use fixed, printed QuickTheories seeds and automatic shrinking so
 
 The repository pull-request template requires affected risk IDs, positive and negative evidence, residual risk and any contract change. The required build result is linked from the pull request rather than copied into this document.
 
-The pull-request workflow records a conservative test-profile plan without using it to skip any
-part of the full quality gate. Modified, explicitly classified paths may select `docs`, `backend`,
-`frontend`, or an additive combination. Build, workflow, security, deployment, migration, OpenAPI,
-and shared test-infrastructure changes select `full`. Unknown paths and every added, deleted,
-renamed, copied, or otherwise structural change also select `full`. The `ci:full` label can only
-escalate a plan. Profile activation requires the separate observation period and review defined in
-the CI planning issues.
+The pull-request workflow uses a conservative test-profile plan to select its required jobs.
+Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, or an additive
+combination. Backend changes run backend and security verification; frontend changes run frontend
+and security verification, including the complete Chromium and WebKit browser matrix. Documentation
+changes need no code-quality job. Build, workflow, security, deployment, migration, OpenAPI, and
+shared test-infrastructure changes select `full`. Unknown paths and every added, deleted, renamed,
+copied, or otherwise structural change also select `full`. The `ci:full` label can only escalate a
+plan. Classifier failures also select `full` and cannot make the required aggregate check pass by
+skipping a quality job. The selector executes the classifier from the immutable pull-request base
+commit, so a classifier or rule change cannot reduce the verification required for itself.
 
 Each completed pull-request run joins its exact-attempt profile plan with the full job outcomes.
 The follow-up workflow recomputes that plan with the protected-branch classifier and the immutable
@@ -85,12 +88,11 @@ from the release job, and every one of them would leave the absence check green.
 also answers to `workflow_dispatch`, so the whole chain — verification record, failure tracker,
 issue — can be summoned and watched rather than waited for.
 It deliberately excludes the mutable `ci:full` label so a later label change cannot rewrite the
-natural classification of a completed run. The observed jobs still show that the full suite ran.
-The retained record distinguishes jobs proposed by the classifier from jobs that ran only because
-the classifier is still observational. A failure in an unselected job is an under-classification
-candidate. A green unselected job proves only that this attempt exposed no miss. Activation review
-requires at least twenty comparable first attempts, including three naturally reduced plans and at
-least one observation of both the backend and frontend profiles.
+natural classification of a completed run. The retained record distinguishes required jobs from
+jobs skipped by the plan and fails closed when the actual topology disagrees. The activation review
+used at least twenty comparable first attempts, including three naturally reduced plans and at
+least one observation of both the backend and frontend profiles. Any later policy change receives
+a new fingerprint and cannot borrow that earlier evidence.
 Only records produced by the protected follow-up workflow count. Locally assembled historical
 records and older aggregate `quality` runs are not comparable and do not count. Any candidate miss
 requires a rule correction plus a regression test before a new observation window can qualify.

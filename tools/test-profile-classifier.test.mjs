@@ -12,6 +12,8 @@ const require = createRequire(new URL("../frontend/package.json", import.meta.ur
 const Ajv = require("ajv/dist/2020").default;
 const planSchema = JSON.parse(readFileSync(
   new URL("../ci/test-profile-plan.schema.json", import.meta.url), "utf8"));
+const profileRules = JSON.parse(readFileSync(
+  new URL("../ci/test-profiles.json", import.meta.url), "utf8"));
 const validatePlan = new Ajv({ strict: true }).compile(planSchema);
 
 test("givenTrackedRepositoryPaths_whenClassifyingEachPath_thenNoneDependsOnTheUnknownFallback", () => {
@@ -64,6 +66,29 @@ test("givenCriticalUnknownOrStructuralChanges_whenClassifying_thenEachFailsClose
   for (const changes of cases) assert.deepEqual(classifyChanges(changes, []).profiles, ["full"]);
 });
 
+test("givenEveryConfiguredFullTrigger_whenClassifying_thenEachSelectsFull", () => {
+  // given
+  const exactPaths = profileRules.profiles.full.exact;
+  const prefixedPaths = profileRules.profiles.full.prefixes.map((prefix) => `${prefix}representative`);
+
+  // when
+  const classifications = [...exactPaths, ...prefixedPaths].map((path) => classifyPath(path));
+
+  // then
+  assert.ok(classifications.length > 0);
+  assert.ok(classifications.every((classification) => classification?.profile === "full"));
+});
+
+test("givenAnyStructuralChange_whenClassifyingKnownReducedPaths_thenEachSelectsFull", () => {
+  // given
+  const statuses = ["A", "D", "R100", "C100", "T", "U", "X", "B"];
+
+  // when / then
+  for (const status of statuses) {
+    assert.deepEqual(classifyChanges([{ status, path: "frontend/src/App.tsx" }], []).profiles, ["full"]);
+  }
+});
+
 test("givenAFullLabel_whenClassifying_thenItCanEscalateButNoLabelCanSuppressFull", () => {
   // given
   const docs = [{ status: "M", path: "docs/design.md" }];
@@ -84,6 +109,12 @@ test("givenOnlyKnownDocumentationChanges_whenNoLabelsAreAvailable_thenTheDocsPro
   // then
   assert.deepEqual(plan.profiles, ["docs"]);
   assert.equal(plan.reasons[0].code, "prefix:docs/");
+  assert.match(profileSummary(bindPlanToRun(plan, {
+    runId: 101,
+    attempt: 1,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40)
+  })), /required build runs only the jobs assigned/);
 });
 
 test("givenNullDelimitedGitEvidence_whenParsing_thenRenamesKeepBothPathsAndMalformedInputFails", () => {
