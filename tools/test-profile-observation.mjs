@@ -328,6 +328,8 @@ export function profileObservationReport(summary) {
     `- Observation window: ${summary.windowDays} days`,
     `- Full-profile rate: ${rate}`,
     `- Naturally reduced first attempts: ${summary.reducedProfileCount}`,
+    `- Backend-profile first attempts: ${summary.profileCounts.backend}`,
+    `- Frontend-profile first attempts: ${summary.profileCounts.frontend}`,
     `- Candidate misses: ${summary.candidateMissCount}`,
     `- Classification errors: ${summary.classificationErrorCount}`,
     `- Incomplete observations excluded: ${summary.incompleteObservationCount}`,

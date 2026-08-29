@@ -302,6 +302,8 @@ test("givenAQualifiedSummary_whenRenderingTheFinalReport_thenSampleWindowAndLimi
   // then
   assert.match(report, /First-attempt sample: 20/);
   assert.match(report, /Naturally reduced first attempts: 20/);
+  assert.match(report, /Backend-profile first attempts: 19/);
+  assert.match(report, /Frontend-profile first attempts: 1/);
   assert.match(report, /Observation window: 19 days/);
   assert.match(report, /Full-profile rate: 0\.00%/);
   for (const limitation of summary.limitations) assert.match(report, new RegExp(limitation.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

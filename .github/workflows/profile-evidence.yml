@@ -1,0 +1,48 @@
+name: Profile evidence
+
+on:
+  workflow_run:
+    workflows: [CI timing]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  aggregate:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '26'
+      - name: Reassess protected first-attempt evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ASSESSED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          node tools/test-profile-replay.mjs \
+            --repository "$GITHUB_REPOSITORY" \
+            --assessed-at "$ASSESSED_AT" \
+            --output build/profile-evidence/status.json \
+            --summary build/profile-evidence/status.md \
+            --observations-output build/profile-evidence/observations.json \
+            --inventory-output build/profile-evidence/inventory.json
+          cp ci/test-profile-observation-summary.schema.json build/profile-evidence/
+          cp ci/test-profile-observation-inventory.schema.json build/profile-evidence/
+          cp ci/test-profile-observation.schema.json build/profile-evidence/
+          cat build/profile-evidence/status.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: profile-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/profile-evidence
+          retention-days: 90
+          if-no-files-found: error
