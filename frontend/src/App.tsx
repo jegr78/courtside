@@ -108,8 +108,8 @@ function relativeLuminance(color: string): number {
   return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
 }
 
-function CourtsideMark() {
-  return <svg viewBox="0 0 64 64" aria-hidden="true" data-testid="courtside-mark" className="h-10 w-10">
+function CourtsideMark({ testId = "courtside-mark", className = "h-10 w-10" }: { testId?: string; className?: string }) {
+  return <svg viewBox="0 0 64 64" aria-hidden="true" data-testid={testId} className={className}>
     <g fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square">
       <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="11" ry="11" />
       <rect x="11" y="9" width="42" height="46" />
@@ -209,6 +209,10 @@ export function App() {
         : <p role="status">{t("status.loading")}</p>}
     </main>
     <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 py-4 text-sm">
+      <span data-testid="footer-product-identity" className="flex items-center gap-2 font-semibold">
+        <CourtsideMark testId="footer-product-mark" className="h-6 w-6" />
+        {t("app.name")}
+      </span>
       <BuildIdentity source={source} />
       {config?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={config.imprintUrl}>{t("footer.imprint")}</a>}
       {config?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={config.privacyUrl}>{t("footer.privacy")}</a>}
