@@ -8,6 +8,7 @@ import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
 import { Preferences } from "./components/Preferences";
 import { PrimaryNavigation } from "./components/PrimaryNavigation";
 import { PwaLifecycle } from "./components/PwaLifecycle";
+import { brandContrast } from "./brandColor";
 import { applyAccountLocale, supportedLocale } from "./i18n";
 import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
@@ -91,21 +92,7 @@ function applyBranding(config: ClubConfig) {
 }
 
 function contrastColor(color: string): string {
-  const shade = "#17211d";
-  const line = "#fcfbf9";
-  return contrastRatio(color, shade) >= contrastRatio(color, line) ? shade : line;
-}
-
-function contrastRatio(first: string, second: string): number {
-  const firstLuminance = relativeLuminance(first);
-  const secondLuminance = relativeLuminance(second);
-  return (Math.max(firstLuminance, secondLuminance) + 0.05) / (Math.min(firstLuminance, secondLuminance) + 0.05);
-}
-
-function relativeLuminance(color: string): number {
-  const channels = [1, 3, 5].map((offset) => Number.parseInt(color.slice(offset, offset + 2), 16) / 255)
-    .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  return brandContrast(color)?.textColor ?? "#17211d";
 }
 
 function CourtsideMark({ testId = "courtside-mark", className = "h-10 w-10" }: { testId?: string; className?: string }) {

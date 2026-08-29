@@ -20,8 +20,46 @@ import { TextField } from "../components/TextField";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { formString } from "../forms/formString";
 import { useFragmentTarget } from "../navigation/useFragmentTarget";
+import { brandContrast } from "../brandColor";
 
 const RULE_SET_NAME_LENGTH = 60;
+
+function BrandColorField({ kind, label, value, changed }: {
+  kind: "primary" | "accent";
+  label: string;
+  value: string;
+  changed: (value: string) => void;
+}) {
+  const { t } = useTranslation();
+  const contrast = brandContrast(value);
+  const id = `${kind}-color`;
+  return <fieldset className="grid gap-3 rounded-xl border p-4">
+    <legend className="px-1 font-semibold">{label}</legend>
+    <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-end gap-3">
+      <TextField id={`${id}-value`} data-testid={`${id}-value`} label={t("admin.config.colorHex")} value={value}
+                 onChange={(event) => changed(event.target.value)} />
+      <label className="grid gap-2 text-sm font-medium" htmlFor={`${id}-picker`}>
+        {t("admin.config.colorPicker")}
+        <input id={`${id}-picker`} data-testid={`${id}-picker`} type="color" value={contrast ? value : "#000000"}
+               className="form-control h-12 w-full cursor-pointer rounded-lg border p-1"
+               onChange={(event) => changed(event.target.value)} />
+      </label>
+    </div>
+    {contrast && <>
+      <button type="button" disabled data-testid={`${id}-preview`} className="rounded-lg px-4 py-3 font-semibold opacity-100"
+              style={{ backgroundColor: value, color: contrast.textColor }}>
+        {t("admin.config.colorPreview")}
+      </button>
+      <output data-testid={`${id}-contrast`} className={contrast.ratio >= 4.5 ? "text-sm" : "text-sm font-semibold text-amber-700 dark:text-amber-300"}>
+        {t("admin.config.colorContrast", {
+          ratio: contrast.ratio.toFixed(2),
+          tone: t(contrast.tone === "dark" ? "admin.config.colorDarkText" : "admin.config.colorLightText"),
+          result: t(contrast.ratio >= 4.5 ? "admin.config.colorContrastPass" : "admin.config.colorContrastWarning")
+        })}
+      </output>
+    </>}
+  </fieldset>;
+}
 
 // Named field by field so a request-only shape cannot pick up what the response adds to it.
 function editable(loaded: AdminClubConfig): ClubConfigRequest {
@@ -218,8 +256,8 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
           <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
           <div className="grid gap-5 sm:grid-cols-2">
-            <TextField label={t("admin.config.primaryColor")} value={config.primaryColor} onChange={(event) => changeConfig({ primaryColor: event.target.value })} />
-            <TextField label={t("admin.config.accentColor")} value={config.accentColor} onChange={(event) => changeConfig({ accentColor: event.target.value })} />
+            <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />
+            <BrandColorField kind="accent" label={t("admin.config.accentColor")} value={config.accentColor} changed={(accentColor) => changeConfig({ accentColor })} />
             <TextField data-testid="logo-url" label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""} onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
             <TextField data-testid="imprint-url" label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
             <TextField data-testid="privacy-url" label={t("admin.config.privacyUrl")} value={config.privacyUrl ?? ""} onChange={(event) => changeConfig({ privacyUrl: event.target.value || null })} />

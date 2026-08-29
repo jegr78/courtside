@@ -103,6 +103,31 @@ describe("AdminConfigurationView", () => {
       expect.objectContaining({ privacyUrl: "/privacy" })));
   });
 
+  it("given stored brand colours, when choosing a new primary colour, then the field and live contrast preview agree", async () => {
+    // given
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    const picker = await screen.findByTestId("primary-color-picker");
+
+    // when
+    fireEvent.change(picker, { target: { value: "#777777" } });
+
+    // then
+    expect(screen.getByTestId("primary-color-value")).toHaveValue("#777777");
+    expect(screen.getByTestId("primary-color-preview")).toHaveStyle({ backgroundColor: "#777777" });
+    expect(screen.getByTestId("primary-color-contrast")).toHaveTextContent("4.33:1");
+    expect(screen.getByTestId("primary-color-contrast")).toHaveTextContent("does not reach 4.5:1");
+  });
+
+  it("given a high contrast accent colour, when it is shown, then the preview names the automatic text tone", async () => {
+    // when
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("accent-color-picker")).toHaveValue("#d7e24b");
+    expect(screen.getByTestId("accent-color-contrast")).toHaveTextContent("Dark text");
+    expect(screen.getByTestId("accent-color-contrast")).toHaveTextContent("reaches 4.5:1");
+  });
+
   it("given a stored privacy policy link, when it is cleared, then the club is not stuck with it", async () => {
     // given
     vi.spyOn(api, "adminConfig").mockResolvedValue({
