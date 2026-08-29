@@ -82,7 +82,7 @@ class NoMembershipTypeRuleSetAssignmentTest extends AbstractIntegrationTest {
         ClubConfigurationSnapshot current = config.current();
         return new ChangeClubConfigurationCommand(
                 clubName, current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), current.privacyUrl(), current.defaultLocale(),
+                current.logoFallbackUrl(), current.imprintUrl(), current.privacyUrl(), current.defaultLocale(),
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()), new ReminderLeadTime(24), ruleSetId);
@@ -92,7 +92,7 @@ class NoMembershipTypeRuleSetAssignmentTest extends AbstractIntegrationTest {
         ClubConfigurationSnapshot current = config.current();
         return new ChangeClubConfigurationCommand(
                 current.clubName(), current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), current.privacyUrl(), current.defaultLocale(),
+                current.logoFallbackUrl(), current.imprintUrl(), current.privacyUrl(), current.defaultLocale(),
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()), new ReminderLeadTime(24), ruleSetId);

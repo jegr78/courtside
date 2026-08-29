@@ -49,6 +49,14 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         return ClubConfigurationSnapshot.from(currentEntity());
     }
 
+    public ClubLogo logo() {
+        ClubLogo logo = currentEntity().uploadedLogo();
+        if (logo == null) {
+            throw new ClubLogoNotFoundException();
+        }
+        return logo;
+    }
+
     private ClubConfiguration currentEntity() {
         return configurations.findById(ClubConfiguration.SINGLETON_ID)
                 .orElseThrow(() -> new IllegalStateException(
@@ -107,6 +115,29 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         apply(configuration, command);
         saveOrRejectAnUnresolvableRuleSet(configuration);
         announce(configuration.getId(), command, changes);
+        return ClubConfigurationSnapshot.from(configuration);
+    }
+
+    @Transactional
+    public ClubConfigurationSnapshot uploadLogo(byte[] content) {
+        ClubLogo logo = ClubLogo.parse(content);
+        lock();
+        ClubConfiguration configuration = currentEntity();
+        configuration.replaceLogo(logo);
+        configurations.saveAndFlush(configuration);
+        events.publishEvent(new ConfigEvent.ClubChanged(configuration.getId(), List.of("logo")));
+        return ClubConfigurationSnapshot.from(configuration);
+    }
+
+    @Transactional
+    public ClubConfigurationSnapshot deleteLogo() {
+        lock();
+        ClubConfiguration configuration = currentEntity();
+        if (configuration.getLogoDigest() != null) {
+            configuration.removeLogo();
+            configurations.saveAndFlush(configuration);
+            events.publishEvent(new ConfigEvent.ClubChanged(configuration.getId(), List.of("logo")));
+        }
         return ClubConfigurationSnapshot.from(configuration);
     }
 

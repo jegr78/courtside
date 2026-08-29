@@ -67,7 +67,7 @@ function editable(loaded: AdminClubConfig): ClubConfigRequest {
     clubName: loaded.clubName,
     primaryColor: loaded.primaryColor,
     accentColor: loaded.accentColor,
-    logoUrl: loaded.logoUrl,
+    logoUrl: loaded.logoFallbackUrl,
     imprintUrl: loaded.imprintUrl,
     privacyUrl: loaded.privacyUrl,
     defaultLocale: loaded.defaultLocale,
