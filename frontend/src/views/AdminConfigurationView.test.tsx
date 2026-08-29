@@ -129,6 +129,117 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("accent-color-contrast")).toHaveTextContent("reaches 4.5:1");
   });
 
+  it("given a board logo file, when uploading it, then the effective preview and shell configuration change", async () => {
+    // given
+    const uploaded = {
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      bookingReminderHours: 24, logoUploaded: true, logoFallbackUrl: "/fallback.svg",
+      logoUrl: `/api/public/config/logo?v=${"a".repeat(64)}`
+    };
+    const upload = vi.spyOn(api, "uploadClubLogo").mockResolvedValue(uploaded);
+    const configurationChanged = vi.fn();
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={configurationChanged} /></MemoryRouter>);
+    const input = await screen.findByTestId("logo-file");
+    const file = new File([new Uint8Array([1, 2, 3])], "club.png", { type: "image/png" });
+
+    // when
+    await userEvent.upload(input, file);
+    await userEvent.click(screen.getByTestId("upload-logo"));
+
+    // then
+    await waitFor(() => expect(upload).toHaveBeenCalledWith(file));
+    expect(screen.getByTestId("logo-preview")).toHaveAttribute("src", uploaded.logoUrl);
+    expect(configurationChanged).toHaveBeenCalledWith(uploaded);
+  });
+
+  it.each([
+    ["an active-content file", new File(["<svg/>"] , "club.svg", { type: "image/svg+xml" }),
+      "The logo must be a valid PNG or JPEG file."],
+    ["a file above one mebibyte", new File([new Uint8Array(1024 * 1024 + 1)], "club.png", { type: "image/png" }),
+      "The logo file must not exceed 1 MiB."]
+  ])("given %s, when selecting it, then it is rejected before upload", async (_case, file, message) => {
+    // given
+    const upload = vi.spyOn(api, "uploadClubLogo");
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    const input = await screen.findByTestId("logo-file");
+    const user = userEvent.setup({ applyAccept: false });
+
+    // when
+    await user.upload(input, file);
+
+    // then
+    expect(await screen.findByTestId("admin-error")).toHaveTextContent(message);
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("given an uploaded logo and a URL fallback, when removing it, then the fallback becomes the preview", async () => {
+    // given
+    vi.spyOn(api, "adminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      bookingReminderHours: 24, logoUploaded: true, logoFallbackUrl: "/fallback.svg",
+      logoUrl: `/api/public/config/logo?v=${"a".repeat(64)}`
+    });
+    const removed = {
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      bookingReminderHours: 24, logoUploaded: false, logoFallbackUrl: "/fallback.svg",
+      logoUrl: "/fallback.svg"
+    };
+    const remove = vi.spyOn(api, "deleteClubLogo").mockResolvedValue(removed);
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    await screen.findByTestId("remove-logo");
+
+    // when
+    await userEvent.click(screen.getByTestId("remove-logo"));
+
+    // then
+    await waitFor(() => expect(remove).toHaveBeenCalledOnce());
+    expect(screen.getByTestId("logo-preview")).toHaveAttribute("src", "/fallback.svg");
+    expect(screen.queryByTestId("remove-logo")).not.toBeInTheDocument();
+  });
+
+  it("given the server rejects a selected image, when uploading it, then the typed reason is shown", async () => {
+    // given
+    vi.spyOn(api, "uploadClubLogo").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:invalid-club-logo", title: "Invalid club logo", status: 400,
+      detail: "The uploaded club logo is not usable",
+      violations: [{ code: "config.logo.dimensions", params: {} }]
+    }));
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    const input = await screen.findByTestId("logo-file");
+    await userEvent.upload(input, new File([new Uint8Array([1])], "club.png", { type: "image/png" }));
+
+    // when
+    await userEvent.click(screen.getByTestId("upload-logo"));
+
+    // then
+    expect(await screen.findByTestId("admin-error")).toHaveTextContent(
+      "The logo must not exceed 2048 by 2048 pixels.");
+  });
+
+  it("given an upload is pending, when its button is pressed again, then one request owns the mutation", async () => {
+    // given
+    const result = deferred<Awaited<ReturnType<typeof api.uploadClubLogo>>>();
+    const upload = vi.spyOn(api, "uploadClubLogo").mockReturnValue(result.promise);
+    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    const input = await screen.findByTestId("logo-file");
+    await userEvent.upload(input, new File([new Uint8Array([1])], "club.png", { type: "image/png" }));
+
+    // when
+    await userEvent.click(screen.getByTestId("upload-logo"));
+    await userEvent.click(screen.getByTestId("upload-logo"));
+
+    // then
+    expect(upload).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("upload-logo")).toBeDisabled();
+    expect(screen.getByTestId("save-club-config")).toBeDisabled();
+  });
+
   it("given a stored privacy policy link, when it is cleared, then the club is not stuck with it", async () => {
     // given
     vi.spyOn(api, "adminConfig").mockResolvedValue({

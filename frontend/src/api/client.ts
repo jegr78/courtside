@@ -131,6 +131,12 @@ export const api = {
   changeAdminConfig: (config: ClubConfigRequest) => request<AdminClubConfig>("/api/admin/config", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config)
   }),
+  uploadClubLogo: (file: File) => {
+    const body = new FormData();
+    body.set("file", file);
+    return request<AdminClubConfig>("/api/admin/config/logo", { method: "PUT", body });
+  },
+  deleteClubLogo: () => request<AdminClubConfig>("/api/admin/config/logo", { method: "DELETE" }),
   ruleSets: () => request<RuleSet[]>("/api/admin/rule-sets"),
   createRuleSet: (ruleSet: RuleSetRequest) => request<RuleSet>("/api/admin/rule-sets", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ruleSet)
