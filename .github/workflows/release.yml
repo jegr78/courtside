@@ -374,6 +374,7 @@ jobs:
           path: build/uat-smoke
       - name: Start the digest-bound security target
         run: |
+          set -o pipefail
           docker pull "$IMAGE"
           node tools/security-image-inventory.mjs active | xargs -n1 docker pull
           node tools/courtside.mjs security "$RUN_ID" "$IMAGE"

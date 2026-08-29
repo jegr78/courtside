@@ -15,7 +15,7 @@ test("given active assessment configuration_whenResolvingImages_thenAllPinnedRun
   assert.deepEqual(images.map((image) => image.split("@")[0]), [
     "caddy:2-alpine",
     "postgres:17-alpine",
-    "schemathesis/schemathesis:v4.25.2",
+    "schemathesis/schemathesis:4.25.2",
     "zaproxy/zap-stable:2.17.0",
   ]);
   assert.ok(images.every((image) => /@sha256:[a-f0-9]{64}$/.test(image)));

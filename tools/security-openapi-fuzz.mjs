@@ -26,6 +26,11 @@ const validateEvidenceSchema = ajv.compile(evidenceSchema);
 export const openApiFuzzPolicy = Object.freeze(JSON.parse(readFileSync(
   new URL("../security/openapi-fuzz-policy.json", import.meta.url), "utf8")));
 
+// The provenance a finding carries has to name the image that produced it, so it is cut from that
+// image rather than written beside it, where the two could drift apart unnoticed.
+export const openApiFuzzVersion = openApiFuzzPolicy.image.slice(
+  openApiFuzzPolicy.image.indexOf(":") + 1, openApiFuzzPolicy.image.indexOf("@"));
+
 export function openApiFuzzPolicyDigest(policy = openApiFuzzPolicy) {
   return `sha256:${createHash("sha256").update(JSON.stringify(policy)).digest("hex")}`;
 }
@@ -494,7 +499,7 @@ function counterexampleCandidate(counterexample, plan, context, observedAt) {
     attackClass: "contract-boundary",
     provenance: {
       tool: "schemathesis",
-      version: "4.25.2",
+      version: openApiFuzzVersion,
       runId: plan.runId,
       attempt: context.attempt,
       targetFingerprint: plan.targetFingerprint,
@@ -564,7 +569,7 @@ function undocumentedRouteCandidate(route, plan, context, observedAt) {
     parameter: "route",
     attackClass: "unexpected-api-route",
     provenance: {
-      tool: "schemathesis", version: "4.25.2", runId: plan.runId, attempt: context.attempt,
+      tool: "schemathesis", version: openApiFuzzVersion, runId: plan.runId, attempt: context.attempt,
       targetFingerprint: plan.targetFingerprint, observedAt
     },
     evidence: [{

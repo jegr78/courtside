@@ -77,7 +77,7 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   assert.match(inventory.find(({ operationId }) => operationId === "getApiDocument").excludedModes.all,
     /SECURITY deployment/);
   assert.match(openApiFuzzPolicy.image,
-    /^schemathesis\/schemathesis:v4\.25\.2@sha256:[a-f0-9]{64}$/);
+    /^schemathesis\/schemathesis:4\.25\.2@sha256:[a-f0-9]{64}$/);
   assert.ok(openApiFuzzPolicy.checks.includes("not_a_server_error"));
   assert.ok(!openApiFuzzPolicy.checks.includes("ignored_auth"));
   assert.deepEqual(openApiFuzzPolicy.negativeInputProxyStatuses, [421]);

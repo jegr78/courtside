@@ -37,7 +37,8 @@ test("given stable assessment suites, when scheduling them, then safe traffic is
   assert.match(scheduled, /timeout-minutes:[^\n]+45/);
   assert.match(scheduled, /security-run "\$RUN_ID" safe/);
   assert.match(scheduled, /github\.event_name == 'schedule' && 'safe' \|\| inputs\.profile/);
-  assert.match(scheduled, /security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
+  assert.match(scheduled,
+    /set -o pipefail\n\s+frontend\/node\/node tools\/security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
   assert.match(scheduled, /security-assessment-gate\.mjs/);
   assert.match(scheduled, /--subject "\$IMAGE_DIGEST"/);
   assert.match(scheduled, /security-cleanup "\$RUN_ID"/);
@@ -49,7 +50,8 @@ test("given a manual baseline run, when selecting active, then the isolated work
   // when / then
   assert.match(scheduled, /workflow_dispatch:[\s\S]+profile:[\s\S]+options:[\s\S]+- safe[\s\S]+- active/);
   assert.match(scheduled, /github\.event_name == 'schedule' && 'safe' \|\| inputs\.profile/);
-  assert.match(scheduled, /security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
+  assert.match(scheduled,
+    /set -o pipefail\n\s+frontend\/node\/node tools\/security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
   assert.match(scheduled, /if \[\[ "\$PROFILE" = active \]\]; then[\s\S]+security-run "\$RUN_ID" active[\s\S]+--authorize "authorize-active-\$RUN_ID"/);
   assert.match(scheduled, /--profile "\$PROFILE"/);
 });
@@ -103,7 +105,6 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.doesNotMatch(build, /courtside-security-base\/frontend\/node_modules/);
   assert.match(build, /security-run "\$BASE_RUN_ID" active/);
   assert.match(build, /security-run "\$CANDIDATE_RUN_ID" active/);
-  assert.match(build, /security-image-inventory\.mjs active[\s\S]+\| sort -u \| xargs -n1 docker pull/);
   assert.match(build, /security-tool-comparison\.mjs/);
   assert.match(build, /COMPARATOR_ROOT="\$BASE_ROOT"/);
   assert.match(build, /cmp -s "\$COMPARATOR_ROOT\/tools\/security-tool-comparison\.mjs" tools\/security-tool-comparison\.mjs/);
@@ -156,6 +157,14 @@ test("given a protected base, when it is prepared, then no candidate code has ru
     + "base worktree exists, so the checkout that supplies the previous toolchain predates them.");
 });
 
+function stepIn(job, name) {
+  const start = job.indexOf(`- name: ${name}\n`);
+  assert.ok(start > 0, `the job has no step named ${name}`);
+  const rest = job.slice(start);
+  const next = rest.indexOf("\n      - ");
+  return next < 0 ? rest : rest.slice(0, next);
+}
+
 function jobIn(workflow, name) {
   const start = workflow.indexOf(`\n  ${name}:\n`);
   assert.ok(start > 0, `the workflow has no job named ${name}`);
@@ -169,7 +178,7 @@ function jobIn(workflow, name) {
 test("given a pinned image is what changed, when the pull step runs, then both inventories are pulled", () => {
   // given
   const comparison = jobIn(build, "tool-update-comparison");
-  const pull = comparison.slice(comparison.indexOf("- name: Pull pinned assessment images"));
+  const pull = stepIn(comparison, "Pull pinned assessment images");
 
   // when / then
   assert.match(pull, /\{ node tools\/security-image-inventory\.mjs active\n/);
@@ -346,7 +355,8 @@ test("given a release candidate, when publishing it, then its exact digest passe
   // when / then
   assert.match(release, /\n  active-security:\n    needs: \[image, qualify\]/);
   assert.match(release, /security-run "\$RUN_ID" active/);
-  assert.match(release, /security-image-inventory\.mjs active \| xargs -n1 docker pull/);
+  assert.match(release,
+    /set -o pipefail[\s\S]{0,120}?node tools\/security-image-inventory\.mjs active \| xargs -n1 docker pull/);
   assert.match(release, /--authorize "authorize-active-\$RUN_ID"/);
   assert.match(release, /--subject "\$\{IMAGE##\*@\}"/);
   assert.match(release, /--assessment-gate build\/security-input\/active-security-summary\.json/);

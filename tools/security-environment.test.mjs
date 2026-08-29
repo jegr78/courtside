@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { zapVersion } from "./security-passive-deployment.mjs";
+import { openApiFuzzPolicy, openApiFuzzVersion } from "./security-openapi-fuzz.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -243,7 +244,7 @@ test("given the security Compose file, when inspecting boundaries, then resource
   assert.match(compose, /\/var\/lib\/postgresql\/data:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
   assert.match(compose, /zaproxy\/zap-stable:[\w.]+@sha256:[a-f0-9]{64}/);
-  assert.match(compose, /schemathesis\/schemathesis:v4\.25\.2@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /schemathesis\/schemathesis:4\.25\.2@sha256:[a-f0-9]{64}/);
   assert.match(compose, /grafana\/k6:2\.2\.0@sha256:[a-f0-9]{64}/);
   assert.match(compose, /COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"/);
   assert.match(compose, /MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"/);
@@ -349,6 +350,11 @@ test("given the scanner version, when a static file names it, then it is the dep
     .properties.zap.properties.version.const, zapVersion);
   assert.equal(read("../security/run-contract.json").tools
     .find((tool) => tool.id === "authenticated-zap").version, zapVersion);
+  assert.equal(read("../security/run-contract.json").tools
+    .find((tool) => tool.id === "openapi-fuzzer").version, openApiFuzzVersion);
+  assert.match(openApiFuzzPolicy.image,
+    new RegExp(read("../security/openapi-fuzz-evidence.schema.json").properties.image.pattern),
+    "the evidence schema refuses the image the assessment actually runs");
 });
 
 test("given docker commands that end with their process, when running them, then no clock is put over any", () => {
