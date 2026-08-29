@@ -3,22 +3,27 @@ import { awaitReadiness, readinessBudget, type ReadinessWorld } from "./applicat
 
 function world(answers: boolean[], overrides: Partial<ReadinessWorld> = {}): {
   world: ReadinessWorld;
-  paused: () => number;
+  paused: () => number[];
 } {
-  let pauses = 0;
+  const pauses: number[] = [];
   let asked = 0;
   return {
     paused: () => pauses,
     world: {
       exitCode: () => null,
+      signalCode: () => null,
       probe: () => Promise.resolve(answers[asked++] ?? false),
-      pause: () => {
-        pauses += 1;
+      pause: (milliseconds) => {
+        pauses.push(milliseconds);
         return Promise.resolve();
       },
       ...overrides
     }
   };
+}
+
+function spent(pauses: number[]): number {
+  return pauses.reduce((total, milliseconds) => total + milliseconds, 0);
 }
 
 describe("awaitReadiness", () => {
@@ -30,17 +35,18 @@ describe("awaitReadiness", () => {
     await awaitReadiness(answering, "http://localhost:1");
 
     // then
-    expect(paused()).toBe(3);
+    expect(paused()).toEqual([500, 500, 500]);
   });
 
-  it("given a server that never becomes ready, when the wait gives up, then it spent every interval", async () => {
+  it("given a server that never becomes ready, when the wait gives up, then it waited a full minute", async () => {
     // given
     const { world: silent, paused } = world([]);
 
     // when / then
     await expect(awaitReadiness(silent, "http://localhost:1"))
-      .rejects.toThrow("Courtside did not become ready");
-    expect(paused()).toBe(readinessBudget.attempts);
+      .rejects.toThrow("did not become ready on http://localhost:1 within 60 seconds");
+    expect(paused()).toHaveLength(readinessBudget.attempts);
+    expect(spent(paused())).toBe(60_000);
   });
 
   it("given the application stops while starting, when the wait notices, then it names the exit code", async () => {
@@ -49,5 +55,14 @@ describe("awaitReadiness", () => {
 
     // when / then
     await expect(awaitReadiness(stopped, "http://localhost:1")).rejects.toThrow("exit code 3");
+  });
+
+  it("given the application is killed while starting, when the wait notices, then it names the signal", async () => {
+    // given — an out-of-memory kill leaves no exit code at all
+    const { world: killed, paused } = world([], { signalCode: () => "SIGKILL" });
+
+    // when / then
+    await expect(awaitReadiness(killed, "http://localhost:1")).rejects.toThrow("killed by SIGKILL");
+    expect(paused()).toEqual([]);
   });
 });

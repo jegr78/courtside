@@ -121,6 +121,7 @@ function publicKeyFingerprints(certificates: string): string[] {
 async function waitForApplication(application: ChildProcess, baseURL: string): Promise<void> {
   await awaitReadiness({
     exitCode: () => application.exitCode,
+    signalCode: () => application.signalCode,
     probe: async () => {
       try {
         return (await fetch(`${baseURL}/actuator/health`)).ok;
