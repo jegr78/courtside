@@ -37,14 +37,24 @@ test("givenAnObservedProfilePlan_whenCollectingTheRun_thenItsImmutableBaseClassi
   assert.doesNotMatch(workflow, /commits\/\$\{RUN_HEAD\}\/pulls/);
   assert.match(workflow, /-f state=all -f "head=\$\{HEAD_OWNER\}:\$\{HEAD_BRANCH\}"/);
   assert.match(workflow, /ci-pull-request\.mjs/);
+  assert.match(workflow, /\.runBaseSha/);
+  assert.doesNotMatch(workflow, /BASE_REF=\$\(jq -er '\.base\.sha/);
   assert.match(workflow, /git fetch --no-tags origin "\$BASE_REF" "\$HEAD_REF"/);
+  assert.match(workflow,
+    /node tools\/ci-base-provenance\.mjs --base "\$BASE_REF" --head "\$HEAD_REF"/);
   assert.match(workflow, /git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"/);
   assert.doesNotMatch(workflow, /pull\/\$\{PR_NUMBER\}\/head/);
   assert.match(workflow, /node "\$PROFILE_ROOT\/tools\/test-profile-classifier\.mjs"/);
   assert.doesNotMatch(workflow, /node tools\/test-profile-classifier\.mjs/);
   assert.doesNotMatch(workflow, /pull_requests\[0\]/);
-  assert.match(workflow, /test-profile-observation\.mjs/);
-  assert.match(workflow, /test-profile-observation\.schema\.json/);
+  assert.match(workflow, /node "\$PROFILE_ROOT\/tools\/ci-timing\.mjs"/);
+  assert.match(workflow, /node "\$PROFILE_ROOT\/tools\/test-profile-observation\.mjs"/);
+  assert.match(workflow,
+    /cp "\$PROFILE_ROOT\/ci\/test-profile-observation\.schema\.json" build\/ci-timing\/test-profile-observation\.schema\.json/);
+  assert.doesNotMatch(workflow, /node tools\/(?:ci-timing|test-profile-observation)\.mjs/);
+  assert.doesNotMatch(workflow, /- name: Record timing/);
+  assert.match(workflow,
+    /trap cleanup_profile EXIT[\s\S]+git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"[\s\S]+node "\$PROFILE_ROOT\/tools\/ci-timing\.mjs"/);
 });
 
 test("givenTheProfileClassifierFails_whenTheBuildContinues_thenItsFailClosedPlanIsStillRetained", () => {
