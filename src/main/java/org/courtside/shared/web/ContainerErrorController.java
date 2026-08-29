@@ -59,7 +59,7 @@ class ContainerErrorController implements ErrorController {
             return problem;
         }
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                status, "This request was rejected before it reached the application");
+                status, "This request was rejected before any operation ran");
         problem.setType(URI.create("urn:courtside:error:request-rejected"));
         problem.setTitle("Request rejected");
         return problem;

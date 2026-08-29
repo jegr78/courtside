@@ -17,6 +17,15 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.beans.ConversionNotSupportedException;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.validation.method.MethodValidationException;
+import org.springframework.web.ErrorResponse;
+import org.springframework.web.ErrorResponseException;
+import org.springframework.web.bind.MissingPathVariableException;
+import org.springframework.web.bind.ServletRequestBindingException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -203,6 +212,21 @@ class SharedExceptionHandler {
         problem.setTitle("Unmapped path");
         logAnswered(problem);
         return problem;
+    }
+
+    // Spring answers a rejection it raises inside the dispatcher itself, and its ProblemDetail
+    // carries no type. These are the ones no other handler here claims.
+    @ExceptionHandler({ConversionNotSupportedException.class, ErrorResponseException.class,
+            HandlerMethodValidationException.class, HttpMessageNotWritableException.class,
+            MethodValidationException.class, MissingPathVariableException.class,
+            ServletRequestBindingException.class, TypeMismatchException.class})
+    ResponseEntity<ProblemDetail> handleFrameworkRejection(Exception exception) {
+        HttpStatus status = exception instanceof ErrorResponse response
+                ? ContainerErrorController.resolve(response.getStatusCode().value())
+                : HttpStatus.INTERNAL_SERVER_ERROR;
+        ProblemDetail problem = ContainerErrorController.problemFor(status);
+        logAnswered(problem);
+        return ResponseEntity.status(status).body(problem);
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
