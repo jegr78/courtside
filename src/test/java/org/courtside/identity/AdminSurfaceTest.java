@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
-    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 66;
+    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 68;
 
     private static final String CATCH_ALL_UUID = "11111111-1111-1111-1111-111111111111";
 
@@ -56,6 +56,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/openapi.yaml",
             "/api/public/booking-grid",
             "/api/public/config",
+            "/api/public/config/logo",
             "/api/public/courts",
             "/api/public/opening-hours",
             "/api/session",
@@ -326,9 +327,15 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             if (endpoint.method() == HttpMethod.GET && endpoint.pattern().equals("/api/bookings")) {
                 request.param("date", "2026-05-12");
             }
-            mockMvc.perform(request)
-                    .andExpect(status().is2xxSuccessful())
-                    .andExpect(content().contentTypeCompatibleWith(endpoint.produces()));
+            if (endpoint.pattern().equals("/api/public/config/logo")) {
+                mockMvc.perform(request)
+                        .andExpect(status().isNotFound())
+                        .andExpect(jsonPath("$.type").value("urn:courtside:error:club-logo-not-found"));
+            } else {
+                mockMvc.perform(request)
+                        .andExpect(status().is2xxSuccessful())
+                        .andExpect(content().contentTypeCompatibleWith(endpoint.produces()));
+            }
             return null;
         } catch (Exception | AssertionError failure) {
             return failure.getMessage();

@@ -12,14 +12,23 @@ import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.internal.ChangeClubConfigurationCommand;
+import org.courtside.config.internal.ClubLogo;
+import org.courtside.config.internal.ClubLogoNotFoundException;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
 import org.courtside.shared.SupportedLanguages;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.InitBinder;
+
+import java.time.Duration;
 
 @RestController
 @RequiredArgsConstructor
@@ -58,6 +67,34 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
     }
 
     @Override
+    public ResponseEntity<Resource> getClubLogo(String version) {
+        ClubLogo logo = config.logo();
+        if (version != null && !version.equals(logo.digest())) {
+            throw new ClubLogoNotFoundException();
+        }
+        ResponseEntity.BodyBuilder response = ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(logo.mediaType()))
+                .cacheControl(version == null ? CacheControl.noCache()
+                        : CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
+                .eTag('"' + logo.digest() + '"');
+        return response.body(new ByteArrayResource(logo.content()));
+    }
+
+    @Override
+    public ResponseEntity<ApiAdminClubConfig> uploadClubLogo(MultipartFile file) {
+        try {
+            return ResponseEntity.ok(toAdminResponse(config.uploadLogo(file.getBytes())));
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("The uploaded club logo could not be read", e);
+        }
+    }
+
+    @Override
+    public ResponseEntity<ApiAdminClubConfig> deleteClubLogo() {
+        return ResponseEntity.ok(toAdminResponse(config.deleteLogo()));
+    }
+
+    @Override
     public ResponseEntity<ApiWebManifest> getWebManifest() {
         ClubConfigurationSnapshot configuration = config.current();
         ApiWebManifestIcon icon = configuration.logoUrl() == null
@@ -88,10 +125,12 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.accentColor(), configuration.defaultLocale(),
                 languages.tags(),
                 configuration.slotMinutes(), configuration.timeZone(),
+                configuration.logoUploaded(),
                 configuration.newAccountCredentialHours(),
                 configuration.passwordResetCredentialHours(),
                 configuration.bookingReminderHours())
                 .logoUrl(configuration.logoUrl())
+                .logoFallbackUrl(configuration.logoFallbackUrl())
                 .imprintUrl(configuration.imprintUrl())
                 .privacyUrl(configuration.privacyUrl())
                 .noMembershipTypeRuleSetId(configuration.noMembershipTypeRuleSetId());

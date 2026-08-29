@@ -421,8 +421,17 @@ components:
       allOf:
         - $ref: "#/components/schemas/ClubConfig"
         - type: object
-          required: [newAccountCredentialHours, passwordResetCredentialHours, bookingReminderHours]
+          required: [newAccountCredentialHours, passwordResetCredentialHours, bookingReminderHours,
+                     logoUploaded]
           properties:
+            logoUploaded:
+              type: boolean
+              description: Whether the effective logo is stored by this Courtside instance.
+            logoFallbackUrl:
+              type: [string, "null"]
+              maxLength: 500
+              pattern: "^(https://\\S+|/[^/\\\\\\s]\\S*|/)$"
+              description: The configured URL used again after an uploaded logo is removed.
             newAccountCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
             passwordResetCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
             bookingReminderHours: { type: integer, minimum: 0, maximum: 168 }
@@ -2390,6 +2399,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ClubConfig" }
+
+  /api/public/config/logo:
+    get:
+      tags: [club-config]
+      operationId: getClubLogo
+      summary: The logo stored by this Courtside instance.
+      security: []
+      parameters:
+        - name: v
+          in: query
+          schema: { type: string, pattern: "^[0-9a-f]{64}$" }
+          description: The content digest from the effective logo URL. Matching versions are immutable.
+      responses:
+        "200":
+          description: The uploaded logo.
+          headers:
+            ETag: { schema: { type: string } }
+            Cache-Control: { schema: { type: string } }
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /manifest.webmanifest:
     get:
@@ -4865,6 +4899,53 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/admin/config/logo:
+    put:
+      tags: [admin-config]
+      operationId: uploadClubLogo
+      summary: Replace the logo stored by this Courtside instance.
+      description: Accepts PNG or JPEG up to 1 MiB and 2048 by 2048 pixels.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminClubConfig" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      tags: [admin-config]
+      operationId: deleteClubLogo
+      summary: Remove the stored logo and return to the configured URL fallback.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminClubConfig" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /api/admin/rule-sets/{id}/rules:
     get:
       tags: [admin-rule-sets]

@@ -6,17 +6,23 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.OffsetDateTime;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import javax.imageio.ImageIO;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -47,6 +53,115 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.defaultLocale").value("de"))
                 .andExpect(jsonPath("$.slotMinutes").value(30))
                 .andExpect(jsonPath("$.timeZone").value("Europe/Berlin"));
+    }
+
+    @Test
+    void givenNoUploadedLogo_whenReadingIt_thenTheTypedNotFoundProblemIsServed() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/public/config/logo"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:club-logo-not-found"))
+                .andExpect(jsonPath("$.detail").value("This instance has no uploaded club logo"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAdmin_whenUploadingALogo_thenItIsStoredAndServedFromThePublicOrigin() throws Exception {
+        // given
+        byte[] content = image("png", 32, 24);
+
+        // when
+        mockMvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/admin/config/logo")
+                        .file(new MockMultipartFile("file", "club.png", "image/svg+xml", content))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logoUploaded").value(true))
+                .andExpect(jsonPath("$.logoFallbackUrl").isEmpty())
+                .andExpect(jsonPath("$.logoUrl").value(org.hamcrest.Matchers.matchesPattern(
+                        "^/api/public/config/logo\\?v=[0-9a-f]{64}$")));
+
+        // then
+        String digest = jdbc.sql("SELECT logo_digest FROM club_config").query(String.class).single();
+        String effectiveUrl = "/api/public/config/logo?v=" + digest;
+        byte[] served = mockMvc.perform(get(effectiveUrl))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Cache-Control", "max-age=31536000, public, immutable"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("ETag", org.hamcrest.Matchers.matchesPattern("\"[0-9a-f]{64}\"")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .contentType(MediaType.IMAGE_PNG))
+                .andReturn().getResponse().getContentAsByteArray();
+        BufferedImage decoded = ImageIO.read(new java.io.ByteArrayInputStream(served));
+        assertThat(decoded.getWidth()).isEqualTo(32);
+        assertThat(decoded.getHeight()).isEqualTo(24);
+        mockMvc.perform(get("/api/public/config/logo"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Cache-Control", "no-cache"));
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logoUrl").value(org.hamcrest.Matchers.matchesPattern(
+                        "^/api/public/config/logo\\?v=[0-9a-f]{64}$")));
+        mockMvc.perform(get("/manifest.webmanifest"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.icons[0].src").value(org.hamcrest.Matchers.matchesPattern(
+                        "^/api/public/config/logo\\?v=[0-9a-f]{64}$")));
+        mockMvc.perform(get("/api/public/config/logo?v=" + "0".repeat(64)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:club-logo-not-found"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnUploadedLogoAndAUrlFallback_whenDeletingTheUpload_thenTheFallbackIsEffective() throws Exception {
+        // given
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club"))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+        mockMvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/admin/config/logo")
+                        .file(new MockMultipartFile("file", "club.png", "image/png", image("png", 16, 16)))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // when / then
+        mockMvc.perform(delete("/api/admin/config/logo").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logoUploaded").value(false))
+                .andExpect(jsonPath("$.logoFallbackUrl").value("/branding/logo.svg"))
+                .andExpect(jsonPath("$.logoUrl").value("/branding/logo.svg"));
+        mockMvc.perform(get("/api/public/config/logo"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:club-logo-not-found"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenActiveContent_whenUploadingALogo_thenTheTypedViolationIsReturned() throws Exception {
+        // given
+        byte[] content = "<svg onload='alert(1)'></svg>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        // when / then
+        mockMvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/admin/config/logo")
+                        .file(new MockMultipartFile("file", "club.svg", "image/png", content))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:invalid-club-logo"))
+                .andExpect(jsonPath("$.detail").value("The uploaded club logo is not usable"))
+                .andExpect(jsonPath("$.violations[0].code").value("config.logo.format"));
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenAMember_whenUploadingALogo_thenItIsForbidden() throws Exception {
+        // when / then
+        mockMvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/admin/config/logo")
+                        .file(new MockMultipartFile("file", "club.png", "image/png", image("png", 8, 8)))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
     }
 
     @Test
@@ -701,5 +816,18 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                  "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
                  "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
                 """.formatted(clubName);
+    }
+
+    private static byte[] image(String format, int width, int height) {
+        try {
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            if (!ImageIO.write(image, format, output)) {
+                throw new IllegalStateException("The test image format is unavailable");
+            }
+            return output.toByteArray();
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 }

@@ -33,6 +33,16 @@ public class ClubConfiguration {
     @Column(name = "logo_url")
     private String logoUrl;
 
+    @Getter(AccessLevel.NONE)
+    @Column(name = "logo_content")
+    private byte[] logoContent;
+
+    @Column(name = "logo_media_type")
+    private String logoMediaType;
+
+    @Column(name = "logo_digest")
+    private String logoDigest;
+
     @Column(name = "imprint_url")
     private String imprintUrl;
 
@@ -85,5 +95,21 @@ public class ClubConfiguration {
 
     public void bindPeopleWithoutAMembershipTypeTo(UUID ruleSetId) {
         this.noMembershipTypeRuleSetId = ruleSetId;
+    }
+
+    public void replaceLogo(ClubLogo logo) {
+        this.logoContent = logo.content();
+        this.logoMediaType = logo.mediaType();
+        this.logoDigest = logo.digest();
+    }
+
+    public void removeLogo() {
+        this.logoContent = null;
+        this.logoMediaType = null;
+        this.logoDigest = null;
+    }
+
+    public ClubLogo uploadedLogo() {
+        return logoContent == null ? null : ClubLogo.stored(logoContent, logoMediaType, logoDigest);
     }
 }

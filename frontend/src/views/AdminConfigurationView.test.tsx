@@ -28,7 +28,8 @@ describe("AdminConfigurationView", () => {
       timeZone: "Europe/Berlin",
       newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24,
-      bookingReminderHours: 24
+      bookingReminderHours: 24,
+      logoUploaded: false
     });
     vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
     vi.spyOn(api, "ruleTypes").mockResolvedValue([
@@ -68,7 +69,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      bookingReminderHours: 24,
+      bookingReminderHours: 24, logoUploaded: false,
       noMembershipTypeRuleSetId: "rule-set"
     });
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
@@ -89,7 +90,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      bookingReminderHours: 24, privacyUrl: "/privacy"
+      bookingReminderHours: 24, logoUploaded: false, privacyUrl: "/privacy"
     });
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
     await screen.findByTestId("privacy-url");
@@ -134,13 +135,13 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      bookingReminderHours: 24, privacyUrl: "/privacy"
+      bookingReminderHours: 24, logoUploaded: false, privacyUrl: "/privacy"
     });
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      bookingReminderHours: 24
+      bookingReminderHours: 24, logoUploaded: false
     });
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
     await screen.findByTestId("privacy-url");
@@ -164,7 +165,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      bookingReminderHours: 24,
+      bookingReminderHours: 24, logoUploaded: false,
       noMembershipTypeRuleSetId: "retired"
     });
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
@@ -326,7 +327,7 @@ describe("AdminConfigurationView", () => {
       timeZone: "Pacific/Auckland",
       newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24,
-      bookingReminderHours: 24
+      bookingReminderHours: 24, logoUploaded: false
     });
     const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
       ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
@@ -378,7 +379,7 @@ describe("AdminConfigurationView", () => {
       timeZone: "Europe/Berlin",
       newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24,
-      bookingReminderHours: 24
+      bookingReminderHours: 24, logoUploaded: false
     })).mockReturnValueOnce(reload.promise);
     render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
     const clubName = await screen.findByTestId("club-name");
@@ -398,7 +399,7 @@ describe("AdminConfigurationView", () => {
         timeZone: "Europe/Berlin",
         newAccountCredentialHours: 168,
         passwordResetCredentialHours: 24,
-        bookingReminderHours: 24
+        bookingReminderHours: 24, logoUploaded: false
       });
       return reload.promise;
     });
@@ -491,7 +492,7 @@ describe("AdminConfigurationView", () => {
       timeZone: "US/Eastern",
       newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24,
-      bookingReminderHours: 24
+      bookingReminderHours: 24, logoUploaded: false
     });
 
     // when

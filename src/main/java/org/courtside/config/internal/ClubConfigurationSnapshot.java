@@ -7,6 +7,8 @@ public record ClubConfigurationSnapshot(
         String primaryColor,
         String accentColor,
         String logoUrl,
+        String logoFallbackUrl,
+        boolean logoUploaded,
         String imprintUrl,
         String privacyUrl,
         String defaultLocale,
@@ -22,7 +24,9 @@ public record ClubConfigurationSnapshot(
                 configuration.getClubName(),
                 configuration.getPrimaryColor(),
                 configuration.getAccentColor(),
+                effectiveLogoUrl(configuration),
                 configuration.getLogoUrl(),
+                configuration.getLogoDigest() != null,
                 configuration.getImprintUrl(),
                 configuration.getPrivacyUrl(),
                 configuration.getDefaultLocale(),
@@ -32,5 +36,11 @@ public record ClubConfigurationSnapshot(
                 configuration.getPasswordResetCredentialHours(),
                 configuration.getBookingReminderHours(),
                 configuration.getNoMembershipTypeRuleSetId());
+    }
+
+    private static String effectiveLogoUrl(ClubConfiguration configuration) {
+        String digest = configuration.getLogoDigest();
+        return digest == null ? configuration.getLogoUrl()
+                : "/api/public/config/logo?v=" + digest;
     }
 }

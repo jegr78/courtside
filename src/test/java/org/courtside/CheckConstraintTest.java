@@ -190,6 +190,31 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenStoringIncompleteUploadedLogoMetadata_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE club_config SET logo_content = decode('89504e47', 'hex')
+                WHERE id = '00000000-0000-0000-0000-000000000001'
+                """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("club_config_logo_complete");
+    }
+
+    @Test
+    void whenStoringAnUploadedLogoAboveTheLimit_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE club_config
+                SET logo_content = decode(repeat('00', 1048577), 'hex'),
+                    logo_media_type = 'image/png',
+                    logo_digest = repeat('a', 64)
+                WHERE id = '00000000-0000-0000-0000-000000000001'
+                """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("club_config_logo_size");
+    }
+
+    @Test
     void whenStoringAPrivacyLinkThatCarriesAnActiveScheme_thenTheDatabaseRefusesIt() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""

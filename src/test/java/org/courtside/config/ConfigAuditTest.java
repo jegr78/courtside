@@ -190,7 +190,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
     private static ChangeClubConfigurationCommand withPrivacyUrl(
             ClubConfigurationSnapshot current, String privacyUrl) {
         return new ChangeClubConfigurationCommand(current.clubName(), current.primaryColor(),
-                current.accentColor(), current.logoUrl(), current.imprintUrl(), privacyUrl,
+                current.accentColor(), current.logoFallbackUrl(), current.imprintUrl(), privacyUrl,
                 current.defaultLocale(), new BookingSlotDuration(current.slotMinutes()),
                 current.timeZone(), new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
@@ -208,7 +208,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                                                          String locale, int minutes, String timeZone,
                                                          UUID noMembershipTypeRuleSetId) {
         return new ChangeClubConfigurationCommand(clubName, current.primaryColor(), current.accentColor(),
-                current.logoUrl(), current.imprintUrl(), current.privacyUrl(), locale,
+                current.logoFallbackUrl(), current.imprintUrl(), current.privacyUrl(), locale,
                 new BookingSlotDuration(minutes), timeZone,
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()), new ReminderLeadTime(24),
