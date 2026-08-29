@@ -43,10 +43,10 @@ export function buildOpenApiFuzzInventory(api, policy = openApiFuzzPolicy) {
       const mutation = method !== "get";
       const inputs = [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])].length > 0
         || operation.requestBody != null;
-      const modes = mutation ? ["negative"] : inputs ? ["positive", "negative"] : ["positive"];
+      const modes = mutation ? (inputs ? ["negative"] : []) : inputs ? ["positive", "negative"] : ["positive"];
       const excludedModes = {
         ...(mutation ? { positive: policy.positiveMutationRationale } : {}),
-        ...(!mutation && !inputs ? { negative: "The operation has no request input to invalidate." } : {})
+        ...(inputs ? {} : { negative: "The operation has no request input to invalidate." })
       };
       return operationCoverage(operation.operationId, method, path, modes, excludedModes);
     }));
