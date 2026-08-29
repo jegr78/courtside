@@ -11,8 +11,18 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
 const schemathesisReasonProjection = readFileSync(join(root, "security", "schemathesis_reason.py"), "utf8");
 const stateRoot = join(root, "build", "security");
-const reservationImage = "caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648";
+// The reservation holds a port for the assessment, so it holds it with the proxy the assessment
+// itself runs; read from there, a bump under deploy/ needs no second edit here.
+const reservationImage = deployedCaddyImage();
 export const securityStateRoot = stateRoot;
+
+function deployedCaddyImage() {
+  const found = /caddy(?::[\w.-]+)?@sha256:[a-f0-9]{64}/.exec(readFileSync(composeFile, "utf8"));
+  if (!found) {
+    throw new Error(`${composeFile} names no Caddy image pinned by digest`);
+  }
+  return found[0];
+}
 
 export function securityProject(runId) {
   if (!/^[a-z0-9][a-z0-9-]{5,47}$/.test(runId)) {

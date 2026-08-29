@@ -9,15 +9,15 @@ The `security` Spring profile and `deploy/compose.security.yaml` create one disp
 
 ## Prepare the images
 
-The application networks have no Internet route and every service uses `pull_policy: never`. Pull the pinned PostgreSQL, Caddy, ZAP and Schemathesis images before starting it. Build or pull the Courtside candidate separately and refer to it by immutable image ID or registry digest.
+The application networks have no Internet route and every service uses `pull_policy: never`. Pull the images the profile pins before starting it. Build or pull the Courtside candidate separately and refer to it by immutable image ID or registry digest.
 
 ```bash
-docker pull postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
-docker pull caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
-docker pull zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
-docker pull schemathesis/schemathesis:4.25.2@sha256:72d6907a936f7b5f08f137c8f84c89eb3ab7834956d9af416e7b6510ebe4e065
+node tools/security-image-inventory.mjs active | xargs -n1 docker pull
 node tools/courtside.mjs security run-0001 ghcr.io/jegr78/courtside@sha256:<digest>
 ```
+
+The inventory reads each digest out of the deployment and the scanner policies, which is where they
+are pinned. A digest written here as well would be a second copy that nothing bumps.
 
 The command creates a random shared password, a seed fingerprint, a random instance fingerprint and a private state file below `build/security/run-0001`. It prints the synthetic credential once for the operator. The password never appears in a tracked file or command argument.
 

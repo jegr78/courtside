@@ -29,8 +29,10 @@ test("given visual baselines, when running them on different hosts, then their p
   assert.match(fixtures, /journeyService\.pinnedBrowser\(browserName\)/);
   assert.match(playwright, /name: "visual"/);
   assert.match(setup, /mcr\.microsoft\.com\/playwright:[^"]*@sha256:/);
-  // Browsers reach the application through the same reverse proxy a club runs, pinned the same way.
-  assert.match(setup, /caddy:[^"]*@sha256:/);
+  // Browsers reach the application through the same reverse proxy a club runs, read from the
+  // deployment so that a literal here could not name a build the club does not run.
+  assert.match(setup, /new GenericContainer\(deployedProxyImage\(\)\)/);
+  assert.doesNotMatch(setup, /caddy(?::[\w.-]+)?@sha256:[a-f0-9]{64}/);
   assert.match(setup, /playwright\/cli\.js launch-server/);
   assert.match(setup, /withCopyDirectoriesToContainer/);
   assert.doesNotMatch(setup, /\bnpx playwright\b/);

@@ -36,8 +36,6 @@ const executeFile = promisify(execFile);
 
 const PINNED_BROWSER_IMAGE =
   "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e";
-const PINNED_PROXY_IMAGE =
-  "caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648";
 // The name the certificate is issued for, so browsers reach the proxy the way a member reaches a club.
 const CLUB_HOST = "courtside.test";
 
@@ -45,20 +43,27 @@ const CLUB_HOST = "courtside.test";
 // an instance is built to refuse to start when it is off.
 const JOURNEY_SESSION_CLEANUP_CRON = "0 0 0 29 2 *";
 
-// Qualifying against a database a club does not run proves nothing about the one it does, so the
-// reference is read from the deployment rather than repeated beside it.
-function deployedPostgresImage(): string {
-  const compose = resolve("../deploy/compose.yaml");
-  const found = /postgres:[\w.-]+@sha256:[a-f0-9]{64}/.exec(readFileSync(compose, "utf8"));
-  if (!found) throw new Error(`${compose} names no PostgreSQL image pinned by digest`);
+// Qualifying against something a club does not run proves nothing about what it does, so every
+// reference here is read from the deployment rather than repeated beside it.
+function deployedImage(composeFile: string, pattern: RegExp, what: string): string {
+  const compose = resolve(`../deploy/${composeFile}`);
+  const found = pattern.exec(readFileSync(compose, "utf8"));
+  if (!found) throw new Error(`${compose} names no ${what} image pinned by digest`);
   return found[0];
 }
+
+function deployedPostgresImage(): string {
+  return deployedImage("compose.yaml", /postgres(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "PostgreSQL");
+}
+
 // The relay a journey reads is the one the deployment's mail smoke test already runs against.
 function deployedMailSinkImage(): string {
-  const compose = resolve("../deploy/compose.mail-smoke.yaml");
-  const found = /axllent\/mailpit:[\w.-]+@sha256:[a-f0-9]{64}/.exec(readFileSync(compose, "utf8"));
-  if (!found) throw new Error(`${compose} names no Mailpit image pinned by digest`);
-  return found[0];
+  return deployedImage("compose.mail-smoke.yaml",
+    /axllent\/mailpit(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "Mailpit");
+}
+
+function deployedProxyImage(): string {
+  return deployedImage("compose.yaml", /caddy(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "Caddy");
 }
 
 // Courtside requires STARTTLS of every relay, and Mailpit offers it only when it holds a certificate.
@@ -610,7 +615,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     await seedJourneyData(postgres, visualDate);
     const tables = await snapshotJourneyData(postgres);
     clubNetwork = await new Network().start();
-    clubProxy = await new GenericContainer(PINNED_PROXY_IMAGE)
+    clubProxy = await new GenericContainer(deployedProxyImage())
       .withNetwork(clubNetwork)
       .withNetworkAliases(CLUB_HOST)
       .withCopyContentToContainer([
