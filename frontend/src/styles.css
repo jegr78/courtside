@@ -18,6 +18,8 @@
   --club-primary: #af5030;
   --club-primary-text: #fcfbf9;
   --club-accent: #d7e24b;
+  --cs-destructive: #ff8a80;
+  --cs-destructive-text: #30110f;
   font-family: "Archivo Variable", Archivo, ui-sans-serif, system-ui, sans-serif;
   color: var(--cs-text);
   background: var(--cs-page);
@@ -34,6 +36,8 @@
   --cs-input: #ffffff;
   --cs-overlay: rgb(23 33 29 / 55%);
   --cs-shadow: rgb(23 33 29 / 16%);
+  --cs-destructive: #a82820;
+  --cs-destructive-text: #ffffff;
 }
 
 body {
@@ -86,10 +90,20 @@ input[type="time"] {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--club-primary) 28%, transparent);
 }
 
+.button-primary {
+  color: var(--club-primary-text);
+  background: var(--club-primary);
+}
+
 .button-secondary {
   color: var(--cs-text);
   background: var(--cs-raised);
   border: 1px solid var(--cs-border);
+}
+
+.button-destructive {
+  color: var(--cs-destructive-text);
+  background: var(--cs-destructive);
 }
 
 .day-plan-table {

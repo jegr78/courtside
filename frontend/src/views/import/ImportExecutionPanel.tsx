@@ -56,7 +56,7 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, executed, re
     <h2 className="text-2xl font-bold">{t("admin.import.execution")}</h2>
 
     {preview && (isExecutable(preview)
-      ? <Button data-testid="execute-preview" disabled={busy} className="justify-self-start" type="button" onClick={() => setConfirming(true)}>
+      ? <Button variant={preview.needsConfirmation ? "destructive" : "primary"} data-testid="execute-preview" disabled={busy} className="justify-self-start" type="button" onClick={() => setConfirming(true)}>
         {t("admin.import.execute")}
       </Button>
       : <p data-testid="not-executable">{t("admin.import.notExecutable")}</p>)}
@@ -92,10 +92,10 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, executed, re
           })}
         </p>}
         <div className="flex flex-wrap gap-3">
-          <Button data-testid="confirm-execute" disabled={busy} type="button" onClick={() => void execute(preview)}>
+          <Button variant={preview.needsConfirmation ? "destructive" : "primary"} data-testid="confirm-execute" disabled={busy} type="button" onClick={() => void execute(preview)}>
             {t("admin.import.execute")}
           </Button>
-          <Button data-testid="cancel-execute" type="button" onClick={() => setConfirming(false)}>
+          <Button variant="secondary" data-testid="cancel-execute" type="button" onClick={() => setConfirming(false)}>
             {t("admin.cancel")}
           </Button>
         </div>

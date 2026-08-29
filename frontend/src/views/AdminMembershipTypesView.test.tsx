@@ -130,13 +130,15 @@ describe("AdminMembershipTypesView", () => {
     // given
     vi.spyOn(api, "setMembershipTypeActive").mockResolvedValue({ ...adults, active: false });
     render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
-    await screen.findByTestId("toggle-membership-type-type-1");
+    const toggle = await screen.findByTestId("toggle-membership-type-type-1");
+    expect(toggle).toHaveClass("button-destructive");
 
     // when
-    await userEvent.click(screen.getByTestId("toggle-membership-type-type-1"));
+    await userEvent.click(toggle);
 
     // then
-    await waitFor(() => expect(screen.getByTestId("toggle-membership-type-type-1")).toHaveTextContent("Activate"));
+    await waitFor(() => expect(toggle).toHaveTextContent("Activate"));
+    expect(toggle).toHaveClass("button-primary");
   });
 
   it("given a retired type, when the view is read, then it is still listed and says so", async () => {

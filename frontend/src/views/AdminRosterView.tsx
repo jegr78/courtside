@@ -118,7 +118,7 @@ export function AdminRosterView() {
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <form noValidate onSubmit={(event) => void search(event)} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
             <TextField data-testid="roster-search" name="query" maxLength={NAME_LENGTH} label={t("admin.roster.search")} />
-            <Button data-testid="roster-search-submit" disabled={pending} type="submit">{t("admin.roster.searchSubmit")}</Button>
+            <Button variant="secondary" data-testid="roster-search-submit" disabled={pending} type="submit">{t("admin.roster.searchSubmit")}</Button>
           </form>
           <label className="grid gap-2 font-medium">
             {t("admin.roster.filter")}
@@ -161,7 +161,7 @@ export function AdminRosterView() {
                 </tbody>
               </table>
             </div>}
-          {cursor && <Button data-testid="roster-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("admin.roster.loadMore")}</Button>}
+          {cursor && <Button variant="secondary" data-testid="roster-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("admin.roster.loadMore")}</Button>}
         </section>
         <form noValidate onSubmit={(event) => void createPerson(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
           <h2 className="text-2xl font-bold">{t("admin.roster.newPerson")}</h2>
@@ -170,7 +170,7 @@ export function AdminRosterView() {
             <TextField data-testid="new-person-last-name" disabled={pending} name="lastName" maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} />
             <TextField data-testid="new-person-email" disabled={pending} name="email" type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} />
           </div>
-          <Button data-testid="create-person" disabled={pending} className="justify-self-start" type="submit">{t("admin.create")}</Button>
+          <Button variant="primary" data-testid="create-person" disabled={pending} className="justify-self-start" type="submit">{t("admin.create")}</Button>
         </form>
       </>}
   </section>;

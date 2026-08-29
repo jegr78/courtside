@@ -132,12 +132,12 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
       <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable action={chooseAction} t={t} />
       <BookingSection testId="past-bookings" title={t("myBookings.past")} empty={t("myBookings.noPast")} bookings={sections.past} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={chooseAction} t={t} />
     </div>}
-    {nextCursor && <Button data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
+    {nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
     {showManaged && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
       <h2 id="managed-appointments-title" data-testid="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h2>
       <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
       <div className="mt-4"><BookingSection testId="managed-bookings" title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={chooseAction} t={t} /></div>
-      {managedNextCursor && <Button className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
+      {managedNextCursor && <Button variant="secondary" className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
       <SeriesForm timeZone={grid.timeZone} courts={courts} created={async () => { await load(); setSuccess(t("series.createdSuccess")); }} reportError={(failure) => { setSuccess(undefined); setError(problemMessage(failure, t)); }} />
     </section>}
     {!loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
@@ -181,11 +181,11 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
             <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
             {participation.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
             <div className="pt-1">
-              <Button data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
+              <Button variant="destructive" data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
             </div>
           </li>)}</ul>}
     </div>
-    {nextCursor && <Button data-testid="load-more-participations" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("participations.loadMore")}</Button>}
+    {nextCursor && <Button variant="secondary" data-testid="load-more-participations" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("participations.loadMore")}</Button>}
   </section>;
 }
 
@@ -208,10 +208,10 @@ function BookingSection({ testId, title, empty, bookings, courtNames, locale, ti
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
           {managed && "participantCount" in booking && <span>{t("managedAppointments.participants", { count: booking.participantCount })}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
-            {managed && <Button data-testid="managed-details" className="button-secondary px-3 py-2" onClick={() => action({ kind: "detail", booking, managed })}>{t("managedAppointments.details")}</Button>}
+            {managed && <Button variant="secondary" data-testid="managed-details" className="px-3 py-2" onClick={() => action({ kind: "detail", booking, managed })}>{t("managedAppointments.details")}</Button>}
             {booking.status === "CONFIRMED" && <>
-              <Button aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid={managed ? "managed-cancel" : "personal-cancel"} data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking, managed })}>{t("myBookings.cancel")}</Button>
-              {booking.seriesId && <Button aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" className="px-3 py-2" onClick={() => action({ kind: "move", booking, managed })}>{t("myBookings.move")}</Button>}
+              <Button variant="destructive" aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid={managed ? "managed-cancel" : "personal-cancel"} data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking, managed })}>{t("myBookings.cancel")}</Button>
+              {booking.seriesId && <Button variant="secondary" aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" className="px-3 py-2" onClick={() => action({ kind: "move", booking, managed })}>{t("myBookings.move")}</Button>}
             </>}
           </div>}
         </li>)}</ul>
@@ -265,7 +265,7 @@ function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, clos
     <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
     {hasMoreBookings && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
     {error && <Alert>{error}</Alert>}
-    <div className="flex gap-2"><Button data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    <div className="flex gap-2"><Button variant="destructive" data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 
@@ -300,7 +300,7 @@ function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, closed, comp
     <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
     {error && <Alert>{error}</Alert>}
     {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatBookingPeriod(move.fromStartsAt, move.fromEndsAt, i18n.language, timeZone)} → {formatBookingPeriod(move.toStartsAt, move.toEndsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
-    <div className="flex gap-2">{preview ? <Button data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    <div className="flex gap-2">{preview ? <Button variant="primary" data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button variant="secondary" data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 
@@ -329,7 +329,7 @@ function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }: { boo
         {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`}>{participant.displayName} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
       </section>
     </>}
-    <div><Button data-testid="close-managed-appointment" className="button-secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    <div><Button variant="secondary" data-testid="close-managed-appointment" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

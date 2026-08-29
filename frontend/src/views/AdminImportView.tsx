@@ -95,12 +95,12 @@ export function AdminImportView() {
         ? <p data-testid="no-sources">{t("admin.import.noSources")}</p>
         : <ul className="grid gap-2">
           {sources.map((source) => <li key={source.id}>
-            <Button data-testid={`source-choice-${source.id}`} disabled={pending} type="button" onClick={() => { setEditing({ source }); setPreview(undefined); }}>
+            <Button variant="secondary" data-testid={`source-choice-${source.id}`} disabled={pending} type="button" onClick={() => { setEditing({ source }); setPreview(undefined); }}>
               {source.displayName}
             </Button>
           </li>)}
         </ul>}
-      <Button data-testid="new-source" disabled={pending} className="justify-self-start" type="button" onClick={() => setEditing({ source: undefined })}>
+      <Button variant="primary" data-testid="new-source" disabled={pending} className="justify-self-start" type="button" onClick={() => setEditing({ source: undefined })}>
         {t("admin.import.newSource")}
       </Button>
     </div>}
@@ -142,7 +142,7 @@ export function AdminImportView() {
       reportError={reportError}
     />}
 
-    {chosen && <Button data-testid="remove-source" disabled={pending} className="justify-self-start" type="button" onClick={() => setRemoving(true)}>
+    {chosen && <Button variant="destructive" data-testid="remove-source" disabled={pending} className="justify-self-start" type="button" onClick={() => setRemoving(true)}>
       {t("admin.import.removeSource")}
     </Button>}
 
@@ -151,10 +151,10 @@ export function AdminImportView() {
         <h2 id="remove-source-title" className="text-2xl font-bold">{t("admin.import.removeSource")}</h2>
         <p>{t("admin.import.removeSourceExplain")}</p>
         <div className="flex flex-wrap gap-3">
-          <Button data-testid="confirm-remove-source" disabled={pending} type="button" onClick={() => void remove(chosen)}>
+          <Button variant="destructive" data-testid="confirm-remove-source" disabled={pending} type="button" onClick={() => void remove(chosen)}>
             {t("admin.import.removeSource")}
           </Button>
-          <Button data-testid="cancel-remove-source" type="button" onClick={() => setRemoving(false)}>
+          <Button variant="secondary" data-testid="cancel-remove-source" type="button" onClick={() => setRemoving(false)}>
             {t("admin.cancel")}
           </Button>
         </div>

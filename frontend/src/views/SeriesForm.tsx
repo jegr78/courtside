@@ -130,7 +130,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
   }
 
   if (!open) {
-    return <Button data-testid="new-series" className="mt-6 justify-self-start" type="button" onClick={() => setOpen(true)}>
+    return <Button variant="primary" data-testid="new-series" className="mt-6 justify-self-start" type="button" onClick={() => setOpen(true)}>
       {t("series.new")}
     </Button>;
   }
@@ -185,10 +185,10 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
     <TextField data-testid="series-note" disabled={pending} label={t("series.note")} value={draft.note} onChange={(event) => change({ note: event.target.value })} />
 
     <div className="flex flex-wrap gap-3">
-      <Button data-testid="preview-series" disabled={pending || !isComplete(draft)} type="button" onClick={() => void readPreview()}>
+      <Button variant="secondary" data-testid="preview-series" disabled={pending || !isComplete(draft)} type="button" onClick={() => void readPreview()}>
         {t("series.preview")}
       </Button>
-      <Button data-testid="cancel-series" type="button" onClick={() => { setOpen(false); setDraft(EMPTY); setPreview(undefined); setChosen([]); setResult(undefined); }}>
+      <Button variant="secondary" data-testid="cancel-series" type="button" onClick={() => { setOpen(false); setDraft(EMPTY); setPreview(undefined); setChosen([]); setResult(undefined); }}>
         {t("admin.cancel")}
       </Button>
     </div>
@@ -207,7 +207,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
           </label>
         </li>)}
       </ul>
-      <Button data-testid="confirm-series" disabled={pending || chosen.length === 0} className="justify-self-start" type="button" onClick={() => void create()}>
+      <Button variant="primary" data-testid="confirm-series" disabled={pending || chosen.length === 0} className="justify-self-start" type="button" onClick={() => void create()}>
         {t("series.create", { chosen: chosen.length })}
       </Button>
     </div>}

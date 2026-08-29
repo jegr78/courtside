@@ -283,7 +283,7 @@ export function AdminFacilityView() {
           <form noValidate onSubmit={(event) => void createCourt(event)} className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
             <TextField data-testid="new-court-number" disabled={pending.has("court:new")} name="number" type="number" label={t("admin.facility.number")} />
             <TextField data-testid="new-court-name" disabled={pending.has("court:new")} name="name" label={t("admin.facility.name")} />
-            <Button data-testid="create-court" disabled={pending.has("court:new")} type="submit">{t("admin.create")}</Button>
+            <Button variant="primary" data-testid="create-court" disabled={pending.has("court:new")} type="submit">{t("admin.create")}</Button>
           </form>
         </section>
         <section className="grid gap-4">
@@ -319,8 +319,8 @@ function CourtEditor({ court, timeZone, disabled, changed, save, toggle, reportE
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto_auto] sm:items-end">
     <TextField disabled={disabled} type="number" label={t("admin.facility.number")} value={court.number} onChange={(event) => changed({ ...court, number: Number(event.target.value) })} />
     <TextField disabled={disabled} data-testid={`court-name-${court.id}`} label={t("admin.facility.name")} value={court.name ?? ""} onChange={(event) => changed({ ...court, name: event.target.value || null })} />
-    <Button disabled={disabled} type="button" onClick={() => void save(court)}>{t("admin.save")}</Button>
-    <Button disabled={disabled} data-testid={`toggle-court-${court.id}`} type="button" onClick={() => void toggle(court)}>{t(court.active ? "admin.deactivate" : "admin.activate")}</Button>
+    <Button variant="primary" disabled={disabled} type="button" onClick={() => void save(court)}>{t("admin.save")}</Button>
+    <Button variant={court.active ? "destructive" : "primary"} disabled={disabled} data-testid={`toggle-court-${court.id}`} type="button" onClick={() => void toggle(court)}>{t(court.active ? "admin.deactivate" : "admin.activate")}</Button>
     <div className="sm:col-span-full">
       <ImpactPanel kind="court" subject={court.id} timeZone={timeZone} ask={() => api.courtImpact(court.id)} reportError={reportError} />
     </div>
@@ -336,8 +336,8 @@ function HoursEditor({ hours, timeZone, disabled, changed, save, close, reportEr
       <TextField disabled={disabled} type="time" label={t("admin.facility.closesAt")} value={shortTime(hours.closesAt)} onChange={(event) => changed({ ...hours, closesAt: event.target.value })} />
     </div>
     <div className="flex gap-3">
-      <Button data-testid={`save-hours-${hours.dayOfWeek}`} disabled={disabled || !hours.opensAt || !hours.closesAt} type="button" onClick={() => void save(hours)}>{t("admin.save")}</Button>
-      <Button disabled={disabled} type="button" onClick={() => void close(hours.dayOfWeek)}>{t("admin.facility.closeDay")}</Button>
+      <Button variant="primary" data-testid={`save-hours-${hours.dayOfWeek}`} disabled={disabled || !hours.opensAt || !hours.closesAt} type="button" onClick={() => void save(hours)}>{t("admin.save")}</Button>
+      <Button variant="destructive" disabled={disabled} type="button" onClick={() => void close(hours.dayOfWeek)}>{t("admin.facility.closeDay")}</Button>
     </div>
     <ImpactPanel
       kind="opening-hours"
@@ -365,8 +365,8 @@ function CardEditor({ card, timeZone, disabled, changed, save, toggle, reportErr
       <Checkbox disabled={disabled} data-testid={`card-generic-occupancy-${card.id}`} label={t("admin.facility.showGenericOccupancy")} checked={card.showGenericOccupancy} changed={(showGenericOccupancy) => changed({ ...card, showGenericOccupancy })} />
     </div>
     <div className="flex gap-3">
-      <Button disabled={disabled} data-testid={`save-card-${card.id}`} type="button" onClick={() => void save({ ...card, allowedPlayerCounts: countsValue, tracksPlayers: countsValue.length > 0 })}>{t("admin.save")}</Button>
-      <Button disabled={disabled} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
+      <Button variant="primary" disabled={disabled} data-testid={`save-card-${card.id}`} type="button" onClick={() => void save({ ...card, allowedPlayerCounts: countsValue, tracksPlayers: countsValue.length > 0 })}>{t("admin.save")}</Button>
+      <Button variant={card.active ? "destructive" : "primary"} disabled={disabled} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
     </div>
     <ImpactPanel kind="booking-card" subject={card.id} timeZone={timeZone} ask={() => api.bookingCardImpact(card.id)} reportError={reportError} />
   </article>;
@@ -380,8 +380,8 @@ function ParticipantCardEditor({ card, disabled, changed, save, toggle }: { card
       <TextField disabled={disabled} data-testid={`participant-card-capacity-${card.id}`} type="number" min={1} max={99} label={t("admin.facility.owned")} value={card.capacity ?? ""} onChange={(event) => changed({ ...card, capacity: ownedCount(event.target.value) })} />
     </div>
     <div className="flex gap-3">
-      <Button disabled={disabled} data-testid={`save-participant-card-${card.id}`} type="button" onClick={() => void save(card)}>{t("admin.save")}</Button>
-      <Button disabled={disabled} data-testid={`toggle-participant-card-${card.id}`} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
+      <Button variant="primary" disabled={disabled} data-testid={`save-participant-card-${card.id}`} type="button" onClick={() => void save(card)}>{t("admin.save")}</Button>
+      <Button variant={card.active ? "destructive" : "primary"} disabled={disabled} data-testid={`toggle-participant-card-${card.id}`} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
     </div>
   </article>;
 }
@@ -394,7 +394,7 @@ function ParticipantCardCreateForm({ disabled, create }: { disabled: boolean; cr
       <TextField disabled={disabled} data-testid="new-participant-card-label" name="label" label={t("admin.facility.label")} />
       <TextField disabled={disabled} data-testid="new-participant-card-capacity" name="capacity" type="number" min={1} max={99} label={t("admin.facility.owned")} />
     </div>
-    <Button disabled={disabled} data-testid="create-participant-card" className="justify-self-start" type="submit">{t("admin.create")}</Button>
+    <Button variant="primary" disabled={disabled} data-testid="create-participant-card" className="justify-self-start" type="submit">{t("admin.create")}</Button>
   </form>;
 }
 
@@ -421,7 +421,7 @@ function CardCreateForm({ disabled, create }: { disabled: boolean; create: (even
       <Checkbox disabled={disabled} name="guestAllowed" label={t("admin.facility.guestAllowed")} />
       <Checkbox disabled={disabled} name="showGenericOccupancy" label={t("admin.facility.showGenericOccupancy")} />
     </div>
-    <Button disabled={disabled} data-testid="create-card" className="justify-self-start" type="submit">{t("admin.create")}</Button>
+    <Button variant="primary" disabled={disabled} data-testid="create-card" className="justify-self-start" type="submit">{t("admin.create")}</Button>
   </form>;
 }
 

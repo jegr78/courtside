@@ -337,7 +337,9 @@ describe("AdminPersonView", () => {
 
     // then
     expect(sent).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByTestId("confirm-send-credentials"));
+    const confirm = screen.getByTestId("confirm-send-credentials");
+    expect(confirm).toHaveClass("button-destructive");
+    await userEvent.click(confirm);
     expect(sent).toHaveBeenCalledWith("person-1");
   });
 

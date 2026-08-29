@@ -62,8 +62,8 @@ export function PrimaryNavigation({ session, signedOut }: { session: SessionStat
             className="font-semibold underline-offset-4"
           >{t(destination.label)}</Link>)}
       </nav>
-      {session.authenticated && <Button type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>}
-      {!session.authenticated && pathname !== "/login" && <Link to="/login" data-testid="sign-in-link" className="rounded-lg bg-(--club-primary) px-4 py-3 font-semibold text-(--club-primary-text)">{t("auth.submit")}</Link>}
+      {session.authenticated && <Button variant="secondary" type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>}
+      {!session.authenticated && pathname !== "/login" && <Link to="/login" data-testid="sign-in-link" className="button-primary rounded-lg px-4 py-3 font-semibold">{t("auth.submit")}</Link>}
     </div>
     {error && <Alert>{error}</Alert>}
   </div>;

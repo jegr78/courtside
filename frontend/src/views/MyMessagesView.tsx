@@ -93,7 +93,7 @@ export function MyMessagesView() {
         pending={pending}
         receive={receive}
       />
-      <div><Button type="button" data-testid="my-messages-save" disabled={pending} onClick={() => void save()}>{t("myMessages.save")}</Button></div>
+      <div><Button variant="primary" type="button" data-testid="my-messages-save" disabled={pending} onClick={() => void save()}>{t("myMessages.save")}</Button></div>
     </>}
   </section>;
 }

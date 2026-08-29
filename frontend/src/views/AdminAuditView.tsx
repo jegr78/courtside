@@ -153,7 +153,7 @@ export function AdminAuditView() {
               </tbody>
             </table>
           </div>}
-        {cursor && <Button data-testid="audit-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("audit.more")}</Button>}
+        {cursor && <Button variant="secondary" data-testid="audit-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("audit.more")}</Button>}
       </>}
   </section>;
 }
