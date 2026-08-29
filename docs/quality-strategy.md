@@ -97,27 +97,28 @@ jobs skipped by the plan and fails closed when the actual topology disagrees. Th
 used at least twenty comparable first attempts, including three naturally reduced plans and at
 least one observation of both the backend and frontend profiles. Any later policy change receives
 a new fingerprint and cannot borrow that earlier evidence.
-Only records produced by the protected follow-up workflow count. Locally assembled historical
-records and older aggregate `quality` runs are not comparable and do not count. Any candidate miss
-requires a rule correction plus a regression test before a new observation window can qualify.
+The protected profile-evidence workflow rebuilds every observation from the first-attempt run and
+job records returned by the GitHub Actions API. It recomputes the profile from the immutable base
+and head commits with the current policy, so a corrected observer can reassess retained builds
+without trusting an editable historical observation. The resulting `status.json` and workflow
+summary are the canonical current count. Locally assembled records and older aggregate `quality`
+runs are not evidence. Any candidate miss requires a rule correction plus a regression test before
+the review can qualify.
 
-After downloading the retained `profile-observation.json` files, produce the review input and final
-report with:
+The workflow also retains the closed observations and exact Actions inventory behind the status.
+For an independent local reproduction, run the same protected collector with a GitHub token that
+has read-only Actions and contents access:
 
 ```bash
-jq -s . observations/*/profile-observation.json > observations.json
-gh api --paginate \
-  'repos/jegr78/courtside/actions/workflows/build.yml/runs?event=pull_request&status=completed&per_page=100' \
-  --slurp > workflow-runs.json
-node tools/test-profile-observation.mjs --observations observations.json \
-  --github-runs workflow-runs.json \
-  --repository jegr78/courtside --window-start 2026-09-01T10:00:00Z \
-  --assessed-at 2026-09-16T10:00:00Z --inventory-output observation-inventory.json \
+GH_TOKEN="$(gh auth token)" node tools/test-profile-replay.mjs \
+  --repository jegr78/courtside --assessed-at 2026-08-29T20:30:00Z \
+  --inventory-output observation-inventory.json --observations-output observations.json \
   --output observation-report.json --summary observation-report.md
 ```
 
-The inventory comes directly from the paginated Actions API. Missing first
-attempts, mixed repositories, or mixed classifier-policy fingerprints prevent a ready report.
+The inventory comes directly from the paginated Actions API. Missing first attempts, mismatched
+repositories, ambiguous pull-request provenance or a base that is not the exact merge base stop the
+replay.
 
 ### Release checklist
 
