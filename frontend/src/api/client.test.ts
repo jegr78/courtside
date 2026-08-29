@@ -287,3 +287,27 @@ it("given an external id with characters a path would swallow, when unlinking it
   // then
   expect(path).toBe("/api/admin/import/sources/s1/references/A%2F4711");
 });
+
+// Signing out clears the CSRF token, so the sign-in that follows carries none and is answered 403 —
+// which the sign-in form can only report as a rejected credential.
+it("given signing out cleared the token, when signing in again, then a fresh token is fetched first", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=; Max-Age=0";
+  let sent: string | null = "absent";
+  server.use(
+    http.get("/api/session", () => {
+      document.cookie = "XSRF-TOKEN=reissued-token";
+      return HttpResponse.json({ authenticated: false, roles: [], passwordChangeRequired: false });
+    }),
+    http.post("/api/session", ({ request }) => {
+      sent = request.headers.get("X-XSRF-TOKEN");
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+
+  // when
+  await api.login("doe.jane", "temporary-password");
+
+  // then
+  expect(sent).toBe("reissued-token");
+});
