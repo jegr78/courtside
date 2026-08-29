@@ -36,6 +36,19 @@ describe("AdminMembershipTypesView", () => {
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });
   });
 
+  it("given no membership type, when the view opens, then the empty state names the creation step", async () => {
+    // given
+    vi.spyOn(api, "membershipTypes").mockResolvedValue([]);
+
+    // when
+    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("membership-types-empty")).toHaveTextContent(
+      "Membership types created for the club appear here. Use the form below to add the first one."
+    );
+  });
+
   it("given the types cannot load, when opening the view, then the failure replaces the loading state", async () => {
     // given
     vi.spyOn(api, "membershipTypes").mockRejectedValue(new Error("unavailable"));

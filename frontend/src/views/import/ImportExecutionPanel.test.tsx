@@ -144,7 +144,9 @@ describe("ImportExecutionPanel", () => {
     show(undefined);
 
     // then
-    expect(await screen.findByTestId("no-runs")).toBeInTheDocument();
+    expect(await screen.findByTestId("no-runs")).toHaveTextContent(
+      "Completed imports and their results appear here. Select a CSV file above to preview and run the first import."
+    );
   });
 
   it("given a finished run, when it is done, then the log holds it without a reload", async () => {
