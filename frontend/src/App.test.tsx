@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -333,6 +333,30 @@ describe("App build identity", () => {
     // then
     expect(await screen.findByTestId("club-logo")).toHaveAttribute("src", "/example-logo.svg");
     expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
+  });
+
+  it("givenAClubBrand_whenTheShellLoads_thenTheFooterStillNamesTheProduct", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#d7e24b",
+      accentColor: "#b85c38",
+      logoUrl: "/example-logo.svg",
+      defaultLocale: "en",
+      supportedLocales: ["de", "en"],
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    // then
+    const productIdentity = await screen.findByTestId("footer-product-identity");
+    expect(productIdentity).toHaveTextContent("Courtside");
+    expect(within(productIdentity).getByTestId("footer-product-mark")).toBeInTheDocument();
   });
 
   it("givenBothLegalLinks_whenTheShellLoads_thenThePrivacyPolicySitsBesideTheImprint", async () => {
