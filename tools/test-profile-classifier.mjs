@@ -132,11 +132,11 @@ export function profileSummary(plan) {
     return `<code>${[...visible].map((character) => `&#x${character.codePointAt(0).toString(16)};`).join("")}</code>`;
   };
   return [
-    "# Observed test profiles",
+    "# Selected test profiles",
     "",
     `Selected: ${plan.profiles.map((profile) => `\`${profile}\``).join(", ")}`,
     "",
-    "This decision is observational. The complete quality gate still runs.",
+    "The required build runs only the jobs assigned to these conservative profiles.",
     "",
     "| Status | Path | Profile | Reason |",
     "| --- | --- | --- | --- |",

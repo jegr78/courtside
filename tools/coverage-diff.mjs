@@ -130,10 +130,20 @@ function option(name) {
   return process.argv[index + 1];
 }
 
+function optionalOption(name) {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return undefined;
+  if (!process.argv[index + 1]) throw new Error(`Missing ${name}`);
+  return process.argv[index + 1];
+}
+
 function main() {
   const base = option("--base");
-  const java = parseJacoco(readFileSync(option("--java"), "utf8"));
-  const frontend = parseLcov(readFileSync(option("--frontend"), "utf8"));
+  const javaPath = optionalOption("--java");
+  const frontendPath = optionalOption("--frontend");
+  if (javaPath === undefined && frontendPath === undefined) throw new Error("No coverage report was selected");
+  const java = javaPath === undefined ? new Map() : parseJacoco(readFileSync(javaPath, "utf8"));
+  const frontend = frontendPath === undefined ? new Map() : parseLcov(readFileSync(frontendPath, "utf8"));
   const critical = JSON.parse(readFileSync(resolve("quality/critical-coverage.json"), "utf8")).paths;
   const diff = execFileSync("git", ["diff", "--unified=0", `${base}...HEAD`, "--",
     "src/main/java", "frontend/src"], { encoding: "utf8" });

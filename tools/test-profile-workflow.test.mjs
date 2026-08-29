@@ -5,15 +5,17 @@ import { test } from "node:test";
 const workflow = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
 const pom = readFileSync(new URL("../pom.xml", import.meta.url), "utf8");
 
-test("givenProfileClassificationIsObservational_whenThePullRequestRuns_thenSplitQualityJobsControlTheGate", () => {
+test("givenProfileClassification_whenThePullRequestRuns_thenSelectedQualityJobsControlTheGate", () => {
   // when / then
   assert.match(workflow, /test-profile-plan:/);
   assert.match(workflow, /test-profile-classifier\.mjs/);
-  assert.match(workflow, /cat build\/test-profile\/summary\.md >> "\$GITHUB_STEP_SUMMARY"/);
+  assert.match(workflow,
+    /git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"[\s\S]+node "\$PROFILE_ROOT\/tools\/test-profile-classifier\.mjs"/);
+  assert.match(workflow, /outputs:[\s\S]+backend: \$\{\{ steps\.selection\.outputs\.backend \}\}/);
   assert.match(workflow,
     /needs: \[backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
-  assert.match(workflow, /pull_request\) test "\$PROFILE_PLAN_RESULT" = success ;;/);
-  assert.match(workflow, /push\|schedule\|workflow_dispatch\) test "\$PROFILE_PLAN_RESULT" = skipped ;;/);
+  assert.match(workflow, /pull_request\)\s+test "\$PROFILE_PLAN_RESULT" = success/);
+  assert.match(workflow, /push\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
   assert.match(workflow, /backend:[\s\S]+name: Verify backend[\s\S]+\.\/mvnw -B clean verify -Pjava-only/);
   assert.match(workflow,
     /frontend:[\s\S]+name: Verify frontend[\s\S]+npm-cli\.js run lint[\s\S]+npm-cli\.js run test[\s\S]+npm-cli\.js run build/);
@@ -22,13 +24,39 @@ test("givenProfileClassificationIsObservational_whenThePullRequestRuns_thenSplit
   assert.match(workflow, /security:[\s\S]+github\/codeql-action\/init@[a-f0-9]{40}/);
 });
 
-test("givenSplitQualityJobs_whenOneDoesNotSucceed_thenTheAggregateFailsClosed", () => {
+test("givenASelectedQualityJob_whenItDoesNotSucceed_thenTheAggregateFailsClosed", () => {
   // when / then
   assert.match(workflow, /build:\n\s+if: always\(\)/);
-  for (const job of ["backend", "frontend", "security"]) {
-    assert.match(workflow, new RegExp(`${job.toUpperCase()}_RESULT: \\$\\{\\{ needs\\.${job}\\.result \\}\\}`));
-    assert.match(workflow, new RegExp(`test "\\$${job.toUpperCase()}_RESULT" = success`));
-  }
+  assert.match(workflow,
+    /selected="\$\{!selected_variable\}"\s+if \[\[ "\$selected" = true \]\]; then\s+test "\$result" = success\s+else\s+test "\$result" = skipped/);
+});
+
+test("givenReducedProfiles_whenJobsAreScheduled_thenOnlyTheirConservativeJobSetRuns", () => {
+  // when / then
+  assert.match(workflow,
+    /backend:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.backend == 'true'\)/);
+  assert.match(workflow,
+    /frontend:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.frontend == 'true'\)/);
+  assert.match(workflow,
+    /security:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
+  assert.match(workflow, /\(\$job == "frontend" or \$job == "security"\)/);
+});
+
+test("givenTheClassifierFails_whenThePlanRuns_thenFullSelectionStillReachesTheGate", () => {
+  // when / then
+  assert.match(workflow, /git worktree add[\s\S]+\|\| CLASSIFIER_EXIT=\$\?/);
+  assert.match(workflow,
+    /if \.plannerOutcome == "failed" then \.isFull and \.profiles == \["full"\]\s+else \$classifierExit == 0 end/);
+  assert.match(workflow,
+    /else\s+PROFILES='\["full"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
+});
+
+test("givenAProfilePlan_whenTheAggregateRuns_thenEverySelectedAndSkippedJobIsExplained", () => {
+  // when / then
+  assert.match(workflow, /name: Summarize selected build results/);
+  assert.match(workflow, /if: always\(\) && github\.event_name == 'pull_request'/);
+  assert.match(workflow, /not selected by the conservative profile plan/);
+  assert.match(workflow, /required by the conservative profile plan/);
 });
 
 test("givenBackendAndSecurityJobs_whenTheyBuildJava_thenMavenSkipsEveryFrontendExecution", () => {
@@ -49,6 +77,8 @@ test("givenSplitCoverageArtifacts_whenTheAggregateDownloadsThem_thenItUsesTheirA
   assert.match(workflow, /--frontend build\/aggregate\/frontend\/coverage\/lcov\.info/);
   assert.doesNotMatch(workflow, /build\/aggregate\/backend\/target\/site/);
   assert.doesNotMatch(workflow, /build\/aggregate\/frontend\/frontend\/coverage/);
+  assert.match(workflow, /arguments\+=\(--java build\/aggregate\/backend\/site\/jacoco\/jacoco\.xml\)/);
+  assert.match(workflow, /arguments\+=\(--frontend build\/aggregate\/frontend\/coverage\/lcov\.info\)/);
 });
 
 test("givenSecurityFindingToolsNeedNodeModules_whenTheSecurityJobRuns_thenItInstallsLockedDependencies", () => {
