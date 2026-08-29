@@ -4,7 +4,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 
 import java.util.List;
 import java.util.Map;
@@ -46,5 +49,26 @@ class SharedExceptionHandlerTest {
         assertThat(fieldErrors.getFirst())
                 .containsEntry("field", "page")
                 .containsEntry("code", "validation.rejected");
+    }
+
+    @Test
+    void givenARejectionSpringRaisesInsideTheDispatcher_whenAnsweringIt_thenItCarriesTheStatusAndAType() {
+        // given
+        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
+
+        // when
+        ResponseEntity<ProblemDetail> refused = handler.handleFrameworkRejection(
+                new ServletRequestBindingException("a required header is missing"));
+        ResponseEntity<ProblemDetail> unwritable = handler.handleFrameworkRejection(
+                new HttpMessageNotWritableException("the answer cannot be serialised"));
+
+        // then
+        assertThat(refused.getStatusCode().value()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(refused.getBody().getType().toString())
+                .isEqualTo("urn:courtside:error:request-rejected");
+        assertThat(unwritable.getStatusCode().value())
+                .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        assertThat(unwritable.getBody().getType().toString())
+                .isEqualTo("urn:courtside:error:internal-error");
     }
 }

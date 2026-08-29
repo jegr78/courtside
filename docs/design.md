@@ -858,7 +858,14 @@ itself, as `application/problem+json` with a `urn:courtside:error:` type —
 `method-not-supported` for a refused method, `request-rejected` for a request the firewall rejected,
 `unmapped-path` for an address that does not exist and `internal-error` for a failure that got that
 far. That dispatch is permitted in the filter chain, because it is the tail of a request that has
-already been decided; re-authorising it would report a 405 as a 401.
+already been decided; re-authorising it would report a 405 as a 401. The same gap opens one
+layer further in, and stayed open longer: Spring answers a rejection it raises inside the
+dispatcher — a binding failure, a body it cannot write, a method-validation failure — from its own
+list, and that answer carries no type either. Those are mapped onto the same status-to-type table
+the container dispatch uses, so a request refused before any operation ran reads the same whichever
+layer refused it. `FrameworkRejectionCoverageTest` reads Spring's list rather than this
+repository's, so a rejection a future Spring version adds arrives as a failing build instead of as
+an untyped answer.
 
 One layer sits below even that. A request target carrying a character the HTTP grammar does not
 allow — `|`, `^`, `[`, a broken percent escape — is refused by the connector while it is still
