@@ -175,7 +175,11 @@ jobs:
           echo "TARGET_IMAGE=$(docker image inspect courtside:uat-local --format '{{.Id}}')" \
             >> "$GITHUB_ENV"
       - name: Pull pinned assessment images
-        run: node tools/security-image-inventory.mjs active | xargs -n1 docker pull
+        run: |
+          # Both sides: the update under comparison can itself be one of these pins.
+          { node tools/security-image-inventory.mjs active
+            node "$RUNNER_TEMP/courtside-security-base/tools/security-image-inventory.mjs" active
+          } | sort -u | xargs -n1 docker pull
       - name: Verify the Schemathesis reason adapter
         run: |
           IMAGE=$(jq -r .image security/openapi-fuzz-policy.json)

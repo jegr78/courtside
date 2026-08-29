@@ -103,7 +103,7 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.doesNotMatch(build, /courtside-security-base\/frontend\/node_modules/);
   assert.match(build, /security-run "\$BASE_RUN_ID" active/);
   assert.match(build, /security-run "\$CANDIDATE_RUN_ID" active/);
-  assert.match(build, /security-image-inventory\.mjs active \| xargs -n1 docker pull/);
+  assert.match(build, /security-image-inventory\.mjs active[\s\S]+\| sort -u \| xargs -n1 docker pull/);
   assert.match(build, /security-tool-comparison\.mjs/);
   assert.match(build, /COMPARATOR_ROOT="\$BASE_ROOT"/);
   assert.match(build, /cmp -s "\$COMPARATOR_ROOT\/tools\/security-tool-comparison\.mjs" tools\/security-tool-comparison\.mjs/);
@@ -163,6 +163,20 @@ function jobIn(workflow, name) {
   const next = rest.slice(1).search(/\n {2}[a-z][a-z-]*:\n/);
   return next < 0 ? rest : rest.slice(0, next + 1);
 }
+
+// The update under comparison can be one of these pins itself, and then the base names an image
+// the candidate no longer does. Pulling one inventory leaves the base leg with no image to start.
+test("given a pinned image is what changed, when the pull step runs, then both inventories are pulled", () => {
+  // given
+  const comparison = jobIn(build, "tool-update-comparison");
+  const pull = comparison.slice(comparison.indexOf("- name: Pull pinned assessment images"));
+
+  // when / then
+  assert.match(pull, /\{ node tools\/security-image-inventory\.mjs active\n/);
+  assert.match(pull,
+    /\n\s+node "\$RUNNER_TEMP\/courtside-security-base\/tools\/security-image-inventory\.mjs" active\n/,
+    "the base leg's own pins have to be pulled, or a bumped image leaves it nothing to run");
+});
 
 // A job that runs and skips every step reports success, which reads in a pull request exactly like
 // a comparison that ran. Only a job GitHub never starts is shown as skipped.
