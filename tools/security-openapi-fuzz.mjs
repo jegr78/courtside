@@ -494,7 +494,7 @@ function counterexampleCandidate(counterexample, plan, context, observedAt) {
     attackClass: "contract-boundary",
     provenance: {
       tool: "schemathesis",
-      version: "4.25.0",
+      version: "4.25.2",
       runId: plan.runId,
       attempt: context.attempt,
       targetFingerprint: plan.targetFingerprint,
@@ -564,7 +564,7 @@ function undocumentedRouteCandidate(route, plan, context, observedAt) {
     parameter: "route",
     attackClass: "unexpected-api-route",
     provenance: {
-      tool: "schemathesis", version: "4.25.0", runId: plan.runId, attempt: context.attempt,
+      tool: "schemathesis", version: "4.25.2", runId: plan.runId, attempt: context.attempt,
       targetFingerprint: plan.targetFingerprint, observedAt
     },
     evidence: [{

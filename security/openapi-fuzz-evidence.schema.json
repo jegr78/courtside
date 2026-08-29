@@ -8,7 +8,7 @@
     "schemaVersion": { "const": 3 },
     "testIds": { "const": ["CSA-API-001", "CSA-IMPORT-001"] },
     "targetFingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-    "image": { "type": "string", "pattern": "^schemathesis/schemathesis:4\\.25\\.0@sha256:[a-f0-9]{64}$" },
+    "image": { "type": "string", "pattern": "^schemathesis/schemathesis:v4\\.25\\.2@sha256:[a-f0-9]{64}$" },
     "policyDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "specificationDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "seed": { "type": "integer", "minimum": 1 },
