@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 import { GenericContainer, Network, Wait,
   type StartedNetwork, type StartedTestContainer } from "testcontainers";
 import type { FullConfig } from "@playwright/test";
+import { awaitReadiness } from "./application-readiness";
 import { requireBuiltAfterItsSources } from "./build-freshness";
 import {
   applicationLogBuffer,
@@ -118,21 +119,17 @@ function publicKeyFingerprints(certificates: string): string[] {
 }
 
 async function waitForApplication(application: ChildProcess, baseURL: string): Promise<void> {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    if (application.exitCode !== null) {
-      throw new Error(`Courtside stopped with exit code ${application.exitCode} while starting`
-        + ` on ${baseURL}. Its own output says why, above this line.`);
-    }
-    try {
-      const response = await fetch(`${baseURL}/actuator/health`);
-      if (response.ok) {
-        return;
+  await awaitReadiness({
+    exitCode: () => application.exitCode,
+    probe: async () => {
+      try {
+        return (await fetch(`${baseURL}/actuator/health`)).ok;
+      } catch {
+        return false;
       }
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-  }
-  throw new Error("Courtside did not become ready");
+    },
+    pause: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+  }, baseURL);
 }
 
 async function seedJourneyData(postgres: StartedTestContainer, visualDate: string): Promise<void> {
