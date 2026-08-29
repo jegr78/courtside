@@ -53,17 +53,17 @@ function deployedImage(composeFile: string, pattern: RegExp, what: string): stri
 }
 
 function deployedPostgresImage(): string {
-  return deployedImage("compose.yaml", /postgres:[\w.-]+@sha256:[a-f0-9]{64}/, "PostgreSQL");
+  return deployedImage("compose.yaml", /postgres(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "PostgreSQL");
 }
 
 // The relay a journey reads is the one the deployment's mail smoke test already runs against.
 function deployedMailSinkImage(): string {
   return deployedImage("compose.mail-smoke.yaml",
-    /axllent\/mailpit:[\w.-]+@sha256:[a-f0-9]{64}/, "Mailpit");
+    /axllent\/mailpit(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "Mailpit");
 }
 
 function deployedProxyImage(): string {
-  return deployedImage("compose.yaml", /caddy:[\w.-]+@sha256:[a-f0-9]{64}/, "Caddy");
+  return deployedImage("compose.yaml", /caddy(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "Caddy");
 }
 
 // Courtside requires STARTTLS of every relay, and Mailpit offers it only when it holds a certificate.
