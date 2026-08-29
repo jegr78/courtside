@@ -166,7 +166,24 @@ async (language) => {
     render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
 
     // then
-    expect(await screen.findByTestId("messages-empty")).toHaveTextContent("Nothing has been sent yet.");
+    expect(await screen.findByTestId("messages-empty")).toHaveTextContent(
+      "Messages sent by Courtside appear here. Create or change a booking to trigger the first notification."
+    );
     expect(screen.queryByTestId("message-row")).not.toBeInTheDocument();
+  });
+
+  it("given no message needs attention, when filtering unsettled messages, then the empty state names how to see the log", async () => {
+    // given
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
+    render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
+    await screen.findByTestId("messages-empty");
+
+    // when
+    await userEvent.click(screen.getByTestId("messages-unsettled-filter"));
+
+    // then
+    expect(await screen.findByTestId("messages-empty")).toHaveTextContent(
+      "Rejected or failed messages appear here. Clear the filter to view all messages."
+    );
   });
 });

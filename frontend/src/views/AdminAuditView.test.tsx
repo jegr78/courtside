@@ -237,7 +237,9 @@ describe("AdminAuditView", () => {
     render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
 
     // then
-    expect(await screen.findByTestId("audit-empty")).toHaveTextContent("Nothing recorded yet.");
+    expect(await screen.findByTestId("audit-empty")).toHaveTextContent(
+      "Administrative changes appear here. Change club settings, people or facilities to create the first entry."
+    );
     expect(screen.queryByTestId("audit-load-more")).not.toBeInTheDocument();
   });
 

@@ -71,6 +71,29 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   expect(screen.getByTestId("booking-44444444-4444-4444-4444-444444444444")).toHaveTextContent("Centre Court");
 });
 
+it("given no appointments or participations, when loaded, then every empty section names its next step", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockResolvedValue({ items: [] });
+  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [] });
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
+
+  // then
+  expect(await screen.findByTestId("upcoming-bookings")).toHaveTextContent(
+    "Your future bookings appear here. Choose a free time on the court plan to create one."
+  );
+  expect(screen.getByTestId("past-bookings")).toHaveTextContent(
+    "Your completed and cancelled bookings appear here after their date has passed."
+  );
+  expect(screen.getByTestId("managed-bookings")).toHaveTextContent(
+    "Appointments covered by your club role appear here. Create an appointment series below or wait for a matching booking."
+  );
+  expect(screen.getByTestId("participations")).toHaveTextContent(
+    "Bookings where another member names you as a player appear here. Ask the booking member to add you."
+  );
+});
+
 it("given an actionable booking, when actions are shown, then labels are concise and accessible names retain context", async () => {
   // when
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);

@@ -208,6 +208,8 @@ describe("AdminRosterView", () => {
     render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
 
     // then
-    expect(await screen.findByTestId("roster-empty")).toBeInTheDocument();
+    expect(await screen.findByTestId("roster-empty")).toHaveTextContent(
+      "People matching the current filters appear here. Change the search or add a person below."
+    );
   });
 });

@@ -46,7 +46,9 @@ describe("ExternalReferencePanel", () => {
     show();
 
     // then
-    expect(await screen.findByTestId("no-references")).toBeInTheDocument();
+    expect(await screen.findByTestId("no-references")).toHaveTextContent(
+      "Members linked to external identifiers appear here. Run an import or link a person below."
+    );
   });
 
   it("given a person the file already knows, when they are linked by hand, then the link is written", async () => {
