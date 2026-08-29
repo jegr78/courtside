@@ -25,6 +25,10 @@ test("given generated transport code, when reporting coverage, then it is not co
   assert.match(vite, /src\/api\/schema\.d\.ts/);
 });
 
+test("given concurrent local builds, when Vitest schedules files, then its worker pool stays bounded", () => {
+  assert.match(vite, /maxWorkers: 2/);
+});
+
 test("given a pull request, when coverage is collected, then changed critical decisions receive context without a percentage gate", () => {
   assert.match(build, /tools\/coverage-diff\.mjs/);
   assert.doesNotMatch(pom, /<minimum>/);
