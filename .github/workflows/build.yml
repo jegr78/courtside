@@ -177,6 +177,7 @@ jobs:
       - name: Pull pinned assessment images
         run: |
           # Both sides: the update under comparison can itself be one of these pins.
+          set -o pipefail
           { node tools/security-image-inventory.mjs active
             node "$RUNNER_TEMP/courtside-security-base/tools/security-image-inventory.mjs" active
           } | sort -u | xargs -n1 docker pull

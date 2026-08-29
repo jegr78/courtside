@@ -176,6 +176,8 @@ test("given a pinned image is what changed, when the pull step runs, then both i
   assert.match(pull,
     /\n\s+node "\$RUNNER_TEMP\/courtside-security-base\/tools\/security-image-inventory\.mjs" active\n/,
     "the base leg's own pins have to be pulled, or a bumped image leaves it nothing to run");
+  assert.match(pull, /set -o pipefail/,
+    "an inventory that fails at the head of the pipeline is otherwise reported by xargs alone");
 });
 
 // A job that runs and skips every step reports success, which reads in a pull request exactly like
