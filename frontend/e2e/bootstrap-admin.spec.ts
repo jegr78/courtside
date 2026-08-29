@@ -272,6 +272,7 @@ test("an admin changes club configuration and a booking rule through the browser
   // when
   const clubName = page.getByTestId("club-name");
   await clubName.fill("Example Racquet Club");
+  await page.getByTestId("logo-url").fill("/icon.svg");
   await clubName.press("Tab");
   await expect(clubName).toHaveValue("Example Racquet Club");
   const withoutMembershipType = page.getByTestId("no-membership-type-rule-set");
@@ -290,6 +291,23 @@ test("an admin changes club configuration and a booking rule through the browser
   expect(changedConfig.noMembershipTypeRuleSetId).toBe(offered);
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
   await expect(page.getByTestId("club-brand-name")).toHaveText("Example Racquet Club");
+  await page.getByTestId("logo-file").setInputFiles({
+    name: "club.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+  });
+  const logoUploaded = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/config/logo") && response.request().method() === "PUT"
+  );
+  await page.getByTestId("upload-logo").click();
+  expect((await logoUploaded).status()).toBe(200);
+  await expect(page.getByTestId("club-logo")).toHaveAttribute("src", /\/api\/public\/config\/logo\?v=[0-9a-f]{64}$/);
+  const logoRemoved = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/config/logo") && response.request().method() === "DELETE"
+  );
+  await page.getByTestId("remove-logo").click();
+  expect((await logoRemoved).status()).toBe(200);
+  await expect(page.getByTestId("club-logo")).toHaveAttribute("src", "/icon.svg");
   await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");
   const ruleSaved = page.waitForResponse((response) =>
     response.url().includes("/api/admin/rule-sets/")

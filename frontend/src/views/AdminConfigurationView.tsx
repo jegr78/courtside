@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
@@ -23,6 +23,7 @@ import { useFragmentTarget } from "../navigation/useFragmentTarget";
 import { brandContrast } from "../brandColor";
 
 const RULE_SET_NAME_LENGTH = 60;
+const MAX_LOGO_BYTES = 1024 * 1024;
 
 function BrandColorField({ kind, label, value, changed }: {
   kind: "primary" | "accent";
@@ -88,6 +89,10 @@ function timeZones(current: string): string[] {
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const [config, setConfig] = useState<ClubConfigRequest>();
+  const [logo, setLogo] = useState<{ url?: string | null; uploaded: boolean }>();
+  const [logoFile, setLogoFile] = useState<File>();
+  const [configurationPending, setConfigurationPending] = useState(false);
+  const logoInput = useRef<HTMLInputElement>(null);
   const [supported, setSupported] = useState<string[]>();
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
   const [ruleTypes, setRuleTypes] = useState<RuleTypeConfiguration[]>([]);
@@ -108,6 +113,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       .then(([loadedConfig, loadedRuleSets, loadedRuleTypes, loadedMembershipTypes]) => {
         if (!active) return;
         setConfig((current) => current ?? editable(loadedConfig));
+        setLogo((current) => current ?? { url: loadedConfig.logoUrl, uploaded: loadedConfig.logoUploaded });
         setSupported(loadedConfig.supportedLocales);
         setRuleSets(loadedRuleSets);
         setRuleTypes(loadedRuleTypes);
@@ -211,18 +217,80 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     setConfig((current) => current ? { ...current, ...changed } : current);
   }
 
+  function selectLogoFile(event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files?.[0];
+    setLogoFile(undefined);
+    if (!selected) return;
+    if (selected.size > MAX_LOGO_BYTES) {
+      setError(t("config.logo.tooLarge"));
+      event.target.value = "";
+      return;
+    }
+    if (selected.type && selected.type !== "image/png" && selected.type !== "image/jpeg") {
+      setError(t("config.logo.format"));
+      event.target.value = "";
+      return;
+    }
+    setError(undefined);
+    setLogoFile(selected);
+  }
+
+  function applyLogoConfiguration(changed: AdminClubConfig) {
+    setConfig(editable(changed));
+    setLogo({ url: changed.logoUrl, uploaded: changed.logoUploaded });
+    configurationChanged(changed);
+  }
+
+  async function uploadLogo() {
+    if (!logoFile || configurationPending) return;
+    setConfigurationPending(true);
+    setError(undefined);
+    setSuccess(undefined);
+    try {
+      const changed = await api.uploadClubLogo(logoFile);
+      applyLogoConfiguration(changed);
+      setLogoFile(undefined);
+      if (logoInput.current) logoInput.current.value = "";
+      setSuccess(t("admin.config.logoUploaded"));
+    } catch (failure) {
+      setError(problemMessage(failure, t));
+    } finally {
+      setConfigurationPending(false);
+    }
+  }
+
+  async function removeLogo() {
+    if (configurationPending) return;
+    setConfigurationPending(true);
+    setError(undefined);
+    setSuccess(undefined);
+    try {
+      const changed = await api.deleteClubLogo();
+      applyLogoConfiguration(changed);
+      setSuccess(t("admin.config.logoRemoved"));
+    } catch (failure) {
+      setError(problemMessage(failure, t));
+    } finally {
+      setConfigurationPending(false);
+    }
+  }
+
   async function saveConfig(event: FormEvent) {
     event.preventDefault();
-    if (!config) return;
+    if (!config || configurationPending) return;
+    setConfigurationPending(true);
     setError(undefined);
     setSuccess(undefined);
     try {
       const changed = await api.changeAdminConfig(config);
-      setConfig(changed);
+      setConfig(editable(changed));
+      setLogo({ url: changed.logoUrl, uploaded: changed.logoUploaded });
       configurationChanged(changed);
       setSuccess(t("admin.config.saved"));
     } catch (failure) {
       setError(problemMessage(failure, t));
+    } finally {
+      setConfigurationPending(false);
     }
   }
 
@@ -248,9 +316,9 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
     </div>
     {!config
-      ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+      ? (error ? <Alert testId="admin-error">{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
-        {error && <Alert>{error}</Alert>}
+        {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
         <form noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5">
           <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
@@ -258,7 +326,31 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <div className="grid gap-5 sm:grid-cols-2">
             <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />
             <BrandColorField kind="accent" label={t("admin.config.accentColor")} value={config.accentColor} changed={(accentColor) => changeConfig({ accentColor })} />
-            <TextField data-testid="logo-url" label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""} onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
+            <fieldset className="grid gap-3 rounded-xl border p-4 sm:col-span-2">
+              <legend className="px-1 font-semibold">{t("admin.config.logo")}</legend>
+              {logo?.url && <img data-testid="logo-preview" src={logo.url} alt={t("admin.config.logoPreview")}
+                                className="max-h-32 max-w-64 object-contain" />}
+              <label className="grid gap-2 font-medium">
+                {t("admin.config.logoFile")}
+                <input ref={logoInput} data-testid="logo-file" type="file" accept="image/png,image/jpeg"
+                       disabled={configurationPending} onChange={selectLogoFile}
+                       className="form-control rounded-lg border px-3 py-3" />
+              </label>
+              <p className="text-muted text-sm">{t("admin.config.logoHelp")}</p>
+              <div className="flex flex-wrap gap-3">
+                <Button data-testid="upload-logo" type="button" variant="secondary"
+                        disabled={!logoFile || configurationPending} onClick={() => void uploadLogo()}>
+                  {t("admin.config.logoUpload")}
+                </Button>
+                {logo?.uploaded && <Button data-testid="remove-logo" type="button" variant="destructive"
+                                          disabled={configurationPending} onClick={() => void removeLogo()}>
+                  {t("admin.config.logoRemove")}
+                </Button>}
+              </div>
+              <TextField data-testid="logo-url" label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""}
+                         onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
+              <p className="text-muted text-sm">{t("admin.config.logoUrlHelp")}</p>
+            </fieldset>
             <TextField data-testid="imprint-url" label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
             <TextField data-testid="privacy-url" label={t("admin.config.privacyUrl")} value={config.privacyUrl ?? ""} onChange={(event) => changeConfig({ privacyUrl: event.target.value || null })} />
           </div>
@@ -296,7 +388,8 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             </label>
             <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
           </div>
-          <Button variant="primary" data-testid="save-club-config" className="justify-self-start" type="submit">{t("admin.save")}</Button>
+          <Button variant="primary" data-testid="save-club-config" className="justify-self-start" type="submit"
+                  disabled={configurationPending}>{t("admin.save")}</Button>
         </form>
         <div className="grid gap-5">
           <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
