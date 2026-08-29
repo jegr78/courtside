@@ -18,7 +18,7 @@ jobs:
         order: [reversealphabetical, random]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -50,7 +50,7 @@ jobs:
         project_order: [configured, reversed]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -107,7 +107,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
