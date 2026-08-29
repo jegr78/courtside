@@ -104,6 +104,19 @@ test("givenAnUnselectedJobIsSkipped_whenObservingCoverage_thenTheReducedAttemptI
   assert.equal(observation.classificationOutcome, "no-observed-miss");
 });
 
+test("givenAnUnselectedJobHasNoConclusiveOutcome_whenObservingCoverage_thenTheAttemptIsIncomplete", () => {
+  // given
+  const cancelled = { ...timing, outcome: "cancelled", jobs: timing.jobs.map((job) =>
+    job.name === "frontend" ? { ...job, outcome: "cancelled" } : job) };
+
+  // when
+  const observation = createProfileObservation(plan, cancelled);
+
+  // then
+  assert.deepEqual(observation.incompleteJobs, [{ name: "frontend", outcome: "cancelled" }]);
+  assert.equal(observation.classificationOutcome, "observation-incomplete");
+});
+
 test("givenAPlanFromAnotherRunAttemptOrCommit_whenObservingCoverage_thenItFailsClosed", () => {
   // when / then
   assert.throws(() => createProfileObservation({ ...plan, runId: 102 }, timing), /identity/);
@@ -166,6 +179,19 @@ test("givenASelectedJobDoesNotReachAResult_whenObservingCoverage_thenTheAttemptI
   assert.equal(observation.classificationOutcome, "observation-incomplete");
 });
 
+test("givenASelectedJobFails_whenObservingCoverage_thenTheAttemptCannotQualify", () => {
+  // given
+  const failed = { ...timing, outcome: "failure", jobs: timing.jobs.map((job) =>
+    job.name === "backend" ? { ...job, outcome: "failure" } : job) };
+
+  // when
+  const observation = createProfileObservation(plan, failed);
+
+  // then
+  assert.deepEqual(observation.incompleteJobs, [{ name: "backend", outcome: "failure" }]);
+  assert.equal(observation.classificationOutcome, "observation-incomplete");
+});
+
 test("givenHistoricalFirstAttempts_whenSummarizing_thenSampleLimitsAndMissesStayVisible", () => {
   // given
   const observations = Array.from({ length: 20 }, (_, index) => ({
@@ -188,8 +214,8 @@ test("givenHistoricalFirstAttempts_whenSummarizing_thenSampleLimitsAndMissesStay
   assert.equal(summary.sampleSize, 20);
   assert.equal(summary.observedFirstAttemptCount, 20);
   assert.equal(summary.windowDays, 19);
-  assert.equal(summary.fullProfileCount, 0);
-  assert.equal(summary.fullProfileRate, 0);
+  assert.equal(summary.fullProfileCount, 20);
+  assert.equal(summary.fullProfileRate, 1);
   assert.equal(summary.candidateMissCount, 1);
   assert.equal(summary.status, "under-classification-observed");
   assert.equal(validateSummary(summary), true, JSON.stringify(validateSummary.errors));
@@ -259,8 +285,12 @@ test("givenAQualifiedSummary_whenRenderingTheFinalReport_thenSampleWindowAndLimi
     ...plan, profiles: ["frontend"],
     reasons: [{ code: "prefix:frontend/", path: "frontend/src/App.tsx", profile: "frontend", status: "M" }]
   };
+  const backendTiming = { ...timing, jobs: timing.jobs.map((job) =>
+    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
+  const frontendTiming = { ...timing, jobs: timing.jobs.map((job) =>
+    job.name === "backend" ? { ...job, outcome: "skipped" } : job) };
   const observations = Array.from({ length: 20 }, (_, index) => ({
-    ...createProfileObservation(index === 0 ? frontendPlan : plan, timing),
+    ...createProfileObservation(index === 0 ? frontendPlan : plan, index === 0 ? frontendTiming : backendTiming),
     runId: 301 + index,
     startedAt: new Date(Date.parse("2026-08-28T10:00:00.000Z") + index * 6 * 60 * 60 * 1000).toISOString()
   }));
@@ -279,8 +309,10 @@ test("givenAQualifiedSummary_whenRenderingTheFinalReport_thenSampleWindowAndLimi
 
 test("givenReducedEvidenceFromOnlyOneProfile_whenSummarizing_thenTheOtherProfileRemainsUnqualified", () => {
   // given
+  const reducedTiming = { ...timing, jobs: timing.jobs.map((job) =>
+    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
   const observations = Array.from({ length: 20 }, (_, index) => ({
-    ...createProfileObservation(plan, timing), runId: 501 + index
+    ...createProfileObservation(plan, reducedTiming), runId: 501 + index
   }));
 
   // when
@@ -289,6 +321,23 @@ test("givenReducedEvidenceFromOnlyOneProfile_whenSummarizing_thenTheOtherProfile
   // then
   assert.equal(summary.profileCounts.backend, 20);
   assert.equal(summary.profileCounts.frontend, 0);
+  assert.equal(summary.status, "collecting");
+});
+
+test("givenAProposedReducedProfileRunsEveryJob_whenSummarizing_thenItIsShadowEvidenceNotNaturalReduction", () => {
+  // given
+  const observations = Array.from({ length: 20 }, (_, index) => ({
+    ...createProfileObservation(plan, timing), runId: 701 + index
+  }));
+
+  // when
+  const summary = summarizeProfileObservations(observations, inventoryFor(observations));
+
+  // then
+  assert.equal(summary.sampleSize, 20);
+  assert.equal(summary.fullProfileCount, 20);
+  assert.equal(summary.reducedProfileCount, 0);
+  assert.equal(summary.profileCounts.backend, 0);
   assert.equal(summary.status, "collecting");
 });
 
