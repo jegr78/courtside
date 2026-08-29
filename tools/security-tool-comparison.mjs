@@ -87,6 +87,21 @@ function expectedPlan(contractPath, catalogPath, profile) {
   return { catalogVersion: catalog.catalogVersion, budgets: contract.profiles[profile], selectedTests, tools };
 }
 
+// A tool ends incomplete for six reasons and only two of them mint a candidate, so a refusal that
+// names the missing candidates alone leaves its reader with nothing to look at.
+function incompleteCases(evidence) {
+  const incomplete = ({ outcome }) => outcome === "incomplete";
+  const cases = [
+    ...(evidence.operations ?? []).flatMap((operation) => (operation.outcomes ?? []).filter(incomplete)
+      .map(({ mode, observation }) => `${operation.method} ${operation.path} ${mode}/${observation}`)),
+    ...(evidence.inputCases ?? []).filter(incomplete).map(({ id, observation }) => `input ${id}/${observation}`),
+    ...(evidence.importCases ?? []).filter(incomplete).map(({ id, observation }) => `import ${id}/${observation}`),
+    ...(evidence.mutationCases ?? []).filter(incomplete)
+      .map(({ method, path, observation }) => `mutation ${method} ${path}/${observation}`)
+  ];
+  return cases.length === 0 ? "none, so the outcome disagrees with every case it was drawn from" : cases.join(", ");
+}
+
 function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, contractPath, catalogPath,
   allowUnattributedIncomplete = false) {
   const bytes = readFileSync(manifestPath, "utf8");
@@ -124,7 +139,8 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
     if (evidence.outcome !== result.outcome) fail(`${result.id} evidence outcome differs from its tool result`);
     if (result.outcome === "incomplete" && (!Array.isArray(evidence.candidates) || evidence.candidates.length === 0)
         && !allowUnattributedIncomplete) {
-      fail(`${result.id} is incomplete without retained finding candidates`);
+      fail(`${result.id} is incomplete without retained finding candidates,`
+        + ` and the cases that ended incomplete are: ${incompleteCases(evidence)}`);
     }
     if (result.outcome === "incomplete" && evidence.candidates.length === 0) unattributedIncomplete = true;
   }

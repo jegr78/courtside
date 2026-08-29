@@ -47,7 +47,9 @@ jobs:
         name: Resolve the immutable local image digest
         run: echo "digest=$(docker image inspect courtside:uat-local --format '{{.Id}}')" >> "$GITHUB_OUTPUT"
       - name: Prepare pinned assessment images
-        run: frontend/node/node tools/security-image-inventory.mjs "$PROFILE" | xargs -n1 docker pull
+        run: |
+          set -o pipefail
+          frontend/node/node tools/security-image-inventory.mjs "$PROFILE" | xargs -n1 docker pull
       - name: Start the disposable security target
         env:
           IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}

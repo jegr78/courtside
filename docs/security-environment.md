@@ -15,7 +15,7 @@ The application networks have no Internet route and every service uses `pull_pol
 docker pull postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
 docker pull caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 docker pull zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
-docker pull schemathesis/schemathesis:4.25.0@sha256:980d159d1211ed2ef1f571aa8c6876955c6699dfd6463b8b5f28e788aa61e25e
+docker pull schemathesis/schemathesis:4.25.2@sha256:72d6907a936f7b5f08f137c8f84c89eb3ab7834956d9af416e7b6510ebe4e065
 node tools/courtside.mjs security run-0001 ghcr.io/jegr78/courtside@sha256:<digest>
 ```
 

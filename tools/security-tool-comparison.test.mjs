@@ -31,6 +31,7 @@ function runtimeRoot(root, name) {
     $schema: "https://json-schema.org/draft/2020-12/schema", type: "object", additionalProperties: false,
     required: ["outcome", "candidates"], properties: {
       outcome: { enum: ["passed", "failed", "incomplete"] },
+      operations: { type: "array" },
       candidates: { type: "array", items: { type: "object", additionalProperties: false,
         required: ["fingerprint"], properties: { fingerprint: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" } } } }
     }
@@ -153,7 +154,9 @@ test("given an unattributed incomplete baseline, when the candidate stays incomp
   writeFileSync(join(base.evidence, "openapi-fuzz.json"),
     JSON.stringify({ outcome: "incomplete", candidates: [] }));
   writeFileSync(join(candidate.evidence, "openapi-fuzz.json"),
-    JSON.stringify({ outcome: "incomplete", candidates: [] }));
+    JSON.stringify({ outcome: "incomplete", candidates: [],
+      operations: [{ operationId: "uploadClubLogo", method: "POST", path: "/api/admin/config/logo",
+        outcomes: [{ mode: "negative", outcome: "incomplete", observation: "candidate-requires-triage" }] }] }));
 
   // when / then
   assert.throws(() => compareSecurityToolRuns({
@@ -161,7 +164,7 @@ test("given an unattributed incomplete baseline, when the candidate stays incomp
     baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
     candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
     candidateRef: "b".repeat(40), candidateContract: contractPath, candidateCatalog: catalogPath
-  }), /incomplete without retained finding candidates/);
+  }), /POST \/api\/admin\/config\/logo negative\/candidate-requires-triage/);
 });
 
 test("given runs for different fixtures or incomplete tool evidence, when comparing them, then the report fails closed", () => {

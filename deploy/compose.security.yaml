@@ -201,7 +201,7 @@ services:
 
   schemathesis:
     profiles: [assessment]
-    image: schemathesis/schemathesis:4.25.0@sha256:980d159d1211ed2ef1f571aa8c6876955c6699dfd6463b8b5f28e788aa61e25e
+    image: schemathesis/schemathesis:4.25.2@sha256:72d6907a936f7b5f08f137c8f84c89eb3ab7834956d9af416e7b6510ebe4e065
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true
