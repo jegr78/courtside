@@ -19,6 +19,30 @@ beforeEach(async () => {
   await i18n.changeLanguage("de");
 });
 
+async function openPreferences() {
+  await userEvent.click(screen.getByTestId("preferences-menu"));
+}
+
+it("given preferences chosen once, when the header is shown, then they stay inside a compact account menu", async () => {
+  // given
+  render(<Preferences authenticated />);
+
+  // when
+  const menu = screen.getByTestId("preferences-menu");
+
+  // then
+  expect(menu).toHaveTextContent("Konto und Darstellung");
+  expect(document.getElementById("locale-preference")).not.toBeVisible();
+  expect(document.getElementById("theme-preference")).not.toBeVisible();
+
+  // when
+  await userEvent.click(menu);
+
+  // then
+  expect(document.getElementById("locale-preference")).toBeVisible();
+  expect(document.getElementById("theme-preference")).toBeVisible();
+});
+
 it("whenNoThemeWasSelected_thenDarkModeIsTheDefault", () => {
   // when
   render(<Preferences />);
@@ -31,6 +55,7 @@ it("whenNoThemeWasSelected_thenDarkModeIsTheDefault", () => {
 it("givenDarkMode_whenSelectingLightMode_thenThePreferenceIsAppliedAndStored", async () => {
   // given
   render(<Preferences />);
+  await openPreferences();
 
   // when
   await userEvent.selectOptions(document.getElementById("theme-preference")!, "light");
@@ -45,6 +70,7 @@ it("givenDarkMode_whenSelectingLightMode_thenThePreferenceIsAppliedAndStored", a
 it("givenGerman_whenSelectingEnglish_thenTheWholeInterfaceUsesAndStoresEnglish", async () => {
   // given
   render(<Preferences />);
+  await openPreferences();
 
   // when
   await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
@@ -80,6 +106,7 @@ it("givenASignedInMember_whenSelectingAnotherLanguage_thenTheAccountIsToldSoTheN
   // given
   const stored = vi.spyOn(api, "changeOwnLocale").mockResolvedValue(undefined);
   render(<Preferences authenticated />);
+  await openPreferences();
 
   // when
   await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
@@ -92,6 +119,7 @@ it("givenNobodySignedIn_whenSelectingAnotherLanguage_thenNoAccountIsWrittenTo", 
   // given
   const stored = vi.spyOn(api, "changeOwnLocale").mockResolvedValue(undefined);
   render(<Preferences />);
+  await openPreferences();
 
   // when
   await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
@@ -105,12 +133,15 @@ it("givenTheAccountRefusesTheChange_whenSelectingAnotherLanguage_thenTheMemberIs
   // given
   vi.spyOn(api, "changeOwnLocale").mockRejectedValue(new ApiError(403));
   render(<Preferences authenticated />);
+  await openPreferences();
 
   // when
   await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
 
   // then — the page has already switched, so silence would leave the two disagreeing unnoticed
   expect(await screen.findByTestId("locale-not-stored")).toBeInTheDocument();
+  await userEvent.click(screen.getByTestId("preferences-menu"));
+  expect(screen.getByTestId("locale-not-stored")).toBeVisible();
 });
 
 it("givenAnInstanceThatShipsOneLanguage_whenOfferingTheChoice_thenOnlyThatOneIsOffered", () => {

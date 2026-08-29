@@ -1,4 +1,4 @@
-import { expect, selectJourneyDate, test } from "./fixtures";
+import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { credentialIn, messagesTo, messageTo } from "./mailbox";
 
 function freeSlot(page: import("@playwright/test").Page, court: number, slot: string) {
@@ -16,8 +16,8 @@ test("language and theme preferences persist across reloads", async ({ page }) =
   await expect(page.locator("#theme-preference")).toHaveValue("dark");
 
   // when
-  await page.locator("#locale-preference").selectOption("en");
-  await page.locator("#theme-preference").selectOption("light");
+  await selectPreference(page, "#locale-preference", "en");
+  await selectPreference(page, "#theme-preference", "light");
   await page.reload();
 
   // then

@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, selectJourneyDate, test } from "./fixtures";
+import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { productFailure } from "./browser-diagnostics";
 
 async function expectNoWcagViolations(page: import("@playwright/test").Page) {
@@ -25,11 +25,25 @@ async function tabToTestId(page: import("@playwright/test").Page, testId: string
   throw productFailure(`Keyboard focus did not reach ${testId}`);
 }
 
+test("account preferences open from the keyboard and remain accessible", async ({ page }) => {
+  // given
+  await page.goto("/");
+  await page.getByTestId("preferences-menu").focus();
+
+  // when
+  await page.keyboard.press("Enter");
+
+  // then
+  await expect(page.locator("#locale-preference")).toBeVisible();
+  await expect(page.locator("#theme-preference")).toBeVisible();
+  await expectNoWcagViolations(page);
+});
+
 for (const locale of ["de", "en"]) {
   test(`${locale} public and login views meet automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
 
     // when / then
     await expectNoWcagViolations(page);
@@ -40,7 +54,7 @@ for (const locale of ["de", "en"]) {
   test(`${locale} member views and booking dialog meet automated WCAG 2.2 AA checks`, async ({ page, journeyService }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "doe.jane");
 
     // when / then
@@ -61,7 +75,7 @@ for (const locale of ["de", "en"]) {
   test(`${locale} the series form meets automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "sport.major");
     await page.getByTestId("my-bookings-link").click();
 
@@ -76,7 +90,7 @@ for (const locale of ["de", "en"]) {
   test(`${locale} administration configuration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "configuration-admin");
 
     // when
@@ -91,7 +105,7 @@ for (const locale of ["de", "en"]) {
   test(`${locale} facility and audit administration meet automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "configuration-admin");
 
     // when
@@ -120,7 +134,7 @@ for (const locale of ["de", "en"]) {
   test(`${locale} roster administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "configuration-admin");
 
     // when
@@ -135,7 +149,7 @@ for (const locale of ["de", "en"]) {
   test(`${locale} one person's administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "configuration-admin");
     await page.goto("/admin/roster");
     await expect(page.getByTestId("create-person")).toBeVisible();
@@ -152,7 +166,7 @@ for (const locale of ["de", "en"]) {
   test(`${locale} membership type administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "configuration-admin");
 
     // when
@@ -167,7 +181,7 @@ for (const locale of ["de", "en"]) {
   test(`${locale} import administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "configuration-admin");
 
     // when
@@ -183,7 +197,7 @@ for (const locale of ["de", "en"]) {
   test(`${locale} message log administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "configuration-admin");
 
     // when — empty, because the control this view adds is the filter and it is on screen either

@@ -35,14 +35,25 @@ export function Preferences({ authenticated = false, supported }: {
     setTheme(value);
   }
 
-  return <div className="flex flex-wrap items-center justify-end gap-2">
+  return <div className="grid justify-items-end gap-2">
     {failure && <span data-testid="locale-not-stored" role="status" className="text-sm">{failure}</span>}
-    <label className="sr-only" htmlFor="locale-preference">{t("preferences.language")}</label>
-    <LocaleSelect id="locale-preference" className={controlClass} value={locale} supported={supported} changed={(value) => void changeLocale(value)} />
-    <label className="sr-only" htmlFor="theme-preference">{t("preferences.theme")}</label>
-    <select id="theme-preference" className={controlClass} value={theme} onChange={(event) => changeTheme(event.target.value as Theme)}>
-      <option value="dark">{t("preferences.dark")}</option>
-      <option value="light">{t("preferences.light")}</option>
-    </select>
+    <details className="relative">
+      <summary data-testid="preferences-menu" className="form-control cursor-pointer list-none rounded-lg border px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+        {t(authenticated ? "preferences.accountMenu" : "preferences.menu")}
+      </summary>
+      <div className="surface-panel absolute right-0 z-30 mt-2 grid w-64 max-w-[calc(100vw-2rem)] gap-4 rounded-xl border p-4 shadow-[0_20px_50px_var(--cs-shadow)]">
+        <label className="grid gap-2 text-sm font-semibold" htmlFor="locale-preference">
+          {t("preferences.language")}
+          <LocaleSelect id="locale-preference" className={controlClass} value={locale} supported={supported} changed={(value) => void changeLocale(value)} />
+        </label>
+        <label className="grid gap-2 text-sm font-semibold" htmlFor="theme-preference">
+          {t("preferences.theme")}
+          <select id="theme-preference" className={controlClass} value={theme} onChange={(event) => changeTheme(event.target.value as Theme)}>
+            <option value="dark">{t("preferences.dark")}</option>
+            <option value="light">{t("preferences.light")}</option>
+          </select>
+        </label>
+      </div>
+    </details>
   </div>;
 }

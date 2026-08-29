@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, selectPreference, test } from "./fixtures";
 
 test("an installed PWA preserves the signed-in mutation and logout journey", async ({ page }) => {
   // given
@@ -14,7 +14,7 @@ test("an installed PWA preserves the signed-in mutation and logout journey", asy
   // when
   const localeResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/account/locale") && response.request().method() === "PUT");
-  await page.locator("#locale-preference").selectOption("en");
+  await selectPreference(page, "#locale-preference", "en");
 
   // then
   expect((await localeResponse).status()).toBe(204);

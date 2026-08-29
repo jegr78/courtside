@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, selectPreference, test } from "./fixtures";
 
 async function install(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -25,7 +25,7 @@ for (const locale of ["de", "en"] as const) {
   test(`the installed ${locale} shell survives an offline launch without caching API data`, async ({ context, page }) => {
     // given
     await install(page);
-    await page.locator("#locale-preference").selectOption(locale);
+    await selectPreference(page, "#locale-preference", locale);
     await page.goto("/login");
     await page.getByTestId("username").fill("doe.jane");
     await page.getByTestId("password").fill("temporary-password");
