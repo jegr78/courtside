@@ -31,11 +31,16 @@ jobs:
           gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100" \
             --slurp | jq '{jobs: map(.jobs[]) }' > build/ci-timing/jobs.json
           RUN_HEAD=$(jq -er '.head_sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/run.json)
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${RUN_HEAD}/pulls?per_page=100" \
+          HEAD_REPOSITORY=$(jq -er '.head_repository.full_name | select(test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))' build/ci-timing/run.json)
+          HEAD_OWNER=${HEAD_REPOSITORY%%/*}
+          HEAD_BRANCH=$(jq -er '.head_branch | select(length > 0 and length <= 255)' build/ci-timing/run.json)
+          gh api --method GET --paginate "repos/${GITHUB_REPOSITORY}/pulls" \
+            -f state=all -f "head=${HEAD_OWNER}:${HEAD_BRANCH}" -f per_page=100 \
             --slurp | jq 'add' > build/ci-timing/pulls.json
-          jq -e --arg head "$RUN_HEAD" \
-            '[.[] | select(.head.sha == $head)] | select(length == 1) | .[0]' \
-            build/ci-timing/pulls.json > build/ci-timing/pr.json
+          node tools/ci-pull-request.mjs \
+            --run build/ci-timing/run.json \
+            --candidates build/ci-timing/pulls.json \
+            --output build/ci-timing/pr.json
           BASE_REF=$(jq -er '.base.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/pr.json)
           HEAD_REF=$(jq -er '.head.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/pr.json)
           test "$HEAD_REF" = "$RUN_HEAD"
