@@ -90,6 +90,20 @@ test("givenAnUnselectedJobFails_whenObservingCoverage_thenItBecomesAnUnderClassi
   assert.equal(observation.classificationOutcome, "candidate-miss");
 });
 
+test("givenAnUnselectedJobIsSkipped_whenObservingCoverage_thenTheReducedAttemptIsComplete", () => {
+  // given
+  const reduced = { ...timing, jobs: timing.jobs.map((job) =>
+    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
+
+  // when
+  const observation = createProfileObservation(plan, reduced);
+
+  // then
+  assert.deepEqual(observation.jobsOutsideProposal, ["frontend"]);
+  assert.deepEqual(observation.incompleteJobs, []);
+  assert.equal(observation.classificationOutcome, "no-observed-miss");
+});
+
 test("givenAPlanFromAnotherRunAttemptOrCommit_whenObservingCoverage_thenItFailsClosed", () => {
   // when / then
   assert.throws(() => createProfileObservation({ ...plan, runId: 102 }, timing), /identity/);
@@ -138,17 +152,17 @@ test("givenAClassifierFallback_whenObservingCoverage_thenTheClassificationErrorR
   }, timing), /fallback/);
 });
 
-test("givenAFullJobDoesNotReachAResult_whenObservingCoverage_thenTheAttemptIsIncompleteNotMissed", () => {
+test("givenASelectedJobDoesNotReachAResult_whenObservingCoverage_thenTheAttemptIsIncompleteNotMissed", () => {
   // given
   const cancelled = { ...timing, outcome: "cancelled", jobs: timing.jobs.map((job) =>
-    job.name === "frontend" ? { ...job, outcome: "cancelled" } : job) };
+    job.name === "backend" ? { ...job, outcome: "cancelled" } : job) };
 
   // when
   const observation = createProfileObservation(plan, cancelled);
 
   // then
   assert.deepEqual(observation.failuresOutsideProposal, []);
-  assert.deepEqual(observation.incompleteJobs, [{ name: "frontend", outcome: "cancelled" }]);
+  assert.deepEqual(observation.incompleteJobs, [{ name: "backend", outcome: "cancelled" }]);
   assert.equal(observation.classificationOutcome, "observation-incomplete");
 });
 
@@ -181,7 +195,7 @@ test("givenHistoricalFirstAttempts_whenSummarizing_thenSampleLimitsAndMissesStay
   assert.equal(validateSummary(summary), true, JSON.stringify(validateSummary.errors));
   assert.deepEqual(summary.limitations, [
     "Observations cover GitHub-hosted pull-request runs only.",
-    "Green jobs outside a proposal show no miss for that attempt; they do not prove classifier completeness.",
+    "A completed reduced run proves its selected gates, not the completeness of the classifier.",
     "Candidate misses require rule correction and a new qualifying observation window."
   ]);
 });
@@ -194,9 +208,9 @@ test("givenRerunsOrContradictoryRecords_whenSummarizing_thenTheyCannotImproveThe
   const incomplete = {
     ...first,
     runId: 103,
-    actualJobs: first.actualJobs.map((job) => job.name === "frontend"
+    actualJobs: first.actualJobs.map((job) => job.name === "backend"
       ? { ...job, outcome: "cancelled" } : job),
-    incompleteJobs: [{ name: "frontend", outcome: "cancelled" }],
+    incompleteJobs: [{ name: "backend", outcome: "cancelled" }],
     classificationOutcome: "observation-incomplete"
   };
 
@@ -276,6 +290,35 @@ test("givenReducedEvidenceFromOnlyOneProfile_whenSummarizing_thenTheOtherProfile
   assert.equal(summary.profileCounts.backend, 20);
   assert.equal(summary.profileCounts.frontend, 0);
   assert.equal(summary.status, "collecting");
+});
+
+test("givenCompletedReducedProfilesWithExpectedSkippedJobs_whenSummarizing_thenTheyQualify", () => {
+  // given
+  const frontendPlan = {
+    ...plan, profiles: ["frontend"],
+    reasons: [{ code: "prefix:frontend/", path: "frontend/src/App.tsx", profile: "frontend", status: "M" }]
+  };
+  const backendTiming = { ...timing, jobs: timing.jobs.map((job) =>
+    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
+  const frontendTiming = { ...timing, jobs: timing.jobs.map((job) =>
+    job.name === "backend" ? { ...job, outcome: "skipped" } : job) };
+  const fullPlan = { ...plan, profiles: ["full"], isFull: true };
+  const observations = Array.from({ length: 20 }, (_, index) => {
+    const selectedPlan = index === 0 ? plan : index < 3 ? frontendPlan : fullPlan;
+    const selectedTiming = index === 0 ? backendTiming : index < 3 ? frontendTiming : timing;
+    return { ...createProfileObservation(selectedPlan, selectedTiming), runId: 601 + index };
+  });
+
+  // when
+  const summary = summarizeProfileObservations(observations, inventoryFor(observations));
+
+  // then
+  assert.equal(summary.sampleSize, 20);
+  assert.equal(summary.reducedProfileCount, 3);
+  assert.equal(summary.profileCounts.backend, 1);
+  assert.equal(summary.profileCounts.frontend, 2);
+  assert.equal(summary.incompleteObservationCount, 0);
+  assert.equal(summary.status, "ready-for-review");
 });
 
 test("givenCompletedGitHubRuns_whenCreatingTheInventory_thenEveryFirstAttemptInTheWindowIsRequired", () => {

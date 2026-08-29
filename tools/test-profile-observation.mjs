@@ -85,7 +85,8 @@ export function createProfileObservation(plan, timing) {
   const jobsOutsideProposal = controlledJobs.filter((job) => !proposedJobs.includes(job));
   const failuresOutsideProposal = actualJobs.filter((job) =>
     jobsOutsideProposal.includes(job.name) && failureOutcomes.has(job.outcome));
-  const incompleteJobs = actualJobs.filter((job) => job.outcome !== "success" && !failureOutcomes.has(job.outcome));
+  const incompleteJobs = actualJobs.filter((job) => proposedJobs.includes(job.name)
+    && job.outcome !== "success" && !failureOutcomes.has(job.outcome));
   return {
     schemaVersion: 1,
     repository: timing.repository,
@@ -154,8 +155,8 @@ function validateObservation(observation) {
   if (JSON.stringify(observation.failuresOutsideProposal) !== JSON.stringify(expectedFailures)) {
     throw new Error("Observation failures outside the proposal are inconsistent");
   }
-  const expectedIncomplete = actual.filter((job) =>
-    job.outcome !== "success" && !failureOutcomes.has(job.outcome));
+  const expectedIncomplete = actual.filter((job) => expectedProposed.includes(job.name)
+    && job.outcome !== "success" && !failureOutcomes.has(job.outcome));
   if (JSON.stringify(observation.incompleteJobs) !== JSON.stringify(expectedIncomplete)) {
     throw new Error("Observation incomplete jobs are inconsistent");
   }
@@ -297,7 +298,7 @@ export function summarizeProfileObservations(observations, inventory) {
     assessedAt: inventory.windowEndedAt,
     limitations: [
       "Observations cover GitHub-hosted pull-request runs only.",
-      "Green jobs outside a proposal show no miss for that attempt; they do not prove classifier completeness.",
+      "A completed reduced run proves its selected gates, not the completeness of the classifier.",
       "Candidate misses require rule correction and a new qualifying observation window."
     ],
     status: candidateMissCount > 0 || classificationErrorCount > 0 ? "under-classification-observed"
