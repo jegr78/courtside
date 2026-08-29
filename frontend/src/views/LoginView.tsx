@@ -38,7 +38,7 @@ export function LoginView({ refreshSession, passwordChanged = false }: { refresh
       {error && <Alert>{error}</Alert>}
       <TextField id="username" name="username" label={t("auth.username")} data-testid="username" autoComplete="username" required autoFocus />
       <TextField id="password" name="password" label={t("auth.password")} data-testid="password" type="password" autoComplete="current-password" required />
-      <Button type="submit" data-testid="login-submit" disabled={pending}>{t("auth.submit")}</Button>
+      <Button variant="primary" type="submit" data-testid="login-submit" disabled={pending}>{t("auth.submit")}</Button>
     </form>
   </section>;
 }

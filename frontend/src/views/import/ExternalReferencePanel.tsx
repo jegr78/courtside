@@ -92,13 +92,13 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
         {references.map((reference) => <li key={reference.referenceId} data-testid={`reference-${reference.externalId}`} className="flex flex-wrap items-center gap-3">
           <span className="font-mono">{reference.externalId}</span>
           <span>{reference.personName}</span>
-          <Button data-testid={`unlink-${reference.externalId}`} disabled={busy} type="button" onClick={() => void unlink(reference)}>
+          <Button variant="destructive" data-testid={`unlink-${reference.externalId}`} disabled={busy} type="button" onClick={() => void unlink(reference)}>
             {t("admin.import.unlink")}
           </Button>
         </li>)}
       </ul>)}
 
-    {cursor && <Button data-testid="more-references" disabled={busy} className="justify-self-start" type="button" onClick={() => void read(cursor).catch(reportError)}>
+    {cursor && <Button variant="secondary" data-testid="more-references" disabled={busy} className="justify-self-start" type="button" onClick={() => void read(cursor).catch(reportError)}>
       {t("admin.import.moreReferences")}
     </Button>}
 
@@ -107,14 +107,14 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
       <TextField data-testid="reference-person-search" disabled={busy} label={t("admin.import.searchPerson")} value={query} onChange={(event) => setQuery(event.target.value)} />
       {candidates.length > 0 && <ul className="grid gap-2">
         {candidates.map((entry) => <li key={entry.personId}>
-          <Button data-testid={`reference-person-${entry.personId}`} disabled={busy} type="button" onClick={() => setChosen(entry)}>
+          <Button variant="secondary" data-testid={`reference-person-${entry.personId}`} disabled={busy} type="button" onClick={() => setChosen(entry)}>
             {entry.firstName} {entry.lastName}
           </Button>
         </li>)}
       </ul>}
       {chosen && <p data-testid="chosen-person">{chosen.firstName} {chosen.lastName}</p>}
       <TextField data-testid="reference-external-id" disabled={busy} maxLength={NUMBER_LENGTH} label={t("admin.import.externalId")} value={externalId} onChange={(event) => setExternalId(event.target.value)} />
-      <Button data-testid="link-reference" disabled={busy || !chosen || !externalId.trim()} className="justify-self-start" type="button" onClick={() => void link()}>
+      <Button variant="primary" data-testid="link-reference" disabled={busy || !chosen || !externalId.trim()} className="justify-self-start" type="button" onClick={() => void link()}>
         {t("admin.import.link")}
       </Button>
     </div>

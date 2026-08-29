@@ -117,7 +117,7 @@ export function AdminMembershipTypesView() {
             {t("admin.membershipTypes.grantsAccount")}
           </label>
           <p className="text-muted text-sm">{t("admin.membershipTypes.grantsAccountNote")}</p>
-          <Button data-testid="create-membership-type" disabled={pending} className="justify-self-start" type="submit">{t("admin.create")}</Button>
+          <Button variant="primary" data-testid="create-membership-type" disabled={pending} className="justify-self-start" type="submit">{t("admin.create")}</Button>
         </form>
       </>}
   </section>;
@@ -164,9 +164,9 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
     <p className="text-muted text-sm">{t("admin.membershipTypes.grantsAccountNote")}</p>
     <Link data-testid={`membership-type-rules-link-${type.id}`} className="underline" to="/admin/configuration">{t("admin.membershipTypes.ruleSetLink")}</Link>
     <div className="grid gap-2 md:grid-cols-[auto_1fr] md:items-center">
-      <Button data-testid={`save-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
+      <Button variant="primary" data-testid={`save-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
       <span />
-      <Button data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
+      <Button variant={type.active ? "destructive" : "primary"} data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
       {type.active && <p data-testid={`membership-type-retire-note-${type.id}`} className="text-muted text-sm">{t("admin.membershipTypes.retireNote")}</p>}
     </div>
   </article>;

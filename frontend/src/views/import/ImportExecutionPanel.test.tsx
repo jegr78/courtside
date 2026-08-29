@@ -78,10 +78,13 @@ describe("ImportExecutionPanel", () => {
     show({ ...preview, needsConfirmation: true });
 
     // when
-    await userEvent.click(await screen.findByTestId("execute-preview"));
+    const execute = await screen.findByTestId("execute-preview");
+    expect(execute).toHaveClass("button-destructive");
+    await userEvent.click(execute);
 
     // then
     expect(await screen.findByTestId("confirm-removals-note")).toBeInTheDocument();
+    expect(screen.getByTestId("confirm-execute")).toHaveClass("button-destructive");
     await userEvent.click(screen.getByTestId("confirm-execute"));
     expect(executing).toHaveBeenCalledWith("preview-1", true);
   });

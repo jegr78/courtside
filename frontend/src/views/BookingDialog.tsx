@@ -171,7 +171,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         </label>
         {memberMatches.length > 0 && <ul className="grid gap-2">
           {memberMatches.map((member) => <li key={member.personId}>
-            <Button type="button" data-testid="member-match" data-person-id={member.personId} className="button-secondary w-full text-left" onClick={() => {
+            <Button variant="secondary" type="button" data-testid="member-match" data-person-id={member.personId} className="w-full text-left" onClick={() => {
               setSelectedMembers((current) => [...current, member]);
               setMemberQuery("");
             }}>{t("booking.addMember", { name: member.displayName })}</Button>
@@ -179,7 +179,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         </ul>}
         {selectedMembers.map((member) => <div key={member.personId} className="surface-raised flex items-center justify-between gap-3 rounded-lg px-3 py-2">
           <span>{member.displayName}</span>
-          <Button type="button" className="button-secondary px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMember", { name: member.displayName })}</Button>
+          <Button variant="secondary" type="button" className="px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMember", { name: member.displayName })}</Button>
         </div>)}
       </fieldset>
       <details data-testid="booking-more" open={showsMore} onToggle={(event) => setShowsMore(event.currentTarget.open)} className="mt-4">
@@ -190,7 +190,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           {index === 0 ? t("booking.guest") : t("booking.guestNumber", { number: index + 1 })}
           <input data-testid="guest-name" value={guestName} onChange={(event) => setGuestNames((current) => current.map((name, currentIndex) => currentIndex === index ? event.target.value : name))} className="form-control rounded-lg border px-3 py-3" />
         </label>)}
-        <Button type="button" className="button-secondary justify-self-start" onClick={() => setGuestNames((current) => [...current, ""])}>{t("booking.addGuest")}</Button>
+        <Button variant="secondary" type="button" className="justify-self-start" onClick={() => setGuestNames((current) => [...current, ""])}>{t("booking.addGuest")}</Button>
       </fieldset>
       <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.participantCards")}</legend>
@@ -201,7 +201,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
             {participantCards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
           </select>
         </label>)}
-        <Button type="button" className="button-secondary justify-self-start" onClick={() => setParticipantCardIds((current) => [...current, ""])}>{t("booking.addParticipantCard")}</Button>
+        <Button variant="secondary" type="button" className="justify-self-start" onClick={() => setParticipantCardIds((current) => [...current, ""])}>{t("booking.addParticipantCard")}</Button>
       </fieldset>
       <FieldViolations id="booking-participants-errors" violations={fieldViolations("participants")} />
       <label className="mt-4 grid gap-2 font-medium">{t("booking.note")}
@@ -213,8 +213,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       {error && <Alert>{error}</Alert>}
       </div>
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
-        <Button type="button" data-testid="booking-close" className="button-secondary" onClick={closed}>{t("booking.close")}</Button>
-        <Button type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod}>{t("booking.submit")}</Button>
+        <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
+        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod}>{t("booking.submit")}</Button>
       </div>
     </form>
   </Modal>;

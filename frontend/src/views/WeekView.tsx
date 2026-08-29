@@ -236,10 +236,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         {days.length > 0 && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
       </div>
       <div className="flex gap-2">
-        <Button type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
+        <Button variant="secondary" type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
           {t("week.previousShort")}
         </Button>
-        <Button type="button" data-testid="week-next" onClick={() => setWeekOffset((offset) => offset + 1)} aria-label={t("week.next")}>
+        <Button variant="secondary" type="button" data-testid="week-next" onClick={() => setWeekOffset((offset) => offset + 1)} aria-label={t("week.next")}>
           {t("week.nextShort")}
         </Button>
       </div>
@@ -266,10 +266,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     </div>}
 
     {data && <div className="mobile-day-navigation sticky top-0 z-10 mt-5 grid grid-cols-[auto_1fr_auto_auto] gap-2 surface-panel py-2">
-      <Button type="button" data-testid="day-previous" className="button-secondary px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), -1)))} aria-label={t("week.previousDay")}>‹</Button>
+      <Button variant="secondary" type="button" data-testid="day-previous" className="px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), -1)))} aria-label={t("week.previousDay")}>‹</Button>
       <input data-testid="selected-date" type="date" value={selectedDate ?? ""} onChange={(event) => selectDate(event.target.value)} aria-label={t("week.chooseDate")} className="form-control min-w-0 rounded-lg border px-2" />
-      <Button type="button" data-testid="day-today" className="button-secondary px-3" onClick={() => selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.today")}</Button>
-      <Button type="button" data-testid="day-next" className="button-secondary px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), 1)))} aria-label={t("week.nextDay")}>›</Button>
+      <Button variant="secondary" type="button" data-testid="day-today" className="px-3" onClick={() => selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.today")}</Button>
+      <Button variant="secondary" type="button" data-testid="day-next" className="px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), 1)))} aria-label={t("week.nextDay")}>›</Button>
     </div>}
 
     {data && data.courts.length > 1 && <div className="mobile-court-selector-frame surface-panel sticky top-0 z-10 mt-3">
@@ -285,10 +285,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         }}
       >
         {data.courts.map((court) => <Button
+          variant={selectedCourtId === court.id ? "primary" : "secondary"}
           key={court.id}
           type="button"
           data-testid={`court-selector-${court.number}`}
-          className={selectedCourtId === court.id ? "" : "button-secondary"}
           aria-pressed={selectedCourtId === court.id}
           onClick={() => setSelectedCourtId(court.id)}
         >{court.name || t("court.number", { number: court.number })}</Button>)}
@@ -308,7 +308,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     </Alert>}
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
     {data && <div className="mt-4 flex justify-end">
-      {isToday && <Button type="button" data-testid="current-time" className="button-secondary" onClick={() => scrollToSlot(planRef.current, currentSlot)}>{t("week.now")}</Button>}
+      {isToday && <Button variant="secondary" type="button" data-testid="current-time" onClick={() => scrollToSlot(planRef.current, currentSlot)}>{t("week.now")}</Button>}
     </div>}
     {data && <div
       ref={planRef}

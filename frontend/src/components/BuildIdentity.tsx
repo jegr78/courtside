@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SourceOffer } from "../api/client";
+import { Button } from "./Button";
 
 interface BuildIdentityProps {
   source?: SourceOffer;
@@ -48,14 +49,15 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
   }
 
   return <>
-    <button
+    <Button
+      variant="secondary"
       type="button"
       ref={opener}
       data-testid="build-identity"
-      className="underline hover:no-underline"
+      className="px-3 py-2"
       disabled={!source}
       onClick={() => source && setOpen(true)}
-    >{shortIdentity(source) ?? t("build.unavailable")}</button>
+    >{shortIdentity(source) ?? t("build.unavailable")}</Button>
     {isOpen && source && <dialog
       ref={dialog}
       aria-labelledby="build-dialog-title"
@@ -73,10 +75,10 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
       </dl>
       <a className="mt-4 inline-block underline hover:no-underline" href={source.sourceUrl}>{t("footer.source")}</a>
       <div className="mt-6 flex justify-end gap-3">
-        <button type="button" autoFocus data-testid="copy-build-identity" className="rounded-lg bg-(--club-primary) px-4 py-2 text-(--club-primary-text)" onClick={() => void copyDiagnostics()}>
+        <Button variant="primary" type="button" autoFocus data-testid="copy-build-identity" className="px-4 py-2" onClick={() => void copyDiagnostics()}>
           {isCopied ? t("build.copied") : t("build.copy")}
-        </button>
-        <button type="button" data-testid="close-build-identity" className="button-secondary rounded-lg px-4 py-2" onClick={() => dialog.current?.close()}>{t("build.close")}</button>
+        </Button>
+        <Button variant="secondary" type="button" data-testid="close-build-identity" className="px-4 py-2" onClick={() => dialog.current?.close()}>{t("build.close")}</Button>
       </div>
     </dialog>}
   </>;

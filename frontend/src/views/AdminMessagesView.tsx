@@ -104,7 +104,7 @@ export function AdminMessagesView() {
               </tbody>
             </table>
           </div>}
-        {cursor && <Button data-testid="messages-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("messages.more")}</Button>}
+        {cursor && <Button variant="secondary" data-testid="messages-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("messages.more")}</Button>}
       </>}
   </section>;
 }

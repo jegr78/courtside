@@ -201,6 +201,6 @@ export function ImportSourceForm({ source, types, disabled, save }: {
 
     <TextField data-testid="source-threshold" disabled={disabled} type="number" min={0} max={100} label={t("admin.import.removalWarning")} value={threshold} onChange={(event) => setThreshold(event.target.value)} />
 
-    <Button data-testid="save-source" disabled={disabled} className="justify-self-start" type="button" onClick={submit}>{t("admin.save")}</Button>
+    <Button variant="primary" data-testid="save-source" disabled={disabled} className="justify-self-start" type="button" onClick={submit}>{t("admin.save")}</Button>
   </section>;
 }

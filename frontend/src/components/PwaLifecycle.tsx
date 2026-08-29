@@ -31,7 +31,7 @@ export function PwaLifecycle() {
     <SuccessFeedback>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span>{t("pwa.updateAvailable")}</span>
-        <Button data-testid="pwa-update" type="button" onClick={() => void update.current?.(true)}>
+        <Button variant="primary" data-testid="pwa-update" type="button" onClick={() => void update.current?.(true)}>
           {t("pwa.update")}
         </Button>
       </div>

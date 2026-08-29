@@ -258,7 +258,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             </label>
             <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
           </div>
-          <Button data-testid="save-club-config" className="justify-self-start" type="submit">{t("admin.save")}</Button>
+          <Button variant="primary" data-testid="save-club-config" className="justify-self-start" type="submit">{t("admin.save")}</Button>
         </form>
         <div className="grid gap-5">
           <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
@@ -271,8 +271,8 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           {selectedRuleSet && <div className="surface-subtle grid gap-3 rounded-xl border p-4">
             <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
               <TextField data-testid="rule-set-name" disabled={pending} maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.ruleSetName")} value={ruleSetName} onChange={(event) => setRuleSetName(event.target.value)} />
-              <Button data-testid="save-rule-set" disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.changeRuleSet(selectedRuleSet.id, { name: ruleSetName }))}>{t("admin.save")}</Button>
-              <Button data-testid="toggle-rule-set" disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.setRuleSetActive(selectedRuleSet.id, !selectedRuleSet.active))}>{t(selectedRuleSet.active ? "admin.deactivate" : "admin.activate")}</Button>
+              <Button variant="primary" data-testid="save-rule-set" disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.changeRuleSet(selectedRuleSet.id, { name: ruleSetName }))}>{t("admin.save")}</Button>
+              <Button variant={selectedRuleSet.active ? "destructive" : "primary"} data-testid="toggle-rule-set" disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.setRuleSetActive(selectedRuleSet.id, !selectedRuleSet.active))}>{t(selectedRuleSet.active ? "admin.deactivate" : "admin.activate")}</Button>
             </div>
             <p data-testid="rule-set-retire-note" className="text-muted text-sm">
               {boundTypes.length === 0
@@ -282,7 +282,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           </div>}
           <form noValidate onSubmit={(event) => { event.preventDefault(); void addRuleSet(event.currentTarget); }} className="surface-subtle grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_auto] md:items-end">
             <TextField data-testid="new-rule-set-name" disabled={pending} name="name" maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.newRuleSet")} />
-            <Button data-testid="create-rule-set" disabled={pending} type="submit">{t("admin.create")}</Button>
+            <Button variant="primary" data-testid="create-rule-set" disabled={pending} type="submit">{t("admin.create")}</Button>
           </form>
           <div className="grid gap-4">
             {ruleTypes.map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} remove={removeRule} />)}
@@ -305,8 +305,8 @@ function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTy
         <p data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted text-sm">{t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}</p>
       </div>)}
       <div className="flex flex-wrap gap-3">
-        <Button data-testid={`save-rule-${type.ruleType}`} disabled={disabled} type="button" onClick={() => void save(type.ruleType, params)}>{t("admin.save")}</Button>
-        {definition && <Button data-testid={`remove-rule-${type.ruleType}`} disabled={disabled} type="button" onClick={() => void remove(type.ruleType)}>{t("admin.rules.remove")}</Button>}
+        <Button variant="primary" data-testid={`save-rule-${type.ruleType}`} disabled={disabled} type="button" onClick={() => void save(type.ruleType, params)}>{t("admin.save")}</Button>
+        {definition && <Button variant="destructive" data-testid={`remove-rule-${type.ruleType}`} disabled={disabled} type="button" onClick={() => void remove(type.ruleType)}>{t("admin.rules.remove")}</Button>}
       </div>
     </>}
   </article>;

@@ -92,7 +92,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
       <p className="text-sm">{t(`admin.import.modeMeans.${mode}`)}</p>
     </div>
 
-    <Button data-testid="upload-snapshot" disabled={busy || !chosen} className="justify-self-start" type="button" onClick={() => void upload()}>
+    <Button variant="primary" data-testid="upload-snapshot" disabled={busy || !chosen} className="justify-self-start" type="button" onClick={() => void upload()}>
       {t("admin.import.upload")}
     </Button>
 
