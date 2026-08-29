@@ -30,13 +30,37 @@ describe("AppRoutes", () => {
     // when
     render(
       <MemoryRouter initialEntries={["/"]}>
-        <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} />
+        <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} clubName="Example Tennis Club" />
       </MemoryRouter>
     );
 
     // then
     expect(await screen.findByTestId("court-plan-view")).toBeInTheDocument();
     expect(screen.getByTestId("sign-in-link")).toHaveAttribute("href", "/login");
+    expect(screen.getByTestId("public-club-name")).toHaveTextContent("Example Tennis Club");
+    expect(screen.getByTestId("guest-guidance")).toHaveTextContent("Belegungsplan");
+  });
+
+  it("given a member, when opening the landing page, then guest guidance stays out of the member workflow", async () => {
+    // given
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({
+      timeZone: "Europe/Berlin",
+      slotMinutes: 30,
+      openingHours: []
+    });
+    vi.spyOn(api, "courts").mockResolvedValue([]);
+
+    // when
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppRoutes session={{ ...anonymous, authenticated: true }} refreshSession={() => Promise.resolve()}
+          clubName="Example Tennis Club" />
+      </MemoryRouter>
+    );
+
+    // then
+    expect(await screen.findByTestId("court-plan-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("guest-guidance")).not.toBeInTheDocument();
   });
 
   it("given an anonymous visitor, when opening personal bookings, then sign in is required", () => {

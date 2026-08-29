@@ -16,6 +16,7 @@ const screenshotOptions = {
 test("stable member surfaces match their reviewed baselines", async ({ page, journeyService }) => {
   // given
   await page.goto("/");
+  await expect(page.getByTestId("public-club-name")).toBeVisible();
   await selectVisualDate(page, journeyService.visualDate);
 
   // then
