@@ -88,10 +88,11 @@ jobs:
           echo "profiles=$PROFILES" >> "$GITHUB_OUTPUT"
           for job in backend frontend security; do
             SELECTED=$(jq -nr --argjson profiles "$PROFILES" --arg job "$job" '
-              ($profiles | index("full")) != null or
-              ($job == "backend" and ($profiles | index("backend")) != null) or
-              (($job == "frontend" or $job == "security") and
-                (($profiles | index("backend")) != null or ($profiles | index("frontend")) != null))')
+            ($profiles | index("full")) != null or
+            ($job == "backend" and ($profiles | index("backend")) != null) or
+            ($job == "frontend" and ($profiles | index("frontend")) != null) or
+            ($job == "security" and
+              (($profiles | index("backend")) != null or ($profiles | index("frontend")) != null))')
             echo "$job=$SELECTED" >> "$GITHUB_OUTPUT"
           done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

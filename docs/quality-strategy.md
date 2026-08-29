@@ -74,8 +74,9 @@ skipping a quality job. The selector executes the classifier from the immutable 
 commit, so a classifier or rule change cannot reduce the verification required for itself.
 
 Each completed pull-request run joins its exact-attempt profile plan with the full job outcomes.
-The follow-up workflow recomputes that plan with the protected-branch classifier and the immutable
-base and head commits; it never trusts the plan artifact produced by pull-request code.
+The follow-up workflow recomputes that plan with the classifier from the immutable pull-request
+base commit and the immutable base and head commits; it never trusts the plan artifact produced by
+pull-request code.
 It resolves the pull request from the recorded head commit so a completed merge cannot erase the
 association before evidence collection.
 
