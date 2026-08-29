@@ -33,6 +33,7 @@ export default defineConfig({
     execArgv: ["--no-experimental-webstorage"],
     environment: "jsdom",
     environmentOptions: { jsdom: { url: "http://localhost" } },
+    maxWorkers: 2,
     include: ["src/**/*.test.{ts,tsx}", "e2e/**/*.test.ts"],
     setupFiles: ["./src/test/setup.ts"],
     coverage: {
