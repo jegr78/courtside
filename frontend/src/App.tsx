@@ -30,9 +30,10 @@ interface AppRoutesProps {
   initialPasswordChanged?: () => void;
   signedOut?: () => void;
   configurationChanged?: (config: ClubConfig) => void;
+  clubName?: string;
 }
 
-export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut, configurationChanged }: AppRoutesProps) {
+export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut, configurationChanged, clubName }: AppRoutesProps) {
   if (session.passwordChangeRequired) {
     return <Routes>
       <Route path="/initial-password" element={<InitialPasswordView changed={() => initialPasswordChanged?.()} />} />
@@ -42,8 +43,8 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
   return <div className="flex w-full flex-col items-center gap-4">
     <PrimaryNavigation session={session} signedOut={() => signedOut?.()} />
     <Routes>
-    <Route path="/" element={<HomeView session={session} />} />
-    <Route path="/courts" element={<HomeView session={session} />} />
+    <Route path="/" element={<HomeView session={session} clubName={clubName} />} />
+    <Route path="/courts" element={<HomeView session={session} clubName={clubName} />} />
     <Route path="/login" element={session.authenticated
       ? <Navigate to="/" replace />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
@@ -204,7 +205,7 @@ export function App() {
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">
       {offline ? <div data-testid="offline-status"><Alert>{t("status.offline")}</Alert></div> : session
-        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} configurationChanged={configurationChanged} />
+        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} configurationChanged={configurationChanged} clubName={config?.clubName} />
         : <p role="status">{t("status.loading")}</p>}
     </main>
     <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 py-4 text-sm">
