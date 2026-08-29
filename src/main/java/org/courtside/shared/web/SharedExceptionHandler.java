@@ -24,6 +24,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -200,6 +201,19 @@ class SharedExceptionHandler {
                 HttpStatus.NOT_FOUND, "No resource exists at this address");
         problem.setType(URI.create("urn:courtside:error:unmapped-path"));
         problem.setTitle("Unmapped path");
+        logAnswered(problem);
+        return problem;
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    ProblemDetail handleMissingPart(MissingServletRequestPartException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "The request does not carry the part this endpoint reads");
+        problem.setType(URI.create("urn:courtside:error:missing-request-part"));
+        problem.setTitle("Missing request part");
+        problem.setProperty("violations", List.of(Map.of(
+                "code", "request.missingPart",
+                "params", Map.of("part", exception.getRequestPartName()))));
         logAnswered(problem);
         return problem;
     }

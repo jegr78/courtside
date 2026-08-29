@@ -103,6 +103,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:malformed-request-body",
             "urn:courtside:error:method-not-supported",
             "urn:courtside:error:missing-parameter",
+            "urn:courtside:error:missing-request-part",
             "urn:courtside:error:not-acceptable",
             "urn:courtside:error:parameter-type-mismatch",
             "urn:courtside:error:payload-too-large",
