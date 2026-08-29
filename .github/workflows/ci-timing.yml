@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event.repository.default_branch }}
-      - name: Read completed run evidence
+      - name: Read and record completed run evidence
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ github.event.workflow_run.id }}
@@ -41,12 +41,13 @@ jobs:
             --run build/ci-timing/run.json \
             --candidates build/ci-timing/pulls.json \
             --output build/ci-timing/pr.json
-          BASE_REF=$(jq -er '.base.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/pr.json)
+          BASE_REF=$(jq -er '.runBaseSha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/pr.json)
           HEAD_REF=$(jq -er '.head.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/pr.json)
           test "$HEAD_REF" = "$RUN_HEAD"
           git fetch --no-tags origin "$BASE_REF" "$HEAD_REF"
           git cat-file -e "${BASE_REF}^{commit}"
           git cat-file -e "${HEAD_REF}^{commit}"
+          node tools/ci-base-provenance.mjs --base "$BASE_REF" --head "$HEAD_REF"
           PROFILE_PARENT=$(mktemp -d)
           PROFILE_ROOT="$PROFILE_PARENT/base"
           cleanup_profile() {
@@ -67,12 +68,7 @@ jobs:
             --summary build/ci-timing/profile-plan/summary.md \
             || test "$(jq -r .plannerOutcome build/ci-timing/profile-plan/plan.json)" = failed
           test -f build/ci-timing/profile-plan/plan.json
-      - name: Record timing
-        env:
-          RUN_ID: ${{ github.event.workflow_run.id }}
-          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-        run: |
-          node tools/ci-timing.mjs \
+          node "$PROFILE_ROOT/tools/ci-timing.mjs" \
             --run build/ci-timing/run.json \
             --jobs build/ci-timing/jobs.json \
             --repository "$GITHUB_REPOSITORY" \
@@ -80,14 +76,14 @@ jobs:
             --expected-attempt "$ATTEMPT" \
             --output build/ci-timing/record.json \
             --summary build/ci-timing/summary.md
-          node tools/test-profile-observation.mjs \
+          node "$PROFILE_ROOT/tools/test-profile-observation.mjs" \
             --plan build/ci-timing/profile-plan/plan.json \
             --timing build/ci-timing/record.json \
             --output build/ci-timing/profile-observation.json \
             --summary build/ci-timing/profile-summary.md
-          cp ci/ci-timing.schema.json build/ci-timing/ci-timing.schema.json
-          cp ci/test-profile-plan.schema.json build/ci-timing/test-profile-plan.schema.json
-          cp ci/test-profile-observation.schema.json build/ci-timing/test-profile-observation.schema.json
+          cp "$PROFILE_ROOT/ci/ci-timing.schema.json" build/ci-timing/ci-timing.schema.json
+          cp "$PROFILE_ROOT/ci/test-profile-plan.schema.json" build/ci-timing/test-profile-plan.schema.json
+          cp "$PROFILE_ROOT/ci/test-profile-observation.schema.json" build/ci-timing/test-profile-observation.schema.json
           cat build/ci-timing/summary.md build/ci-timing/profile-summary.md >> "$GITHUB_STEP_SUMMARY"
           rm build/ci-timing/run.json build/ci-timing/jobs.json \
             build/ci-timing/pulls.json build/ci-timing/pr.json \

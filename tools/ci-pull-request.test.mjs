@@ -5,14 +5,20 @@ import { resolveRunPullRequest } from "./ci-pull-request.mjs";
 
 const sha = "a".repeat(40);
 const baseSha = "b".repeat(40);
+const repositoryId = 42;
 
 function run(overrides = {}) {
   return {
     event: "pull_request",
     head_branch: "feat/example",
     head_sha: sha,
-    repository: { full_name: "example/courtside" },
-    head_repository: { full_name: "example/courtside" },
+    repository: { id: repositoryId, full_name: "example/courtside" },
+    head_repository: { id: repositoryId, full_name: "example/courtside" },
+    pull_requests: [{
+      number: 123,
+      base: { sha: baseSha, ref: "main", repo: { id: repositoryId } },
+      head: { sha, ref: "feat/example", repo: { id: repositoryId } },
+    }],
     ...overrides,
   };
 }
@@ -20,7 +26,7 @@ function run(overrides = {}) {
 function pull(overrides = {}) {
   return {
     number: 123,
-    base: { sha: baseSha, repo: { full_name: "example/courtside" } },
+    base: { ref: "main", sha: baseSha, repo: { full_name: "example/courtside" } },
     head: {
       ref: "feat/example",
       sha,
@@ -38,7 +44,8 @@ test("givenAClosedPullRequestWithADeletedBranch_whenResolving_thenTheExactRunIde
   const result = resolveRunPullRequest(run(), [candidate]);
 
   // then
-  assert.equal(result, candidate);
+  assert.equal(result.number, candidate.number);
+  assert.equal(result.runBaseSha, baseSha);
 });
 
 test("givenCandidatesWithAnotherHead_whenResolving_thenTheMismatchIsRejected", () => {
@@ -68,4 +75,49 @@ test("givenDuplicateExactCandidates_whenResolving_thenAmbiguityIsRejected", () =
 test("givenANonPullRequestRun_whenResolving_thenTheRunIsRejected", () => {
   // when / then
   assert.throws(() => resolveRunPullRequest(run({ event: "push" }), [pull()]), /pull_request run/);
+});
+
+test("givenTheCurrentPullRequestBaseAdvanced_whenResolving_thenTheRunBaseRemainsAuthoritative", () => {
+  // given
+  const currentBase = "c".repeat(40);
+
+  // when
+  const result = resolveRunPullRequest(run(), [pull({
+    base: { ref: "main", sha: currentBase, repo: { full_name: "example/courtside" } }
+  })]);
+
+  // then
+  assert.equal(result.runBaseSha, baseSha);
+  assert.notEqual(result.runBaseSha, currentBase);
+});
+
+test("givenTheRunHasNoBoundPullRequest_whenResolving_thenObservationFailsClosed", () => {
+  // when / then
+  assert.throws(() => resolveRunPullRequest(run({ pull_requests: [] }), [pull()]),
+    /exactly one run-bound pull request/);
+});
+
+test("givenRunBoundPullRequestsAreAmbiguous_whenResolving_thenObservationFailsClosed", () => {
+  // given
+  const bound = run().pull_requests[0];
+
+  // when / then
+  assert.throws(() => resolveRunPullRequest(run({ pull_requests: [bound, { ...bound }] }), [pull()]),
+    /exactly one run-bound pull request/);
+});
+
+test("givenRunBoundIdentityDiffers_whenResolving_thenObservationFailsClosed", () => {
+  // given
+  const bound = run().pull_requests[0];
+  const mismatches = [
+    { ...bound, number: 124 },
+    { ...bound, base: { ...bound.base, repo: { id: 84 } } },
+    { ...bound, head: { ...bound.head, sha: "d".repeat(40) } },
+  ];
+
+  // when / then
+  for (const reference of mismatches) {
+    assert.throws(() => resolveRunPullRequest(run({ pull_requests: [reference] }), [pull()]),
+      /exactly one run-bound pull request/);
+  }
 });

@@ -11,14 +11,21 @@ function requiredString(value, pattern, name) {
   return value;
 }
 
+function requiredId(value, name) {
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error(`Invalid ${name}`);
+  return value;
+}
+
 function runIdentity(run) {
   if (run?.event !== "pull_request") {
     throw new Error("Expected a pull_request run");
   }
   return {
     repository: requiredString(run.repository?.full_name, repositoryPattern, "run repository"),
+    repositoryId: requiredId(run.repository?.id, "run repository id"),
     headRepository: requiredString(run.head_repository?.full_name, repositoryPattern,
       "run head repository"),
+    headRepositoryId: requiredId(run.head_repository?.id, "run head repository id"),
     headBranch: requiredString(run.head_branch, /^.{1,255}$/, "run head branch"),
     headSha: requiredString(run.head_sha, shaPattern, "run head SHA"),
   };
@@ -38,7 +45,19 @@ export function resolveRunPullRequest(run, candidates) {
   if (matches.length !== 1) {
     throw new Error(`Expected exactly one pull request for the completed run, found ${matches.length}`);
   }
-  return matches[0];
+  const candidate = matches[0];
+  const runMatches = Array.isArray(run.pull_requests) ? run.pull_requests.filter(reference =>
+    reference?.number === candidate.number
+    && reference?.base?.repo?.id === identity.repositoryId
+    && reference?.base?.ref === candidate.base.ref
+    && shaPattern.test(reference?.base?.sha ?? "")
+    && reference?.head?.repo?.id === identity.headRepositoryId
+    && reference?.head?.ref === identity.headBranch
+    && reference?.head?.sha === identity.headSha) : [];
+  if (runMatches.length !== 1) {
+    throw new Error(`Expected exactly one run-bound pull request, found ${runMatches.length}`);
+  }
+  return { ...candidate, runBaseSha: runMatches[0].base.sha };
 }
 
 function argumentsFrom(argv) {

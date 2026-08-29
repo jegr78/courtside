@@ -76,7 +76,10 @@ commit, so a classifier or rule change cannot reduce the verification required f
 Each completed pull-request run joins its exact-attempt profile plan with the full job outcomes.
 The follow-up workflow recomputes that plan with the classifier from the immutable pull-request
 base commit and the immutable base and head commits; it never trusts the plan artifact produced by
-pull-request code.
+pull-request code. The attempt-specific run metadata supplies the base commit; current pull-request
+data only identifies the matching pull request. The collector also requires that run base to be the
+exact merge base of the immutable head, rejecting stale or ambiguous provenance. Classification,
+timing normalization and observation validation execute from that same base commit.
 It resolves the pull request from the recorded head commit so a completed merge cannot erase the
 association before evidence collection.
 
