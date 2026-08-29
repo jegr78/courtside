@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { type Page } from "@playwright/test";
-import { expect, selectJourneyDate, test } from "./fixtures";
+import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { journeyDate } from "./global-setup";
 
 const locales = ["de", "en"] as const;
@@ -17,20 +17,20 @@ for (const locale of locales) {
       // given
       await page.setViewportSize(viewport);
       await page.goto("/login");
-      await page.locator("#locale-preference").selectOption(locale);
-      await page.locator("#theme-preference").selectOption("dark");
+      await selectPreference(page, "#locale-preference", locale);
+      await selectPreference(page, "#theme-preference", "dark");
 
       // then
       await captureFullPage(page, locale, viewport.name, "01-login-dark");
 
       // when
-      await page.locator("#theme-preference").selectOption("light");
+      await selectPreference(page, "#theme-preference", "light");
 
       // then
       await captureFullPage(page, locale, viewport.name, "02-login-light");
 
       // when
-      await page.locator("#theme-preference").selectOption("dark");
+      await selectPreference(page, "#theme-preference", "dark");
       await page.getByTestId("username").fill("doe.jane");
       await page.getByTestId("password").fill("temporary-password");
       await page.getByTestId("login-submit").click();
@@ -62,7 +62,7 @@ for (const locale of locales) {
       }
 
       // when
-      await page.locator("#theme-preference").selectOption("light");
+      await selectPreference(page, "#theme-preference", "light");
 
       // then
       await captureFullPage(page, locale, viewport.name, "05-court-plan-light");
@@ -78,7 +78,11 @@ for (const locale of locales) {
       expect(pngDimensions(lightDialog)).toEqual({ width: viewport.width, height: viewport.height });
 
       // when
-      await page.locator("#theme-preference").selectOption("dark");
+      await page.getByTestId("booking-close").click();
+      await expect(page.getByTestId("booking-dialog")).not.toBeVisible();
+      await selectPreference(page, "#theme-preference", "dark");
+      await targetSlot.click();
+      await expect(page.getByTestId("booking-dialog")).toBeVisible();
 
       // then
       const darkDialog = await captureViewport(page, locale, viewport.name, "07-booking-dialog-dark");

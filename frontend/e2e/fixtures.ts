@@ -124,4 +124,11 @@ export async function selectJourneyDate(page: Page, visualDate: string): Promise
   await day.click();
 }
 
+export async function selectPreference(page: Page, selector: "#locale-preference" | "#theme-preference", value: string): Promise<void> {
+  const menu = page.getByTestId("preferences-menu");
+  await menu.click();
+  await page.locator(selector).selectOption(value);
+  await menu.click();
+}
+
 export { expect };
