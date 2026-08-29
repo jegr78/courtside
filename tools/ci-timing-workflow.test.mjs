@@ -28,7 +28,7 @@ test("givenARunIsRerunWhileCollectionStarts_whenReadingEvidence_thenTheTriggerin
   assert.match(workflow, /--expected-attempt "\$ATTEMPT"/);
 });
 
-test("givenAnObservedProfilePlan_whenCollectingTheRun_thenProtectedCodeRecomputesIt", () => {
+test("givenAnObservedProfilePlan_whenCollectingTheRun_thenItsImmutableBaseClassifierRecomputesIt", () => {
   // when / then
   assert.match(workflow, /ref:\s*\$\{\{ github\.event\.repository\.default_branch \}\}/);
   assert.doesNotMatch(workflow, /gh run download|test-profile-plan-\$\{RUN_ID\}/);
@@ -38,8 +38,10 @@ test("givenAnObservedProfilePlan_whenCollectingTheRun_thenProtectedCodeRecompute
   assert.match(workflow, /-f state=all -f "head=\$\{HEAD_OWNER\}:\$\{HEAD_BRANCH\}"/);
   assert.match(workflow, /ci-pull-request\.mjs/);
   assert.match(workflow, /git fetch --no-tags origin "\$BASE_REF" "\$HEAD_REF"/);
+  assert.match(workflow, /git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"/);
   assert.doesNotMatch(workflow, /pull\/\$\{PR_NUMBER\}\/head/);
-  assert.match(workflow, /test-profile-classifier\.mjs/);
+  assert.match(workflow, /node "\$PROFILE_ROOT\/tools\/test-profile-classifier\.mjs"/);
+  assert.doesNotMatch(workflow, /node tools\/test-profile-classifier\.mjs/);
   assert.doesNotMatch(workflow, /pull_requests\[0\]/);
   assert.match(workflow, /test-profile-observation\.mjs/);
   assert.match(workflow, /test-profile-observation\.schema\.json/);

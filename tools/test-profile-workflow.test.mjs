@@ -39,7 +39,10 @@ test("givenReducedProfiles_whenJobsAreScheduled_thenOnlyTheirConservativeJobSetR
     /frontend:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.frontend == 'true'\)/);
   assert.match(workflow,
     /security:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
-  assert.match(workflow, /\(\$job == "frontend" or \$job == "security"\)/);
+  assert.match(workflow, /\(\$job == "frontend" and \(\$profiles \| index\("frontend"\)\) != null\)/);
+  assert.match(workflow,
+    /\(\$job == "security" and\s+\(\(\$profiles \| index\("backend"\)\) != null or \(\$profiles \| index\("frontend"\)\) != null\)\)/);
+  assert.doesNotMatch(workflow, /\$job == "frontend" or \$job == "security"/);
 });
 
 test("givenTheClassifierFails_whenThePlanRuns_thenFullSelectionStillReachesTheGate", () => {

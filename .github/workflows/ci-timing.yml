@@ -47,8 +47,16 @@ jobs:
           git fetch --no-tags origin "$BASE_REF" "$HEAD_REF"
           git cat-file -e "${BASE_REF}^{commit}"
           git cat-file -e "${HEAD_REF}^{commit}"
+          PROFILE_PARENT=$(mktemp -d)
+          PROFILE_ROOT="$PROFILE_PARENT/base"
+          cleanup_profile() {
+            git worktree remove --force "$PROFILE_ROOT" 2>/dev/null || true
+            rmdir "$PROFILE_PARENT" 2>/dev/null || true
+          }
+          trap cleanup_profile EXIT
+          git worktree add --detach "$PROFILE_ROOT" "$BASE_REF"
           mkdir -p build/ci-timing/profile-plan
-          node tools/test-profile-classifier.mjs \
+          node "$PROFILE_ROOT/tools/test-profile-classifier.mjs" \
             --base "$BASE_REF" \
             --head "$HEAD_REF" \
             --labels '[]' \
