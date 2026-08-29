@@ -85,7 +85,9 @@ export function createProfileObservation(plan, timing) {
   const jobsOutsideProposal = controlledJobs.filter((job) => !proposedJobs.includes(job));
   const failuresOutsideProposal = actualJobs.filter((job) =>
     jobsOutsideProposal.includes(job.name) && failureOutcomes.has(job.outcome));
-  const incompleteJobs = actualJobs.filter((job) => job.outcome !== "success" && !failureOutcomes.has(job.outcome));
+  const incompleteJobs = actualJobs.filter((job) => proposedJobs.includes(job.name)
+    ? job.outcome !== "success"
+    : job.outcome !== "success" && job.outcome !== "skipped" && !failureOutcomes.has(job.outcome));
   return {
     schemaVersion: 1,
     repository: timing.repository,
@@ -154,8 +156,9 @@ function validateObservation(observation) {
   if (JSON.stringify(observation.failuresOutsideProposal) !== JSON.stringify(expectedFailures)) {
     throw new Error("Observation failures outside the proposal are inconsistent");
   }
-  const expectedIncomplete = actual.filter((job) =>
-    job.outcome !== "success" && !failureOutcomes.has(job.outcome));
+  const expectedIncomplete = actual.filter((job) => expectedProposed.includes(job.name)
+    ? job.outcome !== "success"
+    : job.outcome !== "success" && job.outcome !== "skipped" && !failureOutcomes.has(job.outcome));
   if (JSON.stringify(observation.incompleteJobs) !== JSON.stringify(expectedIncomplete)) {
     throw new Error("Observation incomplete jobs are inconsistent");
   }
@@ -268,10 +271,14 @@ export function summarizeProfileObservations(observations, inventory) {
   const candidateMissCount = firstAttempts.filter((entry) => entry.classificationOutcome === "candidate-miss").length;
   const classificationErrorCount = firstAttempts.filter((entry) =>
     entry.classificationOutcome === "classification-error").length;
-  const fullProfileCount = qualifyingAttempts.filter((entry) => entry.proposedProfiles.includes("full")).length;
-  const reducedProfileCount = qualifyingAttempts.length - fullProfileCount;
+  const reducedAttempts = qualifyingAttempts.filter((entry) => entry.jobsOutsideProposal.length > 0
+    && entry.jobsOutsideProposal.every((name) =>
+      entry.actualJobs.some((job) => job.name === name && job.outcome === "skipped")));
+  const reducedProfileCount = reducedAttempts.length;
+  const fullProfileCount = qualifyingAttempts.length - reducedProfileCount;
   const profileCounts = Object.fromEntries(Object.keys(contract.profiles).map((profile) => [profile,
-    qualifyingAttempts.filter((entry) => entry.proposedProfiles.includes(profile)).length]));
+    profile === "full" ? fullProfileCount
+      : reducedAttempts.filter((entry) => entry.proposedProfiles.includes(profile)).length]));
   const incompleteObservationCount = firstAttempts.filter((entry) =>
     entry.classificationOutcome === "observation-incomplete").length;
   const enoughEvidence = qualifyingAttempts.length >= contract.minimumFirstAttempts
@@ -297,7 +304,7 @@ export function summarizeProfileObservations(observations, inventory) {
     assessedAt: inventory.windowEndedAt,
     limitations: [
       "Observations cover GitHub-hosted pull-request runs only.",
-      "Green jobs outside a proposal show no miss for that attempt; they do not prove classifier completeness.",
+      "A completed reduced run proves its selected gates, not the completeness of the classifier.",
       "Candidate misses require rule correction and a new qualifying observation window."
     ],
     status: candidateMissCount > 0 || classificationErrorCount > 0 ? "under-classification-observed"
