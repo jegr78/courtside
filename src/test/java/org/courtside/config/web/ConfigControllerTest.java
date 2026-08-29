@@ -188,6 +188,19 @@ class ConfigControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAClubLogo_whenReadingTheManifest_thenTheUnsetIconTypeIsAbsentRatherThanNull()
+            throws Exception {
+        // given
+        jdbc.sql("UPDATE club_config SET logo_url = 'https://cdn.example.org/logo.png'").update();
+
+        // when / then
+        mockMvc.perform(get("/manifest.webmanifest"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.icons[0].src").value("https://cdn.example.org/logo.png"))
+                .andExpect(jsonPath("$.icons[0].type").doesNotExist());
+    }
+
+    @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAMember_whenChangingTheConfig_thenItIsForbidden() throws Exception {
         // when / then

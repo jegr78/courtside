@@ -1465,6 +1465,18 @@ whether it is built or designed. **Designed means absent today.**
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the release workflow signs each image keylessly with
   cosign and attaches an SBOM attestation. Image scanning is designed and not built.*
+- **Accepted: the servlet container carries advisories no released platform version fixes.** Spring
+  Boot 4.1.1 manages Tomcat 11.0.24, and the advisories Apache published on 2026-08-25 name every
+  version through it — an allocation leak in HTTP/2 backlog tracking, a principal lookup that can
+  fail open, a rewrite valve that restarts at its second rule, and two constraint bypasses. What an
+  observer needs: a feature this application does not configure. Nothing sets `server.http2.enabled`
+  and the reverse proxy speaks HTTP/1.1 to the container, so neither HTTP/2 entry is reachable, and
+  there is no container realm, no client certificate, no rewrite valve, no `web.xml` and no security
+  constraint, because every authorization decision is made by the Spring Security filter chain. It
+  stays open because no Spring Boot release manages 11.0.25 yet, and overriding a version the
+  platform manages is how a dependency falls behind it instead. What bounds it: the fixed container
+  arrives with the next Boot patch, and the source scan names it as soon as the advisories reach the
+  vulnerability databases. *Built, as described.*
 - **Accepted: the mail server fetches its admin interface unpinned.** The reference deployment
   pins every image it names by digest, and the mail image is no exception — but on first start
   that image downloads its own web interface from the latest GitHub release, outside the digest
