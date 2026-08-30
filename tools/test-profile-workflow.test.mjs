@@ -87,5 +87,39 @@ test("given split coverage artifacts, when the aggregate downloads them, then it
 test("given security finding tools need node modules, when the security job runs, then it installs locked dependencies", () => {
   // when / then
   assert.match(workflow,
-    /security:[\s\S]+name: Install security toolchain[\s\S]+frontend:install-node-and-npm frontend:npm@npm-ci[\s\S]+tools\/security-findings\.mjs/);
+    /security:[\s\S]+name: Install security toolchain[\s\S]+com\.github\.eirslett:frontend-maven-plugin:install-node-and-npm\s+com\.github\.eirslett:frontend-maven-plugin:npm@npm-ci[\s\S]+tools\/security-findings\.mjs/);
+});
+
+test("given maven downloads fail transiently, when any wrapper command runs, then resolver retries stay bounded", () => {
+  // given
+  const mavenConfig = readFileSync(new URL("../.mvn/maven.config", import.meta.url), "utf8");
+  const expected = new Map([
+    ["count", "3"],
+    ["interval", "15000"],
+    ["intervalMax", "120000"],
+    ["serviceUnavailable", "429,503"]
+  ]);
+
+  // when / then
+  for (const namespace of ["connector", "transport"]) {
+    for (const [property, value] of expected) {
+      assert.match(mavenConfig,
+        new RegExp(`^-Daether\\.${namespace}\\.http\\.retryHandler\\.${property}=${value}$`, "m"));
+    }
+  }
+});
+
+test("given workflow jobs invoke the frontend plugin, when maven resolves it, then no prefix lookup is needed", () => {
+  // when / then
+  assert.doesNotMatch(workflow, /(?:^|\s)frontend:(?:install-node-and-npm|npm@npm-ci)/);
+  assert.match(workflow, /com\.github\.eirslett:frontend-maven-plugin:install-node-and-npm/);
+});
+
+test("given the aggregate only evaluates coverage, when node is prepared, then it does not contact maven central", () => {
+  // when / then
+  assert.match(workflow,
+    /name: Install coverage toolchain[\s\S]+uses: actions\/setup-node@[a-f0-9]{40}[\s\S]+node-version: '26'/);
+  assert.doesNotMatch(workflow,
+    /name: Install coverage toolchain[\s\S]{0,300}run: \.\/mvnw/);
+  assert.match(workflow, /node tools\/coverage-diff\.mjs/);
 });

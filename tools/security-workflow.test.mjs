@@ -99,7 +99,8 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.doesNotMatch(build, /git cat-file -e "\$BASE_REF:tools\/security-tool-comparison\.mjs"/);
   assert.match(build, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
   assert.match(build, /git worktree add --detach/);
-  assert.match(build, /courtside-security-base\/mvnw" -B[\s\S]+courtside-security-base\/pom\.xml" frontend:install-node-and-npm/);
+  assert.match(build,
+    /courtside-security-base\/mvnw" -B[\s\S]+courtside-security-base\/pom\.xml"[\s\\]+com\.github\.eirslett:frontend-maven-plugin:install-node-and-npm/);
   assert.match(build, /working-directory: \$\{\{ runner\.temp \}\}\/courtside-security-base\/frontend/);
   assert.match(build, /npm-cli\.js ci --ignore-scripts/);
   assert.doesNotMatch(build, /courtside-security-base\/frontend\/node_modules/);
@@ -345,7 +346,8 @@ test("given a job that only needs the artefact, when it builds one, then the sui
   assert.doesNotMatch(comparison, /mvnw -B verify/,
     "quality already runs the full suite on the same commit in the same workflow. A second run "
     + "buys nothing and gives every flake a second chance to fail a job about tool comparison.");
-  assert.match(comparison, /mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci/,
+  assert.match(comparison,
+    /mvnw -B\s+com\.github\.eirslett:frontend-maven-plugin:install-node-and-npm\s+com\.github\.eirslett:frontend-maven-plugin:npm@npm-ci/,
     "the CLI these steps launch requires ajv and js-yaml at module load, out of the frontend's "
     + "node_modules, so the job installs the pinned node and those modules before it runs one — "
     + "dropping either turns the step into an import error seconds in");
