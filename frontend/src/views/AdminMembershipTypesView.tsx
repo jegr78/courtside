@@ -8,6 +8,10 @@ import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
+import { differs } from "../unsaved/differs";
+import { describedByMark } from "../unsaved/markId";
+import { UnsavedMark } from "../unsaved/UnsavedMark";
+import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 
 const NAME_LENGTH = 60;
 const HOLDER_PAGE = 200;
@@ -18,6 +22,7 @@ interface Holders {
 }
 
 export function AdminMembershipTypesView() {
+  const newType = useUnsavedForm("membership-type:new");
   const { t } = useTranslation();
   const [types, setTypes] = useState<MembershipType[]>();
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
@@ -100,7 +105,7 @@ export function AdminMembershipTypesView() {
             toggle={() => mutate(() => api.setMembershipTypeActive(type.id, !type.active))}
           />)}
         </section>
-        <form noValidate onSubmit={(event) => void create(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
+        <form noValidate {...newType.form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
           <h2 className="text-2xl font-bold">{t("admin.membershipTypes.newType")}</h2>
           <div className="grid gap-3 md:grid-cols-2">
             <TextField data-testid="new-membership-type-name" disabled={pending} name="name" maxLength={NAME_LENGTH} label={t("admin.membershipTypes.name")} />
@@ -135,6 +140,10 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
   const [name, setName] = useState(type.name);
   const [ruleSetId, setRuleSetId] = useState(type.ruleSetId ?? "");
   const [grantsAccount, setGrantsAccount] = useState(type.grantsAccount);
+  const mark = `membership-type:${type.id}`;
+  const unsaved = differs(
+    { name, ruleSetId: ruleSetId || null, grantsAccount },
+    { name: type.name, ruleSetId: type.ruleSetId ?? null, grantsAccount: type.grantsAccount });
 
   return <article data-testid={`membership-type-${type.id}`} className="surface-subtle grid gap-3 rounded-xl border p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -164,8 +173,8 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
     <p className="text-muted text-sm">{t("admin.membershipTypes.grantsAccountNote")}</p>
     <Link data-testid={`membership-type-rules-link-${type.id}`} className="underline" to="/admin/configuration">{t("admin.membershipTypes.ruleSetLink")}</Link>
     <div className="grid gap-2 md:grid-cols-[auto_1fr] md:items-center">
-      <Button variant="primary" data-testid={`save-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
-      <span />
+      <Button variant="primary" data-testid={`save-membership-type-${type.id}`} aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
+      <span><UnsavedMark id={mark} unsaved={unsaved} /></span>
       <Button variant={type.active ? "destructive" : "primary"} data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
       {type.active && <p data-testid={`membership-type-retire-note-${type.id}`} className="text-muted text-sm">{t("admin.membershipTypes.retireNote")}</p>}
     </div>
