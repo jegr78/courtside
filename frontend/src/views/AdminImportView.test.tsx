@@ -218,4 +218,34 @@ describe("AdminImportView", () => {
     await waitFor(() => expect(screen.getByTestId("source-name")).toHaveValue("Club registry"));
     expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
   });
+
+  it("given a described source is edited, when the same source is chosen again, then nothing is asked", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await userEvent.type(await screen.findByTestId("source-name"), " plus");
+
+    // when
+    await userEvent.click(screen.getByTestId("source-choice-source-1"));
+
+    // then
+    expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
+    expect(screen.getByTestId("source-name")).toHaveValue("Membership system plus");
+  });
+
+  it("given a member number typed for a link, when another source is opened, then the link is asked about", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await userEvent.type(await screen.findByTestId("reference-external-id"), "4711");
+
+    // when
+    await userEvent.click(screen.getByTestId("source-choice-source-2"));
+
+    // then
+    expect(await screen.findByTestId("unsaved-changes")).toBeInTheDocument();
+  });
 });

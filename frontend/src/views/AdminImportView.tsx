@@ -26,12 +26,18 @@ export function AdminImportView() {
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
+  // Wrapped because a choice of undefined is one the board can make — it means no source open —
+  // so the wrapper is what tells an awaited choice apart from none.
   const [pendingChoice, setPendingChoice] = useState<{ next: Editing }>();
   const { holds } = useUnsavedChanges();
 
+  function editorOf(what: Editing): string | undefined {
+    return what && `import-source:${what.source?.id ?? "new"}`;
+  }
+
   function heldHere(): string[] {
     if (!editing) return [];
-    return [`import-source:${editing.source?.id ?? "new"}`, "import-reference:new"].filter(holds);
+    return [editorOf(editing) ?? "", "import-reference:new"].filter(holds);
   }
 
   function openSource(next: Editing) {
@@ -40,9 +46,11 @@ export function AdminImportView() {
   }
 
   // Opening another source rebuilds the form from that source, which is how this surface leaves an
-  // editor: the description on screen would be gone with nothing asked.
+  // editor: the description on screen would be gone with nothing asked. Choosing the source
+  // already open rebuilds nothing, so there is nothing to lose and nothing to ask.
   function askBeforeOpening(next: Editing) {
-    if (heldHere().length > 0) setPendingChoice({ next }); else openSource(next);
+    const leaves = editorOf(next) !== editorOf(editing);
+    if (leaves && heldHere().length > 0) setPendingChoice({ next }); else openSource(next);
   }
 
   const reportError = useCallback((failure: unknown) => {

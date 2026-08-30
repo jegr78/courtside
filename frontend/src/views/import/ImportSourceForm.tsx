@@ -25,23 +25,32 @@ function mappingOf(source: ImportSource | undefined): Mapping {
 }
 
 // What the server last confirmed, in the shape the form would send, so the two are comparable at
-// all. A source nobody has saved yet is compared against the empty form it started as.
-function described(source: ImportSource | undefined): ImportSourceRequest {
+// all — and what the form starts as, so an untouched source cannot read as changed because the
+// two sides spell a default differently.
+function described(source: ImportSource | undefined) {
   return {
     sourceKey: source?.sourceKey ?? "",
     displayName: source?.displayName ?? "",
     separator: source?.separator ?? ",",
     encoding: source?.encoding ?? "UTF-8",
     columns: source?.columns ?? {},
-    membershipTypes: source?.membershipTypes ?? {},
+    membershipTypes: assigned(source?.membershipTypes),
     defaultMembershipTypeId: source?.defaultMembershipTypeId ?? "",
     ownedFields: OWNABLE.filter((field) => (source?.ownedFields ?? []).includes(field)),
     removalWarningPercent: source?.removalWarningPercent ?? 10
   };
 }
 
+// A category left unassigned is absent from the request, so it has to be absent from the
+// comparison too — otherwise one arriving from the server would mark the source unsaved for good.
+function assigned(categories: Record<string, string> | undefined): Record<string, string> {
+  return Object.fromEntries(Object.entries(categories ?? {}).filter(([, typeId]) => typeId));
+}
+
+// Without a prototype, because a column a club named __proto__ would otherwise reach the inherited
+// setter and disappear from the mapping instead of becoming a key of its own.
 function columnsOf(mapping: Mapping): Record<string, CanonicalField> {
-  const columns: Record<string, CanonicalField> = {};
+  const columns = Object.create(null) as Record<string, CanonicalField>;
   FIELDS.forEach((field) => {
     const column = mapping[field];
     if (column) columns[column] = field;
@@ -58,18 +67,19 @@ export function ImportSourceForm({ source, types, disabled, save }: {
 }) {
   const { t } = useTranslation();
   const group = useId();
+  const confirmed = described(source);
   const [chosen, setChosen] = useState<File>();
   const [headers, setHeaders] = useState<string[]>([]);
   const [readValues, setReadValues] = useState<string[]>([]);
-  const [sourceKey, setSourceKey] = useState(source?.sourceKey ?? "");
-  const [displayName, setDisplayName] = useState(source?.displayName ?? "");
+  const [sourceKey, setSourceKey] = useState(confirmed.sourceKey);
+  const [displayName, setDisplayName] = useState(confirmed.displayName);
   const [mapping, setMapping] = useState<Mapping>(mappingOf(source));
-  const [categories, setCategories] = useState<Record<string, string>>(source?.membershipTypes ?? {});
-  const [defaultType, setDefaultType] = useState(source?.defaultMembershipTypeId ?? "");
-  const [owned, setOwned] = useState<CanonicalField[]>(source?.ownedFields ?? []);
-  const [threshold, setThreshold] = useState(String(source?.removalWarningPercent ?? 10));
-  const [separator, setSeparator] = useState(source?.separator ?? ",");
-  const [encoding, setEncoding] = useState(source?.encoding ?? "UTF-8");
+  const [categories, setCategories] = useState<Record<string, string>>(confirmed.membershipTypes);
+  const [defaultType, setDefaultType] = useState(confirmed.defaultMembershipTypeId);
+  const [owned, setOwned] = useState<CanonicalField[]>(confirmed.ownedFields);
+  const [threshold, setThreshold] = useState(String(confirmed.removalWarningPercent));
+  const [separator, setSeparator] = useState(confirmed.separator);
+  const [encoding, setEncoding] = useState(confirmed.encoding);
   const [encodings, setEncodings] = useState<string[]>([]);
   const [unreadableHere, setUnreadableHere] = useState(false);
   const [asksEncoding, setAsksEncoding] = useState(false);
@@ -139,8 +149,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       separator,
       encoding,
       columns: columnsOf(mapping),
-      membershipTypes: Object.fromEntries(
-        Object.entries(categories).filter(([, typeId]) => typeId)),
+      membershipTypes: assigned(categories),
       defaultMembershipTypeId: defaultType,
       // In the canonical order rather than the order they were ticked, so a field taken back and
       // given again leaves the same request rather than a reordered one.
@@ -154,7 +163,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   }
 
   const mark = `import-source:${source?.id ?? "new"}`;
-  const unsaved = differs(requested(), described(source));
+  const unsaved = differs(requested(), confirmed);
 
   // The column choices come from the club's own file, which is why it is read here and never sent.
   return <section className="surface-subtle grid gap-4 rounded-xl border p-4">

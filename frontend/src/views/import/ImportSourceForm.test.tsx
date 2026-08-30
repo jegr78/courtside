@@ -304,3 +304,29 @@ it("given an owned field ticked and unticked again, when the source is read, the
   // then
   await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
 });
+
+// A category the server left unassigned is absent from the request, so it must be absent from the
+// comparison as well or the source reads as unsaved with nothing to save.
+it("given a category the server left unassigned, when the source is read, then it holds nothing to lose", async () => {
+  // given
+  show({ ...existing, membershipTypes: { Adults: "type-1", Passive: "" } }, () => Promise.resolve());
+
+  // then
+  expect(await screen.findByTestId("source-key")).toBeInTheDocument();
+  expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+});
+
+it("given a column a club named __proto__, when it is mapped, then it stays a column of its own", async () => {
+  // given
+  const save = vi.fn((request: ImportSourceRequest) => Promise.resolve(request));
+  // Parsed rather than written out, because a literal would set the prototype instead of a key —
+  // which is the very confusion this guards against.
+  const columns = JSON.parse('{"__proto__":"EXTERNAL_ID"}') as ImportSource["columns"];
+  show({ ...existing, columns }, save);
+
+  // when
+  await userEvent.click(await screen.findByTestId("save-source"));
+
+  // then
+  expect(Object.keys(save.mock.calls[0][0].columns ?? {})).toContain("__proto__");
+});
