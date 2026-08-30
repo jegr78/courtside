@@ -110,11 +110,14 @@ if the login fails with `401` and the credentials are certainly right, the token
 ## Tests
 
 ```bash
-JAVA_HOME=/path/to/temurin-25 ./mvnw -B clean verify
+JAVA_HOME=/path/to/temurin-25 node tools/courtside.mjs check
 ```
 
-Testcontainers starts PostgreSQL 17, so Docker has to be running. The suite never mocks the
-database: collision handling is the database's job and is tested as such.
+The command applies the same conservative path classification as pull-request CI and runs the
+required local backend, frontend, combined, or full verification. Use `check --plan` to inspect the
+decision and `check --full` to escalate it. Testcontainers starts PostgreSQL 17 for every selected
+code profile, so Docker has to be running. The suite never mocks the database: collision handling
+is the database's job and is tested as such.
 
 ## Documentation
 

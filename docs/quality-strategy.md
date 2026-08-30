@@ -34,7 +34,7 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 |---|---:|---|
 | Local unit and contract feedback | under 2 minutes | Focused tests for the changed decision and its negative boundary. |
 | Required pull-request checks | under 15 minutes | Green required checks plus the pull-request risk and evidence declaration. |
-| Full merge verification | under 25 minutes | Clean `./mvnw clean verify` for task completion and diagnosable artifacts on failure. |
+| Local pull-request verification | under 25 minutes | `node tools/courtside.mjs check` selects the protected profile; `full` runs a clean Maven verification. |
 | Nightly qualification | under 90 minutes | Periodic browser, order, concurrency, security and bounded performance evidence assigned by risk. |
 | Release qualification | under 45 minutes | Candidate-image, upgrade, restore and release-risk evidence; long soak runs are recorded separately. |
 
