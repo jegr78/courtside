@@ -12,6 +12,7 @@ import { TextField } from "../components/TextField";
 import { downloadJson } from "../downloads/downloadJson";
 import { formString } from "../forms/formString";
 import { differs } from "../unsaved/differs";
+import { describedByMark } from "../unsaved/markId";
 import { UnsavedMark } from "../unsaved/UnsavedMark";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 
@@ -142,6 +143,8 @@ function PersonSection({ entry, disabled, save }: { entry: RosterEntry; disabled
   const [person, setPerson] = useState<PersonRequest>({
     firstName: entry.firstName, lastName: entry.lastName, email: entry.email
   });
+  const mark = `person:${entry.personId}`;
+  const unsaved = differs(person, { firstName: entry.firstName, lastName: entry.lastName, email: entry.email });
   return <section className="surface-subtle grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.person.person")}</h2>
     <div className="grid gap-3 md:grid-cols-3">
@@ -150,9 +153,8 @@ function PersonSection({ entry, disabled, save }: { entry: RosterEntry; disabled
       <TextField data-testid="person-email" disabled={disabled} type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} value={person.email ?? ""} onChange={(event) => setPerson({ ...person, email: event.target.value || null })} />
     </div>
     <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" data-testid="save-person" disabled={disabled} type="button" onClick={() => void save(person)}>{t("admin.save")}</Button>
-      <UnsavedMark id={`person:${entry.personId}`} unsaved={differs(person,
-        { firstName: entry.firstName, lastName: entry.lastName, email: entry.email })} />
+      <Button variant="primary" data-testid="save-person" aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button" onClick={() => void save(person)}>{t("admin.save")}</Button>
+      <UnsavedMark id={mark} unsaved={unsaved} />
     </div>
   </section>;
 }
@@ -175,6 +177,7 @@ function MembershipSection({ entry, types, disabled, save }: {
   const [endedOn, setEndedOn] = useState(entry.membershipEndedOn ?? "");
   const [ending, setEnding] = useState(false);
   const [chosenEnd, setChosenEnd] = useState(entry.membershipEndedOn ?? "");
+  const membershipMark = `membership:${entry.personId}`;
   const unsavedMembership = differs(
     { typeId, startedOn, endedOn },
     {
@@ -206,9 +209,9 @@ function MembershipSection({ entry, types, disabled, save }: {
       <TextField data-testid="membership-ended-on" disabled={disabled} type="date" label={t("admin.person.endedOn")} value={endedOn} onChange={(event) => setEndedOn(event.target.value)} />
     </div>
     <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" data-testid="save-membership" disabled={disabled || !typeId} type="button" onClick={() => void save({ membershipTypeId: typeId, startedOn: startedOn || null, endedOn: endedOn || null })}>{t("admin.save")}</Button>
+      <Button variant="primary" data-testid="save-membership" aria-describedby={describedByMark(membershipMark, unsavedMembership)} disabled={disabled || !typeId} type="button" onClick={() => void save({ membershipTypeId: typeId, startedOn: startedOn || null, endedOn: endedOn || null })}>{t("admin.save")}</Button>
       {running && <Button variant="destructive" data-testid="end-membership" disabled={disabled} type="button" onClick={() => setEnding(true)}>{t("admin.person.endMembership")}</Button>}
-      <UnsavedMark id={`membership:${entry.personId}`} unsaved={unsavedMembership} />
+      <UnsavedMark id={membershipMark} unsaved={unsavedMembership} />
     </div>
     {ending && <Modal labelledBy="end-membership-title" closed={() => setEnding(false)}>
       <div className="grid gap-4">
@@ -238,6 +241,9 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
   const [username, setUsername] = useState(entry.username ?? "");
   const [locale, setLocale] = useState(entry.locale ?? club?.defaultLocale ?? "");
   const [chosenRoles, setChosenRoles] = useState(entry.roles);
+  const unsavedUsername = username !== (entry.username ?? "");
+  const unsavedLocale = locale !== (entry.locale ?? club?.defaultLocale ?? "");
+  const unsavedRoles = differs({ roles: chosenRoles }, { roles: entry.roles });
   const [replacing, setReplacing] = useState(false);
 
   // Only a chosen password can be destroyed by sending: the other three states have nothing to lose.
@@ -259,8 +265,8 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <TextField data-testid="account-username" disabled={disabled} autoComplete="off" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} value={username} onChange={(event) => setUsername(event.target.value)} />
       <div className="flex flex-wrap items-center gap-3 self-end">
-        <Button variant="primary" data-testid="save-username" disabled={disabled} type="button" onClick={() => void saveUsername(username)}>{t("admin.save")}</Button>
-        <UnsavedMark id={`account-username:${entry.personId}`} unsaved={username !== (entry.username ?? "")} />
+        <Button variant="primary" data-testid="save-username" aria-describedby={describedByMark(`account-username:${entry.personId}`, unsavedUsername)} disabled={disabled} type="button" onClick={() => void saveUsername(username)}>{t("admin.save")}</Button>
+        <UnsavedMark id={`account-username:${entry.personId}`} unsaved={unsavedUsername} />
       </div>
     </div>
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -269,14 +275,14 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
         <LocaleSelect testId="account-locale" disabled={disabled} className="form-control rounded-lg border px-3 py-2" value={locale} supported={club?.supportedLocales} changed={setLocale} />
       </label>
       <div className="flex flex-wrap items-center gap-3 self-end">
-        <Button variant="primary" data-testid="save-locale" disabled={disabled} type="button" onClick={() => void saveLocale(locale)}>{t("admin.save")}</Button>
-        <UnsavedMark id={`account-locale:${entry.personId}`} unsaved={locale !== (entry.locale ?? club?.defaultLocale ?? "")} />
+        <Button variant="primary" data-testid="save-locale" aria-describedby={describedByMark(`account-locale:${entry.personId}`, unsavedLocale)} disabled={disabled} type="button" onClick={() => void saveLocale(locale)}>{t("admin.save")}</Button>
+        <UnsavedMark id={`account-locale:${entry.personId}`} unsaved={unsavedLocale} />
       </div>
     </div>
     <RoleCheckboxes testIdPrefix="account-roles" disabled={disabled} selected={chosenRoles} changed={setChosenRoles} />
     <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" data-testid="save-roles" disabled={disabled} type="button" onClick={() => void saveRoles(chosenRoles)}>{t("admin.save")}</Button>
-      <UnsavedMark id={`account-roles:${entry.personId}`} unsaved={differs({ roles: chosenRoles }, { roles: entry.roles })} />
+      <Button variant="primary" data-testid="save-roles" aria-describedby={describedByMark(`account-roles:${entry.personId}`, unsavedRoles)} disabled={disabled} type="button" onClick={() => void saveRoles(chosenRoles)}>{t("admin.save")}</Button>
+      <UnsavedMark id={`account-roles:${entry.personId}`} unsaved={unsavedRoles} />
     </div>
     <div className="grid gap-2">
       <span className="font-medium">{t("admin.person.credentialState")}</span>

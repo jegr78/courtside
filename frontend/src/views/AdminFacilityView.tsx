@@ -21,6 +21,7 @@ import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 import { useFragmentTarget } from "../navigation/useFragmentTarget";
 import { differs } from "../unsaved/differs";
+import { describedByMark } from "../unsaved/markId";
 import { UnsavedMark } from "../unsaved/UnsavedMark";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 import { ImpactPanel } from "../components/ImpactPanel";
@@ -355,12 +356,14 @@ export function AdminFacilityView() {
 
 function CourtEditor({ court, confirmed, timeZone, disabled, changed, save, toggle, reportError }: { court: AdminCourt; confirmed?: AdminCourt; timeZone: string; disabled: boolean; changed: (court: AdminCourt) => void; save: (court: AdminCourt) => Promise<void>; toggle: (court: AdminCourt) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
+  const mark = `court:${court.id}`;
+  const unsaved = differs(court, confirmed);
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto_auto_auto] sm:items-end">
     <TextField disabled={disabled} type="number" label={t("admin.facility.number")} value={court.number} onChange={(event) => changed({ ...court, number: Number(event.target.value) })} />
     <TextField disabled={disabled} data-testid={`court-name-${court.id}`} label={t("admin.facility.name")} value={court.name ?? ""} onChange={(event) => changed({ ...court, name: event.target.value || null })} />
-    <Button variant="primary" disabled={disabled} data-testid={`save-court-${court.id}`} type="button" onClick={() => void save(court)}>{t("admin.save")}</Button>
+    <Button variant="primary" disabled={disabled} data-testid={`save-court-${court.id}`} aria-describedby={describedByMark(mark, unsaved)} type="button" onClick={() => void save(court)}>{t("admin.save")}</Button>
     <Button variant={court.active ? "destructive" : "primary"} disabled={disabled} data-testid={`toggle-court-${court.id}`} type="button" onClick={() => void toggle(court)}>{t(court.active ? "admin.deactivate" : "admin.activate")}</Button>
-    <UnsavedMark id={`court:${court.id}`} unsaved={differs(court, confirmed)} />
+    <UnsavedMark id={mark} unsaved={unsaved} />
     <div className="sm:col-span-full">
       <ImpactPanel kind="court" subject={court.id} timeZone={timeZone} ask={() => api.courtImpact(court.id)} reportError={reportError} />
     </div>
@@ -369,6 +372,8 @@ function CourtEditor({ court, confirmed, timeZone, disabled, changed, save, togg
 
 function HoursEditor({ hours, confirmed, timeZone, disabled, changed, save, close, reportError }: { hours: OpeningHours; confirmed?: OpeningHours; timeZone: string; disabled: boolean; changed: (hours: OpeningHours) => void; save: (hours: OpeningHours) => Promise<void>; close: (day: DayOfWeek) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
+  const mark = `hours:${hours.dayOfWeek}`;
+  const unsaved = differs(hours, confirmed);
   return <article className="surface-subtle grid gap-3 rounded-xl border p-4">
     <h3 className="font-bold">{t(`weekday.${hours.dayOfWeek}`)}</h3>
     <div className="grid grid-cols-2 gap-3">
@@ -376,9 +381,9 @@ function HoursEditor({ hours, confirmed, timeZone, disabled, changed, save, clos
       <TextField disabled={disabled} type="time" label={t("admin.facility.closesAt")} value={shortTime(hours.closesAt)} onChange={(event) => changed({ ...hours, closesAt: event.target.value })} />
     </div>
     <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" data-testid={`save-hours-${hours.dayOfWeek}`} disabled={disabled || !hours.opensAt || !hours.closesAt} type="button" onClick={() => void save(hours)}>{t("admin.save")}</Button>
+      <Button variant="primary" data-testid={`save-hours-${hours.dayOfWeek}`} aria-describedby={describedByMark(mark, unsaved)} disabled={disabled || !hours.opensAt || !hours.closesAt} type="button" onClick={() => void save(hours)}>{t("admin.save")}</Button>
       <Button variant="destructive" disabled={disabled} type="button" onClick={() => void close(hours.dayOfWeek)}>{t("admin.facility.closeDay")}</Button>
-      <UnsavedMark id={`hours:${hours.dayOfWeek}`} unsaved={differs(hours, confirmed)} />
+      <UnsavedMark id={mark} unsaved={unsaved} />
     </div>
     <ImpactPanel
       kind="opening-hours"
@@ -392,6 +397,8 @@ function HoursEditor({ hours, confirmed, timeZone, disabled, changed, save, clos
 
 function CardEditor({ card, confirmed, timeZone, disabled, changed, save, toggle, reportError }: { card: BookingCard; confirmed?: BookingCard; timeZone: string; disabled: boolean; changed: (card: BookingCard) => void; save: (card: BookingCard) => Promise<void>; toggle: (card: BookingCard) => Promise<void>; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
+  const mark = `card:${card.id}`;
+  const unsaved = differs(card, confirmed);
   const [counts, setCounts] = useState(card.allowedPlayerCounts.join(", "));
   const countsValue = playerCounts(counts);
   return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
@@ -406,9 +413,9 @@ function CardEditor({ card, confirmed, timeZone, disabled, changed, save, toggle
       <Checkbox disabled={disabled} data-testid={`card-generic-occupancy-${card.id}`} label={t("admin.facility.showGenericOccupancy")} checked={card.showGenericOccupancy} changed={(showGenericOccupancy) => changed({ ...card, showGenericOccupancy })} />
     </div>
     <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" disabled={disabled} data-testid={`save-card-${card.id}`} type="button" onClick={() => void save({ ...card, allowedPlayerCounts: countsValue, tracksPlayers: countsValue.length > 0 })}>{t("admin.save")}</Button>
+      <Button variant="primary" disabled={disabled} data-testid={`save-card-${card.id}`} aria-describedby={describedByMark(mark, unsaved)} type="button" onClick={() => void save({ ...card, allowedPlayerCounts: countsValue, tracksPlayers: countsValue.length > 0 })}>{t("admin.save")}</Button>
       <Button variant={card.active ? "destructive" : "primary"} disabled={disabled} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
-      <UnsavedMark id={`card:${card.id}`} unsaved={differs(card, confirmed)} />
+      <UnsavedMark id={mark} unsaved={unsaved} />
     </div>
     <ImpactPanel kind="booking-card" subject={card.id} timeZone={timeZone} ask={() => api.bookingCardImpact(card.id)} reportError={reportError} />
   </article>;
@@ -416,15 +423,17 @@ function CardEditor({ card, confirmed, timeZone, disabled, changed, save, toggle
 
 function ParticipantCardEditor({ card, confirmed, disabled, changed, save, toggle }: { card: ParticipantCard; confirmed?: ParticipantCard; disabled: boolean; changed: (card: ParticipantCard) => void; save: (card: ParticipantCard) => Promise<void>; toggle: (card: ParticipantCard) => Promise<void> }) {
   const { t } = useTranslation();
+  const mark = `participant-card:${card.id}`;
+  const unsaved = differs(card, confirmed);
   return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
     <div className="grid gap-3 md:grid-cols-2">
       <TextField disabled={disabled} data-testid={`participant-card-label-${card.id}`} label={t("admin.facility.label")} value={card.label} onChange={(event) => changed({ ...card, label: event.target.value })} />
       <TextField disabled={disabled} data-testid={`participant-card-capacity-${card.id}`} type="number" min={1} max={99} label={t("admin.facility.owned")} value={card.capacity ?? ""} onChange={(event) => changed({ ...card, capacity: ownedCount(event.target.value) })} />
     </div>
     <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" disabled={disabled} data-testid={`save-participant-card-${card.id}`} type="button" onClick={() => void save(card)}>{t("admin.save")}</Button>
+      <Button variant="primary" disabled={disabled} data-testid={`save-participant-card-${card.id}`} aria-describedby={describedByMark(mark, unsaved)} type="button" onClick={() => void save(card)}>{t("admin.save")}</Button>
       <Button variant={card.active ? "destructive" : "primary"} disabled={disabled} data-testid={`toggle-participant-card-${card.id}`} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
-      <UnsavedMark id={`participant-card:${card.id}`} unsaved={differs(card, confirmed)} />
+      <UnsavedMark id={mark} unsaved={unsaved} />
     </div>
   </article>;
 }

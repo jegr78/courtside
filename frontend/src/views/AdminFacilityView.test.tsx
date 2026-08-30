@@ -35,6 +35,40 @@ describe("AdminFacilityView", () => {
     });
   });
 
+  it("given a renamed court, when the change is saved, then the row stops saying it is unsaved", async () => {
+    // given
+    vi.spyOn(api, "changeAdminCourt").mockImplementation((id, court) =>
+      Promise.resolve({ id, number: court.number, name: court.name ?? null, active: true }));
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminFacilityView />
+    </UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.type(await screen.findByTestId("court-name-court-1"), "!");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+    // when
+    await userEvent.click(screen.getByTestId("save-court-court-1"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+    expect(screen.queryByTestId("unsaved-mark-court:court-1")).not.toBeInTheDocument();
+  });
+
+  it("given a court is renamed, when a screen reader reaches its save, then the mark explains it", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
+    const name = await screen.findByTestId("court-name-court-1");
+    expect(screen.getByTestId("save-court-court-1")).not.toHaveAttribute("aria-describedby");
+
+    // when
+    await userEvent.type(name, "!");
+
+    // then
+    const mark = await screen.findByTestId("unsaved-mark-court:court-1");
+    expect(screen.getByTestId("save-court-court-1"))
+      .toHaveAttribute("aria-describedby", mark.getAttribute("id"));
+  });
+
   it("given a court is renamed, when the row is read, then it says so beside a save that stays usable", async () => {
     // given
     render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
