@@ -16,7 +16,7 @@ const profileRules = JSON.parse(readFileSync(
   new URL("../ci/test-profiles.json", import.meta.url), "utf8"));
 const validatePlan = new Ajv({ strict: true }).compile(planSchema);
 
-test("givenTrackedRepositoryPaths_whenClassifyingEachPath_thenNoneDependsOnTheUnknownFallback", () => {
+test("given tracked repository paths, when classifying each path, then none depends on the unknown fallback", () => {
   // given
   const paths = execFileSync("git", ["ls-files", "-z"], { cwd: repository, encoding: "utf8" })
     .split("\0").filter(Boolean);
@@ -28,7 +28,7 @@ test("givenTrackedRepositoryPaths_whenClassifyingEachPath_thenNoneDependsOnTheUn
   assert.deepEqual(classifications.filter(({ classification }) => classification === null), []);
 });
 
-test("givenBackendAndFrontendChanges_whenClassifying_thenBothReducedProfilesAreObserved", () => {
+test("given backend and frontend changes, when classifying, then both reduced profiles are observed", () => {
   // given
   const changes = [
     { status: "M", path: "src/main/java/org/courtside/booking/BookingService.java" },
@@ -43,7 +43,7 @@ test("givenBackendAndFrontendChanges_whenClassifying_thenBothReducedProfilesAreO
   assert.equal(plan.isFull, false);
 });
 
-test("givenCriticalUnknownOrStructuralChanges_whenClassifying_thenEachFailsClosedToFull", () => {
+test("given critical unknown or structural changes, when classifying, then each fails closed to full", () => {
   // given
   const cases = [
     [{ status: "M", path: "pom.xml" }],
@@ -66,7 +66,7 @@ test("givenCriticalUnknownOrStructuralChanges_whenClassifying_thenEachFailsClose
   for (const changes of cases) assert.deepEqual(classifyChanges(changes, []).profiles, ["full"]);
 });
 
-test("givenEveryConfiguredFullTrigger_whenClassifying_thenEachSelectsFull", () => {
+test("given every configured full trigger, when classifying, then each selects full", () => {
   // given
   const exactPaths = profileRules.profiles.full.exact;
   const prefixedPaths = profileRules.profiles.full.prefixes.map((prefix) => `${prefix}representative`);
@@ -79,7 +79,7 @@ test("givenEveryConfiguredFullTrigger_whenClassifying_thenEachSelectsFull", () =
   assert.ok(classifications.every((classification) => classification?.profile === "full"));
 });
 
-test("givenAnyStructuralChange_whenClassifyingKnownReducedPaths_thenEachSelectsFull", () => {
+test("given any structural change, when classifying known reduced paths, then each selects full", () => {
   // given
   const statuses = ["A", "D", "R100", "C100", "T", "U", "X", "B"];
 
@@ -89,7 +89,7 @@ test("givenAnyStructuralChange_whenClassifyingKnownReducedPaths_thenEachSelectsF
   }
 });
 
-test("givenAFullLabel_whenClassifying_thenItCanEscalateButNoLabelCanSuppressFull", () => {
+test("given a full label, when classifying, then it can escalate but no label can suppress full", () => {
   // given
   const docs = [{ status: "M", path: "docs/design.md" }];
   const critical = [{ status: "M", path: ".github/workflows/build.yml" }];
@@ -99,7 +99,7 @@ test("givenAFullLabel_whenClassifying_thenItCanEscalateButNoLabelCanSuppressFull
   assert.deepEqual(classifyChanges(critical, ["ci:docs"]).profiles, ["full"]);
 });
 
-test("givenOnlyKnownDocumentationChanges_whenNoLabelsAreAvailable_thenTheDocsProfileIsSafeForForks", () => {
+test("given only known documentation changes, when no labels are available, then the docs profile is safe for forks", () => {
   // given
   const changes = [{ status: "M", path: "docs/design.md" }];
 
@@ -117,7 +117,7 @@ test("givenOnlyKnownDocumentationChanges_whenNoLabelsAreAvailable_thenTheDocsPro
   })), /required build runs only the jobs assigned/);
 });
 
-test("givenNullDelimitedGitEvidence_whenParsing_thenRenamesKeepBothPathsAndMalformedInputFails", () => {
+test("given null delimited git evidence, when parsing, then renames keep both paths and malformed input fails", () => {
   // given
   const evidence = "M\0docs/design.md\0R100\0docs/old.md\0docs/new.md\0";
 
@@ -132,7 +132,7 @@ test("givenNullDelimitedGitEvidence_whenParsing_thenRenamesKeepBothPathsAndMalfo
   assert.throws(() => parseNameStatus("M\0docs/design.md"), /malformed/);
 });
 
-test("givenARepositoryPathContainsMarkdown_whenRenderingReasons_thenItCannotInjectSummaryContent", () => {
+test("given a repository path contains markdown, when rendering reasons, then it cannot inject summary content", () => {
   // given
   const plan = classifyChanges([{
     status: "M", path: "unknown/<b>@team|`![open](https://example.org)\n\u202e\u200freversed.md"
@@ -151,7 +151,7 @@ test("givenARepositoryPathContainsMarkdown_whenRenderingReasons_thenItCannotInje
   assert.doesNotMatch(rendered, /<b>|@team|\[open\]|\u202e|\u200f|\nreversed/);
 });
 
-test("givenAProfilePlan_whenBindingItToTheWorkflowRun_thenEveryIdentityIsRetained", () => {
+test("given a profile plan, when binding it to the workflow run, then every identity is retained", () => {
   // given
   const plan = classifyChanges([{ status: "M", path: "docs/design.md" }], []);
 
@@ -177,7 +177,7 @@ test("givenAProfilePlan_whenBindingItToTheWorkflowRun_thenEveryIdentityIsRetaine
   assert.throws(() => bindPlanToRun(plan, { ...bound, runId: 0 }), /identity/);
 });
 
-test("givenTheClassifierFails_whenBindingFallbackEvidence_thenThePlanFailsClosedWithoutRawErrors", () => {
+test("given the classifier fails, when binding fallback evidence, then the plan fails closed without raw errors", () => {
   // when
   const fallback = fallbackPlanToRun({
     runId: 101,

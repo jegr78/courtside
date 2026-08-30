@@ -36,7 +36,7 @@ function pull(overrides = {}) {
   };
 }
 
-test("givenAClosedPullRequestWithADeletedBranch_whenResolving_thenTheExactRunIdentityMatches", () => {
+test("given a closed pull request with a deleted branch, when resolving, then the exact run identity matches", () => {
   // given
   const candidate = pull({ state: "closed", merged_at: "2026-08-29T00:00:00Z" });
 
@@ -48,7 +48,7 @@ test("givenAClosedPullRequestWithADeletedBranch_whenResolving_thenTheExactRunIde
   assert.equal(result.runBaseSha, baseSha);
 });
 
-test("givenCandidatesWithAnotherHead_whenResolving_thenTheMismatchIsRejected", () => {
+test("given candidates with another head, when resolving, then the mismatch is rejected", () => {
   // given
   const candidates = [pull({ head: { ...pull().head, sha: "c".repeat(40) } })];
 
@@ -56,7 +56,7 @@ test("givenCandidatesWithAnotherHead_whenResolving_thenTheMismatchIsRejected", (
   assert.throws(() => resolveRunPullRequest(run(), candidates), /exactly one pull request/);
 });
 
-test("givenCandidatesFromAnotherRepository_whenResolving_thenTheMismatchIsRejected", () => {
+test("given candidates from another repository, when resolving, then the mismatch is rejected", () => {
   // given
   const candidates = [pull({ head: { ...pull().head, repo: { full_name: "other/courtside" } } })];
 
@@ -64,7 +64,7 @@ test("givenCandidatesFromAnotherRepository_whenResolving_thenTheMismatchIsReject
   assert.throws(() => resolveRunPullRequest(run(), candidates), /exactly one pull request/);
 });
 
-test("givenDuplicateExactCandidates_whenResolving_thenAmbiguityIsRejected", () => {
+test("given duplicate exact candidates, when resolving, then ambiguity is rejected", () => {
   // given
   const candidates = [pull(), pull({ number: 124 })];
 
@@ -72,12 +72,12 @@ test("givenDuplicateExactCandidates_whenResolving_thenAmbiguityIsRejected", () =
   assert.throws(() => resolveRunPullRequest(run(), candidates), /exactly one pull request/);
 });
 
-test("givenANonPullRequestRun_whenResolving_thenTheRunIsRejected", () => {
+test("given a non pull request run, when resolving, then the run is rejected", () => {
   // when / then
   assert.throws(() => resolveRunPullRequest(run({ event: "push" }), [pull()]), /pull_request run/);
 });
 
-test("givenTheCurrentPullRequestBaseAdvanced_whenResolving_thenTheRunBaseRemainsAuthoritative", () => {
+test("given the current pull request base advanced, when resolving, then the run base remains authoritative", () => {
   // given
   const currentBase = "c".repeat(40);
 
@@ -91,13 +91,13 @@ test("givenTheCurrentPullRequestBaseAdvanced_whenResolving_thenTheRunBaseRemains
   assert.notEqual(result.runBaseSha, currentBase);
 });
 
-test("givenTheRunHasNoBoundPullRequest_whenResolving_thenObservationFailsClosed", () => {
+test("given the run has no bound pull request, when resolving, then observation fails closed", () => {
   // when / then
   assert.throws(() => resolveRunPullRequest(run({ pull_requests: [] }), [pull()]),
     /exactly one run-bound pull request/);
 });
 
-test("givenRunBoundPullRequestsAreAmbiguous_whenResolving_thenObservationFailsClosed", () => {
+test("given run bound pull requests are ambiguous, when resolving, then observation fails closed", () => {
   // given
   const bound = run().pull_requests[0];
 
@@ -106,7 +106,7 @@ test("givenRunBoundPullRequestsAreAmbiguous_whenResolving_thenObservationFailsCl
     /exactly one run-bound pull request/);
 });
 
-test("givenRunBoundIdentityDiffers_whenResolving_thenObservationFailsClosed", () => {
+test("given run bound identity differs, when resolving, then observation fails closed", () => {
   // given
   const bound = run().pull_requests[0];
   const mismatches = [

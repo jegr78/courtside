@@ -112,7 +112,12 @@ fails on the missing `BuildProperties` bean.
   any real-environment evidence; unresolved or unproven rows block review readiness.
 * **TDD:** Write the test first, watch it fail, then implement. Red → Green → Refactor.
 * **BDD test naming (Given-When-Then):**
-  * Method name: `givenContext_whenAction_thenExpectedResult()`
+  * **Java** method name: `givenContext_whenAction_thenExpectedResult()`
+  * **JavaScript and TypeScript** — `frontend/src`, `frontend/e2e`, `tools` — name the test with a
+    sentence instead: `it("given a club logo, when the shell loads, then the club owns the header")`.
+    A method name has nowhere to put a sentence, which is the only reason Java runs the words
+    together; a test that names itself in a string has the room, so it uses it.
+    `test-naming-policy.test.mjs` keeps the two apart.
   * Body structured with `// given` / `// when` / `// then` comments
   * Without preconditions: `whenAction_thenResult()` is allowed
   * For exception tests: combine as `// when / then` around `assertThatThrownBy`

@@ -21,7 +21,7 @@ test("given active assessment configuration_whenResolvingImages_thenAllPinnedRun
   assert.ok(images.every((image) => /@sha256:[a-f0-9]{64}$/.test(image)));
 });
 
-test("givenSafeAssessment_whenResolvingImages_thenDestructiveScannerIsExcluded", () => {
+test("given safe assessment, when resolving images, then destructive scanner is excluded", () => {
   // when
   const images = assessmentImages("safe");
 
@@ -30,7 +30,7 @@ test("givenSafeAssessment_whenResolvingImages_thenDestructiveScannerIsExcluded",
   assert.equal(images.some((image) => image.startsWith("schemathesis/")), false);
 });
 
-test("givenAnUnpinnedComposeImage_whenResolvingImages_thenResolutionFailsClosed", () => {
+test("given an unpinned compose image, when resolving images, then resolution fails closed", () => {
   // given
   const directory = mkdtempSync(join(tmpdir(), "security-images-"));
   const compose = join(directory, "compose.yaml");
@@ -43,7 +43,7 @@ test("givenAnUnpinnedComposeImage_whenResolvingImages_thenResolutionFailsClosed"
   );
 });
 
-test("givenTwoAssessmentRuns_whenPreparingImportFixtures_thenTheirSourceKeysDoNotCollide", () => {
+test("given two assessment runs, when preparing import fixtures, then their source keys do not collide", () => {
   // when
   const first = securityImportSourceKey("compare-base-123-1", 1);
   const second = securityImportSourceKey("compare-head-123-1", 1);
@@ -54,7 +54,7 @@ test("givenTwoAssessmentRuns_whenPreparingImportFixtures_thenTheirSourceKeysDoNo
   assert.ok(first.length <= 40);
 });
 
-test("givenAnAssessmentRun_whenPreparingItsImportSource_thenRequiredTransportFieldsAreExplicit", () => {
+test("given an assessment run, when preparing its import source, then required transport fields are explicit", () => {
   // when
   const source = securityImportSourceRequest("compare-head-123-1", 1);
 

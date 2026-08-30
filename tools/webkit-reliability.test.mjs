@@ -105,7 +105,7 @@ test("given a completed first attempt_whenBuildingItsRecord_thenTheClosedSchemaA
   assert.equal(result.browserLifecycle.processes.length, 3);
 });
 
-test("givenAProductAssertionFailure_whenBuildingItsRecord_thenItRemainsAProductFailure", () => {
+test("given a product assertion failure, when building its record, then it remains a product failure", () => {
   // given
   const evidence = record();
 
@@ -120,7 +120,7 @@ test("givenAProductAssertionFailure_whenBuildingItsRecord_thenItRemainsAProductF
   assert.deepEqual(result.outcome, { status: "failed", classifications: ["product"], exitCode: 1 });
 });
 
-test("givenAnIncompleteHarnessOrMissingExecution_whenBuildingItsRecord_thenTheFailureClassIsExplicit", () => {
+test("given an incomplete harness or missing execution, when building its record, then the failure class is explicit", () => {
   // given / when
   const harness = record({ execution: { exitCode: 1, gateOutcome: { schemaVersion: 1, claims: [
     { id: "webkit-core-compatibility", status: "not-established" },
@@ -135,7 +135,7 @@ test("givenAnIncompleteHarnessOrMissingExecution_whenBuildingItsRecord_thenTheFa
   assert.equal(environment.outcome.status, "incomplete");
 });
 
-test("givenDockerIsUnavailable_whenCheckingTheEnvironment_thenTheAttemptIsClassifiedBeforePlaywrightStarts", async () => {
+test("given Docker is unavailable, when checking the environment, then the attempt is classified before playwright starts", async () => {
   // given
   const unavailable = () => ({ status: 1, error: undefined });
 
@@ -147,7 +147,7 @@ test("givenDockerIsUnavailable_whenCheckingTheEnvironment_thenTheAttemptIsClassi
   assert.equal(result.classification, "environment");
 });
 
-test("givenAChildIgnoresTheGracefulSignal_whenItsDeadlineExpires_thenTheOwnedProcessIsKilled", async () => {
+test("given a child ignores the graceful signal, when its deadline expires, then the owned process is killed", async () => {
   // given
   const startedAt = Date.now();
 
@@ -162,7 +162,7 @@ test("givenAChildIgnoresTheGracefulSignal_whenItsDeadlineExpires_thenTheOwnedPro
   assert.ok(Date.now() - startedAt < 2_000);
 });
 
-test("givenProductAndHarnessFailures_whenBuildingTheRecord_thenNeitherClassificationIsLost", () => {
+test("given product and harness failures, when building the record, then neither classification is lost", () => {
   // given / when
   const result = record({ execution: { exitCode: 1, gateOutcome: { schemaVersion: 1, claims: [
     { id: "webkit-core-compatibility", status: "failed" },
@@ -174,7 +174,7 @@ test("givenProductAndHarnessFailures_whenBuildingTheRecord_thenNeitherClassifica
   assert.deepEqual(result.outcome, { status: "incomplete", classifications: ["product", "harness"], exitCode: 1 });
 });
 
-test("givenTheDeadlineExpiresAfterPassingClaims_whenBuildingTheRecord_thenTheHarnessRemainsIncomplete", () => {
+test("given the deadline expires after passing claims, when building the record, then the harness remains incomplete", () => {
   // given / when
   const result = record({ execution: { exitCode: null, timedOut: true, gateOutcome: { schemaVersion: 1, claims: [
     { id: "webkit-core-compatibility", status: "passed" },
@@ -186,7 +186,7 @@ test("givenTheDeadlineExpiresAfterPassingClaims_whenBuildingTheRecord_thenTheHar
   assert.deepEqual(result.outcome, { status: "incomplete", classifications: ["harness"], exitCode: null });
 });
 
-test("givenAnExistingFirstAttempt_whenRetainingADiagnosticRun_thenTheOriginalCannotBeOverwritten", () => {
+test("given an existing first attempt, when retaining a diagnostic run, then the original cannot be overwritten", () => {
   // given
   const directory = mkdtempSync(resolve(tmpdir(), "courtside-reliability-"));
   const first = record();
@@ -197,7 +197,7 @@ test("givenAnExistingFirstAttempt_whenRetainingADiagnosticRun_thenTheOriginalCan
   assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), first);
 });
 
-test("givenThirtyHostedSuccesses_whenSummarizingHistory_thenTheStreakIsCountedWithoutAStatisticalClaim", () => {
+test("given thirty hosted successes, when summarizing history, then the streak is counted without a statistical claim", () => {
   // given
   const records = Array.from({ length: 30 }, (_, index) => record({
     attemptId: `018f47a2-9e4c-7a61-8000-${String(index).padStart(12, "0")}`,
@@ -215,7 +215,7 @@ test("givenThirtyHostedSuccesses_whenSummarizingHistory_thenTheStreakIsCountedWi
   assert.equal(Object.hasOwn(summary, "provenFailureRateBelowTarget"), false);
 });
 
-test("givenAClosedResultSchema_whenAddingSensitiveOrUnknownData_thenValidationFails", () => {
+test("given a closed result schema, when adding sensitive or unknown data, then validation fails", () => {
   // given
   const unsafe = { ...record(), cookie: "session=value" };
 
@@ -223,7 +223,7 @@ test("givenAClosedResultSchema_whenAddingSensitiveOrUnknownData_thenValidationFa
   assert.equal(validate(unsafe), false);
 });
 
-test("givenASchemaValidButContradictoryOutcome_whenValidatingSemantics_thenItFailsClosed", () => {
+test("given a schema valid but contradictory outcome, when validating semantics, then it fails closed", () => {
   // given
   const contradictory = record();
   contradictory.outcome = { status: "passed", classifications: ["product"], exitCode: 0 };
@@ -232,7 +232,7 @@ test("givenASchemaValidButContradictoryOutcome_whenValidatingSemantics_thenItFai
   assert.throws(() => validateReliabilityRecord(contradictory), /outcome is contradictory/);
 });
 
-test("givenToolchainOrDurationMetadataThatDoesNotMatch_whenValidatingSemantics_thenItFailsClosed", () => {
+test("given toolchain or duration metadata that does not match, when validating semantics, then it fails closed", () => {
   // given
   const wrongDigest = record();
   wrongDigest.toolchain.browserImageDigest = `sha256:${"c".repeat(64)}`;
@@ -244,7 +244,7 @@ test("givenToolchainOrDurationMetadataThatDoesNotMatch_whenValidatingSemantics_t
   assert.throws(() => validateReliabilityRecord(wrongDuration), /duration does not match/);
 });
 
-test("givenBothImplementedIsolationVariants_whenParsingTheRun_thenTheyRemainExplicit", () => {
+test("given both implemented isolation variants, when parsing the run, then they remain explicit", () => {
   // given / when
   const project = reliabilityOptions(["--isolation", "fresh-project-browser"]);
   const testScoped = reliabilityOptions(["--isolation", "fresh-test-browser"]);
@@ -254,7 +254,7 @@ test("givenBothImplementedIsolationVariants_whenParsingTheRun_thenTheyRemainExpl
   assert.equal(testScoped.isolation, "fresh-test-browser");
 });
 
-test("givenAnIsolationExperiment_whenSelectingItsOutput_thenCompletedAttemptsCannotBeClearedByPlaywright", () => {
+test("given an isolation experiment, when selecting its output, then completed attempts cannot be cleared by playwright", () => {
   // given / when
   const options = comparisonOptions(["--pairs", "20"]);
 
@@ -264,13 +264,13 @@ test("givenAnIsolationExperiment_whenSelectingItsOutput_thenCompletedAttemptsCan
     /outside Playwright test-results/);
 });
 
-test("givenAnUnknownIsolationOrResourceProfile_whenParsingTheRun_thenItCannotBeClaimed", () => {
+test("given an unknown isolation or resource profile, when parsing the run, then it cannot be claimed", () => {
   // given / when / then
   assert.throws(() => reliabilityOptions(["--isolation", "shared-browser"]), /Unsupported isolation/);
   assert.throws(() => reliabilityOptions(["--resource-profile", "large-runner"]), /Unsupported option/);
 });
 
-test("givenLifecycleEvidenceDoesNotMatchTheDeclaredIsolation_whenValidating_thenItFailsClosed", () => {
+test("given lifecycle evidence does not match the declared isolation, when validating, then it fails closed", () => {
   // given
   const wrongProjectCount = record();
   wrongProjectCount.browserLifecycle.processes.pop();
@@ -282,7 +282,7 @@ test("givenLifecycleEvidenceDoesNotMatchTheDeclaredIsolation_whenValidating_then
   assert.throws(() => validateReliabilityRecord(wrongTestCount), /contradictory browser lifecycle/);
 });
 
-test("givenUnsafeOrIncompleteLifecycleEvidence_whenTheRunClaimsSuccess_thenItFailsClosed", () => {
+test("given unsafe or incomplete lifecycle evidence, when the run claims success, then it fails closed", () => {
   // given
   const oom = record();
   oom.browserLifecycle.processes[0].exitState.oomKilled = true;
@@ -314,7 +314,7 @@ test("givenUnsafeOrIncompleteLifecycleEvidence_whenTheRunClaimsSuccess_thenItFai
   assert.throws(() => validateReliabilityRecord(duplicateProject), /contradictory browser lifecycle/);
 });
 
-test("givenTwentyPairedAttemptsPerVariant_whenComparingIsolation_thenConditionsAndResultsStayVisible", () => {
+test("given twenty paired attempts per variant, when comparing isolation, then conditions and results stay visible", () => {
   // given
   const records = comparisonRecords();
 
@@ -329,7 +329,7 @@ test("givenTwentyPairedAttemptsPerVariant_whenComparingIsolation_thenConditionsA
   assert.equal(comparison.selectedVariant, "fresh-project-browser");
 });
 
-test("givenTooFewOrNonComparableAttempts_whenComparingIsolation_thenTheConclusionIsRejected", () => {
+test("given too few or non comparable attempts, when comparing isolation, then the conclusion is rejected", () => {
   // given
   const tooFew = [record(), record({
     attemptId: "018f47a2-9e4c-7a61-8000-123456789abd",

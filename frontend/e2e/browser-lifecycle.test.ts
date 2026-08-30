@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { browserExitState, browserResourceUsage, BrowserLifecycleRecorder } from "./browser-lifecycle";
 
 describe("browser lifecycle evidence", () => {
-  it("givenDockerStats_whenReadingBrowserUsage_thenCPUAndMemoryBecomeNumbers", () => {
+  it("given Docker stats, when reading browser usage, then CPU and memory become numbers", () => {
     // given / when
     const usage = browserResourceUsage({ MemUsage: "128.5MiB / 8GiB", CPUPerc: "3.25%" });
 
@@ -10,7 +10,7 @@ describe("browser lifecycle evidence", () => {
     expect(usage).toEqual({ memoryUsageBytes: 134_742_016, cpuPercent: 3.25 });
   });
 
-  it("givenOneBrowserProcess_whenRecordingTestsAndExit_thenItsIdentityAndHistoryRemain", () => {
+  it("given one browser process, when recording tests and exit, then its identity and history remain", () => {
     // given
     const recorder = new BrowserLifecycleRecorder();
     recorder.start("webkit", "a".repeat(64), "2026-08-27T08:00:00.000Z");
@@ -31,7 +31,7 @@ describe("browser lifecycle evidence", () => {
     })]);
   });
 
-  it("givenMalformedOrCrossProjectMeasurements_whenRecordingEvidence_thenItFailsClosed", () => {
+  it("given malformed or cross project measurements, when recording evidence, then it fails closed", () => {
     // given
     const recorder = new BrowserLifecycleRecorder();
     recorder.start("webkit", "b".repeat(64), "2026-08-27T08:00:00.000Z");
@@ -45,7 +45,7 @@ describe("browser lifecycle evidence", () => {
       "2026-08-27T08:00:02.000Z")).toThrow("two projects");
   });
 
-  it("givenDockerExitState_whenProjectingRetainedEvidence_thenRawErrorTextIsNotRetained", () => {
+  it("given Docker exit state, when projecting retained evidence, then raw error text is not retained", () => {
     // given / when
     const state = browserExitState({ ExitCode: 137, OOMKilled: true, Error: "runtime detail" });
 

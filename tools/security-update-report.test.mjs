@@ -84,7 +84,7 @@ test("given the assessment runtime, when identifying a candidate, then execution
   }
 });
 
-test("givenAFreshOutputDirectory_whenWritingTheReport_thenItsParentIsCreated", () => {
+test("given a fresh output directory, when writing the report, then its parent is created", () => {
   // given
   const directory = mkdtempSync(join(tmpdir(), "courtside-security-update-"));
   const output = join(directory, "nested", "report.md");

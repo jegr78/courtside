@@ -5,7 +5,7 @@ import { test } from "node:test";
 const workflow = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
 const pom = readFileSync(new URL("../pom.xml", import.meta.url), "utf8");
 
-test("givenProfileClassification_whenThePullRequestRuns_thenSelectedQualityJobsControlTheGate", () => {
+test("given profile classification, when the pull request runs, then selected quality jobs control the gate", () => {
   // when / then
   assert.match(workflow, /test-profile-plan:/);
   assert.match(workflow, /test-profile-classifier\.mjs/);
@@ -24,14 +24,14 @@ test("givenProfileClassification_whenThePullRequestRuns_thenSelectedQualityJobsC
   assert.match(workflow, /security:[\s\S]+github\/codeql-action\/init@[a-f0-9]{40}/);
 });
 
-test("givenASelectedQualityJob_whenItDoesNotSucceed_thenTheAggregateFailsClosed", () => {
+test("given a selected quality job, when it does not succeed, then the aggregate fails closed", () => {
   // when / then
   assert.match(workflow, /build:\n\s+if: always\(\)/);
   assert.match(workflow,
     /selected="\$\{!selected_variable\}"\s+if \[\[ "\$selected" = true \]\]; then\s+test "\$result" = success\s+else\s+test "\$result" = skipped/);
 });
 
-test("givenReducedProfiles_whenJobsAreScheduled_thenOnlyTheirConservativeJobSetRuns", () => {
+test("given reduced profiles, when jobs are scheduled, then only their conservative job set runs", () => {
   // when / then
   assert.match(workflow,
     /backend:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.backend == 'true'\)/);
@@ -45,7 +45,7 @@ test("givenReducedProfiles_whenJobsAreScheduled_thenOnlyTheirConservativeJobSetR
   assert.doesNotMatch(workflow, /\$job == "frontend" or \$job == "security"/);
 });
 
-test("givenTheClassifierFails_whenThePlanRuns_thenFullSelectionStillReachesTheGate", () => {
+test("given the classifier fails, when the plan runs, then full selection still reaches the gate", () => {
   // when / then
   assert.match(workflow, /git worktree add[\s\S]+\|\| CLASSIFIER_EXIT=\$\?/);
   assert.match(workflow,
@@ -54,7 +54,7 @@ test("givenTheClassifierFails_whenThePlanRuns_thenFullSelectionStillReachesTheGa
     /else\s+PROFILES='\["full"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
 });
 
-test("givenAProfilePlan_whenTheAggregateRuns_thenEverySelectedAndSkippedJobIsExplained", () => {
+test("given a profile plan, when the aggregate runs, then every selected and skipped job is explained", () => {
   // when / then
   assert.match(workflow, /name: Summarize selected build results/);
   assert.match(workflow, /if: always\(\) && github\.event_name == 'pull_request'/);
@@ -62,7 +62,7 @@ test("givenAProfilePlan_whenTheAggregateRuns_thenEverySelectedAndSkippedJobIsExp
   assert.match(workflow, /required by the conservative profile plan/);
 });
 
-test("givenBackendAndSecurityJobs_whenTheyBuildJava_thenMavenSkipsEveryFrontendExecution", () => {
+test("given backend and security jobs, when they build java, then maven skips every frontend execution", () => {
   // when / then
   assert.match(pom, /<frontend\.skip>false<\/frontend\.skip>/);
   assert.match(pom, /<frontend\.test\.skip>\$\{skipTests}<\/frontend\.test\.skip>/);
@@ -74,7 +74,7 @@ test("givenBackendAndSecurityJobs_whenTheyBuildJava_thenMavenSkipsEveryFrontendE
     /<id>java-only<\/id>[\s\S]+<frontend\.skip>true<\/frontend\.skip>[\s\S]+<frontend\.test\.skip>true<\/frontend\.test\.skip>/);
 });
 
-test("givenSplitCoverageArtifacts_whenTheAggregateDownloadsThem_thenItUsesTheirArchiveRoots", () => {
+test("given split coverage artifacts, when the aggregate downloads them, then it uses their archive roots", () => {
   // when / then
   assert.match(workflow, /--java build\/aggregate\/backend\/site\/jacoco\/jacoco\.xml/);
   assert.match(workflow, /--frontend build\/aggregate\/frontend\/coverage\/lcov\.info/);
@@ -84,7 +84,7 @@ test("givenSplitCoverageArtifacts_whenTheAggregateDownloadsThem_thenItUsesTheirA
   assert.match(workflow, /arguments\+=\(--frontend build\/aggregate\/frontend\/coverage\/lcov\.info\)/);
 });
 
-test("givenSecurityFindingToolsNeedNodeModules_whenTheSecurityJobRuns_thenItInstallsLockedDependencies", () => {
+test("given security finding tools need node modules, when the security job runs, then it installs locked dependencies", () => {
   // when / then
   assert.match(workflow,
     /security:[\s\S]+name: Install security toolchain[\s\S]+frontend:install-node-and-npm frontend:npm@npm-ci[\s\S]+tools\/security-findings\.mjs/);

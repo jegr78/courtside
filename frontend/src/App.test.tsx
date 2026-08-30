@@ -275,7 +275,7 @@ describe("App build identity", () => {
     expect(screen.getByTestId("environment-warning")).toHaveAttribute("role", "alert");
   });
 
-  it("givenShortRoute_whenShellRenders_thenTheShellAnchorsContentToTheTop", async () => {
+  it("given short route, when shell renders, then the shell anchors content to the top", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
@@ -290,7 +290,7 @@ describe("App build identity", () => {
     expect(screen.getByRole("main")).not.toHaveClass("items-center");
   });
 
-  it("givenNoClubLogo_whenTheShellLoads_thenTheCourtsideMarkIsTheNeutralFallback", async () => {
+  it("given no club logo, when the shell loads, then the Courtside mark is the neutral fallback", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockResolvedValue({
@@ -312,7 +312,7 @@ describe("App build identity", () => {
     expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club");
   });
 
-  it("givenAClubLogo_whenTheShellLoads_thenTheClubOwnsTheHeader", async () => {
+  it("given a club logo, when the shell loads, then the club owns the header", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockResolvedValue({
@@ -335,7 +335,7 @@ describe("App build identity", () => {
     expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
   });
 
-  it("givenAClubBrand_whenTheShellLoads_thenTheFooterStillNamesTheProduct", async () => {
+  it("given a club brand, when the shell loads, then the footer still names the product", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockResolvedValue({
@@ -359,7 +359,7 @@ describe("App build identity", () => {
     expect(within(productIdentity).getByTestId("footer-product-mark")).toBeInTheDocument();
   });
 
-  it("givenBothLegalLinks_whenTheShellLoads_thenThePrivacyPolicySitsBesideTheImprint", async () => {
+  it("given both legal links, when the shell loads, then the privacy policy sits beside the imprint", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockResolvedValue({
@@ -384,7 +384,7 @@ describe("App build identity", () => {
     expect(screen.getByTestId("footer-imprint")).toHaveAttribute("href", "/imprint");
   });
 
-  it("givenNoPrivacyPolicyLink_whenTheShellLoads_thenTheFooterOffersNoEmptyTarget", async () => {
+  it("given no privacy policy link, when the shell loads, then the footer offers no empty target", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockResolvedValue({
@@ -407,7 +407,7 @@ describe("App build identity", () => {
     expect(screen.queryByTestId("footer-privacy")).not.toBeInTheDocument();
   });
 
-  it("givenAMidLuminanceClubColour_whenTheShellLoads_thenTheHigherContrastTextColourIsUsed", async () => {
+  it("given a mid luminance club colour, when the shell loads, then the higher contrast text colour is used", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockResolvedValue({

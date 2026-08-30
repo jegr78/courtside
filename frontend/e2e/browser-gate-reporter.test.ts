@@ -100,7 +100,7 @@ describe("browser gate reporter", () => {
     expect(outcome.testPopulation.fingerprint).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
-  it("givenTheSameTestsInAnotherOrder_whenFingerprintingThePopulation_thenTheFingerprintStaysEqual", () => {
+  it("given the same tests in another order, when fingerprinting the population, then the fingerprint stays equal", () => {
     // given
     const results = [
       { identity: "e2e/one.spec.ts:1:1", projectName: "webkit-core", status: "passed", errors: [] },

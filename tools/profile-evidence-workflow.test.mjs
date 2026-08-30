@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 const workflow = readFileSync(new URL("../.github/workflows/profile-evidence.yml", import.meta.url), "utf8");
 
-test("givenProtectedBuildEvidence_whenAggregatingProfiles_thenTheWorkflowReplaysFirstAttemptsFromMain", () => {
+test("given protected build evidence, when aggregating profiles, then the workflow replays first attempts from main", () => {
   // when / then
   assert.match(workflow, /workflow_run:\n\s+workflows: \[CI timing\]/);
   assert.match(workflow, /permissions:\n\s+actions: read\n\s+contents: read/);
