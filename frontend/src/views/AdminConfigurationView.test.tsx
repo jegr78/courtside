@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
+import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
+import { useUnsavedChanges } from "../unsaved/registry";
 import { AdminConfigurationView } from "./AdminConfigurationView";
 
 describe("AdminConfigurationView", () => {
   it("when the page is shown, then it uses the full administration frame", () => {
     // when
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(screen.getByTestId("admin-configuration-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
@@ -53,7 +55,7 @@ describe("AdminConfigurationView", () => {
       { id: "rule-set", name: "Standard", active: true },
       { id: "retired", name: "Retired", active: false }
     ]);
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     const select = await screen.findByTestId("no-membership-type-rule-set");
@@ -72,7 +74,7 @@ describe("AdminConfigurationView", () => {
       bookingReminderHours: 24, logoUploaded: false,
       noMembershipTypeRuleSetId: "rule-set"
     });
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("no-membership-type-rule-set");
 
     // when
@@ -92,7 +94,7 @@ describe("AdminConfigurationView", () => {
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
       bookingReminderHours: 24, logoUploaded: false, privacyUrl: "/privacy"
     });
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("privacy-url");
 
     // when
@@ -106,7 +108,7 @@ describe("AdminConfigurationView", () => {
 
   it("given stored brand colours, when choosing a new primary colour, then the field and live contrast preview agree", async () => {
     // given
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     const picker = await screen.findByTestId("primary-color-picker");
 
     // when
@@ -121,7 +123,7 @@ describe("AdminConfigurationView", () => {
 
   it("given a high contrast accent colour, when it is shown, then the preview names the automatic text tone", async () => {
     // when
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("accent-color-picker")).toHaveValue("#d7e24b");
@@ -140,7 +142,7 @@ describe("AdminConfigurationView", () => {
     };
     const upload = vi.spyOn(api, "uploadClubLogo").mockResolvedValue(uploaded);
     const configurationChanged = vi.fn();
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={configurationChanged} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={configurationChanged} /></UnsavedChangesProvider></MemoryRouter>);
     const input = await screen.findByTestId("logo-file");
     const file = new File([new Uint8Array([1, 2, 3])], "club.png", { type: "image/png" });
 
@@ -162,7 +164,7 @@ describe("AdminConfigurationView", () => {
   ])("given %s, when selecting it, then it is rejected before upload", async (_case, file, message) => {
     // given
     const upload = vi.spyOn(api, "uploadClubLogo");
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     const input = await screen.findByTestId("logo-file");
     const user = userEvent.setup({ applyAccept: false });
 
@@ -191,7 +193,7 @@ describe("AdminConfigurationView", () => {
       logoUrl: "/fallback.svg"
     };
     const remove = vi.spyOn(api, "deleteClubLogo").mockResolvedValue(removed);
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("remove-logo");
 
     // when
@@ -210,7 +212,7 @@ describe("AdminConfigurationView", () => {
       detail: "The uploaded club logo is not usable",
       violations: [{ code: "config.logo.dimensions", params: {} }]
     }));
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     const input = await screen.findByTestId("logo-file");
     await userEvent.upload(input, new File([new Uint8Array([1])], "club.png", { type: "image/png" }));
 
@@ -226,7 +228,7 @@ describe("AdminConfigurationView", () => {
     // given
     const result = deferred<Awaited<ReturnType<typeof api.uploadClubLogo>>>();
     const upload = vi.spyOn(api, "uploadClubLogo").mockReturnValue(result.promise);
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     const input = await screen.findByTestId("logo-file");
     await userEvent.upload(input, new File([new Uint8Array([1])], "club.png", { type: "image/png" }));
 
@@ -254,7 +256,7 @@ describe("AdminConfigurationView", () => {
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
       bookingReminderHours: 24, logoUploaded: false
     });
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("privacy-url");
 
     // when
@@ -279,7 +281,7 @@ describe("AdminConfigurationView", () => {
       bookingReminderHours: 24, logoUploaded: false,
       noMembershipTypeRuleSetId: "retired"
     });
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     const select = await screen.findByTestId("no-membership-type-rule-set");
@@ -294,7 +296,7 @@ describe("AdminConfigurationView", () => {
     // given
     const changing = vi.spyOn(api, "changeRuleSet")
       .mockResolvedValue({ id: "rule-set", name: "Standard rules", active: true });
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("rule-set-name");
 
     // when
@@ -309,7 +311,7 @@ describe("AdminConfigurationView", () => {
     // given
     const creating = vi.spyOn(api, "createRuleSet")
       .mockResolvedValue({ id: "rule-set-2", name: "Juniors", active: true });
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("new-rule-set-name");
 
     // when
@@ -323,7 +325,7 @@ describe("AdminConfigurationView", () => {
 
   it("given membership types pointing at a rule set, when it is read, then retiring it says what that does not change", async () => {
     // given / when
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then — a retired set still binds whoever already points at it, which is the whole surprise
     const note = await screen.findByTestId("rule-set-retire-note");
@@ -337,7 +339,7 @@ describe("AdminConfigurationView", () => {
     ]);
 
     // when
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("rule-set-retire-note")).toBeInTheDocument();
@@ -347,7 +349,7 @@ describe("AdminConfigurationView", () => {
     // given
     const toggling = vi.spyOn(api, "setRuleSetActive")
       .mockResolvedValue({ id: "rule-set", name: "Standard", active: false });
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("toggle-rule-set");
 
     // when — activating it again restores it, so by this project's rule it is not confirmed
@@ -360,7 +362,7 @@ describe("AdminConfigurationView", () => {
   it("given a rule the club no longer wants, when it is removed, then the set stops carrying it", async () => {
     // given
     const removing = vi.spyOn(api, "removeRule").mockResolvedValue(undefined);
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("remove-rule-ADVANCE_WINDOW");
 
     // when
@@ -377,7 +379,7 @@ describe("AdminConfigurationView", () => {
     vi.spyOn(api, "rules").mockResolvedValue([]);
 
     // when
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
 
     // then
@@ -386,7 +388,7 @@ describe("AdminConfigurationView", () => {
 
   it("given an admin, when configuration loads, then club settings and every rule type are visible", async () => {
     // when
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("club-name")).toHaveValue("Example Tennis Club");
@@ -403,7 +405,7 @@ describe("AdminConfigurationView", () => {
 
   it("given the time-grid fragment, when configuration loads, then the owned setting receives focus", async () => {
     // given
-    render(<MemoryRouter initialEntries={["/admin/configuration#slot-minutes"]}><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/configuration#slot-minutes"]}><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     const slotMinutes = await screen.findByTestId("slot-minutes");
@@ -417,7 +419,7 @@ describe("AdminConfigurationView", () => {
     vi.spyOn(api, "adminConfig").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
@@ -446,7 +448,7 @@ describe("AdminConfigurationView", () => {
     const loadedRules = deferred<Awaited<ReturnType<typeof api.rules>>>();
     vi.mocked(api.rules).mockReturnValueOnce(loadedRules.promise);
     const configurationChanged = vi.fn();
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={configurationChanged} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={configurationChanged} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("club-name");
     const saveRuleButton = screen.getByTestId("save-rule-ADVANCE_WINDOW");
     expect(saveRuleButton).toBeDisabled();
@@ -492,7 +494,7 @@ describe("AdminConfigurationView", () => {
       passwordResetCredentialHours: 24,
       bookingReminderHours: 24, logoUploaded: false
     })).mockReturnValueOnce(reload.promise);
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     const clubName = await screen.findByTestId("club-name");
     fireEvent.change(clubName, { target: { value: "Example Racquet Club" } });
 
@@ -527,7 +529,7 @@ describe("AdminConfigurationView", () => {
       status: 400,
       fieldErrors: [{ field: "primaryColor", code: "validation.Pattern", params: {} }]
     }));
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("club-name");
 
     // when
@@ -545,7 +547,7 @@ describe("AdminConfigurationView", () => {
       status: 400,
       violations: [{ code: "config.noMembershipTypeRuleSet.inactive", params: { field: "noMembershipTypeRuleSetId" } }]
     }));
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("club-name");
 
     // when
@@ -557,7 +559,7 @@ describe("AdminConfigurationView", () => {
 
   it("given a rule with no parameters, when it is offered, then it says what switching it on does", async () => {
     // given
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     const description = await screen.findByTestId("rule-NO_COURT_BOOKING-description");
@@ -571,7 +573,7 @@ describe("AdminConfigurationView", () => {
     // given
     const saving = vi.spyOn(api, "setRule")
       .mockResolvedValue({ ruleType: "NO_COURT_BOOKING", params: {} });
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("save-rule-NO_COURT_BOOKING");
 
     // when
@@ -582,7 +584,7 @@ describe("AdminConfigurationView", () => {
   });
 
   it("offers the club time zone as a list of known zones", async () => {
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     const field = await screen.findByTestId("time-zone");
 
@@ -607,7 +609,7 @@ describe("AdminConfigurationView", () => {
     });
 
     // when
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("time-zone")).toHaveValue("US/Eastern");
@@ -627,7 +629,7 @@ describe("AdminConfigurationView", () => {
     const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
       ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
     });
-    render(<MemoryRouter><AdminConfigurationView configurationChanged={() => undefined} /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("club-name");
 
     // when
@@ -651,3 +653,36 @@ function deferred<T>() {
   const promise = new Promise<T>((complete) => { resolve = complete; });
   return { promise, resolve };
 }
+
+function UnsavedCount() {
+  return <p data-testid="unsaved-count">{useUnsavedChanges().unsavedCount}</p>;
+}
+
+it("given the configuration is edited, when the edit is taken back, then nothing is left to lose", async () => {
+  // given
+  vi.spyOn(api, "adminConfig").mockResolvedValue({
+    clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+    defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+    timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+    bookingReminderHours: 24, logoUploaded: false, privacyUrl: "/privacy"
+  });
+  render(<MemoryRouter><UnsavedChangesProvider>
+    <UnsavedCount />
+    <AdminConfigurationView configurationChanged={() => undefined} />
+  </UnsavedChangesProvider></MemoryRouter>);
+  await screen.findByTestId("privacy-url");
+  expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+
+  // when
+  await userEvent.type(screen.getByTestId("privacy-url"), "-v2");
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+  // when
+  await userEvent.clear(screen.getByTestId("privacy-url"));
+  await userEvent.type(screen.getByTestId("privacy-url"), "/privacy");
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+});

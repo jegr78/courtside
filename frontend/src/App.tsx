@@ -8,6 +8,8 @@ import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
 import { Preferences } from "./components/Preferences";
 import { PrimaryNavigation } from "./components/PrimaryNavigation";
 import { PwaLifecycle } from "./components/PwaLifecycle";
+import { UnsavedChangesProvider } from "./unsaved/UnsavedChangesProvider";
+import { UnsavedChangesGuard } from "./unsaved/UnsavedChangesGuard";
 import { brandContrast } from "./brandColor";
 import { applyAccountLocale, supportedLocale } from "./i18n";
 import { HomeView } from "./views/HomeView";
@@ -41,7 +43,9 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       <Route path="*" element={<Navigate to="/initial-password" replace />} />
     </Routes>;
   }
-  return <div className="flex w-full flex-col items-center gap-4">
+  return <UnsavedChangesProvider>
+    <div className="flex w-full flex-col items-center gap-4">
+    <UnsavedChangesGuard />
     <PrimaryNavigation session={session} signedOut={() => signedOut?.()} />
     <Routes>
     <Route path="/" element={<HomeView session={session} clubName={clubName} />} />
@@ -81,7 +85,8 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  </div>;
+    </div>
+  </UnsavedChangesProvider>;
 }
 
 function applyBranding(config: ClubConfig) {

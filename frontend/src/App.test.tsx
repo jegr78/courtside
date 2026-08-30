@@ -1,7 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { useMemo, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App, AppRoutes } from "./App";
 import { api, type SessionStatus } from "./api/client";
@@ -12,6 +13,16 @@ const anonymous: SessionStatus = {
   roles: [],
   passwordChangeRequired: false
 };
+
+// The application runs on a data router, and the navigation guard inside it refuses anything else.
+function MemoryRouter({ initialEntries = ["/"], children }: { initialEntries?: string[]; children: ReactNode }) {
+  const router = useMemo(
+    () => createMemoryRouter([{ path: "*", element: children }], { initialEntries }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []);
+  return <RouterProvider router={router} />;
+}
+
 
 describe("AppRoutes", () => {
   beforeEach(async () => {
