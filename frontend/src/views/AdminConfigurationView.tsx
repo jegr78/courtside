@@ -65,9 +65,12 @@ function BrandColorField({ kind, label, value, changed }: {
 
 // Named field by field so a request-only shape cannot pick up what the response adds to it.
 // Changed means it differs from what the server last confirmed, so taking an edit back by hand
-// leaves nothing to save and nothing to ask about.
+// leaves nothing to save and nothing to ask about. Field by field rather than serialised, because
+// a serialisation reads a reordered but equal pair as changed.
 function holdsUnsaved(edited?: ClubConfigRequest, saved?: ClubConfigRequest): boolean {
-  return edited !== undefined && saved !== undefined && JSON.stringify(edited) !== JSON.stringify(saved);
+  if (edited === undefined || saved === undefined) return false;
+  const fields = new Set([...Object.keys(edited), ...Object.keys(saved)]) as Set<keyof ClubConfigRequest>;
+  return [...fields].some((field) => edited[field] !== saved[field]);
 }
 
 function editable(loaded: AdminClubConfig): ClubConfigRequest {

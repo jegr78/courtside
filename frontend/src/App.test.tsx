@@ -15,7 +15,7 @@ const anonymous: SessionStatus = {
 };
 
 // The application runs on a data router, and the navigation guard inside it refuses anything else.
-function MemoryRouter({ initialEntries = ["/"], children }: { initialEntries?: string[]; children: ReactNode }) {
+function RoutedShell({ initialEntries = ["/"], children }: { initialEntries?: string[]; children: ReactNode }) {
   const router = useMemo(
     () => createMemoryRouter([{ path: "*", element: children }], { initialEntries }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,9 +40,9 @@ describe("AppRoutes", () => {
 
     // when
     render(
-      <MemoryRouter initialEntries={["/"]}>
+      <RoutedShell initialEntries={["/"]}>
         <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} clubName="Example Tennis Club" />
-      </MemoryRouter>
+      </RoutedShell>
     );
 
     // then
@@ -63,10 +63,10 @@ describe("AppRoutes", () => {
 
     // when
     render(
-      <MemoryRouter initialEntries={["/"]}>
+      <RoutedShell initialEntries={["/"]}>
         <AppRoutes session={{ ...anonymous, authenticated: true }} refreshSession={() => Promise.resolve()}
           clubName="Example Tennis Club" />
-      </MemoryRouter>
+      </RoutedShell>
     );
 
     // then
@@ -77,9 +77,9 @@ describe("AppRoutes", () => {
   it("given an anonymous visitor, when opening personal bookings, then sign in is required", () => {
     // when
     render(
-      <MemoryRouter initialEntries={["/my-bookings"]}>
+      <RoutedShell initialEntries={["/my-bookings"]}>
         <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} />
-      </MemoryRouter>
+      </RoutedShell>
     );
 
     // then
@@ -97,9 +97,9 @@ describe("AppRoutes", () => {
 
     // when
     render(
-      <MemoryRouter initialEntries={["/courts"]}>
+      <RoutedShell initialEntries={["/courts"]}>
         <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} />
-      </MemoryRouter>
+      </RoutedShell>
     );
 
     // then
@@ -109,7 +109,7 @@ describe("AppRoutes", () => {
 
   it("given a member session, when opening sign in, then it anchors the app shell at the top", () => {
     render(
-      <MemoryRouter initialEntries={["/login"]}>
+      <RoutedShell initialEntries={["/login"]}>
         <AppRoutes
           session={{
             authenticated: true,
@@ -120,7 +120,7 @@ describe("AppRoutes", () => {
           }}
           refreshSession={() => Promise.resolve()}
         />
-      </MemoryRouter>
+      </RoutedShell>
     );
 
     expect(screen.getByTestId("court-plan-view")).toHaveClass("self-start");
@@ -130,7 +130,7 @@ describe("AppRoutes", () => {
 
   it("given an initial password session, when opening the app, then it requires a new password", () => {
     render(
-      <MemoryRouter initialEntries={["/"]}>
+      <RoutedShell initialEntries={["/"]}>
         <AppRoutes
           session={{
             authenticated: true,
@@ -141,7 +141,7 @@ describe("AppRoutes", () => {
           }}
           refreshSession={() => Promise.resolve()}
         />
-      </MemoryRouter>
+      </RoutedShell>
     );
 
     expect(screen.getByTestId("initial-password-view")).toBeInTheDocument();
@@ -165,7 +165,7 @@ describe("AppRoutes", () => {
         signedOut={() => setSession(anonymous)}
       />;
     }
-    render(<MemoryRouter><Harness /></MemoryRouter>);
+    render(<RoutedShell><Harness /></RoutedShell>);
 
     // when
     await userEvent.click(screen.getByTestId("logout"));
@@ -181,13 +181,13 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "ruleTypes").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
-    render(<MemoryRouter initialEntries={["/admin/configuration"]}><AppRoutes session={{
+    render(<RoutedShell initialEntries={["/admin/configuration"]}><AppRoutes session={{
       authenticated: true,
       username: "admin",
       displayName: "Example Administrator",
       roles: ["ADMIN"],
       passwordChangeRequired: false
-    }} refreshSession={() => Promise.resolve()} /></MemoryRouter>);
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
 
     // then
     expect(screen.getByRole("status")).toBeInTheDocument();
@@ -200,13 +200,13 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "adminBookingCards").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
-    render(<MemoryRouter initialEntries={["/admin/facility"]}><AppRoutes session={{
+    render(<RoutedShell initialEntries={["/admin/facility"]}><AppRoutes session={{
       authenticated: true,
       username: "admin",
       displayName: "Example Administrator",
       roles: ["ADMIN"],
       passwordChangeRequired: false
-    }} refreshSession={() => Promise.resolve()} /></MemoryRouter>);
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
 
     // then
     expect(screen.getByRole("status")).toBeInTheDocument();
@@ -232,7 +232,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
     await screen.findByTestId("environment-warning");
 
     // then — publishing the session first paints the signed-in navigation twice, and the second
@@ -253,7 +253,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
 
     // then — a language is a preference, and no preference may cost somebody their session
     expect(await screen.findByTestId("logout")).toBeInTheDocument();
@@ -266,7 +266,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
 
     // then
     expect(await screen.findByTestId("environment-warning")).toHaveAttribute("role", "alert");
@@ -279,7 +279,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
     await screen.findByTestId("court-plan-view");
 
     // then
@@ -293,7 +293,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter initialEntries={["/login"]}><App /></MemoryRouter>);
+    render(<RoutedShell initialEntries={["/login"]}><App /></RoutedShell>);
     await screen.findByTestId("login-view");
 
     // then
@@ -316,7 +316,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
 
     // then
     expect(await screen.findByTestId("courtside-mark")).toBeInTheDocument();
@@ -339,7 +339,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
 
     // then
     expect(await screen.findByTestId("club-logo")).toHaveAttribute("src", "/example-logo.svg");
@@ -362,7 +362,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
 
     // then
     const productIdentity = await screen.findByTestId("footer-product-identity");
@@ -387,7 +387,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
 
     // then
     expect(await screen.findByTestId("footer-privacy"))
@@ -411,7 +411,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
 
     // then
     expect(await screen.findByTestId("footer-imprint")).toBeInTheDocument();
@@ -433,7 +433,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<RoutedShell><App /></RoutedShell>);
 
     // then
     await screen.findByTestId("courtside-mark");

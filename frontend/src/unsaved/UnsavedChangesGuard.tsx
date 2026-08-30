@@ -5,10 +5,24 @@ import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { useUnsavedChanges } from "./registry";
 
+const SIGN_IN = "/login";
+
 export function UnsavedChangesGuard() {
   const { t } = useTranslation();
   const { unsavedCount } = useUnsavedChanges();
-  const blocker = useBlocker(unsavedCount > 0);
+
+  // Signing out and an expired session both redirect here, and by then the work cannot be saved
+  // any more — holding that redirect would strand somebody on a page that refuses every request.
+  const blocker = useBlocker(({ nextLocation }) =>
+    unsavedCount > 0 && nextLocation.pathname !== SIGN_IN);
+
+  // react-router leaves "blocked" only through proceed or reset, never because the reason expired,
+  // so a question whose work has since gone would keep standing and count nothing.
+  useEffect(() => {
+    if (blocker.state === "blocked" && unsavedCount === 0) {
+      blocker.reset();
+    }
+  }, [blocker, unsavedCount]);
 
   // useBlocker covers navigation inside the app and says so itself; a reload or a closed tab
   // reaches only this, and the wording there belongs to the browser.

@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, Link, Route, RouterProvider, Routes } from "react-router-dom";
+import { useState } from "react";
 import { beforeEach, expect, it } from "vitest";
 import i18n from "../i18n";
 import { UnsavedChangesProvider } from "./UnsavedChangesProvider";
@@ -22,6 +23,30 @@ function routerWith(unsaved: boolean) {
           <Route path="/here" element={<Editor unsaved={unsaved} />} />
           <Route path="/elsewhere" element={<Link data-testid="leave-again" to="/third">on</Link>} />
           <Route path="/third" element={<p>third</p>} />
+        </Routes>
+      </UnsavedChangesProvider>
+    }
+  ], { initialEntries: ["/here"] });
+}
+
+function Savable() {
+  const [unsaved, setUnsaved] = useState(true);
+  useUnsavedMark("club-configuration", unsaved);
+  return <>
+    <Link data-testid="leave" to="/elsewhere">leave</Link>
+    <button data-testid="save" onClick={() => setUnsaved(false)}>save</button>
+  </>;
+}
+
+function routerWithToggle() {
+  return createMemoryRouter([
+    {
+      path: "*",
+      element: <UnsavedChangesProvider>
+        <UnsavedChangesGuard />
+        <Routes>
+          <Route path="/here" element={<Savable />} />
+          <Route path="/elsewhere" element={<p>elsewhere</p>} />
         </Routes>
       </UnsavedChangesProvider>
     }
@@ -127,4 +152,36 @@ it("given the editor was left behind, when leaving the next page, then nothing a
   // then
   await waitFor(() => expect(router.state.location.pathname).toBe("/third"));
   expect(screen.queryByTestId("unsaved-changes")).toBeNull();
+});
+
+// Signing out ends the session before the redirect runs, so the work is already beyond saving.
+it("given unsaved work, when the session ends and sends us to sign in, then nothing stands in the way", async () => {
+  // given
+  const router = routerWith(true);
+  render(<RouterProvider router={router} />);
+  await screen.findByTestId("leave");
+
+  // when
+  await act(async () => { await router.navigate("/login"); });
+
+  // then
+  await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+  expect(screen.queryByTestId("unsaved-changes")).toBeNull();
+});
+
+// react-router keeps a blocker blocked until it is answered, so the question has to withdraw itself
+// when what it protects is gone — a saved form, or an editor that has left the page.
+it("given the question is open, when the work it protects is saved, then the question withdraws", async () => {
+  // given
+  const router = routerWithToggle();
+  render(<RouterProvider router={router} />);
+  await userEvent.click(screen.getByTestId("leave"));
+  await screen.findByTestId("unsaved-changes");
+
+  // when
+  await userEvent.click(screen.getByTestId("save"));
+
+  // then
+  await waitFor(() => expect(screen.queryByTestId("unsaved-changes")).toBeNull());
+  expect(router.state.location.pathname).toBe("/here");
 });
