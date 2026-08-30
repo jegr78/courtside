@@ -6,7 +6,10 @@ import { api } from "./client";
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  document.cookie = "XSRF-TOKEN=; Max-Age=0";
+});
 afterAll(() => server.close());
 
 it("given a session response, when loading it, then the typed session is returned", async () => {
@@ -310,4 +313,48 @@ it("given signing out cleared the token, when signing in again, then a fresh tok
 
   // then
   expect(sent).toBe("reissued-token");
+});
+
+it("given a token cookie left empty, when writing, then a usable one is fetched first", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=";
+  let sent: string | null = "absent";
+  server.use(
+    http.get("/api/session", () => {
+      document.cookie = "XSRF-TOKEN=reissued-token";
+      return HttpResponse.json({ authenticated: false, roles: [], passwordChangeRequired: false });
+    }),
+    http.post("/api/session", ({ request }) => {
+      sent = request.headers.get("X-XSRF-TOKEN");
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+
+  // when
+  await api.login("doe.jane", "temporary-password");
+
+  // then
+  expect(sent).toBe("reissued-token");
+});
+
+it("given two writes starting together without a token, when they run, then one token is fetched", async () => {
+  // given
+  let asked = 0;
+  server.use(
+    http.get("/api/session", () => {
+      asked += 1;
+      document.cookie = "XSRF-TOKEN=shared-token";
+      return HttpResponse.json({ authenticated: false, roles: [], passwordChangeRequired: false });
+    }),
+    http.post("/api/session", () => new HttpResponse(null, { status: 204 }))
+  );
+
+  // when
+  await Promise.all([
+    api.login("doe.jane", "temporary-password"),
+    api.login("roe.john", "temporary-password")
+  ]);
+
+  // then
+  expect(asked).toBe(1);
 });

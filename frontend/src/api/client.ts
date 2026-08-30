@@ -89,7 +89,8 @@ export class ApiError extends Error {
 async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.method && init.method !== "GET" && init.method !== "HEAD") {
-    const token = csrfToken() ?? await reissuedCsrfToken();
+    const held = csrfToken();
+    const token = held || await reissuedCsrfToken();
     if (token) {
       headers.set("X-XSRF-TOKEN", token);
     }
@@ -111,10 +112,16 @@ async function request<T>(path: string, init: RequestInit = {}, notifyUnauthoriz
   return body ? JSON.parse(body) as T : undefined as T;
 }
 
+// Writes that start together would otherwise each ask for a token and read a different one.
+let reissuing: Promise<unknown> | undefined;
+
 // Signing out clears the token, so the write that follows would carry none and come back 403 —
 // a refusal the sign-in form can only report as a rejected credential.
 async function reissuedCsrfToken(): Promise<string | undefined> {
-  await fetch("/api/session", { credentials: "same-origin" });
+  const pending = reissuing ??= fetch("/api/session", { credentials: "same-origin" })
+    .catch(() => undefined)
+    .finally(() => { reissuing = undefined; });
+  await pending;
   return csrfToken();
 }
 
