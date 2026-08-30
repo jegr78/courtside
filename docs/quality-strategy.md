@@ -120,6 +120,37 @@ The inventory comes directly from the paginated Actions API. Missing first attem
 repositories, ambiguous pull-request provenance or a base that is not the exact merge base stop the
 replay.
 
+#### Profile admission decision
+
+The conservative profiles are qualified for required pull-request use. Profile Evidence run
+`33326145088`, artifact `profile-evidence-33326145088-1`, reported `ready-for-review` at
+2026-08-30T17:45:40Z under policy fingerprint
+`d65c7568d0abe78a00dc5285ce4f297946f176bed1bb05d672f40e644e50a14c`: 60 qualifying first
+attempts, including three backend and one frontend plan, with no candidate miss or classification
+error. Three incomplete quality-job observations were excluded rather than converted into positive
+evidence.
+
+Successful full-profile runs had a 14.27-minute median and 14.85-minute p95. Successful backend
+runs had a 10.40-minute median and 10.58-minute p95; the one frontend run measured 11.92 minutes.
+This meets the 15-minute p95 target and improves on the approximately 27-minute serial baseline.
+Successful runs consumed 1,687.75 runner minutes. Among the eight failed aggregate workflows, the
+median first failure arrived after 12.17 minutes and the p95 after 15.97 minutes. The reduced
+sample is deliberately small, so timing trends continue through the CI timing records; it is enough
+for admission because both reduced paths executed naturally and the classifier remains fail-closed.
+
+Eight otherwise qualifying classifications had a failed aggregate workflow. Seven failed in the
+paired assessment comparison, and one failed after its selected backend and security jobs passed
+because Maven Central rate-limited the old coverage-toolchain bootstrap. The latter path was removed
+before this decision. These runs remain classification evidence but are excluded from successful-run
+timing percentiles. None showed a required quality job being skipped.
+
+The admission window contained two scheduled full builds: runs `33240541977` and `33295334495`
+both passed on their first attempt, so it contained no nightly-only failure. Nightly completeness
+remains owned by the retained nightly verification record and release gate. The profile evidence
+contained no confirmed flake. All three excluded incomplete observations were frontend-job failures,
+but the retained profile record does not attribute them to a browser or test group. They remain
+unclassified failures unless their separate diagnostics prove a narrower cause.
+
 ### Release checklist
 
 - [ ] Identify the candidate commit and immutable image digest.
