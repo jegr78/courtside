@@ -90,7 +90,7 @@ function comparisonRecords(overrides = () => ({})) {
   });
 }
 
-test("given a completed first attempt_whenBuildingItsRecord_thenTheClosedSchemaAcceptsOnlySafeMetadata", () => {
+test("given a completed first attempt, when building its record, then the closed schema accepts only safe metadata", () => {
   // given / when
   const result = record();
 

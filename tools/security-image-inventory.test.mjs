@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { assessmentImages } from "./security-image-inventory.mjs";
 import { securityImportSourceKey, securityImportSourceRequest } from "./security-openapi-fuzz.mjs";
 
-test("given active assessment configuration_whenResolvingImages_thenAllPinnedRuntimeImagesAreReturnedOnce", () => {
+test("given active assessment configuration, when resolving images, then all pinned runtime images are returned once", () => {
   // when
   const images = assessmentImages("active");
 

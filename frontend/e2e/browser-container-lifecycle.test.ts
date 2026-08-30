@@ -177,7 +177,7 @@ describe("browser container lifecycle", () => {
     [new Error("Log message not received"), "wait-strategy"],
     [Object.assign(new Error("connect ENOENT"), { name: "DockerError" }), "docker-api"],
     [new Error("unexpected failure"), "unknown"]
-  ])("givenAStartupError_whenClassifyingIt_thenOnlyTheBoundedClassIsRetained", (failure, expected) => {
+  ])("given a startup error, when classifying it, then only the bounded class is retained", (failure, expected) => {
     // given / when / then
     expect(browserStartupFailureClass(failure)).toBe(expected);
   });
