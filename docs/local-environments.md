@@ -68,9 +68,11 @@ unit tests, build, audit, application packaging and browser journeys. A mixed ch
 profiles. Build, workflow, security, deployment, database, OpenAPI, shared test-infrastructure,
 unknown and structural changes run the complete Maven verification.
 
-The command writes `build/local-check/result.json` with the base and head commits, selected
-profiles, reasons, tasks and outcome. If `origin/main` cannot be refreshed, classification falls
-back to `full`. `--full` only escalates. It cannot suppress a required task.
+The command writes `build/local-check/result.json` with the base and head commits, a content
+fingerprint, selected profiles, reasons, tasks and outcome. It verifies the fingerprint before and
+after execution, so a working-tree change cannot retain a passing result. If `origin/main` cannot
+be refreshed, classification falls back to `full`. `--full` only escalates. It cannot suppress a
+required task.
 
 ## Development
 

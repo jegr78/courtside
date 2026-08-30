@@ -1,9 +1,10 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { classifyChanges, parseNameStatus } from "./test-profile-classifier.mjs";
+import { classifyChanges } from "./test-profile-classifier.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const resultFile = join(repository, "build", "local-check", "result.json");
@@ -66,30 +67,52 @@ function planTasks(classified) {
 }
 
 export function collectLocalChanges(git = runGit) {
+  let baseCommit;
+  let fallbackReason = null;
   try {
     git(["fetch", "--quiet", "--no-tags", "origin", "main"]);
+    baseCommit = git(["merge-base", "origin/main", "HEAD"]).trim();
   } catch {
-    return {
-      baseCommit: null,
-      headCommit: null,
-      fallbackReason: "base-refresh-failed",
-      changes: [{ status: "M", path: "tools/local-check-fallback" }]
-    };
+    baseCommit = null;
+    fallbackReason = "base-refresh-failed";
   }
-  const baseCommit = git(["merge-base", "origin/main", "HEAD"]).trim();
+  return collectLocalState(git, baseCommit, fallbackReason);
+}
+
+function collectLocalState(git, baseCommit, fallbackReason) {
   const headCommit = git(["rev-parse", "HEAD"]).trim();
-  if (!/^[a-f0-9]{40}$/.test(baseCommit) || !/^[a-f0-9]{40}$/.test(headCommit)) {
+  if ((baseCommit !== null && !/^[a-f0-9]{40}$/.test(baseCommit))
+      || !/^[a-f0-9]{40}$/.test(headCommit)) {
     throw new Error("Git did not return trustworthy commit identities");
   }
-  git(["diff", "--check", baseCommit, "--"]);
-  const trackedEvidence = git(["diff", "--name-status", "-z", "--find-renames", baseCommit, "--"]);
+  const comparison = baseCommit ?? "HEAD";
+  git(["diff", "--check", comparison, "--"]);
+  const trackedEvidence = git(["diff", "--name-status", "-z", "--find-renames", comparison, "--"]);
   const untrackedEvidence = git(["ls-files", "--others", "--exclude-standard", "-z"]);
-  const changes = [
-    ...(trackedEvidence.length === 0 ? [] : parseNameStatus(trackedEvidence)),
-    ...untrackedEvidence.split("\0").filter(Boolean).map((path) => ({ status: "A", path }))
-  ];
-  if (changes.length === 0) throw new Error("No local changes exist relative to origin/main");
-  return { baseCommit, headCommit, fallbackReason: null, changes };
+  const untrackedPaths = untrackedEvidence.split("\0").filter(Boolean);
+  const changeEvidence = `${trackedEvidence}${untrackedPaths.map((path) => `A\0${path}\0`).join("")}`;
+  if (changeEvidence.length === 0 && fallbackReason === null) {
+    throw new Error("No local changes exist relative to origin/main");
+  }
+  const fingerprint = createHash("sha256")
+    .update(baseCommit ?? "")
+    .update("\0")
+    .update(headCommit)
+    .update("\0")
+    .update(changeEvidence)
+    .update("\0")
+    .update(git(["diff", "--binary", "--full-index", comparison, "--"]));
+  for (const path of untrackedPaths) {
+    fingerprint.update("\0").update(path).update("\0")
+      .update(git(["hash-object", "--no-filters", "--", path]).trim());
+  }
+  return {
+    baseCommit,
+    headCommit,
+    fallbackReason,
+    changeEvidence,
+    changeFingerprint: fingerprint.digest("hex")
+  };
 }
 
 export function localVerificationPlans(tasks, platform = process.platform, root = repository) {
@@ -142,6 +165,7 @@ export async function executeLocalCheck(options, runtime = {}) {
     baseCommit: evidence.baseCommit,
     headCommit: evidence.headCommit,
     fallbackReason: evidence.fallbackReason,
+    changeFingerprint: evidence.changeFingerprint,
     profiles: plan.profiles,
     reasons: plan.reasons,
     tasks: plan.tasks.map((task) => task.label),
@@ -153,11 +177,15 @@ export async function executeLocalCheck(options, runtime = {}) {
   if (options.planOnly) return record;
   const execute = runtime.execute ?? runProcess;
   try {
+    requireUnchangedEvidence(evidence, collectLocalState(runtime.git ?? runGit,
+      evidence.baseCommit, evidence.fallbackReason));
     runtime.beforeRun?.(record);
     for (const processPlan of localVerificationPlans(plan.tasks, runtime.platform, runtime.root)) {
       output.write(`Running local check: ${processPlan.label}\n`);
       execute(processPlan);
     }
+    requireUnchangedEvidence(evidence, collectLocalState(runtime.git ?? runGit,
+      evidence.baseCommit, evidence.fallbackReason));
     record.outcome = "passed";
     persist(record);
     return record;
@@ -181,7 +209,8 @@ export async function classifyProtectedChanges(evidence, forceFull, git = runGit
     attached = true;
     const classifierUrl = pathToFileURL(join(worktree, "tools", "test-profile-classifier.mjs"));
     const protectedClassifier = await loadClassifier(`${classifierUrl.href}?base=${evidence.baseCommit}`);
-    return protectedClassifier.classifyChanges(evidence.changes, forceFull ? ["ci:full"] : []);
+    const changes = protectedClassifier.parseNameStatus(evidence.changeEvidence);
+    return protectedClassifier.classifyChanges(changes, forceFull ? ["ci:full"] : []);
   } finally {
     let cleanupFailure;
     try {
@@ -192,6 +221,13 @@ export async function classifyProtectedChanges(evidence, forceFull, git = runGit
       rmSync(worktree, { recursive: true, force: true });
     }
     if (cleanupFailure) throw cleanupFailure;
+  }
+}
+
+function requireUnchangedEvidence(expected, actual) {
+  if (expected.baseCommit !== actual.baseCommit || expected.headCommit !== actual.headCommit
+      || expected.changeFingerprint !== actual.changeFingerprint) {
+    throw new Error("The working tree changed during local verification; run the check again");
   }
 }
 

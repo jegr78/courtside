@@ -109,8 +109,12 @@ test("given committed dirty and untracked changes, when collecting evidence, the
     if (arguments_[0] === "merge-base") return `${"a".repeat(40)}\n`;
     if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
     if (arguments_[0] === "diff" && arguments_.includes("--check")) return "";
-    if (arguments_[0] === "diff") return "M\0src/main/java/org/courtside/CourtsideApplication.java\0";
+    if (arguments_[0] === "diff" && arguments_.includes("--name-status")) {
+      return "M\0src/main/java/org/courtside/CourtsideApplication.java\0";
+    }
+    if (arguments_[0] === "diff") return "tracked-content";
     if (arguments_[0] === "ls-files") return "docs/new.md\0";
+    if (arguments_[0] === "hash-object") return `${"c".repeat(40)}\n`;
     throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
   };
 
@@ -120,10 +124,9 @@ test("given committed dirty and untracked changes, when collecting evidence, the
   // then
   assert.equal(evidence.baseCommit, "a".repeat(40));
   assert.equal(evidence.headCommit, "b".repeat(40));
-  assert.deepEqual(evidence.changes, [
-    { status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" },
-    { status: "A", path: "docs/new.md" }
-  ]);
+  assert.match(evidence.changeFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(evidence.changeEvidence,
+    "M\0src/main/java/org/courtside/CourtsideApplication.java\0A\0docs/new.md\0");
   assert.ok(calls.some((arguments_) => arguments_[0] === "diff" && arguments_.includes("--check")));
 });
 
@@ -131,7 +134,10 @@ test("given origin cannot be refreshed, when collecting evidence, then the calle
   // given
   const git = (arguments_) => {
     if (arguments_[0] === "fetch") throw new Error("offline");
-    throw new Error("no other Git call is trusted after refresh failed");
+    if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
+    if (arguments_[0] === "diff") return "";
+    if (arguments_[0] === "ls-files") return "";
+    throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
   };
 
   // when
@@ -139,8 +145,9 @@ test("given origin cannot be refreshed, when collecting evidence, then the calle
 
   // then
   assert.equal(evidence.fallbackReason, "base-refresh-failed");
-  assert.deepEqual(evidence.changes, [{ status: "M", path: "tools/local-check-fallback" }]);
-  assert.deepEqual(localCheckPlan(evidence.changes).profiles, ["full"]);
+  assert.equal(evidence.baseCommit, null);
+  assert.equal(evidence.changeEvidence, "");
+  assert.match(evidence.changeFingerprint, /^[a-f0-9]{64}$/);
 });
 
 test("given supported platforms, when resolving tasks, then commands remain shell-free or fixed", () => {
@@ -169,7 +176,7 @@ test("given a plan-only check, when executing it, then prerequisites and tasks d
   // when
   const record = await executeLocalCheck({ planOnly: true, forceFull: false }, {
     git,
-    classify: async (evidence) => localCheckPlan(evidence.changes),
+    classify: async () => backendPlan(),
     output: { write: () => {} },
     beforeRun: () => events.push("before"),
     execute: () => events.push("execute"),
@@ -190,7 +197,7 @@ test("given a selected check, when every task passes, then the retained result i
   // when
   const record = await executeLocalCheck({ planOnly: false, forceFull: false }, {
     git,
-    classify: async (evidence) => localCheckPlan(evidence.changes),
+    classify: async () => backendPlan(),
     output: { write: () => {} },
     beforeRun: () => events.push("before"),
     execute: (plan) => events.push(plan.label),
@@ -211,7 +218,7 @@ test("given a failing selected task, when executing it, then the retained result
   // when / then
   await assert.rejects(() => executeLocalCheck({ planOnly: false, forceFull: false }, {
     git,
-    classify: async (evidence) => localCheckPlan(evidence.changes),
+    classify: async () => backendPlan(),
     output: { write: () => {} },
     execute: () => { throw new Error("backend failed"); },
     writeResult: (candidate) => records.push(structuredClone(candidate))
@@ -227,12 +234,19 @@ test("given a protected base, when classifying, then its classifier runs from an
     baseCommit: "a".repeat(40),
     headCommit: "b".repeat(40),
     fallbackReason: null,
-    changes: [{ status: "M", path: "docs/quality-strategy.md" }]
+    changeEvidence: "M\0docs/quality-strategy.md\0",
+    changeFingerprint: "c".repeat(64)
   };
   const git = (arguments_) => calls.push(arguments_);
   const loadClassifier = async (url) => {
     calls.push(["load", url]);
-    return { classifyChanges: (changes, labels) => localCheckPlan(changes, { forceFull: labels.includes("ci:full") }) };
+    return {
+      parseNameStatus: (value) => {
+        calls.push(["parse", value]);
+        return [{ status: "M", path: "docs/quality-strategy.md" }];
+      },
+      classifyChanges: (changes, labels) => localCheckPlan(changes, { forceFull: labels.includes("ci:full") })
+    };
   };
 
   // when
@@ -244,19 +258,47 @@ test("given a protected base, when classifying, then its classifier runs from an
   assert.equal(calls[0][4], "a".repeat(40));
   assert.equal(calls[1][0], "load");
   assert.match(calls[1][1], /tools\/test-profile-classifier\.mjs\?base=a{40}$/);
-  assert.deepEqual(calls[2].slice(0, 3), ["worktree", "remove", "--force"]);
+  assert.deepEqual(calls[2], ["parse", evidence.changeEvidence]);
+  assert.deepEqual(calls[3].slice(0, 3), ["worktree", "remove", "--force"]);
 });
 
-function gitFor(changes) {
+test("given the working tree changes during verification, when finishing, then passed is never retained", async () => {
+  // given
+  const records = [];
+  let collection = 0;
+  const git = gitFor([{ status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }],
+    () => collection++ === 0 ? "a".repeat(64) : "b".repeat(64));
+
+  // when / then
+  await assert.rejects(() => executeLocalCheck({ planOnly: false, forceFull: false }, {
+    git,
+    classify: async () => localCheckPlan([
+      { status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }
+    ]),
+    output: { write: () => {} },
+    execute: () => {},
+    writeResult: (candidate) => records.push(structuredClone(candidate))
+  }), /working tree changed during local verification/i);
+  assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "failed"]);
+});
+
+function gitFor(changes, fingerprint = () => "c".repeat(64)) {
   return (arguments_) => {
     if (arguments_[0] === "fetch") return "";
     if (arguments_[0] === "merge-base") return `${"a".repeat(40)}\n`;
     if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
     if (arguments_[0] === "diff" && arguments_.includes("--check")) return "";
-    if (arguments_[0] === "diff") {
+    if (arguments_[0] === "diff" && arguments_.includes("--name-status")) {
       return `${changes.flatMap((change) => [change.status, change.path]).join("\0")}\0`;
     }
+    if (arguments_[0] === "diff") return fingerprint();
     if (arguments_[0] === "ls-files") return "";
     throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
   };
+}
+
+function backendPlan() {
+  return localCheckPlan([
+    { status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }
+  ]);
 }
