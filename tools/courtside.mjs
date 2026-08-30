@@ -30,6 +30,7 @@ import {
   runOpenApiMutationCases
 } from "./security-openapi-fuzz.mjs";
 import { runResourceAbuseAssessment } from "./security-resource-abuse.mjs";
+import { executeLocalCheck } from "./local-check.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devComposeFile = join(root, "deploy", "compose.dev.yaml");
@@ -72,7 +73,7 @@ export function parseArguments(argv) {
     flags = flags.slice(1);
   }
   const supported = new Set([
-    "build", "verify", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
+    "build", "verify", "check", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
     "uat-share", "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore",
     "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset", "perf-run", "perf-promote", "perf-compare",
     "security", "security-verify", "security-plan", "security-run", "security-report", "security-stop",
@@ -88,11 +89,15 @@ export function parseArguments(argv) {
     profile: undefined, fresh: false, telemetry: false, remoteWrite: false, showCredentials: true,
     target: undefined, baseline: undefined, output: undefined, runId: undefined, authorization: undefined,
     qualification: undefined,
-    attempt: undefined, image: undefined
+    attempt: undefined, image: undefined, planOnly: false, forceFull: false
   };
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
-    if (flag === "--suspend" && command === "dev-debug") {
+    if (flag === "--plan" && command === "check") {
+      options.planOnly = true;
+    } else if (flag === "--full" && command === "check") {
+      options.forceFull = true;
+    } else if (flag === "--suspend" && command === "dev-debug") {
       options.suspend = true;
     } else if (flag === "--version" && command === "uat") {
       options.version = requiredOptionValue(flags, ++index, "--version");
@@ -514,7 +519,7 @@ async function main() {
     if (["build", "verify", "dev", "dev-debug", "uat", "uat-share", "perf"].includes(options.command) && !options.version) {
       validateJava();
     }
-    if (!["build", "help", "perf-compare", "security-plan", "security-report", "security-stop"].includes(options.command)) {
+    if (!["build", "check", "help", "perf-compare", "security-plan", "security-report", "security-stop"].includes(options.command)) {
       validateDocker();
     }
     await execute(options);
@@ -525,6 +530,16 @@ async function main() {
 }
 
 async function execute(options) {
+  if (options.command === "check") {
+    await executeLocalCheck(options, {
+      beforeRun: (record) => {
+        if (record.tasks.length === 0) return;
+        validateJava();
+        validateDocker();
+      }
+    });
+    return;
+  }
   if (["build", "verify"].includes(options.command)) {
     runInteractive(processPlans(options).single);
     return;
@@ -1998,7 +2013,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;
