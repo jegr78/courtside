@@ -107,9 +107,8 @@ class BookingWriter {
     }
 
     void cancel(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {
-        Booking booking = bookings.findWithAllocationsById(bookingId)
+        Booking booking = bookings.findWithAllocationsForUpdate(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
-
         accessControl.requireManagementAccess(booking, cancelledBy, cancellerRoles);
         booking.cancel(cancelledBy, clock.instant());
         bookings.saveAndFlush(booking);

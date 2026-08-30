@@ -98,6 +98,9 @@ public class Booking {
     }
 
     public void cancel(UUID cancelledBy, Instant at) {
+        if (status == BookingStatus.CANCELLED) {
+            return;
+        }
         this.status = BookingStatus.CANCELLED;
         this.cancelledBy = cancelledBy;
         this.cancelledAt = at;
