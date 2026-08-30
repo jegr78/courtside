@@ -79,22 +79,22 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   // then
   await stableScreenshot(page.getByTestId("primary-navigation"), "primary-navigation.png");
 
-  // when
+  // when — every gate below waits for something the view renders only once its data arrived,
+  // never for the section itself, which is on screen while the request is still in flight
   await page.getByTestId("admin-configuration-link").click();
-  await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
+  await expect(page.getByTestId("save-club-config")).toBeVisible();
 
   // then
   await stableScreenshot(page.getByTestId("admin-configuration-view"), "admin-configuration.png");
 
   // when
   await page.goto("/admin/facility");
-  await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+  await expect(page.getByTestId("create-court")).toBeVisible();
 
   // then
   await stableScreenshot(page.getByTestId("admin-facility-view"), "admin-facility.png");
 
-  // when — every gate below waits for something the view renders only once its data arrived,
-  // never for the section itself, which is on screen while the request is still in flight
+  // when
   await page.goto("/admin/roster");
   await expect(page.locator('[data-testid^="roster-row-"]').first()).toBeVisible();
 
