@@ -11,6 +11,9 @@ import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { downloadJson } from "../downloads/downloadJson";
 import { formString } from "../forms/formString";
+import { differs } from "../unsaved/differs";
+import { UnsavedMark } from "../unsaved/UnsavedMark";
+import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 
 const roles: Role[] = [
   "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"
@@ -146,7 +149,11 @@ function PersonSection({ entry, disabled, save }: { entry: RosterEntry; disabled
       <TextField data-testid="person-last-name" disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} value={person.lastName} onChange={(event) => setPerson({ ...person, lastName: event.target.value })} />
       <TextField data-testid="person-email" disabled={disabled} type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} value={person.email ?? ""} onChange={(event) => setPerson({ ...person, email: event.target.value || null })} />
     </div>
-    <Button variant="primary" data-testid="save-person" disabled={disabled} className="justify-self-start" type="button" onClick={() => void save(person)}>{t("admin.save")}</Button>
+    <div className="flex flex-wrap items-center gap-3">
+      <Button variant="primary" data-testid="save-person" disabled={disabled} type="button" onClick={() => void save(person)}>{t("admin.save")}</Button>
+      <UnsavedMark id={`person:${entry.personId}`} unsaved={differs(person,
+        { firstName: entry.firstName, lastName: entry.lastName, email: entry.email })} />
+    </div>
   </section>;
 }
 
@@ -168,6 +175,13 @@ function MembershipSection({ entry, types, disabled, save }: {
   const [endedOn, setEndedOn] = useState(entry.membershipEndedOn ?? "");
   const [ending, setEnding] = useState(false);
   const [chosenEnd, setChosenEnd] = useState(entry.membershipEndedOn ?? "");
+  const unsavedMembership = differs(
+    { typeId, startedOn, endedOn },
+    {
+      typeId: entry.membershipTypeId ?? "",
+      startedOn: entry.membershipStartedOn ?? "",
+      endedOn: entry.membershipEndedOn ?? ""
+    });
   const running = Boolean(entry.membershipTypeId) && !entry.membershipEndedOn;
 
   async function endMembership() {
@@ -191,9 +205,10 @@ function MembershipSection({ entry, types, disabled, save }: {
       <TextField data-testid="membership-started-on" disabled={disabled} type="date" label={t("admin.person.startedOn")} value={startedOn} onChange={(event) => setStartedOn(event.target.value)} />
       <TextField data-testid="membership-ended-on" disabled={disabled} type="date" label={t("admin.person.endedOn")} value={endedOn} onChange={(event) => setEndedOn(event.target.value)} />
     </div>
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <Button variant="primary" data-testid="save-membership" disabled={disabled || !typeId} type="button" onClick={() => void save({ membershipTypeId: typeId, startedOn: startedOn || null, endedOn: endedOn || null })}>{t("admin.save")}</Button>
       {running && <Button variant="destructive" data-testid="end-membership" disabled={disabled} type="button" onClick={() => setEnding(true)}>{t("admin.person.endMembership")}</Button>}
+      <UnsavedMark id={`membership:${entry.personId}`} unsaved={unsavedMembership} />
     </div>
     {ending && <Modal labelledBy="end-membership-title" closed={() => setEnding(false)}>
       <div className="grid gap-4">
@@ -243,17 +258,26 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
     <h2 className="text-2xl font-bold">{t("admin.person.account")}</h2>
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <TextField data-testid="account-username" disabled={disabled} autoComplete="off" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} value={username} onChange={(event) => setUsername(event.target.value)} />
-      <Button variant="primary" data-testid="save-username" disabled={disabled} className="self-end" type="button" onClick={() => void saveUsername(username)}>{t("admin.save")}</Button>
+      <div className="flex flex-wrap items-center gap-3 self-end">
+        <Button variant="primary" data-testid="save-username" disabled={disabled} type="button" onClick={() => void saveUsername(username)}>{t("admin.save")}</Button>
+        <UnsavedMark id={`account-username:${entry.personId}`} unsaved={username !== (entry.username ?? "")} />
+      </div>
     </div>
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <label className="grid gap-2 font-medium">
         {t("admin.person.accountLocale")}
         <LocaleSelect testId="account-locale" disabled={disabled} className="form-control rounded-lg border px-3 py-2" value={locale} supported={club?.supportedLocales} changed={setLocale} />
       </label>
-      <Button variant="primary" data-testid="save-locale" disabled={disabled} className="self-end" type="button" onClick={() => void saveLocale(locale)}>{t("admin.save")}</Button>
+      <div className="flex flex-wrap items-center gap-3 self-end">
+        <Button variant="primary" data-testid="save-locale" disabled={disabled} type="button" onClick={() => void saveLocale(locale)}>{t("admin.save")}</Button>
+        <UnsavedMark id={`account-locale:${entry.personId}`} unsaved={locale !== (entry.locale ?? club?.defaultLocale ?? "")} />
+      </div>
     </div>
     <RoleCheckboxes testIdPrefix="account-roles" disabled={disabled} selected={chosenRoles} changed={setChosenRoles} />
-    <Button variant="primary" data-testid="save-roles" disabled={disabled} className="justify-self-start" type="button" onClick={() => void saveRoles(chosenRoles)}>{t("admin.save")}</Button>
+    <div className="flex flex-wrap items-center gap-3">
+      <Button variant="primary" data-testid="save-roles" disabled={disabled} type="button" onClick={() => void saveRoles(chosenRoles)}>{t("admin.save")}</Button>
+      <UnsavedMark id={`account-roles:${entry.personId}`} unsaved={differs({ roles: chosenRoles }, { roles: entry.roles })} />
+    </div>
     <div className="grid gap-2">
       <span className="font-medium">{t("admin.person.credentialState")}</span>
       <p data-testid="credential-state" data-state={entry.credentialState ?? "AWAITING_CREDENTIAL"}
@@ -323,6 +347,7 @@ function AccountCreateSection({ entry, disabled, create }: {
   create: (request: { username: string; roles: Role[] }) => Saved;
 }) {
   const { t } = useTranslation();
+  const newAccount = useUnsavedForm("account:new");
   if (!entry.email) {
     return <section className="surface-subtle grid gap-3 rounded-xl border p-4">
       <h2 className="text-2xl font-bold">{t("admin.roster.newAccount")}</h2>
@@ -337,7 +362,7 @@ function AccountCreateSection({ entry, disabled, create }: {
       roles: form.getAll("roles") as Role[]
     });
   }
-  return <form noValidate onSubmit={submit} className="surface-subtle grid gap-3 rounded-xl border p-4">
+  return <form noValidate {...newAccount.form} onSubmit={submit} className="surface-subtle grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.roster.newAccount")}</h2>
     <TextField data-testid="new-account-username" disabled={disabled} autoComplete="off" name="username" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} />
     <CredentialDestination entry={entry} />

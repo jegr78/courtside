@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api, type MembershipType, type RosterEntry, type RuleSet } from "../api/client";
 import i18n from "../i18n";
+import { UnsavedCount } from "../test/UnsavedCount";
+import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { AdminMembershipTypesView } from "./AdminMembershipTypesView";
 
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: "rules-1", active: true, grantsAccount: false };
@@ -22,7 +24,7 @@ function card(id: string): HTMLElement {
 describe("AdminMembershipTypesView", () => {
   it("when the page is shown, then it uses the full administration frame", () => {
     // when
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(screen.getByTestId("admin-membership-types-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
@@ -36,12 +38,49 @@ describe("AdminMembershipTypesView", () => {
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });
   });
 
+  it("given the create form is filled in, when it is read, then it holds work", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminMembershipTypesView />
+    </UnsavedChangesProvider></MemoryRouter>);
+
+    // when
+    await userEvent.type(await screen.findByTestId("new-membership-type-name"), "Students");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+  });
+
+  it("given a type is renamed, when the name is typed back, then nothing is left to lose", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminMembershipTypesView />
+    </UnsavedChangesProvider></MemoryRouter>);
+    const name = await screen.findByTestId("membership-type-name-type-1");
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+
+    // when
+    await userEvent.type(name, "!");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+    // when
+    await userEvent.clear(name);
+    await userEvent.type(name, "Adults");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
   it("given no membership type, when the view opens, then the empty state names the creation step", async () => {
     // given
     vi.spyOn(api, "membershipTypes").mockResolvedValue([]);
 
     // when
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("membership-types-empty")).toHaveTextContent(
@@ -54,7 +93,7 @@ describe("AdminMembershipTypesView", () => {
     vi.spyOn(api, "membershipTypes").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByRole("alert")).toBeInTheDocument();
@@ -71,7 +110,7 @@ describe("AdminMembershipTypesView", () => {
       }));
 
     // when
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     const holders = await screen.findByTestId("membership-type-holders-type-1");
@@ -86,21 +125,21 @@ describe("AdminMembershipTypesView", () => {
       Promise.resolve({ entries: membershipTypeId === "type-1" ? many : [], nextCursor: "p199" }));
 
     // when
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("membership-type-holders-type-1")).toHaveTextContent("200+");
   });
 
   it("given an active type, when the board is about to retire it, then the surface says what stays in force", async () => {
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
     expect(await screen.findByTestId("membership-type-retire-note-type-1")).toBeInTheDocument();
   });
 
   it("given a mistyped name, when correcting it, then the correction is sent with the rule set", async () => {
     // given
     vi.spyOn(api, "changeMembershipType").mockResolvedValue({ ...adults, name: "Adult" });
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("membership-type-name-type-1");
 
     // when
@@ -115,7 +154,7 @@ describe("AdminMembershipTypesView", () => {
   it("given a type on a rule set, when it is taken off that rule set, then no rule set is sent", async () => {
     // given
     vi.spyOn(api, "changeMembershipType").mockResolvedValue({ ...adults, ruleSetId: null });
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("membership-type-rule-set-type-1");
 
     // when
@@ -129,7 +168,7 @@ describe("AdminMembershipTypesView", () => {
   it("given an active type, when retiring it, then the control offers to offer it again", async () => {
     // given
     vi.spyOn(api, "setMembershipTypeActive").mockResolvedValue({ ...adults, active: false });
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
     const toggle = await screen.findByTestId("toggle-membership-type-type-1");
     expect(toggle).toHaveClass("button-destructive");
 
@@ -142,7 +181,7 @@ describe("AdminMembershipTypesView", () => {
   });
 
   it("given a retired type, when the view is read, then it is still listed and says so", async () => {
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
     expect(await screen.findByTestId("membership-type-type-2")).toBeInTheDocument();
     expect(within(card("type-2")).getByTestId("membership-type-state-type-2")).toHaveTextContent("Retired");
   });
@@ -151,7 +190,7 @@ describe("AdminMembershipTypesView", () => {
     // given
     const created: MembershipType = { id: "type-9", name: "Seniors", ruleSetId: null, active: true, grantsAccount: true };
     vi.spyOn(api, "createMembershipType").mockResolvedValue(created);
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("membership-type-type-1");
 
     // when
@@ -167,7 +206,7 @@ describe("AdminMembershipTypesView", () => {
   it("given a type that grants no account, when switching that on and saving, then the change is sent", async () => {
     // given
     vi.spyOn(api, "changeMembershipType").mockResolvedValue({ ...adults, grantsAccount: true });
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("membership-type-type-1");
 
     // when
@@ -181,7 +220,7 @@ describe("AdminMembershipTypesView", () => {
 
   it("given a type that grants an account, when reading it, then the box is already ticked", async () => {
     // when
-    render(<MemoryRouter><AdminMembershipTypesView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("membership-type-grants-account-type-2")).toBeChecked();

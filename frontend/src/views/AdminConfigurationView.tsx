@@ -20,7 +20,9 @@ import { TextField } from "../components/TextField";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { formString } from "../forms/formString";
 import { useFragmentTarget } from "../navigation/useFragmentTarget";
-import { useUnsavedMark } from "../unsaved/registry";
+import { differs } from "../unsaved/differs";
+import { UnsavedMark } from "../unsaved/UnsavedMark";
+import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 import { brandContrast } from "../brandColor";
 
 const RULE_SET_NAME_LENGTH = 60;
@@ -64,15 +66,6 @@ function BrandColorField({ kind, label, value, changed }: {
 }
 
 // Named field by field so a request-only shape cannot pick up what the response adds to it.
-// Changed means it differs from what the server last confirmed, so taking an edit back by hand
-// leaves nothing to save and nothing to ask about. Field by field rather than serialised, because
-// a serialisation reads a reordered but equal pair as changed.
-function holdsUnsaved(edited?: ClubConfigRequest, saved?: ClubConfigRequest): boolean {
-  if (edited === undefined || saved === undefined) return false;
-  const fields = new Set([...Object.keys(edited), ...Object.keys(saved)]) as Set<keyof ClubConfigRequest>;
-  return [...fields].some((field) => edited[field] !== saved[field]);
-}
-
 function editable(loaded: AdminClubConfig): ClubConfigRequest {
   return {
     clubName: loaded.clubName,
@@ -98,6 +91,7 @@ function timeZones(current: string): string[] {
 
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
+  const newRuleSet = useUnsavedForm("rule-set:new");
   const [config, setConfig] = useState<ClubConfigRequest>();
   const [saved, setSaved] = useState<ClubConfigRequest>();
   const [logo, setLogo] = useState<{ url?: string | null; uploaded: boolean }>();
@@ -117,7 +111,6 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   useFragmentTarget("slot-minutes", config !== undefined);
-  useUnsavedMark("club-configuration", holdsUnsaved(config, saved) || logoFile !== undefined);
 
   useEffect(() => {
     let active = true;
@@ -400,8 +393,11 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             </label>
             <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
           </div>
-          <Button variant="primary" data-testid="save-club-config" className="justify-self-start" type="submit"
-                  disabled={configurationPending}>{t("admin.save")}</Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="primary" data-testid="save-club-config" type="submit"
+                    disabled={configurationPending}>{t("admin.save")}</Button>
+            <UnsavedMark id="club-configuration" unsaved={differs(config, saved) || logoFile !== undefined} />
+          </div>
         </form>
         <div className="grid gap-5">
           <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
@@ -412,10 +408,11 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             </select>
           </label>
           {selectedRuleSet && <div className="surface-subtle grid gap-3 rounded-xl border p-4">
-            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
               <TextField data-testid="rule-set-name" disabled={pending} maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.ruleSetName")} value={ruleSetName} onChange={(event) => setRuleSetName(event.target.value)} />
               <Button variant="primary" data-testid="save-rule-set" disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.changeRuleSet(selectedRuleSet.id, { name: ruleSetName }))}>{t("admin.save")}</Button>
               <Button variant={selectedRuleSet.active ? "destructive" : "primary"} data-testid="toggle-rule-set" disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.setRuleSetActive(selectedRuleSet.id, !selectedRuleSet.active))}>{t(selectedRuleSet.active ? "admin.deactivate" : "admin.activate")}</Button>
+              <UnsavedMark id={`rule-set:${selectedRuleSet.id}`} unsaved={ruleSetName !== selectedRuleSet.name} />
             </div>
             <p data-testid="rule-set-retire-note" className="text-muted text-sm">
               {boundTypes.length === 0
@@ -423,7 +420,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
                 : t("admin.rules.retireInUse", { types: boundTypes.map((type) => type.name).join(", ") })}
             </p>
           </div>}
-          <form noValidate onSubmit={(event) => { event.preventDefault(); void addRuleSet(event.currentTarget); }} className="surface-subtle grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_auto] md:items-end">
+          <form noValidate {...newRuleSet.form} onSubmit={(event) => { event.preventDefault(); void addRuleSet(event.currentTarget); }} className="surface-subtle grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_auto] md:items-end">
             <TextField data-testid="new-rule-set-name" disabled={pending} name="name" maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.newRuleSet")} />
             <Button variant="primary" data-testid="create-rule-set" disabled={pending} type="submit">{t("admin.create")}</Button>
           </form>
@@ -447,9 +444,10 @@ function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTy
         <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setParams({ ...params, [parameter.name]: Number(event.target.value) })} />
         <p data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted text-sm">{t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}</p>
       </div>)}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="primary" data-testid={`save-rule-${type.ruleType}`} disabled={disabled} type="button" onClick={() => void save(type.ruleType, params)}>{t("admin.save")}</Button>
         {definition && <Button variant="destructive" data-testid={`remove-rule-${type.ruleType}`} disabled={disabled} type="button" onClick={() => void remove(type.ruleType)}>{t("admin.rules.remove")}</Button>}
+        <UnsavedMark id={`rule:${type.ruleType}`} unsaved={differs(params, definition?.params ?? {})} />
       </div>
     </>}
   </article>;

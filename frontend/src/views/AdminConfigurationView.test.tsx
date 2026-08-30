@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
+import { UnsavedCount } from "../test/UnsavedCount";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
-import { useUnsavedChanges } from "../unsaved/registry";
 import { AdminConfigurationView } from "./AdminConfigurationView";
 
 describe("AdminConfigurationView", () => {
@@ -646,16 +646,28 @@ describe("AdminConfigurationView", () => {
     await userEvent.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
     expect(setRule).toHaveBeenCalledWith("second", "ADVANCE_WINDOW", { maxDays: 14 });
   });
+  it("given a rule parameter is edited, when the rule is read, then it says the change is not saved", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminConfigurationView configurationChanged={() => undefined} />
+    </UnsavedChangesProvider></MemoryRouter>);
+    const parameter = await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
+    await waitFor(() => expect(parameter).toHaveValue(7));
+
+    // when
+    await userEvent.type(parameter, "5");
+
+    // then
+    expect(await screen.findByTestId("unsaved-mark-rule:ADVANCE_WINDOW")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+  });
 });
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((complete) => { resolve = complete; });
   return { promise, resolve };
-}
-
-function UnsavedCount() {
-  return <p data-testid="unsaved-count">{useUnsavedChanges().unsavedCount}</p>;
 }
 
 it("given the configuration is edited, when the edit is taken back, then nothing is left to lose", async () => {
@@ -686,3 +698,19 @@ it("given the configuration is edited, when the edit is taken back, then nothing
   // then
   await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
 });
+
+it("given the rule set form is filled in, when it is read, then it holds work", async () => {
+  // given
+  render(<MemoryRouter><UnsavedChangesProvider>
+    <UnsavedCount />
+    <AdminConfigurationView configurationChanged={() => undefined} />
+  </UnsavedChangesProvider></MemoryRouter>);
+  await screen.findByTestId("new-rule-set-name");
+
+  // when
+  await userEvent.type(screen.getByTestId("new-rule-set-name"), "Juniors");
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+});
+

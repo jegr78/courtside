@@ -5,6 +5,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
 import { downloadJson } from "../downloads/downloadJson";
+import { UnsavedCount } from "../test/UnsavedCount";
+import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { AdminPersonView } from "./AdminPersonView";
 
 vi.mock("../downloads/downloadJson", () => ({ downloadJson: vi.fn() }));
@@ -38,22 +40,94 @@ const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null
 
 function showPerson(entry: RosterEntry = jane) {
   vi.spyOn(api, "person").mockResolvedValue(entry);
-  render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}>
+  render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><UnsavedChangesProvider>
+    <UnsavedCount />
     <Routes>
       <Route path="/admin/roster/:personId" element={<AdminPersonView />} />
     </Routes>
-  </MemoryRouter>);
+  </UnsavedChangesProvider></MemoryRouter>);
 }
 
 describe("AdminPersonView", () => {
   it("when the page is shown, then it uses the full administration frame", () => {
     // when
-    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}>
+    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><UnsavedChangesProvider>
       <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
-    </MemoryRouter>);
+    </UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(screen.getByTestId("admin-person-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
+  });
+
+  it("given the membership and the account are edited, when they are counted, then each one is asked about on its own", async () => {
+    // given
+    showPerson();
+    await screen.findByTestId("account-username");
+
+    // when
+    await userEvent.type(screen.getByTestId("membership-started-on"), "2026-02-01");
+    await userEvent.type(screen.getByTestId("account-username"), "!");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("2"));
+  });
+
+  it("given the username is edited, when the account is read, then only that save is marked", async () => {
+    // given
+    showPerson();
+    const username = await screen.findByTestId("account-username");
+
+    // when
+    await userEvent.type(username, "!");
+
+    // then
+    expect(await screen.findByTestId("unsaved-mark-account-username:person-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("unsaved-mark-account-roles:person-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("unsaved-mark-account-locale:person-1")).not.toBeInTheDocument();
+  });
+
+  it("given only a role is ticked on the account form, when it is read, then it holds work", async () => {
+    // given
+    showPerson(withoutAccount);
+    await screen.findByTestId("new-account-username");
+
+    // when
+    await userEvent.click(screen.getByTestId("new-account-role-TRAINER"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+  });
+
+  it("given the account form is filled in, when it is read, then it holds work", async () => {
+    // given
+    showPerson(withoutAccount);
+    await screen.findByTestId("new-account-username");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-account-username"), "jane.doe");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+  });
+
+  it("given the name is edited, when it is typed back, then nothing is left to lose", async () => {
+    // given
+    showPerson();
+    const firstName = await screen.findByTestId("person-first-name");
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+
+    // when
+    await userEvent.type(firstName, "!");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+    // when
+    await userEvent.clear(firstName);
+    await userEvent.type(firstName, "Jane");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
   });
 
   beforeEach(async () => {
@@ -70,9 +144,9 @@ describe("AdminPersonView", () => {
     vi.spyOn(api, "person").mockResolvedValue(jane);
 
     // when
-    render(<MemoryRouter initialEntries={[{ pathname: "/admin/roster/person-1", state: { personCreated: true } }]}>
+    render(<MemoryRouter initialEntries={[{ pathname: "/admin/roster/person-1", state: { personCreated: true } }]}><UnsavedChangesProvider>
       <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
-    </MemoryRouter>);
+    </UnsavedChangesProvider></MemoryRouter>);
 
     // then
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Person created."));
@@ -83,9 +157,9 @@ describe("AdminPersonView", () => {
     vi.spyOn(api, "person").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}>
+    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><UnsavedChangesProvider>
       <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
-    </MemoryRouter>);
+    </UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByRole("alert")).toBeInTheDocument();
