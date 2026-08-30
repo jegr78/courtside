@@ -646,6 +646,52 @@ describe("AdminConfigurationView", () => {
     await userEvent.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
     expect(setRule).toHaveBeenCalledWith("second", "ADVANCE_WINDOW", { maxDays: 14 });
   });
+  it("given the rule set name is edited, when another rule set is chosen, then the edit is not dropped silently", async () => {
+    // given
+    vi.spyOn(api, "ruleSets").mockResolvedValue([
+      { id: "rule-set", name: "Standard", active: true },
+      { id: "rule-set-2", name: "Juniors", active: true }
+    ]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const name = await screen.findByTestId("rule-set-name");
+    await userEvent.type(name, " plus");
+
+    // when
+    await userEvent.selectOptions(screen.getByTestId("rule-set"), "rule-set-2");
+
+    // then
+    expect(await screen.findByTestId("unsaved-changes")).toBeInTheDocument();
+    expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
+    expect(screen.getByTestId("rule-set")).toHaveValue("rule-set");
+
+    // when
+    await userEvent.click(screen.getByTestId("unsaved-changes-stay"));
+
+    // then
+    expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
+    expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
+  });
+
+  it("given the question about the rule set name stands, when it is discarded, then the other rule set opens", async () => {
+    // given
+    vi.spyOn(api, "ruleSets").mockResolvedValue([
+      { id: "rule-set", name: "Standard", active: true },
+      { id: "rule-set-2", name: "Juniors", active: true }
+    ]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.type(await screen.findByTestId("rule-set-name"), " plus");
+    await userEvent.selectOptions(screen.getByTestId("rule-set"), "rule-set-2");
+    await screen.findByTestId("unsaved-changes");
+
+    // when
+    await userEvent.click(screen.getByTestId("unsaved-changes-discard"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("rule-set")).toHaveValue("rule-set-2"));
+    expect(screen.getByTestId("rule-set-name")).toHaveValue("Juniors");
+    expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
+  });
+
   it("given a rule parameter is edited, when the rule is read, then it says the change is not saved", async () => {
     // given
     render(<MemoryRouter><UnsavedChangesProvider>
