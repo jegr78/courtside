@@ -211,10 +211,11 @@ route, its media types and its parameter names all come from the document.
 
 ### Native processes
 
-**A library beats a binary, and a binary is never named relatively.** Handing `ProcessBuilder` a
-bare command name lets `PATH` decide which program runs, and that is a finding the Code Scanning
-gate raises rather than a style opinion — it has already cost one correction, after a test shelled
-out to `git` while JGit sat in `pom.xml` two files away.
+**A library beats a binary, and outside the host-orchestration boundary below a binary is never
+named relatively.** Handing `ProcessBuilder` a bare command name lets `PATH` decide which program
+runs, and that is a finding the Code Scanning gate raises rather than a style opinion — it has
+already cost one correction, after a test shelled out to `git` while JGit sat in `pom.xml` two files
+away.
 
 * **Reach for the library first.** Git is JGit (`FileRepositoryBuilder`, as `BuildProvenanceTest`
   and `DeploymentImageParityTest` read it). Archives, hashes, JSON and HTTP all have one on the
@@ -222,9 +223,11 @@ out to `git` while JGit sat in `pom.xml` two files away.
 * **When a binary is genuinely the only way**, resolve it to an absolute path before starting it,
   the way `TestRelayCertificate.executable(...)` does: walk `PATH` yourself, keep only absolute
   directories, and fail with a message that says what was missing. Never pass the bare name.
-* This binds `src/main` and `src/test` alike. Node scripts under `tools/` and the browser journeys
-  drive `docker` and `java` on purpose — that is their subject, and it is not what this rule is
-  about.
+* Host-side orchestration under `tools/` and the browser journeys has a distinct trust boundary. It
+  may resolve a fixed, code-defined tool name through the operator- or CI-owned `PATH`, with
+  structured arguments rather than an interpolated shell command. Input data never selects the
+  executable, and living under `tools/` does not by itself grant this exception. The stricter rule
+  binds `src/main` and `src/test` alike.
 
 ### Error Handling
 
