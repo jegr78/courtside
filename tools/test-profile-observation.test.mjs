@@ -65,7 +65,7 @@ const timing = {
   ]
 };
 
-test("givenAFirstAttemptAndItsBoundPlan_whenObservingCoverage_thenSelectedAndActualJobsRemainDistinct", () => {
+test("given a first attempt and its bound plan, when observing coverage, then selected and actual jobs remain distinct", () => {
   // when
   const observation = createProfileObservation(plan, timing);
 
@@ -77,7 +77,7 @@ test("givenAFirstAttemptAndItsBoundPlan_whenObservingCoverage_thenSelectedAndAct
   assert.equal(observation.classificationOutcome, "no-observed-miss");
 });
 
-test("givenAnUnselectedJobFails_whenObservingCoverage_thenItBecomesAnUnderClassificationCandidate", () => {
+test("given an unselected job fails, when observing coverage, then it becomes an under classification candidate", () => {
   // given
   const failed = { ...timing, outcome: "failure", jobs: timing.jobs.map((job) =>
     job.name === "frontend" ? { ...job, outcome: "failure" } : job) };
@@ -90,7 +90,7 @@ test("givenAnUnselectedJobFails_whenObservingCoverage_thenItBecomesAnUnderClassi
   assert.equal(observation.classificationOutcome, "candidate-miss");
 });
 
-test("givenAnUnselectedJobIsSkipped_whenObservingCoverage_thenTheReducedAttemptIsComplete", () => {
+test("given an unselected job is skipped, when observing coverage, then the reduced attempt is complete", () => {
   // given
   const reduced = { ...timing, jobs: timing.jobs.map((job) =>
     job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
@@ -104,7 +104,7 @@ test("givenAnUnselectedJobIsSkipped_whenObservingCoverage_thenTheReducedAttemptI
   assert.equal(observation.classificationOutcome, "no-observed-miss");
 });
 
-test("givenAnUnselectedJobHasNoConclusiveOutcome_whenObservingCoverage_thenTheAttemptIsIncomplete", () => {
+test("given an unselected job has no conclusive outcome, when observing coverage, then the attempt is incomplete", () => {
   // given
   const cancelled = { ...timing, outcome: "cancelled", jobs: timing.jobs.map((job) =>
     job.name === "frontend" ? { ...job, outcome: "cancelled" } : job) };
@@ -117,7 +117,7 @@ test("givenAnUnselectedJobHasNoConclusiveOutcome_whenObservingCoverage_thenTheAt
   assert.equal(observation.classificationOutcome, "observation-incomplete");
 });
 
-test("givenAPlanFromAnotherRunAttemptOrCommit_whenObservingCoverage_thenItFailsClosed", () => {
+test("given a plan from another run attempt or commit, when observing coverage, then it fails closed", () => {
   // when / then
   assert.throws(() => createProfileObservation({ ...plan, runId: 102 }, timing), /identity/);
   assert.throws(() => createProfileObservation({ ...plan, attempt: 2 }, timing), /identity/);
@@ -125,7 +125,7 @@ test("givenAPlanFromAnotherRunAttemptOrCommit_whenObservingCoverage_thenItFailsC
   assert.throws(() => createProfileObservation(plan, { ...timing, isFirstAttempt: false }), /first-attempt/);
 });
 
-test("givenARerunAndItsExactPlan_whenObservingCoverage_thenItRemainsVisibleButCannotCountAsQualification", () => {
+test("given a rerun and its exact plan, when observing coverage, then it remains visible but cannot count as qualification", () => {
   // given
   const rerunPlan = { ...plan, attempt: 2 };
   const rerunTiming = { ...timing, attempt: 2, isFirstAttempt: false };
@@ -139,7 +139,7 @@ test("givenARerunAndItsExactPlan_whenObservingCoverage_thenItRemainsVisibleButCa
   assert.equal(observation.classificationOutcome, "rerun-not-evaluated");
 });
 
-test("givenAClassifierFallback_whenObservingCoverage_thenTheClassificationErrorRemainsVisible", () => {
+test("given a classifier fallback, when observing coverage, then the classification error remains visible", () => {
   // given
   const fallback = {
     ...plan,
@@ -165,7 +165,7 @@ test("givenAClassifierFallback_whenObservingCoverage_thenTheClassificationErrorR
   }, timing), /fallback/);
 });
 
-test("givenASelectedJobDoesNotReachAResult_whenObservingCoverage_thenTheAttemptIsIncompleteNotMissed", () => {
+test("given a selected job does not reach a result, when observing coverage, then the attempt is incomplete not missed", () => {
   // given
   const cancelled = { ...timing, outcome: "cancelled", jobs: timing.jobs.map((job) =>
     job.name === "backend" ? { ...job, outcome: "cancelled" } : job) };
@@ -179,7 +179,7 @@ test("givenASelectedJobDoesNotReachAResult_whenObservingCoverage_thenTheAttemptI
   assert.equal(observation.classificationOutcome, "observation-incomplete");
 });
 
-test("givenASelectedJobFails_whenObservingCoverage_thenTheAttemptCannotQualify", () => {
+test("given a selected job fails, when observing coverage, then the attempt cannot qualify", () => {
   // given
   const failed = { ...timing, outcome: "failure", jobs: timing.jobs.map((job) =>
     job.name === "backend" ? { ...job, outcome: "failure" } : job) };
@@ -192,7 +192,7 @@ test("givenASelectedJobFails_whenObservingCoverage_thenTheAttemptCannotQualify",
   assert.equal(observation.classificationOutcome, "observation-incomplete");
 });
 
-test("givenHistoricalFirstAttempts_whenSummarizing_thenSampleLimitsAndMissesStayVisible", () => {
+test("given historical first attempts, when summarizing, then sample limits and misses stay visible", () => {
   // given
   const observations = Array.from({ length: 20 }, (_, index) => ({
     ...createProfileObservation(plan, timing),
@@ -226,7 +226,7 @@ test("givenHistoricalFirstAttempts_whenSummarizing_thenSampleLimitsAndMissesStay
   ]);
 });
 
-test("givenRerunsOrContradictoryRecords_whenSummarizing_thenTheyCannotImproveTheObservation", () => {
+test("given reruns or contradictory records, when summarizing, then they cannot improve the observation", () => {
   // given
   const first = createProfileObservation(plan, timing);
   const rerun = createProfileObservation({ ...plan, attempt: 2 },
@@ -279,7 +279,7 @@ test("givenRerunsOrContradictoryRecords_whenSummarizing_thenTheyCannotImproveThe
   ], inventoryFor([first, { ...first, runId: 104 }])), /policy/);
 });
 
-test("givenAQualifiedSummary_whenRenderingTheFinalReport_thenSampleWindowAndLimitationsAreExplicit", () => {
+test("given a qualified summary, when rendering the final report, then sample window and limitations are explicit", () => {
   // given
   const frontendPlan = {
     ...plan, profiles: ["frontend"],
@@ -309,7 +309,7 @@ test("givenAQualifiedSummary_whenRenderingTheFinalReport_thenSampleWindowAndLimi
   for (const limitation of summary.limitations) assert.match(report, new RegExp(limitation.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
-test("givenReducedEvidenceFromOnlyOneProfile_whenSummarizing_thenTheOtherProfileRemainsUnqualified", () => {
+test("given reduced evidence from only one profile, when summarizing, then the other profile remains unqualified", () => {
   // given
   const reducedTiming = { ...timing, jobs: timing.jobs.map((job) =>
     job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
@@ -326,7 +326,7 @@ test("givenReducedEvidenceFromOnlyOneProfile_whenSummarizing_thenTheOtherProfile
   assert.equal(summary.status, "collecting");
 });
 
-test("givenAProposedReducedProfileRunsEveryJob_whenSummarizing_thenItIsShadowEvidenceNotNaturalReduction", () => {
+test("given a proposed reduced profile runs every job, when summarizing, then it is shadow evidence not natural reduction", () => {
   // given
   const observations = Array.from({ length: 20 }, (_, index) => ({
     ...createProfileObservation(plan, timing), runId: 701 + index
@@ -343,7 +343,7 @@ test("givenAProposedReducedProfileRunsEveryJob_whenSummarizing_thenItIsShadowEvi
   assert.equal(summary.status, "collecting");
 });
 
-test("givenCompletedReducedProfilesWithExpectedSkippedJobs_whenSummarizing_thenTheyQualify", () => {
+test("given completed reduced profiles with expected skipped jobs, when summarizing, then they qualify", () => {
   // given
   const frontendPlan = {
     ...plan, profiles: ["frontend"],
@@ -372,7 +372,7 @@ test("givenCompletedReducedProfilesWithExpectedSkippedJobs_whenSummarizing_thenT
   assert.equal(summary.status, "ready-for-review");
 });
 
-test("givenCompletedGitHubRuns_whenCreatingTheInventory_thenEveryFirstAttemptInTheWindowIsRequired", () => {
+test("given completed git hub runs, when creating the inventory, then every first attempt in the window is required", () => {
   // given
   const pages = [{ total_count: 3, workflow_runs: [
     { id: 503, event: "pull_request", status: "completed", head_sha: "e".repeat(40),
@@ -394,7 +394,7 @@ test("givenCompletedGitHubRuns_whenCreatingTheInventory_thenEveryFirstAttemptInT
     "example/courtside", "2026-08-01T00:00:00.000Z", "2026-09-17T00:00:00.000Z"), /incomplete/);
 });
 
-test("givenOnlyFullPlans_whenTheSampleThresholdIsMet_thenActivationStillCollectsReducedEvidence", () => {
+test("given only full plans, when the sample threshold is met, then activation still collects reduced evidence", () => {
   // given
   const fullPlan = { ...plan, profiles: ["full"], isFull: true };
   const observations = Array.from({ length: 20 }, (_, index) => ({

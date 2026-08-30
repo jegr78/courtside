@@ -43,7 +43,7 @@ it("given preferences chosen once, when the header is shown, then they stay insi
   expect(document.getElementById("theme-preference")).toBeVisible();
 });
 
-it("whenNoThemeWasSelected_thenDarkModeIsTheDefault", () => {
+it("when no theme was selected, then dark mode is the default", () => {
   // when
   render(<Preferences />);
 
@@ -52,7 +52,7 @@ it("whenNoThemeWasSelected_thenDarkModeIsTheDefault", () => {
   expect(document.getElementById("theme-preference")).toHaveValue("dark");
 });
 
-it("givenDarkMode_whenSelectingLightMode_thenThePreferenceIsAppliedAndStored", async () => {
+it("given dark mode, when selecting light mode, then the preference is applied and stored", async () => {
   // given
   render(<Preferences />);
   await openPreferences();
@@ -67,7 +67,7 @@ it("givenDarkMode_whenSelectingLightMode_thenThePreferenceIsAppliedAndStored", a
   expect(window.localStorage.getItem("courtside.theme")).toBe("light");
 });
 
-it("givenGerman_whenSelectingEnglish_thenTheWholeInterfaceUsesAndStoresEnglish", async () => {
+it("given German, when selecting English, then the whole interface uses and stores English", async () => {
   // given
   render(<Preferences />);
   await openPreferences();
@@ -81,7 +81,7 @@ it("givenGerman_whenSelectingEnglish_thenTheWholeInterfaceUsesAndStoresEnglish",
   expect(window.localStorage.getItem("courtside.locale")).toBe("en");
 });
 
-it("givenNoLanguagePreference_whenDeterminingTheLocale_thenGermanIsTheDefault", () => {
+it("given no language preference, when determining the locale, then German is the default", () => {
   // when
   const locale = initialLocale();
 
@@ -89,7 +89,7 @@ it("givenNoLanguagePreference_whenDeterminingTheLocale_thenGermanIsTheDefault", 
   expect(locale).toBe("de");
 });
 
-it("givenAnExplicitLanguagePreference_whenAnAccountHasAnotherLocale_thenThePreferenceIsKept", async () => {
+it("given an explicit language preference, when an account has another locale, then the preference is kept", async () => {
   // given
   window.localStorage.setItem("courtside.locale", "en");
   await i18n.changeLanguage("en");
@@ -102,7 +102,7 @@ it("givenAnExplicitLanguagePreference_whenAnAccountHasAnotherLocale_thenThePrefe
   expect(document.documentElement).toHaveAttribute("lang", "en");
 });
 
-it("givenASignedInMember_whenSelectingAnotherLanguage_thenTheAccountIsToldSoTheNextMessageFollows", async () => {
+it("given a signed in member, when selecting another language, then the account is told so the next message follows", async () => {
   // given
   const stored = vi.spyOn(api, "changeOwnLocale").mockResolvedValue(undefined);
   render(<Preferences authenticated />);
@@ -115,7 +115,7 @@ it("givenASignedInMember_whenSelectingAnotherLanguage_thenTheAccountIsToldSoTheN
   expect(stored).toHaveBeenCalledWith("en");
 });
 
-it("givenNobodySignedIn_whenSelectingAnotherLanguage_thenNoAccountIsWrittenTo", async () => {
+it("given nobody signed in, when selecting another language, then no account is written to", async () => {
   // given
   const stored = vi.spyOn(api, "changeOwnLocale").mockResolvedValue(undefined);
   render(<Preferences />);
@@ -129,7 +129,7 @@ it("givenNobodySignedIn_whenSelectingAnotherLanguage_thenNoAccountIsWrittenTo", 
   expect(i18n.resolvedLanguage).toBe("en");
 });
 
-it("givenTheAccountRefusesTheChange_whenSelectingAnotherLanguage_thenTheMemberIsToldRatherThanNothing", async () => {
+it("given the account refuses the change, when selecting another language, then the member is told rather than nothing", async () => {
   // given
   vi.spyOn(api, "changeOwnLocale").mockRejectedValue(new ApiError(403));
   render(<Preferences authenticated />);
@@ -144,7 +144,7 @@ it("givenTheAccountRefusesTheChange_whenSelectingAnotherLanguage_thenTheMemberIs
   expect(screen.getByTestId("locale-not-stored")).toBeVisible();
 });
 
-it("givenAnInstanceThatShipsOneLanguage_whenOfferingTheChoice_thenOnlyThatOneIsOffered", () => {
+it("given an instance that ships one language, when offering the choice, then only that one is offered", () => {
   // when
   render(<Preferences supported={["de"]} />);
 

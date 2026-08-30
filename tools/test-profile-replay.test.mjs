@@ -62,7 +62,7 @@ function frontendPlan(identity) {
   };
 }
 
-test("givenAProtectedReducedRun_whenReplayingCurrentPolicy_thenTheExpectedSkipQualifies", async () => {
+test("given a protected reduced run, when replaying current policy, then the expected skip qualifies", async () => {
   // given
   const source = run(101);
   const jobs = [job(1, backend, "skipped"), job(2, frontend, "success"), job(3, security, "success")];
@@ -85,7 +85,7 @@ test("givenAProtectedReducedRun_whenReplayingCurrentPolicy_thenTheExpectedSkipQu
   assert.deepEqual(result.observations[0].incompleteJobs, []);
 });
 
-test("givenRunBoundBaseMetadata_whenIdentityMatches_thenTheImmutableBaseIsReturned", () => {
+test("given run bound base metadata, when identity matches, then the immutable base is returned", () => {
   // given
   const source = run(101);
 
@@ -96,7 +96,7 @@ test("givenRunBoundBaseMetadata_whenIdentityMatches_thenTheImmutableBaseIsReturn
   assert.deepEqual(identity, { runId: 101, attempt: 1, baseCommit: base, headCommit: head });
 });
 
-test("givenAmbiguousOrMismatchedRunMetadata_whenResolvingBase_thenReplayFailsClosed", () => {
+test("given ambiguous or mismatched run metadata, when resolving base, then replay fails closed", () => {
   // given
   const ambiguous = run(101, { pull_requests: [run(101).pull_requests[0], run(101).pull_requests[0]] });
   const mismatched = run(101, { pull_requests: [{
@@ -108,7 +108,7 @@ test("givenAmbiguousOrMismatchedRunMetadata_whenResolvingBase_thenReplayFailsClo
   assert.throws(() => runBaseIdentity(mismatched, "jegr78/courtside"), /run-bound pull request/);
 });
 
-test("givenAmbiguousHead_whenReconstructingIdentity_thenReplayFailsClosed", () => {
+test("given ambiguous head, when reconstructing identity, then replay fails closed", () => {
   // given
   const source = run(101, { pull_requests: [] });
   const match = {
@@ -121,7 +121,7 @@ test("givenAmbiguousHead_whenReconstructingIdentity_thenReplayFailsClosed", () =
   assert.throws(() => pullRequestIdentity(source, [match, match], "jegr78/courtside"), /head-bound/);
 });
 
-test("givenAForcePushedHistoricalHead_whenResolvingItsBranch_thenThePullRequestLifetimeBindsTheRun", () => {
+test("given a force pushed historical head, when resolving its branch, then the pull request lifetime binds the run", () => {
   // given
   const source = run(101, { pull_requests: [] });
   const candidate = {
@@ -141,7 +141,7 @@ test("givenAForcePushedHistoricalHead_whenResolvingItsBranch_thenThePullRequestL
     /historical head-bound/);
 });
 
-test("givenCurrentPolicyNeedsAnHistoricallySkippedJob_whenReplaying_thenTheMissRemainsVisible", async () => {
+test("given current policy needs an historically skipped job, when replaying, then the miss remains visible", async () => {
   // given
   const source = run(101);
   const jobs = [job(1, backend, "skipped"), job(2, frontend, "success"), job(3, security, "success")];
@@ -165,7 +165,7 @@ test("givenCurrentPolicyNeedsAnHistoricallySkippedJob_whenReplaying_thenTheMissR
   assert.equal(result.summary.incompleteObservationCount, 1);
 });
 
-test("givenAReplayAttemptOtherThanTheFirst_whenLoadingEvidence_thenItIsRejected", async () => {
+test("given a replay attempt other than the first, when loading evidence, then it is rejected", async () => {
   // given
   const summary = run(101);
   const secondAttempt = run(101, { run_attempt: 2 });

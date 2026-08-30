@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 const workflow = readFileSync(new URL("../.github/workflows/ci-timing.yml", import.meta.url), "utf8");
 
-test("whenTheBuildCompletes_thenTimingCollectionCannotMutateRepositoryState", () => {
+test("when the build completes, then timing collection cannot mutate repository state", () => {
   // when / then
   assert.match(workflow, /workflow_run:/);
   assert.match(workflow, /actions:\s*read/);
@@ -12,7 +12,7 @@ test("whenTheBuildCompletes_thenTimingCollectionCannotMutateRepositoryState", ()
   assert.doesNotMatch(workflow, /pull-requests:\s*write|issues:\s*write|contents:\s*write/);
 });
 
-test("whenTimingEvidenceIsUploaded_thenRetentionAndFirstAttemptIdentityAreExplicit", () => {
+test("when timing evidence is uploaded, then retention and first attempt identity are explicit", () => {
   // when / then
   assert.match(workflow, /retention-days:\s*90/);
   assert.match(workflow, /run_attempt/);
@@ -20,7 +20,7 @@ test("whenTimingEvidenceIsUploaded_thenRetentionAndFirstAttemptIdentityAreExplic
   assert.match(workflow, /GITHUB_STEP_SUMMARY/);
 });
 
-test("givenARunIsRerunWhileCollectionStarts_whenReadingEvidence_thenTheTriggeringAttemptRemainsBound", () => {
+test("given a run is rerun while collection starts, when reading evidence, then the triggering attempt remains bound", () => {
   // when / then
   assert.match(workflow, /attempts\/\$\{ATTEMPT\}/);
   assert.doesNotMatch(workflow, /jobs\?filter=latest/);
@@ -28,7 +28,7 @@ test("givenARunIsRerunWhileCollectionStarts_whenReadingEvidence_thenTheTriggerin
   assert.match(workflow, /--expected-attempt "\$ATTEMPT"/);
 });
 
-test("givenAnObservedProfilePlan_whenCollectingTheRun_thenItsImmutableBaseClassifierRecomputesIt", () => {
+test("given an observed profile plan, when collecting the run, then its immutable base classifier recomputes it", () => {
   // when / then
   assert.match(workflow, /ref:\s*\$\{\{ github\.event\.repository\.default_branch \}\}/);
   assert.doesNotMatch(workflow, /gh run download|test-profile-plan-\$\{RUN_ID\}/);
@@ -57,7 +57,7 @@ test("givenAnObservedProfilePlan_whenCollectingTheRun_thenItsImmutableBaseClassi
     /trap cleanup_profile EXIT[\s\S]+git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"[\s\S]+node "\$PROFILE_ROOT\/tools\/ci-timing\.mjs"/);
 });
 
-test("givenTheProfileClassifierFails_whenTheBuildContinues_thenItsFailClosedPlanIsStillRetained", () => {
+test("given the profile classifier fails, when the build continues, then its fail closed plan is still retained", () => {
   // given
   const build = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
 

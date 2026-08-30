@@ -54,7 +54,7 @@ describe("AdminFacilityView", () => {
     await vi.waitFor(() => expect(heading).toHaveFocus());
   });
 
-  it("whenImpactIsAvailable_thenItIsOfferedAsADisclosure", async () => {
+  it("when impact is available, then it is offered as a disclosure", async () => {
     // when
     render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
 

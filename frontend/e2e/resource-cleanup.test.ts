@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { completeCleanup } from "./resource-cleanup";
 
 describe("journey resource cleanup", () => {
-  it("givenOneCleanupFails_whenCompletingTheJourney_thenEveryOwnedResourceIsStillAttempted", async () => {
+  it("given one cleanup fails, when completing the journey, then every owned resource is still attempted", async () => {
     // given
     const first = vi.fn().mockRejectedValue(new Error("browser cleanup failed"));
     const second = vi.fn().mockResolvedValue(undefined);

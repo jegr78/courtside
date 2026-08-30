@@ -200,7 +200,7 @@ describe("browser diagnostics", () => {
     expect(command).toHaveBeenCalledTimes(9);
   });
 
-  it("givenBrowserStartupFails_whenCollectingDiagnostics_thenItsBoundedClassAndNetworkAttachmentAreRetained", async () => {
+  it("given browser startup fails, when collecting diagnostics, then its bounded class and network attachment are retained", async () => {
     // given
     const command = vi.fn((args: string[]) => Promise.resolve(args[0] === "inspect"
       ? JSON.stringify({ Status: "running" }) : "{}"));
@@ -220,7 +220,7 @@ describe("browser diagnostics", () => {
     });
   });
 
-  it("givenStartupNetworkInspectionFails_whenCollectingDiagnostics_thenTheMissingEvidenceIsExplicit", async () => {
+  it("given startup network inspection fails, when collecting diagnostics, then the missing evidence is explicit", async () => {
     // given
     const command = vi.fn((args: string[]) => Promise.resolve(args[0] === "inspect"
       ? JSON.stringify({ Status: "running" }) : "{}"));

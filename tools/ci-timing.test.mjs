@@ -36,7 +36,7 @@ const jobs = [{
   ]
 }];
 
-test("givenACompletedFirstAttempt_whenRecordingTiming_thenTheFirstFailureAndDurationsRemainAttributable", () => {
+test("given a completed first attempt, when recording timing, then the first failure and durations remain attributable", () => {
   // given / when
   const record = createTimingRecord(run, jobs, "jegr78/courtside");
 
@@ -50,7 +50,7 @@ test("givenACompletedFirstAttempt_whenRecordingTiming_thenTheFirstFailureAndDura
   assert.deepEqual(record.jobs[0].runner.labels, ["ubuntu-latest"]);
 });
 
-test("givenARerun_whenRecordingTiming_thenItCannotMasqueradeAsFirstAttemptEvidence", () => {
+test("given a rerun, when recording timing, then it cannot masquerade as first attempt evidence", () => {
   // given
   const rerun = {
     ...run,
@@ -69,7 +69,7 @@ test("givenARerun_whenRecordingTiming_thenItCannotMasqueradeAsFirstAttemptEviden
   assert.equal(record.durationMilliseconds, 720_000);
 });
 
-test("givenCancelledAndMalformedJobs_whenRecordingTiming_thenTheRecordFailsClosed", () => {
+test("given cancelled and malformed jobs, when recording timing, then the record fails closed", () => {
   // given
   const cancelled = { ...run, conclusion: "cancelled" };
   const malformedJobs = [{ ...jobs[0], completed_at: null }];
@@ -78,7 +78,7 @@ test("givenCancelledAndMalformedJobs_whenRecordingTiming_thenTheRecordFailsClose
   assert.throws(() => createTimingRecord(cancelled, malformedJobs, "jegr78/courtside"), /completed_at/);
 });
 
-test("givenACancelledJobWithUnstartedSteps_whenRecordingTiming_thenCancellationRemainsAttributable", () => {
+test("given a cancelled job with unstarted steps, when recording timing, then cancellation remains attributable", () => {
   // given
   const cancelledJob = {
     ...jobs[0],
@@ -99,7 +99,7 @@ test("givenACancelledJobWithUnstartedSteps_whenRecordingTiming_thenCancellationR
   assert.equal(record.timeToFirstFailureMilliseconds, null);
 });
 
-test("givenGitHubReportsASkippedJobBeforeItsStart_whenRecordingTiming_thenNoRunnerTimeIsInvented", () => {
+test("given git hub reports a skipped job before its start, when recording timing, then no runner time is invented", () => {
   // given
   const skipped = {
     ...jobs[0],
@@ -119,7 +119,7 @@ test("givenGitHubReportsASkippedJobBeforeItsStart_whenRecordingTiming_thenNoRunn
   assert.equal(record.jobs[0].runner.kind, "not-assigned");
 });
 
-test("givenAJobFailsOutsideANamedStep_whenRecordingTiming_thenItsCompletionMarksTheFirstFailure", () => {
+test("given a job fails outside a named step, when recording timing, then its completion marks the first failure", () => {
   // given
   const failed = { ...jobs[0], steps: [] };
 
@@ -130,7 +130,7 @@ test("givenAJobFailsOutsideANamedStep_whenRecordingTiming_thenItsCompletionMarks
   assert.equal(record.timeToFirstFailureMilliseconds, 710_000);
 });
 
-test("givenFirstAttemptRecords_whenAggregating_thenMedianP95AndRunnerMinutesAreReported", () => {
+test("given first attempt records, when aggregating, then median P95 and runner minutes are reported", () => {
   // given
   const records = [600_000, 900_000, 1_200_000, 1_500_000].map((duration, index) => {
     const completedAt = new Date(Date.parse(run.run_started_at) + duration).toISOString();
@@ -158,7 +158,7 @@ test("givenFirstAttemptRecords_whenAggregating_thenMedianP95AndRunnerMinutesAreR
   assert.equal(aggregate.runnerMinutes, 70);
 });
 
-test("givenOnlyReruns_whenAggregating_thenTheSampleIsExplicitlyInsufficient", () => {
+test("given only reruns, when aggregating, then the sample is explicitly insufficient", () => {
   // given
   const records = [{ ...createTimingRecord({ ...run, run_attempt: 2 }, jobs, "jegr78/courtside"), isFirstAttempt: false }];
 
@@ -169,7 +169,7 @@ test("givenOnlyReruns_whenAggregating_thenTheSampleIsExplicitlyInsufficient", ()
   assert.deepEqual(aggregate, { sampleSize: 0, status: "insufficient-sample" });
 });
 
-test("givenMalformedOrContradictoryRecords_whenAggregating_thenTheyCannotInfluenceTheBaseline", () => {
+test("given malformed or contradictory records, when aggregating, then they cannot influence the baseline", () => {
   // given
   const valid = createTimingRecord(run, jobs, "jegr78/courtside");
 
@@ -180,7 +180,7 @@ test("givenMalformedOrContradictoryRecords_whenAggregating_thenTheyCannotInfluen
   assert.throws(() => aggregateTimingRecords([valid, valid]), /duplicate run attempt/);
 });
 
-test("givenDuplicateOrUnboundedJobEvidence_whenAggregating_thenRunnerTimeCannotBeInflated", () => {
+test("given duplicate or unbounded job evidence, when aggregating, then runner time cannot be inflated", () => {
   // given
   const valid = createTimingRecord(run, jobs, "jegr78/courtside");
   const duplicateJob = { ...valid, jobs: [valid.jobs[0], valid.jobs[0]] };
@@ -197,7 +197,7 @@ test("givenDuplicateOrUnboundedJobEvidence_whenAggregating_thenRunnerTimeCannotB
   assert.throws(() => aggregateTimingRecords([stepOutsideJob]), /outside its job/);
 });
 
-test("givenLooseJavaScriptDates_whenRecordingTiming_thenOnlyRfc3339UtcEvidenceIsAccepted", () => {
+test("given loose java script dates, when recording timing, then only rfc3339 utc evidence is accepted", () => {
   // given
   const looseRun = { ...run, run_started_at: "1", updated_at: "2" };
 
@@ -205,7 +205,7 @@ test("givenLooseJavaScriptDates_whenRecordingTiming_thenOnlyRfc3339UtcEvidenceIs
   assert.throws(() => createTimingRecord(looseRun, jobs, "jegr78/courtside"), /RFC 3339/);
 });
 
-test("givenFetchedEvidenceFromAnotherAttempt_whenBindingTheEvent_thenCollectionFailsClosed", () => {
+test("given fetched evidence from another attempt, when binding the event, then collection fails closed", () => {
   // given
   const fetched = { ...run, run_attempt: 2 };
 
@@ -214,7 +214,7 @@ test("givenFetchedEvidenceFromAnotherAttempt_whenBindingTheEvent_thenCollectionF
   assert.doesNotThrow(() => assertRunIdentity(run, 101, 1));
 });
 
-test("givenARecordedRun_whenValidatingTheRetainedArtifact_thenItsShapeIsClosed", () => {
+test("given a recorded run, when validating the retained artifact, then its shape is closed", () => {
   // given
   const record = createTimingRecord(run, jobs, "jegr78/courtside");
 

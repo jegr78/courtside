@@ -7,7 +7,7 @@ import {
 } from "./browser-container-lifecycle";
 
 describe("browser container lifecycle", () => {
-  it("givenStartupFailsBeforePortPublication_whenTheContainerWasCreated_thenItIsDiagnosedAndRemoved", async () => {
+  it("given startup fails before port publication, when the container was created, then it is diagnosed and removed", async () => {
     // given
     const attached = new Set<string>();
     const diagnose = vi.fn().mockResolvedValue(undefined);
@@ -29,7 +29,7 @@ describe("browser container lifecycle", () => {
     expect(attached).toEqual(new Set());
   });
 
-  it("givenStartupFailsBeforeTheCreatedCallback_whenTheAttemptLabelExists_thenTheExactContainerIsRecovered", async () => {
+  it("given startup fails before the created callback, when the attempt label exists, then the exact container is recovered", async () => {
     // given
     const containerId = "e".repeat(64);
     const discover = vi.fn().mockResolvedValue([containerId]);
@@ -44,7 +44,7 @@ describe("browser container lifecycle", () => {
     expect(remove).toHaveBeenCalledWith(containerId);
   });
 
-  it("givenStartupDiagnosisFails_whenRollingBackTheContainer_thenRemovalStillRunsAndBothFailuresRemain", async () => {
+  it("given startup diagnosis fails, when rolling back the container, then removal still runs and both failures remain", async () => {
     // given
     const containerId = "9".repeat(64);
     const diagnose = vi.fn().mockRejectedValue(new Error("diagnostics unavailable"));
@@ -64,7 +64,7 @@ describe("browser container lifecycle", () => {
     expect(remove).toHaveBeenCalledWith(containerId);
   });
 
-  it("givenImmediateCleanupFails_whenGlobalTeardownInventoriesTheNetwork_thenTheOwnedContainerCannotBlockIt", async () => {
+  it("given immediate cleanup fails, when global teardown inventories the network, then the owned container cannot block it", async () => {
     // given
     const containerId = "b".repeat(64);
     const attached = new Set([containerId]);
@@ -97,7 +97,7 @@ describe("browser container lifecycle", () => {
     expect(docker).toHaveBeenCalledWith(["rm", "-f", containerId]);
   });
 
-  it("givenInventoryReturnsAContainerWithDifferentOwnership_whenCleanupRuns_thenItFailsClosed", async () => {
+  it("given inventory returns a container with different ownership, when cleanup runs, then it fails closed", async () => {
     // given
     const containerId = "c".repeat(64);
     const docker = vi.fn((args: string[]) => Promise.resolve(args[0] === "ps" ? `${containerId}\n` : JSON.stringify({
@@ -111,7 +111,7 @@ describe("browser container lifecycle", () => {
     expect(docker).not.toHaveBeenCalledWith(["rm", "-f", containerId]);
   });
 
-  it("givenStartupRecoverySeesAnotherAttempt_whenDiscoveringTheContainer_thenItFailsClosed", async () => {
+  it("given startup recovery sees another attempt, when discovering the container, then it fails closed", async () => {
     // given
     const containerId = "f".repeat(64);
     const docker = vi.fn((args: string[]) => Promise.resolve(args[0] === "ps" ? `${containerId}\n` : JSON.stringify({
@@ -129,7 +129,7 @@ describe("browser container lifecycle", () => {
       "--filter", "label=org.courtside.e2e.startup-id=startup-1"]);
   });
 
-  it("givenAContainerWasCreatedBeforeNetworkAttachment_whenRecoveringTheStartup_thenLabelsStillFindIt", async () => {
+  it("given a container was created before network attachment, when recovering the startup, then labels still find it", async () => {
     // given
     const containerId = "1".repeat(64);
     const docker = vi.fn((args: string[]) => Promise.resolve(args[0] === "ps" ? `${containerId}\n` : JSON.stringify({
@@ -149,7 +149,7 @@ describe("browser container lifecycle", () => {
       "--filter", "label=org.courtside.e2e.startup-id=startup-1"]);
   });
 
-  it("givenRemovingOneOwnedContainerFails_whenCleaningUp_thenEveryOtherContainerIsStillRemoved", async () => {
+  it("given removing one owned container fails, when cleaning up, then every other container is still removed", async () => {
     // given
     const first = "2".repeat(64);
     const second = "3".repeat(64);
@@ -177,7 +177,7 @@ describe("browser container lifecycle", () => {
     [new Error("Log message not received"), "wait-strategy"],
     [Object.assign(new Error("connect ENOENT"), { name: "DockerError" }), "docker-api"],
     [new Error("unexpected failure"), "unknown"]
-  ])("givenAStartupError_whenClassifyingIt_thenOnlyTheBoundedClassIsRetained", (failure, expected) => {
+  ])("given a startup error, when classifying it, then only the bounded class is retained", (failure, expected) => {
     // given / when / then
     expect(browserStartupFailureClass(failure)).toBe(expected);
   });

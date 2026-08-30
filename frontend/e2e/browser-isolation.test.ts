@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { browserFixtureScope, browserIsolationVariant } from "./browser-isolation";
 
 describe("browser isolation", () => {
-  it("givenNoExperiment_whenResolvingIsolation_thenOneBrowserLivesForTheProject", () => {
+  it("given no experiment, when resolving isolation, then one browser lives for the project", () => {
     // given / when
     const variant = browserIsolationVariant(undefined);
 
@@ -11,7 +11,7 @@ describe("browser isolation", () => {
     expect(browserFixtureScope(variant)).toBe("worker");
   });
 
-  it("givenTestIsolation_whenResolvingIsolation_thenOneBrowserLivesForEachTest", () => {
+  it("given test isolation, when resolving isolation, then one browser lives for each test", () => {
     // given / when
     const variant = browserIsolationVariant("test");
 
@@ -20,7 +20,7 @@ describe("browser isolation", () => {
     expect(browserFixtureScope(variant)).toBe("test");
   });
 
-  it("givenAnUnknownIsolation_whenResolvingIsolation_thenTheRunFailsClosed", () => {
+  it("given an unknown isolation, when resolving isolation, then the run fails closed", () => {
     // given / when / then
     expect(() => browserIsolationVariant("context")).toThrow("Unsupported WebKit browser isolation");
   });

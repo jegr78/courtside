@@ -38,7 +38,7 @@ function repositoryHistory() {
   return { repository, base, head, advancedBase };
 }
 
-test("givenTheExactRunBase_whenValidatingProvenance_thenItIsAccepted", () => {
+test("given the exact run base, when validating provenance, then it is accepted", () => {
   // given
   const history = repositoryHistory();
 
@@ -50,7 +50,7 @@ test("givenTheExactRunBase_whenValidatingProvenance_thenItIsAccepted", () => {
   }
 });
 
-test("givenTheDefaultBranchAdvancedAfterTheRun_whenValidatingProvenance_thenItFailsClosed", () => {
+test("given the default branch advanced after the run, when validating provenance, then it fails closed", () => {
   // given
   const history = repositoryHistory();
 
@@ -65,7 +65,7 @@ test("givenTheDefaultBranchAdvancedAfterTheRun_whenValidatingProvenance_thenItFa
   }
 });
 
-test("givenMalformedCommitIdentity_whenValidatingProvenance_thenItIsRejectedBeforeGit", () => {
+test("given malformed commit identity, when validating provenance, then it is rejected before git", () => {
   // when / then
   assert.throws(() => validateObservedBase(".", "main", "head"), /commit identity is invalid/);
 });
