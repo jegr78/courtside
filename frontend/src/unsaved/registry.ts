@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect } from "react";
 
 export type UnsavedChangesRegistry = {
   unsavedCount: number;
+  holds: (id: string) => boolean;
   mark: (id: string, unsaved: boolean) => void;
 };
 

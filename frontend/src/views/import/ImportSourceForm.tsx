@@ -4,6 +4,10 @@ import { api, type CanonicalField, type ImportSource, type ImportSourceRequest, 
 import { EncodingUnreadableHereError, NotUtf8Error, readCsvColumn, readCsvHeader, suggestSeparator } from "../../import/read-csv";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
+import { differs } from "../../unsaved/differs";
+import { importSourceMark } from "./importSourceMark";
+import { describedByMark } from "../../unsaved/markId";
+import { UnsavedMark } from "../../unsaved/UnsavedMark";
 
 const FIELDS: CanonicalField[] = [
   "EXTERNAL_ID", "FIRST_NAME", "LAST_NAME", "EMAIL", "MEMBERSHIP_TYPE"
@@ -21,8 +25,34 @@ function mappingOf(source: ImportSource | undefined): Mapping {
   return mapping;
 }
 
+// What the server last confirmed, in the shape the form would send, so the two are comparable at
+// all — and what the form starts as, so an untouched source cannot read as changed because the
+// two sides spell a default differently. Deliberately unannotated: the generated request type
+// carries its fields as optional, and only the inferred one is usable as an initial state.
+function described(source: ImportSource | undefined) {
+  return {
+    sourceKey: source?.sourceKey ?? "",
+    displayName: source?.displayName ?? "",
+    separator: source?.separator ?? ",",
+    encoding: source?.encoding ?? "UTF-8",
+    columns: source?.columns ?? {},
+    membershipTypes: source?.membershipTypes ?? {},
+    defaultMembershipTypeId: source?.defaultMembershipTypeId ?? "",
+    ownedFields: OWNABLE.filter((field) => (source?.ownedFields ?? []).includes(field)),
+    removalWarningPercent: source?.removalWarningPercent ?? 10
+  };
+}
+
+// A category left unassigned is absent from the request, so it has to be absent from the
+// comparison too — otherwise one arriving from the server would mark the source unsaved for good.
+function assigned(categories: Record<string, string> | undefined): Record<string, string> {
+  return Object.fromEntries(Object.entries(categories ?? {}).filter(([, typeId]) => typeId));
+}
+
+// Without a prototype, because a column a club named __proto__ would otherwise reach the inherited
+// setter and disappear from the mapping instead of becoming a key of its own.
 function columnsOf(mapping: Mapping): Record<string, CanonicalField> {
-  const columns: Record<string, CanonicalField> = {};
+  const columns = Object.create(null) as Record<string, CanonicalField>;
   FIELDS.forEach((field) => {
     const column = mapping[field];
     if (column) columns[column] = field;
@@ -39,18 +69,19 @@ export function ImportSourceForm({ source, types, disabled, save }: {
 }) {
   const { t } = useTranslation();
   const group = useId();
+  const confirmed = described(source);
   const [chosen, setChosen] = useState<File>();
   const [headers, setHeaders] = useState<string[]>([]);
   const [readValues, setReadValues] = useState<string[]>([]);
-  const [sourceKey, setSourceKey] = useState(source?.sourceKey ?? "");
-  const [displayName, setDisplayName] = useState(source?.displayName ?? "");
+  const [sourceKey, setSourceKey] = useState(confirmed.sourceKey);
+  const [displayName, setDisplayName] = useState(confirmed.displayName);
   const [mapping, setMapping] = useState<Mapping>(mappingOf(source));
-  const [categories, setCategories] = useState<Record<string, string>>(source?.membershipTypes ?? {});
-  const [defaultType, setDefaultType] = useState(source?.defaultMembershipTypeId ?? "");
-  const [owned, setOwned] = useState<CanonicalField[]>(source?.ownedFields ?? []);
-  const [threshold, setThreshold] = useState(String(source?.removalWarningPercent ?? 10));
-  const [separator, setSeparator] = useState(source?.separator ?? ",");
-  const [encoding, setEncoding] = useState(source?.encoding ?? "UTF-8");
+  const [categories, setCategories] = useState<Record<string, string>>(confirmed.membershipTypes);
+  const [defaultType, setDefaultType] = useState(confirmed.defaultMembershipTypeId);
+  const [owned, setOwned] = useState<CanonicalField[]>(confirmed.ownedFields);
+  const [threshold, setThreshold] = useState(String(confirmed.removalWarningPercent));
+  const [separator, setSeparator] = useState(confirmed.separator);
+  const [encoding, setEncoding] = useState(confirmed.encoding);
   const [encodings, setEncodings] = useState<string[]>([]);
   const [unreadableHere, setUnreadableHere] = useState(false);
   const [asksEncoding, setAsksEncoding] = useState(false);
@@ -113,20 +144,30 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     setReadValues(chosen && column ? await readCsvColumn(chosen, column, encoding, separator) : []);
   }
 
-  function submit() {
-    void save({
+  function requested(): ImportSourceRequest {
+    return {
       sourceKey,
       displayName,
       separator,
       encoding,
       columns: columnsOf(mapping),
-      membershipTypes: Object.fromEntries(
-        Object.entries(categories).filter(([, typeId]) => typeId)),
+      membershipTypes: assigned(categories),
       defaultMembershipTypeId: defaultType,
-      ownedFields: owned,
+      // In the canonical order rather than the order they were ticked, so a field taken back and
+      // given again leaves the same request rather than a reordered one.
+      ownedFields: OWNABLE.filter((field) => owned.includes(field)),
       removalWarningPercent: Number(threshold)
-    });
+    };
   }
+
+  function submit() {
+    void save(requested());
+  }
+
+  const mark = importSourceMark(source);
+  // Assigned on both sides: an unassigned category is dropped from the request, so comparing it
+  // against one the server still holds would mark a source unsaved with nothing to save.
+  const unsaved = differs(requested(), { ...confirmed, membershipTypes: assigned(confirmed.membershipTypes) });
 
   // The column choices come from the club's own file, which is why it is read here and never sent.
   return <section className="surface-subtle grid gap-4 rounded-xl border p-4">
@@ -201,6 +242,9 @@ export function ImportSourceForm({ source, types, disabled, save }: {
 
     <TextField data-testid="source-threshold" disabled={disabled} type="number" min={0} max={100} label={t("admin.import.removalWarning")} value={threshold} onChange={(event) => setThreshold(event.target.value)} />
 
-    <Button variant="primary" data-testid="save-source" disabled={disabled} className="justify-self-start" type="button" onClick={submit}>{t("admin.save")}</Button>
+    <div className="flex flex-wrap items-center gap-3">
+      <Button variant="primary" data-testid="save-source" aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button" onClick={submit}>{t("admin.save")}</Button>
+      <UnsavedMark id={mark} unsaved={unsaved} />
+    </div>
   </section>;
 }

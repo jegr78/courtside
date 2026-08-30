@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type ExternalReference, type RosterEntry } from "../../api/client";
 import { Button } from "../../components/Button";
+import { useUnsavedMark } from "../../unsaved/registry";
 import { TextField } from "../../components/TextField";
 import { SuccessFeedback } from "../../components/SuccessFeedback";
 
@@ -22,6 +23,7 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
   const [externalId, setExternalId] = useState("");
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState<string>();
+  useUnsavedMark("import-reference:new", chosen !== undefined || externalId.trim() !== "");
 
   const read = useCallback(async (after?: string) => {
     const page = await api.externalReferences(sourceId, after);

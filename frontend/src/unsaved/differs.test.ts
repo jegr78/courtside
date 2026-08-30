@@ -33,3 +33,30 @@ it("given a list with an entry added, when comparing, then it is unsaved", () =>
   // then
   expect(differs({ roles: ["MEMBER"] }, { roles: ["MEMBER", "TRAINER"] })).toBe(true);
 });
+
+// A column mapping is a record of its own, and rebuilding it puts the keys back in another order.
+it("given a nested record with the same entries, when comparing, then nothing is unsaved", () => {
+  // then
+  expect(differs(
+    { columns: { Surname: "LAST_NAME", Forename: "FIRST_NAME" } },
+    { columns: { Forename: "FIRST_NAME", Surname: "LAST_NAME" } })).toBe(false);
+});
+
+it("given a nested record with one entry changed, when comparing, then it is unsaved", () => {
+  // then
+  expect(differs(
+    { columns: { Surname: "LAST_NAME" } },
+    { columns: { Surname: "EXTERNAL_ID" } })).toBe(true);
+});
+
+it("given a nested record with an entry added, when comparing, then it is unsaved", () => {
+  // then
+  expect(differs({ columns: { Surname: "LAST_NAME" } }, { columns: {} })).toBe(true);
+});
+
+// The comparison looks into plain objects only, so anything else stands or falls by identity
+// rather than by having no fields of its own to tell two of them apart.
+it("given two objects that are not plain, when comparing them, then they count as unsaved", () => {
+  // then
+  expect(differs({ read: new Date(0) }, { read: new Date(0) })).toBe(true);
+});

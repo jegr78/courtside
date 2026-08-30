@@ -1,8 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type ImportSource, type ImportSourceRequest, type MembershipType } from "../../api/client";
 import i18n from "../../i18n";
+import { UnsavedCount } from "../../test/UnsavedCount";
+import { UnsavedChangesProvider } from "../../unsaved/UnsavedChangesProvider";
 import { ImportSourceForm } from "./ImportSourceForm";
 
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
@@ -24,7 +26,10 @@ function file(content: string, name = "members.csv") {
 }
 
 function show(source: ImportSource | undefined, save: (request: ImportSourceRequest) => Promise<unknown>) {
-  render(<ImportSourceForm source={source} types={[adults, passive]} disabled={false} save={save} />);
+  render(<UnsavedChangesProvider>
+    <UnsavedCount />
+    <ImportSourceForm source={source} types={[adults, passive]} disabled={false} save={save} />
+  </UnsavedChangesProvider>);
 }
 
 describe("ImportSourceForm", () => {
@@ -246,4 +251,89 @@ describe("ImportSourceForm", () => {
     expect([...screen.getByTestId("column-EXTERNAL_ID").querySelectorAll("option")]
       .map((option) => option.getAttribute("value"))).toContain("Straße");
   });
+});
+
+it("given a described source, when nothing is touched, then it holds nothing to lose", async () => {
+  // when
+  show(existing, () => Promise.resolve());
+
+  // then
+  expect(await screen.findByTestId("source-key")).toBeInTheDocument();
+  expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+  expect(screen.queryByTestId("unsaved-mark-import-source:source-1")).not.toBeInTheDocument();
+});
+
+it("given a described source, when its name is edited and typed back, then nothing is left to lose", async () => {
+  // given
+  show(existing, () => Promise.resolve());
+  const name = await screen.findByTestId("source-name");
+
+  // when
+  await userEvent.type(name, "!");
+
+  // then
+  expect(await screen.findByTestId("unsaved-mark-import-source:source-1")).toBeInTheDocument();
+  expect(screen.getByTestId("save-source"))
+    .toHaveAttribute("aria-describedby", "unsaved-mark-import-source:source-1");
+
+  // when
+  await userEvent.clear(name);
+  await userEvent.type(name, "Membership system");
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+});
+
+// The column mapping is a record inside the request, and rebuilding it reorders its keys.
+it("given an owned field ticked and unticked again, when the source is read, then nothing is left to lose", async () => {
+  // given
+  show(existing, () => Promise.resolve());
+  const owned = await screen.findByTestId("owned-FIRST_NAME");
+
+  // when
+  await userEvent.click(owned);
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+  // when
+  await userEvent.click(screen.getByTestId("owned-LAST_NAME"));
+  await userEvent.click(screen.getByTestId("owned-LAST_NAME"));
+  await userEvent.click(owned);
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+});
+
+// A category the server left unassigned is absent from the request, so it must be absent from the
+// comparison as well or the source reads as unsaved with nothing to save.
+it("given a category the server left unassigned, when the source is read, then it holds nothing to lose", async () => {
+  // given
+  show({
+    ...existing,
+    columns: { ...existing.columns, Category: "MEMBERSHIP_TYPE" },
+    membershipTypes: { Adults: "type-1", Passive: "" }
+  }, () => Promise.resolve());
+
+  // then
+  expect(await screen.findByTestId("source-key")).toBeInTheDocument();
+  expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+
+  // and the unassigned one is still a row somebody can assign, rather than one the form hides
+  expect(screen.getByTestId("category-Passive")).toHaveValue("");
+});
+
+it("given a column a club named __proto__, when it is mapped, then it stays a column of its own", async () => {
+  // given
+  const save = vi.fn((request: ImportSourceRequest) => Promise.resolve(request));
+  // Parsed rather than written out, because a literal would set the prototype instead of a key —
+  // which is the very confusion this guards against.
+  const columns = JSON.parse('{"__proto__":"EXTERNAL_ID"}') as ImportSource["columns"];
+  show({ ...existing, columns }, save);
+
+  // when
+  await userEvent.click(await screen.findByTestId("save-source"));
+
+  // then
+  expect(Object.keys(save.mock.calls[0][0].columns ?? {})).toContain("__proto__");
 });

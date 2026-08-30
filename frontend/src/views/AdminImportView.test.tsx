@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api, type ImportSource, type MembershipType } from "../api/client";
 import i18n from "../i18n";
+import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { AdminImportView } from "./AdminImportView";
 
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
@@ -22,7 +23,7 @@ const rosterSystem: ImportSource = {
 const clubRegistry: ImportSource = { ...rosterSystem, id: "source-2", sourceKey: "club-registry", displayName: "Club registry" };
 
 function show() {
-  render(<MemoryRouter><AdminImportView /></MemoryRouter>);
+  render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
 }
 
 describe("AdminImportView", () => {
@@ -172,5 +173,94 @@ describe("AdminImportView", () => {
 
     // then
     expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
+
+  it("given a described source is edited, when another source is opened, then the edit is not dropped silently", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await userEvent.type(await screen.findByTestId("source-name"), " plus");
+
+    // when
+    await userEvent.click(screen.getByTestId("source-choice-source-2"));
+
+    // then
+    expect(await screen.findByTestId("unsaved-changes")).toBeInTheDocument();
+    expect(screen.getByTestId("source-name")).toHaveValue("Membership system plus");
+
+    // when
+    await userEvent.click(screen.getByTestId("unsaved-changes-stay"));
+
+    // then
+    expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
+    expect(screen.getByTestId("source-name")).toHaveValue("Membership system plus");
+
+    // when
+    await userEvent.click(screen.getByTestId("source-choice-source-2"));
+    await userEvent.click(await screen.findByTestId("unsaved-changes-discard"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("source-name")).toHaveValue("Club registry"));
+  });
+
+  it("given a source with nothing edited, when another source is opened, then it opens without a question", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await screen.findByTestId("source-name");
+
+    // when
+    await userEvent.click(screen.getByTestId("source-choice-source-2"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("source-name")).toHaveValue("Club registry"));
+    expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
+  });
+
+  it("given a described source is edited, when the same source is chosen again, then nothing is asked", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await userEvent.type(await screen.findByTestId("source-name"), " plus");
+
+    // when
+    await userEvent.click(screen.getByTestId("source-choice-source-1"));
+
+    // then
+    expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
+    expect(screen.getByTestId("source-name")).toHaveValue("Membership system plus");
+  });
+
+  it("given a member number typed for a link, when another source is opened, then the link is asked about", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await userEvent.type(await screen.findByTestId("reference-external-id"), "4711");
+
+    // when
+    await userEvent.click(screen.getByTestId("source-choice-source-2"));
+
+    // then
+    expect(await screen.findByTestId("unsaved-changes")).toBeInTheDocument();
+  });
+
+  it("given a source being described for the first time, when another is opened, then it is asked about", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId("new-source"));
+    await userEvent.type(await screen.findByTestId("source-name"), "Club registry");
+
+    // when
+    await userEvent.click(screen.getByTestId("source-choice-source-1"));
+
+    // then
+    expect(await screen.findByTestId("unsaved-changes")).toBeInTheDocument();
+    expect(screen.getByTestId("source-name")).toHaveValue("Club registry");
   });
 });
