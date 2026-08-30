@@ -93,12 +93,20 @@ test("given security finding tools need node modules, when the security job runs
 test("given maven downloads fail transiently, when any wrapper command runs, then resolver retries stay bounded", () => {
   // given
   const mavenConfig = readFileSync(new URL("../.mvn/maven.config", import.meta.url), "utf8");
+  const expected = new Map([
+    ["count", "3"],
+    ["interval", "15000"],
+    ["intervalMax", "120000"],
+    ["serviceUnavailable", "429,503"]
+  ]);
 
   // when / then
-  assert.match(mavenConfig, /^-Daether\.transport\.http\.retryHandler\.count=3$/m);
-  assert.match(mavenConfig, /^-Daether\.transport\.http\.retryHandler\.interval=15000$/m);
-  assert.match(mavenConfig, /^-Daether\.transport\.http\.retryHandler\.intervalMax=120000$/m);
-  assert.match(mavenConfig, /^-Daether\.transport\.http\.retryHandler\.serviceUnavailable=429,503$/m);
+  for (const namespace of ["connector", "transport"]) {
+    for (const [property, value] of expected) {
+      assert.match(mavenConfig,
+        new RegExp(`^-Daether\\.${namespace}\\.http\\.retryHandler\\.${property}=${value}$`, "m"));
+    }
+  }
 });
 
 test("given workflow jobs invoke the frontend plugin, when maven resolves it, then no prefix lookup is needed", () => {
