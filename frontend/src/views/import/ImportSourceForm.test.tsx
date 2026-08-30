@@ -309,11 +309,18 @@ it("given an owned field ticked and unticked again, when the source is read, the
 // comparison as well or the source reads as unsaved with nothing to save.
 it("given a category the server left unassigned, when the source is read, then it holds nothing to lose", async () => {
   // given
-  show({ ...existing, membershipTypes: { Adults: "type-1", Passive: "" } }, () => Promise.resolve());
+  show({
+    ...existing,
+    columns: { ...existing.columns, Category: "MEMBERSHIP_TYPE" },
+    membershipTypes: { Adults: "type-1", Passive: "" }
+  }, () => Promise.resolve());
 
   // then
   expect(await screen.findByTestId("source-key")).toBeInTheDocument();
   expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+
+  // and the unassigned one is still a row somebody can assign, rather than one the form hides
+  expect(screen.getByTestId("category-Passive")).toHaveValue("");
 });
 
 it("given a column a club named __proto__, when it is mapped, then it stays a column of its own", async () => {

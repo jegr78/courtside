@@ -10,6 +10,7 @@ import { ExternalReferencePanel } from "./import/ExternalReferencePanel";
 import { ImportExecutionPanel } from "./import/ImportExecutionPanel";
 import { ImportPreviewPanel } from "./import/ImportPreviewPanel";
 import { ImportSourceForm } from "./import/ImportSourceForm";
+import { importSourceMark } from "./import/importSourceMark";
 import { useUnsavedChanges } from "../unsaved/registry";
 import { UnsavedChangesQuestion } from "../unsaved/UnsavedChangesQuestion";
 
@@ -32,12 +33,13 @@ export function AdminImportView() {
   const { holds } = useUnsavedChanges();
 
   function editorOf(what: Editing): string | undefined {
-    return what && `import-source:${what.source?.id ?? "new"}`;
+    return what && importSourceMark(what.source);
   }
 
   function heldHere(): string[] {
-    if (!editing) return [];
-    return [editorOf(editing) ?? "", "import-reference:new"].filter(holds);
+    const editor = editorOf(editing);
+    if (!editor) return [];
+    return [editor, "import-reference:new"].filter(holds);
   }
 
   function openSource(next: Editing) {

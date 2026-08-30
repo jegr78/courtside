@@ -5,6 +5,7 @@ import { EncodingUnreadableHereError, NotUtf8Error, readCsvColumn, readCsvHeader
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { differs } from "../../unsaved/differs";
+import { importSourceMark } from "./importSourceMark";
 import { describedByMark } from "../../unsaved/markId";
 import { UnsavedMark } from "../../unsaved/UnsavedMark";
 
@@ -26,7 +27,8 @@ function mappingOf(source: ImportSource | undefined): Mapping {
 
 // What the server last confirmed, in the shape the form would send, so the two are comparable at
 // all — and what the form starts as, so an untouched source cannot read as changed because the
-// two sides spell a default differently.
+// two sides spell a default differently. Deliberately unannotated: the generated request type
+// carries its fields as optional, and only the inferred one is usable as an initial state.
 function described(source: ImportSource | undefined) {
   return {
     sourceKey: source?.sourceKey ?? "",
@@ -34,7 +36,7 @@ function described(source: ImportSource | undefined) {
     separator: source?.separator ?? ",",
     encoding: source?.encoding ?? "UTF-8",
     columns: source?.columns ?? {},
-    membershipTypes: assigned(source?.membershipTypes),
+    membershipTypes: source?.membershipTypes ?? {},
     defaultMembershipTypeId: source?.defaultMembershipTypeId ?? "",
     ownedFields: OWNABLE.filter((field) => (source?.ownedFields ?? []).includes(field)),
     removalWarningPercent: source?.removalWarningPercent ?? 10
@@ -162,8 +164,10 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     void save(requested());
   }
 
-  const mark = `import-source:${source?.id ?? "new"}`;
-  const unsaved = differs(requested(), confirmed);
+  const mark = importSourceMark(source);
+  // Assigned on both sides: an unassigned category is dropped from the request, so comparing it
+  // against one the server still holds would mark a source unsaved with nothing to save.
+  const unsaved = differs(requested(), { ...confirmed, membershipTypes: assigned(confirmed.membershipTypes) });
 
   // The column choices come from the club's own file, which is why it is read here and never sent.
   return <section className="surface-subtle grid gap-4 rounded-xl border p-4">

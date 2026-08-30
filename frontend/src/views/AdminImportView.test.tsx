@@ -248,4 +248,19 @@ describe("AdminImportView", () => {
     // then
     expect(await screen.findByTestId("unsaved-changes")).toBeInTheDocument();
   });
+
+  it("given a source being described for the first time, when another is opened, then it is asked about", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId("new-source"));
+    await userEvent.type(await screen.findByTestId("source-name"), "Club registry");
+
+    // when
+    await userEvent.click(screen.getByTestId("source-choice-source-1"));
+
+    // then
+    expect(await screen.findByTestId("unsaved-changes")).toBeInTheDocument();
+    expect(screen.getByTestId("source-name")).toHaveValue("Club registry");
+  });
 });
