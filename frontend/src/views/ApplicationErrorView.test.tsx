@@ -75,3 +75,23 @@ it("given the page may just be stale, when reloading from the error page, then t
   // then
   expect(reload).toHaveBeenCalled();
 });
+
+it("given the sign-out is refused, when it is attempted from the error page, then nothing claims it ended", async () => {
+  // given
+  server.use(
+    http.get("/api/session", () => HttpResponse.json({
+      authenticated: true, roles: [], passwordChangeRequired: false
+    })),
+    http.post("/api/session/logout", () => HttpResponse.json({
+      type: "urn:courtside:error:csrf-token-missing", title: "Refused", status: 403
+    }, { status: 403, headers: { "Content-Type": "application/problem+json" } }))
+  );
+  render(<ApplicationErrorView />);
+
+  // when
+  await userEvent.click(screen.getByTestId("application-error-sign-out"));
+
+  // then
+  await waitFor(() => expect(screen.getAllByRole("alert").length).toBeGreaterThan(1));
+  expect(assign).not.toHaveBeenCalled();
+});
