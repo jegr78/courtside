@@ -20,6 +20,7 @@ import { TextField } from "../components/TextField";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { formString } from "../forms/formString";
 import { useFragmentTarget } from "../navigation/useFragmentTarget";
+import { useUnsavedMark } from "../unsaved/registry";
 import { brandContrast } from "../brandColor";
 
 const RULE_SET_NAME_LENGTH = 60;
@@ -63,6 +64,15 @@ function BrandColorField({ kind, label, value, changed }: {
 }
 
 // Named field by field so a request-only shape cannot pick up what the response adds to it.
+// Changed means it differs from what the server last confirmed, so taking an edit back by hand
+// leaves nothing to save and nothing to ask about. Field by field rather than serialised, because
+// a serialisation reads a reordered but equal pair as changed.
+function holdsUnsaved(edited?: ClubConfigRequest, saved?: ClubConfigRequest): boolean {
+  if (edited === undefined || saved === undefined) return false;
+  const fields = new Set([...Object.keys(edited), ...Object.keys(saved)]) as Set<keyof ClubConfigRequest>;
+  return [...fields].some((field) => edited[field] !== saved[field]);
+}
+
 function editable(loaded: AdminClubConfig): ClubConfigRequest {
   return {
     clubName: loaded.clubName,
@@ -89,6 +99,7 @@ function timeZones(current: string): string[] {
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const [config, setConfig] = useState<ClubConfigRequest>();
+  const [saved, setSaved] = useState<ClubConfigRequest>();
   const [logo, setLogo] = useState<{ url?: string | null; uploaded: boolean }>();
   const [logoFile, setLogoFile] = useState<File>();
   const [configurationPending, setConfigurationPending] = useState(false);
@@ -106,6 +117,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   useFragmentTarget("slot-minutes", config !== undefined);
+  useUnsavedMark("club-configuration", holdsUnsaved(config, saved) || logoFile !== undefined);
 
   useEffect(() => {
     let active = true;
@@ -113,6 +125,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       .then(([loadedConfig, loadedRuleSets, loadedRuleTypes, loadedMembershipTypes]) => {
         if (!active) return;
         setConfig((current) => current ?? editable(loadedConfig));
+        setSaved((current) => current ?? editable(loadedConfig));
         setLogo((current) => current ?? { url: loadedConfig.logoUrl, uploaded: loadedConfig.logoUploaded });
         setSupported(loadedConfig.supportedLocales);
         setRuleSets(loadedRuleSets);
@@ -235,8 +248,10 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     setLogoFile(selected);
   }
 
-  function applyLogoConfiguration(changed: AdminClubConfig) {
-    setConfig(editable(changed));
+  function applyConfiguration(changed: AdminClubConfig) {
+    const written = editable(changed);
+    setConfig(written);
+    setSaved(written);
     setLogo({ url: changed.logoUrl, uploaded: changed.logoUploaded });
     configurationChanged(changed);
   }
@@ -248,7 +263,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     setSuccess(undefined);
     try {
       const changed = await api.uploadClubLogo(logoFile);
-      applyLogoConfiguration(changed);
+      applyConfiguration(changed);
       setLogoFile(undefined);
       if (logoInput.current) logoInput.current.value = "";
       setSuccess(t("admin.config.logoUploaded"));
@@ -266,7 +281,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     setSuccess(undefined);
     try {
       const changed = await api.deleteClubLogo();
-      applyLogoConfiguration(changed);
+      applyConfiguration(changed);
       setSuccess(t("admin.config.logoRemoved"));
     } catch (failure) {
       setError(problemMessage(failure, t));
@@ -282,10 +297,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     setError(undefined);
     setSuccess(undefined);
     try {
-      const changed = await api.changeAdminConfig(config);
-      setConfig(editable(changed));
-      setLogo({ url: changed.logoUrl, uploaded: changed.logoUploaded });
-      configurationChanged(changed);
+      applyConfiguration(await api.changeAdminConfig(config));
       setSuccess(t("admin.config.saved"));
     } catch (failure) {
       setError(problemMessage(failure, t));
