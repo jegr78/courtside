@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
-  classifyProtectedChanges, collectLocalChanges, executeLocalCheck, localCheckPlan, localVerificationPlans
+  classifyProtectedChanges, collectLocalChanges, executeLocalCheck, localVerificationPlans, planTasks
 } from "./local-check.mjs";
+import { classifyChanges } from "./test-profile-classifier.mjs";
+
+test("when loading the production runner, then no changed-worktree classifier executes eagerly", () => {
+  // when
+  const source = readFileSync(new URL("./local-check.mjs", import.meta.url), "utf8");
+
+  // then
+  assert.doesNotMatch(source, /from\s+["']\.\/test-profile-classifier\.mjs["']/);
+});
 
 test("given documentation changes, when planning the local check, then no code suite is required", () => {
   // given
@@ -301,4 +311,8 @@ function backendPlan() {
   return localCheckPlan([
     { status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }
   ]);
+}
+
+function localCheckPlan(changes, { forceFull = false } = {}) {
+  return planTasks(classifyChanges(changes, forceFull ? ["ci:full"] : []));
 }

@@ -4,7 +4,6 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { classifyChanges } from "./test-profile-classifier.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const resultFile = join(repository, "build", "local-check", "result.json");
@@ -51,12 +50,7 @@ const fullTask = {
   arguments: ["clean", "verify"]
 };
 
-export function localCheckPlan(changes, { forceFull = false } = {}) {
-  const classified = classifyChanges(changes, forceFull ? ["ci:full"] : []);
-  return planTasks(classified);
-}
-
-function planTasks(classified) {
+export function planTasks(classified) {
   const tasks = classified.profiles.includes("full")
     ? [fullTask]
     : [
