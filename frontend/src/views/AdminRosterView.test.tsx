@@ -1,9 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes, useLocation } from "react-router-dom";
 import { api, type MembershipType, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
+import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
+import { UnsavedChangesGuard } from "../unsaved/UnsavedChangesGuard";
 import { AdminRosterView } from "./AdminRosterView";
 
 const withAccount: RosterEntry = {
@@ -46,7 +48,7 @@ describe("AdminRosterView", () => {
   });
 
   it("given people with and without an account, when the view loads, then the list says which is which", async () => {
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
 
     expect(await screen.findByTestId("roster-row-person-1")).toBeInTheDocument();
     expect(within(row("person-1")).getByTestId("roster-account-person-1")).toHaveTextContent("Active");
@@ -58,7 +60,7 @@ describe("AdminRosterView", () => {
     vi.spyOn(api, "roster").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
@@ -67,7 +69,7 @@ describe("AdminRosterView", () => {
   });
 
   it("given a person in the list, when reading their row, then their name links to their page", async () => {
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
 
     expect(await screen.findByTestId("person-link-person-1"))
       .toHaveAttribute("href", "/admin/roster/person-1");
@@ -78,7 +80,7 @@ describe("AdminRosterView", () => {
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, departed], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("roster-membership-person-1")).toHaveTextContent("Adults");
@@ -89,7 +91,7 @@ describe("AdminRosterView", () => {
 
   it("given a membership type is chosen, when filtering, then the list asks the server for that type", async () => {
     // given
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     await userEvent.selectOptions(await screen.findByTestId("roster-filter"), "type-1");
@@ -100,7 +102,7 @@ describe("AdminRosterView", () => {
 
   it("given a name to look for, when searching, then the roster is read again for that name", async () => {
     // given
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
 
     // when
@@ -116,7 +118,7 @@ describe("AdminRosterView", () => {
     vi.spyOn(api, "roster")
       .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" })
       .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null });
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
 
     // when
@@ -133,7 +135,7 @@ describe("AdminRosterView", () => {
       .mockResolvedValueOnce({ entries: [withAccount, withoutAccount], nextCursor: null })
       .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" })
       .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null });
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
     await userEvent.type(screen.getByTestId("roster-search"), "Doe");
     await userEvent.click(screen.getByTestId("roster-search-submit"));
@@ -153,12 +155,12 @@ describe("AdminRosterView", () => {
       accountId: null, username: null, enabled: false, roles: []
     };
     vi.spyOn(api, "createPerson").mockResolvedValue(created);
-    render(<MemoryRouter initialEntries={["/admin/roster"]}>
+    render(<MemoryRouter initialEntries={["/admin/roster"]}><UnsavedChangesProvider>
       <Routes>
         <Route path="/admin/roster" element={<AdminRosterView />} />
         <Route path="/admin/roster/:personId" element={<OpenedPerson />} />
       </Routes>
-    </MemoryRouter>);
+    </UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
 
     // when
@@ -174,6 +176,55 @@ describe("AdminRosterView", () => {
     expect(await screen.findByTestId("opened-person")).toHaveAttribute("data-created", "true");
   });
 
+  function rosterRouter() {
+    return createMemoryRouter([{
+      path: "*",
+      element: <UnsavedChangesProvider>
+        <UnsavedChangesGuard />
+        <Routes>
+          <Route path="/admin/roster" element={<AdminRosterView />} />
+          <Route path="/admin/roster/:personId" element={<p data-testid="opened-person">opened</p>} />
+        </Routes>
+      </UnsavedChangesProvider>
+    }], { initialEntries: ["/admin/roster"] });
+  }
+
+  it("given the create form is filled in, when the person is created, then their page opens without a question", async () => {
+    // given
+    vi.spyOn(api, "createPerson").mockResolvedValue({
+      personId: "person-9", firstName: "Mary", lastName: "Major", email: null,
+      accountId: null, username: null, enabled: false, roles: []
+    });
+    render(<RouterProvider router={rosterRouter()} />);
+    await screen.findByTestId("roster-row-person-1");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-person-first-name"), "Mary");
+    await userEvent.type(screen.getByTestId("new-person-last-name"), "Major");
+    await userEvent.click(screen.getByTestId("create-person"));
+
+    // then
+    expect(await screen.findByTestId("opened-person")).toBeInTheDocument();
+    expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
+  });
+
+  it("given creating the person failed, when leaving the roster, then the filled form is still asked about", async () => {
+    // given
+    vi.spyOn(api, "createPerson").mockRejectedValue(new Error("unavailable"));
+    render(<RouterProvider router={rosterRouter()} />);
+    await screen.findByTestId("roster-row-person-1");
+    await userEvent.type(screen.getByTestId("new-person-first-name"), "Mary");
+    await userEvent.click(screen.getByTestId("create-person"));
+    await screen.findByRole("alert");
+
+    // when
+    await userEvent.click(screen.getByTestId("person-link-person-1"));
+
+    // then
+    expect(await screen.findByTestId("unsaved-changes")).toBeInTheDocument();
+    expect(screen.queryByTestId("opened-person")).not.toBeInTheDocument();
+  });
+
   it("given a club with no address for somebody, when adding them, then no empty address is sent", async () => {
     // given
     const created: RosterEntry = {
@@ -181,12 +232,12 @@ describe("AdminRosterView", () => {
       accountId: null, username: null, enabled: false, roles: []
     };
     vi.spyOn(api, "createPerson").mockResolvedValue(created);
-    render(<MemoryRouter initialEntries={["/admin/roster"]}>
+    render(<MemoryRouter initialEntries={["/admin/roster"]}><UnsavedChangesProvider>
       <Routes>
         <Route path="/admin/roster" element={<AdminRosterView />} />
         <Route path="/admin/roster/:personId" element={<div data-testid="opened-person">opened</div>} />
       </Routes>
-    </MemoryRouter>);
+    </UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
 
     // when
@@ -205,7 +256,7 @@ describe("AdminRosterView", () => {
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminRosterView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("roster-empty")).toHaveTextContent(

@@ -1,9 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api } from "../api/client";
 import i18n from "../i18n";
+import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
+import { UnsavedCount } from "../test/UnsavedCount";
 import { AdminFacilityView } from "./AdminFacilityView";
 
 describe("AdminFacilityView", () => {
@@ -33,9 +35,117 @@ describe("AdminFacilityView", () => {
     });
   });
 
+  it("given a court is renamed, when the row is read, then it says so beside a save that stays usable", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
+    const name = await screen.findByTestId("court-name-court-1");
+    expect(screen.queryByTestId("unsaved-mark-court:court-1")).not.toBeInTheDocument();
+
+    // when
+    await userEvent.type(name, "!");
+
+    // then
+    expect(await screen.findByTestId("unsaved-mark-court:court-1")).toHaveTextContent("Not saved yet");
+    expect(screen.getByTestId("save-court-court-1")).toBeEnabled();
+  });
+
+  it("given every kind of row is edited, when they are counted, then each one is asked about on its own", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminFacilityView />
+    </UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("court-name-court-1");
+
+    // when
+    await userEvent.type(screen.getByTestId("hours-open-MONDAY"), "09:00");
+    await userEvent.type(screen.getByTestId("card-label-card-1"), "!");
+    await userEvent.type(screen.getByTestId("participant-card-label-filler-1"), "!");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("3"));
+  });
+
+  it("given the participant card form is filled in, when it is read, then it holds work", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminFacilityView />
+    </UnsavedChangesProvider></MemoryRouter>);
+
+    // when
+    await userEvent.type(await screen.findByTestId("new-participant-card-label"), "Ball machine");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+  });
+
+  it("given a create form is filled in, when the entry is cleared again, then nothing is left to lose", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminFacilityView />
+    </UnsavedChangesProvider></MemoryRouter>);
+    const label = await screen.findByTestId("new-card-label");
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+
+    // when
+    await userEvent.type(label, "League match");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+    // when
+    await userEvent.clear(label);
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given a filled create form, when the court is created, then nothing is left to lose", async () => {
+    // given
+    vi.spyOn(api, "createAdminCourt").mockResolvedValue({ id: "court-2", number: 2, name: "Court 2", active: true });
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminFacilityView />
+    </UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.type(await screen.findByTestId("new-court-number"), "2");
+    await userEvent.type(screen.getByTestId("new-court-name"), "Court 2");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+    // when
+    await userEvent.click(screen.getByTestId("create-court"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given a court is renamed, when the name is typed back, then nothing is left to lose", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminFacilityView />
+    </UnsavedChangesProvider></MemoryRouter>);
+    const name = await screen.findByTestId("court-name-court-1");
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+
+    // when
+    await userEvent.type(name, "!");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+    // when
+    await userEvent.clear(name);
+    await userEvent.type(name, "Centre Court");
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
   it("when the facility loads, then opening hours have a stable navigation target", async () => {
     // when
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     const heading = await screen.findByTestId("opening-hours-heading");
@@ -45,7 +155,7 @@ describe("AdminFacilityView", () => {
 
   it("given the opening-hours fragment, when the asynchronous view loads, then its heading receives focus", async () => {
     // given
-    render(<MemoryRouter initialEntries={["/admin/facility#opening-hours"]}><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/facility#opening-hours"]}><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     const heading = await screen.findByTestId("opening-hours-heading");
@@ -56,7 +166,7 @@ describe("AdminFacilityView", () => {
 
   it("when impact is available, then it is offered as a disclosure", async () => {
     // when
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     const control = await screen.findByTestId("court-impact-court-1");
@@ -69,7 +179,7 @@ describe("AdminFacilityView", () => {
     // given
     const ask = vi.spyOn(api, "courtImpact")
       .mockResolvedValue({ affectedCount: 2, truncated: false, bookings: [] });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     const control = await screen.findByTestId("court-impact-court-1");
     await userEvent.click(control);
     await screen.findByTestId("impact-court-1");
@@ -91,7 +201,7 @@ describe("AdminFacilityView", () => {
         { bookingId: "booking-2", courtIds: ["court-1"], startsAt: "2026-09-02T10:00:00Z", endsAt: "2026-09-02T11:00:00Z" }
       ]
     });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     await userEvent.click(await screen.findByTestId("court-impact-court-1"));
@@ -108,7 +218,7 @@ describe("AdminFacilityView", () => {
     // given
     vi.spyOn(api, "courtImpact")
       .mockResolvedValue({ affectedCount: 0, truncated: false, nextCursor: null, bookings: [] });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     await userEvent.click(await screen.findByTestId("court-impact-court-1"));
@@ -124,7 +234,7 @@ describe("AdminFacilityView", () => {
     vi.spyOn(api, "courtImpact").mockReturnValue(new Promise((resolve) => { answer = resolve; }));
     vi.spyOn(api, "setAdminCourtActive")
       .mockResolvedValue({ id: "court-1", number: 1, name: "Centre Court", active: false });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     await userEvent.click(await screen.findByTestId("court-impact-court-1"));
 
     // when / then
@@ -139,7 +249,7 @@ describe("AdminFacilityView", () => {
       affectedCount: 120, truncated: true, nextCursor: "booking-50",
       bookings: [{ bookingId: "booking-1", courtIds: ["court-1"], startsAt: "2026-09-01T08:00:00Z", endsAt: "2026-09-01T09:00:00Z" }]
     });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     await userEvent.click(await screen.findByTestId("court-impact-court-1"));
@@ -154,7 +264,7 @@ describe("AdminFacilityView", () => {
       affectedCount: 1, truncated: false, nextCursor: null,
       bookings: [{ bookingId: "booking-9", courtIds: ["court-1"], startsAt: "2026-09-01T08:00:00Z", endsAt: "2026-09-01T09:00:00Z" }]
     });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // when
     await userEvent.click(await screen.findByTestId("booking-card-impact-card-1"));
@@ -167,7 +277,7 @@ describe("AdminFacilityView", () => {
     // given
     const asking = vi.spyOn(api, "openingHoursImpact")
       .mockResolvedValue({ affectedCount: 0, truncated: false, nextCursor: null, bookings: [] });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("opening-hours-impact-MONDAY");
 
     // when
@@ -179,7 +289,7 @@ describe("AdminFacilityView", () => {
 
   it("given the club's participant cards, when the view loads, then each is listed with how many it owns", async () => {
     // when
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("participant-card-label-filler-1")).toHaveValue("Ball machine");
@@ -190,7 +300,7 @@ describe("AdminFacilityView", () => {
     // given
     const changing = vi.spyOn(api, "changeParticipantCard")
       .mockResolvedValue({ id: "filler-1", label: "Ball machine", capacity: 2, active: true });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("participant-card-capacity-filler-1");
 
     // when
@@ -206,7 +316,7 @@ describe("AdminFacilityView", () => {
     // given
     const changing = vi.spyOn(api, "changeParticipantCard")
       .mockResolvedValue({ id: "filler-1", label: "Looking for a partner", capacity: null, active: true });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("participant-card-capacity-filler-1");
 
     // when
@@ -221,7 +331,7 @@ describe("AdminFacilityView", () => {
     // given
     const creating = vi.spyOn(api, "createParticipantCard")
       .mockResolvedValue({ id: "filler-2", label: "Looking for a partner", capacity: null, active: true });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("new-participant-card-label");
 
     // when
@@ -237,7 +347,7 @@ describe("AdminFacilityView", () => {
     // given
     const toggling = vi.spyOn(api, "setParticipantCardActive")
       .mockResolvedValue({ id: "filler-1", label: "Ball machine", capacity: 1, active: false });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("toggle-participant-card-filler-1");
 
     // when — clicking again restores it, so by this project's rule it is not confirmed
@@ -249,7 +359,7 @@ describe("AdminFacilityView", () => {
 
   it("given facility data, when the view loads, then courts, hours, and card access are visible", async () => {
     // when
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("court-name-court-1")).toHaveValue("Centre Court");
@@ -267,7 +377,7 @@ describe("AdminFacilityView", () => {
     vi.spyOn(api, "adminCourts").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
@@ -281,7 +391,7 @@ describe("AdminFacilityView", () => {
     const setCourtActive = vi.spyOn(api, "setAdminCourtActive")
       .mockResolvedValueOnce({ id: "court-1", number: 1, name: "Centre Court", active: false })
       .mockResolvedValueOnce({ id: "court-1", number: 1, name: "Centre Court", active: true });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     const user = userEvent.setup();
 
     // when
@@ -297,7 +407,7 @@ describe("AdminFacilityView", () => {
     // given
     const response = deferred<Awaited<ReturnType<typeof api.setAdminCourtActive>>>();
     const setCourtActive = vi.spyOn(api, "setAdminCourtActive").mockReturnValue(response.promise);
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     const user = userEvent.setup();
     const toggle = await screen.findByTestId("toggle-court-court-1");
 
@@ -327,7 +437,7 @@ describe("AdminFacilityView", () => {
     const setHours = vi.spyOn(api, "setAdminOpeningHours").mockResolvedValue({
       dayOfWeek: "MONDAY", opensAt: "09:00:00", closesAt: "21:00:00"
     });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     const user = userEvent.setup();
     await screen.findByTestId("court-name-court-1");
 
@@ -360,7 +470,7 @@ describe("AdminFacilityView", () => {
       managingRoles: ["TRAINER"], allowedPlayerCounts: [2, 4], tracksPlayers: true,
       countsAgainstLimits: true, guestAllowed: true, showGenericOccupancy: true, active: true
     });
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     const user = userEvent.setup();
     await screen.findByTestId("court-name-court-1");
 
@@ -387,7 +497,7 @@ describe("AdminFacilityView", () => {
       managingRoles: ["TRAINER"], allowedPlayerCounts: [], tracksPlayers: false, countsAgainstLimits: false,
       guestAllowed: false, showGenericOccupancy: false, active: true
     };
-    render(<MemoryRouter><AdminFacilityView /></MemoryRouter>);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminFacilityView /></UnsavedChangesProvider></MemoryRouter>);
     const user = userEvent.setup();
     await screen.findByTestId("court-name-court-1");
 
@@ -416,3 +526,4 @@ function deferred<T>() {
   const promise = new Promise<T>((complete) => { resolve = complete; });
   return { promise, resolve };
 }
+
