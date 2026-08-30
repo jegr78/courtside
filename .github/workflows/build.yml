@@ -164,12 +164,16 @@ jobs:
         run: |
           git worktree add --detach "$RUNNER_TEMP/courtside-security-base" "$BASE_REF"
           "$RUNNER_TEMP/courtside-security-base/mvnw" -B \
-            -f "$RUNNER_TEMP/courtside-security-base/pom.xml" frontend:install-node-and-npm
+            -f "$RUNNER_TEMP/courtside-security-base/pom.xml" \
+            com.github.eirslett:frontend-maven-plugin:install-node-and-npm
       - name: Install protected-base assessment dependencies
         working-directory: ${{ runner.temp }}/courtside-security-base/frontend
         run: ./node/node ./node/node_modules/npm/bin/npm-cli.js ci --ignore-scripts
       - name: Install candidate assessment dependencies
-        run: ./mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci
+        run: >
+          ./mvnw -B
+          com.github.eirslett:frontend-maven-plugin:install-node-and-npm
+          com.github.eirslett:frontend-maven-plugin:npm@npm-ci
       - name: Build and qualify the target both runs assess
         run: |
           frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
@@ -323,7 +327,10 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - name: Install frontend toolchain
-        run: ./mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci
+        run: >
+          ./mvnw -B
+          com.github.eirslett:frontend-maven-plugin:install-node-and-npm
+          com.github.eirslett:frontend-maven-plugin:npm@npm-ci
       - name: Verify frontend
         working-directory: frontend
         run: |
@@ -386,7 +393,10 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - name: Install security toolchain
-        run: ./mvnw -B frontend:install-node-and-npm frontend:npm@npm-ci
+        run: >
+          ./mvnw -B
+          com.github.eirslett:frontend-maven-plugin:install-node-and-npm
+          com.github.eirslett:frontend-maven-plugin:npm@npm-ci
       - name: Build security candidate
         run: ./mvnw -B clean package -DskipTests -Pjava-only
       - name: Compare security contracts and tool versions
@@ -564,15 +574,11 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - if: github.event_name == 'pull_request' && (needs.test-profile-plan.outputs.backend == 'true' || needs.test-profile-plan.outputs.frontend == 'true')
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c
-        with:
-          java-version: '25'
-          distribution: 'temurin'
-          cache: maven
       - name: Install coverage toolchain
         if: github.event_name == 'pull_request' && (needs.test-profile-plan.outputs.backend == 'true' || needs.test-profile-plan.outputs.frontend == 'true')
-        run: ./mvnw -B frontend:install-node-and-npm
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '26'
       - if: github.event_name == 'pull_request' && needs.test-profile-plan.outputs.backend == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -597,7 +603,7 @@ jobs:
           if [[ "$FRONTEND_SELECTED" = true ]]; then
             arguments+=(--frontend build/aggregate/frontend/coverage/lcov.info)
           fi
-          frontend/node/node tools/coverage-diff.mjs "${arguments[@]}"
+          node tools/coverage-diff.mjs "${arguments[@]}"
       - name: Upload combined test evidence
         if: github.event_name == 'pull_request' && (needs.test-profile-plan.outputs.backend == 'true' || needs.test-profile-plan.outputs.frontend == 'true')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
