@@ -1,6 +1,7 @@
 package org.courtside.booking;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.persistence.EntityManager;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingAccessControl;
 import org.courtside.booking.internal.BookingRuleGate;
@@ -45,6 +46,7 @@ class BookingWriter {
     private static final String IDEMPOTENCY_CONSTRAINT = "booking_idempotency_by_account";
 
     private final BookingRepository bookings;
+    private final EntityManager entityManager;
     private final Clock clock;
     private final BookingRuleGate ruleGate;
     private final BookingAccessControl accessControl;
@@ -107,7 +109,10 @@ class BookingWriter {
     }
 
     void cancel(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {
-        Booking booking = bookings.findWithAllocationsForUpdate(bookingId)
+        bookings.lockById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+        entityManager.clear();
+        Booking booking = bookings.findWithAllocationsById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         accessControl.requireManagementAccess(booking, cancelledBy, cancellerRoles);
         booking.cancel(cancelledBy, clock.instant());

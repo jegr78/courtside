@@ -1,9 +1,7 @@
 package org.courtside.booking;
 
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,10 +20,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @EntityGraph(attributePaths = "allocations")
     Optional<Booking> findWithAllocationsById(UUID id);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "allocations")
-    @Query("SELECT b FROM Booking b WHERE b.id = :id")
-    Optional<Booking> findWithAllocationsForUpdate(@Param("id") UUID id);
+    @Query(value = "SELECT id FROM booking WHERE id = :id FOR UPDATE", nativeQuery = true)
+    Optional<UUID> lockById(@Param("id") UUID id);
 
     @EntityGraph(attributePaths = "participants")
     Optional<Booking> findWithParticipantsById(UUID id);
