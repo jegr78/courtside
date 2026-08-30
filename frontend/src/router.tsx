@@ -1,8 +1,15 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { App } from "./App";
+import { ApplicationErrorView } from "./views/ApplicationErrorView";
 
 // The application keeps its own route tree behind one splat route: what a data router adds here is
 // navigation blocking, which react-router refuses to provide under BrowserRouter.
+export const appRoute: RouteObject = {
+  path: "*",
+  element: <App />,
+  errorElement: <ApplicationErrorView />
+};
+
 export function createAppRouter() {
-  return createBrowserRouter([{ path: "*", element: <App /> }]);
+  return createBrowserRouter([appRoute]);
 }
