@@ -10,6 +10,8 @@ import { ExternalReferencePanel } from "./import/ExternalReferencePanel";
 import { ImportExecutionPanel } from "./import/ImportExecutionPanel";
 import { ImportPreviewPanel } from "./import/ImportPreviewPanel";
 import { ImportSourceForm } from "./import/ImportSourceForm";
+import { useUnsavedChanges } from "../unsaved/registry";
+import { UnsavedChangesQuestion } from "../unsaved/UnsavedChangesQuestion";
 
 type Editing = { source: ImportSource } | { source: undefined } | undefined;
 
@@ -24,6 +26,24 @@ export function AdminImportView() {
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
+  const [pendingChoice, setPendingChoice] = useState<{ next: Editing }>();
+  const { holds } = useUnsavedChanges();
+
+  function heldHere(): string[] {
+    if (!editing) return [];
+    return [`import-source:${editing.source?.id ?? "new"}`, "import-reference:new"].filter(holds);
+  }
+
+  function openSource(next: Editing) {
+    setEditing(next);
+    setPreview(undefined);
+  }
+
+  // Opening another source rebuilds the form from that source, which is how this surface leaves an
+  // editor: the description on screen would be gone with nothing asked.
+  function askBeforeOpening(next: Editing) {
+    if (heldHere().length > 0) setPendingChoice({ next }); else openSource(next);
+  }
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
@@ -95,15 +115,21 @@ export function AdminImportView() {
         ? <p data-testid="no-sources">{t("admin.import.noSources")}</p>
         : <ul className="grid gap-2">
           {sources.map((source) => <li key={source.id}>
-            <Button variant="secondary" data-testid={`source-choice-${source.id}`} disabled={pending} type="button" onClick={() => { setEditing({ source }); setPreview(undefined); }}>
+            <Button variant="secondary" data-testid={`source-choice-${source.id}`} disabled={pending} type="button" onClick={() => askBeforeOpening({ source })}>
               {source.displayName}
             </Button>
           </li>)}
         </ul>}
-      <Button variant="primary" data-testid="new-source" disabled={pending} className="justify-self-start" type="button" onClick={() => setEditing({ source: undefined })}>
+      <Button variant="primary" data-testid="new-source" disabled={pending} className="justify-self-start" type="button" onClick={() => askBeforeOpening({ source: undefined })}>
         {t("admin.import.newSource")}
       </Button>
     </div>}
+
+    {pendingChoice && <UnsavedChangesQuestion
+      count={heldHere().length}
+      stay={() => setPendingChoice(undefined)}
+      discard={() => { openSource(pendingChoice.next); setPendingChoice(undefined); }}
+    />}
 
     {editing && <ImportSourceForm
       key={chosen?.id ?? "new"}

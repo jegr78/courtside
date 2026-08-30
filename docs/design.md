@@ -137,9 +137,10 @@ list, reading what it would change, and running it. The column
 mapping is offered from the club's own export, read in the browser and never uploaded for that
 purpose. Before a court, a booking card or a day goes out of service, the facility view says which
 bookings sit on it — information beside the control, never a gate in front of it. No administrative
-surface loses work by accident: an edited row and a half-filled creation form each count as
-something to lose, and leaving the page — inside the application or by closing the tab — asks
-first. What a board still
+surface loses work by accident: an edited row, a described import source and a half-filled creation
+form each count as something to lose, and leaving asks first — the page, whether inside the
+application or by closing the tab, and equally the editor on it when another rule set or another
+import source is opened in its place. What a board still
 cannot reach from a browser is listed with the endpoints that have no surface, in
 `tools/surfaceless-endpoints.json`; every entry left in it now names a
 decision rather than a gap.

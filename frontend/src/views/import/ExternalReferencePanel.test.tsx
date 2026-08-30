@@ -1,8 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type ExternalReference, type RosterEntry } from "../../api/client";
 import i18n from "../../i18n";
+import { UnsavedCount } from "../../test/UnsavedCount";
+import { UnsavedChangesProvider } from "../../unsaved/UnsavedChangesProvider";
 import { ExternalReferencePanel } from "./ExternalReferencePanel";
 
 const jane: RosterEntry = {
@@ -16,7 +18,10 @@ const linked: ExternalReference = {
 };
 
 function show(reportError = vi.fn()) {
-  render(<ExternalReferencePanel sourceId="source-1" disabled={false} reportError={reportError} />);
+  render(<UnsavedChangesProvider>
+    <UnsavedCount />
+    <ExternalReferencePanel sourceId="source-1" disabled={false} reportError={reportError} />
+  </UnsavedChangesProvider>);
 }
 
 describe("ExternalReferencePanel", () => {
@@ -115,4 +120,24 @@ describe("ExternalReferencePanel", () => {
     // then
     await vi.waitFor(() => expect(reportError).toHaveBeenCalled());
   });
+});
+
+it("given a member number typed for a link, when it is cleared again, then nothing is left to lose", async () => {
+  // given
+  vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+  show();
+  const number = await screen.findByTestId("reference-external-id");
+  expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+
+  // when
+  await userEvent.type(number, "4711");
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+  // when
+  await userEvent.clear(number);
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
 });

@@ -4,6 +4,9 @@ import { api, type CanonicalField, type ImportSource, type ImportSourceRequest, 
 import { EncodingUnreadableHereError, NotUtf8Error, readCsvColumn, readCsvHeader, suggestSeparator } from "../../import/read-csv";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
+import { differs } from "../../unsaved/differs";
+import { describedByMark } from "../../unsaved/markId";
+import { UnsavedMark } from "../../unsaved/UnsavedMark";
 
 const FIELDS: CanonicalField[] = [
   "EXTERNAL_ID", "FIRST_NAME", "LAST_NAME", "EMAIL", "MEMBERSHIP_TYPE"
@@ -19,6 +22,22 @@ function mappingOf(source: ImportSource | undefined): Mapping {
   const mapping: Mapping = {};
   Object.entries(source?.columns ?? {}).forEach(([column, field]) => { mapping[field] = column; });
   return mapping;
+}
+
+// What the server last confirmed, in the shape the form would send, so the two are comparable at
+// all. A source nobody has saved yet is compared against the empty form it started as.
+function described(source: ImportSource | undefined): ImportSourceRequest {
+  return {
+    sourceKey: source?.sourceKey ?? "",
+    displayName: source?.displayName ?? "",
+    separator: source?.separator ?? ",",
+    encoding: source?.encoding ?? "UTF-8",
+    columns: source?.columns ?? {},
+    membershipTypes: source?.membershipTypes ?? {},
+    defaultMembershipTypeId: source?.defaultMembershipTypeId ?? "",
+    ownedFields: OWNABLE.filter((field) => (source?.ownedFields ?? []).includes(field)),
+    removalWarningPercent: source?.removalWarningPercent ?? 10
+  };
 }
 
 function columnsOf(mapping: Mapping): Record<string, CanonicalField> {
@@ -113,8 +132,8 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     setReadValues(chosen && column ? await readCsvColumn(chosen, column, encoding, separator) : []);
   }
 
-  function submit() {
-    void save({
+  function requested(): ImportSourceRequest {
+    return {
       sourceKey,
       displayName,
       separator,
@@ -123,10 +142,19 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       membershipTypes: Object.fromEntries(
         Object.entries(categories).filter(([, typeId]) => typeId)),
       defaultMembershipTypeId: defaultType,
-      ownedFields: owned,
+      // In the canonical order rather than the order they were ticked, so a field taken back and
+      // given again leaves the same request rather than a reordered one.
+      ownedFields: OWNABLE.filter((field) => owned.includes(field)),
       removalWarningPercent: Number(threshold)
-    });
+    };
   }
+
+  function submit() {
+    void save(requested());
+  }
+
+  const mark = `import-source:${source?.id ?? "new"}`;
+  const unsaved = differs(requested(), described(source));
 
   // The column choices come from the club's own file, which is why it is read here and never sent.
   return <section className="surface-subtle grid gap-4 rounded-xl border p-4">
@@ -201,6 +229,9 @@ export function ImportSourceForm({ source, types, disabled, save }: {
 
     <TextField data-testid="source-threshold" disabled={disabled} type="number" min={0} max={100} label={t("admin.import.removalWarning")} value={threshold} onChange={(event) => setThreshold(event.target.value)} />
 
-    <Button variant="primary" data-testid="save-source" disabled={disabled} className="justify-self-start" type="button" onClick={submit}>{t("admin.save")}</Button>
+    <div className="flex flex-wrap items-center gap-3">
+      <Button variant="primary" data-testid="save-source" aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button" onClick={submit}>{t("admin.save")}</Button>
+      <UnsavedMark id={mark} unsaved={unsaved} />
+    </div>
   </section>;
 }
