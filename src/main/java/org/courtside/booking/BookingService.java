@@ -1,6 +1,8 @@
 package org.courtside.booking;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import org.courtside.booking.internal.BookingAccessControl;
+import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.IdempotencyKeyRaceException;
 import org.courtside.booking.internal.IdempotencyKeyReusedException;
@@ -32,6 +34,7 @@ public class BookingService {
     private final CourtAllocationRepository allocations;
     private final BookingRepository bookings;
     private final BookingRequestFingerprint fingerprints;
+    private final BookingAccessControl accessControl;
     private final MeterRegistry meters;
 
     public UUID create(CreateBookingCommand command) {
@@ -105,6 +108,9 @@ public class BookingService {
     }
 
     public void cancel(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {
+        Booking visibleBooking = bookings.findWithAllocationsById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+        accessControl.requireManagementAccess(visibleBooking, cancelledBy, cancellerRoles);
         writer.cancel(bookingId, cancelledBy, cancellerRoles);
     }
 
