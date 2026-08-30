@@ -185,6 +185,40 @@ class BookingServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAlreadyCancelledBooking_whenCancelledAgain_thenOriginalAuditValuesRemain() {
+        // given
+        UUID originalActor = UUID.randomUUID();
+        Booking booking = new Booking(MEMBER_BOOKING_CARD, someUser, null, SIX_PM);
+        booking.allocate(courtId, new TimeSlot(SIX_PM, SEVEN_PM));
+        booking.cancel(originalActor, SEVEN_PM);
+
+        // when
+        booking.cancel(UUID.randomUUID(), EIGHT_PM);
+
+        // then
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(booking.getCancelledBy()).isEqualTo(originalActor);
+        assertThat(booking.getCancelledAt()).isEqualTo(SEVEN_PM);
+        assertThat(booking.getAllocations()).singleElement()
+                .extracting(CourtAllocation::getStatus)
+                .isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    @Test
+    void givenAnAlreadyCancelledBooking_whenAnUnrelatedMemberCancels_thenItStillReadsAsNotFound() {
+        // given
+        UUID bookingId = bookingService.create(command(SIX_PM, SEVEN_PM));
+        bookingService.cancel(bookingId, someUser, Set.of(Role.MEMBER));
+
+        // when / then
+        assertThatThrownBy(() -> bookingService.cancel(
+                bookingId, UUID.randomUUID(), Set.of(Role.MEMBER)))
+                .isInstanceOf(BookingNotFoundException.class)
+                .hasMessageContaining("may not manage");
+        assertThat(bookings.findById(bookingId).orElseThrow().getCancelledBy()).isEqualTo(someUser);
+    }
+
+    @Test
     void givenALeagueMatchCreatedByASportDirector_whenAYouthDirectorCancels_thenTheActorIsRecorded() {
         // given
         UUID sportDirector = UUID.randomUUID();

@@ -20,6 +20,9 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @EntityGraph(attributePaths = "allocations")
     Optional<Booking> findWithAllocationsById(UUID id);
 
+    @Query(value = "SELECT id FROM booking WHERE id = :id FOR UPDATE", nativeQuery = true)
+    Optional<UUID> lockById(@Param("id") UUID id);
+
     @EntityGraph(attributePaths = "participants")
     Optional<Booking> findWithParticipantsById(UUID id);
 

@@ -120,6 +120,49 @@ class BookingConcurrencyTest extends AbstractIntegrationTest {
         assertThat(bookings.count()).isEqualTo(1);
     }
 
+    @Test
+    void givenTwoConcurrentCancellations_whenTheSecondWaits_thenTheFirstActorRemainsRecorded()
+            throws Exception {
+        // given
+        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookingId = bookingService.create(new CreateBookingCommand(
+                List.of(courtId), MEMBER_BOOKING_CARD,
+                new TimeSlot(SIX_PM, SEVEN_PM), UUID.randomUUID(), bookerPersonId,
+                Set.of(Role.MEMBER), null,
+                List.of(ParticipantSpec.guest("Partner")), null));
+        UUID firstActor = UUID.randomUUID();
+        UUID secondActor = UUID.randomUUID();
+        CountDownLatch firstCancellationIsInPlace = new CountDownLatch(1);
+
+        Callable<Void> holdTheFirstCancellationUncommitted = () -> {
+            new TransactionTemplate(transactions).executeWithoutResult(status -> {
+                bookingService.cancel(bookingId, firstActor, Set.of(Role.ADMIN));
+                firstCancellationIsInPlace.countDown();
+                awaitASessionBlockedOnALock();
+            });
+            return null;
+        };
+        Callable<Void> contendWithASecondCancellation = () -> {
+            await(firstCancellationIsInPlace);
+            bookingService.cancel(bookingId, secondActor, Set.of(Role.ADMIN));
+            return null;
+        };
+
+        // when
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            List<Future<Void>> futures = List.of(
+                    pool.submit(holdTheFirstCancellationUncommitted),
+                    pool.submit(contendWithASecondCancellation));
+            PostgresDiagnostics.await(
+                    futures.get(0), Duration.ofSeconds(20), jdbc, "First cancellation");
+            PostgresDiagnostics.await(
+                    futures.get(1), Duration.ofSeconds(20), jdbc, "Competing cancellation");
+        }
+
+        // then
+        assertThat(bookings.findById(bookingId).orElseThrow().getCancelledBy()).isEqualTo(firstActor);
+    }
+
     private void book(UUID bookerPersonId) {
         bookingService.create(new CreateBookingCommand(
                 List.of(courtId), MEMBER_BOOKING_CARD,
