@@ -1,5 +1,8 @@
 package org.courtside;
 
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -9,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
@@ -84,17 +86,18 @@ class DeploymentImageParityTest {
 
     // What the repository holds, not what the working tree happens to contain: a local scratch file
     // is nobody's second copy, and a walk that counts it fails here while CI stays green.
-    private static List<Path> sources() throws IOException, InterruptedException {
-        Process listing = new ProcessBuilder("git", "ls-files", "-z").start();
-        String tracked = new String(listing.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        if (listing.waitFor() != 0) {
-            throw new IllegalStateException("git ls-files failed, so the tracked files are unknown");
+    private static List<Path> sources() throws IOException {
+        try (Repository repository = new FileRepositoryBuilder().findGitDir().build()) {
+            DirCache index = repository.readDirCache();
+            List<Path> tracked = new ArrayList<>(index.getEntryCount());
+            for (int entry = 0; entry < index.getEntryCount(); entry++) {
+                Path path = Path.of(index.getEntry(entry).getPathString());
+                if (Files.isRegularFile(path)) {
+                    tracked.add(path);
+                }
+            }
+            return List.copyOf(tracked);
         }
-        return Arrays.stream(tracked.split("\0"))
-                .filter(entry -> !entry.isEmpty())
-                .map(Path::of)
-                .filter(Files::isRegularFile)
-                .toList();
     }
 
     private static List<String> references(Path file, String image) throws IOException {
