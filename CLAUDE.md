@@ -122,8 +122,11 @@ fails on the missing `BuildProperties` bean.
   * Without preconditions: `whenAction_thenResult()` is allowed
   * For exception tests: combine as `// when / then` around `assertThatThrownBy`
 * **Sequence:** unit tests → implementation → integration tests → E2E.
-* **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. One full `./mvnw clean verify`
-  before any commit that closes a task.
+* **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. Before the final push, run
+  `node tools/courtside.mjs check`; it uses the protected test-profile contract against
+  `origin/main` and includes committed, staged, unstaged and untracked changes. A `full`
+  classification runs `./mvnw clean verify`. Unknown, structural or untrusted change evidence
+  fails closed to `full`; `--full` may escalate but never reduce the selected verification.
 * **Cross-module test setup uses test fixtures.** A module exposes intent-revealing fixture
   operations from `src/test/java/org/courtside/<module>/testfixture`, and consuming integration
   tests register the required fixture explicitly with `@Import`. Fixtures return identifiers or

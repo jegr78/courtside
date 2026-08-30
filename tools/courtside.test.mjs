@@ -249,6 +249,20 @@ test("given build and verify, when planning commands, then Maven remains the bui
     ["clean", "verify"]);
 });
 
+test("given a local check, when parsing its options, then planning and escalation remain explicit", () => {
+  // when
+  const normal = parseArguments(["check"]);
+  const planned = parseArguments(["check", "--plan"]);
+  const full = parseArguments(["check", "--full"]);
+
+  // then
+  assert.equal(normal.planOnly, false);
+  assert.equal(normal.forceFull, false);
+  assert.equal(planned.planOnly, true);
+  assert.equal(full.forceFull, true);
+  assert.throws(() => parseArguments(["check", "--skip-verify"]), /Unknown option/);
+});
+
 test("given an unsupported argument, when parsing it, then it is rejected", () => {
   // when / then
   assert.throws(() => parseArguments(["dev", "--force"]), /Unknown option/);

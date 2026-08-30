@@ -25,6 +25,9 @@ $env:JAVA_HOME = "C:\path\to\temurin-25"
 |---|---|
 | `node tools/courtside.mjs build` | Builds the application and frontend without running tests. |
 | `node tools/courtside.mjs verify` | Runs the complete Maven, frontend, integration, and E2E quality gate. |
+| `node tools/courtside.mjs check` | Classifies all local changes against `origin/main` and runs the required local quality profile. |
+| `node tools/courtside.mjs check --plan` | Prints and records the selected profile without running its tasks. |
+| `node tools/courtside.mjs check --full` | Escalates any local classification to the complete quality gate. |
 | `node tools/courtside.mjs dev` | Starts the Dev database, API UI, Spring Boot, and Vite. |
 | `node tools/courtside.mjs dev-debug` | Starts Dev and listens for a backend debugger on `127.0.0.1:5005`. |
 | `node tools/courtside.mjs dev-debug --suspend` | Waits for the backend debugger before application startup. |
@@ -54,6 +57,22 @@ entire UAT environment when it finishes.
 The CLI controls Spring profiles deliberately: `dev` and `dev-debug` activate `demo`, UAT runs the
 default application profile, and Maven activates test configuration only inside the automated test
 suite. Do not enable `demo` in UAT or production.
+
+## Pull-request verification
+
+Run `node tools/courtside.mjs check` before the final push. It refreshes `origin/main`, finds the
+merge base, and classifies committed, staged, unstaged and untracked changes with
+`ci/test-profiles.json`, the same contract protected pull-request CI uses. Documentation changes
+need only clean change evidence. Backend changes run the Java profile; frontend changes run lint,
+unit tests, build, audit, application packaging and browser journeys. A mixed change runs both
+profiles. Build, workflow, security, deployment, database, OpenAPI, shared test-infrastructure,
+unknown and structural changes run the complete Maven verification.
+
+The command writes `build/local-check/result.json` with the base and head commits, a content
+fingerprint, selected profiles, reasons, tasks and outcome. It verifies the fingerprint before and
+after execution, so a working-tree change cannot retain a passing result. If `origin/main` cannot
+be refreshed, classification falls back to `full`. `--full` only escalates. It cannot suppress a
+required task.
 
 ## Development
 
