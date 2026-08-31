@@ -17,6 +17,7 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
 }) {
   const { t, i18n } = useTranslation();
   const [theme, updateTheme] = useState<Theme>(initialTheme);
+  const [open, setOpen] = useState(false);
   const [failure, setFailure] = useState<string>();
   const locale = supportedLocale(i18n.resolvedLanguage) ?? i18n.resolvedLanguage ?? "";
 
@@ -39,6 +40,7 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
     setFailure(undefined);
     try {
       await api.logout();
+      setOpen(false);
       signedOut?.();
     } catch (rejected) {
       setFailure(problemMessage(rejected, t));
@@ -52,7 +54,7 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
 
   return <div className="grid justify-items-end gap-2">
     {failure && <Alert testId="preferences-failure">{failure}</Alert>}
-    <details className="relative">
+    <details className="relative" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary data-testid="preferences-menu" className="form-control cursor-pointer list-none rounded-lg border px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
         {t(authenticated ? "preferences.accountMenu" : "preferences.menu")}
       </summary>

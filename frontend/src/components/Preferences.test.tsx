@@ -168,6 +168,35 @@ it("given an administrator deep in an administrative page, when signing out, the
   expect(signedOut).toHaveBeenCalled();
 });
 
+// Left standing, the panel covers the page it was opened over, and the next click on the control
+// that opens it closes it instead.
+it("given the account menu is open, when signing out succeeds, then the menu closes behind it", async () => {
+  // given
+  vi.spyOn(api, "logout").mockResolvedValue();
+  render(<Preferences authenticated signedOut={() => undefined} />);
+  await openPreferences();
+
+  // when
+  await userEvent.click(screen.getByTestId("logout"));
+
+  // then
+  expect(screen.getByTestId("preferences-menu").closest("details")).not.toHaveAttribute("open");
+});
+
+it("given signing out fails, when it is attempted, then the menu stays open with the failure in it", async () => {
+  // given
+  vi.spyOn(api, "logout").mockRejectedValue(new Error("network"));
+  render(<Preferences authenticated signedOut={() => undefined} />);
+  await openPreferences();
+
+  // when
+  await userEvent.click(screen.getByTestId("logout"));
+
+  // then
+  expect(await screen.findByTestId("preferences-failure")).toBeInTheDocument();
+  expect(screen.getByTestId("preferences-menu").closest("details")).toHaveAttribute("open");
+});
+
 it("given signing out fails, when it is attempted, then the failure is shown and the session is kept", async () => {
   // given
   const signedOut = vi.fn();
