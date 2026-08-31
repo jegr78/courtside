@@ -264,7 +264,37 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
   assert.equal(rejectedCli.status, 1);
   assert.equal(rejectedCli.stdout, "");
   assert.doesNotMatch(rejectedCli.stderr, /do-not-retain/);
-  assert.match(rejectedCli.stderr, /observed result contains credential-like material/);
+  assert.equal(rejectedCli.stderr, "Manual assessment evidence is invalid\n");
+  writeFileSync(evidencePath, `password=malformed-do-not-retain`);
+  const malformedCli = spawnSync(
+    process.execPath,
+    [join(import.meta.dirname, "security-manual-assessment.mjs"), evidencePath],
+    { encoding: "utf8" }
+  );
+  assert.equal(malformedCli.status, 1);
+  assert.equal(malformedCli.stdout, "");
+  assert.equal(malformedCli.stderr, "Manual assessment evidence is not valid JSON\n");
+  assert.doesNotMatch(malformedCli.stderr, /malformed-do-not-retain/);
+  writeFileSync(evidencePath, JSON.stringify({ ...evidence, "password=property-do-not-retain": true }));
+  const unknownPropertyCli = spawnSync(
+    process.execPath,
+    [join(import.meta.dirname, "security-manual-assessment.mjs"), evidencePath],
+    { encoding: "utf8" }
+  );
+  assert.equal(unknownPropertyCli.status, 1);
+  assert.equal(unknownPropertyCli.stdout, "");
+  assert.equal(unknownPropertyCli.stderr, "Manual assessment evidence is invalid\n");
+  assert.doesNotMatch(unknownPropertyCli.stderr, /property-do-not-retain/);
+  const missingPath = join(directory, "missing-path-do-not-retain.json");
+  const unreadableCli = spawnSync(
+    process.execPath,
+    [join(import.meta.dirname, "security-manual-assessment.mjs"), missingPath],
+    { encoding: "utf8" }
+  );
+  assert.equal(unreadableCli.status, 1);
+  assert.equal(unreadableCli.stdout, "");
+  assert.equal(unreadableCli.stderr, "Manual assessment evidence could not be read\n");
+  assert.doesNotMatch(unreadableCli.stderr, /missing-path-do-not-retain/);
   const blockedControl = {
     ...control,
     controlId: "v5.0.0-1.1.2",

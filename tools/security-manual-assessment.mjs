@@ -123,12 +123,34 @@ export function validateManualAssessmentEvidence(evidence, assessmentDate = new 
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  try {
-    if (process.argv.length !== 3) throw new Error("Usage: security-manual-assessment.mjs <evidence.json>");
-    validateManualAssessmentEvidence(JSON.parse(readFileSync(process.argv[2], "utf8")));
-    process.stdout.write("Manual assessment evidence is valid\n");
-  } catch (failure) {
-    process.stderr.write(`${failure.message}\n`);
+  if (process.argv.length !== 3) {
+    process.stderr.write("Usage: security-manual-assessment.mjs <evidence.json>\n");
     process.exitCode = 1;
+  } else {
+    let content;
+    try {
+      content = readFileSync(process.argv[2], "utf8");
+    } catch {
+      process.stderr.write("Manual assessment evidence could not be read\n");
+      process.exitCode = 1;
+    }
+    if (content !== undefined) {
+      let evidence;
+      try {
+        evidence = JSON.parse(content);
+      } catch {
+        process.stderr.write("Manual assessment evidence is not valid JSON\n");
+        process.exitCode = 1;
+      }
+      if (evidence !== undefined) {
+        try {
+          validateManualAssessmentEvidence(evidence);
+          process.stdout.write("Manual assessment evidence is valid\n");
+        } catch {
+          process.stderr.write("Manual assessment evidence is invalid\n");
+          process.exitCode = 1;
+        }
+      }
+    }
   }
 }
