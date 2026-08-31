@@ -102,7 +102,8 @@ jobs:
           else
             frontend/node/node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest.json
           fi
-      - name: Validate the baseline pair
+      - id: pair
+        name: Validate the baseline pair
         if: env.PROFILE == 'baseline'
         env:
           IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
@@ -114,7 +115,7 @@ jobs:
           "${{ github.sha }}"
       - id: seal
         name: Seal protected assessment evidence
-        if: always()
+        if: always() && (env.PROFILE != 'baseline' || steps.pair.outcome == 'success')
         run: |
           umask 077
           set -o pipefail

@@ -6,6 +6,10 @@ const completeSafeManifest = {
   status: "incomplete",
   profile: "safe",
   attempt: 1,
+  tools: [
+    { id: "target-identity", version: "1.0.0" },
+    { id: "passive-deployment", version: "1.3.0" }
+  ],
   toolResults: [
     { id: "target-identity", version: "1.0.0", outcome: "passed" },
     { id: "passive-deployment", version: "1.3.0", outcome: "incomplete" }
@@ -34,4 +38,23 @@ test("given the wrong attempt or profile, when continuing a baseline, then the a
 
   // when / then
   assert.throws(() => baselineMayContinue(manifest), /first safe attempt/);
+});
+
+test("given a failed safe assessment, when continuing a baseline, then active traffic is rejected", () => {
+  // given
+  const manifest = structuredClone(completeSafeManifest);
+  manifest.status = "failed";
+  manifest.toolResults[1].outcome = "failed";
+
+  // when / then
+  assert.throws(() => baselineMayContinue(manifest), /safe outcome/);
+});
+
+test("given a changed tool result identity, when continuing a baseline, then active traffic is rejected", () => {
+  // given
+  const manifest = structuredClone(completeSafeManifest);
+  manifest.toolResults[1].version = "different";
+
+  // when / then
+  assert.throws(() => baselineMayContinue(manifest), /complete passive evidence/);
 });

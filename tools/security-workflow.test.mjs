@@ -65,6 +65,8 @@ test("given a manual baseline run, when selecting baseline, then safe and active
   assert.match(scheduled, /security-report "\$RUN_ID" --attempt 1 > build\/security-gate\/manifest-safe\.json/);
   assert.match(scheduled, /security-report "\$RUN_ID" --attempt 2 > build\/security-gate\/manifest-active\.json/);
   assert.match(scheduled, /security-baseline-pair\.mjs[\s\S]+manifest-safe\.json[\s\S]+manifest-active\.json/);
+  assert.match(scheduled, /- id: pair[\s\S]+if: env\.PROFILE == 'baseline'/);
+  assert.match(scheduled, /- id: seal[\s\S]+if: always\(\) && \(env\.PROFILE != 'baseline' \|\| steps\.pair\.outcome == 'success'\)/);
   assert.equal((scheduled.match(/Start the disposable security target/g) ?? []).length, 1);
   assert.equal((scheduled.match(/Resolve the immutable local image digest/g) ?? []).length, 1);
   assert.match(scheduled, /attempt-1\/evidence attempt-2\/evidence/);

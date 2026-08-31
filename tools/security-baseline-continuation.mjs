@@ -8,8 +8,15 @@ export function baselineMayContinue(manifest) {
   if (manifest.profile !== "safe" || manifest.attempt !== 1) {
     throw new Error("The baseline continuation requires the finished first safe attempt");
   }
-  const resultIds = manifest.toolResults?.map(({ id }) => id) ?? [];
-  if (JSON.stringify(resultIds) !== JSON.stringify(expectedResults)
+  if (!["passed", "incomplete"].includes(manifest.status)) {
+    throw new Error("The baseline continuation rejects a failed safe outcome");
+  }
+  const tools = manifest.tools?.map(({ id, version }) => `${id}@${version}`) ?? [];
+  const results = manifest.toolResults?.map(({ id, version }) => `${id}@${version}`) ?? [];
+  const outcomes = manifest.toolResults?.map(({ outcome }) => outcome) ?? [];
+  if (JSON.stringify(manifest.tools?.map(({ id }) => id) ?? []) !== JSON.stringify(expectedResults)
+      || JSON.stringify(results) !== JSON.stringify(tools)
+      || outcomes[0] !== "passed" || !["passed", "incomplete"].includes(outcomes[1])
       || !Number.isInteger(manifest.usage?.requests) || manifest.usage.requests < 1
       || !Number.isInteger(manifest.usage?.evidenceBytes) || manifest.usage.evidenceBytes < 1) {
     throw new Error("The baseline continuation requires complete passive evidence");
