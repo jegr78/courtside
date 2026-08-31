@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -547,7 +547,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "membershipTypes").mockResolvedValue([]);
     vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...adminClub, clubName: "Example Racquet Club" });
     render(<RoutedShell initialEntries={["/admin/configuration"]}><App /></RoutedShell>);
-    expect(await screen.findByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club");
+    await waitFor(() => expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club"));
 
     // when
     fireEvent.change(await screen.findByTestId("club-name"), { target: { value: "Example Racquet Club" } });
@@ -576,7 +576,7 @@ describe("App build identity", () => {
     render(<RoutedShell><App /></RoutedShell>);
 
     // then
-    expect(await screen.findByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club");
+    await waitFor(() => expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club"));
     expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
   });
 });

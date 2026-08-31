@@ -12,9 +12,12 @@ const club: ClubConfig = {
   defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Pacific/Auckland"
 };
 
+// The element appears only once there is something to say, so a test that waits for it waits for
+// the answer rather than for a placeholder that was on screen from the first render.
 function Zone({ testId }: { testId: string }) {
   const { club: held, error } = useClubConfiguration();
-  return <p data-testid={testId}>{error ?? held?.timeZone ?? "waiting"}</p>;
+  const answer = error ?? held?.timeZone;
+  return answer ? <p data-testid={testId}>{answer}</p> : null;
 }
 
 function Saver() {

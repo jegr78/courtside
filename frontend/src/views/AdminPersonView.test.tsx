@@ -153,7 +153,7 @@ describe("AdminPersonView", () => {
     </UnsavedChangesProvider></ClubConfigurationProvider></MemoryRouter>);
 
     // then
-    await waitFor(() => expect(api.person).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Jane Doe"));
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.queryByTestId("account-locale")).not.toBeInTheDocument();
   });
