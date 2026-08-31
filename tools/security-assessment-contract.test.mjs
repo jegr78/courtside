@@ -348,6 +348,25 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
     ...evidence,
     authorization: { ...evidence.authorization, expiresAt: "2026-10-21T20:00:00Z" }
   }, new Date("2026-09-22T00:00:00Z")), /evidence evidence-001 has expired/);
+  assert.throws(() => validateManualAssessmentEvidence(evidence, new Date("invalid")),
+    /assessment date is not a real timestamp/);
+  assert.throws(() => validateManualAssessmentEvidence(evidence, new Date("2026-08-20T20:00:00Z")),
+    /recordedAt is after the assessment date/);
+  assert.throws(() => validateManualAssessmentEvidence({
+    ...evidence,
+    recordedAt: "2026-09-22T20:00:00Z",
+    authorization: { ...evidence.authorization, expiresAt: "2026-09-21T20:00:00Z" },
+    procedures: [{ ...procedure, recordedAt: "2026-09-22T20:00:00Z",
+      controls: [{ ...control, redactedEvidenceReferences: [{
+        ...control.redactedEvidenceReferences[0], expiresOn: "2026-10-21"
+      }] }] }]
+  }, new Date("2026-09-22T20:00:00Z")), /authorization expired before recordedAt/);
+  assert.throws(() => validateManualAssessmentEvidence({
+    ...evidence,
+    recordedAt: "2026-09-22T20:00:00Z",
+    authorization: { ...evidence.authorization, expiresAt: "2026-10-21T20:00:00Z" },
+    procedures: [{ ...procedure, recordedAt: "2026-09-22T20:00:00Z" }]
+  }, new Date("2026-09-22T20:00:00Z")), /evidence evidence-001 expired before recordedAt/);
 });
 
 test("given an active-only procedure, when safe or production execution is claimed, then validation fails closed", () => {

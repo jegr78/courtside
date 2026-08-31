@@ -48,10 +48,16 @@ function requireRealTimestamp(value, field) {
 
 export function validateManualAssessmentEvidence(evidence, assessmentDate = new Date()) {
   if (!validateShape(evidence)) fail(JSON.stringify(validateShape.errors));
+  if (!(assessmentDate instanceof Date) || !Number.isFinite(assessmentDate.getTime())) {
+    fail("assessment date is not a real timestamp");
+  }
   if (evidence.catalogVersion !== catalog.catalogVersion) fail("catalogVersion does not match the current catalog");
   requireRealTimestamp(evidence.recordedAt, "recordedAt");
   requireRealTimestamp(evidence.authorization.expiresAt, "authorization expiry");
+  const recordedAt = Date.parse(evidence.recordedAt);
   const authorizationExpiry = Date.parse(evidence.authorization.expiresAt);
+  if (recordedAt > assessmentDate.getTime()) fail("recordedAt is after the assessment date");
+  if (authorizationExpiry < recordedAt) fail("authorization expired before recordedAt");
   if (authorizationExpiry < assessmentDate.getTime()) fail("authorization has expired");
   if (evidence.authorization.profile !== evidence.profile) fail("authorization profile differs from the run profile");
   if (evidence.authorization.targetFingerprint !== evidence.targetFingerprint) fail("authorization target differs from the run target");
@@ -90,6 +96,9 @@ export function validateManualAssessmentEvidence(evidence, assessmentDate = new 
       observed.add(controlId);
       for (const reference of outcome.redactedEvidenceReferences) {
         requireRealDate(reference.expiresOn, `evidence ${reference.id} expiry`);
+        if (reference.expiresOn < evidence.recordedAt.slice(0, 10)) {
+          fail(`evidence ${reference.id} expired before recordedAt`);
+        }
         if (reference.expiresOn < assessmentDate.toISOString().slice(0, 10)) {
           fail(`evidence ${reference.id} has expired`);
         }
