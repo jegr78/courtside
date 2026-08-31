@@ -44,6 +44,7 @@ test("being recorded as a player is told, and so is leaving one", async ({ page,
   expect(notice.Text).not.toContain("Doe");
 
   // when — the member takes themselves out again
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("roe.jane");

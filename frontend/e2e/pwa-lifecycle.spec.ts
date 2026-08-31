@@ -17,7 +17,10 @@ async function expectNoApiResponseInCache(page: import("@playwright/test").Page)
 
 async function expectAnonymousSurface(page: import("@playwright/test").Page) {
   await expect(page.getByTestId("my-bookings-page")).not.toBeVisible();
-  await expect(page.getByTestId("logout")).not.toBeVisible();
+  // Signing out lives in the account menu, so the menu has to be open for its absence to mean anything.
+  await page.getByTestId("preferences-menu").click();
+  await expect(page.getByTestId("logout")).toHaveCount(0);
+  await page.getByTestId("preferences-menu").click();
   await expect(page.getByTestId("sign-in-link").or(page.getByTestId("login-submit"))).toBeVisible();
 }
 
@@ -64,6 +67,7 @@ test("logout and browser history cannot reveal a cached personal view", async ({
   // when
   const logoutResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/session/logout") && response.request().method() === "POST");
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   expect((await logoutResponse).status()).toBe(204);
   await page.goBack();

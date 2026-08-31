@@ -1,5 +1,14 @@
+import { useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
+
+const laidOpenFrom = "(width >= 1024px)";
+
+function subscribe(changed: () => void) {
+  const query = window.matchMedia(laidOpenFrom);
+  query.addEventListener("change", changed);
+  return () => query.removeEventListener("change", changed);
+}
 
 interface Destination {
   to: string;
@@ -57,14 +66,20 @@ export function AdminNavigation() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const current = currentLabel(pathname);
+  const laidOpen = useSyncExternalStore(subscribe, () => window.matchMedia(laidOpenFrom).matches, () => false);
+  const [unfolded, setUnfolded] = useState(false);
 
-  // Folded away below the breakpoint and laid open above it, where the stylesheet shows the panel
-  // whatever the element's own state is — the court plan switches between its two shapes the same way.
-  return <details className="admin-navigation">
+  // A stylesheet cannot lay the panel open: a browser hides a closed disclosure's content whatever
+  // the display of that content says, so above the breakpoint the element's own state opens it.
+  return <details
+    data-testid="admin-navigation"
+    open={laidOpen || unfolded}
+    onToggle={(event) => !laidOpen && setUnfolded(event.currentTarget.open)}
+  >
     <summary data-testid="admin-menu" className="admin-navigation-menu form-control cursor-pointer list-none rounded-lg border px-4 py-3 font-semibold [&::-webkit-details-marker]:hidden">
       {current ? t(current) : t("nav.administration")}
     </summary>
-    <nav aria-label={t("nav.administration")} className="admin-navigation-panel grid gap-5 pt-3 lg:pt-0">
+    <nav aria-label={t("nav.administration")} className="grid gap-5 pt-3 lg:pt-0">
       <Link data-testid="court-plan-link" to="/" className="font-semibold underline-offset-4">
         {t("nav.courts")}
       </Link>

@@ -303,8 +303,4 @@ input[type="time"] {
   .admin-navigation-menu {
     display: none;
   }
-
-  .admin-navigation > .admin-navigation-panel {
-    display: grid;
-  }
 }

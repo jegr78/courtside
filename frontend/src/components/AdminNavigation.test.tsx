@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import i18n from "../i18n";
@@ -8,9 +8,15 @@ function show(at: string) {
   render(<MemoryRouter initialEntries={[at]}><AdminNavigation /></MemoryRouter>);
 }
 
+function resizeTo(width: number) {
+  window.innerWidth = width;
+  window.dispatchEvent(new Event("resize"));
+}
+
 describe("AdminNavigation", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
+    resizeTo(1280);
   });
 
   it("given the administration, when the navigation is read, then its destinations sit in named groups", () => {
@@ -63,5 +69,38 @@ describe("AdminNavigation", () => {
 
     // then
     expect(screen.getByTestId("admin-menu")).toHaveTextContent("Import");
+  });
+
+  // Above the breakpoint the panel is laid open by the element's own state: a stylesheet cannot
+  // reveal it, because the browser hides a closed disclosure's content whatever its display says.
+  it("given a window wider than the breakpoint, when the navigation is shown, then it is laid open", () => {
+    // when
+    show("/admin/facility");
+
+    // then
+    expect(screen.getByTestId("admin-navigation")).toHaveAttribute("open");
+  });
+
+  it("given a window narrower than the breakpoint, when the navigation is shown, then it stays folded", () => {
+    // given
+    resizeTo(375);
+
+    // when
+    show("/admin/facility");
+
+    // then
+    expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
+  });
+
+  it("given a folded navigation, when the window grows past the breakpoint, then it lays itself open", () => {
+    // given
+    resizeTo(375);
+    show("/admin/facility");
+
+    // when
+    act(() => resizeTo(1280));
+
+    // then
+    expect(screen.getByTestId("admin-navigation")).toHaveAttribute("open");
   });
 });
