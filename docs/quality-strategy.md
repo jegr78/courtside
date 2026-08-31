@@ -167,7 +167,8 @@ Any changed semantic contract has a different fingerprint. Until protected repla
 that exact fingerprint, both CI and local checks execute `full`; the earlier figures remain
 historical evidence and cannot activate the changed policy.
 
-The admissible observation window for the five-job topology starts at 2026-08-31T18:23:45Z. Runs
+The admissible observation window for the five-job topology starts at 2026-08-31T20:13:44Z, when
+the topology was merged to `main`. Runs
 from the earlier topology remain historical context but cannot prove that the tooling job was
 selected or safely skipped, so replay excludes them instead of inventing a result.
 
