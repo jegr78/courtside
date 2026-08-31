@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type DayOfWeek, type OpeningHours } from "../../api/client";
+import { useClubConfiguration } from "../../club/registry";
 import { Button } from "../../components/Button";
 import { ImpactPanel } from "../../components/ImpactPanel";
 import { TextField } from "../../components/TextField";
@@ -13,16 +14,15 @@ import { useSaving } from "./useSaving";
 
 export function AdminOpeningHoursView() {
   const { t } = useTranslation();
+  const { club, error: clubError } = useClubConfiguration();
   const [hours, setHours] = useState<OpeningHours[]>();
   const [confirmed, setConfirmed] = useState<Record<string, OpeningHours>>({});
-  const [timeZone, setTimeZone] = useState<string>();
   const { error, success, pending, reportError, save } = useSaving();
 
   useEffect(() => {
-    void Promise.all([api.adminOpeningHours(), api.config()])
-      .then(([loaded, configuration]) => {
+    void api.adminOpeningHours()
+      .then((loaded) => {
         setHours(loaded);
-        setTimeZone(configuration.timeZone);
         setConfirmed(Object.fromEntries(loaded.map((day) => [String(day.dayOfWeek), day])));
       })
       .catch(reportError);
@@ -52,13 +52,13 @@ export function AdminOpeningHoursView() {
     });
   }
 
-  return <FacilityPage testId="admin-opening-hours-view" title={t("admin.facility.openingHours")} error={error} success={success}>
-    {hours !== undefined && timeZone !== undefined && <div className="grid gap-3 lg:grid-cols-2">
+  return <FacilityPage testId="admin-opening-hours-view" title={t("admin.facility.openingHours")} error={error ?? clubError} success={success}>
+    {hours !== undefined && club !== undefined && <div className="grid gap-3 lg:grid-cols-2">
       {hours.map((day) => <HoursEditor
         key={day.dayOfWeek}
         hours={day}
         confirmed={confirmed[String(day.dayOfWeek)]}
-        timeZone={timeZone}
+        timeZone={club.timeZone}
         disabled={pending.has(`hours:${day.dayOfWeek}`)}
         changed={replace}
         save={saveDay}

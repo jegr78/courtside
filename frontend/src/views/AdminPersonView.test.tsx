@@ -6,6 +6,8 @@ import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry,
 import i18n from "../i18n";
 import { downloadJson } from "../downloads/downloadJson";
 import { UnsavedCount } from "../test/UnsavedCount";
+import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
+import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { AdminPersonView } from "./AdminPersonView";
 
@@ -38,22 +40,22 @@ const handedOver: MessageEntry = {
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
 const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null, active: true, grantsAccount: false };
 
-function showPerson(entry: RosterEntry = jane) {
+function showPerson(entry: RosterEntry = jane, shown: ClubConfig = club) {
   vi.spyOn(api, "person").mockResolvedValue(entry);
-  render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><UnsavedChangesProvider>
+  render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><WithClubConfiguration club={shown}><UnsavedChangesProvider>
     <UnsavedCount />
     <Routes>
       <Route path="/admin/roster/:personId" element={<AdminPersonView />} />
     </Routes>
-  </UnsavedChangesProvider></MemoryRouter>);
+  </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 }
 
 describe("AdminPersonView", () => {
   it("when the page is shown, then its content keeps a readable line length", () => {
     // when
-    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><UnsavedChangesProvider>
+    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><WithClubConfiguration><UnsavedChangesProvider>
       <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
-    </UnsavedChangesProvider></MemoryRouter>);
+    </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 
     // then
     expect(screen.getByTestId("admin-person-view")).toHaveClass("[&>*]:max-w-5xl");
@@ -135,8 +137,25 @@ describe("AdminPersonView", () => {
     vi.mocked(downloadJson).mockClear();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults, juniors]);
-    vi.spyOn(api, "config").mockResolvedValue(club);
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
+  });
+
+  // The account section reads the club once, when it mounts: shown before the club has arrived, it
+  // would offer no languages and mark an untouched locale as unsaved.
+  it("given a club that has not arrived yet, when a person is opened, then the page waits rather than showing an account without one", async () => {
+    // given
+    vi.spyOn(api, "person").mockResolvedValue(jane);
+    vi.spyOn(api, "config").mockReturnValue(new Promise<never>(() => undefined));
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><ClubConfigurationProvider><UnsavedChangesProvider>
+      <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
+    </UnsavedChangesProvider></ClubConfigurationProvider></MemoryRouter>);
+
+    // then
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Jane Doe"));
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByTestId("account-locale")).not.toBeInTheDocument();
   });
 
   it("given navigation from person creation, when the new page loads, then creation is confirmed consistently", async () => {
@@ -144,9 +163,9 @@ describe("AdminPersonView", () => {
     vi.spyOn(api, "person").mockResolvedValue(jane);
 
     // when
-    render(<MemoryRouter initialEntries={[{ pathname: "/admin/roster/person-1", state: { personCreated: true } }]}><UnsavedChangesProvider>
+    render(<MemoryRouter initialEntries={[{ pathname: "/admin/roster/person-1", state: { personCreated: true } }]}><WithClubConfiguration><UnsavedChangesProvider>
       <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
-    </UnsavedChangesProvider></MemoryRouter>);
+    </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 
     // then
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Person created."));
@@ -157,9 +176,9 @@ describe("AdminPersonView", () => {
     vi.spyOn(api, "person").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><UnsavedChangesProvider>
+    render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><WithClubConfiguration><UnsavedChangesProvider>
       <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
-    </UnsavedChangesProvider></MemoryRouter>);
+    </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 
     // then
     expect(await screen.findByRole("alert")).toBeInTheDocument();
@@ -376,10 +395,8 @@ describe("AdminPersonView", () => {
 
   it("given an instance that ships one language, when opening an account, then only that one is offered", async () => {
     // given
-    vi.spyOn(api, "config").mockResolvedValue({ ...club, supportedLocales: ["de"] });
-
     // when
-    showPerson();
+    showPerson(jane, { ...club, supportedLocales: ["de"] });
 
     // then
     const offered = await screen.findByTestId("account-locale");

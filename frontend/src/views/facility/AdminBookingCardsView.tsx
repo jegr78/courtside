@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type BookingCard, type BookingCardRequest, type Role } from "../../api/client";
+import { useClubConfiguration } from "../../club/registry";
 import { Button } from "../../components/Button";
 import { ImpactPanel } from "../../components/ImpactPanel";
 import { TextField } from "../../components/TextField";
@@ -18,16 +19,15 @@ const managingRoleOptions: Role[] = roles.filter((role) => role !== "MEMBER");
 
 export function AdminBookingCardsView() {
   const { t } = useTranslation();
+  const { club, error: clubError } = useClubConfiguration();
   const [cards, setCards] = useState<BookingCard[]>();
   const [confirmed, setConfirmed] = useState<Record<string, BookingCard>>({});
-  const [timeZone, setTimeZone] = useState<string>();
   const { error, success, pending, reportError, save } = useSaving();
 
   useEffect(() => {
-    void Promise.all([api.adminBookingCards(), api.config()])
-      .then(([loaded, configuration]) => {
+    void api.adminBookingCards()
+      .then((loaded) => {
         setCards(loaded);
-        setTimeZone(configuration.timeZone);
         setConfirmed(Object.fromEntries(loaded.map((card) => [card.id, card])));
       })
       .catch(reportError);
@@ -73,14 +73,14 @@ export function AdminBookingCardsView() {
     });
   }
 
-  return <FacilityPage testId="admin-booking-cards-view" title={t("admin.facility.cards")} error={error} success={success}>
-    {cards !== undefined && timeZone !== undefined && <>
+  return <FacilityPage testId="admin-booking-cards-view" title={t("admin.facility.cards")} error={error ?? clubError} success={success}>
+    {cards !== undefined && club !== undefined && <>
       <CardCreateForm disabled={pending.has("card:new")} create={create} />
       {cards.map((card) => <CardEditor
         key={card.id}
         card={card}
         confirmed={confirmed[card.id]}
-        timeZone={timeZone}
+        timeZone={club.timeZone}
         disabled={pending.has(`card:${card.id}`)}
         changed={applyEdit}
         save={saveCard}
