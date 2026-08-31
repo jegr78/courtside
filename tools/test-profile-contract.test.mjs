@@ -158,6 +158,10 @@ test("given semantic sources, when one changes, then the fingerprint changes but
     assert.ok(semanticPolicySources.includes("tools/local-check.mjs"));
     assert.ok(semanticPolicySources.includes("tools/test-profile-replay.mjs"));
     assert.ok(semanticPolicySources.includes("tools/docs-check.mjs"));
+    assert.ok(semanticPolicySources.includes("tools/github-metadata.test.mjs"));
+    assert.ok(semanticPolicySources.includes("tools/github-template-metadata.test.mjs"));
+    assert.ok(semanticPolicySources.includes("tools/workflow-action-pinning.test.mjs"));
+    assert.ok(semanticPolicySources.includes("ci/github-profile-manifest.json"));
     assert.ok(semanticPolicySources.includes("tools/tool-tests.mjs"));
     assert.ok(semanticPolicySources.includes("tools/node-toolchain.mjs"));
     assert.ok(semanticPolicySources.includes("frontend/package.json"));

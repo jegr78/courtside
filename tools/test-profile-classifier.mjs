@@ -11,11 +11,14 @@ const repository = fileURLToPath(new URL("..", import.meta.url));
 const rulesUrl = new URL("../ci/test-profiles.json", import.meta.url);
 const admissionUrl = new URL("../ci/test-profile-admission.json", import.meta.url);
 const toolManifestUrl = new URL("../ci/tool-profile-manifest.json", import.meta.url);
+const githubManifestUrl = new URL("../ci/github-profile-manifest.json", import.meta.url);
 const rules = JSON.parse(readFileSync(rulesUrl, "utf8"));
 const toolManifest = JSON.parse(readFileSync(toolManifestUrl, "utf8"));
+const githubManifest = JSON.parse(readFileSync(githubManifestUrl, "utf8"));
 const reducedProfiles = ["docs", "backend", "frontend", "tooling"];
 validateRules(rules);
 validateToolManifest(toolManifest);
+validateGitHubManifest(githubManifest, undefined, toolManifest);
 
 export function validateRules(candidate) {
   const profileNames = ["full", ...reducedProfiles];
@@ -70,6 +73,38 @@ export function validateToolManifest(candidate, trackedPaths) {
   }
 }
 
+export function validateGitHubManifest(candidate, trackedPaths, validators) {
+  if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)
+      || Object.keys(candidate).sort().join() !== ["entries", "schemaVersion"].sort().join()
+      || candidate.schemaVersion !== 1 || !Array.isArray(candidate.entries)) {
+    throw new Error("GitHub profile manifest is invalid");
+  }
+  const paths = candidate.entries.map((entry) => entry?.path);
+  if (new Set(paths).size !== paths.length || candidate.entries.some((entry) => entry === null
+      || typeof entry !== "object" || Array.isArray(entry)
+      || Object.keys(entry).sort().join() !== ["path", "profiles", "validators"].sort().join()
+      || typeof entry.path !== "string" || !entry.path.startsWith(".github/")
+      || !Array.isArray(entry.profiles) || entry.profiles.length < 1
+      || new Set(entry.profiles).size !== entry.profiles.length
+      || entry.profiles.some((profile) => ![...reducedProfiles, "full"].includes(profile))
+      || (entry.profiles.includes("full") && entry.profiles.length !== 1)
+      || !Array.isArray(entry.validators) || new Set(entry.validators).size !== entry.validators.length
+      || entry.validators.some((validator) => typeof validator !== "string")
+      || (!entry.profiles.includes("full") && entry.validators.length < 1))) {
+    throw new Error("GitHub profile manifest is invalid");
+  }
+  if (validators !== undefined) {
+    const executable = new Set(validators.entries
+      .filter((entry) => entry.test && entry.profiles.includes("tooling")).map((entry) => entry.path));
+    if (candidate.entries.some((entry) => entry.validators.some((validator) => !executable.has(validator)))) {
+      throw new Error("GitHub profile manifest validator is invalid");
+    }
+  }
+  if (trackedPaths !== undefined && JSON.stringify([...paths].sort()) !== JSON.stringify([...trackedPaths].sort())) {
+    throw new Error("GitHub profile manifest inventory is stale");
+  }
+}
+
 function matchingRule(path, profile, kind) {
   const configured = rules.profiles[profile];
   if (kind === "exact" && configured.exact.includes(path)) return `exact:${path}`;
@@ -89,6 +124,11 @@ function matchingRule(path, profile, kind) {
 
 export function classifyPath(path) {
   if (typeof path !== "string" || path.length < 1 || path.includes("\0")) return null;
+  if (path.startsWith(".github/")) {
+    const entry = githubManifest.entries.find((candidate) => candidate.path === path);
+    if (entry === undefined) return null;
+    return { profiles: entry.profiles, rule: `manifest:${path}` };
+  }
   if (path.startsWith("tools/")) {
     const entry = toolManifest.entries.find((candidate) => candidate.path === path);
     if (entry === undefined) return null;
