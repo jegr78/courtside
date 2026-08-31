@@ -162,6 +162,26 @@ describe("AdminOpeningHoursView", () => {
     expect(saveWeek).not.toHaveBeenCalled();
   });
 
+  it("given a saved week, when the next save is refused by the form, then the page stops saying it saved", async () => {
+    // given
+    vi.spyOn(api, "setAdminWeeklyOpeningHours")
+      .mockResolvedValue(week({ MONDAY: ["08:00:00", "22:00:00"] }));
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("hours-closed-FRIDAY");
+    await user.click(screen.getByTestId("save-opening-hours"));
+    await screen.findByRole("status");
+
+    // when
+    await user.click(screen.getByTestId("hours-closed-FRIDAY"));
+    await user.type(screen.getByTestId("hours-open-FRIDAY"), "09:00");
+    await user.click(screen.getByTestId("save-opening-hours"));
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
   it("given an edited day, when it is counted, then the week is asked about once", async () => {
     // given
     show(true);

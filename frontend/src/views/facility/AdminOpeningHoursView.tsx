@@ -47,12 +47,12 @@ export function AdminOpeningHoursView() {
   function saveWeek(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!week) return Promise.resolve();
-    const incomplete = incompleteDays(week, t);
-    if (Object.keys(incomplete).length > 0) {
-      setRejected(incomplete);
-      return Promise.resolve();
-    }
     return save(MARK, async () => {
+      const incomplete = incompleteDays(week, t);
+      if (Object.keys(incomplete).length > 0) {
+        setRejected(incomplete);
+        throw new Error("A day carries one of its two times and is not marked closed");
+      }
       try {
         const stored = await api.setAdminWeeklyOpeningHours(week.map(toRequest));
         setRejected({});
