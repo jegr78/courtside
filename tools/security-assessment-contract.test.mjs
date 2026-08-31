@@ -323,14 +323,25 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
     { ...evidence, authorization: { ...evidence.authorization, targetFingerprint: `sha256:${"b".repeat(64)}` } },
     { ...evidence, targetOrigin: "https://127.0.0.1:9443" },
     { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-08-20T20:00:00Z" } },
+    { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-99-21T20:00:00Z" } },
+    { ...evidence, procedures: [{ ...procedure, controls: [{ ...control,
+      redactedEvidenceReferences: [{ ...control.redactedEvidenceReferences[0], expiresOn: "2026-99-21" }]
+    }] }] },
     { ...evidence, procedures: [{ ...procedure,
-      controls: [{ ...control, observedResult: "cookie=opaque-value" }] }] }
+      controls: [{ ...control, observedResult: "cookie=opaque-value" }] }] },
+    { ...evidence, procedures: [{ ...procedure,
+      controls: [{ ...control, outcome: "blocked", rationale: "Awaiting review", owner: "Maintainer",
+        trackingReference: "secret=opaque-value" }] }] }
   ];
 
   // when / then
   for (const invalidRecord of invalidRecords) {
     assert.throws(() => validateManualAssessmentEvidence(invalidRecord, new Date("2026-08-21T20:00:00Z")));
   }
+  assert.throws(() => validateManualAssessmentEvidence({
+    ...evidence,
+    authorization: { ...evidence.authorization, expiresAt: "2026-10-21T20:00:00Z" }
+  }, new Date("2026-09-22T00:00:00Z")), /evidence evidence-001 has expired/);
 });
 
 test("given an active-only procedure, when safe or production execution is claimed, then validation fails closed", () => {
