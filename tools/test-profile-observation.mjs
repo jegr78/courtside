@@ -397,6 +397,7 @@ export function profileObservationReport(summary) {
     `- Naturally reduced first attempts: ${summary.reducedProfileCount}`,
     `- Backend-profile first attempts: ${summary.profileCounts.backend}`,
     `- Frontend-profile first attempts: ${summary.profileCounts.frontend}`,
+    `- Tooling-profile first attempts: ${summary.profileCounts.tooling}`,
     `- Candidate misses: ${summary.candidateMissCount}`,
     `- Classification errors: ${summary.classificationErrorCount}`,
     `- Incomplete observations excluded: ${summary.incompleteObservationCount}`,

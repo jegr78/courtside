@@ -23,6 +23,7 @@ jobs:
       docs: ${{ steps.selection.outputs.docs }}
       backend: ${{ steps.selection.outputs.backend }}
       frontend: ${{ steps.selection.outputs.frontend }}
+      tooling: ${{ steps.selection.outputs.tooling }}
       security: ${{ steps.selection.outputs.security }}
       profiles: ${{ steps.selection.outputs.profiles }}
     steps:
@@ -67,11 +68,11 @@ jobs:
             'type == "object" and .schemaVersion == 4 and .runId == $runId and
               .attempt == $attempt and .baseCommit == $base and .headCommit == $head and
               (.proposedPolicyFingerprint | test("^[a-f0-9]{64}$")) and
-              (.activeProfiles | type == "array" and length >= 1 and length <= 4 and
-                all(. == "docs" or . == "backend" or . == "frontend" or . == "full") and
+              (.activeProfiles | type == "array" and length >= 1 and length <= 5 and
+                all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or . == "full") and
                 (unique | length) == length) and
-              (.proposedProfiles | type == "array" and length >= 1 and length <= 4) and
-              (.activeCiJobs | type == "array" and all(. == "docs" or . == "backend" or . == "frontend" or . == "security")) and
+              (.proposedProfiles | type == "array" and length >= 1 and length <= 5) and
+              (.activeCiJobs | type == "array" and all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or . == "security")) and
               (.isFull | type == "boolean") and .isFull == (.activeProfiles == ["full"]) and
               (.plannerOutcome == "passed" or .plannerOutcome == "failed") and
               (.reasons | type == "array" and length >= 1) and
@@ -82,7 +83,7 @@ jobs:
             JOBS=$(jq -cer '.activeCiJobs' build/test-profile/plan.json)
           else
             PROFILES='["full"]'
-            JOBS='["docs","backend","frontend","security"]'
+            JOBS='["docs","backend","frontend","tooling","security"]'
             mkdir -p build/test-profile
             {
               echo '# Selected test profiles'
@@ -94,7 +95,7 @@ jobs:
           fi
           cat build/test-profile/summary.md >> "$GITHUB_STEP_SUMMARY"
           echo "profiles=$PROFILES" >> "$GITHUB_OUTPUT"
-          for job in docs backend frontend security; do
+          for job in docs backend frontend tooling security; do
             SELECTED=$(jq -nr --argjson jobs "$JOBS" --arg job "$job" '($jobs | index($job)) != null')
             echo "$job=$SELECTED" >> "$GITHUB_OUTPUT"
           done
@@ -124,6 +125,43 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Verify documentation
         run: node tools/docs-check.mjs --check
+
+  tooling:
+    needs: test-profile-plan
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.tooling == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: tooling-toolchain
+        name: Read locked tooling versions
+        run: node tools/node-toolchain.mjs --github-output "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: ${{ steps.tooling-toolchain.outputs.node }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked npm
+        env:
+          NPM_VERSION: ${{ steps.tooling-toolchain.outputs.npm }}
+        run: npm install --global "npm@$NPM_VERSION"
+      - name: Verify locked toolchain
+        env:
+          NODE_VERSION: ${{ steps.tooling-toolchain.outputs.node }}
+          NPM_VERSION: ${{ steps.tooling-toolchain.outputs.npm }}
+        run: |
+          test "$(node --version)" = "v$NODE_VERSION"
+          test "$(npm --version)" = "$NPM_VERSION"
+      - name: Install locked tool dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Verify repository tooling
+        working-directory: frontend
+        run: npm run test:tools
 
   assessment-runtime:
     if: github.event_name == 'pull_request'
@@ -357,7 +395,7 @@ jobs:
         working-directory: frontend
         run: |
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run lint
-          ./node/node ./node/node_modules/npm/bin/npm-cli.js run test
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run test:frontend
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run build
           ./node/node ./node/node_modules/npm/bin/npm-cli.js audit --audit-level=high
       - name: Package the E2E application
@@ -486,7 +524,7 @@ jobs:
 
   build:
     if: always()
-    needs: [docs, backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan]
+    needs: [docs, backend, frontend, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -497,6 +535,7 @@ jobs:
           DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
+          TOOLING_RESULT: ${{ needs.tooling.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
         run: |
           mkdir -p build/nightly
@@ -507,11 +546,12 @@ jobs:
             --arg docs "$DOCS_RESULT" \
             --arg backend "$BACKEND_RESULT" \
             --arg frontend "$FRONTEND_RESULT" \
+            --arg tooling "$TOOLING_RESULT" \
             --arg security "$SECURITY_RESULT" \
             '{schemaVersion: 1, commit: $commit, runId: $runId, attempt: $attempt,
-              firstAttempt: ($attempt == 1), jobs: {docs: $docs, backend: $backend, frontend: $frontend, security: $security},
+              firstAttempt: ($attempt == 1), jobs: {docs: $docs, backend: $backend, frontend: $frontend, tooling: $tooling, security: $security},
               releaseReadiness: (if $attempt == 1 and $docs == "success" and $backend == "success" and $frontend == "success"
-                and $security == "success" then "complete" else "incomplete" end)}' \
+                and $tooling == "success" and $security == "success" then "complete" else "incomplete" end)}' \
             > build/nightly/verification.json
           jq -r '"Nightly release readiness: **\(.releaseReadiness)** (`\(.commit)`, attempt \(.attempt))"' \
             build/nightly/verification.json >> "$GITHUB_STEP_SUMMARY"
@@ -520,6 +560,7 @@ jobs:
           DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
+          TOOLING_RESULT: ${{ needs.tooling.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
           IDENTITY_RESULT: ${{ needs.assessment-runtime.result }}
           COMPARISON_RESULT: ${{ needs.tool-update-comparison.result }}
@@ -528,6 +569,7 @@ jobs:
           DOCS_SELECTED: ${{ needs.test-profile-plan.outputs.docs }}
           BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
           FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
+          TOOLING_SELECTED: ${{ needs.test-profile-plan.outputs.tooling }}
           SECURITY_SELECTED: ${{ needs.test-profile-plan.outputs.security }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
@@ -536,7 +578,7 @@ jobs:
           case "$EVENT_NAME" in
             pull_request)
               test "$PROFILE_PLAN_RESULT" = success
-              for job in docs backend frontend security; do
+              for job in docs backend frontend tooling security; do
                 result_variable="${job^^}_RESULT"
                 selected_variable="${job^^}_SELECTED"
                 result="${!result_variable}"
@@ -553,6 +595,7 @@ jobs:
               test "$DOCS_RESULT" = success
               test "$BACKEND_RESULT" = success
               test "$FRONTEND_RESULT" = success
+              test "$TOOLING_RESULT" = success
               test "$SECURITY_RESULT" = success
               ;;
             *) exit 1 ;;
@@ -563,10 +606,12 @@ jobs:
           DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
+          TOOLING_RESULT: ${{ needs.tooling.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
           DOCS_SELECTED: ${{ needs.test-profile-plan.outputs.docs }}
           BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
           FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
+          TOOLING_SELECTED: ${{ needs.test-profile-plan.outputs.tooling }}
           SECURITY_SELECTED: ${{ needs.test-profile-plan.outputs.security }}
           PROFILES: ${{ needs.test-profile-plan.outputs.profiles }}
         run: |
@@ -577,7 +622,7 @@ jobs:
             echo
             echo '| Job | Result | Reason |'
             echo '| --- | --- | --- |'
-            for job in docs backend frontend security; do
+            for job in docs backend frontend tooling security; do
               result_variable="${job^^}_RESULT"
               selected_variable="${job^^}_SELECTED"
               result="${!result_variable}"

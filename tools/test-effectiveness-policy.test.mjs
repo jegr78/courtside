@@ -13,7 +13,8 @@ test("given the required coverage evidence, when running verify, then backend an
   assert.match(pom, /jacoco-maven-plugin/);
   assert.match(pom, /<goal>prepare-agent<\/goal>/);
   assert.match(pom, /<goal>report<\/goal>/);
-  assert.equal(frontendPackage.scripts.test.includes("--coverage"), true);
+  assert.equal(frontendPackage.scripts["test:frontend"].includes("--coverage"), true);
+  assert.match(frontendPackage.scripts.test, /test:frontend.*test:tools/);
   assert.equal(frontendPackage.devDependencies["@vitest/coverage-v8"], frontendPackage.devDependencies.vitest);
   assert.match(vite, /provider: "v8"/);
   assert.match(build, /target\/site\/jacoco/);

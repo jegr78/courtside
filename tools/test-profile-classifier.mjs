@@ -10,9 +10,12 @@ import {
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const rulesUrl = new URL("../ci/test-profiles.json", import.meta.url);
 const admissionUrl = new URL("../ci/test-profile-admission.json", import.meta.url);
+const toolManifestUrl = new URL("../ci/tool-profile-manifest.json", import.meta.url);
 const rules = JSON.parse(readFileSync(rulesUrl, "utf8"));
-const reducedProfiles = ["docs", "backend", "frontend"];
+const toolManifest = JSON.parse(readFileSync(toolManifestUrl, "utf8"));
+const reducedProfiles = ["docs", "backend", "frontend", "tooling"];
 validateRules(rules);
+validateToolManifest(toolManifest);
 
 export function validateRules(candidate) {
   const profileNames = ["full", ...reducedProfiles];
@@ -39,6 +42,34 @@ export function validateRules(candidate) {
   }
 }
 
+export function validateToolManifest(candidate, trackedPaths) {
+  if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)
+      || Object.keys(candidate).sort().join() !== ["entries", "schemaVersion"].sort().join()
+      || candidate.schemaVersion !== 1 || !Array.isArray(candidate.entries)) {
+    throw new Error("Tool profile manifest is invalid");
+  }
+  const paths = candidate.entries.map((entry) => entry?.path);
+  if (new Set(paths).size !== paths.length || candidate.entries.some((entry) => entry === null
+      || typeof entry !== "object" || Array.isArray(entry)
+      || Object.keys(entry).sort().join() !== ["path", "profiles", "test"].sort().join()
+      || typeof entry.path !== "string" || !entry.path.startsWith("tools/")
+      || !Array.isArray(entry.profiles) || entry.profiles.length < 1
+      || typeof entry.test !== "boolean"
+      || new Set(entry.profiles).size !== entry.profiles.length
+      || entry.profiles.some((profile) => ![...reducedProfiles, "full"].includes(profile))
+      || entry.test !== entry.path.endsWith(".test.mjs")
+      || (entry.test && !entry.profiles.includes("tooling"))
+      || (entry.profiles.includes("full") && entry.profiles.length !== 1))) {
+    throw new Error("Tool profile manifest is invalid");
+  }
+  if (trackedPaths !== undefined) {
+    const expected = [...trackedPaths].sort();
+    if (JSON.stringify([...paths].sort()) !== JSON.stringify(expected)) {
+      throw new Error("Tool profile manifest inventory is stale");
+    }
+  }
+}
+
 function matchingRule(path, profile, kind) {
   const configured = rules.profiles[profile];
   if (kind === "exact" && configured.exact.includes(path)) return `exact:${path}`;
@@ -58,10 +89,15 @@ function matchingRule(path, profile, kind) {
 
 export function classifyPath(path) {
   if (typeof path !== "string" || path.length < 1 || path.includes("\0")) return null;
+  if (path.startsWith("tools/")) {
+    const entry = toolManifest.entries.find((candidate) => candidate.path === path);
+    if (entry === undefined) return null;
+    return { profiles: entry.profiles, rule: `manifest:${path}` };
+  }
   for (const kind of ["exact", "specific", "prefix"]) {
     for (const profile of ["full", ...reducedProfiles]) {
       const rule = matchingRule(path, profile, kind);
-      if (rule !== null) return { profile, rule };
+    if (rule !== null) return { profiles: [profile], rule };
     }
   }
   return null;
@@ -102,13 +138,13 @@ export function classifyChanges(changes, labels) {
     }
     const structural = change.status !== "M" && change.status !== "A";
     const classification = classifyPath(change.path);
-    if (structural || classification === null || classification.profile === "full") requiresFull = true;
-    const profile = structural || classification === null ? "full" : classification.profile;
-    if (profile !== "full") selected.add(profile);
+    const classifiedProfiles = structural || classification === null ? ["full"] : classification.profiles;
+    if (classifiedProfiles.includes("full")) requiresFull = true;
+    for (const profile of classifiedProfiles) if (profile !== "full") selected.add(profile);
     reasons.push({
       code: structural ? "structural-change" : classification === null ? "unknown-path" : classification.rule,
       path: change.path,
-      profile,
+      profile: classifiedProfiles.includes("full") ? "full" : classifiedProfiles[0],
       status: change.status
     });
   }

@@ -58,12 +58,21 @@ test("given frontend changes, when planning the local check, then its tasks matc
       "com.github.eirslett:frontend-maven-plugin:npm@npm-ci"
     ]],
     ["frontend-lint", "npm", ["run", "lint"]],
-    ["frontend-test", "npm", ["run", "test"]],
+    ["frontend-test", "npm", ["run", "test:frontend"]],
     ["frontend-build", "npm", ["run", "build"]],
     ["frontend-audit", "npm", ["audit", "--audit-level=high"]],
     ["frontend-package", "maven", ["package", "-DskipTests", "-Pjava-only"]],
     ["frontend-e2e", "npm", ["run", "test:e2e"]]
   ]);
+});
+
+test("given a tooling test changes, when planning locally, then only locked tooling verification runs", () => {
+  // when
+  const plan = localCheckPlan([{ status: "M", path: "tools/mail-check.test.mjs" }]);
+
+  // then
+  assert.deepEqual(plan.profiles, ["tooling"]);
+  assert.deepEqual(plan.tasks.map((task) => task.label), ["frontend-toolchain", "tooling-test"]);
 });
 
 test("given backend and frontend changes, when planning the local check, then both profiles run", () => {
