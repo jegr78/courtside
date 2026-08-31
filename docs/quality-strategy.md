@@ -168,9 +168,10 @@ that exact fingerprint, both CI and local checks execute `full`; the earlier fig
 historical evidence and cannot activate the changed policy.
 
 The admissible observation window for the five-job topology starts at 2026-08-31T20:13:44Z, when
-the topology was merged to `main`. Runs
-from the earlier topology remain historical context but cannot prove that the tooling job was
-selected or safely skipped, so replay excludes them instead of inventing a result.
+the topology was merged to `main`. A run also needs a merge base containing commit
+`2722b3d4325a38e8e1bafc30865138134c2ff6b9`. A stale pull-request branch can start after the time
+boundary while still using the earlier topology. Replay retains such runs as incompatible evidence
+but does not treat a job that did not yet exist as missing or successful.
 
 Successful full-profile runs had a 14.27-minute median and 14.85-minute p95. Successful backend
 runs had a 10.40-minute median and 10.58-minute p95; the one frontend run measured 11.92 minutes.

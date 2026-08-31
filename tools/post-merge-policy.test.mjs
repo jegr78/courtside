@@ -24,4 +24,5 @@ test("given reduced profiles, when observation policy qualifies them, then every
   assert.deepEqual([...observation.requiredReducedProfiles].sort(), ["backend", "frontend", "tooling"]);
   assert.ok(observation.minimumFirstAttempts >= observation.minimumReducedFirstAttempts);
   assert.ok(Number.isFinite(Date.parse(observation.evidenceWindowStartedAt)));
+  assert.match(observation.requiredBaseCommit, /^[a-f0-9]{40}$/);
 });
