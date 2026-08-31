@@ -15,6 +15,8 @@ const summarySchema = JSON.parse(readFileSync(
   new URL("../ci/test-profile-observation-summary.schema.json", import.meta.url), "utf8"));
 const inventorySchema = JSON.parse(readFileSync(
   new URL("../ci/test-profile-observation-inventory.schema.json", import.meta.url), "utf8"));
+const observationContract = JSON.parse(readFileSync(
+  new URL("../ci/test-profile-observation.json", import.meta.url), "utf8"));
 const validate = new Ajv({ strict: true, formats: { "date-time": true } }).compile(schema);
 const validateSummary = new Ajv({ strict: true, formats: { "date-time": true } }).compile(summarySchema);
 const validateInventory = new Ajv({ strict: true, formats: { "date-time": true } }).compile(inventorySchema);
@@ -34,14 +36,16 @@ const plan = {
 
 function inventoryFor(observations, overrides = {}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     repository: "example/courtside",
     windowStartedAt: "2026-08-28T00:00:00.000Z",
     windowEndedAt: "2026-09-16T23:59:59.000Z",
+    requiredBaseCommit: observationContract.requiredBaseCommit,
     firstAttempts: observations.filter((entry) => entry.isFirstAttempt).map((entry) => ({
       runId: entry.runId,
       commit: entry.commit
     })),
+    incompatibleFirstAttempts: [],
     ...overrides
   };
 }
@@ -345,6 +349,7 @@ test("given reruns or contradictory records, when summarizing, then they cannot 
   assert.equal(summary.sampleSize, 1);
   assert.equal(summary.observedFirstAttemptCount, 2);
   assert.equal(summary.incompleteObservationCount, 1);
+  assert.equal(summary.incompatibleBaseCount, 0);
   assert.equal(summary.rerunCount, 1);
   assert.equal(summary.status, "collecting");
   assert.throws(() => summarizeProfileObservations([
@@ -367,6 +372,12 @@ test("given reruns or contradictory records, when summarizing, then they cannot 
     windowEndedAt: "2026-08-27T10:00:00.000Z"
   })), /precedes/);
   assert.throws(() => summarizeProfileObservations([first], inventoryFor([])), /inventory/);
+  assert.throws(() => summarizeProfileObservations([first], inventoryFor([first], {
+    requiredBaseCommit: "f".repeat(40)
+  })), /inventory/);
+  assert.throws(() => summarizeProfileObservations([first], inventoryFor([first], {
+    incompatibleFirstAttempts: [{ runId: first.runId, commit: first.commit, baseCommit: "a".repeat(40) }]
+  })), /incompatible/i);
   assert.throws(() => summarizeProfileObservations([first], inventoryFor([first], {
     repository: "another/repository"
   })), /repository/);
@@ -412,6 +423,7 @@ test("given a qualified summary, when rendering the final report, then sample wi
   assert.match(report, /Tooling-profile first attempts: 1/);
   assert.match(report, /Observation window: 19 days/);
   assert.match(report, /Full-profile rate: 0\.00%/);
+  assert.match(report, /Incompatible-base first attempts excluded: 0/);
   for (const limitation of summary.limitations) assert.match(report, new RegExp(limitation.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 

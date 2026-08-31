@@ -3,7 +3,7 @@
   "$id": "urn:courtside:ci:test-profile-observation-summary:v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["sampleSize", "repository", "policyFingerprint", "windowStartedAt", "observedFirstAttemptCount", "rerunCount", "windowDays", "fullProfileCount", "reducedProfileCount", "fullProfileRate", "profileCounts", "candidateMissCount", "classificationErrorCount", "incompleteObservationCount", "assessedAt", "limitations", "status"],
+  "required": ["sampleSize", "repository", "policyFingerprint", "windowStartedAt", "observedFirstAttemptCount", "rerunCount", "windowDays", "fullProfileCount", "reducedProfileCount", "fullProfileRate", "profileCounts", "candidateMissCount", "classificationErrorCount", "incompleteObservationCount", "incompatibleBaseCount", "assessedAt", "limitations", "status"],
   "properties": {
     "sampleSize": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$" },
@@ -30,6 +30,7 @@
     "candidateMissCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "classificationErrorCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "incompleteObservationCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "incompatibleBaseCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "assessedAt": { "type": "string", "format": "date-time" },
     "limitations": {
       "type": "array",

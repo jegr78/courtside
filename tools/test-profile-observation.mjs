@@ -281,18 +281,30 @@ export function createObservationInventory(pages, repository, windowStartedAt, w
       && Date.parse(run.created_at) <= Date.parse(windowEndedAt))
     .map((run) => ({ runId: run.id, commit: run.head_sha }))
     .sort((left, right) => left.runId - right.runId);
-  return { schemaVersion: 1, repository, windowStartedAt, windowEndedAt, firstAttempts };
+  return {
+    schemaVersion: 2,
+    repository,
+    windowStartedAt,
+    windowEndedAt,
+    requiredBaseCommit: contract.requiredBaseCommit,
+    firstAttempts,
+    incompatibleFirstAttempts: []
+  };
 }
 
 function validateInventory(inventory) {
-  const fields = new Set(["schemaVersion", "repository", "windowStartedAt", "windowEndedAt", "firstAttempts"]);
+  const fields = new Set(["schemaVersion", "repository", "windowStartedAt", "windowEndedAt",
+    "requiredBaseCommit", "firstAttempts", "incompatibleFirstAttempts"]);
   if (inventory === null || typeof inventory !== "object" || Array.isArray(inventory)
-      || Object.keys(inventory).some((field) => !fields.has(field)) || inventory.schemaVersion !== 1
+      || Object.keys(inventory).some((field) => !fields.has(field)) || inventory.schemaVersion !== 2
       || typeof inventory.repository !== "string"
       || !/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(inventory.repository)
       || !utcTimestamp.test(inventory.windowStartedAt) || !utcTimestamp.test(inventory.windowEndedAt)
       || Date.parse(inventory.windowStartedAt) >= Date.parse(inventory.windowEndedAt)
-      || !Array.isArray(inventory.firstAttempts) || inventory.firstAttempts.length > 10_000) {
+      || inventory.requiredBaseCommit !== contract.requiredBaseCommit
+      || !Array.isArray(inventory.firstAttempts) || inventory.firstAttempts.length > 10_000
+      || !Array.isArray(inventory.incompatibleFirstAttempts)
+      || inventory.incompatibleFirstAttempts.length > 10_000) {
     throw new Error("Observation inventory is invalid");
   }
   const expectedFields = new Set(["runId", "commit"]);
@@ -301,6 +313,17 @@ function validateInventory(inventory) {
       || !Number.isSafeInteger(entry.runId) || entry.runId < 1 || !/^[a-f0-9]{40}$/.test(entry.commit))
       || new Set(inventory.firstAttempts.map((entry) => entry.runId)).size !== inventory.firstAttempts.length) {
     throw new Error("Observation inventory attempts are invalid");
+  }
+  const incompatibleFields = new Set(["runId", "commit", "baseCommit"]);
+  if (inventory.incompatibleFirstAttempts.some((entry) => entry === null || typeof entry !== "object"
+      || Array.isArray(entry) || Object.keys(entry).some((field) => !incompatibleFields.has(field))
+      || !Number.isSafeInteger(entry.runId) || entry.runId < 1
+      || !/^[a-f0-9]{40}$/.test(entry.commit) || !/^[a-f0-9]{40}$/.test(entry.baseCommit))
+      || new Set(inventory.incompatibleFirstAttempts.map((entry) => entry.runId)).size
+        !== inventory.incompatibleFirstAttempts.length
+      || inventory.incompatibleFirstAttempts.some((entry) =>
+        inventory.firstAttempts.some((compatible) => compatible.runId === entry.runId))) {
+    throw new Error("Incompatible observation inventory attempts are invalid");
   }
 }
 
@@ -368,6 +391,7 @@ export function summarizeProfileObservations(observations, inventory) {
     candidateMissCount,
     classificationErrorCount,
     incompleteObservationCount,
+    incompatibleBaseCount: inventory.incompatibleFirstAttempts.length,
     assessedAt: inventory.windowEndedAt,
     limitations: [
       "Observations cover GitHub-hosted pull-request runs only.",
@@ -401,6 +425,7 @@ export function profileObservationReport(summary) {
     `- Candidate misses: ${summary.candidateMissCount}`,
     `- Classification errors: ${summary.classificationErrorCount}`,
     `- Incomplete observations excluded: ${summary.incompleteObservationCount}`,
+    `- Incompatible-base first attempts excluded: ${summary.incompatibleBaseCount}`,
     "",
     "## Limitations",
     "",

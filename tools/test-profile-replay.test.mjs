@@ -11,6 +11,7 @@ const tooling = "tooling";
 const security = "security";
 const base = "a".repeat(40);
 const head = "b".repeat(40);
+const compatibleBase = async () => true;
 
 test("given runs around the five-job topology merge, when selecting evidence, then only compatible runs remain", () => {
   // given
@@ -93,7 +94,8 @@ test("given a protected reduced run, when replaying current policy, then the exp
     runSummaries: [source],
     loadAttempt: async () => source,
     loadJobs: async () => jobs,
-    classify: async (identity) => frontendPlan(identity)
+    classify: async (identity) => frontendPlan(identity),
+    baseIncludesRequiredCommit: compatibleBase
   });
   // then
   assert.equal(result.summary.sampleSize, 1);
@@ -101,6 +103,34 @@ test("given a protected reduced run, when replaying current policy, then the exp
   assert.equal(result.summary.profileCounts.frontend, 1);
   assert.equal(result.observations[0].classificationOutcome, "no-observed-miss");
   assert.deepEqual(result.observations[0].incompleteJobs, []);
+});
+
+test("given a first attempt based before the required topology, when replaying, then it remains visible but is not assessed", async () => {
+  // given
+  const incompatible = run(105);
+  const compatible = run(106);
+  const jobs = [job(1, docs, "success"), job(2, backend, "success"),
+    job(3, frontend, "success"), job(4, tooling, "skipped"), job(5, security, "success")];
+
+  // when
+  const result = await replayProfileEvidence({
+    repository: "jegr78/courtside",
+    assessedAt: "2026-09-01T07:00:00Z",
+    runSummaries: [incompatible, compatible],
+    loadAttempt: async (runId) => runId === 105 ? incompatible : compatible,
+    loadJobs: async () => jobs,
+    classify: async (identity) => frontendPlan(identity),
+    baseIncludesRequiredCommit: async (_baseCommit, runId) => runId === 106
+  });
+
+  // then
+  assert.deepEqual(result.observations.map((observation) => observation.runId), [106]);
+  assert.deepEqual(result.inventory.firstAttempts, [{ runId: 106, commit: head }]);
+  assert.deepEqual(result.inventory.incompatibleFirstAttempts, [{
+    runId: 105,
+    commit: head,
+    baseCommit: base
+  }]);
 });
 
 test("given historical added e2e evidence, when replaying current policy, then frontend remains attributable", async () => {
@@ -116,6 +146,7 @@ test("given historical added e2e evidence, when replaying current policy, then f
     runSummaries: [source],
     loadAttempt: async () => source,
     loadJobs: async () => jobs,
+    baseIncludesRequiredCommit: compatibleBase,
     classify: async (identity) => {
       const classified = classifyChanges([
         { status: "A", path: "frontend/e2e/new-journey.spec.ts" }
@@ -142,6 +173,7 @@ test("given historical added e2e evidence loses a required job, when replaying, 
     runSummaries: [source],
     loadAttempt: async () => source,
     loadJobs: async () => jobs,
+    baseIncludesRequiredCommit: compatibleBase,
     classify: async (identity) => {
       const classified = classifyChanges([
         { status: "A", path: "frontend/e2e/new-journey.spec.ts" }
@@ -157,6 +189,7 @@ test("given historical added e2e evidence loses a required job, when replaying, 
     loadAttempt: async () => source,
     loadJobs: async () => [job(1, docs, "skipped"), job(2, backend, "skipped"),
       job(3, frontend, "success"), job(4, tooling, "skipped"), job(5, security, "skipped")],
+    baseIncludesRequiredCommit: compatibleBase,
     classify: async (identity) => {
       const classified = classifyChanges([
         { status: "A", path: "frontend/e2e/new-journey.spec.ts" }
@@ -243,6 +276,7 @@ test("given current policy needs an historically skipped job, when replaying, th
     runSummaries: [source],
     loadAttempt: async () => source,
     loadJobs: async () => jobs,
+    baseIncludesRequiredCommit: compatibleBase,
     classify: async (identity) => ({
       ...frontendPlan(identity), profiles: [backend, frontend],
       reasons: [{ code: "current-policy", path: "src/Main.java", profile: backend, status: "M" }]
@@ -268,6 +302,7 @@ test("given a replay attempt other than the first, when loading evidence, then i
     loadAttempt: async () => secondAttempt,
     loadJobs: async () => [job(1, docs, "skipped"), job(2, backend, "skipped"),
       job(3, frontend, "success"), job(4, tooling, "skipped"), job(5, security, "success")],
-    classify: async (identity) => frontendPlan(identity)
+    classify: async (identity) => frontendPlan(identity),
+    baseIncludesRequiredCommit: compatibleBase
   }), /first attempt/);
 });

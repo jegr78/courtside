@@ -65,21 +65,34 @@ function validateRunSummary(summary, attempt, repository) {
 
 export async function replayProfileEvidence({ repository, assessedAt, runSummaries, loadAttempt,
   loadJobs, classify, resolveIdentity = (run) => runBaseIdentity(run, repository),
-  windowStartedAt = contract.evidenceWindowStartedAt }) {
+  windowStartedAt = contract.evidenceWindowStartedAt,
+  requiredBaseCommit = contract.requiredBaseCommit,
+  baseIncludesRequiredCommit = gitBaseIncludesRequiredCommit }) {
   if (!repositoryPattern.test(repository ?? "") || !validTimestamp(assessedAt)
       || !validTimestamp(windowStartedAt) || Date.parse(windowStartedAt) >= Date.parse(assessedAt)
+      || !shaPattern.test(requiredBaseCommit ?? "")
       || !Array.isArray(runSummaries) || runSummaries.length < 1 || runSummaries.length > 10_000
-      || typeof loadAttempt !== "function" || typeof loadJobs !== "function" || typeof classify !== "function") {
+      || typeof loadAttempt !== "function" || typeof loadJobs !== "function" || typeof classify !== "function"
+      || typeof baseIncludesRequiredCommit !== "function") {
     throw new Error("Replay input is invalid");
   }
   const runIds = runSummaries.map((run) => run?.id);
   if (new Set(runIds).size !== runIds.length) throw new Error("Run inventory contains duplicates");
   const observations = [];
+  const incompatibleFirstAttempts = [];
   for (const summary of [...runSummaries].sort((left, right) => left.id - right.id)) {
     try {
       const attempt = await loadAttempt(summary.id);
       validateRunSummary(summary, attempt, repository);
       const identity = await resolveIdentity(attempt);
+      if (!await baseIncludesRequiredCommit(identity.baseCommit, identity.runId, requiredBaseCommit)) {
+        incompatibleFirstAttempts.push({
+          runId: identity.runId,
+          commit: identity.headCommit,
+          baseCommit: identity.baseCommit
+        });
+        continue;
+      }
       const jobs = await loadJobs(summary.id);
       const timing = createTimingRecord(attempt, jobs, repository);
       const plan = await classify(identity);
@@ -93,14 +106,31 @@ export async function replayProfileEvidence({ repository, assessedAt, runSummari
     }
   }
   const inventory = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     repository,
     windowStartedAt,
     windowEndedAt: assessedAt,
-    firstAttempts: observations.map(({ runId, commit }) => ({ runId, commit }))
+    requiredBaseCommit,
+    firstAttempts: observations.map(({ runId, commit }) => ({ runId, commit })),
+    incompatibleFirstAttempts
   };
   const summary = summarizeProfileObservations(observations, inventory);
   return { observations, inventory, summary };
+}
+
+function gitBaseIncludesRequiredCommit(baseCommit, runId, requiredBaseCommit) {
+  if (!shaPattern.test(baseCommit ?? "") || !Number.isSafeInteger(runId) || runId < 1) {
+    throw new Error("Replay base identity is invalid");
+  }
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", requiredBaseCommit, baseCommit], {
+      cwd: repositoryRoot, stdio: "ignore"
+    });
+    return true;
+  } catch (error) {
+    if (error?.status === 1) return false;
+    throw error;
+  }
 }
 
 export function pullRequestIdentity(run, pullRequests, repository) {
