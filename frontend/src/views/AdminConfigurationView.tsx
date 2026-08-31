@@ -479,7 +479,7 @@ function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTy
 
 function GlobalRuleLink({ ruleType }: { ruleType: RuleType }) {
   const { t } = useTranslation();
-  const target = ruleType === "OPENING_HOURS" ? "/admin/facility#opening-hours"
+  const target = ruleType === "OPENING_HOURS" ? "/admin/facility/opening-hours"
     : ruleType === "SLOT_GRID" ? "/admin/configuration#slot-minutes"
       : undefined;
   if (!target) return null;

@@ -411,7 +411,7 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("time-zone")).toHaveValue("Europe/Berlin");
     expect(screen.getByTestId("rule-OPENING_HOURS-title")).toHaveRole("heading");
     expect(screen.getByTestId("rule-OPENING_HOURS-title")).toHaveTextContent("Opening hours");
-    expect(screen.getByTestId("rule-OPENING_HOURS-global")).toHaveAttribute("href", "/admin/facility#opening-hours");
+    expect(screen.getByTestId("rule-OPENING_HOURS-global")).toHaveAttribute("href", "/admin/facility/opening-hours");
     expect(screen.getByTestId("rule-SLOT_GRID-global")).toHaveAttribute("href", "/admin/configuration#slot-minutes");
     expect(screen.getByTestId("slot-minutes")).toHaveAttribute("id", "slot-minutes");
     await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));

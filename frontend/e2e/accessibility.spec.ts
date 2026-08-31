@@ -109,20 +109,41 @@ for (const locale of ["de", "en"]) {
     await signIn(page, "configuration-admin");
 
     // when
-    await page.goto("/admin/facility");
-    await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+    await page.goto("/admin/facility/courts");
+    await expect(page.getByTestId("admin-courts-view")).toBeVisible();
     await expect(page.getByTestId("create-court")).toBeVisible();
 
     // then
     await expectNoWcagViolations(page);
 
-    // when
+    // when — the audit entry the last stage reads is written here, on the page that owns the court
     const courtToggled = page.waitForResponse((response) =>
       response.url().endsWith("/api/admin/courts/dddddddd-0000-0000-0000-000000000002/active")
         && response.request().method() === "PUT"
     );
     await page.getByTestId("toggle-court-dddddddd-0000-0000-0000-000000000002").click();
     await courtToggled;
+    await page.goto("/admin/facility/opening-hours");
+    await expect(page.getByTestId("save-hours-MONDAY")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+
+    // when
+    await page.goto("/admin/facility/booking-cards");
+    await expect(page.getByTestId("create-card")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+
+    // when
+    await page.goto("/admin/facility/slot-fillers");
+    await expect(page.getByTestId("create-participant-card")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+
+    // when
     await page.goto("/admin/audit");
     await expect(page.getByTestId("admin-audit-view")).toBeVisible();
     await expect(page.getByTestId("audit-row").first()).toBeVisible();

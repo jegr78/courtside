@@ -233,7 +233,7 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await page.getByTestId("administration-link").click();
-  await page.getByTestId("admin-facility-link").click();
+  await page.getByTestId("admin-booking-cards-link").click();
   await page.getByTestId("new-card-label").fill("Restricted event");
   await page.getByTestId("new-card-role-MEMBER").check();
   await page.getByTestId("new-card-counts").fill("2");
@@ -362,8 +362,8 @@ test("a court going out of service reaches the member whose booking is on it",
     await page.getByTestId("password").fill("temporary-password");
     await page.getByTestId("login-submit").click();
     await page.getByTestId("administration-link").click();
-    await page.getByTestId("admin-facility-link").click();
-    await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+    await page.getByTestId("admin-courts-link").click();
+    await expect(page.getByTestId("admin-courts-view")).toBeVisible();
 
     // when
     const court = "dddddddd-0000-0000-0000-000000000003";
@@ -389,8 +389,8 @@ test("an admin takes a court out of service and restores it through the browser"
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await page.getByTestId("administration-link").click();
-  await page.getByTestId("admin-facility-link").click();
-  await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+  await page.getByTestId("admin-courts-link").click();
+  await expect(page.getByTestId("admin-courts-view")).toBeVisible();
   const court = "dddddddd-0000-0000-0000-000000000004";
 
   // when
@@ -407,7 +407,7 @@ test("an admin takes a court out of service and restores it through the browser"
 
   // when
   await page.getByTestId("administration-link").click();
-  await page.getByTestId("admin-facility-link").click();
+  await page.getByTestId("admin-courts-link").click();
   const courtReactivated = page.waitForResponse((response) =>
     response.url().endsWith(`/api/admin/courts/${court}/active`)
       && response.request().method() === "PUT"
@@ -427,8 +427,8 @@ test("an admin changes a court and finds that change in the log", async ({ page 
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await page.getByTestId("administration-link").click();
-  await page.getByTestId("admin-facility-link").click();
-  await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+  await page.getByTestId("admin-courts-link").click();
+  await expect(page.getByTestId("admin-courts-view")).toBeVisible();
   const court = "dddddddd-0000-0000-0000-000000000003";
 
   // when

@@ -147,7 +147,7 @@ test("an administrator can open both core administration views", async ({ page }
   await page.goto("/admin/facility");
 
   // then
-  await expect(page.getByTestId("admin-facility-view")).toBeVisible();
+  await expect(page.getByTestId("admin-courts-view")).toBeVisible();
   await expect(page.getByTestId("create-court")).toBeVisible();
 });
 

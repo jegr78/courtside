@@ -26,8 +26,17 @@ const groups: Group[] = [
     testId: "admin-group-club",
     heading: "nav.adminClub",
     destinations: [
-      { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration" },
-      { to: "/admin/facility", testId: "admin-facility-link", label: "nav.adminFacility" }
+      { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration" }
+    ]
+  },
+  {
+    testId: "admin-group-facility",
+    heading: "nav.adminFacility",
+    destinations: [
+      { to: "/admin/facility/courts", testId: "admin-courts-link", label: "nav.adminCourts" },
+      { to: "/admin/facility/opening-hours", testId: "admin-opening-hours-link", label: "nav.adminOpeningHours" },
+      { to: "/admin/facility/booking-cards", testId: "admin-booking-cards-link", label: "nav.adminBookingCards" },
+      { to: "/admin/facility/slot-fillers", testId: "admin-slot-fillers-link", label: "nav.adminSlotFillers" }
     ]
   },
   {
