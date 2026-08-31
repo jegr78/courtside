@@ -33,6 +33,21 @@ test("given the router, when reading its routes, then the wildcard is not one of
   assert.deepEqual(clientRoutes(source), ["/courts"]);
 });
 
+// Administration is a layout route with its destinations nested inside it, so a child path is
+// written relative to its parent and only the two together name the route the server must forward.
+test("given nested routes, when reading them, then a child is read together with its parent", () => {
+  // given
+  const source = 'const a = <Routes><Route path="/admin" element={<Shell />}>'
+    + '<Route index element={<X />} />'
+    + '<Route path="facility" element={<Y />} />'
+    + '<Route path="roster/:personId" element={<Z />} />'
+    + '<Route path="*" element={<W />} />'
+    + '</Route></Routes>;';
+
+  // when / then
+  assert.deepEqual(clientRoutes(source), ["/admin", "/admin/facility", "/admin/roster/:personId"]);
+});
+
 test("given a client route, when the server serves the shell, then it forwards to the application", () => {
   // when / then
   assert.deepEqual(
@@ -57,15 +72,32 @@ test("given a client route, when it is opened before signing in, then the shell 
 function clientRoutes(source) {
   const file = ts.createSourceFile("router.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const routes = [];
-  function visit(node) {
-    if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
-      const path = routePath(node);
-      if (path && path !== "*") routes.push(path);
+  function visit(node, parent) {
+    // An element with children carries its path on the opening tag, which the walk reaches as a
+    // sibling of those children — so the nesting is read here rather than left to the traversal.
+    if (ts.isJsxElement(node)) {
+      const route = named(routePath(node.openingElement), parent);
+      if (route) routes.push(route);
+      node.children.forEach((child) => visit(child, route ?? parent));
+      return;
     }
-    ts.forEachChild(node, visit);
+    if (ts.isJsxSelfClosingElement(node)) {
+      const route = named(routePath(node), parent);
+      if (route) routes.push(route);
+    }
+    ts.forEachChild(node, (child) => visit(child, parent));
   }
-  visit(file);
+
+  function named(path, parent) {
+    return path && path !== "*" ? beneath(parent, path) : undefined;
+  }
+  visit(file, "");
   return [...new Set(routes)];
+}
+
+// A child path is relative to the route it sits in unless it names the root itself.
+function beneath(parent, path) {
+  return !parent || path.startsWith("/") ? path : `${parent}/${path}`;
 }
 
 function routePath(element) {
