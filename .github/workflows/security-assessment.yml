@@ -13,6 +13,7 @@ on:
         options:
           - safe
           - active
+          - baseline
 
 concurrency:
   group: scheduled-security-assessment
@@ -24,7 +25,7 @@ permissions:
 jobs:
   assessment:
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.profile == 'active' && 65 || 45 }}
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.profile == 'baseline' && 75 || github.event_name == 'workflow_dispatch' && inputs.profile == 'active' && 65 || 45 }}
     outputs:
       evidence-sealed: ${{ steps.seal.outputs.sealed }}
     env:
@@ -49,27 +50,68 @@ jobs:
       - name: Prepare pinned assessment images
         run: |
           set -o pipefail
-          frontend/node/node tools/security-image-inventory.mjs "$PROFILE" | xargs -n1 docker pull
+          ASSESSMENT_PROFILE="$PROFILE"
+          if [[ "$PROFILE" = baseline ]]; then ASSESSMENT_PROFILE=active; fi
+          frontend/node/node tools/security-image-inventory.mjs "$ASSESSMENT_PROFILE" | xargs -n1 docker pull
       - name: Start the disposable security target
         env:
           IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
         run: frontend/node/node tools/courtside.mjs security "$RUN_ID" "$IMAGE_DIGEST"
-      - name: Execute the bounded assessment
+      - name: Execute the bounded safe assessment
+        if: env.PROFILE != 'active'
         run: |
-          if [[ "$PROFILE" = active ]]; then
-            frontend/node/node tools/courtside.mjs security-run "$RUN_ID" active \
-              --qualification build/uat-smoke/qualification.json \
-              --authorize "authorize-active-$RUN_ID"
+          if [[ "$PROFILE" = baseline ]]; then
+            frontend/node/node tools/courtside.mjs security-run "$RUN_ID" safe \
+              --qualification build/uat-smoke/qualification.json || true
           else
             frontend/node/node tools/courtside.mjs security-run "$RUN_ID" safe \
               --qualification build/uat-smoke/qualification.json
           fi
-      - name: Capture the immutable first-attempt manifest
-        if: always()
+      - name: Capture the immutable safe manifest
+        if: always() && env.PROFILE != 'active'
         run: |
           umask 077
           mkdir -p build/security-gate
-          frontend/node/node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest.json
+          if [[ "$PROFILE" = baseline ]]; then
+            frontend/node/node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest-safe.json
+          else
+            frontend/node/node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest.json
+          fi
+      - name: Validate safe baseline continuation
+        if: env.PROFILE == 'baseline'
+        env:
+          IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
+        run: >
+          frontend/node/node tools/security-baseline-continuation.mjs
+          build/security-gate/manifest-safe.json
+          "$IMAGE_DIGEST"
+          "${{ github.sha }}"
+      - name: Execute the bounded active assessment
+        if: env.PROFILE != 'safe'
+        run: |
+          frontend/node/node tools/courtside.mjs security-run "$RUN_ID" active \
+            --qualification build/uat-smoke/qualification.json \
+            --authorize "authorize-active-$RUN_ID"
+      - name: Capture the immutable active manifest
+        if: always() && env.PROFILE != 'safe'
+        run: |
+          umask 077
+          mkdir -p build/security-gate
+          if [[ "$PROFILE" = baseline ]]; then
+            frontend/node/node tools/courtside.mjs security-report "$RUN_ID" --attempt 2 > build/security-gate/manifest-active.json
+          else
+            frontend/node/node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest.json
+          fi
+      - name: Validate the baseline pair
+        if: env.PROFILE == 'baseline'
+        env:
+          IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
+        run: >
+          frontend/node/node tools/security-baseline-pair.mjs
+          build/security-gate/manifest-safe.json
+          build/security-gate/manifest-active.json
+          "$IMAGE_DIGEST"
+          "${{ github.sha }}"
       - id: seal
         name: Seal protected assessment evidence
         if: always()
@@ -83,15 +125,18 @@ jobs:
           jq -e --arg today "$TODAY" \
             '.canaryVerifiedOn <= $today and $today <= .canaryValidThrough' \
             .github/security-evidence-key.json > /dev/null
-          tar -czf - -C "build/security/$RUN_ID/assessment/attempt-1" evidence \
-            | openssl cms -encrypt -binary -aes-256-gcm -outform DER \
-            -out build/security-gate/protected-evidence.cms \
-            .github/security-evidence-recipient.pem
+          if [[ "$PROFILE" = baseline ]]; then
+            tar -czf - -C "build/security/$RUN_ID/assessment" attempt-1/evidence attempt-2/evidence
+          else
+            tar -czf - -C "build/security/$RUN_ID/assessment/attempt-1" evidence
+          fi | openssl cms -encrypt -binary -aes-256-gcm -outform DER \
+              -out build/security-gate/protected-evidence.cms \
+              .github/security-evidence-recipient.pem
           openssl dgst -sha256 -r build/security-gate/protected-evidence.cms \
             | awk '{print $1}' > build/security-gate/protected-evidence.sha256
           echo "sealed=true" >> "$GITHUB_OUTPUT"
-      - name: Enforce the assessment gate
-        if: always()
+      - name: Enforce the standalone assessment gate
+        if: always() && env.PROFILE != 'baseline'
         env:
           IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
         run: >
@@ -101,6 +146,28 @@ jobs:
           --subject "$IMAGE_DIGEST"
           --source-commit "${{ github.sha }}"
           --output build/security-gate/summary.json
+      - name: Enforce the safe baseline gate
+        if: always() && env.PROFILE == 'baseline'
+        env:
+          IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
+        run: >
+          frontend/node/node tools/security-assessment-gate.mjs
+          --manifest build/security-gate/manifest-safe.json
+          --profile safe
+          --subject "$IMAGE_DIGEST"
+          --source-commit "${{ github.sha }}"
+          --output build/security-gate/summary-safe.json
+      - name: Enforce the active baseline gate
+        if: always() && env.PROFILE == 'baseline'
+        env:
+          IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
+        run: >
+          frontend/node/node tools/security-assessment-gate.mjs
+          --manifest build/security-gate/manifest-active.json
+          --profile active
+          --subject "$IMAGE_DIGEST"
+          --source-commit "${{ github.sha }}"
+          --output build/security-gate/summary-active.json
       - name: Remove the disposable security target
         if: always()
         run: frontend/node/node tools/courtside.mjs security-cleanup "$RUN_ID"
@@ -109,8 +176,8 @@ jobs:
         with:
           name: security-assessment-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            build/security-gate/manifest.json
-            build/security-gate/summary.json
+            build/security-gate/manifest*.json
+            build/security-gate/summary*.json
             build/security-gate/protected-evidence.cms
             build/security-gate/protected-evidence.sha256
           retention-days: 14

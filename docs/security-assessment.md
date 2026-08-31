@@ -137,9 +137,12 @@ record and run manifest plus a CMS-encrypted envelope of the protected normalize
 days. Missing scanners, missing evidence and incomplete outcomes fail the job; they are never
 normalized as a clean run.
 
-Manual dispatch may select the complete `active` profile for a baseline or retest. It uses the same
-fresh hosted runner, qualified immutable image and evidence gate as the scheduled job. The schedule
-always selects `safe`; an active run is never introduced by changing a default or cron expression.
+Manual dispatch may select `active` for a focused retest or `baseline` for paired safe and active
+evidence. A baseline builds, qualifies and starts one immutable image, records safe as attempt 1 and
+continues with active as attempt 2 only after the safe attempt produced complete passive evidence.
+Both manifests are gated against the same image, commit and target identity, and both evidence
+directories share one encrypted envelope. The schedule always selects `safe`; active traffic is
+never introduced by changing a default or cron expression.
 
 The public certificate in [`.github/security-evidence-recipient.pem`](../.github/security-evidence-recipient.pem)
 encrypts that envelope with AES-256-GCM through OpenSSL CMS. Its security evidence private key is
