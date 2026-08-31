@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = require("ajv/dist/2020").default;
@@ -119,4 +120,15 @@ export function validateManualAssessmentEvidence(evidence, assessmentDate = new 
     fail("executed procedures differ from the authorized procedures");
   }
   return evidence;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    if (process.argv.length !== 3) throw new Error("Usage: security-manual-assessment.mjs <evidence.json>");
+    validateManualAssessmentEvidence(JSON.parse(readFileSync(process.argv[2], "utf8")));
+    process.stdout.write("Manual assessment evidence is valid\n");
+  } catch (failure) {
+    process.stderr.write(`${failure.message}\n`);
+    process.exitCode = 1;
+  }
 }

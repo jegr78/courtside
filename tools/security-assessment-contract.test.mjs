@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { validateManualAssessmentEvidence } from "./security-manual-assessment.mjs";
 
@@ -183,7 +186,7 @@ test("given the manual runbook, when an assessment is recorded, then method evid
   assert.match(manualRunbook, /independent external tester/i);
 });
 
-test("given manual evidence, when its outcome needs action, then rationale and finding provenance fail closed", () => {
+test("given manual evidence, when its outcome needs action, then schema and CLI validation fail closed", (context) => {
   // given
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true })
     .compile(manualEvidenceSchema);
@@ -239,6 +242,29 @@ test("given manual evidence, when its outcome needs action, then rationale and f
   // when / then
   assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
   assert.equal(validateManualAssessmentEvidence(evidence, new Date("2026-08-21T20:00:00Z")), evidence);
+  const directory = mkdtempSync(join(tmpdir(), "courtside-manual-assessment-"));
+  context.after(() => rmSync(directory, { recursive: true, force: true }));
+  const evidencePath = join(directory, "evidence.json");
+  writeFileSync(evidencePath, JSON.stringify(evidence));
+  const cli = spawnSync(process.execPath, [join(import.meta.dirname, "security-manual-assessment.mjs"), evidencePath], {
+    encoding: "utf8"
+  });
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(cli.stdout, "Manual assessment evidence is valid\n");
+  const credential = "password=do-not-retain";
+  writeFileSync(evidencePath, JSON.stringify({
+    ...evidence,
+    procedures: [{ ...procedure, controls: [{ ...control, observedResult: credential }] }]
+  }));
+  const rejectedCli = spawnSync(
+    process.execPath,
+    [join(import.meta.dirname, "security-manual-assessment.mjs"), evidencePath],
+    { encoding: "utf8" }
+  );
+  assert.equal(rejectedCli.status, 1);
+  assert.equal(rejectedCli.stdout, "");
+  assert.doesNotMatch(rejectedCli.stderr, /do-not-retain/);
+  assert.match(rejectedCli.stderr, /observed result contains credential-like material/);
   const blockedControl = {
     ...control,
     controlId: "v5.0.0-1.1.2",
