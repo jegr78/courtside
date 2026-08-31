@@ -12,8 +12,14 @@ authorization. Record whether an independent reviewer participates; a single mai
 authorize, execute, validate and accept risk.
 
 Use [`security/manual-assessment-evidence.schema.json`](../security/manual-assessment-evidence.schema.json)
-for the record and validate it with the repository contract tests. The authorization object binds
-the exact HTTPS origin, target fingerprint, image digest, profile, procedure set and expiry.
+for the record and validate the protected file without printing its contents:
+
+```bash
+node tools/security-manual-assessment.mjs <evidence.json>
+```
+
+The authorization object binds the exact HTTPS origin, target fingerprint, image digest, profile,
+procedure set and expiry.
 
 For every procedure retain:
 

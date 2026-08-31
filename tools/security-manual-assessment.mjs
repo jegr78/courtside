@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = require("ajv/dist/2020").default;
@@ -119,4 +120,37 @@ export function validateManualAssessmentEvidence(evidence, assessmentDate = new 
     fail("executed procedures differ from the authorized procedures");
   }
   return evidence;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (process.argv.length !== 3) {
+    process.stderr.write("Usage: security-manual-assessment.mjs <evidence.json>\n");
+    process.exitCode = 1;
+  } else {
+    let content;
+    try {
+      content = readFileSync(process.argv[2], "utf8");
+    } catch {
+      process.stderr.write("Manual assessment evidence could not be read\n");
+      process.exitCode = 1;
+    }
+    if (content !== undefined) {
+      let evidence;
+      try {
+        evidence = JSON.parse(content);
+      } catch {
+        process.stderr.write("Manual assessment evidence is not valid JSON\n");
+        process.exitCode = 1;
+      }
+      if (evidence !== undefined) {
+        try {
+          validateManualAssessmentEvidence(evidence);
+          process.stdout.write("Manual assessment evidence is valid\n");
+        } catch {
+          process.stderr.write("Manual assessment evidence is invalid\n");
+          process.exitCode = 1;
+        }
+      }
+    }
+  }
 }
