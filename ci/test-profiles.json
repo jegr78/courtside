@@ -33,7 +33,6 @@
       ],
       "prefixes": [
         ".codex/",
-        ".github/",
         ".mvn/",
         "ci/",
         "deploy/",

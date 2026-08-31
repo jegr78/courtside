@@ -75,6 +75,18 @@ test("given a tooling test changes, when planning locally, then only locked tool
   assert.deepEqual(plan.tasks.map((task) => task.label), ["frontend-toolchain", "tooling-test"]);
 });
 
+test("given reviewed GitHub metadata changes, when planning locally, then the declared validators run", () => {
+  // when
+  const template = localCheckPlan([{ status: "M", path: ".github/ISSUE_TEMPLATE/bug.md" }]);
+  const dependabot = localCheckPlan([{ status: "M", path: ".github/dependabot.yml" }]);
+
+  // then
+  assert.deepEqual(template.profiles, ["docs"]);
+  assert.deepEqual(template.tasks.map((task) => task.label), ["docs-check"]);
+  assert.deepEqual(dependabot.profiles, ["tooling"]);
+  assert.deepEqual(dependabot.tasks.map((task) => task.label), ["frontend-toolchain", "tooling-test"]);
+});
+
 test("given backend and frontend changes, when planning the local check, then both profiles run", () => {
   // given
   const changes = [

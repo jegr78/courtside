@@ -135,6 +135,7 @@ function main() {
   else if (process.argv.includes("--check")) {
     checkDocumentation(repository, admission);
     execFileSync(process.execPath, ["--test", "tools/docs-check.test.mjs",
+      "tools/github-template-metadata.test.mjs",
       "tools/quality-strategy.test.mjs", "tools/post-merge-policy.test.mjs",
       "tools/test-profile-contract.test.mjs"], { cwd: repository, shell: false, stdio: "inherit" });
   }

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    { "path": ".github/ISSUE_TEMPLATE/bug.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs", "tools/github-template-metadata.test.mjs"] },
+    { "path": ".github/ISSUE_TEMPLATE/debt.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs", "tools/github-template-metadata.test.mjs"] },
+    { "path": ".github/ISSUE_TEMPLATE/decision.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs", "tools/github-template-metadata.test.mjs"] },
+    { "path": ".github/ISSUE_TEMPLATE/known-limit.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs", "tools/github-template-metadata.test.mjs"] },
+    { "path": ".github/ISSUE_TEMPLATE/operations.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs", "tools/github-template-metadata.test.mjs"] },
+    { "path": ".github/codeql/codeql-config.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/dependabot.yml", "profiles": ["tooling"], "validators": ["tools/github-metadata.test.mjs"] },
+    { "path": ".github/pull_request_template.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs"] },
+    { "path": ".github/security-evidence-key.json", "profiles": ["full"], "validators": [] },
+    { "path": ".github/security-evidence-recipient.pem", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/backup-restore-smoke.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/build.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/ci-timing.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/mail-smoke.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/mutation-testing.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/nightly-failure-tracking.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/performance-smoke.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/post-merge-smoke.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/pr-title-lint.yml", "profiles": ["tooling"], "validators": ["tools/github-metadata.test.mjs", "tools/workflow-action-pinning.test.mjs"] },
+    { "path": ".github/workflows/profile-evidence.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/release.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/security-assessment.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/test-stability.yml", "profiles": ["full"], "validators": [] }
+  ]
+}
