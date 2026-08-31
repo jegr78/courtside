@@ -5,16 +5,17 @@ import { MemoryRouter } from "react-router-dom";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
 import { UnsavedCount } from "../test/UnsavedCount";
+import { UnsavedCounts } from "../test/UnsavedCounts";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { AdminConfigurationView } from "./AdminConfigurationView";
 
 describe("AdminConfigurationView", () => {
-  it("when the page is shown, then it uses the full administration frame", () => {
+  it("when the page is shown, then its content keeps a readable line length", () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
-    expect(screen.getByTestId("admin-configuration-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
+    expect(screen.getByTestId("admin-configuration-view")).toHaveClass("[&>*]:max-w-5xl");
   });
 
   beforeEach(async () => {
@@ -47,6 +48,20 @@ describe("AdminConfigurationView", () => {
       { id: "type-1", name: "Adults", ruleSetId: "rule-set", active: true, grantsAccount: false },
       { id: "type-2", name: "Juniors", ruleSetId: null, active: true, grantsAccount: false }
     ]);
+  });
+
+  // A rule editor that reads its values from a prop through an effect claims unsaved work for the
+  // tick in between, which blocks a navigation and then withdraws the question that would explain it.
+  it("given a rule that is already configured, when it arrives, then nothing ever claims unsaved work", async () => {
+    // given
+    const seen: number[] = [];
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><UnsavedCounts seen={seen} /><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));
+
+    // then
+    expect(Math.max(...seen)).toBe(0);
   });
 
   it("when the configuration is loaded, then the rule set for people without a membership type is offered", async () => {
@@ -425,7 +440,6 @@ describe("AdminConfigurationView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
-    expect(screen.getByRole("link")).toBeInTheDocument();
   });
 
   it("given changed settings, when saving, then both writes use the admin API", async () => {

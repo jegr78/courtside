@@ -69,6 +69,7 @@ test("the bootstrap admin can replace the initial password and maintain a sessio
 
   await page.reload();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
 });
@@ -84,6 +85,7 @@ test("a seeded member stays signed in across a reload and can sign out", async (
   await expect(page.getByTestId("week-grid")).toBeVisible();
   await page.reload();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
 });
@@ -230,6 +232,7 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   await page.getByTestId("username").fill("configuration-admin");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
   await page.getByTestId("admin-facility-link").click();
   await page.getByTestId("new-card-label").fill("Restricted event");
   await page.getByTestId("new-card-role-MEMBER").check();
@@ -241,6 +244,7 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   expect((await cardCreated).status()).toBe(201);
   await expect(page.getByRole("status")).toBeVisible();
   await page.goto("/");
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   await page.getByTestId("username").fill("doe.jane");
   await page.getByTestId("password").fill("temporary-password");
@@ -265,7 +269,7 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("username").fill("configuration-admin");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
-  await page.getByTestId("admin-configuration-link").click();
+  await page.getByTestId("administration-link").click();
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
   await expect(page.getByTestId("time-zone")).toHaveValue("Europe/Berlin");
 
@@ -322,6 +326,7 @@ test("an admin changes club configuration and a booking rule through the browser
 
   // when
   await page.goto("/");
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   await page.getByTestId("username").fill("doe.jane");
   await page.getByTestId("password").fill("temporary-password");
@@ -350,11 +355,13 @@ test("a court going out of service reaches the member whose booking is on it",
     await page.getByTestId("member-match").first().click();
     await page.getByTestId("booking-submit").click();
     await expect(page.locator('tr[data-slot="13:00"] [data-testid="own-allocation"]')).toBeVisible();
+    await page.getByTestId("preferences-menu").click();
     await page.getByTestId("logout").click();
     await expect(page.getByTestId("login-view")).toBeVisible();
     await page.getByTestId("username").fill("configuration-admin");
     await page.getByTestId("password").fill("temporary-password");
     await page.getByTestId("login-submit").click();
+    await page.getByTestId("administration-link").click();
     await page.getByTestId("admin-facility-link").click();
     await expect(page.getByTestId("admin-facility-view")).toBeVisible();
 
@@ -381,6 +388,7 @@ test("an admin takes a court out of service and restores it through the browser"
   await page.getByTestId("username").fill("configuration-admin");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
   await page.getByTestId("admin-facility-link").click();
   await expect(page.getByTestId("admin-facility-view")).toBeVisible();
   const court = "dddddddd-0000-0000-0000-000000000004";
@@ -398,6 +406,7 @@ test("an admin takes a court out of service and restores it through the browser"
   await expect(page.getByTestId("court-column-4")).not.toBeVisible();
 
   // when
+  await page.getByTestId("administration-link").click();
   await page.getByTestId("admin-facility-link").click();
   const courtReactivated = page.waitForResponse((response) =>
     response.url().endsWith(`/api/admin/courts/${court}/active`)
@@ -417,6 +426,7 @@ test("an admin changes a court and finds that change in the log", async ({ page 
   await page.getByTestId("username").fill("configuration-admin");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
   await page.getByTestId("admin-facility-link").click();
   await expect(page.getByTestId("admin-facility-view")).toBeVisible();
   const court = "dddddddd-0000-0000-0000-000000000003";
@@ -429,6 +439,7 @@ test("an admin changes a court and finds that change in the log", async ({ page 
   await page.getByTestId(`toggle-court-${court}`).click();
   expect((await courtDeactivated).status()).toBe(200);
   await page.goto("/");
+  await page.getByTestId("administration-link").click();
   await page.getByTestId("admin-audit-link").click();
   await expect(page.getByTestId("admin-audit-view")).toBeVisible();
 
@@ -448,6 +459,7 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await page.getByTestId("username").fill("configuration-admin");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
   await page.getByTestId("admin-roster-link").click();
   await expect(page.getByTestId("admin-roster-view")).toBeVisible();
 
@@ -488,6 +500,7 @@ test("an admin adds a person, gives them an account, and that person signs in an
     .toHaveAttribute("data-state", "CREDENTIAL_ISSUED");
 
   // when — the member signs in with what the instance mailed them and replaces it
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("roe.mary");
@@ -512,12 +525,13 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await expect(page.getByTestId("own-allocation")).toBeVisible();
 
   // when — the board sends again, which now destroys a password the member chose
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("configuration-admin");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
-  await expect(page.getByTestId("admin-roster-link")).toBeVisible();
+  await expect(page.getByTestId("administration-link")).toBeVisible();
   await page.goto(`/admin/roster/${personId}`);
   await expect(page.getByTestId("credential-state"))
     .toHaveAttribute("data-state", "PASSWORD_CHOSEN");

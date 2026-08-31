@@ -81,10 +81,11 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // when — every gate below waits for something the view renders only once its data arrived,
   // never for the section itself, which is on screen while the request is still in flight
-  await page.getByTestId("admin-configuration-link").click();
+  await page.getByTestId("administration-link").click();
   await expect(page.getByTestId("save-club-config")).toBeVisible();
 
   // then
+  await stableScreenshot(page.getByTestId("admin-navigation"), "admin-navigation.png");
   await stableScreenshot(page.getByTestId("admin-configuration-view"), "admin-configuration.png");
 
   // when

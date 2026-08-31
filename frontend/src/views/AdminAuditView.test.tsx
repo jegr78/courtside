@@ -254,7 +254,6 @@ describe("AdminAuditView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
-    expect(screen.getByRole("link")).toBeInTheDocument();
   });
 
   it("given a subject in the address, when the log is opened, then only that subject is asked for", async () => {

@@ -89,7 +89,7 @@ export function AdminPersonView() {
     }
   }
 
-  return <section data-testid="admin-person-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
+  return <section data-testid="admin-person-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-3xl font-bold">{entry ? `${entry.firstName} ${entry.lastName}` : t("admin.person.title")}</h1>
       <Link data-testid="back-to-roster" to="/admin/roster" className="font-semibold underline">{t("admin.person.backToRoster")}</Link>

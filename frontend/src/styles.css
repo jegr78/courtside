@@ -298,3 +298,9 @@ input[type="time"] {
     animation-iteration-count: 1 !important;
   }
 }
+
+@media (width >= 1024px) {
+  .admin-navigation-menu {
+    display: none;
+  }
+}

@@ -49,14 +49,14 @@ function showPerson(entry: RosterEntry = jane) {
 }
 
 describe("AdminPersonView", () => {
-  it("when the page is shown, then it uses the full administration frame", () => {
+  it("when the page is shown, then its content keeps a readable line length", () => {
     // when
     render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><UnsavedChangesProvider>
       <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
     </UnsavedChangesProvider></MemoryRouter>);
 
     // then
-    expect(screen.getByTestId("admin-person-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
+    expect(screen.getByTestId("admin-person-view")).toHaveClass("[&>*]:max-w-5xl");
   });
 
   it("given the membership and the account are edited, when they are counted, then each one is asked about on its own", async () => {

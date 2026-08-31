@@ -326,11 +326,8 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     }
   }
 
-  return <section data-testid="admin-configuration-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <h1 className="text-3xl font-bold">{t("admin.config.title")}</h1>
-      <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
-    </div>
+  return <section data-testid="admin-configuration-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
+    <h1 className="text-3xl font-bold">{t("admin.config.title")}</h1>
     {!config
       ? (error ? <Alert testId="admin-error">{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
@@ -451,16 +448,24 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
 
 function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTypeConfiguration; definition?: RuleDefinition; disabled: boolean; save: (ruleType: RuleType, params: Record<string, number>) => Promise<void>; remove: (ruleType: RuleType) => Promise<void> }) {
   const { t } = useTranslation();
-  const [params, setParams] = useState<Record<string, number>>({});
-  useEffect(() => setParams(definition?.params ?? {}), [definition]);
+  const [edited, setEdited] = useState<Record<string, number>>();
+  const [read, setRead] = useState(definition);
+  // Reading the definition through an effect instead would leave one render in which the editor
+  // holds nothing and the rule holds values, and that render marks work nobody has done.
+  if (read !== definition) {
+    setRead(definition);
+    setEdited(undefined);
+  }
+  const saved = definition?.params ?? {};
+  const params = edited ?? saved;
   const mark = `rule:${type.ruleType}`;
-  const unsaved = differs(params, definition?.params ?? {});
+  const unsaved = differs(params, saved);
   return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
     <div><h3 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <GlobalRuleLink ruleType={type.ruleType} />}</div>
     {type.configurable && <>
       {type.parameters.length === 0 && <p data-testid={`rule-${type.ruleType}-description`} className="text-muted text-sm">{t(`admin.rules.description.${type.ruleType}`, { defaultValue: "" })}</p>}
       {type.parameters.map((parameter) => <div key={parameter.name} className="grid gap-1">
-        <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setParams({ ...params, [parameter.name]: Number(event.target.value) })} />
+        <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setEdited({ ...params, [parameter.name]: Number(event.target.value) })} />
         <p data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted text-sm">{t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}</p>
       </div>)}
       <div className="flex flex-wrap items-center gap-3">

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 import {
   api,
   type AdminCourt,
@@ -306,11 +305,8 @@ export function AdminFacilityView() {
     }
   }
 
-  return <section data-testid="admin-facility-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <h1 className="text-3xl font-bold">{t("admin.facility.title")}</h1>
-      <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
-    </div>
+  return <section data-testid="admin-facility-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+    <h1 className="text-3xl font-bold">{t("admin.facility.title")}</h1>
     {!courts || !hours || !cards || !timeZone
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>

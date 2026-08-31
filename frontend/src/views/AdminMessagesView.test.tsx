@@ -122,7 +122,7 @@ async (language) => {
     // then — every control on the page navigates, and the only places it goes are readable pages
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href")))
-      .toEqual(["/", `/admin/roster/${refused.personId}`]);
+      .toEqual([`/admin/roster/${refused.personId}`]);
   });
 
   it("given only what went wrong is asked, when the filter is set, then the log is read again for it", async () => {

@@ -21,7 +21,9 @@ test("an installed PWA preserves the signed-in mutation and logout journey", asy
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   const logoutResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/session/logout") && response.request().method() === "POST");
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   expect((await logoutResponse).status()).toBe(204);
-  await expect(page.getByTestId("logout")).not.toBeVisible();
+  // The menu stays open across the sign-out, so the button is gone rather than merely folded away.
+  await expect(page.getByTestId("logout")).toHaveCount(0);
 });

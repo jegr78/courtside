@@ -62,7 +62,7 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/admin/configuration", "/admin/facility", "/admin/roster", "/admin/audit"})
+    @ValueSource(strings = {"/admin", "/admin/configuration", "/admin/facility", "/admin/roster", "/admin/audit"})
     void givenAnAnonymousVisitor_whenOpeningAnAdministrationRoute_thenTheLoginCapableAppShellIsServed(String route)
             throws Exception {
         // when / then

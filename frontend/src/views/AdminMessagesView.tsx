@@ -55,11 +55,8 @@ export function AdminMessagesView() {
     }
   }
 
-  return <section data-testid="admin-messages-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <h1 className="text-3xl font-bold">{t("messages.title")}</h1>
-      <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
-    </div>
+  return <section data-testid="admin-messages-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+    <h1 className="text-3xl font-bold">{t("messages.title")}</h1>
     <p data-testid="messages-handover-note" className="text-muted max-w-3xl">{t("messages.handoverNote")}</p>
     <label className="flex items-center gap-2 font-medium">
       <input
