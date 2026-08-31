@@ -89,11 +89,32 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   await stableScreenshot(page.getByTestId("admin-configuration-view"), "admin-configuration.png");
 
   // when
-  await page.goto("/admin/facility");
+  await page.goto("/admin/facility/courts");
   await expect(page.getByTestId("create-court")).toBeVisible();
 
   // then
-  await stableScreenshot(page.getByTestId("admin-facility-view"), "admin-facility.png");
+  await stableScreenshot(page.getByTestId("admin-courts-view"), "admin-courts.png");
+
+  // when
+  await page.goto("/admin/facility/opening-hours");
+  await expect(page.getByTestId("save-hours-MONDAY")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-opening-hours-view"), "admin-opening-hours.png");
+
+  // when
+  await page.goto("/admin/facility/booking-cards");
+  await expect(page.getByTestId("create-card")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-booking-cards-view"), "admin-booking-cards.png");
+
+  // when
+  await page.goto("/admin/facility/slot-fillers");
+  await expect(page.getByTestId("create-participant-card")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-slot-fillers-view"), "admin-slot-fillers.png");
 
   // when
   await page.goto("/admin/roster");

@@ -18,6 +18,10 @@ class SpaConfiguration implements WebMvcConfigurer {
         registry.addViewController("/admin").setViewName("forward:/index.html");
         registry.addViewController("/admin/configuration").setViewName("forward:/index.html");
         registry.addViewController("/admin/facility").setViewName("forward:/index.html");
+        registry.addViewController("/admin/facility/courts").setViewName("forward:/index.html");
+        registry.addViewController("/admin/facility/opening-hours").setViewName("forward:/index.html");
+        registry.addViewController("/admin/facility/booking-cards").setViewName("forward:/index.html");
+        registry.addViewController("/admin/facility/slot-fillers").setViewName("forward:/index.html");
         registry.addViewController("/admin/roster").setViewName("forward:/index.html");
         registry.addViewController("/admin/roster/{personId}").setViewName("forward:/index.html");
         registry.addViewController("/admin/membership-types").setViewName("forward:/index.html");

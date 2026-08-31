@@ -21,7 +21,10 @@ import { MyMessagesView } from "./views/MyMessagesView";
 import { AdminAuditView } from "./views/AdminAuditView";
 import { AdminMessagesView } from "./views/AdminMessagesView";
 import { AdminConfigurationView } from "./views/AdminConfigurationView";
-import { AdminFacilityView } from "./views/AdminFacilityView";
+import { AdminBookingCardsView } from "./views/facility/AdminBookingCardsView";
+import { AdminCourtsView } from "./views/facility/AdminCourtsView";
+import { AdminOpeningHoursView } from "./views/facility/AdminOpeningHoursView";
+import { AdminSlotFillersView } from "./views/facility/AdminSlotFillersView";
 import { AdminMembershipTypesView } from "./views/AdminMembershipTypesView";
 import { AdminImportView } from "./views/AdminImportView";
 import { AdminPersonView } from "./views/AdminPersonView";
@@ -66,7 +69,13 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/admin" element={session.roles.includes("ADMIN") ? <AdminShell /> : <Navigate to="/" replace />}>
       <Route index element={<Navigate to="/admin/configuration" replace />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={(changed) => configurationChanged?.(changed)} />} />
-      <Route path="facility" element={<AdminFacilityView />} />
+      <Route path="facility">
+        <Route index element={<Navigate to="/admin/facility/courts" replace />} />
+        <Route path="courts" element={<AdminCourtsView />} />
+        <Route path="opening-hours" element={<AdminOpeningHoursView />} />
+        <Route path="booking-cards" element={<AdminBookingCardsView />} />
+        <Route path="slot-fillers" element={<AdminSlotFillersView />} />
+      </Route>
       <Route path="roster" element={<AdminRosterView />} />
       <Route path="roster/:personId" element={<AdminPersonView />} />
       <Route path="membership-types" element={<AdminMembershipTypesView />} />
