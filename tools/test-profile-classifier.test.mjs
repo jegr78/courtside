@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { bindPlanToRun, classifyChanges, classifyPath, fallbackPlanToRun, parseNameStatus,
-  profileSummary } from "./test-profile-classifier.mjs";
+  profileSummary, validateRules } from "./test-profile-classifier.mjs";
 import { profilePolicyFingerprint } from "./test-profile-contract.mjs";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
@@ -44,7 +44,7 @@ test("given backend and frontend changes, when classifying, then both reduced pr
   assert.equal(plan.isFull, false);
 });
 
-test("given critical unknown or structural changes, when classifying, then each fails closed to full", () => {
+test("given critical unknown or destructive changes, when classifying, then each fails closed to full", () => {
   // given
   const cases = [
     [{ status: "M", path: "pom.xml" }],
@@ -58,7 +58,6 @@ test("given critical unknown or structural changes, when classifying, then each 
     [{ status: "M", path: "src/main/resources/db/migration/V1__baseline.sql" }],
     [{ status: "M", path: "src/main/resources/api/openapi.yaml" }],
     [{ status: "M", path: "unknown/new-surface.txt" }],
-    [{ status: "A", path: "docs/new-guide.md" }],
     [{ status: "D", path: "docs/old-guide.md" }],
     [{ status: "R100", path: "docs/old.md", previousPath: "docs/new.md" }]
   ];
@@ -80,14 +79,69 @@ test("given every configured full trigger, when classifying, then each selects f
   assert.ok(classifications.every((classification) => classification?.profile === "full"));
 });
 
-test("given any structural change, when classifying known reduced paths, then each selects full", () => {
+test("given malformed path rules, when loading their contract, then classification fails closed", () => {
   // given
-  const statuses = ["A", "D", "R100", "C100", "T", "U", "X", "B"];
+  const openPattern = structuredClone(profileRules);
+  openPattern.profiles.frontend.patterns[0].unknown = "value";
+  const missingProfiles = structuredClone(profileRules);
+  delete missingProfiles.profiles.full;
+
+  // when / then
+  assert.throws(() => validateRules(openPattern), /path rules are invalid/i);
+  assert.throws(() => validateRules(missingProfiles), /path rules are invalid/i);
+});
+
+test("given added known paths, when classifying them, then the declared reduced profiles apply", () => {
+  // given
+  const changes = [
+    { status: "A", path: "docs/new-guide.md" },
+    { status: "A", path: "src/main/java/org/courtside/NewService.java" },
+    { status: "A", path: "frontend/src/NewView.tsx" }
+  ];
+
+  // when / then
+  assert.deepEqual(classifyChanges(changes, []).profiles, ["docs", "backend", "frontend"]);
+  assert.ok(classifyChanges(changes, []).reasons.every((reason) => reason.status === "A"));
+  assert.deepEqual(classifyChanges([{ status: "A", path: "unknown/new.txt" }], []).profiles, ["full"]);
+});
+
+test("given e2e evidence or orchestration, when classifying it, then only executable evidence is frontend", () => {
+  // when / then
+  for (const path of [
+    "frontend/e2e/accessibility.spec.ts",
+    "frontend/e2e/new-journey.spec.ts",
+    "frontend/e2e/visual-regression.spec.ts-snapshots/new-state.png",
+    "frontend/e2e/static-fixtures/import.csv"
+  ]) {
+    assert.deepEqual(classifyChanges([{ status: "A", path }], []).profiles, ["frontend"]);
+  }
+  assert.deepEqual(classifyChanges([{ status: "M", path: "src/test/example.spec.ts" }], []).profiles,
+    ["backend"]);
+  for (const path of [
+    "frontend/e2e/global-setup.ts",
+    "frontend/e2e/fixtures.ts",
+    "frontend/e2e/browser-container-lifecycle.ts",
+    "frontend/e2e/browser-container-lifecycle.test.ts",
+    "frontend/e2e/journey-control.ts",
+    "frontend/e2e/visual-regression.spec.ts-snapshots/update-baseline.sh",
+    "frontend/e2e/static-fixtures/setup.ts"
+  ]) {
+    assert.deepEqual(classifyChanges([{ status: "A", path }], []).profiles, ["full"]);
+  }
+});
+
+test("given a non additive structural status, when classifying known reduced paths, then each selects full", () => {
+  // given
+  const statuses = ["D", "R100", "C100", "T", "U", "X", "B"];
 
   // when / then
   for (const status of statuses) {
-    assert.deepEqual(classifyChanges([{ status, path: "frontend/src/App.tsx" }], []).profiles, ["full"]);
+    const change = status.startsWith("R") || status.startsWith("C")
+      ? { status, previousPath: "frontend/src/Old.tsx", path: "frontend/src/App.tsx" }
+      : { status, path: "frontend/src/App.tsx" };
+    assert.deepEqual(classifyChanges([change], []).profiles, ["full"]);
   }
+  assert.throws(() => classifyChanges([{ status: "Z", path: "frontend/src/App.tsx" }], []), /status/);
 });
 
 test("given a full label, when classifying, then it can escalate but no label can suppress full", () => {
