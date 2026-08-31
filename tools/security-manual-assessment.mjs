@@ -39,12 +39,19 @@ function requireRealDate(value, field) {
   }
 }
 
+function requireRealTimestamp(value, field) {
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString() !== value.replace("Z", ".000Z")) {
+    fail(`${field} is not a real timestamp`);
+  }
+}
+
 export function validateManualAssessmentEvidence(evidence, assessmentDate = new Date()) {
   if (!validateShape(evidence)) fail(JSON.stringify(validateShape.errors));
   if (evidence.catalogVersion !== catalog.catalogVersion) fail("catalogVersion does not match the current catalog");
-  if (!Number.isFinite(Date.parse(evidence.recordedAt))) fail("recordedAt is not a real timestamp");
+  requireRealTimestamp(evidence.recordedAt, "recordedAt");
+  requireRealTimestamp(evidence.authorization.expiresAt, "authorization expiry");
   const authorizationExpiry = Date.parse(evidence.authorization.expiresAt);
-  if (!Number.isFinite(authorizationExpiry)) fail("authorization expiry is not a real timestamp");
   if (authorizationExpiry < assessmentDate.getTime()) fail("authorization has expired");
   if (evidence.authorization.profile !== evidence.profile) fail("authorization profile differs from the run profile");
   if (evidence.authorization.targetFingerprint !== evidence.targetFingerprint) fail("authorization target differs from the run target");

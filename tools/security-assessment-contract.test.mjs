@@ -262,6 +262,9 @@ test("given manual evidence, when its outcome needs action, then rationale and f
     controls: [{ ...control, outcome: "blocked" }] }] }), false);
   assert.equal(validate({ ...evidence, procedures: [{ ...procedure,
     controls: [{ ...control, outcome: "fail", rationale: "Mismatch" }] }] }), false);
+  assert.equal(validate({ ...evidence, procedures: [{ ...procedure,
+    controls: [{ ...control, outcome: "fail", rationale: "Mismatch", findingFingerprint: digest,
+      redactedEvidenceReferences: [] }] }] }), false);
   assert.equal(validate({ ...evidence, profile: "active", environment: "UAT" }), false);
   assert.equal(validate({ ...evidence, profile: "destructive", environment: "EXPLICIT_PRODUCTION" }), false);
   assert.equal(validate({ ...evidence, unexpectedRawTraffic: "secret" }), false);
@@ -324,6 +327,9 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
     { ...evidence, targetOrigin: "https://127.0.0.1:9443" },
     { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-08-20T20:00:00Z" } },
     { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-99-21T20:00:00Z" } },
+    { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-09-31T20:00:00Z" } },
+    { ...evidence, recordedAt: "2026-02-30T20:00:00Z",
+      procedures: [{ ...procedure, recordedAt: "2026-02-30T20:00:00Z" }] },
     { ...evidence, procedures: [{ ...procedure, controls: [{ ...control,
       redactedEvidenceReferences: [{ ...control.redactedEvidenceReferences[0], expiresOn: "2026-99-21" }]
     }] }] },

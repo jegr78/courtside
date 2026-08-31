@@ -31,8 +31,8 @@ For every selected control within that procedure retain:
 - Outcome
 
 Outcome is exactly `pass`, `fail`, `not-applicable` or `blocked`. `not-applicable` and `blocked`
-require a control-specific rationale and owner. `fail` requires a private lifecycle candidate.
-Only `pass` may omit a rationale.
+require a control-specific rationale and owner and may omit evidence when none exists. `fail`
+requires redacted evidence and a private lifecycle candidate. Only `pass` may omit a rationale.
 
 ## Authorization and profile boundary
 
