@@ -136,13 +136,19 @@ summary are the canonical current count. Locally assembled records and older agg
 runs are not evidence. Any candidate miss requires a rule correction plus a regression test before
 the review can qualify.
 
+An unadmitted candidate still executes the full job set. Replay treats the natural proposed profile
+as shadow evidence when every job required by that proposal succeeded. A failure outside the
+proposal remains a candidate miss, and an unsuccessful required job remains incomplete. The report
+records separately how many runs actually skipped jobs. That number measures saved work after
+activation; it is not an admission condition.
+
 The workflow also retains the closed observations and exact Actions inventory behind the status.
 For an independent local reproduction, run the same protected collector with a GitHub token that
 has read-only Actions and contents access:
 
 ```bash
 GH_TOKEN="$(gh auth token)" node tools/test-profile-replay.mjs \
-  --repository jegr78/courtside --assessed-at 2026-08-29T20:30:00Z \
+  --repository jegr78/courtside --assessed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --inventory-output observation-inventory.json --observations-output observations.json \
   --output observation-report.json --summary observation-report.md
 ```

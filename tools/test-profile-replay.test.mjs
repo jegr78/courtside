@@ -99,8 +99,8 @@ test("given a protected reduced run, when replaying current policy, then the exp
   });
   // then
   assert.equal(result.summary.sampleSize, 1);
-  assert.equal(result.summary.reducedProfileCount, 1);
-  assert.equal(result.summary.profileCounts.frontend, 1);
+  assert.equal(result.summary.naturalReducedProfileCount, 1);
+  assert.equal(result.summary.proposedProfileCounts.frontend, 1);
   assert.equal(result.observations[0].classificationOutcome, "no-observed-miss");
   assert.deepEqual(result.observations[0].incompleteJobs, []);
 });

@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:ci:test-profile-observation-summary:v1",
+  "$id": "urn:courtside:ci:test-profile-observation-summary:v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["sampleSize", "repository", "policyFingerprint", "windowStartedAt", "observedFirstAttemptCount", "rerunCount", "windowDays", "fullProfileCount", "reducedProfileCount", "fullProfileRate", "profileCounts", "candidateMissCount", "classificationErrorCount", "incompleteObservationCount", "incompatibleBaseCount", "assessedAt", "limitations", "status"],
+  "required": ["sampleSize", "repository", "policyFingerprint", "windowStartedAt", "observedFirstAttemptCount", "rerunCount", "windowDays", "fullProposalCount", "naturalReducedProfileCount", "actualReducedProfileCount", "actualFullProfileRate", "proposedProfileCounts", "candidateMissCount", "classificationErrorCount", "incompleteObservationCount", "incompatibleBaseCount", "assessedAt", "limitations", "status"],
   "properties": {
     "sampleSize": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$" },
@@ -12,10 +12,11 @@
     "observedFirstAttemptCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "rerunCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
     "windowDays": { "type": "integer", "minimum": 0 },
-    "fullProfileCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
-    "reducedProfileCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
-    "fullProfileRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-    "profileCounts": {
+    "fullProposalCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "naturalReducedProfileCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "actualReducedProfileCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "actualFullProfileRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "proposedProfileCounts": {
       "type": "object",
       "additionalProperties": false,
       "required": ["docs", "backend", "frontend", "tooling", "full"],
