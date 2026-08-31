@@ -254,14 +254,22 @@ describe("AppRoutes", () => {
     expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin/configuration");
   });
 
-  it("given an admin session, when opening facility management, then the protected admin view is available", () => {
+  // The four subjects of the facility are pages of their own, so a link can point at one of them.
+  it.each([
+    ["/admin/facility", "admin-courts-view"],
+    ["/admin/facility/courts", "admin-courts-view"],
+    ["/admin/facility/opening-hours", "admin-opening-hours-view"],
+    ["/admin/facility/booking-cards", "admin-booking-cards-view"],
+    ["/admin/facility/slot-fillers", "admin-slot-fillers-view"]
+  ])("given an admin session, when opening %s, then %s is the page", (address, view) => {
     // given
     vi.spyOn(api, "adminCourts").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "adminOpeningHours").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "adminBookingCards").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "adminParticipantCards").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
-    render(<RoutedShell initialEntries={["/admin/facility"]}><AppRoutes session={{
+    render(<RoutedShell initialEntries={[address]}><AppRoutes session={{
       authenticated: true,
       username: "admin",
       displayName: "Example Administrator",
@@ -270,6 +278,7 @@ describe("AppRoutes", () => {
     }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
 
     // then
+    expect(screen.getByTestId(view)).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 });

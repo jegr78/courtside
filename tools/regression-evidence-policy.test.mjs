@@ -13,14 +13,15 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
   for (const surface of [
     "court-plan", "booking-dialog", "booking-validation", "personal-bookings",
     "my-messages", "series-preview", "primary-navigation", "admin-navigation",
-    "admin-configuration", "admin-facility", "admin-roster", "admin-membership-types",
+    "admin-configuration", "admin-courts", "admin-opening-hours", "admin-booking-cards",
+    "admin-slot-fillers", "admin-roster", "admin-membership-types",
     "admin-import", "admin-audit", "admin-messages"
   ]) {
     assert.match(visual, new RegExp(`\\"${surface}\\.png\\"`));
   }
   assert.equal(existsSync(snapshots), true);
   const reviewed = readdirSync(snapshots).filter((file) => file.endsWith(".png"));
-  assert.equal(reviewed.length, 15);
+  assert.equal(reviewed.length, 18);
   assert.deepEqual(reviewed.filter((file) => /-(darwin|linux)\.png$/.test(file)), []);
 });
 

@@ -9,7 +9,8 @@ const member: SessionStatus = { authenticated: true, roles: ["MEMBER"], password
 const administrator: SessionStatus = { authenticated: true, roles: ["ADMIN"], passwordChangeRequired: false };
 
 const adminDestinations = [
-  "admin-configuration-link", "admin-facility-link", "admin-roster-link",
+  "admin-configuration-link", "admin-courts-link", "admin-opening-hours-link",
+  "admin-booking-cards-link", "admin-slot-fillers-link", "admin-roster-link",
   "admin-membership-types-link", "admin-import-link", "admin-audit-link",
   "admin-messages-link"
 ];

@@ -182,7 +182,7 @@ test("stored text projections remain inert on administrative and managed views",
   await page.getByTestId("booking-close").click();
   await page.goto("/admin/configuration");
   await expect(page.getByTestId("rule-set").locator('option[value="aaaaaaaa-0000-0000-0000-000000000001"]')).toHaveText(payload);
-  await page.goto("/admin/facility");
+  await page.goto("/admin/facility/booking-cards");
   await expect(page.getByTestId("card-label-33333333-3333-3333-3333-333333333333")).toHaveValue(payload);
   await page.goto("/admin/roster");
   await expect(page.getByTestId("roster-filter").locator(
