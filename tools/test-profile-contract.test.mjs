@@ -54,8 +54,8 @@ test("given any full profile, when resolving coverage, then only full coverage r
   const tasks = localTasksForProfiles(contract, ["frontend", "full"]);
 
   // then
-  assert.deepEqual(jobs, ["backend", "frontend", "security"]);
-  assert.deepEqual(tasks.map((task) => task.label), ["full"]);
+  assert.deepEqual(jobs, ["docs", "backend", "frontend", "security"]);
+  assert.deepEqual(tasks.map((task) => task.label), ["docs-check", "full"]);
 });
 
 test("given admission and override states, when selecting active coverage, then only an exact admission reduces", () => {
@@ -66,7 +66,14 @@ test("given admission and override states, when selecting active coverage, then 
     attempt: 1,
     artifact: "profile-evidence-101-1",
     assessedAt: "2026-08-31T10:00:00Z",
-    status: "ready-for-review"
+    expiresOn: "2026-09-30",
+    status: "ready-for-review",
+    qualifyingFirstAttempts: 20,
+    backendPlans: 2,
+    frontendPlans: 1,
+    candidateMisses: 0,
+    classificationErrors: 0,
+    incompleteObservations: 0
   };
 
   // when / then
@@ -88,6 +95,25 @@ test("given admission and override states, when selecting active coverage, then 
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
     schemaVersion: 1, admittedPolicyFingerprint: fingerprint, evidence
   }, "").overrideOutcome, "invalid-full");
+  assert.equal(activeProfileDecision(["backend"], fingerprint, {
+    schemaVersion: 1, admittedPolicyFingerprint: fingerprint, evidence
+  }, "admitted", "2026-10-01").admissionOutcome, "invalid");
+  assert.equal(activeProfileDecision(["backend"], fingerprint, {
+    schemaVersion: 1, admittedPolicyFingerprint: fingerprint,
+    evidence: { ...evidence, artifact: "profile-evidence-999-1" }
+  }, "admitted").admissionOutcome, "invalid");
+  assert.equal(activeProfileDecision(["backend"], fingerprint, {
+    schemaVersion: 1, admittedPolicyFingerprint: fingerprint,
+    evidence: { ...evidence, attempt: 2, artifact: "profile-evidence-101-2" }
+  }, "admitted").admissionOutcome, "invalid");
+  assert.equal(activeProfileDecision(["backend"], fingerprint, {
+    schemaVersion: 1, admittedPolicyFingerprint: fingerprint,
+    evidence: { ...evidence, expiresOn: "2026-02-30" }
+  }, "admitted", "2026-02-01").admissionOutcome, "invalid");
+  assert.equal(activeProfileDecision(["backend"], fingerprint, {
+    schemaVersion: 1, admittedPolicyFingerprint: fingerprint,
+    evidence: { ...evidence, assessedAt: "2026-02-30T10:00:00Z" }
+  }, "admitted", "2026-02-01").admissionOutcome, "invalid");
 });
 
 test("given semantic sources, when one changes, then the fingerprint changes but admission data does not", () => {
@@ -110,6 +136,7 @@ test("given semantic sources, when one changes, then the fingerprint changes but
     assert.ok(semanticPolicySources.includes(".github/workflows/build.yml"));
     assert.ok(semanticPolicySources.includes("tools/local-check.mjs"));
     assert.ok(semanticPolicySources.includes("tools/test-profile-replay.mjs"));
+    assert.ok(semanticPolicySources.includes("tools/docs-check.mjs"));
     assert.ok(semanticPolicySources.includes("ci/test-profile-plan.schema.json"));
     assert.ok(!semanticPolicySources.includes("ci/test-profile-admission.json"));
   } finally {

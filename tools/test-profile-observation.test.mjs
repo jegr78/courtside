@@ -61,6 +61,7 @@ const timing = {
   timeToFirstFailureMilliseconds: null,
   url: "https://github.com/example/courtside/actions/runs/101",
   jobs: [
+    { name: "docs", outcome: "success" },
     { name: "backend", outcome: "success" },
     { name: "frontend", outcome: "success" },
     { name: "security", outcome: "success" }
@@ -74,7 +75,7 @@ test("given a first attempt and its bound plan, when observing coverage, then se
   // then
   assert.equal(validate(observation), true, JSON.stringify(validate.errors));
   assert.deepEqual(observation.proposedJobs, ["backend", "security"]);
-  assert.deepEqual(observation.jobsOutsideProposal, ["frontend"]);
+  assert.deepEqual(observation.jobsOutsideProposal, ["docs", "frontend"]);
   assert.deepEqual(observation.failuresOutsideProposal, []);
   assert.equal(observation.classificationOutcome, "no-observed-miss");
 });
@@ -99,7 +100,14 @@ test("given an admitted contract plan, when observing coverage, then active and 
       attempt: 1,
       artifact: "profile-evidence-101-1",
       assessedAt: "2026-08-31T10:00:00Z",
-      status: "ready-for-review"
+      expiresOn: "2026-09-30",
+      status: "ready-for-review",
+      qualifyingFirstAttempts: 20,
+      backendPlans: 2,
+      frontendPlans: 1,
+      candidateMisses: 0,
+      classificationErrors: 0,
+      incompleteObservations: 0
     }
   });
 
@@ -135,7 +143,14 @@ test("given a version four plan, when active evidence is missing or contradictor
       attempt: 1,
       artifact: "profile-evidence-101-1",
       assessedAt: "2026-08-31T10:00:00Z",
-      status: "ready-for-review"
+      expiresOn: "2026-09-30",
+      status: "ready-for-review",
+      qualifyingFirstAttempts: 20,
+      backendPlans: 2,
+      frontendPlans: 1,
+      candidateMisses: 0,
+      classificationErrors: 0,
+      incompleteObservations: 0
     }
   });
 
@@ -178,7 +193,7 @@ test("given an unselected job is skipped, when observing coverage, then the redu
   const observation = createProfileObservation(plan, reduced);
 
   // then
-  assert.deepEqual(observation.jobsOutsideProposal, ["frontend"]);
+  assert.deepEqual(observation.jobsOutsideProposal, ["docs", "frontend"]);
   assert.deepEqual(observation.incompleteJobs, []);
   assert.equal(observation.classificationOutcome, "no-observed-miss");
 });
@@ -233,7 +248,7 @@ test("given a classifier fallback, when observing coverage, then the classificat
 
   // then
   assert.equal(observation.classificationOutcome, "classification-error");
-  assert.deepEqual(observation.proposedJobs, ["backend", "frontend", "security"]);
+  assert.deepEqual(observation.proposedJobs, ["backend", "docs", "frontend", "security"]);
   assert.throws(() => createProfileObservation({
     ...fallback,
     plannerOutcome: "passed"
@@ -365,9 +380,9 @@ test("given a qualified summary, when rendering the final report, then sample wi
     reasons: [{ code: "prefix:frontend/", path: "frontend/src/App.tsx", profile: "frontend", status: "M" }]
   };
   const backendTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "frontend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const frontendTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "backend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "backend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const observations = Array.from({ length: 20 }, (_, index) => ({
     ...createProfileObservation(index === 0 ? frontendPlan : plan, index === 0 ? frontendTiming : backendTiming),
     runId: 301 + index,
@@ -391,7 +406,7 @@ test("given a qualified summary, when rendering the final report, then sample wi
 test("given reduced evidence from only one profile, when summarizing, then the other profile remains unqualified", () => {
   // given
   const reducedTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "frontend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const observations = Array.from({ length: 20 }, (_, index) => ({
     ...createProfileObservation(plan, reducedTiming), runId: 501 + index
   }));
@@ -429,9 +444,9 @@ test("given completed reduced profiles with expected skipped jobs, when summariz
     reasons: [{ code: "prefix:frontend/", path: "frontend/src/App.tsx", profile: "frontend", status: "M" }]
   };
   const backendTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "frontend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const frontendTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "backend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "backend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const fullPlan = { ...plan, profiles: ["full"], isFull: true };
   const observations = Array.from({ length: 20 }, (_, index) => {
     const selectedPlan = index === 0 ? plan : index < 3 ? frontendPlan : fullPlan;

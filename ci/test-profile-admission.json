@@ -6,6 +6,13 @@
     "attempt": 1,
     "artifact": "profile-evidence-33326145088-1",
     "assessedAt": "2026-08-30T17:45:40Z",
-    "status": "ready-for-review"
+    "expiresOn": "2026-09-30",
+    "status": "ready-for-review",
+    "qualifyingFirstAttempts": 60,
+    "backendPlans": 3,
+    "frontendPlans": 1,
+    "candidateMisses": 0,
+    "classificationErrors": 0,
+    "incompleteObservations": 3
   }
 }

@@ -13,10 +13,13 @@ test("given profile classification, when the pull request runs, then selected qu
     /git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"[\s\S]+node "\$PROFILE_ROOT\/tools\/test-profile-classifier\.mjs"/);
   assert.match(workflow, /outputs:[\s\S]+backend: \$\{\{ steps\.selection\.outputs\.backend \}\}/);
   assert.match(workflow,
-    /needs: \[backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
+    /needs: \[docs, backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(workflow, /pull_request\)\s+test "\$PROFILE_PLAN_RESULT" = success/);
   assert.match(workflow, /push\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
   assert.match(workflow, /backend:[\s\S]+name: Verify backend[\s\S]+\.\/mvnw -B clean verify -Pjava-only/);
+  assert.match(workflow, /docs:[\s\S]+name: Verify documentation[\s\S]+node tools\/docs-check\.mjs --check/);
+  assert.match(workflow,
+    /docs:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.docs == 'true'\)/);
   assert.match(workflow,
     /frontend:[\s\S]+name: Verify frontend[\s\S]+npm-cli\.js run lint[\s\S]+npm-cli\.js run test[\s\S]+npm-cli\.js run build/);
   assert.match(workflow,
@@ -51,7 +54,7 @@ test("given the classifier fails, when the plan runs, then full selection still 
   assert.match(workflow,
     /if \.plannerOutcome == "failed" then \.isFull and \.activeProfiles == \["full"\]\s+else \$classifierExit == 0 end/);
   assert.match(workflow,
-    /else\s+PROFILES='\["full"\]'\s+JOBS='\["backend","frontend","security"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
+    /else\s+PROFILES='\["full"\]'\s+JOBS='\["docs","backend","frontend","security"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
 });
 
 test("given repository profile mode, when selecting coverage, then only admitted or full reaches the classifier", () => {
@@ -59,7 +62,7 @@ test("given repository profile mode, when selecting coverage, then only admitted
   assert.match(workflow, /name: test-profile-plan \[\$\{\{ vars\.COURTSIDE_TEST_PROFILES == 'admitted'/);
   assert.match(workflow, /PROFILE_MODE: \$\{\{ vars\.COURTSIDE_TEST_PROFILES == 'admitted'/);
   assert.match(workflow, /--mode "\$PROFILE_MODE"/);
-  assert.match(workflow, /JOBS='\["backend","frontend","security"\]'/);
+  assert.match(workflow, /JOBS='\["docs","backend","frontend","security"\]'/);
 });
 
 test("given a profile plan, when the aggregate runs, then every selected and skipped job is explained", () => {

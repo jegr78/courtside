@@ -69,7 +69,9 @@ therefore names one exact CI and local coverage policy.
 Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, or an additive
 combination. Backend changes run backend and security verification; frontend changes run frontend
 and security verification, including the complete Chromium and WebKit browser matrix. Documentation
-changes need no code-quality job. Build, workflow, security, deployment, migration, OpenAPI, and
+changes run a bounded documentation job in CI and the same checks locally. It validates Markdown,
+internal references, maintained quality contracts and the generated admission section without
+starting Java, Vitest or Playwright. Build, workflow, security, deployment, migration, OpenAPI, and
 shared test-infrastructure changes select `full`. Unknown paths and every added, deleted, renamed,
 copied, or otherwise structural change also select `full`. The `ci:full` label can only escalate a
 plan. Classifier failures also select `full` and cannot make the required aggregate check pass by
@@ -131,15 +133,17 @@ The inventory comes directly from the paginated Actions API. Missing first attem
 repositories, ambiguous pull-request provenance or a base that is not the exact merge base stop the
 replay.
 
-#### Previous profile admission evidence
+#### Profile admission evidence
 
-The previous profile policy was qualified for required pull-request use. Profile Evidence run
+<!-- profile-admission:start -->
+The admitted profile policy is backed by Profile Evidence run
 `33326145088`, artifact `profile-evidence-33326145088-1`, reported `ready-for-review` at
 2026-08-30T17:45:40Z under policy fingerprint
-`d65c7568d0abe78a00dc5285ce4f297946f176bed1bb05d672f40e644e50a14c`: 60 qualifying first
-attempts, including three backend and one frontend plan, with no candidate miss or classification
-error. Three incomplete quality-job observations were excluded rather than converted into positive
-evidence.
+`d65c7568d0abe78a00dc5285ce4f297946f176bed1bb05d672f40e644e50a14c`. The evidence expires on 2026-09-30. It contains
+60 qualifying first attempts, including 3 backend and
+1 frontend plans, with 0 candidate misses and
+0 classification errors. 3 incomplete observations were excluded.
+<!-- profile-admission:end -->
 
 Any changed semantic contract has a different fingerprint. Until protected replay evidence admits
 that exact fingerprint, both CI and local checks execute `full`; the earlier figures remain

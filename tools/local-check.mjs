@@ -78,6 +78,15 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
   const npmCli = join(frontend, "node", "node_modules", "npm", "bin", "npm-cli.js");
   const node = join(frontend, "node", platform === "win32" ? "node.exe" : "node");
   return tasks.map((task) => {
+    if (task.executable === "node") {
+      return {
+        label: task.label,
+        command: node,
+        arguments: task.arguments,
+        workingDirectory: root,
+        shell: false
+      };
+    }
     if (task.executable === "npm") {
       return {
         label: task.label,

@@ -14,7 +14,7 @@ test("when loading the production runner, then no changed-worktree classifier ex
   assert.doesNotMatch(source, /from\s+["']\.\/test-profile-classifier\.mjs["']/);
 });
 
-test("given documentation changes, when planning the local check, then no code suite is required", () => {
+test("given documentation changes, when planning the local check, then the bounded documentation check runs", () => {
   // given
   const changes = [{ status: "M", path: "docs/quality-strategy.md" }];
 
@@ -23,7 +23,7 @@ test("given documentation changes, when planning the local check, then no code s
 
   // then
   assert.deepEqual(plan.profiles, ["docs"]);
-  assert.deepEqual(plan.tasks, []);
+  assert.deepEqual(plan.tasks.map((task) => task.label), ["docs-check"]);
 });
 
 test("given backend changes, when planning the local check, then Java verification matches CI", () => {
@@ -90,12 +90,7 @@ test("given structural or unknown changes, when planning the local check, then i
   // then
   assert.deepEqual(added.profiles, ["full"]);
   assert.deepEqual(unknown.profiles, ["full"]);
-  assert.deepEqual(added.tasks, [{
-    label: "full",
-    workingDirectory: "repository",
-    executable: "maven",
-    arguments: ["clean", "verify"]
-  }]);
+  assert.deepEqual(added.tasks.map((task) => task.label), ["full"]);
 });
 
 test("given a reduced change, when full is requested, then the local plan only escalates", () => {
@@ -176,6 +171,12 @@ test("given supported platforms, when resolving tasks, then commands remain shel
   assert.match(windows[0].arguments.at(-1), /^mvnw\.cmd /);
   assert.equal(windows[1].command, "C:/repo/frontend/node/node.exe");
   assert.equal(windows[1].shell, false);
+
+  const docs = localVerificationPlans(localCheckPlan([
+    { status: "M", path: "docs/quality-strategy.md" }
+  ]).tasks, "win32", "C:/repo");
+  assert.equal(docs[0].command, "C:/repo/frontend/node/node.exe");
+  assert.deepEqual(docs[0].arguments, ["tools/docs-check.mjs", "--check"]);
 });
 
 test("given a plan-only check, when executing it, then prerequisites and tasks do not run", async () => {
