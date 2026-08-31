@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   test-profile-plan:
+    name: test-profile-plan [${{ vars.COURTSIDE_TEST_PROFILES == 'admitted' && 'admitted' || vars.COURTSIDE_TEST_PROFILES == 'full' && 'full' || 'invalid' }}]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -37,6 +38,7 @@ jobs:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           RUN_ID: ${{ github.run_id }}
           ATTEMPT: ${{ github.run_attempt }}
+          PROFILE_MODE: ${{ vars.COURTSIDE_TEST_PROFILES == 'admitted' && 'admitted' || vars.COURTSIDE_TEST_PROFILES == 'full' && 'full' || 'invalid' }}
         run: |
           CLASSIFIER_EXIT=0
           PROFILE_ROOT="$RUNNER_TEMP/courtside-profile-base"
@@ -48,6 +50,7 @@ jobs:
               --labels "$LABELS_JSON" \
               --run-id "$RUN_ID" \
               --attempt "$ATTEMPT" \
+              --mode "$PROFILE_MODE" \
               --fallback-on-error \
               --output build/test-profile/plan.json \
               --summary build/test-profile/summary.md \
@@ -60,21 +63,25 @@ jobs:
             --argjson classifierExit "$CLASSIFIER_EXIT" \
             --arg base "$BASE_REF" \
             --arg head "$HEAD_REF" \
-            'type == "object" and .schemaVersion == 3 and .runId == $runId and
+            'type == "object" and .schemaVersion == 4 and .runId == $runId and
               .attempt == $attempt and .baseCommit == $base and .headCommit == $head and
-              (.policyFingerprint | test("^[a-f0-9]{64}$")) and
-              (.profiles | type == "array" and length >= 1 and length <= 3 and
+              (.proposedPolicyFingerprint | test("^[a-f0-9]{64}$")) and
+              (.activeProfiles | type == "array" and length >= 1 and length <= 4 and
                 all(. == "docs" or . == "backend" or . == "frontend" or . == "full") and
                 (unique | length) == length) and
-              (.isFull | type == "boolean") and .isFull == (.profiles == ["full"]) and
+              (.proposedProfiles | type == "array" and length >= 1 and length <= 4) and
+              (.activeCiJobs | type == "array" and all(. == "backend" or . == "frontend" or . == "security")) and
+              (.isFull | type == "boolean") and .isFull == (.activeProfiles == ["full"]) and
               (.plannerOutcome == "passed" or .plannerOutcome == "failed") and
               (.reasons | type == "array" and length >= 1) and
-              (if .plannerOutcome == "failed" then .isFull and .profiles == ["full"]
+              (if .plannerOutcome == "failed" then .isFull and .activeProfiles == ["full"]
                 else $classifierExit == 0 end)' \
             build/test-profile/plan.json > /dev/null 2>&1; then
-            PROFILES=$(jq -cer '.profiles' build/test-profile/plan.json)
+            PROFILES=$(jq -cer '.activeProfiles' build/test-profile/plan.json)
+            JOBS=$(jq -cer '.activeCiJobs' build/test-profile/plan.json)
           else
             PROFILES='["full"]'
+            JOBS='["backend","frontend","security"]'
             mkdir -p build/test-profile
             {
               echo '# Selected test profiles'
@@ -87,12 +94,7 @@ jobs:
           cat build/test-profile/summary.md >> "$GITHUB_STEP_SUMMARY"
           echo "profiles=$PROFILES" >> "$GITHUB_OUTPUT"
           for job in backend frontend security; do
-            SELECTED=$(jq -nr --argjson profiles "$PROFILES" --arg job "$job" '
-            ($profiles | index("full")) != null or
-            ($job == "backend" and ($profiles | index("backend")) != null) or
-            ($job == "frontend" and ($profiles | index("frontend")) != null) or
-            ($job == "security" and
-              (($profiles | index("backend")) != null or ($profiles | index("frontend")) != null))')
+            SELECTED=$(jq -nr --argjson jobs "$JOBS" --arg job "$job" '($jobs | index($job)) != null')
             echo "$job=$SELECTED" >> "$GITHUB_OUTPUT"
           done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

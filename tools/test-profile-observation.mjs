@@ -1,16 +1,12 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { ciJobsForProfiles, loadProfileContract, localTasksForProfiles } from "./test-profile-contract.mjs";
 
 const contract = JSON.parse(readFileSync(
   new URL("../ci/test-profile-observation.json", import.meta.url), "utf8"));
-const controlledJobs = contract.profiles.full;
-if (!Array.isArray(controlledJobs) || controlledJobs.length < 1
-    || new Set(controlledJobs).size !== controlledJobs.length
-    || Object.values(contract.profiles).some((jobs) => !Array.isArray(jobs)
-      || jobs.some((job) => !controlledJobs.includes(job)))) {
-  throw new Error("Profile observation job topology is invalid");
-}
+const profileContract = loadProfileContract();
+const controlledJobs = profileContract.ciJobOrder;
 const outcomes = new Set(["success", "failure", "cancelled", "timed_out", "action_required", "neutral",
   "skipped", "startup_failure", "stale"]);
 const failureOutcomes = new Set(["failure", "timed_out", "startup_failure"]);
@@ -20,20 +16,35 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort();
 }
 
+function same(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 function validatePlan(plan) {
-  if (plan === null || typeof plan !== "object" || Array.isArray(plan) || plan.schemaVersion !== 3
+  const profiles = plan?.schemaVersion === 4 ? plan.proposedProfiles : plan?.profiles;
+  const fingerprint = plan?.schemaVersion === 4 ? plan.proposedPolicyFingerprint : plan?.policyFingerprint;
+  if (plan === null || typeof plan !== "object" || Array.isArray(plan) || ![3, 4].includes(plan.schemaVersion)
       || !Number.isSafeInteger(plan.runId) || plan.runId < 1
       || !Number.isSafeInteger(plan.attempt) || plan.attempt < 1
       || !/^[a-f0-9]{40}$/.test(plan.baseCommit) || !/^[a-f0-9]{40}$/.test(plan.headCommit)
-      || !/^[a-f0-9]{64}$/.test(plan.policyFingerprint)
-      || !Array.isArray(plan.profiles) || plan.profiles.length < 1
-      || plan.profiles.some((profile) => !Object.hasOwn(contract.profiles, profile))) {
+      || !/^[a-f0-9]{64}$/.test(fingerprint)
+      || !Array.isArray(profiles) || profiles.length < 1
+      || profiles.some((profile) => !Object.hasOwn(profileContract.profiles, profile))) {
     throw new Error("Profile plan is invalid");
   }
-  const expectedFields = new Set(["schemaVersion", "runId", "attempt", "baseCommit", "headCommit",
-    "policyFingerprint", "plannerOutcome", "profiles", "isFull", "reasons"]);
+  const expectedFields = new Set(plan.schemaVersion === 4
+    ? ["schemaVersion", "runId", "attempt", "baseCommit", "headCommit", "activePolicyFingerprint",
+      "proposedPolicyFingerprint", "admissionOutcome", "overrideOutcome", "plannerOutcome",
+      "activeProfiles", "proposedProfiles", "activeCiJobs", "proposedCiJobs", "activeLocalTasks",
+      "proposedLocalTasks", "isFull", "reasons"]
+    : ["schemaVersion", "runId", "attempt", "baseCommit", "headCommit", "policyFingerprint",
+      "plannerOutcome", "profiles", "isFull", "reasons"]);
   if (Object.keys(plan).some((field) => !expectedFields.has(field))) throw new Error("Profile plan has unknown fields");
-  if (plan.isFull !== plan.profiles.includes("full") || new Set(plan.profiles).size !== plan.profiles.length) {
+  const activeProfiles = plan.schemaVersion === 4 ? plan.activeProfiles : plan.profiles;
+  if (plan.isFull !== activeProfiles.includes("full") || new Set(profiles).size !== profiles.length
+      || !Array.isArray(activeProfiles) || activeProfiles.length < 1
+      || new Set(activeProfiles).size !== activeProfiles.length
+      || activeProfiles.some((profile) => !Object.hasOwn(profileContract.profiles, profile))) {
     throw new Error("Profile plan selection is inconsistent");
   }
   if (!Array.isArray(plan.reasons) || plan.reasons.length < 1 || plan.reasons.length > 1000
@@ -41,7 +52,7 @@ function validatePlan(plan) {
         || Object.keys(reason).some((field) => !new Set(["code", "path", "profile", "status"]).has(field))
         || typeof reason.code !== "string" || reason.code.length < 1 || reason.code.length > 300
         || (reason.path !== null && (typeof reason.path !== "string" || reason.path.length > 1000))
-        || !Object.hasOwn(contract.profiles, reason.profile)
+        || !Object.hasOwn(profileContract.profiles, reason.profile)
         || (reason.status !== null && (typeof reason.status !== "string" || reason.status.length > 5)))) {
     throw new Error("Profile plan reasons are invalid");
   }
@@ -51,11 +62,32 @@ function validatePlan(plan) {
   if (plan.plannerOutcome === "passed" && plan.reasons.some((reason) => reason.code === "classifier-error")) {
     throw new Error("Passed profile plan outcome is invalid");
   }
-  if (plan.plannerOutcome === "failed" && (plan.profiles.length !== 1 || plan.profiles[0] !== "full"
+  if (plan.plannerOutcome === "failed" && (activeProfiles.length !== 1 || activeProfiles[0] !== "full"
       || plan.reasons.length !== 1 || plan.reasons[0].code !== "classifier-error"
       || plan.reasons[0].path !== null || plan.reasons[0].profile !== "full"
       || plan.reasons[0].status !== null)) {
     throw new Error("Failed profile planning did not select the closed fallback");
+  }
+  if (plan.schemaVersion === 4) {
+    const expectedActiveJobs = ciJobsForProfiles(profileContract, plan.activeProfiles);
+    const expectedProposedJobs = ciJobsForProfiles(profileContract, plan.proposedProfiles);
+    const expectedActiveTasks = localTasksForProfiles(profileContract, plan.activeProfiles);
+    const expectedProposedTasks = localTasksForProfiles(profileContract, plan.proposedProfiles)
+      .map((task) => task.label);
+    const isAdmitted = plan.admissionOutcome === "matched" && plan.overrideOutcome === "admitted";
+    if (!same(plan.activeCiJobs, expectedActiveJobs)
+        || !same(plan.proposedCiJobs, expectedProposedJobs)
+        || !same(plan.activeLocalTasks, expectedActiveTasks)
+        || !same(plan.proposedLocalTasks, expectedProposedTasks)
+        || !["matched", "missing", "stale", "invalid"].includes(plan.admissionOutcome)
+        || !["admitted", "emergency-full", "invalid-full"].includes(plan.overrideOutcome)
+        || (plan.admissionOutcome === "matched"
+          ? plan.activePolicyFingerprint !== plan.proposedPolicyFingerprint
+          : plan.activePolicyFingerprint !== null)
+        || (isAdmitted ? !same(plan.activeProfiles, plan.proposedProfiles)
+          : !same(plan.activeProfiles, ["full"]))) {
+      throw new Error("Admitted profile coverage is invalid");
+    }
   }
 }
 
@@ -80,7 +112,8 @@ export function createProfileObservation(plan, timing) {
   if (plan.runId !== timing.runId || plan.attempt !== timing.attempt || plan.headCommit !== timing.commit) {
     throw new Error("Profile plan and timing identity do not match");
   }
-  const proposedJobs = uniqueSorted(plan.profiles.flatMap((profile) => contract.profiles[profile]));
+  const proposedProfiles = plan.schemaVersion === 4 ? plan.proposedProfiles : plan.profiles;
+  const proposedJobs = uniqueSorted(ciJobsForProfiles(profileContract, proposedProfiles));
   const actualJobs = actualControlledJobs(timing);
   const jobsOutsideProposal = controlledJobs.filter((job) => !proposedJobs.includes(job));
   const failuresOutsideProposal = actualJobs.filter((job) =>
@@ -89,16 +122,23 @@ export function createProfileObservation(plan, timing) {
     ? job.outcome !== "success"
     : job.outcome !== "success" && job.outcome !== "skipped" && !failureOutcomes.has(job.outcome));
   return {
-    schemaVersion: 1,
+    schemaVersion: plan.schemaVersion === 4 ? 2 : 1,
     repository: timing.repository,
     runId: timing.runId,
     attempt: timing.attempt,
     isFirstAttempt: timing.isFirstAttempt,
     commit: timing.commit,
     startedAt: timing.startedAt,
-    policyFingerprint: plan.policyFingerprint,
+    policyFingerprint: plan.schemaVersion === 4 ? plan.proposedPolicyFingerprint : plan.policyFingerprint,
     plannerOutcome: plan.plannerOutcome,
-    proposedProfiles: [...plan.profiles],
+    proposedProfiles: [...proposedProfiles],
+    ...(plan.schemaVersion === 4 ? {
+      activePolicyFingerprint: plan.activePolicyFingerprint,
+      admissionOutcome: plan.admissionOutcome,
+      overrideOutcome: plan.overrideOutcome,
+      activeProfiles: [...plan.activeProfiles],
+      activeJobs: [...plan.activeCiJobs]
+    } : {}),
     proposedJobs,
     actualJobs,
     jobsOutsideProposal,
@@ -113,14 +153,16 @@ export function createProfileObservation(plan, timing) {
 
 function validateObservation(observation) {
   const fields = new Set(["schemaVersion", "repository", "runId", "attempt", "isFirstAttempt", "commit",
-    "startedAt", "policyFingerprint", "plannerOutcome", "proposedProfiles", "proposedJobs", "actualJobs", "jobsOutsideProposal",
+    "startedAt", "policyFingerprint", "plannerOutcome", "activePolicyFingerprint", "admissionOutcome",
+    "overrideOutcome", "activeProfiles", "activeJobs", "proposedProfiles", "proposedJobs", "actualJobs", "jobsOutsideProposal",
     "failuresOutsideProposal", "incompleteJobs", "classificationOutcome"]);
   if (observation === null || typeof observation !== "object" || Array.isArray(observation)) {
     throw new Error("Observation is not an object");
   }
   const unknown = Object.keys(observation).filter((field) => !fields.has(field));
   if (unknown.length > 0) throw new Error(`Observation has unknown fields: ${unknown.join(", ")}`);
-  if (observation.schemaVersion !== 1 || !Number.isSafeInteger(observation.runId) || observation.runId < 1
+  if (![1, 2].includes(observation.schemaVersion)
+      || !Number.isSafeInteger(observation.runId) || observation.runId < 1
       || !Number.isSafeInteger(observation.attempt) || observation.attempt < 1
       || observation.isFirstAttempt !== (observation.attempt === 1)
       || typeof observation.repository !== "string"
@@ -134,14 +176,39 @@ function validateObservation(observation) {
   }
   if (!Array.isArray(observation.proposedProfiles) || observation.proposedProfiles.length < 1
       || new Set(observation.proposedProfiles).size !== observation.proposedProfiles.length
-      || observation.proposedProfiles.some((profile) => !Object.hasOwn(contract.profiles, profile))) {
+    || observation.proposedProfiles.some((profile) => !Object.hasOwn(profileContract.profiles, profile))) {
     throw new Error("Observation profiles are invalid");
+  }
+  const admissionFields = ["activePolicyFingerprint", "admissionOutcome", "overrideOutcome",
+    "activeProfiles", "activeJobs"];
+  const admissionFieldCount = admissionFields.filter((field) => Object.hasOwn(observation, field)).length;
+  if ((observation.schemaVersion === 2 && admissionFieldCount !== admissionFields.length)
+      || (observation.schemaVersion === 1 && admissionFieldCount !== 0)) {
+    throw new Error("Observation active coverage is incomplete");
+  }
+  const hasAdmission = admissionFieldCount === admissionFields.length;
+  if (hasAdmission && ((observation.activePolicyFingerprint !== null
+        && !/^[a-f0-9]{64}$/.test(observation.activePolicyFingerprint))
+      || !["matched", "missing", "stale", "invalid"].includes(observation.admissionOutcome)
+      || !["admitted", "emergency-full", "invalid-full"].includes(observation.overrideOutcome)
+      || !Array.isArray(observation.activeProfiles) || observation.activeProfiles.length < 1
+      || observation.activeProfiles.some((profile) => !Object.hasOwn(profileContract.profiles, profile))
+      || new Set(observation.activeProfiles).size !== observation.activeProfiles.length
+      || !same(observation.activeJobs,
+        ciJobsForProfiles(profileContract, observation.activeProfiles))
+      || (observation.admissionOutcome === "matched"
+        ? observation.activePolicyFingerprint !== observation.policyFingerprint
+        : observation.activePolicyFingerprint !== null)
+      || (observation.admissionOutcome === "matched" && observation.overrideOutcome === "admitted"
+        ? !same(observation.activeProfiles, observation.proposedProfiles)
+        : !same(observation.activeProfiles, ["full"])))) {
+    throw new Error("Observation active coverage is invalid");
   }
   if (observation.plannerOutcome === "failed"
       && (observation.proposedProfiles.length !== 1 || observation.proposedProfiles[0] !== "full")) {
     throw new Error("Observation classifier fallback is invalid");
   }
-  const expectedProposed = uniqueSorted(observation.proposedProfiles.flatMap((profile) => contract.profiles[profile]));
+  const expectedProposed = uniqueSorted(ciJobsForProfiles(profileContract, observation.proposedProfiles));
   const expectedOutside = controlledJobs.filter((job) => !expectedProposed.includes(job));
   if (JSON.stringify(observation.proposedJobs) !== JSON.stringify(expectedProposed)
       || JSON.stringify(observation.jobsOutsideProposal) !== JSON.stringify(expectedOutside)) {
@@ -276,7 +343,7 @@ export function summarizeProfileObservations(observations, inventory) {
       entry.actualJobs.some((job) => job.name === name && job.outcome === "skipped")));
   const reducedProfileCount = reducedAttempts.length;
   const fullProfileCount = qualifyingAttempts.length - reducedProfileCount;
-  const profileCounts = Object.fromEntries(Object.keys(contract.profiles).map((profile) => [profile,
+  const profileCounts = Object.fromEntries(Object.keys(profileContract.profiles).map((profile) => [profile,
     profile === "full" ? fullProfileCount
       : reducedAttempts.filter((entry) => entry.proposedProfiles.includes(profile)).length]));
   const incompleteObservationCount = firstAttempts.filter((entry) =>

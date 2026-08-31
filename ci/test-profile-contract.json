@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "profileOrder": ["docs", "backend", "frontend", "full"],
+  "ciJobOrder": ["backend", "frontend", "security"],
+  "profiles": {
+    "docs": {
+      "ciJobs": [],
+      "localTasks": []
+    },
+    "backend": {
+      "ciJobs": ["backend", "security"],
+      "localTasks": ["backend"]
+    },
+    "frontend": {
+      "ciJobs": ["frontend", "security"],
+      "localTasks": [
+        "frontend-toolchain",
+        "frontend-lint",
+        "frontend-test",
+        "frontend-build",
+        "frontend-audit",
+        "frontend-package",
+        "frontend-e2e"
+      ]
+    },
+    "full": {
+      "ciJobs": ["backend", "frontend", "security"],
+      "localTasks": ["full"]
+    }
+  },
+  "localTaskDefinitions": {
+    "backend": {
+      "workingDirectory": "repository",
+      "executable": "maven",
+      "arguments": ["clean", "verify", "-Pjava-only"]
+    },
+    "frontend-toolchain": {
+      "workingDirectory": "repository",
+      "executable": "maven",
+      "arguments": [
+        "com.github.eirslett:frontend-maven-plugin:install-node-and-npm",
+        "com.github.eirslett:frontend-maven-plugin:npm@npm-ci"
+      ]
+    },
+    "frontend-lint": {
+      "workingDirectory": "frontend",
+      "executable": "npm",
+      "arguments": ["run", "lint"]
+    },
+    "frontend-test": {
+      "workingDirectory": "frontend",
+      "executable": "npm",
+      "arguments": ["run", "test"]
+    },
+    "frontend-build": {
+      "workingDirectory": "frontend",
+      "executable": "npm",
+      "arguments": ["run", "build"]
+    },
+    "frontend-audit": {
+      "workingDirectory": "frontend",
+      "executable": "npm",
+      "arguments": ["audit", "--audit-level=high"]
+    },
+    "frontend-package": {
+      "workingDirectory": "repository",
+      "executable": "maven",
+      "arguments": ["package", "-DskipTests", "-Pjava-only"]
+    },
+    "frontend-e2e": {
+      "workingDirectory": "frontend",
+      "executable": "npm",
+      "arguments": ["run", "test:e2e"]
+    },
+    "full": {
+      "workingDirectory": "repository",
+      "executable": "maven",
+      "arguments": ["clean", "verify"]
+    }
+  },
+  "coverageDifferences": [
+    {
+      "scope": "security",
+      "ci": "CodeQL, dependency review, container scanning and security tooling",
+      "local": "Security tooling included by Maven verification; hosted CodeQL and dependency review unavailable"
+    }
+  ]
+}

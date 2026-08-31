@@ -30,6 +30,10 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}" > build/ci-timing/run.json
           gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100" \
             --slurp | jq '{jobs: map(.jobs[]) }' > build/ci-timing/jobs.json
+          PROFILE_MODE=$(jq -er '
+            [.jobs[].name | select(test("^test-profile-plan \\[(admitted|full|invalid)\\]$"))]
+            | select(length == 1) | .[0] | capture("\\[(?<mode>[^]]+)\\]$").mode' \
+            build/ci-timing/jobs.json)
           RUN_HEAD=$(jq -er '.head_sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/run.json)
           HEAD_REPOSITORY=$(jq -er '.head_repository.full_name | select(test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))' build/ci-timing/run.json)
           HEAD_OWNER=${HEAD_REPOSITORY%%/*}
@@ -63,6 +67,7 @@ jobs:
             --labels '[]' \
             --run-id "$RUN_ID" \
             --attempt "$ATTEMPT" \
+            --mode "$PROFILE_MODE" \
             --fallback-on-error \
             --output build/ci-timing/profile-plan/plan.json \
             --summary build/ci-timing/profile-plan/summary.md \

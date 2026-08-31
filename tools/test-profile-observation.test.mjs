@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createObservationInventory, createProfileObservation, profileObservationReport,
   summarizeProfileObservations } from "./test-profile-observation.mjs";
+import { bindPlanToRun } from "./test-profile-classifier.mjs";
+import { profilePolicyFingerprint } from "./test-profile-contract.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = require("ajv/dist/2020").default;
@@ -75,6 +77,83 @@ test("given a first attempt and its bound plan, when observing coverage, then se
   assert.deepEqual(observation.jobsOutsideProposal, ["frontend"]);
   assert.deepEqual(observation.failuresOutsideProposal, []);
   assert.equal(observation.classificationOutcome, "no-observed-miss");
+});
+
+test("given an admitted contract plan, when observing coverage, then active and proposed selections remain distinct", () => {
+  // given
+  const admittedPlan = bindPlanToRun({
+    schemaVersion: 1,
+    profiles: ["backend"],
+    isFull: false,
+    reasons: plan.reasons
+  }, {
+    runId: 101,
+    attempt: 1,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40)
+  }, "admitted", {
+    schemaVersion: 1,
+    admittedPolicyFingerprint: profilePolicyFingerprint(),
+    evidence: {
+      runId: 101,
+      attempt: 1,
+      artifact: "profile-evidence-101-1",
+      assessedAt: "2026-08-31T10:00:00Z",
+      status: "ready-for-review"
+    }
+  });
+
+  // when
+  const observation = createProfileObservation(admittedPlan, timing);
+
+  // then
+  assert.deepEqual(observation.activeProfiles, ["backend"]);
+  assert.deepEqual(observation.proposedProfiles, ["backend"]);
+  assert.deepEqual(observation.activeJobs, ["backend", "security"]);
+  assert.equal(observation.admissionOutcome, "matched");
+  assert.equal(observation.schemaVersion, 2);
+  assert.equal(validate(observation), true, JSON.stringify(validate.errors));
+});
+
+test("given a version four plan, when active evidence is missing or contradictory, then it fails closed", () => {
+  // given
+  const admittedPlan = bindPlanToRun({
+    schemaVersion: 1,
+    profiles: ["backend"],
+    isFull: false,
+    reasons: plan.reasons
+  }, {
+    runId: 101,
+    attempt: 1,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40)
+  }, "admitted", {
+    schemaVersion: 1,
+    admittedPolicyFingerprint: profilePolicyFingerprint(),
+    evidence: {
+      runId: 101,
+      attempt: 1,
+      artifact: "profile-evidence-101-1",
+      assessedAt: "2026-08-31T10:00:00Z",
+      status: "ready-for-review"
+    }
+  });
+
+  // when / then
+  assert.throws(() => createProfileObservation({ ...admittedPlan, activeLocalTasks: [] }, timing),
+    /coverage/);
+  assert.throws(() => createProfileObservation({ ...admittedPlan, proposedLocalTasks: [] }, timing),
+    /coverage/);
+  assert.throws(() => createProfileObservation({
+    ...admittedPlan,
+    admissionOutcome: "stale",
+    activePolicyFingerprint: null
+  }, timing), /coverage/);
+
+  const observation = createProfileObservation(admittedPlan, timing);
+  const missingActive = structuredClone(observation);
+  delete missingActive.activeJobs;
+  assert.equal(validate(missingActive), false);
 });
 
 test("given an unselected job fails, when observing coverage, then it becomes an under classification candidate", () => {
