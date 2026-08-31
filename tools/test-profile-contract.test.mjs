@@ -8,6 +8,18 @@ import {
   profilePolicyFingerprint, semanticPolicySources, validateContract
 } from "./test-profile-contract.mjs";
 
+test("given the repository toolchain contract, when CI and Maven install Node, then both use the exact versions", () => {
+  // given
+  const toolchain = JSON.parse(readFileSync(new URL("../ci/node-toolchain.json", import.meta.url), "utf8"));
+  const pom = readFileSync(new URL("../pom.xml", import.meta.url), "utf8");
+
+  // when / then
+  assert.match(toolchain.node, /^\d+\.\d+\.\d+$/);
+  assert.match(toolchain.npm, /^\d+\.\d+\.\d+$/);
+  assert.match(pom, new RegExp(`<node\\.version>v${toolchain.node.replaceAll(".", "\\.")}<\\/node\\.version>`));
+  assert.match(pom, new RegExp(`<npm\\.version>${toolchain.npm.replaceAll(".", "\\.")}<\\/npm\\.version>`));
+});
+
 test("given combined reduced profiles, when resolving coverage, then jobs and tasks form stable unions", () => {
   // given
   const contract = loadProfileContract();
@@ -54,7 +66,7 @@ test("given any full profile, when resolving coverage, then only full coverage r
   const tasks = localTasksForProfiles(contract, ["frontend", "full"]);
 
   // then
-  assert.deepEqual(jobs, ["docs", "backend", "frontend", "security"]);
+  assert.deepEqual(jobs, ["docs", "backend", "frontend", "tooling", "security"]);
   assert.deepEqual(tasks.map((task) => task.label), ["docs-check", "full"]);
 });
 
@@ -71,6 +83,7 @@ test("given admission and override states, when selecting active coverage, then 
     qualifyingFirstAttempts: 20,
     backendPlans: 2,
     frontendPlans: 1,
+    toolingPlans: 1,
     candidateMisses: 0,
     classificationErrors: 0,
     incompleteObservations: 0
@@ -78,40 +91,48 @@ test("given admission and override states, when selecting active coverage, then 
 
   // when / then
   assert.deepEqual(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 1, admittedPolicyFingerprint: fingerprint, evidence
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint, evidence
   }, "admitted"), {
     activeProfiles: ["backend"], admissionOutcome: "matched", overrideOutcome: "admitted"
   });
+  const { toolingPlans: _toolingPlans, ...legacyEvidence } = evidence;
+  assert.equal(activeProfileDecision(["backend"], fingerprint, {
+    schemaVersion: 1, admittedPolicyFingerprint: fingerprint, evidence: legacyEvidence
+  }, "admitted").admissionOutcome, "stale");
+  assert.equal(activeProfileDecision(["backend"], fingerprint, {
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
+    evidence: { ...evidence, toolingPlans: 0 }
+  }, "admitted").admissionOutcome, "invalid");
   assert.deepEqual(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 1, admittedPolicyFingerprint: "b".repeat(64), evidence
+    schemaVersion: 2, admittedPolicyFingerprint: "b".repeat(64), evidence
   }, "admitted").activeProfiles, ["full"]);
   assert.equal(activeProfileDecision(["backend"], fingerprint, null, "admitted").admissionOutcome,
     "missing");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {}, "admitted").admissionOutcome,
     "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 1, admittedPolicyFingerprint: fingerprint, evidence
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint, evidence
   }, "full").overrideOutcome, "emergency-full");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 1, admittedPolicyFingerprint: fingerprint, evidence
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint, evidence
   }, "").overrideOutcome, "invalid-full");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 1, admittedPolicyFingerprint: fingerprint, evidence
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint, evidence
   }, "admitted", "2026-10-01").admissionOutcome, "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 1, admittedPolicyFingerprint: fingerprint,
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
     evidence: { ...evidence, artifact: "profile-evidence-999-1" }
   }, "admitted").admissionOutcome, "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 1, admittedPolicyFingerprint: fingerprint,
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
     evidence: { ...evidence, attempt: 2, artifact: "profile-evidence-101-2" }
   }, "admitted").admissionOutcome, "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 1, admittedPolicyFingerprint: fingerprint,
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
     evidence: { ...evidence, expiresOn: "2026-02-30" }
   }, "admitted", "2026-02-01").admissionOutcome, "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 1, admittedPolicyFingerprint: fingerprint,
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
     evidence: { ...evidence, assessedAt: "2026-02-30T10:00:00Z" }
   }, "admitted", "2026-02-01").admissionOutcome, "invalid");
 });
@@ -137,6 +158,13 @@ test("given semantic sources, when one changes, then the fingerprint changes but
     assert.ok(semanticPolicySources.includes("tools/local-check.mjs"));
     assert.ok(semanticPolicySources.includes("tools/test-profile-replay.mjs"));
     assert.ok(semanticPolicySources.includes("tools/docs-check.mjs"));
+    assert.ok(semanticPolicySources.includes("tools/github-metadata.test.mjs"));
+    assert.ok(semanticPolicySources.includes("tools/github-template-metadata.test.mjs"));
+    assert.ok(semanticPolicySources.includes("tools/workflow-action-pinning.test.mjs"));
+    assert.ok(semanticPolicySources.includes("ci/github-profile-manifest.json"));
+    assert.ok(semanticPolicySources.includes("tools/tool-tests.mjs"));
+    assert.ok(semanticPolicySources.includes("tools/node-toolchain.mjs"));
+    assert.ok(semanticPolicySources.includes("frontend/package.json"));
     assert.ok(semanticPolicySources.includes("ci/test-profile-plan.schema.json"));
     assert.ok(!semanticPolicySources.includes("ci/test-profile-admission.json"));
   } finally {

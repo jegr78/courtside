@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "profileOrder": ["docs", "backend", "frontend", "full"],
-  "ciJobOrder": ["docs", "backend", "frontend", "security"],
+  "profileOrder": ["docs", "backend", "frontend", "tooling", "full"],
+  "ciJobOrder": ["docs", "backend", "frontend", "tooling", "security"],
   "profiles": {
     "docs": {
       "ciJobs": ["docs"],
@@ -23,8 +23,12 @@
         "frontend-e2e"
       ]
     },
+    "tooling": {
+      "ciJobs": ["tooling", "security"],
+      "localTasks": ["frontend-toolchain", "tooling-test"]
+    },
     "full": {
-      "ciJobs": ["docs", "backend", "frontend", "security"],
+      "ciJobs": ["docs", "backend", "frontend", "tooling", "security"],
       "localTasks": ["docs-check", "full"]
     }
   },
@@ -55,7 +59,7 @@
     "frontend-test": {
       "workingDirectory": "frontend",
       "executable": "npm",
-      "arguments": ["run", "test"]
+      "arguments": ["run", "test:frontend"]
     },
     "frontend-build": {
       "workingDirectory": "frontend",
@@ -77,6 +81,11 @@
       "executable": "npm",
       "arguments": ["run", "test:e2e"]
     },
+    "tooling-test": {
+      "workingDirectory": "frontend",
+      "executable": "npm",
+      "arguments": ["run", "test:tools"]
+    },
     "full": {
       "workingDirectory": "repository",
       "executable": "maven",
@@ -88,6 +97,11 @@
       "scope": "security",
       "ci": "CodeQL, dependency review, container scanning and security tooling",
       "local": "Security tooling included by Maven verification; hosted CodeQL and dependency review unavailable"
+    },
+    {
+      "scope": "tooling",
+      "ci": "Repository tool tests plus the required security job",
+      "local": "Repository tool tests; hosted CodeQL, dependency review and container scanning unavailable"
     }
   ]
 }

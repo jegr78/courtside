@@ -7,6 +7,7 @@ import { classifyChanges } from "./test-profile-classifier.mjs";
 const backend = "backend";
 const docs = "docs";
 const frontend = "frontend";
+const tooling = "tooling";
 const security = "security";
 const base = "a".repeat(40);
 const head = "b".repeat(40);
@@ -68,7 +69,7 @@ test("given a protected reduced run, when replaying current policy, then the exp
   // given
   const source = run(101);
   const jobs = [job(1, docs, "skipped"), job(2, backend, "skipped"),
-    job(3, frontend, "success"), job(4, security, "success")];
+    job(3, frontend, "success"), job(4, tooling, "skipped"), job(5, security, "success")];
 
   // when
   const result = await replayProfileEvidence({
@@ -91,7 +92,7 @@ test("given historical added e2e evidence, when replaying current policy, then f
   // given
   const source = run(102);
   const jobs = [job(1, docs, "skipped"), job(2, backend, "skipped"),
-    job(3, frontend, "success"), job(4, security, "success")];
+    job(3, frontend, "success"), job(4, tooling, "skipped"), job(5, security, "success")];
 
   // when
   const result = await replayProfileEvidence({
@@ -117,7 +118,7 @@ test("given historical added e2e evidence loses a required job, when replaying, 
   // given
   const source = run(103, { conclusion: "failure" });
   const jobs = [job(1, docs, "skipped"), job(2, backend, "skipped"),
-    job(3, frontend, "failure"), job(4, security, "success")];
+    job(3, frontend, "failure"), job(4, tooling, "skipped"), job(5, security, "success")];
 
   // when
   const result = await replayProfileEvidence({
@@ -140,7 +141,7 @@ test("given historical added e2e evidence loses a required job, when replaying, 
     runSummaries: [source],
     loadAttempt: async () => source,
     loadJobs: async () => [job(1, docs, "skipped"), job(2, backend, "skipped"),
-      job(3, frontend, "success"), job(4, security, "skipped")],
+      job(3, frontend, "success"), job(4, tooling, "skipped"), job(5, security, "skipped")],
     classify: async (identity) => {
       const classified = classifyChanges([
         { status: "A", path: "frontend/e2e/new-journey.spec.ts" }
@@ -218,7 +219,7 @@ test("given current policy needs an historically skipped job, when replaying, th
   // given
   const source = run(101);
   const jobs = [job(1, docs, "skipped"), job(2, backend, "skipped"),
-    job(3, frontend, "success"), job(4, security, "success")];
+    job(3, frontend, "success"), job(4, tooling, "skipped"), job(5, security, "success")];
 
   // when
   const result = await replayProfileEvidence({
@@ -251,7 +252,7 @@ test("given a replay attempt other than the first, when loading evidence, then i
     runSummaries: [summary],
     loadAttempt: async () => secondAttempt,
     loadJobs: async () => [job(1, docs, "skipped"), job(2, backend, "skipped"),
-      job(3, frontend, "success"), job(4, security, "success")],
+      job(3, frontend, "success"), job(4, tooling, "skipped"), job(5, security, "success")],
     classify: async (identity) => frontendPlan(identity)
   }), /first attempt/);
 });

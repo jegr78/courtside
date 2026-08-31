@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { bindPlanToRun, classifyChanges, classifyPath, fallbackPlanToRun, parseNameStatus,
-  profileSummary, validateRules } from "./test-profile-classifier.mjs";
+  profileSummary, validateGitHubManifest, validateRules, validateToolManifest } from "./test-profile-classifier.mjs";
 import { profilePolicyFingerprint } from "./test-profile-contract.mjs";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
@@ -15,6 +15,10 @@ const planSchema = JSON.parse(readFileSync(
   new URL("../ci/test-profile-plan.schema.json", import.meta.url), "utf8"));
 const profileRules = JSON.parse(readFileSync(
   new URL("../ci/test-profiles.json", import.meta.url), "utf8"));
+const toolManifest = JSON.parse(readFileSync(
+  new URL("../ci/tool-profile-manifest.json", import.meta.url), "utf8"));
+const githubManifest = JSON.parse(readFileSync(
+  new URL("../ci/github-profile-manifest.json", import.meta.url), "utf8"));
 const validatePlan = new Ajv({ strict: true }).compile(planSchema);
 
 test("given tracked repository paths, when classifying each path, then none depends on the unknown fallback", () => {
@@ -27,6 +31,58 @@ test("given tracked repository paths, when classifying each path, then none depe
 
   // then
   assert.deepEqual(classifications.filter(({ classification }) => classification === null), []);
+});
+
+test("given the reviewed tool inventory, when tracked files change, then every tool remains assigned exactly once", () => {
+  // given
+  const trackedTools = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "tools"],
+    { cwd: repository, encoding: "utf8" })
+    .trim().split("\n").filter(Boolean);
+
+  // when / then
+  validateToolManifest(toolManifest, trackedTools);
+});
+
+test("given the reviewed GitHub inventory, when tracked files change, then every reduced file names an executable validator", () => {
+  // given
+  const trackedGitHub = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", ".github"],
+    { cwd: repository, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+
+  // when / then
+  validateGitHubManifest(githubManifest, trackedGitHub, toolManifest);
+});
+
+test("given stale unknown or unvalidated GitHub metadata, when validating or classifying, then it fails closed", () => {
+  // given
+  const missingValidator = { schemaVersion: 1, entries: [
+    { path: ".github/dependabot.yml", profiles: ["tooling"], validators: [] }
+  ] };
+  const unknownValidator = { schemaVersion: 1, entries: [
+    { path: ".github/dependabot.yml", profiles: ["tooling"], validators: ["tools/missing.test.mjs"] }
+  ] };
+  const duplicate = { schemaVersion: 1, entries: [
+    { path: ".github/dependabot.yml", profiles: ["tooling"], validators: ["tools/github-metadata.test.mjs"] },
+    { path: ".github/dependabot.yml", profiles: ["full"], validators: [] }
+  ] };
+  const stale = { schemaVersion: 1, entries: [
+    { path: ".github/dependabot.yml", profiles: ["tooling"], validators: ["tools/github-metadata.test.mjs"] }
+  ] };
+
+  // when / then
+  assert.throws(() => validateGitHubManifest(missingValidator, undefined, toolManifest), /manifest is invalid/i);
+  assert.throws(() => validateGitHubManifest(unknownValidator, undefined, toolManifest), /validator is invalid/i);
+  assert.throws(() => validateGitHubManifest(duplicate, undefined, toolManifest), /manifest is invalid/i);
+  assert.throws(() => validateGitHubManifest(stale, [".github/new.yml"], toolManifest), /inventory is stale/i);
+  assert.deepEqual(classifyChanges([{ status: "A", path: ".github/new-metadata.yml" }], []).profiles, ["full"]);
+});
+
+test("given reviewed GitHub metadata, when classifying, then templates and validated automation use their declared checks", () => {
+  // when / then
+  assert.deepEqual(classifyChanges([{ status: "M", path: ".github/ISSUE_TEMPLATE/bug.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(classifyChanges([{ status: "M", path: ".github/dependabot.yml" }], []).profiles, ["tooling"]);
+  assert.deepEqual(classifyChanges([{ status: "M", path: ".github/workflows/pr-title-lint.yml" }], []).profiles,
+    ["tooling"]);
+  assert.deepEqual(classifyChanges([{ status: "M", path: ".github/workflows/build.yml" }], []).profiles, ["full"]);
 });
 
 test("given backend and frontend changes, when classifying, then both reduced profiles are observed", () => {
@@ -76,7 +132,35 @@ test("given every configured full trigger, when classifying, then each selects f
 
   // then
   assert.ok(classifications.length > 0);
-  assert.ok(classifications.every((classification) => classification?.profile === "full"));
+  assert.ok(classifications.every((classification) => classification?.profiles.includes("full")));
+});
+
+test("given reviewed tool assignments, when classifying changes, then tests reduce and runners remain full", () => {
+  // when / then
+  assert.deepEqual(classifyChanges([
+    { status: "M", path: "tools/mail-check.test.mjs" }
+  ], []).profiles, ["tooling"]);
+  assert.deepEqual(classifyChanges([
+    { status: "M", path: "tools/courtside.mjs" }
+  ], []).profiles, ["full"]);
+  assert.deepEqual(classifyChanges([
+    { status: "A", path: "tools/new-policy.test.mjs" }
+  ], []).profiles, ["full"]);
+});
+
+test("given duplicate or stale tool assignments, when validating the manifest, then it fails closed", () => {
+  // given
+  const duplicate = { schemaVersion: 1, entries: [
+    { path: "tools/example.test.mjs", profiles: ["tooling"], test: true },
+    { path: "tools/example.test.mjs", profiles: ["full"], test: false }
+  ] };
+  const stale = { schemaVersion: 1, entries: [
+    { path: "tools/missing.test.mjs", profiles: ["tooling"], test: true }
+  ] };
+
+  // when / then
+  assert.throws(() => validateToolManifest(duplicate), /manifest is invalid/i);
+  assert.throws(() => validateToolManifest(stale, ["tools/current.test.mjs"]), /inventory is stale/i);
 });
 
 test("given malformed path rules, when loading their contract, then classification fails closed", () => {

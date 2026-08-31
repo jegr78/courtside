@@ -66,7 +66,7 @@ The pull-request workflow uses a conservative test-profile plan to select its re
 closed contract defines each profile's CI jobs and local tasks. Its semantic fingerprint also binds
 the classifier, workflow selection, local runner, observation and admission logic. A fingerprint
 therefore names one exact CI and local coverage policy.
-Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, or an additive
+Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, `tooling`, or an additive
 combination. Backend changes run backend and security verification; frontend changes run frontend
 and security verification, including the complete Chromium and WebKit browser matrix. Documentation
 changes run a bounded documentation job in CI and the same checks locally. It validates Markdown,
@@ -79,6 +79,22 @@ deleted, renamed, copied, type-changed, conflicted or otherwise ambiguous change
 plan. Classifier failures also select `full` and cannot make the required aggregate check pass by
 skipping a quality job. The selector executes the classifier from the immutable pull-request base
 commit, so a classifier or rule change cannot reduce the verification required for itself.
+
+The tooling profile installs the locked Node dependencies and runs every repository tool, policy
+and contract test without Java integration tests, Vitest or Playwright. CI additionally requires
+the security job; hosted CodeQL has no local equivalent. A closed manifest assigns every tracked
+file below `tools/` explicitly. Reviewed test files select `tooling`, while build, profile,
+security, release, restore, upgrade and other execution-critical runners remain `full`. An
+unlisted new tool, duplicate assignment or stale manifest entry fails closed.
+Three local first attempts of the declared tooling tasks completed in 14, 11 and 11 seconds, for an
+11-second median. Each attempt reinstalled the locked dependencies and passed all 636 tool tests.
+
+A second closed manifest assigns every tracked `.github/` file. Markdown issue and pull-request
+templates select `docs`. Dependabot metadata and the PR-title workflow select `tooling` because
+closed structural tests validate their supported fields, permissions and pinned action. Build,
+release, security, nightly, profile-evidence and every other central workflow remain `full`.
+Every reduced entry names an executable validator. Unknown files, missing validators and stale or
+duplicate manifest entries fail closed.
 
 The classifier records two selections. The proposed selection describes the candidate policy. The
 active selection controls CI and local execution. They become equal only when the checked-in
@@ -151,10 +167,9 @@ Any changed semantic contract has a different fingerprint. Until protected repla
 that exact fingerprint, both CI and local checks execute `full`; the earlier figures remain
 historical evidence and cannot activate the changed policy.
 
-The admissible observation window for the four-job topology starts at 2026-08-31T17:20:08Z. Runs
-from the earlier three-job topology remain historical context but cannot prove that the
-documentation job was selected or safely skipped, so replay excludes them instead of inventing a
-result.
+The admissible observation window for the five-job topology starts at 2026-08-31T18:23:45Z. Runs
+from the earlier topology remain historical context but cannot prove that the tooling job was
+selected or safely skipped, so replay excludes them instead of inventing a result.
 
 Successful full-profile runs had a 14.27-minute median and 14.85-minute p95. Successful backend
 runs had a 10.40-minute median and 10.58-minute p95; the one frontend run measured 11.92 minutes.

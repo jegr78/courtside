@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const allowedJobs = new Set(["backend", "frontend", "security", "build", "tool-update-comparison"]);
+const allowedJobs = new Set(["backend", "frontend", "tooling", "security", "build", "tool-update-comparison"]);
 // A run that can be summoned is a path that can be proven; only a scheduled one counts
 // towards the consecutive green nights that make an issue ready for closure.
 const trackedEvents = new Set(["schedule", "workflow_dispatch"]);

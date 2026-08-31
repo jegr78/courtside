@@ -6,7 +6,11 @@ const contractUrl = new URL("../ci/test-profile-contract.json", import.meta.url)
 
 export const semanticPolicySources = [
   "ci/test-profile-contract.json",
+  "ci/node-toolchain.json",
+  "ci/github-profile-manifest.json",
   "ci/test-profiles.json",
+  "ci/tool-profile-manifest.json",
+  "frontend/package.json",
   "ci/test-profile-plan.schema.json",
   "ci/test-profile-observation.json",
   "ci/test-profile-observation.schema.json",
@@ -17,8 +21,13 @@ export const semanticPolicySources = [
   ".github/workflows/profile-evidence.yml",
   "tools/test-profile-contract.mjs",
   "tools/docs-check.mjs",
+  "tools/github-metadata.test.mjs",
+  "tools/github-template-metadata.test.mjs",
   "tools/test-profile-classifier.mjs",
   "tools/local-check.mjs",
+  "tools/node-toolchain.mjs",
+  "tools/tool-tests.mjs",
+  "tools/workflow-action-pinning.test.mjs",
   "tools/test-profile-observation.mjs",
   "tools/test-profile-replay.mjs",
   "tools/ci-timing.mjs",
@@ -47,7 +56,7 @@ export function activeProfileDecision(proposedProfiles, fingerprint, admission, 
   const validAdmission = validateAdmissionRecord(admission, assessedOn, false);
   const admissionOutcome = admission === null ? "missing"
     : !validAdmission ? "invalid"
-    : admission.admittedPolicyFingerprint === fingerprint ? "matched" : "stale";
+    : admission.schemaVersion === 2 && admission.admittedPolicyFingerprint === fingerprint ? "matched" : "stale";
   const overrideOutcome = mode === "full" ? "emergency-full"
     : mode === "admitted" ? "admitted" : "invalid-full";
   return {
@@ -63,10 +72,10 @@ export function validateAdmissionRecord(admission, assessedOn = new Date().toISO
   const evidence = admission?.evidence;
   const valid = admission !== null && typeof admission === "object" && !Array.isArray(admission)
     && Object.keys(admission).sort().join() === ["admittedPolicyFingerprint", "evidence", "schemaVersion"].sort().join()
-    && admission.schemaVersion === 1
+    && [1, 2].includes(admission.schemaVersion)
     && /^[a-f0-9]{64}$/.test(admission.admittedPolicyFingerprint ?? "")
     && evidence !== null && typeof evidence === "object" && !Array.isArray(evidence)
-    && Object.keys(evidence).length === 12
+    && Object.keys(evidence).length === (admission.schemaVersion === 2 ? 13 : 12)
     && Number.isSafeInteger(evidence.runId) && evidence.runId > 0
     && evidence.attempt === 1
     && typeof evidence.artifact === "string"
@@ -79,9 +88,11 @@ export function validateAdmissionRecord(admission, assessedOn = new Date().toISO
     && evidence.status === "ready-for-review"
     && isCalendarDate(assessedOn)
     && evidence.expiresOn >= assessedOn
-    && ["qualifyingFirstAttempts", "backendPlans", "frontendPlans", "candidateMisses",
+    && ["qualifyingFirstAttempts", "backendPlans", "frontendPlans",
+      ...(admission.schemaVersion === 2 ? ["toolingPlans"] : []), "candidateMisses",
       "classificationErrors", "incompleteObservations"]
-      .every((field) => Number.isSafeInteger(evidence[field]) && evidence[field] >= 0);
+      .every((field) => Number.isSafeInteger(evidence[field]) && evidence[field] >= 0)
+    && (admission.schemaVersion === 1 || evidence.toolingPlans > 0);
   if (!valid && throwOnInvalid) throw new Error("Profile admission record is invalid or expired");
   return valid;
 }
@@ -126,8 +137,8 @@ export function validateContract(contract) {
   if (contract === null || typeof contract !== "object" || Array.isArray(contract)
       || contract.schemaVersion !== 1
       || Object.keys(contract).some((field) => !rootFields.includes(field))
-      || JSON.stringify(contract.profileOrder) !== JSON.stringify(["docs", "backend", "frontend", "full"])
-      || JSON.stringify(contract.ciJobOrder) !== JSON.stringify(["docs", "backend", "frontend", "security"])
+      || JSON.stringify(contract.profileOrder) !== JSON.stringify(["docs", "backend", "frontend", "tooling", "full"])
+      || JSON.stringify(contract.ciJobOrder) !== JSON.stringify(["docs", "backend", "frontend", "tooling", "security"])
       || Object.keys(contract.profiles ?? {}).length !== contract.profileOrder.length
       || Object.keys(contract.localTaskDefinitions ?? {}).length < 1
       || !Array.isArray(contract.coverageDifferences) || contract.coverageDifferences.length < 1) {

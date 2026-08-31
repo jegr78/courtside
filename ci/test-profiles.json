@@ -33,7 +33,6 @@
       ],
       "prefixes": [
         ".codex/",
-        ".github/",
         ".mvn/",
         "ci/",
         "deploy/",
@@ -44,7 +43,6 @@
         "src/main/resources/api/",
         "src/main/resources/db/",
         "src/test/resources/",
-        "tools/",
         "upgrade/"
       ]
     },
@@ -66,6 +64,10 @@
         { "prefix": "frontend/e2e/static-fixtures/", "suffix": ".csv" },
         { "prefix": "frontend/e2e/static-fixtures/", "suffix": ".txt" }
       ]
+    },
+    "tooling": {
+      "exact": [],
+      "prefixes": []
     }
   }
 }

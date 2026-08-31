@@ -18,7 +18,9 @@ export function admissionSection(admission) {
     `${evidence.assessedAt} under policy fingerprint`,
     `\`${admission.admittedPolicyFingerprint}\`. The evidence expires on ${evidence.expiresOn}. It contains`,
     `${evidence.qualifyingFirstAttempts} qualifying first attempts, including ${evidence.backendPlans} backend and`,
-    `${evidence.frontendPlans} frontend plans, with ${evidence.candidateMisses} candidate misses and`,
+    admission.schemaVersion === 2
+      ? `${evidence.frontendPlans} frontend and ${evidence.toolingPlans} tooling plans, with ${evidence.candidateMisses} candidate misses and`
+      : `${evidence.frontendPlans} frontend plans, with ${evidence.candidateMisses} candidate misses and`,
     `${evidence.classificationErrors} classification errors. ${evidence.incompleteObservations} incomplete observations were excluded.`,
     endMarker
   ].join("\n");
@@ -133,6 +135,7 @@ function main() {
   else if (process.argv.includes("--check")) {
     checkDocumentation(repository, admission);
     execFileSync(process.execPath, ["--test", "tools/docs-check.test.mjs",
+      "tools/github-template-metadata.test.mjs",
       "tools/quality-strategy.test.mjs", "tools/post-merge-policy.test.mjs",
       "tools/test-profile-contract.test.mjs"], { cwd: repository, shell: false, stdio: "inherit" });
   }

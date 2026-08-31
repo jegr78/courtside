@@ -19,9 +19,9 @@ test("given the checked-in profile policy, when a merge smoke reads it, then eve
   }
 });
 
-test("given reduced profiles, when observation policy qualifies them, then both code surfaces remain required", () => {
+test("given reduced profiles, when observation policy qualifies them, then every application and tooling surface remains required", () => {
   // when / then
-  assert.deepEqual([...observation.requiredReducedProfiles].sort(), ["backend", "frontend"]);
+  assert.deepEqual([...observation.requiredReducedProfiles].sort(), ["backend", "frontend", "tooling"]);
   assert.ok(observation.minimumFirstAttempts >= observation.minimumReducedFirstAttempts);
   assert.ok(Number.isFinite(Date.parse(observation.evidenceWindowStartedAt)));
 });
