@@ -12,19 +12,57 @@ const rulesUrl = new URL("../ci/test-profiles.json", import.meta.url);
 const admissionUrl = new URL("../ci/test-profile-admission.json", import.meta.url);
 const rules = JSON.parse(readFileSync(rulesUrl, "utf8"));
 const reducedProfiles = ["docs", "backend", "frontend"];
+validateRules(rules);
 
-function matchingRule(path, profile) {
+export function validateRules(candidate) {
+  const profileNames = ["full", ...reducedProfiles];
+  if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)
+      || Object.keys(candidate).sort().join() !== ["profiles", "schemaVersion"].sort().join()
+      || candidate.schemaVersion !== 1
+      || Object.keys(candidate.profiles ?? {}).sort().join() !== [...profileNames].sort().join()) {
+    throw new Error("Test profile path rules are invalid");
+  }
+  for (const profile of profileNames) {
+    const configured = candidate.profiles[profile];
+    if (configured === null || typeof configured !== "object" || Array.isArray(configured)
+        || Object.keys(configured).some((field) => !["exact", "prefixes", "patterns"].includes(field))
+        || !Array.isArray(configured.exact) || !Array.isArray(configured.prefixes)
+        || [...configured.exact, ...configured.prefixes].some((value) => typeof value !== "string" || value.length < 1)
+        || (configured.patterns !== undefined && (!Array.isArray(configured.patterns)
+          || configured.patterns.some((pattern) => pattern === null || typeof pattern !== "object"
+            || Array.isArray(pattern) || Object.keys(pattern).some((field) => !["prefix", "suffix", "contains"].includes(field))
+            || typeof pattern.prefix !== "string" || pattern.prefix.length < 1
+            || (pattern.suffix !== undefined && (typeof pattern.suffix !== "string" || pattern.suffix.length < 1))
+            || (pattern.contains !== undefined && (typeof pattern.contains !== "string" || pattern.contains.length < 1)))))) {
+      throw new Error("Test profile path rules are invalid");
+    }
+  }
+}
+
+function matchingRule(path, profile, kind) {
   const configured = rules.profiles[profile];
-  if (configured.exact.includes(path)) return `exact:${path}`;
-  const prefix = configured.prefixes.find((candidate) => path.startsWith(candidate));
+  if (kind === "exact" && configured.exact.includes(path)) return `exact:${path}`;
+  if (kind === "specific") {
+    const pattern = (configured.patterns ?? []).find((candidate) => path.startsWith(candidate.prefix)
+      && (candidate.suffix === undefined || path.endsWith(candidate.suffix))
+      && (candidate.contains === undefined || path.includes(candidate.contains)));
+    if (pattern === undefined) return null;
+    if (pattern.suffix !== undefined) return `suffix:${pattern.prefix}*${pattern.suffix}`;
+    if (pattern.contains !== undefined) return `contains:${pattern.prefix}${pattern.contains}`;
+    return `prefix:${pattern.prefix}`;
+  }
+  const prefix = kind === "prefix"
+    ? configured.prefixes.find((candidate) => path.startsWith(candidate)) : undefined;
   return prefix === undefined ? null : `prefix:${prefix}`;
 }
 
 export function classifyPath(path) {
   if (typeof path !== "string" || path.length < 1 || path.includes("\0")) return null;
-  for (const profile of ["full", ...reducedProfiles]) {
-    const rule = matchingRule(path, profile);
-    if (rule !== null) return { profile, rule };
+  for (const kind of ["exact", "specific", "prefix"]) {
+    for (const profile of ["full", ...reducedProfiles]) {
+      const rule = matchingRule(path, profile, kind);
+      if (rule !== null) return { profile, rule };
+    }
   }
   return null;
 }
@@ -57,7 +95,12 @@ export function classifyChanges(changes, labels) {
   for (const change of changes) {
     if (change === null || typeof change !== "object" || typeof change.status !== "string"
         || typeof change.path !== "string") throw new Error("Changed path evidence is invalid");
-    const structural = change.status !== "M";
+    if (!/^(?:[ACDMRTUXB]|R\d{1,3}|C\d{1,3})$/.test(change.status)
+        || ((change.status.startsWith("R") || change.status.startsWith("C"))
+          && typeof change.previousPath !== "string")) {
+      throw new Error("Changed path status is invalid");
+    }
+    const structural = change.status !== "M" && change.status !== "A";
     const classification = classifyPath(change.path);
     if (structural || classification === null || classification.profile === "full") requiresFull = true;
     const profile = structural || classification === null ? "full" : classification.profile;
