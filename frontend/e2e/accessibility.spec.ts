@@ -124,7 +124,7 @@ for (const locale of ["de", "en"]) {
     await page.getByTestId("toggle-court-dddddddd-0000-0000-0000-000000000002").click();
     await courtToggled;
     await page.goto("/admin/facility/opening-hours");
-    await expect(page.getByTestId("save-hours-MONDAY")).toBeVisible();
+    await expect(page.getByTestId("save-opening-hours")).toBeVisible();
 
     // then
     await expectNoWcagViolations(page);

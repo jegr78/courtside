@@ -97,7 +97,7 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // when
   await page.goto("/admin/facility/opening-hours");
-  await expect(page.getByTestId("save-hours-MONDAY")).toBeVisible();
+  await expect(page.getByTestId("save-opening-hours")).toBeVisible();
 
   // then
   await stableScreenshot(page.getByTestId("admin-opening-hours-view"), "admin-opening-hours.png");

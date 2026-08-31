@@ -14,7 +14,6 @@ export type AdminCourt = components["schemas"]["Court"];
 export type CourtRequest = components["schemas"]["CourtRequest"];
 export type OpeningHours = components["schemas"]["OpeningHours"];
 export type DayOfWeek = components["schemas"]["DayOfWeek"];
-export type SetOpeningHoursRequest = components["schemas"]["SetOpeningHoursRequest"];
 export type BookingCard = components["schemas"]["BookingCard"];
 export type BookingCardRequest = components["schemas"]["BookingCardRequest"];
 export type Role = components["schemas"]["Role"];
@@ -194,12 +193,11 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
   adminOpeningHours: () => request<OpeningHours[]>("/api/admin/opening-hours"),
-  setAdminOpeningHours: (day: DayOfWeek, hours: SetOpeningHoursRequest) => request<OpeningHours>(
-    `/api/admin/opening-hours/${day}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(hours)
+  setAdminWeeklyOpeningHours: (days: OpeningHours[]) => request<OpeningHours[]>(
+    "/api/admin/opening-hours", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days })
     }
   ),
-  closeAdminDay: (day: DayOfWeek) => request<void>(`/api/admin/opening-hours/${day}`, { method: "DELETE" }),
   adminBookingCards: () => request<BookingCard[]>("/api/admin/booking-cards"),
   createAdminBookingCard: (card: BookingCardRequest) => request<BookingCard>("/api/admin/booking-cards", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card)
