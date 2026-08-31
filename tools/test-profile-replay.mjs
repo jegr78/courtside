@@ -19,6 +19,15 @@ function validTimestamp(value) {
     && Number.isFinite(Date.parse(value));
 }
 
+export function runsInEvidenceWindow(runs, windowStartedAt, assessedAt) {
+  if (!Array.isArray(runs) || !validTimestamp(windowStartedAt) || !validTimestamp(assessedAt)) {
+    throw new Error("Replay evidence window is invalid");
+  }
+  return runs.filter((run) => validTimestamp(run?.created_at)
+    && Date.parse(run.created_at) >= Date.parse(windowStartedAt)
+    && Date.parse(run.created_at) <= Date.parse(assessedAt));
+}
+
 export function runBaseIdentity(run, repository) {
   if (run === null || typeof run !== "object" || run.event !== "pull_request"
       || run.status !== "completed" || run.run_attempt !== 1
@@ -199,9 +208,7 @@ async function main() {
   const inventoryOutput = resolve(argument("--inventory-output"));
   const github = githubClient(process.env.GH_TOKEN);
   const runs = await github.pages(`/repos/${repository}/actions/workflows/build.yml/runs?event=pull_request&status=completed`);
-  const inWindow = runs.filter((run) => validTimestamp(run.created_at)
-    && Date.parse(run.created_at) >= Date.parse(contract.evidenceWindowStartedAt)
-    && Date.parse(run.created_at) <= Date.parse(assessedAt));
+  const inWindow = runsInEvidenceWindow(runs, contract.evidenceWindowStartedAt, assessedAt);
   const result = await replayProfileEvidence({
     repository,
     assessedAt,

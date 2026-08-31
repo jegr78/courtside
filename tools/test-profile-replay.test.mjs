@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { historicalPullRequest, pullRequestIdentity, replayProfileEvidence,
-  runBaseIdentity } from "./test-profile-replay.mjs";
+  runBaseIdentity, runsInEvidenceWindow } from "./test-profile-replay.mjs";
 import { classifyChanges } from "./test-profile-classifier.mjs";
 
 const backend = "backend";
@@ -11,6 +11,21 @@ const tooling = "tooling";
 const security = "security";
 const base = "a".repeat(40);
 const head = "b".repeat(40);
+
+test("given runs around the five-job topology merge, when selecting evidence, then only compatible runs remain", () => {
+  // given
+  const runs = [
+    { id: 100, created_at: "2026-08-31T20:13:43Z" },
+    { id: 101, created_at: "2026-08-31T20:13:44Z" },
+    { id: 102, created_at: "2026-08-31T20:13:45Z" }
+  ];
+
+  // when
+  const selected = runsInEvidenceWindow(runs, "2026-08-31T20:13:44Z", "2026-08-31T20:13:44Z");
+
+  // then
+  assert.deepEqual(selected.map((candidate) => candidate.id), [101]);
+});
 
 function run(id, overrides = {}) {
   return {
