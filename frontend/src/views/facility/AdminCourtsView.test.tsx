@@ -6,13 +6,14 @@ import { api } from "../../api/client";
 import i18n from "../../i18n";
 import { UnsavedChangesProvider } from "../../unsaved/UnsavedChangesProvider";
 import { UnsavedCount } from "../../test/UnsavedCount";
+import { WithClubConfiguration } from "../../test/ClubConfiguration";
 import { AdminCourtsView } from "./AdminCourtsView";
 
 function show(counted = false) {
-  render(<MemoryRouter><UnsavedChangesProvider>
+  render(<MemoryRouter><WithClubConfiguration><UnsavedChangesProvider>
     {counted && <UnsavedCount />}
     <AdminCourtsView />
-  </UnsavedChangesProvider></MemoryRouter>);
+  </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 }
 
 describe("AdminCourtsView", () => {
@@ -22,11 +23,6 @@ describe("AdminCourtsView", () => {
     vi.spyOn(api, "adminCourts").mockResolvedValue([
       { id: "court-1", number: 1, name: "Centre Court", active: true }
     ]);
-    vi.spyOn(api, "config").mockResolvedValue({
-      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
-      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Pacific/Auckland"
-    });
   });
 
   it("given court data, when the view loads, then the courts are listed", async () => {

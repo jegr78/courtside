@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type AdminCourt } from "../../api/client";
+import { useClubConfiguration } from "../../club/registry";
 import { Button } from "../../components/Button";
 import { ImpactPanel } from "../../components/ImpactPanel";
 import { TextField } from "../../components/TextField";
@@ -14,17 +15,16 @@ import { useSaving } from "./useSaving";
 
 export function AdminCourtsView() {
   const { t } = useTranslation();
+  const { club, error: clubError } = useClubConfiguration();
   const [courts, setCourts] = useState<AdminCourt[]>();
   const [confirmed, setConfirmed] = useState<Record<string, AdminCourt>>({});
-  const [timeZone, setTimeZone] = useState<string>();
   const { error, success, pending, reportError, save } = useSaving();
   const newCourt = useUnsavedForm("court:new");
 
   useEffect(() => {
-    void Promise.all([api.adminCourts(), api.config()])
-      .then(([loaded, configuration]) => {
+    void api.adminCourts()
+      .then((loaded) => {
         setCourts(loaded);
-        setTimeZone(configuration.timeZone);
         setConfirmed(Object.fromEntries(loaded.map((court) => [court.id, court])));
       })
       .catch(reportError);
@@ -63,8 +63,8 @@ export function AdminCourtsView() {
     });
   }
 
-  return <FacilityPage testId="admin-courts-view" title={t("admin.facility.courts")} error={error} success={success}>
-    {courts !== undefined && timeZone !== undefined && <>
+  return <FacilityPage testId="admin-courts-view" title={t("admin.facility.courts")} error={error ?? clubError} success={success}>
+    {courts !== undefined && club !== undefined && <>
       <form noValidate {...newCourt.form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
         <h2 className="font-bold">{t("admin.facility.newCourt")}</h2>
         <div className="grid gap-3 sm:grid-cols-[8rem_1fr] sm:items-end">
@@ -77,7 +77,7 @@ export function AdminCourtsView() {
         key={court.id}
         court={court}
         confirmed={confirmed[court.id]}
-        timeZone={timeZone}
+        timeZone={club.timeZone}
         disabled={pending.has(`court:${court.id}`)}
         changed={applyEdit}
         save={saveCourt}

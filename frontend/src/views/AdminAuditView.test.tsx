@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api, type AuditEntry, type ClubConfig } from "../api/client";
 import i18n from "../i18n";
+import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
+import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { AdminAuditView } from "./AdminAuditView";
 
 const courtAdded: AuditEntry = {
@@ -23,6 +25,10 @@ const clubConfig: ClubConfig = {
   slotMinutes: 60, timeZone: "Europe/Berlin"
 };
 
+function show({ club = clubConfig, at = "/admin/audit" }: { club?: ClubConfig; at?: string } = {}) {
+  render(<MemoryRouter initialEntries={[at]}><WithClubConfiguration club={club}><AdminAuditView /></WithClubConfiguration></MemoryRouter>);
+}
+
 function row(entryId: string): HTMLElement {
   const found = screen.getAllByTestId("audit-row")
     .find((element) => element.getAttribute("data-entry-id") === entryId);
@@ -34,7 +40,6 @@ describe("AdminAuditView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
-    vi.spyOn(api, "config").mockResolvedValue(clubConfig);
   });
 
   it("given an entry, when the log is shown, then its row names the change, the subject and the actor", async () => {
@@ -42,7 +47,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     await screen.findByTestId("audit-row");
 
     // then
@@ -58,7 +63,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     await screen.findByTestId("audit-row");
 
     // then
@@ -71,7 +76,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     await screen.findByTestId("audit-row");
 
     // then
@@ -86,7 +91,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     await screen.findByTestId("audit-row");
 
     // then
@@ -101,7 +106,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     await screen.findByTestId("audit-row");
 
     // then
@@ -116,7 +121,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     await screen.findByTestId("audit-row");
 
     // then
@@ -126,17 +131,31 @@ describe("AdminAuditView", () => {
   it("given the occurred-at cell, when the club has its own time zone and the browser has a language, then both are honoured, never the browser's own zone", async () => {
     // given
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
-    vi.spyOn(api, "config").mockResolvedValue({ ...clubConfig, timeZone: "America/New_York" });
     await i18n.changeLanguage("de");
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show({ club: { ...clubConfig, timeZone: "America/New_York" } });
     await screen.findByTestId("audit-row");
 
     // then
     const expected = new Intl.DateTimeFormat("de", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" })
       .format(new Date(courtAdded.occurredAt));
     expect(within(row(courtAdded.id)).getByTestId("audit-occurred-at")).toHaveTextContent(expected);
+  });
+
+  // A club nobody can read used to leave the column on UTC, which reads as a time the change never
+  // happened at.
+  it("given a club that cannot be read, when the log is shown, then the failure is named and no row states a time", async () => {
+    // given
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unreachable"));
+
+    // when
+    render(<MemoryRouter><ClubConfigurationProvider><AdminAuditView /></ClubConfigurationProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("error.generic"));
+    expect(screen.queryByTestId("audit-row")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -157,7 +176,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     await screen.findByTestId("audit-row");
 
     // then
@@ -184,7 +203,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     await screen.findByTestId("audit-row");
 
     // then
@@ -197,7 +216,7 @@ describe("AdminAuditView", () => {
     const audit = vi.spyOn(api, "audit")
       .mockResolvedValueOnce({ entries: [courtAdded], nextCursor: courtAdded.id })
       .mockResolvedValueOnce({ entries: [second], nextCursor: null });
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     const user = userEvent.setup();
 
     // when
@@ -216,7 +235,7 @@ describe("AdminAuditView", () => {
     const audit = vi.spyOn(api, "audit")
       .mockResolvedValueOnce({ entries: [courtAdded], nextCursor: courtAdded.id })
       .mockResolvedValueOnce({ entries: [second], nextCursor: null });
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("audit-load-more"));
     expect(await screen.findAllByTestId("audit-row")).toHaveLength(2);
@@ -234,7 +253,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
 
     // then
     expect(await screen.findByTestId("audit-empty")).toHaveTextContent(
@@ -248,7 +267,7 @@ describe("AdminAuditView", () => {
     vi.spyOn(api, "audit").mockRejectedValue(new Error("unavailable"));
 
     // when
-    render(<MemoryRouter><AdminAuditView /></MemoryRouter>);
+    show();
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
@@ -261,7 +280,7 @@ describe("AdminAuditView", () => {
     const audit = vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
 
     // when
-    render(<MemoryRouter initialEntries={["/admin/audit?subjectId=subject-1"]}><AdminAuditView /></MemoryRouter>);
+    show({ at: "/admin/audit?subjectId=subject-1" });
 
     // then
     await waitFor(() => expect(audit).toHaveBeenCalledWith(undefined, 50, "subject-1"));
@@ -272,7 +291,7 @@ describe("AdminAuditView", () => {
     const audit = vi.spyOn(api, "audit")
       .mockResolvedValueOnce({ entries: [courtAdded], nextCursor: "cursor-1" })
       .mockResolvedValueOnce({ entries: [], nextCursor: null });
-    render(<MemoryRouter initialEntries={["/admin/audit?subjectId=subject-1"]}><AdminAuditView /></MemoryRouter>);
+    show({ at: "/admin/audit?subjectId=subject-1" });
     await screen.findByTestId("audit-load-more");
 
     // when

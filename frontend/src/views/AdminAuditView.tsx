@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { api, type AuditEntry, type DayOfWeek } from "../api/client";
 import { problemMessage } from "../api/problem-message";
+import { useClubConfiguration } from "../club/registry";
 import { formatDateTime, shortTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -85,9 +86,9 @@ export function AdminAuditView() {
   const language = i18n.resolvedLanguage ?? i18n.language;
   const [search] = useSearchParams();
   const subjectId = search.get("subjectId") ?? undefined;
+  const { club, error: clubError } = useClubConfiguration();
   const [entries, setEntries] = useState<AuditEntry[]>();
   const [cursor, setCursor] = useState<string>();
-  const [timeZone, setTimeZone] = useState("UTC");
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
 
@@ -98,11 +99,10 @@ export function AdminAuditView() {
   }, [reportError]);
 
   useEffect(() => {
-    void Promise.all([api.audit(undefined, 50, subjectId), api.config()])
-      .then(([page, config]) => {
+    void api.audit(undefined, 50, subjectId)
+      .then((page) => {
         setEntries(page.entries);
         setCursor(page.nextCursor ?? undefined);
-        setTimeZone(config.timeZone);
       })
       .catch((failure: unknown) => reportErrorRef.current(failure));
   }, [subjectId]);
@@ -122,12 +122,13 @@ export function AdminAuditView() {
     }
   }
 
+  const problem = error ?? clubError;
   return <section data-testid="admin-audit-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("audit.title")}</h1>
-    {!entries
-      ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+    {!entries || !club
+      ? (problem ? <Alert>{problem}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
-        {error && <Alert>{error}</Alert>}
+        {problem && <Alert>{problem}</Alert>}
         {entries.length === 0
           ? <p data-testid="audit-empty">{t("audit.empty")}</p>
           : <div className="overflow-x-auto">
@@ -142,7 +143,7 @@ export function AdminAuditView() {
               </thead>
               <tbody>
                 {entries.map((entry) => <tr key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId} data-event-type={entry.eventType} className="border-t">
-                  <td data-testid="audit-occurred-at" className="p-2">{formatDateTime(entry.occurredAt, language, timeZone)}</td>
+                  <td data-testid="audit-occurred-at" className="p-2">{formatDateTime(entry.occurredAt, language, club.timeZone)}</td>
                   <td data-testid="audit-message" className="p-2">{auditMessage(entry, t)}</td>
                   <td data-testid="audit-subject" className="p-2">{subjectLabel(entry, t)}</td>
                   <td data-testid="audit-actor" className="p-2">{actorLabel(entry, t)}</td>

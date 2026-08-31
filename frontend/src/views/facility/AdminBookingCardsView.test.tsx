@@ -6,13 +6,14 @@ import { api } from "../../api/client";
 import i18n from "../../i18n";
 import { UnsavedChangesProvider } from "../../unsaved/UnsavedChangesProvider";
 import { UnsavedCount } from "../../test/UnsavedCount";
+import { WithClubConfiguration } from "../../test/ClubConfiguration";
 import { AdminBookingCardsView } from "./AdminBookingCardsView";
 
 function show(counted = false) {
-  render(<MemoryRouter><UnsavedChangesProvider>
+  render(<MemoryRouter><WithClubConfiguration><UnsavedChangesProvider>
     {counted && <UnsavedCount />}
     <AdminBookingCardsView />
-  </UnsavedChangesProvider></MemoryRouter>);
+  </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 }
 
 describe("AdminBookingCardsView", () => {
@@ -26,11 +27,6 @@ describe("AdminBookingCardsView", () => {
         guestAllowed: true, showGenericOccupancy: true, active: true
       }
     ]);
-    vi.spyOn(api, "config").mockResolvedValue({
-      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
-      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Pacific/Auckland"
-    });
   });
 
   it("given booking cards, when the view loads, then each card and who may use it is shown", async () => {

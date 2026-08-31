@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api, type ClubConfig, type MessageEntry } from "../api/client";
 import i18n from "../i18n";
+import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { AdminMessagesView } from "./AdminMessagesView";
 
 const handedOver: MessageEntry = {
@@ -36,6 +37,10 @@ const clubConfig: ClubConfig = {
   slotMinutes: 60, timeZone: "Europe/Berlin"
 };
 
+function show() {
+  render(<MemoryRouter><WithClubConfiguration club={clubConfig}><AdminMessagesView /></WithClubConfiguration></MemoryRouter>);
+}
+
 function row(entryId: string): HTMLElement {
   const found = screen.getAllByTestId("message-row")
     .find((element) => element.getAttribute("data-entry-id") === entryId);
@@ -47,7 +52,6 @@ describe("AdminMessagesView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
-    vi.spyOn(api, "config").mockResolvedValue(clubConfig);
   });
 
   it("given a handed-over message, when the log is shown, then the row rests there and claims no delivery", async () => {
@@ -55,7 +59,7 @@ describe("AdminMessagesView", () => {
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [handedOver], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
+    show();
     await screen.findByTestId("message-row");
 
     // then
@@ -88,7 +92,7 @@ async (language) => {
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [refused], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
+    show();
     await screen.findByTestId("message-row");
 
     // then
@@ -102,7 +106,7 @@ async (language) => {
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [refused], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
+    show();
     await screen.findByTestId("message-row");
 
     // then
@@ -116,7 +120,7 @@ async (language) => {
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [refused], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
+    show();
     await screen.findByTestId("message-row");
 
     // then — every control on the page navigates, and the only places it goes are readable pages
@@ -129,7 +133,7 @@ async (language) => {
     // given
     const messages = vi.spyOn(api, "messages")
       .mockResolvedValue({ entries: [handedOver], nextCursor: null });
-    render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
+    show();
     await screen.findByTestId("message-row");
     messages.mockResolvedValue({ entries: [refused], nextCursor: null });
 
@@ -146,7 +150,7 @@ async (language) => {
     // given
     const messages = vi.spyOn(api, "messages")
       .mockResolvedValue({ entries: [handedOver], nextCursor: "a-cursor" });
-    render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
+    show();
     await screen.findByTestId("message-row");
     messages.mockResolvedValue({ entries: [refused], nextCursor: null });
 
@@ -163,7 +167,7 @@ async (language) => {
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
 
     // when
-    render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
+    show();
 
     // then
     expect(await screen.findByTestId("messages-empty")).toHaveTextContent(
@@ -175,7 +179,7 @@ async (language) => {
   it("given no message needs attention, when filtering unsettled messages, then the empty state names how to see the log", async () => {
     // given
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
-    render(<MemoryRouter><AdminMessagesView /></MemoryRouter>);
+    show();
     await screen.findByTestId("messages-empty");
 
     // when

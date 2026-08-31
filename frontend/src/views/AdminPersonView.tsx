@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api, type ClubConfig, type MembershipType, type MessageEntry, type PersonRequest, type Role, type RosterEntry } from "../api/client";
 import { problemMessage } from "../api/problem-message";
+import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { LocaleSelect } from "../components/LocaleSelect";
@@ -33,9 +34,9 @@ export function AdminPersonView() {
   const { t } = useTranslation();
   const location = useLocation();
   const { personId = "" } = useParams();
+  const { club, error: clubError } = useClubConfiguration();
   const [entry, setEntry] = useState<RosterEntry>();
   const [types, setTypes] = useState<MembershipType[]>([]);
-  const [club, setClub] = useState<ClubConfig>();
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string | undefined>(() => arrivedFromPersonCreation(location.state as unknown)
     ? t("admin.roster.personCreated")
@@ -48,11 +49,10 @@ export function AdminPersonView() {
   }, [t]);
 
   useEffect(() => {
-    void Promise.all([api.person(personId), api.membershipTypes(), api.config()])
-      .then(([person, membershipTypes, configuration]) => {
+    void Promise.all([api.person(personId), api.membershipTypes()])
+      .then(([person, membershipTypes]) => {
         setEntry(person);
         setTypes(membershipTypes);
-        setClub(configuration);
       })
       .catch(reportError);
   }, [personId, reportError]);
@@ -89,15 +89,16 @@ export function AdminPersonView() {
     }
   }
 
+  const problem = error ?? clubError;
   return <section data-testid="admin-person-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-3xl font-bold">{entry ? `${entry.firstName} ${entry.lastName}` : t("admin.person.title")}</h1>
       <Link data-testid="back-to-roster" to="/admin/roster" className="font-semibold underline">{t("admin.person.backToRoster")}</Link>
     </div>
-    {!entry
-      ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+    {!entry || !club
+      ? (problem ? <Alert>{problem}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
-        {error && <Alert>{error}</Alert>}
+        {problem && <Alert>{problem}</Alert>}
         {success && <SuccessFeedback>{success}</SuccessFeedback>}
         <PersonSection entry={entry} disabled={pending} save={(person) => mutate(() => api.changePerson(personId, person))} />
         <MembershipSection
@@ -229,7 +230,7 @@ function MembershipSection({ entry, types, disabled, save }: {
 
 function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLocale, sendCredentials, toggleAccount }: {
   entry: RosterEntry;
-  club: ClubConfig | undefined;
+  club: ClubConfig;
   disabled: boolean;
   saveRoles: (roles: Role[]) => Saved;
   saveUsername: (username: string) => Saved;
@@ -239,10 +240,10 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
 }) {
   const { t } = useTranslation();
   const [username, setUsername] = useState(entry.username ?? "");
-  const [locale, setLocale] = useState(entry.locale ?? club?.defaultLocale ?? "");
+  const [locale, setLocale] = useState(entry.locale ?? club.defaultLocale);
   const [chosenRoles, setChosenRoles] = useState(entry.roles);
   const unsavedUsername = username !== (entry.username ?? "");
-  const unsavedLocale = locale !== (entry.locale ?? club?.defaultLocale ?? "");
+  const unsavedLocale = locale !== (entry.locale ?? club.defaultLocale);
   const unsavedRoles = differs({ roles: chosenRoles }, { roles: entry.roles });
   const [replacing, setReplacing] = useState(false);
 
@@ -272,7 +273,7 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <label className="grid gap-2 font-medium">
         {t("admin.person.accountLocale")}
-        <LocaleSelect testId="account-locale" disabled={disabled} className="form-control rounded-lg border px-3 py-2" value={locale} supported={club?.supportedLocales} changed={setLocale} />
+        <LocaleSelect testId="account-locale" disabled={disabled} className="form-control rounded-lg border px-3 py-2" value={locale} supported={club.supportedLocales} changed={setLocale} />
       </label>
       <div className="flex flex-wrap items-center gap-3 self-end">
         <Button variant="primary" data-testid="save-locale" aria-describedby={describedByMark(`account-locale:${entry.personId}`, unsavedLocale)} disabled={disabled} type="button" onClick={() => void saveLocale(locale)}>{t("admin.save")}</Button>

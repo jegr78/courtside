@@ -6,13 +6,14 @@ import { api } from "../../api/client";
 import i18n from "../../i18n";
 import { UnsavedChangesProvider } from "../../unsaved/UnsavedChangesProvider";
 import { UnsavedCount } from "../../test/UnsavedCount";
+import { WithClubConfiguration } from "../../test/ClubConfiguration";
 import { AdminOpeningHoursView } from "./AdminOpeningHoursView";
 
 function show(counted = false) {
-  render(<MemoryRouter><UnsavedChangesProvider>
+  render(<MemoryRouter><WithClubConfiguration><UnsavedChangesProvider>
     {counted && <UnsavedCount />}
     <AdminOpeningHoursView />
-  </UnsavedChangesProvider></MemoryRouter>);
+  </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 }
 
 describe("AdminOpeningHoursView", () => {
@@ -22,11 +23,6 @@ describe("AdminOpeningHoursView", () => {
     vi.spyOn(api, "adminOpeningHours").mockResolvedValue([
       { dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }
     ]);
-    vi.spyOn(api, "config").mockResolvedValue({
-      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
-      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Pacific/Auckland"
-    });
   });
 
   // The rule editor on the configuration page links straight here, which is what the route buys.

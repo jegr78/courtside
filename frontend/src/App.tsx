@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
@@ -11,6 +11,7 @@ import { PrimaryNavigation } from "./components/PrimaryNavigation";
 import { PwaLifecycle } from "./components/PwaLifecycle";
 import { UnsavedChangesProvider } from "./unsaved/UnsavedChangesProvider";
 import { UnsavedChangesGuard } from "./unsaved/UnsavedChangesGuard";
+import { useClubConfiguration } from "./club/registry";
 import { brandContrast } from "./brandColor";
 import { applyAccountLocale, supportedLocale } from "./i18n";
 import { HomeView } from "./views/HomeView";
@@ -117,8 +118,8 @@ function CourtsideMark({ testId = "courtside-mark", className = "h-10 w-10" }: {
 export function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { club, changed: configurationChanged } = useClubConfiguration();
   const [session, setSession] = useState<SessionStatus>();
-  const [config, setConfig] = useState<ClubConfig>();
   const [source, setSource] = useState<SourceOffer>();
   const [identityStatus, setIdentityStatus] = useState<"loading" | "available" | "unavailable">("loading");
   const [offline, setOffline] = useState(false);
@@ -139,7 +140,6 @@ export function App() {
   useEffect(() => {
     void Promise.all([
       refreshSession().catch(() => setOffline(true)),
-      api.config().then((value) => { setConfig(value); applyBranding(value); }).catch(() => undefined),
       api.source()
         .then((value) => {
           setSource(value);
@@ -154,6 +154,12 @@ export function App() {
     window.addEventListener("courtside:unauthenticated", unauthenticated);
     return () => window.removeEventListener("courtside:unauthenticated", unauthenticated);
   }, [navigate, refreshSession]);
+
+  // Before the paint, not after it: the club's colours would otherwise show one frame of the
+  // stylesheet's own.
+  useLayoutEffect(() => {
+    if (club) applyBranding(club);
+  }, [club]);
 
   useEffect(() => {
     const wentOffline = () => setOffline(true);
@@ -181,24 +187,19 @@ export function App() {
     void navigate("/login");
   }
 
-  function configurationChanged(changed: ClubConfig) {
-    setConfig(changed);
-    applyBranding(changed);
-  }
-
   return <div className="flex min-h-screen flex-col bg-(--cs-page) text-(--cs-text)">
     <PwaLifecycle />
     <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
       <div className="flex items-center gap-3">
-        {config?.logoUrl ? <img src={config.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
-        <span data-testid="club-brand-name" className="text-xl font-bold">{config?.clubName ?? t("app.name")}</span>
+        {club?.logoUrl ? <img src={club.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
+        <span data-testid="club-brand-name" className="text-xl font-bold">{club?.clubName ?? t("app.name")}</span>
       </div>
-      <Preferences authenticated={session?.authenticated ?? false} supported={config?.supportedLocales} signedOut={signOut} />
+      <Preferences authenticated={session?.authenticated ?? false} supported={club?.supportedLocales} signedOut={signOut} />
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">
       {offline ? <div data-testid="offline-status"><Alert>{t("status.offline")}</Alert></div> : session
-        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} configurationChanged={configurationChanged} clubName={config?.clubName} />
+        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} configurationChanged={configurationChanged} clubName={club?.clubName} />
         : <p role="status">{t("status.loading")}</p>}
     </main>
     <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 py-4 text-sm">
@@ -207,8 +208,8 @@ export function App() {
         {t("app.name")}
       </span>
       <BuildIdentity source={source} />
-      {config?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={config.imprintUrl}>{t("footer.imprint")}</a>}
-      {config?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={config.privacyUrl}>{t("footer.privacy")}</a>}
+      {club?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={club.imprintUrl}>{t("footer.imprint")}</a>}
+      {club?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={club.privacyUrl}>{t("footer.privacy")}</a>}
     </footer>
   </div>;
 }

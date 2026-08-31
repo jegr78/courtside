@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -6,6 +6,7 @@ import { useMemo, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App, AppRoutes } from "./App";
 import { api, type SessionStatus } from "./api/client";
+import { ClubConfigurationProvider } from "./club/ClubConfigurationProvider";
 import { Preferences } from "./components/Preferences";
 import i18n from "./i18n";
 
@@ -21,7 +22,7 @@ function RoutedShell({ initialEntries = ["/"], children }: { initialEntries?: st
     () => createMemoryRouter([{ path: "*", element: children }], { initialEntries }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []);
-  return <RouterProvider router={router} />;
+  return <ClubConfigurationProvider><RouterProvider router={router} /></ClubConfigurationProvider>;
 }
 
 
@@ -286,9 +287,45 @@ describe("AppRoutes", () => {
     expect(screen.getByTestId(view)).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
+
+  // The club's configuration belongs to the shell, not to each page: walking the facility must not
+  // make the instance answer the same question once per page.
+  it("given an admin on the courts, when the opening hours are opened, then the club is not asked for a second time", async () => {
+    // given
+    const asked = vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Pacific/Auckland"
+    });
+    vi.spyOn(api, "adminCourts").mockResolvedValue([{ id: "court-1", number: 1, name: "Centre Court", active: true }]);
+    vi.spyOn(api, "adminOpeningHours").mockResolvedValue([{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }]);
+    render(<RoutedShell initialEntries={["/admin/facility/courts"]}><AppRoutes session={{
+      authenticated: true,
+      username: "admin",
+      displayName: "Example Administrator",
+      roles: ["ADMIN"],
+      passwordChangeRequired: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+    await screen.findByTestId("court-name-court-1");
+
+    // when
+    await userEvent.click(screen.getByTestId("admin-opening-hours-link"));
+
+    // then
+    expect(await screen.findByTestId("hours-open-MONDAY")).toBeInTheDocument();
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("App build identity", () => {
+  const club = {
+    clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+    defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin"
+  };
+  const adminClub = {
+    ...club, newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+    bookingReminderHours: 24, logoUploaded: false
+  };
+
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
@@ -493,6 +530,34 @@ describe("App build identity", () => {
     expect(screen.queryByTestId("footer-privacy")).not.toBeInTheDocument();
   });
 
+  // Nothing else holds this wire: cutting the callback in App leaves every other test green, and
+  // only the browser journey would notice.
+  it("given a saved club name, when the configuration page reports it, then the shell carries it without a reload", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue({
+      authenticated: true, username: "admin", displayName: "Example Administrator",
+      roles: ["ADMIN"], passwordChangeRequired: false
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "adminConfig").mockResolvedValue(adminClub);
+    vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
+    vi.spyOn(api, "ruleTypes").mockResolvedValue([]);
+    vi.spyOn(api, "rules").mockResolvedValue([]);
+    vi.spyOn(api, "membershipTypes").mockResolvedValue([]);
+    vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...adminClub, clubName: "Example Racquet Club" });
+    render(<RoutedShell initialEntries={["/admin/configuration"]}><App /></RoutedShell>);
+    expect(await screen.findByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club");
+
+    // when
+    fireEvent.change(await screen.findByTestId("club-name"), { target: { value: "Example Racquet Club" } });
+    fireEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    expect(await screen.findByTestId("admin-save-success")).toBeInTheDocument();
+    expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Racquet Club");
+  });
+
   it("given a mid luminance club colour, when the shell loads, then the higher contrast text colour is used", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
@@ -511,7 +576,7 @@ describe("App build identity", () => {
     render(<RoutedShell><App /></RoutedShell>);
 
     // then
-    await screen.findByTestId("courtside-mark");
+    expect(await screen.findByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club");
     expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
   });
 });
