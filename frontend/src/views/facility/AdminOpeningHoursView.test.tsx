@@ -178,8 +178,63 @@ describe("AdminOpeningHoursView", () => {
     await user.click(screen.getByTestId("save-opening-hours"));
 
     // then
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(await screen.findByRole("alert"))
+      .toHaveTextContent("Complete the marked day, or mark it closed");
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("given a day the server rejected, when its time is corrected, then the message goes with it", async () => {
+    // given
+    vi.spyOn(api, "setAdminWeeklyOpeningHours").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:weekly-opening-hours-rejected",
+      title: "The week cannot be stored as given",
+      status: 400,
+      violations: [{
+        code: "facility.openingHours.slotGridMismatch",
+        params: { slotMinutes: 30, day: "MONDAY" }
+      }]
+    }));
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("hours-open-MONDAY");
+    await user.click(screen.getByTestId("save-opening-hours"));
+    await screen.findByTestId("hours-error-MONDAY");
+
+    // when
+    await user.clear(screen.getByTestId("hours-open-MONDAY"));
+    await user.type(screen.getByTestId("hours-open-MONDAY"), "09:00");
+
+    // then
+    await waitFor(() =>
+      expect(screen.queryByTestId("hours-error-MONDAY")).not.toBeInTheDocument());
+  });
+
+  it("given several days the applied times reach, when applying them, then their messages go too", async () => {
+    // given
+    vi.spyOn(api, "setAdminWeeklyOpeningHours").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:weekly-opening-hours-rejected",
+      title: "The week cannot be stored as given",
+      status: 400,
+      violations: [{
+        code: "facility.openingHours.slotGridMismatch",
+        params: { slotMinutes: 30, day: "MONDAY" }
+      }]
+    }));
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("hours-open-MONDAY");
+    await user.click(screen.getByTestId("save-opening-hours"));
+    await screen.findByTestId("hours-error-MONDAY");
+
+    // when
+    await user.type(screen.getByTestId("apply-opens-at"), "09:00");
+    await user.type(screen.getByTestId("apply-closes-at"), "18:00");
+    await user.click(screen.getByTestId("apply-day-MONDAY"));
+    await user.click(screen.getByTestId("apply-hours"));
+
+    // then
+    await waitFor(() =>
+      expect(screen.queryByTestId("hours-error-MONDAY")).not.toBeInTheDocument());
   });
 
   it("given an edited day, when it is counted, then the week is asked about once", async () => {

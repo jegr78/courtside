@@ -178,7 +178,7 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAWeekMissingAWeekday_whenSavingIt_thenItIsRefusedBeforeAnythingIsStored()
+    void givenAWeekMissingAWeekday_whenSavingIt_thenTheContractsOwnBoundRefusesItUnstored()
             throws Exception {
         // given
         mockMvc.perform(saveWeek(open(DayOfWeek.MONDAY, "08:00", "22:00")))
@@ -190,7 +190,10 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
         // when
         mockMvc.perform(put("/api/admin/opening-hours")
                         .contentType(MediaType.APPLICATION_JSON).content(body).with(csrf()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("days"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"));
 
         // then
         mockMvc.perform(get("/api/admin/opening-hours"))

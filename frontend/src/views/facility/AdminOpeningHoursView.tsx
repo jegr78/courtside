@@ -23,7 +23,7 @@ export function AdminOpeningHoursView() {
   const [week, setWeek] = useState<WeekDay[]>();
   const [confirmed, setConfirmed] = useState<WeekDay[]>();
   const [rejected, setRejected] = useState<Record<string, string>>({});
-  const { error, success, pending, reportError, save } = useSaving();
+  const { error, success, pending, reportError, refuse, save } = useSaving();
 
   useEffect(() => {
     void api.adminOpeningHours()
@@ -34,25 +34,34 @@ export function AdminOpeningHoursView() {
       .catch(reportError);
   }, [reportError]);
 
+  // A day somebody has since edited no longer carries the answer the server gave about it.
+  function forget(days: Set<DayOfWeek>) {
+    setRejected((current) =>
+      Object.fromEntries(Object.entries(current).filter(([day]) => !days.has(day as DayOfWeek))));
+  }
+
   function replace(changed: WeekDay) {
     setWeek((current) => current?.map((day) => day.dayOfWeek === changed.dayOfWeek ? changed : day));
+    forget(new Set([changed.dayOfWeek]));
   }
 
   function applyTo(days: Set<DayOfWeek>, opensAt: string, closesAt: string) {
     setWeek((current) => current?.map((day) => days.has(day.dayOfWeek)
       ? { ...day, opensAt, closesAt, closed: false }
       : day));
+    forget(days);
   }
 
   function saveWeek(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!week) return Promise.resolve();
+    const incomplete = incompleteDays(week, t);
+    if (Object.keys(incomplete).length > 0) {
+      setRejected(incomplete);
+      refuse(t("admin.facility.dayNeedsBothTimes"));
+      return Promise.resolve();
+    }
     return save(MARK, async () => {
-      const incomplete = incompleteDays(week, t);
-      if (Object.keys(incomplete).length > 0) {
-        setRejected(incomplete);
-        throw new Error("A day carries one of its two times and is not marked closed");
-      }
       try {
         const stored = await api.setAdminWeeklyOpeningHours(week.map(toRequest));
         setRejected({});
