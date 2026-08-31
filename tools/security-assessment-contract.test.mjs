@@ -194,21 +194,24 @@ test("given manual evidence, when its outcome needs action, then rationale and f
     classification: "restricted-security-evidence",
     expiresOn: "2026-09-21"
   };
-  const procedure = {
-    procedureId: "MAN-ARCH-001",
-    controlIds: ["v5.0.0-1.1.1"],
-    prerequisites: ["Qualified target"],
+  const control = {
+    controlId: "v5.0.0-1.1.1",
     stepsPerformed: ["Reviewed the boundary"],
     expectedSecureOutcome: "No undocumented boundary exists.",
     observedResult: "The documented and deployed boundaries agree.",
     redactedEvidenceReferences: [evidenceReference],
-    tester: "Maintainer",
-    recordedAt: "2026-08-21T20:00:00Z",
-    targetImageDigest: digest,
     outcome: "pass"
   };
+  const procedure = {
+    procedureId: "MAN-ARCH-001",
+    prerequisites: ["Qualified target"],
+    controls: [control],
+    tester: "Maintainer",
+    recordedAt: "2026-08-21T20:00:00Z",
+    targetImageDigest: digest
+  };
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     catalogVersion: catalog.catalogVersion,
     runId: "manual-baseline-1",
     tester: "Maintainer",
@@ -236,8 +239,29 @@ test("given manual evidence, when its outcome needs action, then rationale and f
   // when / then
   assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
   assert.equal(validateManualAssessmentEvidence(evidence, new Date("2026-08-21T20:00:00Z")), evidence);
-  assert.equal(validate({ ...evidence, procedures: [{ ...procedure, outcome: "blocked" }] }), false);
-  assert.equal(validate({ ...evidence, procedures: [{ ...procedure, outcome: "fail", rationale: "Mismatch" }] }), false);
+  const blockedControl = {
+    ...control,
+    controlId: "v5.0.0-1.1.2",
+    outcome: "blocked",
+    rationale: "A physical review is not available in this run.",
+    owner: "Maintainer",
+    trackingReference: "issue-1"
+  };
+  const expandedEvidence = {
+    ...evidence,
+    selectedControlIds: [control.controlId, blockedControl.controlId],
+    procedures: [{ ...procedure, controls: [control, blockedControl] }]
+  };
+  assert.equal(validateManualAssessmentEvidence(expandedEvidence,
+    new Date("2026-08-21T20:00:00Z")), expandedEvidence);
+  assert.throws(() => validateManualAssessmentEvidence({
+    ...expandedEvidence,
+    procedures: [{ ...procedure, controls: [control, control] }]
+  }, new Date("2026-08-21T20:00:00Z")), /duplicate outcome/);
+  assert.equal(validate({ ...evidence, procedures: [{ ...procedure,
+    controls: [{ ...control, outcome: "blocked" }] }] }), false);
+  assert.equal(validate({ ...evidence, procedures: [{ ...procedure,
+    controls: [{ ...control, outcome: "fail", rationale: "Mismatch" }] }] }), false);
   assert.equal(validate({ ...evidence, profile: "active", environment: "UAT" }), false);
   assert.equal(validate({ ...evidence, profile: "destructive", environment: "EXPLICIT_PRODUCTION" }), false);
   assert.equal(validate({ ...evidence, unexpectedRawTraffic: "secret" }), false);
@@ -246,23 +270,26 @@ test("given manual evidence, when its outcome needs action, then rationale and f
 test("given schema-valid manual evidence, when catalog and authorization relationships disagree, then validation fails closed", () => {
   // given
   const digest = `sha256:${"a".repeat(64)}`;
-  const procedure = {
-    procedureId: "MAN-ARCH-001",
-    controlIds: ["v5.0.0-1.1.1"],
-    prerequisites: ["Qualified target"],
+  const control = {
+    controlId: "v5.0.0-1.1.1",
     stepsPerformed: ["Compared the deployed trust boundary with the pinned requirement"],
     expectedSecureOutcome: "The boundary is explicit.",
     observedResult: "The boundary agrees with the documented model.",
     redactedEvidenceReferences: [{
       id: "evidence-001", digest, classification: "restricted-security-evidence", expiresOn: "2026-09-21"
     }],
-    tester: "Maintainer",
-    recordedAt: "2026-08-21T20:00:00Z",
-    targetImageDigest: digest,
     outcome: "pass"
   };
+  const procedure = {
+    procedureId: "MAN-ARCH-001",
+    prerequisites: ["Qualified target"],
+    controls: [control],
+    tester: "Maintainer",
+    recordedAt: "2026-08-21T20:00:00Z",
+    targetImageDigest: digest
+  };
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     catalogVersion: catalog.catalogVersion,
     runId: "manual-baseline-1",
     tester: "Maintainer",
@@ -290,12 +317,14 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
     { ...evidence, catalogVersion: "99.0.0" },
     { ...evidence, selectedControlIds: ["v5.0.0-1.1.2"] },
     { ...evidence, procedures: [procedure, procedure] },
-    { ...evidence, procedures: [{ ...procedure, controlIds: ["v5.0.0-2.1.1"] }] },
+    { ...evidence, procedures: [{ ...procedure,
+      controls: [{ ...control, controlId: "v5.0.0-2.1.1" }] }] },
     { ...evidence, procedures: [{ ...procedure, targetImageDigest: `sha256:${"b".repeat(64)}` }] },
     { ...evidence, authorization: { ...evidence.authorization, targetFingerprint: `sha256:${"b".repeat(64)}` } },
     { ...evidence, targetOrigin: "https://127.0.0.1:9443" },
     { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-08-20T20:00:00Z" } },
-    { ...evidence, procedures: [{ ...procedure, observedResult: "cookie=opaque-value" }] }
+    { ...evidence, procedures: [{ ...procedure,
+      controls: [{ ...control, observedResult: "cookie=opaque-value" }] }] }
   ];
 
   // when / then
@@ -307,23 +336,26 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
 test("given an active-only procedure, when safe or production execution is claimed, then validation fails closed", () => {
   // given
   const digest = `sha256:${"a".repeat(64)}`;
-  const procedure = {
-    procedureId: "MAN-INPUT-001",
-    controlIds: ["v5.0.0-5.1.1"],
-    prerequisites: ["Qualified target"],
+  const control = {
+    controlId: "v5.0.0-5.1.1",
     stepsPerformed: ["Compared parser interpretations"],
     expectedSecureOutcome: "Ambiguity is rejected.",
     observedResult: "All layers rejected the ambiguous input.",
     redactedEvidenceReferences: [{
       id: "evidence-001", digest, classification: "restricted-security-evidence", expiresOn: "2026-09-21"
     }],
-    tester: "Maintainer",
-    recordedAt: "2026-08-21T20:00:00Z",
-    targetImageDigest: digest,
     outcome: "pass"
   };
+  const procedure = {
+    procedureId: "MAN-INPUT-001",
+    prerequisites: ["Qualified target"],
+    controls: [control],
+    tester: "Maintainer",
+    recordedAt: "2026-08-21T20:00:00Z",
+    targetImageDigest: digest
+  };
   const evidence = {
-    schemaVersion: 1, catalogVersion: catalog.catalogVersion, runId: "manual-baseline-1",
+    schemaVersion: 2, catalogVersion: catalog.catalogVersion, runId: "manual-baseline-1",
     tester: "Maintainer", recordedAt: "2026-08-21T20:00:00Z", sourceCommit: "a".repeat(40),
     targetImageDigest: digest, targetFingerprint: digest, targetOrigin: "https://127.0.0.1:8443",
     environment: "SECURITY", profile: "safe",

@@ -60,23 +60,26 @@ export function validateManualAssessmentEvidence(evidence, assessmentDate = new 
         || procedure.targetImageDigest !== evidence.targetImageDigest) {
       fail(`procedure ${procedure.procedureId} provenance differs from the run`);
     }
-    for (const controlId of procedure.controlIds) {
+    requireSafeText(procedure.prerequisites, `${procedure.procedureId} prerequisites`);
+    const procedureControls = new Set();
+    for (const outcome of procedure.controls) {
+      const controlId = outcome.controlId;
       const control = controls.get(controlId);
       if (!control || control.manualProcedureId !== procedure.procedureId) {
         fail(`${controlId} is not assigned to ${procedure.procedureId}`);
       }
       if (!selected.has(controlId)) fail(`${controlId} was not selected`);
-      if (observed.has(controlId)) fail(`duplicate outcome for ${controlId}`);
+      if (procedureControls.has(controlId) || observed.has(controlId)) fail(`duplicate outcome for ${controlId}`);
+      procedureControls.add(controlId);
       observed.add(controlId);
+      for (const reference of outcome.redactedEvidenceReferences) {
+        if (reference.expiresOn < evidence.recordedAt.slice(0, 10)) fail(`evidence ${reference.id} expired before the run`);
+      }
+      requireSafeText(outcome.stepsPerformed, `${controlId} steps`);
+      requireSafeText(outcome.expectedSecureOutcome, `${controlId} expected outcome`);
+      requireSafeText(outcome.observedResult, `${controlId} observed result`);
+      if (outcome.rationale) requireSafeText(outcome.rationale, `${controlId} rationale`);
     }
-    for (const reference of procedure.redactedEvidenceReferences) {
-      if (reference.expiresOn < evidence.recordedAt.slice(0, 10)) fail(`evidence ${reference.id} expired before the run`);
-    }
-    requireSafeText(procedure.prerequisites, `${procedure.procedureId} prerequisites`);
-    requireSafeText(procedure.stepsPerformed, `${procedure.procedureId} steps`);
-    requireSafeText(procedure.expectedSecureOutcome, `${procedure.procedureId} expected outcome`);
-    requireSafeText(procedure.observedResult, `${procedure.procedureId} observed result`);
-    if (procedure.rationale) requireSafeText(procedure.rationale, `${procedure.procedureId} rationale`);
   }
   if (observed.size !== selected.size || [...selected].some((id) => !observed.has(id))) {
     fail("selected controls do not have exactly one outcome");
