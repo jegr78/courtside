@@ -37,7 +37,8 @@ interface AppRoutesProps {
 }
 
 export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, configurationChanged, clubName }: AppRoutesProps) {
-  const administrative = useLocation().pathname.startsWith("/admin");
+  const { pathname } = useLocation();
+  const administrative = pathname === "/admin" || pathname.startsWith("/admin/");
 
   if (session.passwordChangeRequired) {
     return <Routes>

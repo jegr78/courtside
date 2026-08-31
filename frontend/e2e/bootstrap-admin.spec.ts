@@ -270,7 +270,6 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await page.getByTestId("administration-link").click();
-  await page.getByTestId("admin-configuration-link").click();
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
   await expect(page.getByTestId("time-zone")).toHaveValue("Europe/Berlin");
 

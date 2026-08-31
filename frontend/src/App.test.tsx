@@ -222,6 +222,23 @@ describe("AppRoutes", () => {
     expect(screen.getByTestId("court-plan-link")).toHaveAttribute("href", "/");
   });
 
+  // One guard now stands for all eight destinations, where there used to be one per route.
+  it("given a member session, when opening an administrative page, then it is not served", () => {
+    // when
+    render(<RoutedShell initialEntries={["/admin/configuration"]}><AppRoutes session={{
+      authenticated: true,
+      username: "doe.jane",
+      displayName: "Jane Doe",
+      roles: ["MEMBER"],
+      passwordChangeRequired: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(screen.queryByTestId("admin-navigation")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-configuration-view")).not.toBeInTheDocument();
+    expect(screen.getByTestId("court-plan-view")).toBeInTheDocument();
+  });
+
   it("given an admin session, when opening the court plan, then the member bar carries administration", () => {
     // when
     render(<RoutedShell initialEntries={["/"]}><AppRoutes session={{

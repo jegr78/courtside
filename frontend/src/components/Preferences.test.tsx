@@ -183,7 +183,7 @@ it("given the account menu is open, when signing out succeeds, then the menu clo
   expect(screen.getByTestId("preferences-menu").closest("details")).not.toHaveAttribute("open");
 });
 
-it("given signing out fails, when it is attempted, then the menu stays open with the failure in it", async () => {
+it("given signing out fails, when it is attempted, then the menu stays open beside the failure", async () => {
   // given
   vi.spyOn(api, "logout").mockRejectedValue(new Error("network"));
   render(<Preferences authenticated signedOut={() => undefined} />);

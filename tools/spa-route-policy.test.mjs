@@ -48,6 +48,18 @@ test("given nested routes, when reading them, then a child is read together with
   assert.deepEqual(clientRoutes(source), ["/admin", "/admin/facility", "/admin/roster/:personId"]);
 });
 
+// The walk used to stop at an element's children, so a route inside an attribute of that element
+// was invisible to the gate and would have reached a server that never forwards it.
+test("given a route inside an element attribute, when reading the routes, then the gate still sees it", () => {
+  // given
+  const source = 'const a = <Routes><Route path="/admin" element={<Guard><Route path="hidden" element={<X />} /></Guard>}>'
+    + '<Route path="facility" element={<Y />} />'
+    + '</Route></Routes>;';
+
+  // when / then
+  assert.deepEqual(clientRoutes(source), ["/admin", "/admin/hidden", "/admin/facility"]);
+});
+
 test("given a client route, when the server serves the shell, then it forwards to the application", () => {
   // when / then
   assert.deepEqual(
@@ -78,12 +90,17 @@ function clientRoutes(source) {
     if (ts.isJsxElement(node)) {
       const route = named(routePath(node.openingElement), parent);
       if (route) routes.push(route);
+      // The opening tag is walked as well as the children: a route written inside an `element`
+      // attribute is reachable through that attribute and would otherwise escape the gate.
+      ts.forEachChild(node.openingElement, (child) => visit(child, route ?? parent));
       node.children.forEach((child) => visit(child, route ?? parent));
       return;
     }
     if (ts.isJsxSelfClosingElement(node)) {
       const route = named(routePath(node), parent);
       if (route) routes.push(route);
+      ts.forEachChild(node, (child) => visit(child, route ?? parent));
+      return;
     }
     ts.forEachChild(node, (child) => visit(child, parent));
   }
