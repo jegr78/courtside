@@ -5,13 +5,11 @@ import org.courtside.api.AdminOpeningHoursApi;
 import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiCourt;
 import org.courtside.api.ApiCourtRequest;
-import org.courtside.api.ApiDayOfWeek;
 import org.courtside.api.ApiOpeningHours;
-import org.courtside.api.ApiSetOpeningHoursRequest;
+import org.courtside.api.ApiSetWeeklyOpeningHoursRequest;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
-import org.courtside.facility.OpeningHours;
-import org.courtside.shared.OpeningWindow;
+import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.WireTypes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +19,7 @@ import java.net.URI;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -68,19 +67,20 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
     }
 
     @Override
-    public ResponseEntity<ApiOpeningHours> setOpeningHours(
-            ApiDayOfWeek day, ApiSetOpeningHoursRequest request) {
-        DayOfWeek weekday = WireTypes.toDayOfWeek(day);
-        OpeningHours hours = facility.setOpeningHours(
-                weekday, new OpeningWindow(request.getOpensAt(), request.getClosesAt()));
-        return ResponseEntity.ok(
-                toResponse(weekday, hours.getOpensAt(), hours.getClosesAt()));
+    public ResponseEntity<List<ApiOpeningHours>> setWeeklyOpeningHours(
+            ApiSetWeeklyOpeningHoursRequest request) {
+        List<WeeklyOpeningHours> week = Optional.ofNullable(request.getDays())
+                .orElseGet(List::of).stream()
+                .map(FacilityAdminController::toWeekday)
+                .toList();
+        return ResponseEntity.ok(facility.setWeeklyOpeningHours(week).stream()
+                .map(hours -> toResponse(hours.dayOfWeek(), hours.opensAt(), hours.closesAt()))
+                .toList());
     }
 
-    @Override
-    public ResponseEntity<Void> closeDay(ApiDayOfWeek day) {
-        facility.closeOn(WireTypes.toDayOfWeek(day));
-        return ResponseEntity.noContent().build();
+    private static WeeklyOpeningHours toWeekday(ApiOpeningHours day) {
+        return new WeeklyOpeningHours(
+                WireTypes.toDayOfWeek(day.getDayOfWeek()), day.getOpensAt(), day.getClosesAt());
     }
 
     static ApiOpeningHours toResponse(DayOfWeek day, LocalTime opensAt, LocalTime closesAt) {

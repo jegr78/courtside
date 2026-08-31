@@ -364,12 +364,19 @@ components:
           type: array
           items: { $ref: "#/components/schemas/OpeningHours" }
 
-    SetOpeningHoursRequest:
+    SetWeeklyOpeningHoursRequest:
       type: object
-      required: [opensAt, closesAt]
+      description: |
+        The whole week, one entry per weekday. A day with no window is closed; a day carrying one
+        of the two times is rejected. The week travels as one body because seven requests behind
+        one button is a save that can half-succeed.
+      required: [days]
       properties:
-        opensAt: { $ref: "#/components/schemas/LocalTime" }
-        closesAt: { $ref: "#/components/schemas/LocalTime" }
+        days:
+          type: array
+          minItems: 7
+          maxItems: 7
+          items: { $ref: "#/components/schemas/OpeningHours" }
 
     ClubConfig:
       type: object
@@ -4801,55 +4808,33 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
-
-  /api/admin/opening-hours/{day}:
     put:
       tags: [admin-opening-hours]
-      operationId: setOpeningHours
-      summary: Set one weekday's window.
+      operationId: setWeeklyOpeningHours
+      summary: Set the whole week at once.
       description: |
-        To open the courts early for a tournament, change the day's window rather than booking
+        Applied in one transaction: either every weekday in the body is stored or none of them is.
+        To open the courts early for a tournament, change that day's window rather than booking
         around it — the window binds everyone, including an admin.
+
+        Every unusable day is reported together, each violation naming its `day`, so a board fixes
+        the week once instead of meeting the next problem after every save.
       security:
         - sessionCookie: []
           csrfToken: []
-      parameters:
-        - name: day
-          in: path
-          required: true
-          schema: { $ref: "#/components/schemas/DayOfWeek" }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/SetOpeningHoursRequest" }
+            schema: { $ref: "#/components/schemas/SetWeeklyOpeningHoursRequest" }
       responses:
         "200":
-          description: Set.
+          description: The stored week, one entry per weekday.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/OpeningHours" }
-        "400":
-          $ref: "#/components/responses/Invalid"
-        "401":
-          $ref: "#/components/responses/Unauthenticated"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-    delete:
-      tags: [admin-opening-hours]
-      operationId: closeDay
-      summary: Close a weekday entirely.
-      security:
-        - sessionCookie: []
-          csrfToken: []
-      parameters:
-        - name: day
-          in: path
-          required: true
-          schema: { $ref: "#/components/schemas/DayOfWeek" }
-      responses:
-        "204":
-          description: Closed.
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OpeningHours" }
         "400":
           $ref: "#/components/responses/Invalid"
         "401":

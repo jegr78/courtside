@@ -71,6 +71,7 @@ class AuditedOperationCoverageTest {
             "FacilityService#requireCourt",
             "FacilityService#setCourtActive",
             "FacilityService#setOpeningHours",
+            "FacilityService#setWeeklyOpeningHours",
             "FacilityService#weeklyOpeningHours",
             "MemberService#activeMembershipTypeIds",
             "MemberService#allMembershipTypes",

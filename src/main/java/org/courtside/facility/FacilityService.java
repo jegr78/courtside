@@ -4,6 +4,7 @@ import org.courtside.facility.internal.CourtNumberTakenException;
 import org.courtside.facility.internal.CourtRepository;
 import org.courtside.facility.internal.OpeningHoursRepository;
 import org.courtside.facility.internal.WeeklyOpeningHours;
+import org.courtside.shared.InvalidOpeningWindowException;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.config.BookingGridSettings;
 import org.courtside.config.BookingSlotDuration;
@@ -15,8 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -114,26 +117,93 @@ public class FacilityService {
                 || !slotDuration.isAligned(required.closesAt())) {
             throw new OpeningHoursGridMismatchException(slotDuration.minutes());
         }
-        Optional<OpeningHours> existing = openingHours.findByDayOfWeek(day.getValue());
-        boolean changed = existing
-                .map(hours -> !hours.getOpensAt().equals(required.opensAt())
-                        || !hours.getClosesAt().equals(required.closesAt()))
-                .orElse(true);
-        OpeningHours saved = existing
-                .map(hours -> {
-                    hours.changeTo(required);
-                    return hours;
-                })
-                .orElseGet(() -> openingHours.save(new OpeningHours(day, required)));
-        if (changed) {
-            events.publishEvent(new FacilityEvent.OpeningHoursSet(
-                    saved.getId(), day.getValue(), required.opensAt(), required.closesAt()));
-        }
-        return saved;
+        return store(day, required);
     }
 
     @Transactional
     public void closeOn(DayOfWeek day) {
+        close(day);
+    }
+
+    @Transactional
+    public List<WeeklyOpeningHours> setWeeklyOpeningHours(List<WeeklyOpeningHours> week) {
+        Map<DayOfWeek, WeeklyOpeningHours> requested = everyWeekdayOnce(week);
+        bookingGridCoordination.lock();
+        Map<DayOfWeek, OpeningWindow> windows =
+                storable(requested, bookingGridSettings.slotDuration());
+        windows.forEach((day, window) -> {
+            if (window == null) {
+                close(day);
+            } else {
+                store(day, window);
+            }
+        });
+        return weeklyOpeningHours();
+    }
+
+    private static Map<DayOfWeek, WeeklyOpeningHours> everyWeekdayOnce(List<WeeklyOpeningHours> week) {
+        if (week == null || week.size() != DayOfWeek.values().length) {
+            throw new OpeningWeekIncompleteException();
+        }
+        Map<DayOfWeek, WeeklyOpeningHours> byDay = new EnumMap<>(DayOfWeek.class);
+        week.forEach(day -> {
+            if (day == null || day.dayOfWeek() == null
+                    || byDay.put(day.dayOfWeek(), day) != null) {
+                throw new OpeningWeekIncompleteException();
+            }
+        });
+        return byDay;
+    }
+
+    // A null value is a day that closes; an EnumMap keeps both that and the order of the week.
+    private static Map<DayOfWeek, OpeningWindow> storable(
+            Map<DayOfWeek, WeeklyOpeningHours> requested, BookingSlotDuration slotDuration) {
+        Map<DayOfWeek, OpeningWindow> windows = new EnumMap<>(DayOfWeek.class);
+        List<OpeningHoursViolation> violations = new ArrayList<>();
+        for (DayOfWeek day : DayOfWeek.values()) {
+            WeeklyOpeningHours hours = requested.get(day);
+            try {
+                OpeningWindow window = OpeningWindow
+                        .ofNullable(hours.opensAt(), hours.closesAt())
+                        .orElse(null);
+                if (window != null && (!slotDuration.isAligned(window.opensAt())
+                        || !slotDuration.isAligned(window.closesAt()))) {
+                    violations.add(OpeningHoursViolation.on(day,
+                            "facility.openingHours.slotGridMismatch",
+                            Map.of("slotMinutes", slotDuration.minutes())));
+                    continue;
+                }
+                windows.put(day, window);
+            } catch (InvalidOpeningWindowException rejected) {
+                violations.add(OpeningHoursViolation.on(day, rejected.getCode(), Map.of()));
+            }
+        }
+        if (!violations.isEmpty()) {
+            throw new WeeklyOpeningHoursRejectedException(violations);
+        }
+        return windows;
+    }
+
+    private OpeningHours store(DayOfWeek day, OpeningWindow window) {
+        Optional<OpeningHours> existing = openingHours.findByDayOfWeek(day.getValue());
+        boolean changed = existing
+                .map(hours -> !hours.getOpensAt().equals(window.opensAt())
+                        || !hours.getClosesAt().equals(window.closesAt()))
+                .orElse(true);
+        OpeningHours saved = existing
+                .map(hours -> {
+                    hours.changeTo(window);
+                    return hours;
+                })
+                .orElseGet(() -> openingHours.save(new OpeningHours(day, window)));
+        if (changed) {
+            events.publishEvent(new FacilityEvent.OpeningHoursSet(
+                    saved.getId(), day.getValue(), window.opensAt(), window.closesAt()));
+        }
+        return saved;
+    }
+
+    private void close(DayOfWeek day) {
         openingHours.findByDayOfWeek(day.getValue()).ifPresent(hours -> {
             events.publishEvent(new FacilityEvent.OpeningHoursClosed(hours.getId(), day.getValue()));
             openingHours.deleteByDayOfWeek(day.getValue());
