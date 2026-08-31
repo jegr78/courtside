@@ -315,14 +315,16 @@ test("given historical first attempts, when summarizing, then sample limits and 
   assert.equal(summary.sampleSize, 20);
   assert.equal(summary.observedFirstAttemptCount, 20);
   assert.equal(summary.windowDays, 19);
-  assert.equal(summary.fullProfileCount, 20);
-  assert.equal(summary.fullProfileRate, 1);
+  assert.equal(summary.fullProposalCount, 0);
+  assert.equal(summary.naturalReducedProfileCount, 20);
+  assert.equal(summary.actualReducedProfileCount, 0);
+  assert.equal(summary.actualFullProfileRate, 1);
   assert.equal(summary.candidateMissCount, 1);
   assert.equal(summary.status, "under-classification-observed");
   assert.equal(validateSummary(summary), true, JSON.stringify(validateSummary.errors));
   assert.deepEqual(summary.limitations, [
     "Observations cover GitHub-hosted pull-request runs only.",
-    "A completed reduced run proves its selected gates, not the completeness of the classifier.",
+    "Successful shadow evidence proves required jobs and exposes failures outside the proposal, not saved work.",
     "Candidate misses require rule correction and a new qualifying observation window."
   ]);
 });
@@ -417,12 +419,13 @@ test("given a qualified summary, when rendering the final report, then sample wi
 
   // then
   assert.match(report, /First-attempt sample: 20/);
-  assert.match(report, /Naturally reduced first attempts: 20/);
+  assert.match(report, /Natural reduced-profile proposals: 20/);
+  assert.match(report, /Actually reduced first attempts: 20/);
   assert.match(report, /Backend-profile first attempts: 18/);
   assert.match(report, /Frontend-profile first attempts: 1/);
   assert.match(report, /Tooling-profile first attempts: 1/);
   assert.match(report, /Observation window: 19 days/);
-  assert.match(report, /Full-profile rate: 0\.00%/);
+  assert.match(report, /Actual full-profile rate: 0\.00%/);
   assert.match(report, /Incompatible-base first attempts excluded: 0/);
   for (const limitation of summary.limitations) assert.match(report, new RegExp(limitation.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
@@ -439,12 +442,12 @@ test("given reduced evidence from only one profile, when summarizing, then the o
   const summary = summarizeProfileObservations(observations, inventoryFor(observations));
 
   // then
-  assert.equal(summary.profileCounts.backend, 20);
-  assert.equal(summary.profileCounts.frontend, 0);
+  assert.equal(summary.proposedProfileCounts.backend, 20);
+  assert.equal(summary.proposedProfileCounts.frontend, 0);
   assert.equal(summary.status, "collecting");
 });
 
-test("given a proposed reduced profile runs every job, when summarizing, then it is shadow evidence not natural reduction", () => {
+test("given a natural candidate profile runs every job, when summarizing, then evidence and savings stay distinct", () => {
   // given
   const observations = Array.from({ length: 20 }, (_, index) => ({
     ...createProfileObservation(plan, timing), runId: 701 + index
@@ -455,10 +458,42 @@ test("given a proposed reduced profile runs every job, when summarizing, then it
 
   // then
   assert.equal(summary.sampleSize, 20);
-  assert.equal(summary.fullProfileCount, 20);
-  assert.equal(summary.reducedProfileCount, 0);
-  assert.equal(summary.profileCounts.backend, 0);
+  assert.equal(summary.fullProposalCount, 0);
+  assert.equal(summary.naturalReducedProfileCount, 20);
+  assert.equal(summary.actualReducedProfileCount, 0);
+  assert.equal(summary.proposedProfileCounts.backend, 20);
   assert.equal(summary.status, "collecting");
+});
+
+test("given every natural candidate profile has successful shadow evidence, when summarizing, then it is ready", () => {
+  // given
+  const frontendPlan = {
+    ...plan, profiles: ["frontend"],
+    reasons: [{ code: "prefix:frontend/", path: "frontend/src/App.tsx", profile: "frontend", status: "M" }]
+  };
+  const toolingPlan = {
+    ...plan, profiles: ["tooling"],
+    reasons: [{ code: "manifest:tools/mail-check.test.mjs", path: "tools/mail-check.test.mjs",
+      profile: "tooling", status: "M" }]
+  };
+  const fullPlan = { ...plan, profiles: ["full"], isFull: true };
+  const observations = Array.from({ length: 20 }, (_, index) => ({
+    ...createProfileObservation(index === 0 ? plan : index === 1 ? frontendPlan
+      : index === 2 ? toolingPlan : fullPlan, timing),
+    runId: 801 + index
+  }));
+
+  // when
+  const summary = summarizeProfileObservations(observations, inventoryFor(observations));
+
+  // then
+  assert.equal(summary.naturalReducedProfileCount, 3);
+  assert.equal(summary.actualReducedProfileCount, 0);
+  assert.equal(summary.actualFullProfileRate, 1);
+  assert.equal(summary.proposedProfileCounts.backend, 1);
+  assert.equal(summary.proposedProfileCounts.frontend, 1);
+  assert.equal(summary.proposedProfileCounts.tooling, 1);
+  assert.equal(summary.status, "ready-for-review");
 });
 
 test("given completed reduced profiles with expected skipped jobs, when summarizing, then they qualify", () => {
@@ -491,10 +526,11 @@ test("given completed reduced profiles with expected skipped jobs, when summariz
 
   // then
   assert.equal(summary.sampleSize, 20);
-  assert.equal(summary.reducedProfileCount, 3);
-  assert.equal(summary.profileCounts.backend, 1);
-  assert.equal(summary.profileCounts.frontend, 1);
-  assert.equal(summary.profileCounts.tooling, 1);
+  assert.equal(summary.naturalReducedProfileCount, 3);
+  assert.equal(summary.actualReducedProfileCount, 3);
+  assert.equal(summary.proposedProfileCounts.backend, 1);
+  assert.equal(summary.proposedProfileCounts.frontend, 1);
+  assert.equal(summary.proposedProfileCounts.tooling, 1);
   assert.equal(summary.incompleteObservationCount, 0);
   assert.equal(summary.status, "ready-for-review");
 });
@@ -533,6 +569,6 @@ test("given only full plans, when the sample threshold is met, then activation s
 
   // then
   assert.equal(summary.sampleSize, 20);
-  assert.equal(summary.reducedProfileCount, 0);
+  assert.equal(summary.naturalReducedProfileCount, 0);
   assert.equal(summary.status, "collecting");
 });

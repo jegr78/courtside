@@ -361,19 +361,19 @@ export function summarizeProfileObservations(observations, inventory) {
   const candidateMissCount = firstAttempts.filter((entry) => entry.classificationOutcome === "candidate-miss").length;
   const classificationErrorCount = firstAttempts.filter((entry) =>
     entry.classificationOutcome === "classification-error").length;
-  const reducedAttempts = qualifyingAttempts.filter((entry) => entry.jobsOutsideProposal.length > 0
+  const naturalReducedProposals = qualifyingAttempts.filter((entry) => !entry.proposedProfiles.includes("full"));
+  const actuallyReducedAttempts = naturalReducedProposals.filter((entry) => entry.jobsOutsideProposal.length > 0
     && entry.jobsOutsideProposal.every((name) =>
       entry.actualJobs.some((job) => job.name === name && job.outcome === "skipped")));
-  const reducedProfileCount = reducedAttempts.length;
-  const fullProfileCount = qualifyingAttempts.length - reducedProfileCount;
-  const profileCounts = Object.fromEntries(Object.keys(profileContract.profiles).map((profile) => [profile,
-    profile === "full" ? fullProfileCount
-      : reducedAttempts.filter((entry) => entry.proposedProfiles.includes(profile)).length]));
+  const fullProposalCount = qualifyingAttempts.length - naturalReducedProposals.length;
+  const proposedProfileCounts = Object.fromEntries(Object.keys(profileContract.profiles).map((profile) => [profile,
+    profile === "full" ? fullProposalCount
+      : naturalReducedProposals.filter((entry) => entry.proposedProfiles.includes(profile)).length]));
   const incompleteObservationCount = firstAttempts.filter((entry) =>
     entry.classificationOutcome === "observation-incomplete").length;
   const enoughEvidence = qualifyingAttempts.length >= contract.minimumFirstAttempts
-    && reducedProfileCount >= contract.minimumReducedFirstAttempts
-    && contract.requiredReducedProfiles.every((profile) => profileCounts[profile] > 0)
+    && naturalReducedProposals.length >= contract.minimumNaturalReducedProposals
+    && contract.requiredNaturalProfiles.every((profile) => proposedProfileCounts[profile] > 0)
     && windowDays >= contract.minimumDays;
   return {
     sampleSize: qualifyingAttempts.length,
@@ -383,11 +383,13 @@ export function summarizeProfileObservations(observations, inventory) {
     observedFirstAttemptCount: firstAttempts.length,
     rerunCount: observations.length - firstAttempts.length,
     windowDays,
-    fullProfileCount,
-    reducedProfileCount,
-    fullProfileRate: qualifyingAttempts.length === 0 ? null
-      : Math.round(fullProfileCount / qualifyingAttempts.length * 10_000) / 10_000,
-    profileCounts,
+    fullProposalCount,
+    naturalReducedProfileCount: naturalReducedProposals.length,
+    actualReducedProfileCount: actuallyReducedAttempts.length,
+    actualFullProfileRate: qualifyingAttempts.length === 0 ? null
+      : Math.round((qualifyingAttempts.length - actuallyReducedAttempts.length)
+        / qualifyingAttempts.length * 10_000) / 10_000,
+    proposedProfileCounts,
     candidateMissCount,
     classificationErrorCount,
     incompleteObservationCount,
@@ -395,7 +397,7 @@ export function summarizeProfileObservations(observations, inventory) {
     assessedAt: inventory.windowEndedAt,
     limitations: [
       "Observations cover GitHub-hosted pull-request runs only.",
-      "A completed reduced run proves its selected gates, not the completeness of the classifier.",
+      "Successful shadow evidence proves required jobs and exposes failures outside the proposal, not saved work.",
       "Candidate misses require rule correction and a new qualifying observation window."
     ],
     status: candidateMissCount > 0 || classificationErrorCount > 0 ? "under-classification-observed"
@@ -404,8 +406,8 @@ export function summarizeProfileObservations(observations, inventory) {
 }
 
 export function profileObservationReport(summary) {
-  const rate = summary.fullProfileRate === null ? "not available"
-    : `${(summary.fullProfileRate * 100).toFixed(2)}%`;
+  const rate = summary.actualFullProfileRate === null ? "not available"
+    : `${(summary.actualFullProfileRate * 100).toFixed(2)}%`;
   return [
     "# Test profile observation",
     "",
@@ -417,11 +419,12 @@ export function profileObservationReport(summary) {
     `- First attempts observed: ${summary.observedFirstAttemptCount}`,
     `- Reruns excluded: ${summary.rerunCount}`,
     `- Observation window: ${summary.windowDays} days`,
-    `- Full-profile rate: ${rate}`,
-    `- Naturally reduced first attempts: ${summary.reducedProfileCount}`,
-    `- Backend-profile first attempts: ${summary.profileCounts.backend}`,
-    `- Frontend-profile first attempts: ${summary.profileCounts.frontend}`,
-    `- Tooling-profile first attempts: ${summary.profileCounts.tooling}`,
+    `- Actual full-profile rate: ${rate}`,
+    `- Natural reduced-profile proposals: ${summary.naturalReducedProfileCount}`,
+    `- Actually reduced first attempts: ${summary.actualReducedProfileCount}`,
+    `- Backend-profile first attempts: ${summary.proposedProfileCounts.backend}`,
+    `- Frontend-profile first attempts: ${summary.proposedProfileCounts.frontend}`,
+    `- Tooling-profile first attempts: ${summary.proposedProfileCounts.tooling}`,
     `- Candidate misses: ${summary.candidateMissCount}`,
     `- Classification errors: ${summary.classificationErrorCount}`,
     `- Incomplete observations excluded: ${summary.incompleteObservationCount}`,
