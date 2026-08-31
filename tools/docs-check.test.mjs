@@ -8,7 +8,7 @@ import {
 } from "./docs-check.mjs";
 
 const admission = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   admittedPolicyFingerprint: "a".repeat(64),
   evidence: {
     runId: 101,
@@ -20,6 +20,7 @@ const admission = {
     qualifyingFirstAttempts: 20,
     backendPlans: 2,
     frontendPlans: 1,
+    toolingPlans: 1,
     candidateMisses: 0,
     classificationErrors: 0,
     incompleteObservations: 1
@@ -35,6 +36,7 @@ test("given admission facts, when rendering the maintained section, then output 
   assert.equal(first, second);
   assert.match(first, /Profile Evidence run\n`101`/);
   assert.match(first, /expires on 2026-09-30/);
+  assert.match(first, /1 tooling plans/);
   assert.doesNotMatch(first, /token|cookie|credential/i);
 });
 

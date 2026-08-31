@@ -51,8 +51,8 @@
     "profiles": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 4,
-      "items": { "enum": ["docs", "backend", "frontend", "full"] },
+      "maxItems": 5,
+      "items": { "enum": ["docs", "backend", "frontend", "tooling", "full"] },
       "uniqueItems": true
     },
     "jobs": {
@@ -83,7 +83,7 @@
       "properties": {
         "code": { "type": "string", "minLength": 1, "maxLength": 300 },
         "path": { "type": ["string", "null"], "maxLength": 1000 },
-        "profile": { "enum": ["docs", "backend", "frontend", "full"] },
+        "profile": { "enum": ["docs", "backend", "frontend", "tooling", "full"] },
         "status": { "type": ["string", "null"], "maxLength": 5 }
       }
     }

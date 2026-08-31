@@ -18,11 +18,12 @@
     "profileCounts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["docs", "backend", "frontend", "full"],
+      "required": ["docs", "backend", "frontend", "tooling", "full"],
       "properties": {
         "docs": { "type": "integer", "minimum": 0, "maximum": 10000 },
         "backend": { "type": "integer", "minimum": 0, "maximum": 10000 },
         "frontend": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "tooling": { "type": "integer", "minimum": 0, "maximum": 10000 },
         "full": { "type": "integer", "minimum": 0, "maximum": 10000 }
       }
     },
