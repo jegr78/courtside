@@ -250,6 +250,9 @@ test("given a protected base, when classifying, then its classifier runs from an
   const git = (arguments_) => calls.push(arguments_);
   const loadClassifier = async (url) => {
     calls.push(["load", url]);
+    if (url.includes("local-check.mjs")) {
+      return { planTasks: (classified) => ({ ...classified, tasks: [] }) };
+    }
     return {
       parseNameStatus: (value) => {
         calls.push(["parse", value]);
@@ -269,7 +272,65 @@ test("given a protected base, when classifying, then its classifier runs from an
   assert.equal(calls[1][0], "load");
   assert.match(calls[1][1], /tools\/test-profile-classifier\.mjs\?base=a{40}$/);
   assert.deepEqual(calls[2], ["parse", evidence.changeEvidence]);
-  assert.deepEqual(calls[3].slice(0, 3), ["worktree", "remove", "--force"]);
+  assert.equal(calls[3][0], "load");
+  assert.match(calls[3][1], /tools\/local-check\.mjs\?base=a{40}$/);
+  assert.deepEqual(calls[4].slice(0, 3), ["worktree", "remove", "--force"]);
+});
+
+test("given a protected candidate lacks admission, when classifying locally, then the runner selects full", async () => {
+  // given
+  const evidence = {
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40),
+    fallbackReason: null,
+    changeEvidence: "M\0docs/quality-strategy.md\0",
+    changeFingerprint: "c".repeat(64)
+  };
+  const git = () => {};
+  const loadClassifier = async () => ({
+    parseNameStatus: () => [{ status: "M", path: "docs/quality-strategy.md" }],
+    classifyChanges: () => ({ profiles: ["docs"] }),
+    admitPlan: () => ({
+      activeProfiles: ["full"],
+      proposedProfiles: ["docs"],
+      activeLocalTasks: [{
+        label: "full", workingDirectory: "repository", executable: "maven",
+        arguments: ["clean", "verify"]
+      }],
+      admissionOutcome: "stale",
+      overrideOutcome: "admitted"
+    })
+  });
+
+  // when
+  const plan = await classifyProtectedChanges(evidence, false, git, loadClassifier);
+
+  // then
+  assert.deepEqual(plan.activeProfiles, ["full"]);
+  assert.deepEqual(plan.proposedProfiles, ["docs"]);
+  assert.equal(plan.admissionOutcome, "stale");
+});
+
+test("given protected classification fails, when planning locally, then candidate full tasks cannot weaken fallback", async () => {
+  // given
+  const git = gitFor([{ status: "M", path: "docs/quality-strategy.md" }]);
+
+  // when
+  const record = await executeLocalCheck({ planOnly: true, forceFull: false }, {
+    git,
+    classify: async () => { throw new Error("protected classifier unavailable"); },
+    output: { write: () => {} },
+    writeResult: () => {}
+  });
+
+  // then
+  assert.deepEqual(record.profiles, ["full"]);
+  assert.deepEqual(record.tasks, ["full"]);
+  const execution = localVerificationPlans([{
+    label: "full", workingDirectory: "repository", executable: "maven",
+    arguments: ["clean", "verify"]
+  }], "linux", "/repo");
+  assert.deepEqual(execution[0].arguments, ["clean", "verify"]);
 });
 
 test("given the working tree changes during verification, when finishing, then passed is never retained", async () => {

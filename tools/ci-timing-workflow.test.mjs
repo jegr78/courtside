@@ -45,6 +45,9 @@ test("given an observed profile plan, when collecting the run, then its immutabl
   assert.match(workflow, /git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"/);
   assert.doesNotMatch(workflow, /pull\/\$\{PR_NUMBER\}\/head/);
   assert.match(workflow, /node "\$PROFILE_ROOT\/tools\/test-profile-classifier\.mjs"/);
+  assert.ok(workflow.includes('test("^test-profile-plan \\\\[(admitted|full|invalid)\\\\]$")'));
+  assert.match(workflow, /PROFILE_MODE=\$\(jq -er/);
+  assert.doesNotMatch(workflow, /vars\.COURTSIDE_TEST_PROFILES/);
   assert.doesNotMatch(workflow, /node tools\/test-profile-classifier\.mjs/);
   assert.doesNotMatch(workflow, /pull_requests\[0\]/);
   assert.match(workflow, /node "\$PROFILE_ROOT\/tools\/ci-timing\.mjs"/);
