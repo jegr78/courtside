@@ -32,11 +32,33 @@ function requireSafeText(value, field) {
   if (values.some((entry) => sensitiveText.test(entry))) fail(`${field} contains credential-like material`);
 }
 
+function requireRealDate(value, field) {
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    fail(`${field} is not a real date`);
+  }
+}
+
+function requireRealTimestamp(value, field) {
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString() !== value.replace("Z", ".000Z")) {
+    fail(`${field} is not a real timestamp`);
+  }
+}
+
 export function validateManualAssessmentEvidence(evidence, assessmentDate = new Date()) {
   if (!validateShape(evidence)) fail(JSON.stringify(validateShape.errors));
+  if (!(assessmentDate instanceof Date) || !Number.isFinite(assessmentDate.getTime())) {
+    fail("assessment date is not a real timestamp");
+  }
   if (evidence.catalogVersion !== catalog.catalogVersion) fail("catalogVersion does not match the current catalog");
-  if (!Number.isFinite(Date.parse(evidence.recordedAt))) fail("recordedAt is not a real timestamp");
-  if (Date.parse(evidence.authorization.expiresAt) < assessmentDate.getTime()) fail("authorization has expired");
+  requireRealTimestamp(evidence.recordedAt, "recordedAt");
+  requireRealTimestamp(evidence.authorization.expiresAt, "authorization expiry");
+  const recordedAt = Date.parse(evidence.recordedAt);
+  const authorizationExpiry = Date.parse(evidence.authorization.expiresAt);
+  if (recordedAt > assessmentDate.getTime()) fail("recordedAt is after the assessment date");
+  if (authorizationExpiry < recordedAt) fail("authorization expired before recordedAt");
+  if (authorizationExpiry < assessmentDate.getTime()) fail("authorization has expired");
   if (evidence.authorization.profile !== evidence.profile) fail("authorization profile differs from the run profile");
   if (evidence.authorization.targetFingerprint !== evidence.targetFingerprint) fail("authorization target differs from the run target");
   if (evidence.authorization.targetImageDigest !== evidence.targetImageDigest) fail("authorization image differs from the run image");
@@ -60,23 +82,34 @@ export function validateManualAssessmentEvidence(evidence, assessmentDate = new 
         || procedure.targetImageDigest !== evidence.targetImageDigest) {
       fail(`procedure ${procedure.procedureId} provenance differs from the run`);
     }
-    for (const controlId of procedure.controlIds) {
+    requireSafeText(procedure.prerequisites, `${procedure.procedureId} prerequisites`);
+    const procedureControls = new Set();
+    for (const outcome of procedure.controls) {
+      const controlId = outcome.controlId;
       const control = controls.get(controlId);
       if (!control || control.manualProcedureId !== procedure.procedureId) {
         fail(`${controlId} is not assigned to ${procedure.procedureId}`);
       }
       if (!selected.has(controlId)) fail(`${controlId} was not selected`);
-      if (observed.has(controlId)) fail(`duplicate outcome for ${controlId}`);
+      if (procedureControls.has(controlId) || observed.has(controlId)) fail(`duplicate outcome for ${controlId}`);
+      procedureControls.add(controlId);
       observed.add(controlId);
+      for (const reference of outcome.redactedEvidenceReferences) {
+        requireRealDate(reference.expiresOn, `evidence ${reference.id} expiry`);
+        if (reference.expiresOn < evidence.recordedAt.slice(0, 10)) {
+          fail(`evidence ${reference.id} expired before recordedAt`);
+        }
+        if (reference.expiresOn < assessmentDate.toISOString().slice(0, 10)) {
+          fail(`evidence ${reference.id} has expired`);
+        }
+      }
+      requireSafeText(outcome.stepsPerformed, `${controlId} steps`);
+      requireSafeText(outcome.expectedSecureOutcome, `${controlId} expected outcome`);
+      requireSafeText(outcome.observedResult, `${controlId} observed result`);
+      if (outcome.rationale) requireSafeText(outcome.rationale, `${controlId} rationale`);
+      if (outcome.owner) requireSafeText(outcome.owner, `${controlId} owner`);
+      if (outcome.trackingReference) requireSafeText(outcome.trackingReference, `${controlId} tracking reference`);
     }
-    for (const reference of procedure.redactedEvidenceReferences) {
-      if (reference.expiresOn < evidence.recordedAt.slice(0, 10)) fail(`evidence ${reference.id} expired before the run`);
-    }
-    requireSafeText(procedure.prerequisites, `${procedure.procedureId} prerequisites`);
-    requireSafeText(procedure.stepsPerformed, `${procedure.procedureId} steps`);
-    requireSafeText(procedure.expectedSecureOutcome, `${procedure.procedureId} expected outcome`);
-    requireSafeText(procedure.observedResult, `${procedure.procedureId} observed result`);
-    if (procedure.rationale) requireSafeText(procedure.rationale, `${procedure.procedureId} rationale`);
   }
   if (observed.size !== selected.size || [...selected].some((id) => !observed.has(id))) {
     fail("selected controls do not have exactly one outcome");

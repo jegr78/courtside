@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:security:manual-assessment-evidence:v1",
+  "$id": "urn:courtside:security:manual-assessment-evidence:v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,7 +21,7 @@
     "procedures"
   ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "catalogVersion": { "type": "string", "pattern": "^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$" },
     "runId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$" },
     "tester": { "type": "string", "minLength": 1, "maxLength": 100 },
@@ -128,26 +128,38 @@
       "additionalProperties": false,
       "required": [
         "procedureId",
-        "controlIds",
         "prerequisites",
+        "controls",
+        "tester",
+        "recordedAt",
+        "targetImageDigest"
+      ],
+      "properties": {
+        "procedureId": { "type": "string", "pattern": "^MAN-[A-Z]+-[0-9]{3}$" },
+        "prerequisites": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "controls": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/controlOutcome" }
+        },
+        "tester": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "recordedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+        "targetImageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "controlOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controlId",
         "stepsPerformed",
         "expectedSecureOutcome",
         "observedResult",
         "redactedEvidenceReferences",
-        "tester",
-        "recordedAt",
-        "targetImageDigest",
         "outcome"
       ],
       "properties": {
-        "procedureId": { "type": "string", "pattern": "^MAN-[A-Z]+-[0-9]{3}$" },
-        "controlIds": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": { "$ref": "#/$defs/controlId" }
-        },
-        "prerequisites": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "controlId": { "$ref": "#/$defs/controlId" },
         "stepsPerformed": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
         "expectedSecureOutcome": { "type": "string", "minLength": 1, "maxLength": 1000 },
         "observedResult": { "type": "string", "minLength": 1, "maxLength": 2000 },
@@ -155,9 +167,6 @@
           "type": "array",
           "items": { "$ref": "#/$defs/evidenceReference" }
         },
-        "tester": { "type": "string", "minLength": 1, "maxLength": 100 },
-        "recordedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
-        "targetImageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "outcome": { "enum": ["pass", "fail", "not-applicable", "blocked"] },
         "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 },
         "findingFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
@@ -179,7 +188,10 @@
         },
         {
           "if": { "properties": { "outcome": { "const": "fail" } }, "required": ["outcome"] },
-          "then": { "required": ["rationale", "findingFingerprint"] }
+          "then": {
+            "required": ["rationale", "findingFingerprint"],
+            "properties": { "redactedEvidenceReferences": { "type": "array", "minItems": 1 } }
+          }
         }
       ]
     }
