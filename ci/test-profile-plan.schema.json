@@ -68,7 +68,7 @@
       "properties": {
         "label": { "type": "string", "minLength": 1, "maxLength": 100 },
         "workingDirectory": { "enum": ["repository", "frontend"] },
-        "executable": { "enum": ["maven", "npm"] },
+        "executable": { "enum": ["maven", "node", "npm"] },
         "arguments": {
           "type": "array",
           "maxItems": 20,

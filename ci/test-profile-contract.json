@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "profileOrder": ["docs", "backend", "frontend", "full"],
-  "ciJobOrder": ["backend", "frontend", "security"],
+  "ciJobOrder": ["docs", "backend", "frontend", "security"],
   "profiles": {
     "docs": {
-      "ciJobs": [],
-      "localTasks": []
+      "ciJobs": ["docs"],
+      "localTasks": ["docs-check"]
     },
     "backend": {
       "ciJobs": ["backend", "security"],
@@ -24,11 +24,16 @@
       ]
     },
     "full": {
-      "ciJobs": ["backend", "frontend", "security"],
-      "localTasks": ["full"]
+      "ciJobs": ["docs", "backend", "frontend", "security"],
+      "localTasks": ["docs-check", "full"]
     }
   },
   "localTaskDefinitions": {
+    "docs-check": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/docs-check.mjs", "--check"]
+    },
     "backend": {
       "workingDirectory": "repository",
       "executable": "maven",

@@ -4,6 +4,7 @@ import { historicalPullRequest, pullRequestIdentity, replayProfileEvidence,
   runBaseIdentity } from "./test-profile-replay.mjs";
 
 const backend = "backend";
+const docs = "docs";
 const frontend = "frontend";
 const security = "security";
 const base = "a".repeat(40);
@@ -65,7 +66,8 @@ function frontendPlan(identity) {
 test("given a protected reduced run, when replaying current policy, then the expected skip qualifies", async () => {
   // given
   const source = run(101);
-  const jobs = [job(1, backend, "skipped"), job(2, frontend, "success"), job(3, security, "success")];
+  const jobs = [job(1, docs, "skipped"), job(2, backend, "skipped"),
+    job(3, frontend, "success"), job(4, security, "success")];
 
   // when
   const result = await replayProfileEvidence({
@@ -144,7 +146,8 @@ test("given a force pushed historical head, when resolving its branch, then the 
 test("given current policy needs an historically skipped job, when replaying, then the miss remains visible", async () => {
   // given
   const source = run(101);
-  const jobs = [job(1, backend, "skipped"), job(2, frontend, "success"), job(3, security, "success")];
+  const jobs = [job(1, docs, "skipped"), job(2, backend, "skipped"),
+    job(3, frontend, "success"), job(4, security, "success")];
 
   // when
   const result = await replayProfileEvidence({
@@ -176,7 +179,8 @@ test("given a replay attempt other than the first, when loading evidence, then i
     assessedAt: "2026-08-29T07:00:00Z",
     runSummaries: [summary],
     loadAttempt: async () => secondAttempt,
-    loadJobs: async () => [job(1, backend, "skipped"), job(2, frontend, "success"), job(3, security, "success")],
+    loadJobs: async () => [job(1, docs, "skipped"), job(2, backend, "skipped"),
+      job(3, frontend, "success"), job(4, security, "success")],
     classify: async (identity) => frontendPlan(identity)
   }), /first attempt/);
 });

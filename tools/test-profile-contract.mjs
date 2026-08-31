@@ -16,6 +16,7 @@ export const semanticPolicySources = [
   ".github/workflows/ci-timing.yml",
   ".github/workflows/profile-evidence.yml",
   "tools/test-profile-contract.mjs",
+  "tools/docs-check.mjs",
   "tools/test-profile-classifier.mjs",
   "tools/local-check.mjs",
   "tools/test-profile-observation.mjs",
@@ -41,12 +42,9 @@ export function localTasksForProfiles(contract, profiles) {
   return labels.map((label) => ({ label, ...structuredClone(contract.localTaskDefinitions[label]) }));
 }
 
-export function activeProfileDecision(proposedProfiles, fingerprint, admission, mode) {
-  const validAdmission = admission !== null && typeof admission === "object"
-    && !Array.isArray(admission) && Object.keys(admission).length === 3
-    && admission.schemaVersion === 1
-    && /^[a-f0-9]{64}$/.test(admission.admittedPolicyFingerprint ?? "")
-    && validAdmissionEvidence(admission.evidence);
+export function activeProfileDecision(proposedProfiles, fingerprint, admission, mode,
+    assessedOn = new Date().toISOString().slice(0, 10)) {
+  const validAdmission = validateAdmissionRecord(admission, assessedOn, false);
   const admissionOutcome = admission === null ? "missing"
     : !validAdmission ? "invalid"
     : admission.admittedPolicyFingerprint === fingerprint ? "matched" : "stale";
@@ -60,17 +58,38 @@ export function activeProfileDecision(proposedProfiles, fingerprint, admission, 
   };
 }
 
-function validAdmissionEvidence(evidence) {
-  return evidence !== null && typeof evidence === "object" && !Array.isArray(evidence)
-    && Object.keys(evidence).length === 5
+export function validateAdmissionRecord(admission, assessedOn = new Date().toISOString().slice(0, 10),
+    throwOnInvalid = true) {
+  const evidence = admission?.evidence;
+  const valid = admission !== null && typeof admission === "object" && !Array.isArray(admission)
+    && Object.keys(admission).sort().join() === ["admittedPolicyFingerprint", "evidence", "schemaVersion"].sort().join()
+    && admission.schemaVersion === 1
+    && /^[a-f0-9]{64}$/.test(admission.admittedPolicyFingerprint ?? "")
+    && evidence !== null && typeof evidence === "object" && !Array.isArray(evidence)
+    && Object.keys(evidence).length === 12
     && Number.isSafeInteger(evidence.runId) && evidence.runId > 0
-    && Number.isSafeInteger(evidence.attempt) && evidence.attempt > 0
+    && evidence.attempt === 1
     && typeof evidence.artifact === "string"
-    && /^profile-evidence-[1-9][0-9]*-[1-9][0-9]*$/.test(evidence.artifact)
+    && evidence.artifact === `profile-evidence-${evidence.runId}-${evidence.attempt}`
     && typeof evidence.assessedAt === "string"
     && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(evidence.assessedAt)
     && Number.isFinite(Date.parse(evidence.assessedAt))
-    && evidence.status === "ready-for-review";
+    && isCalendarDate(evidence.assessedAt.slice(0, 10))
+    && isCalendarDate(evidence.expiresOn)
+    && evidence.status === "ready-for-review"
+    && isCalendarDate(assessedOn)
+    && evidence.expiresOn >= assessedOn
+    && ["qualifyingFirstAttempts", "backendPlans", "frontendPlans", "candidateMisses",
+      "classificationErrors", "incompleteObservations"]
+      .every((field) => Number.isSafeInteger(evidence[field]) && evidence[field] >= 0);
+  if (!valid && throwOnInvalid) throw new Error("Profile admission record is invalid or expired");
+  return valid;
+}
+
+function isCalendarDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 export function profilePolicyFingerprint(sources = semanticPolicySources.map((path) =>
@@ -108,7 +127,7 @@ export function validateContract(contract) {
       || contract.schemaVersion !== 1
       || Object.keys(contract).some((field) => !rootFields.includes(field))
       || JSON.stringify(contract.profileOrder) !== JSON.stringify(["docs", "backend", "frontend", "full"])
-      || JSON.stringify(contract.ciJobOrder) !== JSON.stringify(["backend", "frontend", "security"])
+      || JSON.stringify(contract.ciJobOrder) !== JSON.stringify(["docs", "backend", "frontend", "security"])
       || Object.keys(contract.profiles ?? {}).length !== contract.profileOrder.length
       || Object.keys(contract.localTaskDefinitions ?? {}).length < 1
       || !Array.isArray(contract.coverageDifferences) || contract.coverageDifferences.length < 1) {
@@ -128,14 +147,14 @@ export function validateContract(contract) {
     }
   }
   if (JSON.stringify(contract.profiles.full.ciJobs) !== JSON.stringify(contract.ciJobOrder)
-      || JSON.stringify(contract.profiles.full.localTasks) !== JSON.stringify(["full"])) {
+      || JSON.stringify(contract.profiles.full.localTasks) !== JSON.stringify(["docs-check", "full"])) {
     throw new Error("Full test profile coverage is incomplete");
   }
   for (const [label, task] of Object.entries(contract.localTaskDefinitions)) {
     if (task === null || typeof task !== "object" || Array.isArray(task)
         || Object.keys(task).some((field) => !["workingDirectory", "executable", "arguments"].includes(field))
         || !["repository", "frontend"].includes(task.workingDirectory)
-        || !["maven", "npm"].includes(task.executable)
+        || !["maven", "node", "npm"].includes(task.executable)
         || !Array.isArray(task.arguments) || task.arguments.some((argument) => typeof argument !== "string")) {
       throw new Error(`Local task ${label} is invalid`);
     }
