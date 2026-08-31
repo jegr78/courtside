@@ -14,6 +14,13 @@ export function useSaving() {
     setError(problemMessage(failure, t));
   }, [t]);
 
+  // A form that refuses its own body has a better answer than "please try again", and it still
+  // has to take back whatever the last save said.
+  const refuse = useCallback((message: string) => {
+    setSuccess(undefined);
+    setError(message);
+  }, []);
+
   function replacePending(changed: Set<string>) {
     pendingRef.current = changed;
     setPending(changed);
@@ -37,5 +44,5 @@ export function useSaving() {
     }
   }
 
-  return { error, success, pending, reportError, save };
+  return { error, success, pending, reportError, refuse, save };
 }

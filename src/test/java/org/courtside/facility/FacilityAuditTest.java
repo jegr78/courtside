@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.audit.testfixture.AuditTestFixture.RecordedEvent;
 import org.courtside.audit.testfixture.DomainEventTypes;
+import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -137,6 +139,60 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         assertThat(closed.getFirst().payload()).containsEntry("dayOfWeek", DayOfWeek.SATURDAY.getValue());
         assertEventCounts(hours.getId(), Map.of(FacilityEvent.OpeningHoursSet.TYPE, 1L,
                 FacilityEvent.OpeningHoursClosed.TYPE, 1L));
+    }
+
+    @Test
+    void givenAStoredWeek_whenTheSameWeekIsSavedAgain_thenNothingIsRecorded() {
+        // given
+        List<WeeklyOpeningHours> week = week(DayOfWeek.SATURDAY, LocalTime.of(8, 0), LocalTime.of(22, 0));
+        facility.setWeeklyOpeningHours(week);
+
+        // when
+        facility.setWeeklyOpeningHours(week);
+
+        // then
+        assertThat(audit.eventsOfType(FacilityEvent.OpeningHoursSet.TYPE)).hasSize(1);
+        assertThat(audit.eventsOfType(FacilityEvent.OpeningHoursClosed.TYPE)).isEmpty();
+    }
+
+    @Test
+    void givenAStoredWeek_whenOnlyOneDayChanges_thenTheLogNamesThatDayAlone() {
+        // given
+        facility.setWeeklyOpeningHours(week(DayOfWeek.SATURDAY, LocalTime.of(8, 0), LocalTime.of(22, 0)));
+
+        // when
+        facility.setWeeklyOpeningHours(week(DayOfWeek.SATURDAY, LocalTime.of(9, 0), LocalTime.of(21, 0)));
+
+        // then
+        List<RecordedEvent> set = audit.eventsOfType(FacilityEvent.OpeningHoursSet.TYPE);
+        assertThat(set).hasSize(2);
+        assertThat(set).extracting(recorded -> recorded.payload().get("opensAt"))
+                .containsExactlyInAnyOrder("08:00:00", "09:00:00");
+        assertThat(set).allSatisfy(recorded -> assertThat(recorded.payload())
+                .containsEntry("dayOfWeek", DayOfWeek.SATURDAY.getValue()));
+    }
+
+    @Test
+    void givenAStoredWeek_whenTheWeekSendsADayWithoutAWindow_thenThatDayIsLoggedAsClosed() {
+        // given
+        facility.setWeeklyOpeningHours(week(DayOfWeek.SATURDAY, LocalTime.of(8, 0), LocalTime.of(22, 0)));
+
+        // when
+        facility.setWeeklyOpeningHours(week(null, null, null));
+
+        // then
+        List<RecordedEvent> closed = audit.eventsOfType(FacilityEvent.OpeningHoursClosed.TYPE);
+        assertThat(closed).hasSize(1);
+        assertThat(closed.getFirst().payload())
+                .containsEntry("dayOfWeek", DayOfWeek.SATURDAY.getValue());
+    }
+
+    private static List<WeeklyOpeningHours> week(DayOfWeek open, LocalTime opensAt, LocalTime closesAt) {
+        return Arrays.stream(DayOfWeek.values())
+                .map(day -> day == open
+                        ? new WeeklyOpeningHours(day, opensAt, closesAt)
+                        : new WeeklyOpeningHours(day, null, null))
+                .toList();
     }
 
     @Test
