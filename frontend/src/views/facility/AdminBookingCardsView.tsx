@@ -33,8 +33,6 @@ export function AdminBookingCardsView() {
       .catch(reportError);
   }, [reportError]);
 
-  // What the server last confirmed, kept beside what is on screen: a card is unsaved when the two
-  // differ, so taking an edit back by hand leaves nothing to ask about.
   function confirm(changed: BookingCard) {
     setCards((current) => current?.some((item) => item.id === changed.id)
       ? current.map((item) => item.id === changed.id ? changed : item)
@@ -42,7 +40,7 @@ export function AdminBookingCardsView() {
     setConfirmed((current) => ({ ...current, [changed.id]: changed }));
   }
 
-  function edited(changed: BookingCard) {
+  function applyEdit(changed: BookingCard) {
     setCards((current) => current?.map((item) => item.id === changed.id ? changed : item));
   }
 
@@ -75,19 +73,21 @@ export function AdminBookingCardsView() {
     });
   }
 
-  return <FacilityPage testId="admin-booking-cards-view" title={t("admin.facility.cards")} loaded={cards !== undefined && timeZone !== undefined} error={error} success={success}>
-    <CardCreateForm disabled={pending.has("card:new")} create={create} />
-    {cards && timeZone && cards.map((card) => <CardEditor
-      key={card.id}
-      card={card}
-      confirmed={confirmed[card.id]}
-      timeZone={timeZone}
-      disabled={pending.has(`card:${card.id}`)}
-      changed={edited}
-      save={saveCard}
-      toggle={toggle}
-      reportError={reportError}
-    />)}
+  return <FacilityPage testId="admin-booking-cards-view" title={t("admin.facility.cards")} error={error} success={success}>
+    {cards !== undefined && timeZone !== undefined && <>
+      <CardCreateForm disabled={pending.has("card:new")} create={create} />
+      {cards.map((card) => <CardEditor
+        key={card.id}
+        card={card}
+        confirmed={confirmed[card.id]}
+        timeZone={timeZone}
+        disabled={pending.has(`card:${card.id}`)}
+        changed={applyEdit}
+        save={saveCard}
+        toggle={toggle}
+        reportError={reportError}
+      />)}
+    </>}
   </FacilityPage>;
 }
 

@@ -32,8 +32,6 @@ export function AdminOpeningHoursView() {
     setHours((current) => current?.map((item) => item.dayOfWeek === changed.dayOfWeek ? changed : item));
   }
 
-  // What the server last confirmed, kept beside what is on screen: a day is unsaved when the two
-  // differ, so taking an edit back by hand leaves nothing to ask about.
   function confirm(changed: OpeningHours) {
     replace(changed);
     setConfirmed((current) => ({ ...current, [String(changed.dayOfWeek)]: changed }));
@@ -54,9 +52,9 @@ export function AdminOpeningHoursView() {
     });
   }
 
-  return <FacilityPage testId="admin-opening-hours-view" title={t("admin.facility.openingHours")} loaded={hours !== undefined && timeZone !== undefined} error={error} success={success}>
-    <div className="grid gap-3 lg:grid-cols-2">
-      {hours && timeZone && hours.map((day) => <HoursEditor
+  return <FacilityPage testId="admin-opening-hours-view" title={t("admin.facility.openingHours")} error={error} success={success}>
+    {hours !== undefined && timeZone !== undefined && <div className="grid gap-3 lg:grid-cols-2">
+      {hours.map((day) => <HoursEditor
         key={day.dayOfWeek}
         hours={day}
         confirmed={confirmed[String(day.dayOfWeek)]}
@@ -67,7 +65,7 @@ export function AdminOpeningHoursView() {
         close={closeDay}
         reportError={reportError}
       />)}
-    </div>
+    </div>}
   </FacilityPage>;
 }
 

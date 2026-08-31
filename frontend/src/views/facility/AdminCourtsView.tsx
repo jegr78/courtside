@@ -30,8 +30,6 @@ export function AdminCourtsView() {
       .catch(reportError);
   }, [reportError]);
 
-  // What the server last confirmed, kept beside what is on screen: a row is unsaved when the two
-  // differ, so taking an edit back by hand leaves nothing to ask about.
   function confirm(changed: AdminCourt) {
     setCourts((current) => current?.some((item) => item.id === changed.id)
       ? current.map((item) => item.id === changed.id ? changed : item)
@@ -39,7 +37,7 @@ export function AdminCourtsView() {
     setConfirmed((current) => ({ ...current, [changed.id]: changed }));
   }
 
-  function edited(changed: AdminCourt) {
+  function applyEdit(changed: AdminCourt) {
     setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item));
   }
 
@@ -65,23 +63,28 @@ export function AdminCourtsView() {
     });
   }
 
-  return <FacilityPage testId="admin-courts-view" title={t("admin.facility.courts")} loaded={courts !== undefined && timeZone !== undefined} error={error} success={success}>
-    <form noValidate {...newCourt.form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
-      <TextField data-testid="new-court-number" disabled={pending.has("court:new")} name="number" type="number" label={t("admin.facility.number")} />
-      <TextField data-testid="new-court-name" disabled={pending.has("court:new")} name="name" label={t("admin.facility.name")} />
-      <Button variant="primary" data-testid="create-court" disabled={pending.has("court:new")} type="submit">{t("admin.create")}</Button>
-    </form>
-    {courts && timeZone && courts.map((court) => <CourtEditor
-      key={court.id}
-      court={court}
-      confirmed={confirmed[court.id]}
-      timeZone={timeZone}
-      disabled={pending.has(`court:${court.id}`)}
-      changed={edited}
-      save={saveCourt}
-      toggle={toggle}
-      reportError={reportError}
-    />)}
+  return <FacilityPage testId="admin-courts-view" title={t("admin.facility.courts")} error={error} success={success}>
+    {courts !== undefined && timeZone !== undefined && <>
+      <form noValidate {...newCourt.form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
+        <h2 className="font-bold">{t("admin.facility.newCourt")}</h2>
+        <div className="grid gap-3 sm:grid-cols-[8rem_1fr] sm:items-end">
+          <TextField data-testid="new-court-number" disabled={pending.has("court:new")} name="number" type="number" label={t("admin.facility.number")} />
+          <TextField data-testid="new-court-name" disabled={pending.has("court:new")} name="name" label={t("admin.facility.name")} />
+        </div>
+        <Button variant="primary" data-testid="create-court" disabled={pending.has("court:new")} className="justify-self-start" type="submit">{t("admin.create")}</Button>
+      </form>
+      {courts.map((court) => <CourtEditor
+        key={court.id}
+        court={court}
+        confirmed={confirmed[court.id]}
+        timeZone={timeZone}
+        disabled={pending.has(`court:${court.id}`)}
+        changed={applyEdit}
+        save={saveCourt}
+        toggle={toggle}
+        reportError={reportError}
+      />)}
+    </>}
   </FacilityPage>;
 }
 

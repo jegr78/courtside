@@ -222,10 +222,15 @@ describe("AppRoutes", () => {
     expect(screen.getByTestId("court-plan-link")).toHaveAttribute("href", "/");
   });
 
-  // One guard now stands for all eight destinations, where there used to be one per route.
-  it("given a member session, when opening an administrative page, then it is not served", () => {
+  // One guard on /admin stands for every destination below it, however deep — the facility routes
+  // sit a level further down than the rest, and a guard that only reached its children would let
+  // them through.
+  it.each([
+    ["/admin/configuration", "admin-configuration-view"],
+    ["/admin/facility/opening-hours", "admin-opening-hours-view"]
+  ])("given a member session, when opening %s, then it is not served", (address, view) => {
     // when
-    render(<RoutedShell initialEntries={["/admin/configuration"]}><AppRoutes session={{
+    render(<RoutedShell initialEntries={[address]}><AppRoutes session={{
       authenticated: true,
       username: "doe.jane",
       displayName: "Jane Doe",
@@ -235,7 +240,7 @@ describe("AppRoutes", () => {
 
     // then
     expect(screen.queryByTestId("admin-navigation")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("admin-configuration-view")).not.toBeInTheDocument();
+    expect(screen.queryByTestId(view)).not.toBeInTheDocument();
     expect(screen.getByTestId("court-plan-view")).toBeInTheDocument();
   });
 

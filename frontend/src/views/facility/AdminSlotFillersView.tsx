@@ -26,8 +26,6 @@ export function AdminSlotFillersView() {
       .catch(reportError);
   }, [reportError]);
 
-  // What the server last confirmed, kept beside what is on screen: a card is unsaved when the two
-  // differ, so taking an edit back by hand leaves nothing to ask about.
   function confirm(changed: ParticipantCard) {
     setFillers((current) => current?.some((item) => item.id === changed.id)
       ? current.map((item) => item.id === changed.id ? changed : item)
@@ -35,7 +33,7 @@ export function AdminSlotFillersView() {
     setConfirmed((current) => ({ ...current, [changed.id]: changed }));
   }
 
-  function edited(changed: ParticipantCard) {
+  function applyEdit(changed: ParticipantCard) {
     setFillers((current) => current?.map((item) => item.id === changed.id ? changed : item));
   }
 
@@ -62,18 +60,20 @@ export function AdminSlotFillersView() {
     });
   }
 
-  return <FacilityPage testId="admin-slot-fillers-view" title={t("admin.facility.participantCards")} loaded={fillers !== undefined} error={error} success={success}>
-    <p className="text-sm">{t("admin.facility.participantCardsHint")}</p>
-    <ParticipantCardCreateForm disabled={pending.has("filler:new")} create={create} />
-    {(fillers ?? []).map((card) => <ParticipantCardEditor
-      key={card.id}
-      card={card}
-      confirmed={confirmed[card.id]}
-      disabled={pending.has(`filler:${card.id}`)}
-      changed={edited}
-      save={saveFiller}
-      toggle={toggle}
-    />)}
+  return <FacilityPage testId="admin-slot-fillers-view" title={t("admin.facility.participantCards")} error={error} success={success}>
+    {fillers !== undefined && <>
+      <p className="text-sm">{t("admin.facility.participantCardsHint")}</p>
+      <ParticipantCardCreateForm disabled={pending.has("filler:new")} create={create} />
+      {fillers.map((card) => <ParticipantCardEditor
+        key={card.id}
+        card={card}
+        confirmed={confirmed[card.id]}
+        disabled={pending.has(`filler:${card.id}`)}
+        changed={applyEdit}
+        save={saveFiller}
+        toggle={toggle}
+      />)}
+    </>}
   </FacilityPage>;
 }
 
