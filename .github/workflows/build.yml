@@ -13,12 +13,14 @@ permissions:
 
 jobs:
   test-profile-plan:
+    name: test-profile-plan [${{ vars.COURTSIDE_TEST_PROFILES == 'admitted' && 'admitted' || vars.COURTSIDE_TEST_PROFILES == 'full' && 'full' || 'invalid' }}]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
     outputs:
+      docs: ${{ steps.selection.outputs.docs }}
       backend: ${{ steps.selection.outputs.backend }}
       frontend: ${{ steps.selection.outputs.frontend }}
       security: ${{ steps.selection.outputs.security }}
@@ -37,6 +39,7 @@ jobs:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           RUN_ID: ${{ github.run_id }}
           ATTEMPT: ${{ github.run_attempt }}
+          PROFILE_MODE: ${{ vars.COURTSIDE_TEST_PROFILES == 'admitted' && 'admitted' || vars.COURTSIDE_TEST_PROFILES == 'full' && 'full' || 'invalid' }}
         run: |
           CLASSIFIER_EXIT=0
           PROFILE_ROOT="$RUNNER_TEMP/courtside-profile-base"
@@ -48,6 +51,7 @@ jobs:
               --labels "$LABELS_JSON" \
               --run-id "$RUN_ID" \
               --attempt "$ATTEMPT" \
+              --mode "$PROFILE_MODE" \
               --fallback-on-error \
               --output build/test-profile/plan.json \
               --summary build/test-profile/summary.md \
@@ -60,21 +64,25 @@ jobs:
             --argjson classifierExit "$CLASSIFIER_EXIT" \
             --arg base "$BASE_REF" \
             --arg head "$HEAD_REF" \
-            'type == "object" and .schemaVersion == 3 and .runId == $runId and
+            'type == "object" and .schemaVersion == 4 and .runId == $runId and
               .attempt == $attempt and .baseCommit == $base and .headCommit == $head and
-              (.policyFingerprint | test("^[a-f0-9]{64}$")) and
-              (.profiles | type == "array" and length >= 1 and length <= 3 and
+              (.proposedPolicyFingerprint | test("^[a-f0-9]{64}$")) and
+              (.activeProfiles | type == "array" and length >= 1 and length <= 4 and
                 all(. == "docs" or . == "backend" or . == "frontend" or . == "full") and
                 (unique | length) == length) and
-              (.isFull | type == "boolean") and .isFull == (.profiles == ["full"]) and
+              (.proposedProfiles | type == "array" and length >= 1 and length <= 4) and
+              (.activeCiJobs | type == "array" and all(. == "docs" or . == "backend" or . == "frontend" or . == "security")) and
+              (.isFull | type == "boolean") and .isFull == (.activeProfiles == ["full"]) and
               (.plannerOutcome == "passed" or .plannerOutcome == "failed") and
               (.reasons | type == "array" and length >= 1) and
-              (if .plannerOutcome == "failed" then .isFull and .profiles == ["full"]
+              (if .plannerOutcome == "failed" then .isFull and .activeProfiles == ["full"]
                 else $classifierExit == 0 end)' \
             build/test-profile/plan.json > /dev/null 2>&1; then
-            PROFILES=$(jq -cer '.profiles' build/test-profile/plan.json)
+            PROFILES=$(jq -cer '.activeProfiles' build/test-profile/plan.json)
+            JOBS=$(jq -cer '.activeCiJobs' build/test-profile/plan.json)
           else
             PROFILES='["full"]'
+            JOBS='["docs","backend","frontend","security"]'
             mkdir -p build/test-profile
             {
               echo '# Selected test profiles'
@@ -86,13 +94,8 @@ jobs:
           fi
           cat build/test-profile/summary.md >> "$GITHUB_STEP_SUMMARY"
           echo "profiles=$PROFILES" >> "$GITHUB_OUTPUT"
-          for job in backend frontend security; do
-            SELECTED=$(jq -nr --argjson profiles "$PROFILES" --arg job "$job" '
-            ($profiles | index("full")) != null or
-            ($job == "backend" and ($profiles | index("backend")) != null) or
-            ($job == "frontend" and ($profiles | index("frontend")) != null) or
-            ($job == "security" and
-              (($profiles | index("backend")) != null or ($profiles | index("frontend")) != null))')
+          for job in docs backend frontend security; do
+            SELECTED=$(jq -nr --argjson jobs "$JOBS" --arg job "$job" '($jobs | index($job)) != null')
             echo "$job=$SELECTED" >> "$GITHUB_OUTPUT"
           done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -102,6 +105,25 @@ jobs:
           path: build/test-profile
           retention-days: 14
           if-no-files-found: error
+
+  docs:
+    needs: test-profile-plan
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.docs == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Verify documentation
+        run: node tools/docs-check.mjs --check
 
   assessment-runtime:
     if: github.event_name == 'pull_request'
@@ -464,7 +486,7 @@ jobs:
 
   build:
     if: always()
-    needs: [backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan]
+    needs: [docs, backend, frontend, security, assessment-runtime, tool-update-comparison, test-profile-plan]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -472,6 +494,7 @@ jobs:
       - name: Record nightly verification
         if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
         env:
+          DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
@@ -481,18 +504,20 @@ jobs:
             --arg commit "${{ github.sha }}" \
             --argjson runId "${{ github.run_id }}" \
             --argjson attempt "${{ github.run_attempt }}" \
+            --arg docs "$DOCS_RESULT" \
             --arg backend "$BACKEND_RESULT" \
             --arg frontend "$FRONTEND_RESULT" \
             --arg security "$SECURITY_RESULT" \
             '{schemaVersion: 1, commit: $commit, runId: $runId, attempt: $attempt,
-              firstAttempt: ($attempt == 1), jobs: {backend: $backend, frontend: $frontend, security: $security},
-              releaseReadiness: (if $attempt == 1 and $backend == "success" and $frontend == "success"
+              firstAttempt: ($attempt == 1), jobs: {docs: $docs, backend: $backend, frontend: $frontend, security: $security},
+              releaseReadiness: (if $attempt == 1 and $docs == "success" and $backend == "success" and $frontend == "success"
                 and $security == "success" then "complete" else "incomplete" end)}' \
             > build/nightly/verification.json
           jq -r '"Nightly release readiness: **\(.releaseReadiness)** (`\(.commit)`, attempt \(.attempt))"' \
             build/nightly/verification.json >> "$GITHUB_STEP_SUMMARY"
       - name: Enforce required build results
         env:
+          DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
@@ -500,6 +525,7 @@ jobs:
           COMPARISON_RESULT: ${{ needs.tool-update-comparison.result }}
           PROFILE_PLAN_RESULT: ${{ needs.test-profile-plan.result }}
           PROFILES: ${{ needs.test-profile-plan.outputs.profiles }}
+          DOCS_SELECTED: ${{ needs.test-profile-plan.outputs.docs }}
           BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
           FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
           SECURITY_SELECTED: ${{ needs.test-profile-plan.outputs.security }}
@@ -510,7 +536,7 @@ jobs:
           case "$EVENT_NAME" in
             pull_request)
               test "$PROFILE_PLAN_RESULT" = success
-              for job in backend frontend security; do
+              for job in docs backend frontend security; do
                 result_variable="${job^^}_RESULT"
                 selected_variable="${job^^}_SELECTED"
                 result="${!result_variable}"
@@ -524,6 +550,7 @@ jobs:
               ;;
             push|schedule|workflow_dispatch)
               test "$PROFILE_PLAN_RESULT" = skipped
+              test "$DOCS_RESULT" = success
               test "$BACKEND_RESULT" = success
               test "$FRONTEND_RESULT" = success
               test "$SECURITY_RESULT" = success
@@ -533,9 +560,11 @@ jobs:
       - name: Summarize selected build results
         if: always() && github.event_name == 'pull_request'
         env:
+          DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
+          DOCS_SELECTED: ${{ needs.test-profile-plan.outputs.docs }}
           BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
           FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
           SECURITY_SELECTED: ${{ needs.test-profile-plan.outputs.security }}
@@ -548,7 +577,7 @@ jobs:
             echo
             echo '| Job | Result | Reason |'
             echo '| --- | --- | --- |'
-            for job in backend frontend security; do
+            for job in docs backend frontend security; do
               result_variable="${job^^}_RESULT"
               selected_variable="${job^^}_SELECTED"
               result="${!result_variable}"

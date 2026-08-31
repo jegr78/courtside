@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createObservationInventory, createProfileObservation, profileObservationReport,
   summarizeProfileObservations } from "./test-profile-observation.mjs";
+import { bindPlanToRun } from "./test-profile-classifier.mjs";
+import { profilePolicyFingerprint } from "./test-profile-contract.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = require("ajv/dist/2020").default;
@@ -59,6 +61,7 @@ const timing = {
   timeToFirstFailureMilliseconds: null,
   url: "https://github.com/example/courtside/actions/runs/101",
   jobs: [
+    { name: "docs", outcome: "success" },
     { name: "backend", outcome: "success" },
     { name: "frontend", outcome: "success" },
     { name: "security", outcome: "success" }
@@ -72,9 +75,100 @@ test("given a first attempt and its bound plan, when observing coverage, then se
   // then
   assert.equal(validate(observation), true, JSON.stringify(validate.errors));
   assert.deepEqual(observation.proposedJobs, ["backend", "security"]);
-  assert.deepEqual(observation.jobsOutsideProposal, ["frontend"]);
+  assert.deepEqual(observation.jobsOutsideProposal, ["docs", "frontend"]);
   assert.deepEqual(observation.failuresOutsideProposal, []);
   assert.equal(observation.classificationOutcome, "no-observed-miss");
+});
+
+test("given an admitted contract plan, when observing coverage, then active and proposed selections remain distinct", () => {
+  // given
+  const admittedPlan = bindPlanToRun({
+    schemaVersion: 1,
+    profiles: ["backend"],
+    isFull: false,
+    reasons: plan.reasons
+  }, {
+    runId: 101,
+    attempt: 1,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40)
+  }, "admitted", {
+    schemaVersion: 1,
+    admittedPolicyFingerprint: profilePolicyFingerprint(),
+    evidence: {
+      runId: 101,
+      attempt: 1,
+      artifact: "profile-evidence-101-1",
+      assessedAt: "2026-08-31T10:00:00Z",
+      expiresOn: "2026-09-30",
+      status: "ready-for-review",
+      qualifyingFirstAttempts: 20,
+      backendPlans: 2,
+      frontendPlans: 1,
+      candidateMisses: 0,
+      classificationErrors: 0,
+      incompleteObservations: 0
+    }
+  });
+
+  // when
+  const observation = createProfileObservation(admittedPlan, timing);
+
+  // then
+  assert.deepEqual(observation.activeProfiles, ["backend"]);
+  assert.deepEqual(observation.proposedProfiles, ["backend"]);
+  assert.deepEqual(observation.activeJobs, ["backend", "security"]);
+  assert.equal(observation.admissionOutcome, "matched");
+  assert.equal(observation.schemaVersion, 2);
+  assert.equal(validate(observation), true, JSON.stringify(validate.errors));
+});
+
+test("given a version four plan, when active evidence is missing or contradictory, then it fails closed", () => {
+  // given
+  const admittedPlan = bindPlanToRun({
+    schemaVersion: 1,
+    profiles: ["backend"],
+    isFull: false,
+    reasons: plan.reasons
+  }, {
+    runId: 101,
+    attempt: 1,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40)
+  }, "admitted", {
+    schemaVersion: 1,
+    admittedPolicyFingerprint: profilePolicyFingerprint(),
+    evidence: {
+      runId: 101,
+      attempt: 1,
+      artifact: "profile-evidence-101-1",
+      assessedAt: "2026-08-31T10:00:00Z",
+      expiresOn: "2026-09-30",
+      status: "ready-for-review",
+      qualifyingFirstAttempts: 20,
+      backendPlans: 2,
+      frontendPlans: 1,
+      candidateMisses: 0,
+      classificationErrors: 0,
+      incompleteObservations: 0
+    }
+  });
+
+  // when / then
+  assert.throws(() => createProfileObservation({ ...admittedPlan, activeLocalTasks: [] }, timing),
+    /coverage/);
+  assert.throws(() => createProfileObservation({ ...admittedPlan, proposedLocalTasks: [] }, timing),
+    /coverage/);
+  assert.throws(() => createProfileObservation({
+    ...admittedPlan,
+    admissionOutcome: "stale",
+    activePolicyFingerprint: null
+  }, timing), /coverage/);
+
+  const observation = createProfileObservation(admittedPlan, timing);
+  const missingActive = structuredClone(observation);
+  delete missingActive.activeJobs;
+  assert.equal(validate(missingActive), false);
 });
 
 test("given an unselected job fails, when observing coverage, then it becomes an under classification candidate", () => {
@@ -99,7 +193,7 @@ test("given an unselected job is skipped, when observing coverage, then the redu
   const observation = createProfileObservation(plan, reduced);
 
   // then
-  assert.deepEqual(observation.jobsOutsideProposal, ["frontend"]);
+  assert.deepEqual(observation.jobsOutsideProposal, ["docs", "frontend"]);
   assert.deepEqual(observation.incompleteJobs, []);
   assert.equal(observation.classificationOutcome, "no-observed-miss");
 });
@@ -154,7 +248,7 @@ test("given a classifier fallback, when observing coverage, then the classificat
 
   // then
   assert.equal(observation.classificationOutcome, "classification-error");
-  assert.deepEqual(observation.proposedJobs, ["backend", "frontend", "security"]);
+  assert.deepEqual(observation.proposedJobs, ["backend", "docs", "frontend", "security"]);
   assert.throws(() => createProfileObservation({
     ...fallback,
     plannerOutcome: "passed"
@@ -286,9 +380,9 @@ test("given a qualified summary, when rendering the final report, then sample wi
     reasons: [{ code: "prefix:frontend/", path: "frontend/src/App.tsx", profile: "frontend", status: "M" }]
   };
   const backendTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "frontend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const frontendTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "backend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "backend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const observations = Array.from({ length: 20 }, (_, index) => ({
     ...createProfileObservation(index === 0 ? frontendPlan : plan, index === 0 ? frontendTiming : backendTiming),
     runId: 301 + index,
@@ -312,7 +406,7 @@ test("given a qualified summary, when rendering the final report, then sample wi
 test("given reduced evidence from only one profile, when summarizing, then the other profile remains unqualified", () => {
   // given
   const reducedTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "frontend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const observations = Array.from({ length: 20 }, (_, index) => ({
     ...createProfileObservation(plan, reducedTiming), runId: 501 + index
   }));
@@ -350,9 +444,9 @@ test("given completed reduced profiles with expected skipped jobs, when summariz
     reasons: [{ code: "prefix:frontend/", path: "frontend/src/App.tsx", profile: "frontend", status: "M" }]
   };
   const backendTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "frontend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "frontend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const frontendTiming = { ...timing, jobs: timing.jobs.map((job) =>
-    job.name === "backend" ? { ...job, outcome: "skipped" } : job) };
+    ["docs", "backend"].includes(job.name) ? { ...job, outcome: "skipped" } : job) };
   const fullPlan = { ...plan, profiles: ["full"], isFull: true };
   const observations = Array.from({ length: 20 }, (_, index) => {
     const selectedPlan = index === 0 ? plan : index < 3 ? frontendPlan : fullPlan;

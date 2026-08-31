@@ -4,46 +4,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { loadProfileContract, localTasksForProfiles } from "./test-profile-contract.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const resultFile = join(repository, "build", "local-check", "result.json");
-
-const backendTask = {
-  label: "backend",
-  workingDirectory: "repository",
-  executable: "maven",
-  arguments: ["clean", "verify", "-Pjava-only"]
-};
-
-const frontendTasks = [
-  {
-    label: "frontend-toolchain",
-    workingDirectory: "repository",
-    executable: "maven",
-    arguments: [
-      "com.github.eirslett:frontend-maven-plugin:install-node-and-npm",
-      "com.github.eirslett:frontend-maven-plugin:npm@npm-ci"
-    ]
-  },
-  { label: "frontend-lint", workingDirectory: "frontend", executable: "npm", arguments: ["run", "lint"] },
-  { label: "frontend-test", workingDirectory: "frontend", executable: "npm", arguments: ["run", "test"] },
-  { label: "frontend-build", workingDirectory: "frontend", executable: "npm", arguments: ["run", "build"] },
-  {
-    label: "frontend-audit",
-    workingDirectory: "frontend",
-    executable: "npm",
-    arguments: ["audit", "--audit-level=high"]
-  },
-  {
-    label: "frontend-package",
-    workingDirectory: "repository",
-    executable: "maven",
-    arguments: ["package", "-DskipTests", "-Pjava-only"]
-  },
-  { label: "frontend-e2e", workingDirectory: "frontend", executable: "npm", arguments: ["run", "test:e2e"] }
-];
-
-const fullTask = {
+const protectedFullTask = {
   label: "full",
   workingDirectory: "repository",
   executable: "maven",
@@ -51,13 +16,12 @@ const fullTask = {
 };
 
 export function planTasks(classified) {
-  const tasks = classified.profiles.includes("full")
-    ? [fullTask]
-    : [
-        ...(classified.profiles.includes("backend") ? [backendTask] : []),
-        ...(classified.profiles.includes("frontend") ? frontendTasks : [])
-      ];
-  return { ...classified, tasks: structuredClone(tasks) };
+  const profiles = classified.activeProfiles ?? classified.profiles;
+  const tasks = classified.activeLocalTasks
+    ?? classified.tasks
+    ?? (profiles.includes("full") ? [protectedFullTask]
+      : localTasksForProfiles(loadProfileContract(), profiles));
+  return { ...classified, profiles, tasks: structuredClone(tasks) };
 }
 
 export function collectLocalChanges(git = runGit) {
@@ -114,6 +78,15 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
   const npmCli = join(frontend, "node", "node_modules", "npm", "bin", "npm-cli.js");
   const node = join(frontend, "node", platform === "win32" ? "node.exe" : "node");
   return tasks.map((task) => {
+    if (task.executable === "node") {
+      return {
+        label: task.label,
+        command: node,
+        arguments: task.arguments,
+        workingDirectory: root,
+        shell: false
+      };
+    }
     if (task.executable === "npm") {
       return {
         label: task.label,
@@ -160,7 +133,12 @@ export async function executeLocalCheck(options, runtime = {}) {
     headCommit: evidence.headCommit,
     fallbackReason: evidence.fallbackReason,
     changeFingerprint: evidence.changeFingerprint,
+    activePolicyFingerprint: plan.activePolicyFingerprint ?? null,
+    proposedPolicyFingerprint: plan.proposedPolicyFingerprint ?? null,
     profiles: plan.profiles,
+    proposedProfiles: plan.proposedProfiles ?? plan.profiles,
+    admissionOutcome: plan.admissionOutcome ?? null,
+    overrideOutcome: plan.overrideOutcome ?? null,
     reasons: plan.reasons,
     tasks: plan.tasks.map((task) => task.label),
     outcome: options.planOnly ? "planned" : "running"
@@ -204,7 +182,14 @@ export async function classifyProtectedChanges(evidence, forceFull, git = runGit
     const classifierUrl = pathToFileURL(join(worktree, "tools", "test-profile-classifier.mjs"));
     const protectedClassifier = await loadClassifier(`${classifierUrl.href}?base=${evidence.baseCommit}`);
     const changes = protectedClassifier.parseNameStatus(evidence.changeEvidence);
-    return protectedClassifier.classifyChanges(changes, forceFull ? ["ci:full"] : []);
+    const classified = protectedClassifier.classifyChanges(changes, forceFull ? ["ci:full"] : []);
+    if (typeof protectedClassifier.admitPlan === "function") {
+      return protectedClassifier.admitPlan(classified, forceFull ? "full" : "admitted");
+    }
+    const protectedLocalCheckUrl = pathToFileURL(join(worktree, "tools", "local-check.mjs"));
+    const protectedLocalCheck = await loadClassifier(
+      `${protectedLocalCheckUrl.href}?base=${evidence.baseCommit}`);
+    return protectedLocalCheck.planTasks(classified);
   } finally {
     let cleanupFailure;
     try {
@@ -229,6 +214,9 @@ function fullClassification(reason) {
   return {
     schemaVersion: 1,
     profiles: ["full"],
+    activeProfiles: ["full"],
+    proposedProfiles: ["full"],
+    activeLocalTasks: [structuredClone(protectedFullTask)],
     isFull: true,
     reasons: [{ code: reason, path: null, profile: "full", status: null }]
   };
@@ -240,6 +228,7 @@ export function renderLocalCheckPlan(record) {
     : `full fallback: ${record.fallbackReason}`;
   return [
     `Local profiles: ${record.profiles.join(" + ")}`,
+    `Proposed profiles: ${record.proposedProfiles.join(" + ")}`,
     `Change evidence: ${source}`,
     `Tasks: ${record.tasks.length === 0 ? "diff-check only" : record.tasks.join(", ")}`,
     `Result: ${resultFile}`

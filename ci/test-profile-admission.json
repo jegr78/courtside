@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "admittedPolicyFingerprint": "d65c7568d0abe78a00dc5285ce4f297946f176bed1bb05d672f40e644e50a14c",
+  "evidence": {
+    "runId": 33326145088,
+    "attempt": 1,
+    "artifact": "profile-evidence-33326145088-1",
+    "assessedAt": "2026-08-30T17:45:40Z",
+    "expiresOn": "2026-09-30",
+    "status": "ready-for-review",
+    "qualifyingFirstAttempts": 60,
+    "backendPlans": 3,
+    "frontendPlans": 1,
+    "candidateMisses": 0,
+    "classificationErrors": 0,
+    "incompleteObservations": 3
+  }
+}

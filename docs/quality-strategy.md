@@ -62,16 +62,29 @@ Property tests use fixed, printed QuickTheories seeds and automatic shrinking so
 
 The repository pull-request template requires affected risk IDs, positive and negative evidence, residual risk and any contract change. The required build result is linked from the pull request rather than copied into this document.
 
-The pull-request workflow uses a conservative test-profile plan to select its required jobs.
+The pull-request workflow uses a conservative test-profile plan to select its required jobs. One
+closed contract defines each profile's CI jobs and local tasks. Its semantic fingerprint also binds
+the classifier, workflow selection, local runner, observation and admission logic. A fingerprint
+therefore names one exact CI and local coverage policy.
 Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, or an additive
 combination. Backend changes run backend and security verification; frontend changes run frontend
 and security verification, including the complete Chromium and WebKit browser matrix. Documentation
-changes need no code-quality job. Build, workflow, security, deployment, migration, OpenAPI, and
+changes run a bounded documentation job in CI and the same checks locally. It validates Markdown,
+internal references, maintained quality contracts and the generated admission section without
+starting Java, Vitest or Playwright. Build, workflow, security, deployment, migration, OpenAPI, and
 shared test-infrastructure changes select `full`. Unknown paths and every added, deleted, renamed,
 copied, or otherwise structural change also select `full`. The `ci:full` label can only escalate a
 plan. Classifier failures also select `full` and cannot make the required aggregate check pass by
 skipping a quality job. The selector executes the classifier from the immutable pull-request base
 commit, so a classifier or rule change cannot reduce the verification required for itself.
+
+The classifier records two selections. The proposed selection describes the candidate policy. The
+active selection controls CI and local execution. They become equal only when the checked-in
+admission record names the exact candidate fingerprint and CI mode is `admitted`. A missing,
+malformed or stale admission selects `full`. The repository variable `COURTSIDE_TEST_PROFILES` may
+contain `admitted` or `full`; an empty or unknown value also selects `full`. The `full` value is an
+emergency escalation and can never request a reduced profile. Locally, `check --full` provides the
+same escalation, while the admission record remains mandatory for every reduced plan.
 
 Each completed pull-request run joins its exact-attempt profile plan with the full job outcomes.
 The follow-up workflow recomputes that plan with the classifier from the immutable pull-request
@@ -120,15 +133,21 @@ The inventory comes directly from the paginated Actions API. Missing first attem
 repositories, ambiguous pull-request provenance or a base that is not the exact merge base stop the
 replay.
 
-#### Profile admission decision
+#### Profile admission evidence
 
-The conservative profiles are qualified for required pull-request use. Profile Evidence run
+<!-- profile-admission:start -->
+The admitted profile policy is backed by Profile Evidence run
 `33326145088`, artifact `profile-evidence-33326145088-1`, reported `ready-for-review` at
 2026-08-30T17:45:40Z under policy fingerprint
-`d65c7568d0abe78a00dc5285ce4f297946f176bed1bb05d672f40e644e50a14c`: 60 qualifying first
-attempts, including three backend and one frontend plan, with no candidate miss or classification
-error. Three incomplete quality-job observations were excluded rather than converted into positive
-evidence.
+`d65c7568d0abe78a00dc5285ce4f297946f176bed1bb05d672f40e644e50a14c`. The evidence expires on 2026-09-30. It contains
+60 qualifying first attempts, including 3 backend and
+1 frontend plans, with 0 candidate misses and
+0 classification errors. 3 incomplete observations were excluded.
+<!-- profile-admission:end -->
+
+Any changed semantic contract has a different fingerprint. Until protected replay evidence admits
+that exact fingerprint, both CI and local checks execute `full`; the earlier figures remain
+historical evidence and cannot activate the changed policy.
 
 Successful full-profile runs had a 14.27-minute median and 14.85-minute p95. Successful backend
 runs had a 10.40-minute median and 10.58-minute p95; the one frontend run measured 11.92 minutes.

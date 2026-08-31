@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { bindPlanToRun, classifyChanges, classifyPath, fallbackPlanToRun, parseNameStatus,
-  profilePolicyFingerprint, profileSummary } from "./test-profile-classifier.mjs";
+  profileSummary } from "./test-profile-classifier.mjs";
+import { profilePolicyFingerprint } from "./test-profile-contract.mjs";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -139,7 +140,12 @@ test("given a repository path contains markdown, when rendering reasons, then it
   }], []);
 
   // when
-  const rendered = profileSummary(plan);
+  const rendered = profileSummary(bindPlanToRun(plan, {
+    runId: 101,
+    attempt: 1,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40)
+  }));
 
   // then
   const code = rendered.match(/<code>([^<]*)<\/code>/)?.[1];
@@ -164,15 +170,17 @@ test("given a profile plan, when binding it to the workflow run, then every iden
   });
 
   // then
-  assert.equal(bound.schemaVersion, 3);
-  assert.match(bound.policyFingerprint, /^[a-f0-9]{64}$/);
-  assert.equal(bound.policyFingerprint, profilePolicyFingerprint());
+  assert.equal(bound.schemaVersion, 4);
+  assert.match(bound.proposedPolicyFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(bound.proposedPolicyFingerprint, profilePolicyFingerprint());
   assert.equal(bound.runId, 101);
   assert.equal(bound.attempt, 1);
   assert.equal(bound.baseCommit, "a".repeat(40));
   assert.equal(bound.headCommit, "b".repeat(40));
   assert.equal(bound.plannerOutcome, "passed");
-  assert.deepEqual(bound.profiles, ["docs"]);
+  assert.deepEqual(bound.activeProfiles, ["full"]);
+  assert.deepEqual(bound.proposedProfiles, ["docs"]);
+  assert.equal(bound.admissionOutcome, "stale");
   assert.equal(validatePlan(bound), true, JSON.stringify(validatePlan.errors));
   assert.throws(() => bindPlanToRun(plan, { ...bound, runId: 0 }), /identity/);
 });
@@ -188,7 +196,8 @@ test("given the classifier fails, when binding fallback evidence, then the plan 
 
   // then
   assert.equal(fallback.plannerOutcome, "failed");
-  assert.deepEqual(fallback.profiles, ["full"]);
+  assert.deepEqual(fallback.activeProfiles, ["full"]);
+  assert.deepEqual(fallback.proposedProfiles, ["full"]);
   assert.deepEqual(fallback.reasons, [
     { code: "classifier-error", path: null, profile: "full", status: null }
   ]);
