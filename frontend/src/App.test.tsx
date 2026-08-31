@@ -6,6 +6,7 @@ import { useMemo, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App, AppRoutes } from "./App";
 import { api, type SessionStatus } from "./api/client";
+import { Preferences } from "./components/Preferences";
 import i18n from "./i18n";
 
 const anonymous: SessionStatus = {
@@ -147,6 +148,8 @@ describe("AppRoutes", () => {
     expect(screen.getByTestId("initial-password-view")).toBeInTheDocument();
   });
 
+  // The control sits in the account menu and the shell reacts to the session it leaves behind, so
+  // the two are rendered together the way the application arranges them.
   it("given a member session, when sign out succeeds, then the public plan offers sign in without another session request", async () => {
     // given
     vi.spyOn(api, "logout").mockResolvedValue();
@@ -159,13 +162,16 @@ describe("AppRoutes", () => {
     };
     function Harness() {
       const [session, setSession] = useState(member);
-      return <AppRoutes
-        session={session}
-        refreshSession={() => Promise.reject(new Error("must not be called"))}
-        signedOut={() => setSession(anonymous)}
-      />;
+      return <>
+        <Preferences authenticated={session.authenticated} signedOut={() => setSession(anonymous)} />
+        <AppRoutes
+          session={session}
+          refreshSession={() => Promise.reject(new Error("must not be called"))}
+        />
+      </>;
     }
     render(<RoutedShell><Harness /></RoutedShell>);
+    await userEvent.click(screen.getByTestId("preferences-menu"));
 
     // when
     await userEvent.click(screen.getByTestId("logout"));

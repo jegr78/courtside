@@ -34,11 +34,15 @@ test("member and administration surfaces remain usable on a touch viewport", asy
 
   // when
   await page.getByTestId("booking-close").tap();
+  await page.getByTestId("preferences-menu").tap();
   await page.getByTestId("logout").tap();
   await signIn(page, "configuration-admin");
-  await page.getByTestId("admin-configuration-link").tap();
+  await page.getByTestId("administration-link").tap();
 
-  // then
+  // then — the destinations are folded behind one control at this width, and the control says
+  // which one is open rather than leaving that to a marker nobody can see while it is folded
+  await expect(page.getByTestId("admin-menu")).toBeVisible();
+  await expect(page.getByTestId("admin-facility-link")).not.toBeVisible();
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
   await expect(page.getByTestId("save-club-config")).toBeVisible();
   await expectNoHorizontalOverflow(page);
@@ -55,7 +59,8 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await expectNoHorizontalOverflow(page);
 
   // when
-  await page.goto("/admin/facility");
+  await page.getByTestId("admin-menu").tap();
+  await page.getByTestId("admin-facility-link").tap();
 
   // then
   await expect(page.getByTestId("admin-facility-view")).toBeVisible();

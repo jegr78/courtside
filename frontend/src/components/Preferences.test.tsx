@@ -139,9 +139,9 @@ it("given the account refuses the change, when selecting another language, then 
   await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
 
   // then — the page has already switched, so silence would leave the two disagreeing unnoticed
-  expect(await screen.findByTestId("locale-not-stored")).toBeInTheDocument();
+  expect(await screen.findByTestId("preferences-failure")).toBeInTheDocument();
   await userEvent.click(screen.getByTestId("preferences-menu"));
-  expect(screen.getByTestId("locale-not-stored")).toBeVisible();
+  expect(screen.getByTestId("preferences-failure")).toBeVisible();
 });
 
 it("given an instance that ships one language, when offering the choice, then only that one is offered", () => {
@@ -151,4 +151,45 @@ it("given an instance that ships one language, when offering the choice, then on
   // then
   expect(Array.from(document.getElementById("locale-preference")!.children)
     .map((option) => option.getAttribute("value"))).toEqual(["de"]);
+});
+
+it("given an administrator deep in an administrative page, when signing out, then no detour is needed", async () => {
+  // given
+  const signedOut = vi.fn();
+  vi.spyOn(api, "logout").mockResolvedValue();
+  render(<Preferences authenticated signedOut={signedOut} />);
+  await openPreferences();
+
+  // when
+  await userEvent.click(screen.getByTestId("logout"));
+
+  // then
+  expect(api.logout).toHaveBeenCalled();
+  expect(signedOut).toHaveBeenCalled();
+});
+
+it("given signing out fails, when it is attempted, then the failure is shown and the session is kept", async () => {
+  // given
+  const signedOut = vi.fn();
+  vi.spyOn(api, "logout").mockRejectedValue(new Error("network"));
+  render(<Preferences authenticated signedOut={signedOut} />);
+  await openPreferences();
+
+  // when
+  await userEvent.click(screen.getByTestId("logout"));
+
+  // then
+  expect(await screen.findByRole("alert")).toBeInTheDocument();
+  expect(signedOut).not.toHaveBeenCalled();
+});
+
+it("given nobody is signed in, when the menu is opened, then it offers nothing to sign out of", async () => {
+  // given
+  render(<Preferences />);
+
+  // when
+  await openPreferences();
+
+  // then
+  expect(screen.queryByTestId("logout")).not.toBeInTheDocument();
 });

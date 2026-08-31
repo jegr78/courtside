@@ -112,7 +112,7 @@ export function AdminRosterView() {
 
   const typeNames = new Map(types.map((type) => [type.id, type.name]));
 
-  return <section data-testid="admin-roster-view" className="surface-panel grid w-full max-w-7xl gap-8 self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+  return <section data-testid="admin-roster-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.roster.title")}</h1>
     {!entries
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)

@@ -96,6 +96,7 @@ test("stored values remain data across roles without entering browser storage or
   });
 
   // when
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   await page.goBack();
   await page.goForward();

@@ -17,6 +17,8 @@ async function signInAsAdministrator(page: Page): Promise<void> {
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await page.getByTestId("administration-link").click();
+  await expect(page.getByTestId("admin-shell")).toBeVisible();
 }
 
 async function chooseFile(page: Page, testId: string): Promise<void> {

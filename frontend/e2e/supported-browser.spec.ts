@@ -67,7 +67,7 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
       .find((cookie) => cookie.name === "XSRF-TOKEN" && !cookie.isEmpty);
     expect(csrfCookie).toBeDefined();
     expectIssuedCookie(csrfCookie!, "XSRF-TOKEN");
-    await expect(page.getByTestId("logout")).toBeVisible();
+    await expect(page.getByTestId("my-bookings-link")).toBeVisible();
     await expect(page.getByTestId("court-plan-legend")).toBeVisible();
   } finally {
     allocationResponses.cancel();
@@ -119,6 +119,7 @@ test("a member can navigate the core signed-in journey", async ({ page }) => {
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
   const logoutResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/session/logout") && response.request().method() === "POST");
+  await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   const response = await logoutResponse;
   expect(response.status()).toBe(204);
@@ -127,7 +128,7 @@ test("a member can navigate the core signed-in journey", async ({ page }) => {
     { name: "XSRF-TOKEN", path: "/", sameSite: "Lax", secure: false, httpOnly: false, maxAge: null, isEmpty: true }
   ]));
   await expect(page.getByTestId("my-bookings-page")).not.toBeVisible();
-  await expect(page.getByTestId("logout")).not.toBeVisible();
+  await expect(page.getByTestId("my-bookings-link")).not.toBeVisible();
   await expect(page.getByTestId("sign-in-link").or(page.getByTestId("login-submit"))).toBeVisible();
 });
 
@@ -136,7 +137,7 @@ test("an administrator can open both core administration views", async ({ page }
   await signIn(page, "configuration-admin");
 
   // when
-  await page.getByTestId("admin-configuration-link").click();
+  await page.getByTestId("administration-link").click();
 
   // then
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();

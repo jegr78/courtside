@@ -6,6 +6,7 @@ import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./ap
 import { Alert } from "./components/Alert";
 import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
 import { Preferences } from "./components/Preferences";
+import { AdminShell } from "./components/AdminShell";
 import { PrimaryNavigation } from "./components/PrimaryNavigation";
 import { PwaLifecycle } from "./components/PwaLifecycle";
 import { UnsavedChangesProvider } from "./unsaved/UnsavedChangesProvider";
@@ -31,12 +32,11 @@ interface AppRoutesProps {
   refreshSession: () => Promise<void>;
   passwordChanged?: boolean;
   initialPasswordChanged?: () => void;
-  signedOut?: () => void;
   configurationChanged?: (config: ClubConfig) => void;
   clubName?: string;
 }
 
-export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut, configurationChanged, clubName }: AppRoutesProps) {
+export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, configurationChanged, clubName }: AppRoutesProps) {
   if (session.passwordChangeRequired) {
     return <Routes>
       <Route path="/initial-password" element={<InitialPasswordView changed={() => initialPasswordChanged?.()} />} />
@@ -46,7 +46,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
   return <UnsavedChangesProvider>
     <div className="flex w-full flex-col items-center gap-4">
     <UnsavedChangesGuard />
-    <PrimaryNavigation session={session} signedOut={() => signedOut?.()} />
+    <PrimaryNavigation session={session} />
     <Routes>
     <Route path="/" element={<HomeView session={session} clubName={clubName} />} />
     <Route path="/courts" element={<HomeView session={session} clubName={clubName} />} />
@@ -59,30 +59,19 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/my-messages" element={session.authenticated
       ? <MyMessagesView />
       : <Navigate to="/login" replace />} />
-    <Route path="/admin/configuration" element={session.roles.includes("ADMIN")
-      ? <AdminConfigurationView configurationChanged={(changed) => configurationChanged?.(changed)} />
-      : <Navigate to="/" replace />} />
-    <Route path="/admin/facility" element={session.roles.includes("ADMIN")
-      ? <AdminFacilityView />
-      : <Navigate to="/" replace />} />
-    <Route path="/admin/roster" element={session.roles.includes("ADMIN")
-      ? <AdminRosterView />
-      : <Navigate to="/" replace />} />
-    <Route path="/admin/roster/:personId" element={session.roles.includes("ADMIN")
-      ? <AdminPersonView />
-      : <Navigate to="/" replace />} />
-    <Route path="/admin/membership-types" element={session.roles.includes("ADMIN")
-      ? <AdminMembershipTypesView />
-      : <Navigate to="/" replace />} />
-    <Route path="/admin/import" element={session.roles.includes("ADMIN")
-      ? <AdminImportView />
-      : <Navigate to="/" replace />} />
-    <Route path="/admin/audit" element={session.roles.includes("ADMIN")
-      ? <AdminAuditView />
-      : <Navigate to="/" replace />} />
-    <Route path="/admin/messages" element={session.roles.includes("ADMIN")
-      ? <AdminMessagesView />
-      : <Navigate to="/" replace />} />
+    {/* The role is asked once for the whole surface rather than once per destination. */}
+    <Route path="/admin" element={session.roles.includes("ADMIN") ? <AdminShell /> : <Navigate to="/" replace />}>
+      <Route index element={<Navigate to="/admin/configuration" replace />} />
+      <Route path="configuration" element={<AdminConfigurationView configurationChanged={(changed) => configurationChanged?.(changed)} />} />
+      <Route path="facility" element={<AdminFacilityView />} />
+      <Route path="roster" element={<AdminRosterView />} />
+      <Route path="roster/:personId" element={<AdminPersonView />} />
+      <Route path="membership-types" element={<AdminMembershipTypesView />} />
+      <Route path="import" element={<AdminImportView />} />
+      <Route path="audit" element={<AdminAuditView />} />
+      <Route path="messages" element={<AdminMessagesView />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </div>
@@ -192,12 +181,12 @@ export function App() {
         {config?.logoUrl ? <img src={config.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
         <span data-testid="club-brand-name" className="text-xl font-bold">{config?.clubName ?? t("app.name")}</span>
       </div>
-      <Preferences authenticated={session?.authenticated ?? false} supported={config?.supportedLocales} />
+      <Preferences authenticated={session?.authenticated ?? false} supported={config?.supportedLocales} signedOut={signOut} />
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">
       {offline ? <div data-testid="offline-status"><Alert>{t("status.offline")}</Alert></div> : session
-        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} signedOut={signOut} configurationChanged={configurationChanged} clubName={config?.clubName} />
+        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} configurationChanged={configurationChanged} clubName={config?.clubName} />
         : <p role="status">{t("status.loading")}</p>}
     </main>
     <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 py-4 text-sm">

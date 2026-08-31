@@ -9,12 +9,12 @@ import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { AdminConfigurationView } from "./AdminConfigurationView";
 
 describe("AdminConfigurationView", () => {
-  it("when the page is shown, then it uses the full administration frame", () => {
+  it("when the page is shown, then its content keeps a readable line length", () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
-    expect(screen.getByTestId("admin-configuration-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
+    expect(screen.getByTestId("admin-configuration-view")).toHaveClass("[&>*]:max-w-5xl");
   });
 
   beforeEach(async () => {

@@ -22,12 +22,12 @@ function card(id: string): HTMLElement {
 }
 
 describe("AdminMembershipTypesView", () => {
-  it("when the page is shown, then it uses the full administration frame", () => {
+  it("when the page is shown, then its content keeps a readable line length", () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
-    expect(screen.getByTestId("admin-membership-types-view")).toHaveClass("max-w-7xl", "[&>*]:max-w-5xl");
+    expect(screen.getByTestId("admin-membership-types-view")).toHaveClass("[&>*]:max-w-5xl");
   });
 
   beforeEach(async () => {

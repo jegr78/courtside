@@ -1,8 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { api, type SessionStatus } from "../api/client";
+import { type SessionStatus } from "../api/client";
 import { PrimaryNavigation } from "./PrimaryNavigation";
 
 const anonymous: SessionStatus = { authenticated: false, roles: [], passwordChangeRequired: false };
@@ -15,9 +14,9 @@ const adminDestinations = [
   "admin-messages-link"
 ];
 
-function show(session: SessionStatus, at = "/", signedOut = () => undefined) {
+function show(session: SessionStatus, at = "/") {
   render(<MemoryRouter initialEntries={[at]}>
-    <PrimaryNavigation session={session} signedOut={signedOut} />
+    <PrimaryNavigation session={session} />
   </MemoryRouter>);
 }
 
@@ -27,33 +26,27 @@ describe("PrimaryNavigation", () => {
     expect(screen.getByTestId("court-plan-link")).toBeInTheDocument();
     expect(screen.getByTestId("sign-in-link")).toHaveAttribute("href", "/login");
     expect(screen.queryByTestId("my-bookings-link")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("logout")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
   });
 
-  it("given a member, when rendered, then no administrative destination is offered", () => {
+  it("given a member, when rendered, then nothing offers administration", () => {
     show(member);
     expect(screen.getByTestId("my-bookings-link")).toBeInTheDocument();
+    expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
+  });
+
+  // The destinations themselves live in the administration's own navigation, not in this bar.
+  it("given an administrator, when rendered, then administration is offered as one destination", () => {
+    show(administrator);
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin/configuration");
     for (const destination of adminDestinations) {
       expect(screen.queryByTestId(destination)).not.toBeInTheDocument();
     }
   });
 
-  it("given an administrator, when rendered, then every administrative destination is offered", () => {
-    show(administrator);
-    for (const destination of adminDestinations) {
-      expect(screen.getByTestId(destination)).toBeInTheDocument();
-    }
-  });
-
-  it("given the roster is open, when rendered, then its link is the current page and its siblings are not", () => {
-    show(administrator, "/admin/roster");
-    expect(screen.getByTestId("admin-roster-link")).toHaveAttribute("aria-current", "page");
-    expect(screen.getByTestId("admin-facility-link")).not.toHaveAttribute("aria-current");
-  });
-
-  it("given a person below the roster is open, when rendered, then the roster stays the current page", () => {
+  it("given an administrative page is open, when rendered, then administration is the current destination", () => {
     show(administrator, "/admin/roster/a3f1e2d4-0000-0000-0000-000000000001");
-    expect(screen.getByTestId("admin-roster-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("aria-current", "page");
   });
 
   it("given the court plan is open under its other address, when rendered, then it is still the current page", () => {
@@ -61,26 +54,10 @@ describe("PrimaryNavigation", () => {
     expect(screen.getByTestId("court-plan-link")).toHaveAttribute("aria-current", "page");
   });
 
-  it("given an administrator deep in an admin view, when signing out, then they need no detour over the court plan", async () => {
-    const signedOut = vi.fn();
-    vi.spyOn(api, "logout").mockResolvedValue();
-    show(administrator, "/admin/roster", signedOut);
-
-    await userEvent.click(screen.getByTestId("logout"));
-
-    expect(api.logout).toHaveBeenCalled();
-    expect(signedOut).toHaveBeenCalled();
-  });
-
-  it("given signing out fails, when it is attempted, then the failure is shown and the session is kept", async () => {
-    const signedOut = vi.fn();
-    vi.spyOn(api, "logout").mockRejectedValue(new Error("network"));
-    show(administrator, "/admin/roster", signedOut);
-
-    await userEvent.click(screen.getByTestId("logout"));
-
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(signedOut).not.toHaveBeenCalled();
+  // Signing out belongs to the account and is offered there, never as the loudest control on a page.
+  it("when rendered, then signing out is not one of the destinations", () => {
+    show(administrator);
+    expect(screen.queryByTestId("logout")).not.toBeInTheDocument();
   });
 
   it("given the sign in page is open, when rendered, then nothing offers to sign in a second time", () => {

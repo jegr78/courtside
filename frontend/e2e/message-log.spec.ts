@@ -6,6 +6,7 @@ async function signInAsAdministrator(page: import("@playwright/test").Page) {
   await page.getByTestId("username").fill("configuration-admin");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
   await expect(page.getByTestId("admin-messages-link")).toBeVisible();
 }
 
