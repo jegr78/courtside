@@ -103,21 +103,24 @@ function ApplyToDays({ disabled, apply }: { disabled: boolean; apply: (days: Set
     });
   }
 
-  return <fieldset className="surface-subtle grid gap-3 rounded-xl border p-4">
-    <legend className="font-bold">{t("admin.facility.applyToDays")}</legend>
+  return <article className="surface-subtle grid gap-3 rounded-xl border p-4">
+    <h2 className="font-bold">{t("admin.facility.applyToDays")}</h2>
     <p data-testid="apply-to-days-hint" className="text-sm text-[var(--cs-muted)]">{t("admin.facility.applyToDaysHint")}</p>
     <div className="grid gap-3 sm:grid-cols-2">
       <TextField disabled={disabled} data-testid="apply-opens-at" type="time" label={t("admin.facility.opensAt")} value={opensAt} onChange={(event) => setOpensAt(event.target.value)} />
       <TextField disabled={disabled} data-testid="apply-closes-at" type="time" label={t("admin.facility.closesAt")} value={closesAt} onChange={(event) => setClosesAt(event.target.value)} />
     </div>
-    <div className="flex flex-wrap gap-x-4 gap-y-2">
-      {weekdays.map((day) => <label key={day} className="flex items-center gap-2 font-medium">
-        <input data-testid={`apply-day-${day}`} disabled={disabled} type="checkbox" checked={days.has(day)} onChange={(event) => toggle(day, event.target.checked)} />
-        {t(`weekday.${day}`)}
-      </label>)}
-    </div>
+    <fieldset className="grid gap-2">
+      <legend className="font-medium">{t("admin.facility.applyDays")}</legend>
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {weekdays.map((day) => <label key={day} className="flex items-center gap-2 font-medium">
+          <input data-testid={`apply-day-${day}`} disabled={disabled} type="checkbox" checked={days.has(day)} onChange={(event) => toggle(day, event.target.checked)} />
+          {t(`weekday.${day}`)}
+        </label>)}
+      </div>
+    </fieldset>
     <Button variant="secondary" data-testid="apply-hours" className="justify-self-start" disabled={disabled || days.size === 0 || !opensAt || !closesAt} type="button" onClick={() => apply(days, opensAt, closesAt)}>{t("admin.facility.apply")}</Button>
-  </fieldset>;
+  </article>;
 }
 
 function DayEditor({ day, timeZone, disabled, rejected, changed, reportError }: { day: WeekDay; timeZone: string; disabled: boolean; rejected?: string; changed: (day: WeekDay) => void; reportError: (failure: unknown) => void }) {
