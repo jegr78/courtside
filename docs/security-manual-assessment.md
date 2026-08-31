@@ -15,8 +15,14 @@ Use [`security/manual-assessment-evidence.schema.json`](../security/manual-asses
 for the record and validate it with the repository contract tests. The authorization object binds
 the exact HTTPS origin, target fingerprint, image digest, profile, procedure set and expiry.
 
-For every procedure retain its prerequisites, tester, timestamp and target image digest. For every
-selected control within that procedure retain these fields:
+For every procedure retain:
+
+- Prerequisites
+- Tester
+- Timestamp
+- Target image digest
+
+For every selected control within that procedure retain:
 
 - Steps
 - Expected secure outcome
