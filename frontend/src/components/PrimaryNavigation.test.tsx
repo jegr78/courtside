@@ -44,11 +44,6 @@ describe("PrimaryNavigation", () => {
     }
   });
 
-  it("given an administrative page is open, when rendered, then administration is the current destination", () => {
-    show(administrator, "/admin/roster/a3f1e2d4-0000-0000-0000-000000000001");
-    expect(screen.getByTestId("administration-link")).toHaveAttribute("aria-current", "page");
-  });
-
   it("given the court plan is open under its other address, when rendered, then it is still the current page", () => {
     show(anonymous, "/courts");
     expect(screen.getByTestId("court-plan-link")).toHaveAttribute("aria-current", "page");

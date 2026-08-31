@@ -85,6 +85,7 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   await expect(page.getByTestId("save-club-config")).toBeVisible();
 
   // then
+  await stableScreenshot(page.getByTestId("admin-navigation"), "admin-navigation.png");
   await stableScreenshot(page.getByTestId("admin-configuration-view"), "admin-configuration.png");
 
   // when

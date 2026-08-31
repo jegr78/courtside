@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./api/client";
 import { Alert } from "./components/Alert";
 import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
@@ -37,6 +37,8 @@ interface AppRoutesProps {
 }
 
 export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, configurationChanged, clubName }: AppRoutesProps) {
+  const administrative = useLocation().pathname.startsWith("/admin");
+
   if (session.passwordChangeRequired) {
     return <Routes>
       <Route path="/initial-password" element={<InitialPasswordView changed={() => initialPasswordChanged?.()} />} />
@@ -46,7 +48,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
   return <UnsavedChangesProvider>
     <div className="flex w-full flex-col items-center gap-4">
     <UnsavedChangesGuard />
-    <PrimaryNavigation session={session} />
+    {!administrative && <PrimaryNavigation session={session} />}
     <Routes>
     <Route path="/" element={<HomeView session={session} clubName={clubName} />} />
     <Route path="/courts" element={<HomeView session={session} clubName={clubName} />} />

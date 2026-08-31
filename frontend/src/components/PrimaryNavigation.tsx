@@ -24,7 +24,6 @@ const destinations: Destination[] = [
 // read as the current page everywhere. The rule below is the one a reader needs.
 function isCurrent(destination: Destination, pathname: string): boolean {
   if (destination.to === "/") return pathname === "/" || pathname === "/courts";
-  if (destination.testId === "administration-link") return pathname.startsWith("/admin");
   return pathname === destination.to || pathname.startsWith(`${destination.to}/`);
 }
 

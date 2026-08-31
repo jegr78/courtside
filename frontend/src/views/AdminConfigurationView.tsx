@@ -329,7 +329,6 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   return <section data-testid="admin-configuration-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-3xl font-bold">{t("admin.config.title")}</h1>
-      <Link to="/" className="font-semibold underline">{t("nav.courts")}</Link>
     </div>
     {!config
       ? (error ? <Alert testId="admin-error">{error}</Alert> : <p role="status">{t("status.loading")}</p>)

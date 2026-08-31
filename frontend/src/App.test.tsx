@@ -199,6 +199,44 @@ describe("AppRoutes", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
+  // The two audiences do not share a layout: inside administration the surface carries its own
+  // navigation, and the member bar would offer a second, competing way back to the court plan.
+  it("given an admin session, when opening an administrative page, then the member bar gives way to it", () => {
+    // given
+    vi.spyOn(api, "adminConfig").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "ruleSets").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "ruleTypes").mockReturnValue(new Promise<never>(() => undefined));
+
+    // when
+    render(<RoutedShell initialEntries={["/admin/configuration"]}><AppRoutes session={{
+      authenticated: true,
+      username: "admin",
+      displayName: "Example Administrator",
+      roles: ["ADMIN"],
+      passwordChangeRequired: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(screen.queryByTestId("primary-navigation")).not.toBeInTheDocument();
+    expect(screen.getByTestId("admin-navigation")).toBeInTheDocument();
+    expect(screen.getByTestId("court-plan-link")).toHaveAttribute("href", "/");
+  });
+
+  it("given an admin session, when opening the court plan, then the member bar carries administration", () => {
+    // when
+    render(<RoutedShell initialEntries={["/"]}><AppRoutes session={{
+      authenticated: true,
+      username: "admin",
+      displayName: "Example Administrator",
+      roles: ["ADMIN"],
+      passwordChangeRequired: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(screen.getByTestId("primary-navigation")).toBeInTheDocument();
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin/configuration");
+  });
+
   it("given an admin session, when opening facility management, then the protected admin view is available", () => {
     // given
     vi.spyOn(api, "adminCourts").mockReturnValue(new Promise<never>(() => undefined));
