@@ -136,7 +136,8 @@ may not be replaced by a unit test of the lifecycle helper.
 
 Follow the qualification and environment sequence in
 [`security-environment.md`](security-environment.md), then execute the safe and active commands in
-[`security-assessment.md`](security-assessment.md) with one resolved image digest. Preserve the first
-attempt manifests, use the exact active authorization string, classify observations through
+[`security-assessment.md`](security-assessment.md) with one resolved image digest. The manual
+`baseline` workflow dispatch performs that sequence as safe attempt 1 and active attempt 2. Preserve
+both manifests, use the exact active authorization string, classify observations through
 [`security-findings.md`](security-findings.md), and finish with the ownership-checked cleanup. A new
 run uses a new run identifier; it never overwrites this baseline's evidence.

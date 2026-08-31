@@ -38,7 +38,7 @@ test("given stable assessment suites, when scheduling them, then safe traffic is
   assert.match(scheduled, /security-run "\$RUN_ID" safe/);
   assert.match(scheduled, /github\.event_name == 'schedule' && 'safe' \|\| inputs\.profile/);
   assert.match(scheduled,
-    /set -o pipefail\n\s+frontend\/node\/node tools\/security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
+    /set -o pipefail[\s\S]+security-image-inventory\.mjs "\$ASSESSMENT_PROFILE" \| xargs -n1 docker pull/);
   assert.match(scheduled, /security-assessment-gate\.mjs/);
   assert.match(scheduled, /--subject "\$IMAGE_DIGEST"/);
   assert.match(scheduled, /security-cleanup "\$RUN_ID"/);
@@ -51,9 +51,27 @@ test("given a manual baseline run, when selecting active, then the isolated work
   assert.match(scheduled, /workflow_dispatch:[\s\S]+profile:[\s\S]+options:[\s\S]+- safe[\s\S]+- active/);
   assert.match(scheduled, /github\.event_name == 'schedule' && 'safe' \|\| inputs\.profile/);
   assert.match(scheduled,
-    /set -o pipefail\n\s+frontend\/node\/node tools\/security-image-inventory\.mjs "\$PROFILE" \| xargs -n1 docker pull/);
-  assert.match(scheduled, /if \[\[ "\$PROFILE" = active \]\]; then[\s\S]+security-run "\$RUN_ID" active[\s\S]+--authorize "authorize-active-\$RUN_ID"/);
+    /set -o pipefail[\s\S]+security-image-inventory\.mjs "\$ASSESSMENT_PROFILE" \| xargs -n1 docker pull/);
+  assert.match(scheduled, /if: env\.PROFILE != 'safe'[\s\S]+security-run "\$RUN_ID" active[\s\S]+--authorize "authorize-active-\$RUN_ID"/);
   assert.match(scheduled, /--profile "\$PROFILE"/);
+});
+
+test("given a manual baseline run, when selecting baseline, then safe and active assess one immutable target", () => {
+  // when / then
+  assert.match(scheduled, /options:[\s\S]+- safe[\s\S]+- active[\s\S]+- baseline/);
+  assert.match(scheduled, /security-run "\$RUN_ID" safe/);
+  assert.match(scheduled, /security-baseline-continuation\.mjs[\s\S]+manifest-safe\.json/);
+  assert.match(scheduled, /security-run "\$RUN_ID" active[\s\S]+--authorize "authorize-active-\$RUN_ID"/);
+  assert.match(scheduled, /security-report "\$RUN_ID" --attempt 1 > build\/security-gate\/manifest-safe\.json/);
+  assert.match(scheduled, /security-report "\$RUN_ID" --attempt 2 > build\/security-gate\/manifest-active\.json/);
+  assert.match(scheduled, /security-baseline-pair\.mjs[\s\S]+manifest-safe\.json[\s\S]+manifest-active\.json/);
+  assert.match(scheduled, /- id: pair[\s\S]+if: env\.PROFILE == 'baseline'/);
+  assert.match(scheduled, /- id: seal[\s\S]+if: always\(\) && \(env\.PROFILE != 'baseline' \|\| steps\.pair\.outcome == 'success'\)/);
+  assert.equal((scheduled.match(/Start the disposable security target/g) ?? []).length, 1);
+  assert.equal((scheduled.match(/Resolve the immutable local image digest/g) ?? []).length, 1);
+  assert.match(scheduled, /attempt-1\/evidence attempt-2\/evidence/);
+  assert.match(scheduled, /--manifest build\/security-gate\/manifest-safe\.json[\s\S]+--profile safe/);
+  assert.match(scheduled, /--manifest build\/security-gate\/manifest-active\.json[\s\S]+--profile active/);
 });
 
 test("given protected active evidence, when the hosted run finishes, then only its encrypted envelope is uploaded", () => {
@@ -91,6 +109,18 @@ test("given the active duration contract, when the workflow chooses its job budg
 
   // when / then
   assert.match(scheduled, new RegExp(`timeout-minutes:.*${activeJobMinutes}.*${safeJobMinutes}`));
+});
+
+test("given paired profile budgets, when the baseline runs both, then its job budget adds their declared durations once", () => {
+  // given
+  const safeMinutes = runContract.profiles.safe.durationSeconds / 60;
+  const activeMinutes = runContract.profiles.active.durationSeconds / 60;
+  const safeJobMinutes = 45;
+  const fixedJobMinutes = safeJobMinutes - safeMinutes;
+  const baselineJobMinutes = fixedJobMinutes + safeMinutes + activeMinutes;
+
+  // when / then
+  assert.match(scheduled, new RegExp(`timeout-minutes:.*${baselineJobMinutes}.*${safeJobMinutes}`));
 });
 
 test("given changed assessment bytes, when the required build runs, then paired immutable evidence is compared", () => {
