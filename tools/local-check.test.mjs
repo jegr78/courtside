@@ -82,15 +82,39 @@ test("given backend and frontend changes, when planning the local check, then bo
   assert.equal(plan.tasks.at(-1).label, "frontend-e2e");
 });
 
-test("given structural or unknown changes, when planning the local check, then it fails closed to full", () => {
+test("given added documentation, when planning the local check, then it uses the bounded docs task", () => {
   // when
   const added = localCheckPlan([{ status: "A", path: "docs/new.md" }]);
+
+  // then
+  assert.deepEqual(added.profiles, ["docs"]);
+  assert.deepEqual(added.tasks.map((task) => task.label), ["docs-check"]);
+});
+
+test("given an added e2e specification, when planning locally, then the complete frontend path runs", () => {
+  // when
+  const plan = localCheckPlan([{ status: "A", path: "frontend/e2e/new-journey.spec.ts" }]);
+
+  // then
+  assert.deepEqual(plan.profiles, ["frontend"]);
+  assert.deepEqual(plan.tasks.map((task) => task.label), [
+    "frontend-toolchain", "frontend-lint", "frontend-test", "frontend-build", "frontend-audit",
+    "frontend-package", "frontend-e2e"
+  ]);
+  assert.deepEqual(localCheckPlan([
+    { status: "A", path: "frontend/e2e/global-setup.ts" }
+  ]).profiles, ["full"]);
+});
+
+test("given destructive or unknown changes, when planning the local check, then it fails closed to full", () => {
+  // when
+  const deleted = localCheckPlan([{ status: "D", path: "docs/old.md" }]);
   const unknown = localCheckPlan([{ status: "M", path: "unclassified.txt" }]);
 
   // then
-  assert.deepEqual(added.profiles, ["full"]);
+  assert.deepEqual(deleted.profiles, ["full"]);
   assert.deepEqual(unknown.profiles, ["full"]);
-  assert.deepEqual(added.tasks.map((task) => task.label), ["full"]);
+  assert.deepEqual(deleted.tasks.map((task) => task.label), ["full"]);
 });
 
 test("given a reduced change, when full is requested, then the local plan only escalates", () => {

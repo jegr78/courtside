@@ -72,8 +72,10 @@ and security verification, including the complete Chromium and WebKit browser ma
 changes run a bounded documentation job in CI and the same checks locally. It validates Markdown,
 internal references, maintained quality contracts and the generated admission section without
 starting Java, Vitest or Playwright. Build, workflow, security, deployment, migration, OpenAPI, and
-shared test-infrastructure changes select `full`. Unknown paths and every added, deleted, renamed,
-copied, or otherwise structural change also select `full`. The `ci:full` label can only escalate a
+shared test-infrastructure changes select `full`. Added files follow the same closed path rules as
+modified files. Playwright specifications and their reviewed visual baselines select `frontend`;
+E2E process, container, network and journey orchestration remains `full`. Unknown paths and every
+deleted, renamed, copied, type-changed, conflicted or otherwise ambiguous change select `full`. The `ci:full` label can only escalate a
 plan. Classifier failures also select `full` and cannot make the required aggregate check pass by
 skipping a quality job. The selector executes the classifier from the immutable pull-request base
 commit, so a classifier or rule change cannot reduce the verification required for itself.
@@ -148,6 +150,11 @@ The admitted profile policy is backed by Profile Evidence run
 Any changed semantic contract has a different fingerprint. Until protected replay evidence admits
 that exact fingerprint, both CI and local checks execute `full`; the earlier figures remain
 historical evidence and cannot activate the changed policy.
+
+The admissible observation window for the four-job topology starts at 2026-08-31T17:20:08Z. Runs
+from the earlier three-job topology remain historical context but cannot prove that the
+documentation job was selected or safely skipped, so replay excludes them instead of inventing a
+result.
 
 Successful full-profile runs had a 14.27-minute median and 14.85-minute p95. Successful backend
 runs had a 10.40-minute median and 10.58-minute p95; the one frontend run measured 11.92 minutes.

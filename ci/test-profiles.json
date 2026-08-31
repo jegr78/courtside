@@ -58,7 +58,14 @@
     },
     "frontend": {
       "exact": [],
-      "prefixes": ["frontend/"]
+      "prefixes": ["frontend/"],
+      "patterns": [
+        { "prefix": "frontend/e2e/", "suffix": ".spec.ts" },
+        { "prefix": "frontend/e2e/", "contains": ".spec.ts-snapshots/", "suffix": ".png" },
+        { "prefix": "frontend/e2e/static-fixtures/", "suffix": ".json" },
+        { "prefix": "frontend/e2e/static-fixtures/", "suffix": ".csv" },
+        { "prefix": "frontend/e2e/static-fixtures/", "suffix": ".txt" }
+      ]
     }
   }
 }

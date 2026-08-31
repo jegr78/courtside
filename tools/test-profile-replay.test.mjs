@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { historicalPullRequest, pullRequestIdentity, replayProfileEvidence,
   runBaseIdentity } from "./test-profile-replay.mjs";
+import { classifyChanges } from "./test-profile-classifier.mjs";
 
 const backend = "backend";
 const docs = "docs";
@@ -19,8 +20,8 @@ function run(id, overrides = {}) {
     conclusion: "success",
     head_sha: head,
     head_branch: "feat/example",
-    run_started_at: "2026-08-29T06:00:00Z",
-    updated_at: "2026-08-29T06:10:00Z",
+    run_started_at: "2026-09-01T06:00:00Z",
+    updated_at: "2026-09-01T06:10:00Z",
     html_url: `https://github.com/jegr78/courtside/actions/runs/${id}`,
     repository: { id: 7, full_name: "jegr78/courtside" },
     head_repository: { id: 7, full_name: "jegr78/courtside" },
@@ -40,8 +41,8 @@ function job(id, name, conclusion) {
     name,
     status: "completed",
     conclusion,
-    started_at: skipped ? "2026-08-29T06:00:00Z" : "2026-08-29T06:01:00Z",
-    completed_at: skipped ? "2026-08-29T06:00:00Z" : "2026-08-29T06:09:00Z",
+    started_at: skipped ? "2026-09-01T06:00:00Z" : "2026-09-01T06:01:00Z",
+    completed_at: skipped ? "2026-09-01T06:00:00Z" : "2026-09-01T06:09:00Z",
     runner_name: skipped ? null : "GitHub Actions 1",
     labels: skipped ? [] : ["ubuntu-latest"],
     steps: []
@@ -72,19 +73,89 @@ test("given a protected reduced run, when replaying current policy, then the exp
   // when
   const result = await replayProfileEvidence({
     repository: "jegr78/courtside",
-    assessedAt: "2026-08-29T07:00:00Z",
+    assessedAt: "2026-09-01T07:00:00Z",
     runSummaries: [source],
     loadAttempt: async () => source,
     loadJobs: async () => jobs,
     classify: async (identity) => frontendPlan(identity)
   });
-
   // then
   assert.equal(result.summary.sampleSize, 1);
   assert.equal(result.summary.reducedProfileCount, 1);
   assert.equal(result.summary.profileCounts.frontend, 1);
   assert.equal(result.observations[0].classificationOutcome, "no-observed-miss");
   assert.deepEqual(result.observations[0].incompleteJobs, []);
+});
+
+test("given historical added e2e evidence, when replaying current policy, then frontend remains attributable", async () => {
+  // given
+  const source = run(102);
+  const jobs = [job(1, docs, "skipped"), job(2, backend, "skipped"),
+    job(3, frontend, "success"), job(4, security, "success")];
+
+  // when
+  const result = await replayProfileEvidence({
+    repository: "jegr78/courtside",
+    assessedAt: "2026-09-01T07:00:00Z",
+    runSummaries: [source],
+    loadAttempt: async () => source,
+    loadJobs: async () => jobs,
+    classify: async (identity) => {
+      const classified = classifyChanges([
+        { status: "A", path: "frontend/e2e/new-journey.spec.ts" }
+      ], []);
+      return { ...frontendPlan(identity), profiles: classified.profiles,
+        isFull: classified.isFull, reasons: classified.reasons };
+    }
+  });
+  // then
+  assert.deepEqual(result.observations[0].proposedProfiles, ["frontend"]);
+  assert.equal(result.observations[0].classificationOutcome, "no-observed-miss");
+});
+
+test("given historical added e2e evidence loses a required job, when replaying, then it cannot qualify", async () => {
+  // given
+  const source = run(103, { conclusion: "failure" });
+  const jobs = [job(1, docs, "skipped"), job(2, backend, "skipped"),
+    job(3, frontend, "failure"), job(4, security, "success")];
+
+  // when
+  const result = await replayProfileEvidence({
+    repository: "jegr78/courtside",
+    assessedAt: "2026-09-01T07:00:00Z",
+    runSummaries: [source],
+    loadAttempt: async () => source,
+    loadJobs: async () => jobs,
+    classify: async (identity) => {
+      const classified = classifyChanges([
+        { status: "A", path: "frontend/e2e/new-journey.spec.ts" }
+      ], []);
+      return { ...frontendPlan(identity), profiles: classified.profiles,
+        isFull: classified.isFull, reasons: classified.reasons };
+    }
+  });
+  const skippedSecurity = await replayProfileEvidence({
+    repository: "jegr78/courtside",
+    assessedAt: "2026-09-01T07:00:00Z",
+    runSummaries: [source],
+    loadAttempt: async () => source,
+    loadJobs: async () => [job(1, docs, "skipped"), job(2, backend, "skipped"),
+      job(3, frontend, "success"), job(4, security, "skipped")],
+    classify: async (identity) => {
+      const classified = classifyChanges([
+        { status: "A", path: "frontend/e2e/new-journey.spec.ts" }
+      ], []);
+      return { ...frontendPlan(identity), profiles: classified.profiles,
+        isFull: classified.isFull, reasons: classified.reasons };
+    }
+  });
+
+  // then
+  assert.equal(result.observations[0].classificationOutcome, "observation-incomplete");
+  assert.deepEqual(result.observations[0].incompleteJobs, [{ name: "frontend", outcome: "failure" }]);
+  assert.equal(result.summary.sampleSize, 0);
+  assert.deepEqual(skippedSecurity.observations[0].incompleteJobs,
+    [{ name: "security", outcome: "skipped" }]);
 });
 
 test("given run bound base metadata, when identity matches, then the immutable base is returned", () => {
@@ -128,8 +199,8 @@ test("given a force pushed historical head, when resolving its branch, then the 
   const source = run(101, { pull_requests: [] });
   const candidate = {
     number: 574,
-    created_at: "2026-08-29T05:00:00Z",
-    closed_at: "2026-08-29T08:00:00Z",
+    created_at: "2026-09-01T05:00:00Z",
+    closed_at: "2026-09-01T08:00:00Z",
     base: { repo: { full_name: "jegr78/courtside" } },
     head: { sha: "d".repeat(40), ref: "feat/example", repo: { full_name: "jegr78/courtside" } }
   };
@@ -138,7 +209,7 @@ test("given a force pushed historical head, when resolving its branch, then the 
 
   // then
   assert.equal(selected.number, 574);
-  assert.throws(() => historicalPullRequest(source, [{ ...candidate, closed_at: "2026-08-29T05:30:00Z" }],
+  assert.throws(() => historicalPullRequest(source, [{ ...candidate, closed_at: "2026-09-01T05:30:00Z" }],
     "jegr78/courtside"),
     /historical head-bound/);
 });
@@ -152,7 +223,7 @@ test("given current policy needs an historically skipped job, when replaying, th
   // when
   const result = await replayProfileEvidence({
     repository: "jegr78/courtside",
-    assessedAt: "2026-08-29T07:00:00Z",
+    assessedAt: "2026-09-01T07:00:00Z",
     runSummaries: [source],
     loadAttempt: async () => source,
     loadJobs: async () => jobs,
@@ -176,7 +247,7 @@ test("given a replay attempt other than the first, when loading evidence, then i
   // when / then
   await assert.rejects(() => replayProfileEvidence({
     repository: "jegr78/courtside",
-    assessedAt: "2026-08-29T07:00:00Z",
+    assessedAt: "2026-09-01T07:00:00Z",
     runSummaries: [summary],
     loadAttempt: async () => secondAttempt,
     loadJobs: async () => [job(1, docs, "skipped"), job(2, backend, "skipped"),
