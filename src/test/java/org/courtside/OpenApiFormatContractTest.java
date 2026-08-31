@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.courtside.api.ApiProblem;
-import org.courtside.api.ApiSetOpeningHoursRequest;
+import org.courtside.api.ApiOpeningHours;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 
@@ -56,8 +56,8 @@ class OpenApiFormatContractTest {
         // when / then
         assertThat(property("OpeningHours", "opensAt")).containsEntry("$ref", "#/components/schemas/NullableLocalTime");
         assertThat(property("OpeningHours", "closesAt")).containsEntry("$ref", "#/components/schemas/NullableLocalTime");
-        assertThat(property("SetOpeningHoursRequest", "opensAt")).containsEntry("$ref", "#/components/schemas/LocalTime");
-        assertThat(property("SetOpeningHoursRequest", "closesAt")).containsEntry("$ref", "#/components/schemas/LocalTime");
+        assertThat(property("SetWeeklyOpeningHoursRequest", "days"))
+                .containsEntry("items", Map.of("$ref", "#/components/schemas/OpeningHours"));
         assertThat(property("SeriesRuleRequest", "startTime")).containsEntry("$ref", "#/components/schemas/LocalTime");
         assertThat(property("MoveRequest", "newStartTime")).containsEntry("$ref", "#/components/schemas/NullableLocalTime");
         assertThat(parameter("/api/admin/impact/opening-hours/{day}", "opensAt"))
@@ -70,7 +70,7 @@ class OpenApiFormatContractTest {
     void givenMappedLocalTimes_whenGeneratingBeanValidation_thenOnlyCompatibleAnnotationsRemain()
             throws NoSuchMethodException {
         // when
-        boolean localTimeHasPattern = ApiSetOpeningHoursRequest.class.getMethod("getOpensAt")
+        boolean localTimeHasPattern = ApiOpeningHours.class.getMethod("getOpensAt")
                 .isAnnotationPresent(jakarta.validation.constraints.Pattern.class);
         boolean stringHasPattern = ApiProblem.class.getMethod("getTraceId")
                 .isAnnotationPresent(jakarta.validation.constraints.Pattern.class);

@@ -131,7 +131,7 @@ function DayEditor({ day, timeZone, disabled, rejected, changed, reportError }: 
     </div>
     <label className="flex items-center gap-2 font-medium">
       <input data-testid={`hours-closed-${day.dayOfWeek}`} disabled={disabled} type="checkbox" checked={day.closed} onChange={(event) => changed(event.target.checked ? { ...day, opensAt: "", closesAt: "", closed: true } : { ...day, closed: false })} />
-      {t("admin.facility.closeDay")}
+      {t("admin.facility.dayClosed")}
     </label>
     {rejected && <p id={errorId} data-testid={errorId} className="text-sm text-red-800 dark:text-red-200">{rejected}</p>}
     <ImpactPanel
