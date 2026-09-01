@@ -229,6 +229,36 @@ describe("AdminCourtsView", () => {
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
   });
 
+  // Closing the editor takes the focused input off the page, and without this somebody on a
+  // keyboard lands back at the top of the document instead of at the value they were editing.
+  it("given an open editor, when it is dismissed, then the value it belonged to takes the focus back", async () => {
+    // given
+    show();
+    await openName("court-1");
+
+    // when
+    await userEvent.click(screen.getByTestId("dismiss-court-edit"));
+
+    // then
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveFocus();
+  });
+
+  it("given an open editor, when the edit is confirmed, then the value it belonged to takes the focus back", async () => {
+    // given
+    vi.spyOn(api, "changeAdminCourt")
+      .mockResolvedValue({ id: "court-1", number: 3, name: "Garden Court", active: true });
+    show();
+    const editor = await openName("court-1");
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "Garden Court");
+
+    // when
+    await userEvent.click(screen.getByTestId("confirm-court-edit"));
+
+    // then
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveFocus();
+  });
+
   it("given an edited name, when a screen reader reaches the confirm, then the mark explains it", async () => {
     // given
     show();

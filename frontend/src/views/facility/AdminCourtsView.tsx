@@ -36,6 +36,7 @@ export function AdminCourtsView() {
   const { club, error: clubError } = useClubConfiguration();
   const [courts, setCourts] = useState<AdminCourt[]>();
   const [editor, setEditor] = useState<CellEditor>();
+  const [restored, setRestored] = useState<CellEditor>();
   const { error, success, pending, reportError, save } = useSaving();
   const newCourt = useUnsavedForm("court:new");
 
@@ -44,6 +45,13 @@ export function AdminCourtsView() {
   }, [reportError]);
 
   const edited = courts?.find((court) => court.id === editor?.courtId);
+
+  // Closing an editor takes the focused input off the page, so the value it belonged to takes the
+  // focus back rather than dropping whoever is on a keyboard at the top of the document.
+  function close() {
+    setRestored(editor);
+    setEditor(undefined);
+  }
 
   function replace(changed: AdminCourt) {
     setCourts((current) => current?.map((court) => court.id === changed.id ? changed : court));
@@ -56,7 +64,7 @@ export function AdminCourtsView() {
       : { number: edited.number, name: editor.entry || undefined };
     return save(`court:${editor.courtId}`, async () => {
       replace(await api.changeAdminCourt(editor.courtId, request));
-      setEditor(undefined);
+      close();
     });
   }
 
@@ -111,10 +119,11 @@ export function AdminCourtsView() {
                 editor={editor?.courtId === court.id ? editor : undefined}
                 timeZone={club.timeZone}
                 disabled={pending.has(`court:${court.id}`)}
+                restored={restored?.courtId === court.id ? restored.field : undefined}
                 open={(field) => setEditor({ courtId: court.id, field, entry: shown(court, field) })}
                 entered={(entry) => setEditor((current) => current && { ...current, entry })}
                 confirm={confirmEdit}
-                dismiss={() => setEditor(undefined)}
+                dismiss={close}
                 toggle={toggle}
                 reportError={reportError}
               />)}
@@ -126,9 +135,10 @@ export function AdminCourtsView() {
   </FacilityPage>;
 }
 
-function CourtRow({ court, editor, timeZone, disabled, open, entered, confirm, dismiss, toggle, reportError }: {
+function CourtRow({ court, editor, restored, timeZone, disabled, open, entered, confirm, dismiss, toggle, reportError }: {
   court: AdminCourt;
   editor?: CellEditor;
+  restored?: Field;
   timeZone: string;
   disabled: boolean;
   open: (field: Field) => void;
@@ -147,7 +157,7 @@ function CourtRow({ court, editor, timeZone, disabled, open, entered, confirm, d
         ? <CellEditorControls
             editor={editor} mark={mark} unsaved={unsaved} disabled={disabled}
             entered={entered} confirm={confirm} dismiss={dismiss} />
-        : <CellValue court={court} field={field} disabled={disabled} open={() => open(field)} />}
+        : <CellValue court={court} field={field} disabled={disabled} focused={restored === field} open={() => open(field)} />}
     </td>)}
     <td className="border-b p-2 align-top">
       <span className="flex flex-wrap items-center gap-3">
@@ -163,12 +173,13 @@ function CourtRow({ court, editor, timeZone, disabled, open, entered, confirm, d
   </tr>;
 }
 
-function CellValue({ court, field, disabled, open }: { court: AdminCourt; field: Field; disabled: boolean; open: () => void }) {
+function CellValue({ court, field, disabled, focused, open }: { court: AdminCourt; field: Field; disabled: boolean; focused: boolean; open: () => void }) {
   const { t } = useTranslation();
   const value = field === "number" ? String(court.number) : court.name;
   return <button
+    autoFocus={focused}
     data-testid={`edit-court-${field}-${court.id}`}
-    className="min-h-11 w-full cursor-pointer rounded-md px-2 py-2 text-left underline decoration-dotted underline-offset-4 hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:no-underline"
+    className={`min-h-11 cursor-pointer rounded-lg border border-dashed px-3 py-2 text-left hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed ${field === "number" ? "w-20" : "w-56"}`}
     type="button"
     disabled={disabled}
     onClick={open}
@@ -199,7 +210,7 @@ function CellEditorControls({ editor, mark, unsaved, disabled, entered, confirm,
     <input
       autoFocus
       data-testid="court-editor"
-      className="form-control min-h-11 w-32 rounded-lg border px-3 py-2 outline-none"
+      className={`form-control min-h-11 rounded-lg border px-3 py-2 outline-none ${number ? "w-20" : "w-56"}`}
       aria-label={t(number ? "admin.facility.number" : "admin.facility.name")}
       type={number ? "number" : "text"}
       min={number ? MIN_NUMBER : undefined}
