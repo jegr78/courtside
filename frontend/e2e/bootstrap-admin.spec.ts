@@ -454,6 +454,47 @@ test("an admin changes a court and finds that change in the log", async ({ page 
   await expect(entry.getByTestId("audit-actor")).toHaveText("configuration-admin");
 });
 
+test("an admin renames a court in the list and finds that change in the log", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
+  await page.getByTestId("admin-courts-link").click();
+  await expect(page.getByTestId("admin-courts-view")).toBeVisible();
+  const court = "dddddddd-0000-0000-0000-000000000003";
+  const written = () => page.waitForResponse((response) =>
+    response.url().endsWith(`/api/admin/courts/${court}`) && response.request().method() === "PUT"
+  );
+
+  // when
+  const renamed = written();
+  await page.getByTestId(`edit-court-name-${court}`).click();
+  await page.getByTestId("court-editor").fill("Practice Wall");
+  await page.getByTestId("confirm-court-edit").click();
+  expect((await renamed).status()).toBe(200);
+
+  // then
+  await expect(page.getByTestId(`edit-court-name-${court}`)).toContainText("Practice Wall");
+  await page.getByTestId("admin-audit-link").click();
+  await expect(page.getByTestId("admin-audit-view")).toBeVisible();
+  await expect(page.locator(
+    `[data-testid="audit-row"][data-subject-id="${court}"][data-event-type="facility.court.changed"]`
+  ).first()).toBeVisible();
+
+  // when — the one journey world every other test shares gets its court back
+  await page.getByTestId("admin-courts-link").click();
+  const restored = written();
+  await page.getByTestId(`edit-court-name-${court}`).click();
+  await page.getByTestId("court-editor").fill("");
+  await page.getByTestId("confirm-court-edit").click();
+  expect((await restored).status()).toBe(200);
+
+  // then
+  await expect(page.getByTestId("court-editor")).toHaveCount(0);
+});
+
 test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");
