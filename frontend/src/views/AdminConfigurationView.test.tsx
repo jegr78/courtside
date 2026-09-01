@@ -16,6 +16,8 @@ describe("AdminConfigurationView", () => {
 
     // then
     expect(screen.getByTestId("admin-configuration-view")).toHaveClass("[&>*]:max-w-5xl");
+    expect(screen.getByTestId("admin-configuration-view")).toHaveClass("min-w-0");
+    expect(screen.getByTestId("admin-configuration-view")).toHaveClass("[&>*]:min-w-0");
   });
 
   beforeEach(async () => {
@@ -773,4 +775,3 @@ it("given the rule set form is filled in, when it is read, then it holds work", 
   // then
   await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
 });
-

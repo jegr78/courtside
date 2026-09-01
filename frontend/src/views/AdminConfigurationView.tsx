@@ -39,7 +39,7 @@ function BrandColorField({ kind, label, value, changed }: {
   const { t } = useTranslation();
   const contrast = brandContrast(value);
   const id = `${kind}-color`;
-  return <fieldset className="grid gap-3 rounded-xl border p-4">
+  return <fieldset className="min-w-0 grid gap-3 rounded-xl border p-4">
     <legend className="px-1 font-semibold">{label}</legend>
     <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-end gap-3">
       <TextField id={`${id}-value`} data-testid={`${id}-value`} label={t("admin.config.colorHex")} value={value}
@@ -326,7 +326,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     }
   }
 
-  return <section data-testid="admin-configuration-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
+  return <section data-testid="admin-configuration-view" className="surface-panel min-w-0 grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.config.title")}</h1>
     {!config
       ? (error ? <Alert testId="admin-error">{error}</Alert> : <p role="status">{t("status.loading")}</p>)
@@ -336,10 +336,10 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         <form noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5">
           <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
           <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 [&>*]:min-w-0 sm:grid-cols-2">
             <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />
             <BrandColorField kind="accent" label={t("admin.config.accentColor")} value={config.accentColor} changed={(accentColor) => changeConfig({ accentColor })} />
-            <fieldset className="grid gap-3 rounded-xl border p-4 sm:col-span-2">
+            <fieldset className="min-w-0 grid gap-3 rounded-xl border p-4 sm:col-span-2">
               <legend className="px-1 font-semibold">{t("admin.config.logo")}</legend>
               {logo?.url && <img data-testid="logo-preview" src={logo.url} alt={t("admin.config.logoPreview")}
                                 className="max-h-32 max-w-64 object-contain" />}
@@ -347,7 +347,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
                 {t("admin.config.logoFile")}
                 <input ref={logoInput} data-testid="logo-file" type="file" accept="image/png,image/jpeg"
                        disabled={configurationPending} onChange={selectLogoFile}
-                       className="form-control rounded-lg border px-3 py-3" />
+                       className="form-control min-w-0 w-full rounded-lg border px-3 py-3" />
               </label>
               <p className="text-muted text-sm">{t("admin.config.logoHelp")}</p>
               <div className="flex flex-wrap gap-3">
