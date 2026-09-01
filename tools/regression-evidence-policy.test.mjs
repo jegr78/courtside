@@ -14,6 +14,7 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
     "court-plan", "booking-dialog", "booking-validation", "personal-bookings",
     "my-messages", "series-preview", "primary-navigation", "admin-navigation",
     "admin-configuration", "admin-courts", "admin-opening-hours", "admin-booking-cards",
+    "admin-booking-card",
     "admin-slot-fillers", "admin-roster", "admin-membership-types",
     "admin-import", "admin-audit", "admin-messages"
   ]) {
@@ -21,7 +22,7 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
   }
   assert.equal(existsSync(snapshots), true);
   const reviewed = readdirSync(snapshots).filter((file) => file.endsWith(".png"));
-  assert.equal(reviewed.length, 18);
+  assert.equal(reviewed.length, 19);
   assert.deepEqual(reviewed.filter((file) => /-(darwin|linux)\.png$/.test(file)), []);
 });
 

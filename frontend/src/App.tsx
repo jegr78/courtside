@@ -22,6 +22,7 @@ import { MyMessagesView } from "./views/MyMessagesView";
 import { AdminAuditView } from "./views/AdminAuditView";
 import { AdminMessagesView } from "./views/AdminMessagesView";
 import { AdminConfigurationView } from "./views/AdminConfigurationView";
+import { AdminBookingCardView } from "./views/facility/AdminBookingCardView";
 import { AdminBookingCardsView } from "./views/facility/AdminBookingCardsView";
 import { AdminCourtsView } from "./views/facility/AdminCourtsView";
 import { AdminOpeningHoursView } from "./views/facility/AdminOpeningHoursView";
@@ -75,6 +76,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
         <Route path="courts" element={<AdminCourtsView />} />
         <Route path="opening-hours" element={<AdminOpeningHoursView />} />
         <Route path="booking-cards" element={<AdminBookingCardsView />} />
+        <Route path="booking-cards/:cardId" element={<AdminBookingCardView />} />
         <Route path="slot-fillers" element={<AdminSlotFillersView />} />
       </Route>
       <Route path="roster" element={<AdminRosterView />} />

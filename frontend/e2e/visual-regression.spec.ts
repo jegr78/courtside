@@ -110,6 +110,13 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   await stableScreenshot(page.getByTestId("admin-booking-cards-view"), "admin-booking-cards.png");
 
   // when
+  await page.getByTestId(/^card-link-/).first().click();
+  await expect(page.getByTestId("card-preview")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-booking-card-view"), "admin-booking-card.png");
+
+  // when
   await page.goto("/admin/facility/slot-fillers");
   await expect(page.getByTestId("create-participant-card")).toBeVisible();
 

@@ -7,6 +7,7 @@ import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { BookingDialog, type BookingSelection } from "./BookingDialog";
 import { CancellationDialog } from "./CancellationDialog";
+import { contrastColor } from "./cardColors";
 import {
   addDays, calendarDayNumber, dateInTimeZone, dateInTimeZoneValue, formatBookingTimeRange,
   formatDate, formatTime, isPastSlot, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes,
@@ -566,22 +567,4 @@ function formatDayLong(date: Date, language: string): string {
 function formatWeekRange(days: Date[], language: string): string {
   const formatter = new Intl.DateTimeFormat(language, { year: "numeric", month: "short", day: "numeric" });
   return `${formatter.format(days[0])} – ${formatter.format(days[6])}`;
-}
-
-function contrastColor(color: string): string {
-  const background = relativeLuminance(color);
-  const dark = "#0f172a";
-  const light = "#ffffff";
-  return contrastRatio(background, relativeLuminance(dark)) >= contrastRatio(background, relativeLuminance(light))
-    ? dark : light;
-}
-
-function relativeLuminance(color: string): number {
-  const channels = [1, 3, 5].map((offset) => Number.parseInt(color.slice(offset, offset + 2), 16) / 255)
-    .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
-  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
-}
-
-function contrastRatio(first: number, second: number): number {
-  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }

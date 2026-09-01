@@ -1,12 +1,19 @@
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 import { formEdited } from "./formEdited";
 import { useUnsavedChanges, useUnsavedMark } from "./registry";
 
-export function useUnsavedForm(id: string) {
+// A control that is no form field — a chip, a swatch — is invisible to an input event, so a form
+// carrying one says so itself and has the fields read again whenever that answer changes.
+export function useUnsavedForm(id: string, besidesFields = false) {
   const { mark } = useUnsavedChanges();
   const [edited, setEdited] = useState(false);
-  useUnsavedMark(id, edited);
+  const form = useRef<HTMLFormElement>(null);
+  useUnsavedMark(id, edited || besidesFields);
+
+  useEffect(() => {
+    if (form.current) setEdited(formEdited(form.current));
+  }, [besidesFields]);
 
   // The blocker asks the registry the moment a route changes, and a mark set through an effect
   // would still be standing then, so a form that navigates on success clears it itself.
@@ -17,6 +24,7 @@ export function useUnsavedForm(id: string) {
 
   return {
     form: {
+      ref: form,
       onInput: (event: FormEvent<HTMLFormElement>) => setEdited(formEdited(event.currentTarget)),
       onReset: () => setEdited(false)
     },

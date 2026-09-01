@@ -137,6 +137,13 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
 
     // when
+    await page.getByTestId(/^card-link-/).first().click();
+    await expect(page.getByTestId("card-preview")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+
+    // when
     await page.goto("/admin/facility/slot-fillers");
     await expect(page.getByTestId("create-participant-card")).toBeVisible();
 

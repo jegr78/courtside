@@ -41,9 +41,14 @@ export function AdminCourtsView() {
     setCourts((current) => current?.map((item) => item.id === changed.id ? changed : item));
   }
 
+  // Taking a court out of service is not a save, so it answers for `active` and for nothing else
+  // somebody may still be editing in the row.
   function toggle(court: AdminCourt) {
-    return save(`court:${court.id}`, async () =>
-      confirm(await api.setAdminCourtActive(court.id, !court.active)));
+    return save(`court:${court.id}`, async () => {
+      const { active } = await api.setAdminCourtActive(court.id, !court.active);
+      setCourts((current) => current?.map((item) => item.id === court.id ? { ...item, active } : item));
+      setConfirmed((current) => ({ ...current, [court.id]: { ...current[court.id], active } }));
+    });
   }
 
   function saveCourt(court: AdminCourt) {
