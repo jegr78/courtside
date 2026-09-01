@@ -107,6 +107,60 @@ class CourtAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAWhitespaceOnlyName_whenCreatingACourt_thenItIsStoredWithoutAName() throws Exception {
+        // when
+        MvcResult created = mockMvc.perform(post("/api/admin/courts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"number": 7, "name": "%s"}
+                                """.formatted("\u2003".repeat(61)))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").doesNotExist())
+                .andReturn();
+
+        // then
+        mockMvc.perform(get(created.getResponse().getHeader("Location")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").doesNotExist());
+    }
+
+    @Test
+    void givenANamedCourt_whenChangingItsNameToBlank_thenItIsStoredWithoutAName() throws Exception {
+        // given
+        String id = createCourt(7, "Centre Court");
+
+        // when
+        mockMvc.perform(put("/api/admin/courts/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"number": 7, "name": "%s"}
+                                """.formatted("\u2003".repeat(61)))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").doesNotExist());
+
+        // then
+        mockMvc.perform(get("/api/admin/courts/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").doesNotExist());
+    }
+
+    @Test
+    void givenAnOverlongNonBlankName_whenCreatingACourt_thenTheNameIsRejected() throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/courts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"number": 7, "name": "%s"}
+                                """.formatted("C".repeat(61)))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("name"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+    }
+
+    @Test
     void givenTwoCourts_whenCreatingAThirdWithATakenNumber_thenItIsAConflict() throws Exception {
         // given
         createCourt(5, "Centre Court");
