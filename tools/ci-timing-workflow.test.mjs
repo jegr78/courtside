@@ -30,14 +30,15 @@ test("given a run is rerun while collection starts, when reading evidence, then 
 
 test("given an observed profile plan, when collecting the run, then its immutable base classifier recomputes it", () => {
   // when / then
-  assert.match(workflow, /ref:\s*\$\{\{ github\.event\.repository\.default_branch \}\}/);
-  assert.doesNotMatch(workflow, /gh run download|test-profile-plan-\$\{RUN_ID\}/);
+  assert.match(workflow, /ref:\s*\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /--event "\$GITHUB_EVENT_PATH"/);
   assert.doesNotMatch(workflow, /issues\/\$\{PR_NUMBER\}|LABELS_JSON/);
   assert.match(workflow, /--labels '\[\]'/);
   assert.doesNotMatch(workflow, /commits\/\$\{RUN_HEAD\}\/pulls/);
-  assert.match(workflow, /-f state=all -f "head=\$\{HEAD_OWNER\}:\$\{HEAD_BRANCH\}"/);
-  assert.match(workflow, /ci-pull-request\.mjs/);
-  assert.match(workflow, /\.runBaseSha/);
+  assert.doesNotMatch(workflow, /repos\/\$\{GITHUB_REPOSITORY\}\/pulls/);
+  assert.doesNotMatch(workflow, /actions\/artifacts|gh run download/);
+  assert.match(workflow, /ci-workflow-run\.mjs/);
+  assert.match(workflow, /\.baseCommit/);
   assert.doesNotMatch(workflow, /BASE_REF=\$\(jq -er '\.base\.sha/);
   assert.match(workflow, /git fetch --no-tags origin "\$BASE_REF" "\$HEAD_REF"/);
   assert.match(workflow,

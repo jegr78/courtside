@@ -19,7 +19,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ github.sha }}
       - name: Read and record completed run evidence
         env:
           GH_TOKEN: ${{ github.token }}
@@ -34,20 +34,15 @@ jobs:
             [.jobs[].name | select(test("^test-profile-plan \\[(admitted|full|invalid)\\]$"))]
             | select(length == 1) | .[0] | capture("\\[(?<mode>[^]]+)\\]$").mode' \
             build/ci-timing/jobs.json)
-          RUN_HEAD=$(jq -er '.head_sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/run.json)
-          HEAD_REPOSITORY=$(jq -er '.head_repository.full_name | select(test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))' build/ci-timing/run.json)
-          HEAD_OWNER=${HEAD_REPOSITORY%%/*}
-          HEAD_BRANCH=$(jq -er '.head_branch | select(length > 0 and length <= 255)' build/ci-timing/run.json)
-          gh api --method GET --paginate "repos/${GITHUB_REPOSITORY}/pulls" \
-            -f state=all -f "head=${HEAD_OWNER}:${HEAD_BRANCH}" -f per_page=100 \
-            --slurp | jq 'add' > build/ci-timing/pulls.json
-          node tools/ci-pull-request.mjs \
+          node tools/ci-workflow-run.mjs \
+            --event "$GITHUB_EVENT_PATH" \
             --run build/ci-timing/run.json \
-            --candidates build/ci-timing/pulls.json \
-            --output build/ci-timing/pr.json
-          BASE_REF=$(jq -er '.runBaseSha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/pr.json)
-          HEAD_REF=$(jq -er '.head.sha | select(test("^[a-f0-9]{40}$"))' build/ci-timing/pr.json)
-          test "$HEAD_REF" = "$RUN_HEAD"
+            --repository "$GITHUB_REPOSITORY" \
+            --run-id "$RUN_ID" \
+            --attempt "$ATTEMPT" \
+            --output build/ci-timing/provenance.json
+          BASE_REF=$(jq -er '.baseCommit | select(test("^[a-f0-9]{40}$"))' build/ci-timing/provenance.json)
+          HEAD_REF=$(jq -er '.headCommit | select(test("^[a-f0-9]{40}$"))' build/ci-timing/provenance.json)
           git fetch --no-tags origin "$BASE_REF" "$HEAD_REF"
           git cat-file -e "${BASE_REF}^{commit}"
           git cat-file -e "${HEAD_REF}^{commit}"
@@ -91,7 +86,7 @@ jobs:
           cp "$PROFILE_ROOT/ci/test-profile-observation.schema.json" build/ci-timing/test-profile-observation.schema.json
           cat build/ci-timing/summary.md build/ci-timing/profile-summary.md >> "$GITHUB_STEP_SUMMARY"
           rm build/ci-timing/run.json build/ci-timing/jobs.json \
-            build/ci-timing/pulls.json build/ci-timing/pr.json \
+            build/ci-timing/provenance.json \
             build/ci-timing/summary.md build/ci-timing/profile-summary.md \
             build/ci-timing/profile-plan/summary.md
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
