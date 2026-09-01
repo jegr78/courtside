@@ -34,7 +34,7 @@ export const semanticPolicySources = [
   "tools/test-profile-observation.mjs",
   "tools/test-profile-replay.mjs",
   "tools/ci-timing.mjs",
-  "tools/ci-pull-request.mjs",
+  "tools/ci-workflow-run.mjs",
   "tools/ci-base-provenance.mjs",
   "ci/ci-timing.schema.json"
 ];

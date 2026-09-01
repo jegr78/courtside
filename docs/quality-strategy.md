@@ -106,13 +106,14 @@ same escalation, while the admission record remains mandatory for every reduced 
 
 Each completed pull-request run joins its exact-attempt profile plan with the full job outcomes.
 The follow-up workflow recomputes that plan with the classifier from the immutable pull-request
-base commit and the immutable base and head commits; it never trusts the plan artifact produced by
-pull-request code. The attempt-specific run metadata supplies the base commit; current pull-request
-data only identifies the matching pull request. The collector also requires that run base to be the
-exact merge base of the immutable head, rejecting stale or ambiguous provenance. Classification,
-timing normalization and observation validation execute from that same base commit.
-It resolves the pull request from the recorded head commit so a completed merge cannot erase the
-association before evidence collection.
+base commit. Its protected `workflow_run` event captures the pull request number, repositories,
+refs and base and head commits when the build completes. The collector binds that immutable event
+to the exact attempt returned by the Actions API and rejects missing, ambiguous or mismatched pull
+request provenance. It does not query current pull-request data, because GitHub may remove that
+association after a merge. The base must remain an ancestor of the immutable head. Classification,
+timing normalization and observation validation execute from that same base commit, while the
+collector itself is checked out at the exact protected default-branch commit that received the
+event.
 
 A release demands a nightly that verified it, rather than the absence of a complaint about one. The
 tag is refused unless a scheduled `build` run succeeded on its first attempt over a commit the
