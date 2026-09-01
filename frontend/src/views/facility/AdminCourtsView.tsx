@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type AdminCourt } from "../../api/client";
 import { useClubConfiguration } from "../../club/registry";
@@ -40,6 +40,7 @@ export function AdminCourtsView() {
   const [courts, setCourts] = useState<AdminCourt[]>();
   const [editor, setEditor] = useState<CellEditor>();
   const [restored, setRestored] = useState<Cell>();
+  const open = useRef<CellEditor | undefined>(undefined);
   const { error, success, pending, reportError, save } = useSaving();
   const newCourt = useUnsavedForm("court:new");
 
@@ -49,12 +50,17 @@ export function AdminCourtsView() {
 
   const edited = courts?.find((court) => court.id === editor?.courtId);
 
+  // Read at the moment of closing rather than from the render a write started in: by the time an
+  // answer arrives, somebody may have opened another cell, and that one is not ours to close.
+  useEffect(() => {
+    open.current = editor;
+  }, [editor]);
+
   // Closing takes the focused input off the page, so the value it belonged to takes the focus back.
-  // It closes that cell and not whichever one is open by the time a write answers.
   function close(closing: Cell) {
-    setRestored({ courtId: closing.courtId, field: closing.field });
-    setEditor((current) =>
-      current?.courtId === closing.courtId && current.field === closing.field ? undefined : current);
+    if (open.current?.courtId !== closing.courtId || open.current.field !== closing.field) return;
+    setRestored(closing);
+    setEditor(undefined);
   }
 
   function replace(changed: AdminCourt) {
@@ -127,7 +133,7 @@ export function AdminCourtsView() {
                 open={(field) => setEditor({ courtId: court.id, field, entry: shown(court, field) })}
                 entered={(entry) => setEditor((current) => current && { ...current, entry })}
                 confirm={confirmEdit}
-                dismiss={() => { if (editor) close(editor); }}
+                dismiss={close}
                 toggle={toggle}
                 reportError={reportError}
               />)}
@@ -148,7 +154,7 @@ function CourtRow({ court, editor, restored, timeZone, disabled, open, entered, 
   open: (field: Field) => void;
   entered: (entry: string) => void;
   confirm: () => Promise<void>;
-  dismiss: () => void;
+  dismiss: (cell: Cell) => void;
   toggle: (court: AdminCourt) => Promise<void>;
   reportError: (failure: unknown) => void;
 }) {
@@ -160,7 +166,7 @@ function CourtRow({ court, editor, restored, timeZone, disabled, open, entered, 
       {editor?.field === field
         ? <CellEditorControls
             editor={editor} mark={mark} unsaved={unsaved} disabled={disabled}
-            entered={entered} confirm={confirm} dismiss={dismiss} />
+            entered={entered} confirm={confirm} dismiss={() => dismiss(editor)} />
         : <CellValue court={court} field={field} disabled={disabled} focused={restored === field} open={() => open(field)} />}
     </td>)}
     <td className="border-b p-2 align-top">

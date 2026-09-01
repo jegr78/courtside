@@ -454,21 +454,28 @@ test("an admin changes a court and finds that change in the log", async ({ page 
   await expect(entry.getByTestId("audit-actor")).toHaveText("configuration-admin");
 });
 
-test("an admin renames a court in the list and finds that change in the log", async ({ page, journeyService }) => {
-  // given
-  await page.goto("/login");
-  await page.getByTestId("username").fill("configuration-admin");
-  await page.getByTestId("password").fill("temporary-password");
-  await page.getByTestId("login-submit").click();
-  await page.getByTestId("administration-link").click();
-  await page.getByTestId("admin-courts-link").click();
-  await expect(page.getByTestId("admin-courts-view")).toBeVisible();
+test.describe("renaming a court", () => {
   const court = "dddddddd-0000-0000-0000-000000000003";
-  const written = () => page.waitForResponse((response) =>
-    response.url().endsWith(`/api/admin/courts/${court}`) && response.request().method() === "PUT"
-  );
 
-  try {
+  // One journey world serves every worker and the court plan renders this name into a reviewed
+  // baseline. An afterEach reports its own failure beside the test's instead of in place of it.
+  test.afterEach(async ({ journeyService }) => {
+    await journeyService.executeSql(`UPDATE court SET name = NULL WHERE id = '${court}';`);
+  });
+
+  test("an admin renames a court in the list and finds that change in the log", async ({ page }) => {
+    // given
+    await page.goto("/login");
+    await page.getByTestId("username").fill("configuration-admin");
+    await page.getByTestId("password").fill("temporary-password");
+    await page.getByTestId("login-submit").click();
+    await page.getByTestId("administration-link").click();
+    await page.getByTestId("admin-courts-link").click();
+    await expect(page.getByTestId("admin-courts-view")).toBeVisible();
+    const written = () => page.waitForResponse((response) =>
+      response.url().endsWith(`/api/admin/courts/${court}`) && response.request().method() === "PUT"
+    );
+
     // when
     const renamed = written();
     await page.getByTestId(`edit-court-name-${court}`).click();
@@ -495,11 +502,7 @@ test("an admin renames a court in the list and finds that change in the log", as
     // then
     await expect(page.getByTestId("court-editor")).toHaveCount(0);
     await expect(page.getByTestId(`edit-court-name-${court}`)).not.toContainText("Practice Wall");
-  } finally {
-    // One journey world serves every worker, and the court plan renders this name into a reviewed
-    // baseline, so a walk that failed halfway must not leave it behind for everything after it.
-    await journeyService.executeSql(`UPDATE court SET name = NULL WHERE id = '${court}';`);
-  }
+  });
 });
 
 test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
