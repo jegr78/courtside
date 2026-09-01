@@ -83,6 +83,18 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnUnnamedCourt_whenChangedToABlankName_thenNothingIsRecorded() {
+        // given
+        Court court = facility.createCourt(7, null);
+
+        // when
+        facility.changeCourt(court.getId(), 7, "\u2003".repeat(61));
+
+        // then
+        assertThat(audit.eventsAbout(court.getId(), FacilityEvent.CourtChanged.TYPE)).isEmpty();
+    }
+
+    @Test
     void givenAnActiveCourt_whenItIsDeactivated_thenTheLogCarriesTheFlag() {
         // given
         Court court = facility.createCourt(7, "Centre Court");

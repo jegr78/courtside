@@ -63,9 +63,11 @@ public class FacilityService {
     @Transactional
     public Court changeCourt(UUID courtId, int number, String name) {
         Court court = requireCourt(courtId);
-        List<String> changedFields = Objects.equals(court.getName(), name) ? List.of() : List.of("name");
+        String previousName = court.getName();
         boolean numberChanged = court.getNumber() != number;
         court.changeTo(number, name);
+        List<String> changedFields = Objects.equals(previousName, court.getName())
+                ? List.of() : List.of("name");
         Court saved = saveOrRejectTakenNumber(court);
         if (numberChanged || !changedFields.isEmpty()) {
             events.publishEvent(

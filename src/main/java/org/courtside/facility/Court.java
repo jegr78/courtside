@@ -30,8 +30,7 @@ public class Court {
 
     public Court(int number, String name) {
         this.id = UUID.randomUUID();
-        this.number = number;
-        this.name = name;
+        changeTo(number, name);
         this.active = true;
     }
 
@@ -45,6 +44,6 @@ public class Court {
 
     public void changeTo(int number, String name) {
         this.number = number;
-        this.name = name;
+        this.name = name == null || name.isBlank() ? null : name;
     }
 }
