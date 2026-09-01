@@ -5,6 +5,7 @@
       "exact": [
         ".dockerignore",
         ".gitignore",
+        "AGENTS.md",
         "CLAUDE.md",
         "Dockerfile",
         "SECURITY.md",
