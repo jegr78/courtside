@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:quality:local-profile-timing:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "studyId", "commit", "policyFingerprint", "machineFingerprint", "machine", "createdAt", "attemptsPerCase", "targets", "cases", "attempts", "summary"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "studyId": { "type": "string", "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$" },
+    "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "policyFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "machineFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostFingerprint", "environmentFingerprint", "platform", "arch", "cpuModel", "cpuCount", "totalMemoryBytes", "nodeVersion"],
+      "properties": {
+        "hostFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "environmentFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "platform": { "type": "string", "minLength": 1, "maxLength": 30 },
+        "arch": { "type": "string", "minLength": 1, "maxLength": 30 },
+        "cpuModel": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "cpuCount": { "type": "integer", "minimum": 1, "maximum": 1024 },
+        "totalMemoryBytes": { "type": "integer", "minimum": 1 },
+        "nodeVersion": { "type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$" }
+      }
+    },
+    "createdAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" },
+    "attemptsPerCase": { "const": 3 },
+    "targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "attemptsPerCase", "absoluteMedianLimitsMs", "minimumRelativeSavings"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "attemptsPerCase": { "const": 3 },
+        "absoluteMedianLimitsMs": {
+          "type": "object", "additionalProperties": false, "required": ["docs", "tooling"],
+          "properties": { "docs": { "const": 30000 }, "tooling": { "const": 120000 } }
+        },
+        "minimumRelativeSavings": {
+          "type": "object", "additionalProperties": false, "required": ["backend", "frontend"],
+          "properties": { "backend": { "const": 0.2 }, "frontend": { "const": 0.2 } }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "profiles", "tasks"],
+        "properties": {
+          "id": { "enum": ["docs", "tooling", "backend", "frontend", "backend-frontend", "full"] },
+          "profiles": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "enum": ["docs", "tooling", "backend", "frontend", "full"] }, "uniqueItems": true },
+          "tasks": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 100 }, "uniqueItems": true }
+        }
+      }
+    },
+    "attempts": {
+      "type": "array",
+      "maxItems": 18,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["caseId", "attempt", "startedAt", "completedAt", "durationMs", "outcome"],
+        "properties": {
+          "caseId": { "enum": ["docs", "tooling", "backend", "frontend", "backend-frontend", "full"] },
+          "attempt": { "type": "integer", "minimum": 1, "maximum": 3 },
+          "startedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" },
+          "completedAt": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" },
+          "durationMs": { "type": ["integer", "null"], "minimum": 0 },
+          "outcome": { "enum": ["running", "passed", "failed"] }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "cases", "absoluteTargets", "relativeSavings"],
+      "properties": {
+        "status": { "enum": ["collecting", "qualified", "target-failed", "execution-failed"] },
+        "cases": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "completedAttempts", "medianMs", "maximumMs"],
+            "properties": {
+              "id": { "enum": ["docs", "tooling", "backend", "frontend", "backend-frontend", "full"] },
+              "completedAttempts": { "type": "integer", "minimum": 0, "maximum": 3 },
+              "medianMs": { "type": ["integer", "null"], "minimum": 0 },
+              "maximumMs": { "type": ["integer", "null"], "minimum": 0 }
+            }
+          }
+        },
+        "absoluteTargets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["docs", "tooling"],
+          "properties": { "docs": { "type": ["boolean", "null"] }, "tooling": { "type": ["boolean", "null"] } }
+        },
+        "relativeSavings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["backend", "frontend", "backendFrontend"],
+          "properties": {
+            "backend": { "type": ["number", "null"], "maximum": 1 },
+            "frontend": { "type": ["number", "null"], "maximum": 1 },
+            "backendFrontend": { "type": ["number", "null"], "maximum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

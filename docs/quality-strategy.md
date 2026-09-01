@@ -142,6 +142,18 @@ proposal remains a candidate miss, and an unsuccessful required job remains inco
 records separately how many runs actually skipped jobs. That number measures saved work after
 activation; it is not an admission condition.
 
+Local qualification uses the exact tasks in the profile contract. Run
+`frontend/node/node tools/local-profile-timing.mjs --run-all` from one clean commit and machine.
+The runner checkpoints three first attempts for docs, tooling, backend, frontend, the combined
+backend and frontend plan, and full verification. It refuses a changed commit, machine, policy,
+task plan, environment, interrupted attempt, or failed attempt. Qualification requires docs below
+30 seconds, tooling below 120 seconds, and at least 20 percent median savings for both backend and
+frontend against full verification. A reservation below `~/.courtside/profile-timing/` prevents an
+accidentally deleted workspace record from starting a replacement study for the same commit,
+policy, and host; the first environment remains bound to that reservation. Both owner-only records
+are private evidence and workflows do not upload them. The evidence runner requires POSIX file
+permissions and refuses Windows rather than claiming privacy that its mode bits cannot enforce.
+
 The workflow also retains the closed observations and exact Actions inventory behind the status.
 For an independent local reproduction, run the same protected collector with a GitHub token that
 has read-only Actions and contents access:
