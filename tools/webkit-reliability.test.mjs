@@ -52,15 +52,15 @@ function record(overrides = {}) {
       processId: "browser-2", browserName: "webkit", projectName: "webkit-pwa",
       startedAt: "2026-08-27T08:00:00.000Z", finishedAt: "2026-08-27T08:02:00.000Z", durationMs: 120_000,
       samples: [
-        { recordedAt: "2026-08-27T08:00:03.000Z", testPosition: 2, phase: "start", memoryUsageBytes: 1000, cpuPercent: 1 },
-        { recordedAt: "2026-08-27T08:00:04.000Z", testPosition: 2, phase: "end", memoryUsageBytes: 1100, cpuPercent: 2 }
+        { recordedAt: "2026-08-27T08:00:03.000Z", testPosition: 1, phase: "start", memoryUsageBytes: 1000, cpuPercent: 1 },
+        { recordedAt: "2026-08-27T08:00:04.000Z", testPosition: 1, phase: "end", memoryUsageBytes: 1100, cpuPercent: 2 }
       ], exitState: { exitCode: 137, oomKilled: false, hasError: false }
     }, {
       processId: "browser-3", browserName: "webkit", projectName: "webkit-accessibility",
       startedAt: "2026-08-27T08:00:00.000Z", finishedAt: "2026-08-27T08:02:00.000Z", durationMs: 120_000,
       samples: [
-        { recordedAt: "2026-08-27T08:00:05.000Z", testPosition: 3, phase: "start", memoryUsageBytes: 1000, cpuPercent: 1 },
-        { recordedAt: "2026-08-27T08:00:06.000Z", testPosition: 3, phase: "end", memoryUsageBytes: 1100, cpuPercent: 2 }
+        { recordedAt: "2026-08-27T08:00:05.000Z", testPosition: 1, phase: "start", memoryUsageBytes: 1000, cpuPercent: 1 },
+        { recordedAt: "2026-08-27T08:00:06.000Z", testPosition: 1, phase: "end", memoryUsageBytes: 1100, cpuPercent: 2 }
       ], exitState: { exitCode: 137, oomKilled: false, hasError: false }
     }] } },
     ...overrides
@@ -292,6 +292,49 @@ test("given unsafe or incomplete lifecycle evidence, when the run claims success
   duplicateStart.browserLifecycle.processes[0].samples[1].phase = "start";
   const duplicateProject = record();
   duplicateProject.browserLifecycle.processes[1].projectName = duplicateProject.browserLifecycle.processes[0].projectName;
+  const duplicateProcess = record();
+  duplicateProcess.browserLifecycle.processes[1].processId = duplicateProcess.browserLifecycle.processes[0].processId;
+  const projectPositionGap = record();
+  projectPositionGap.browserLifecycle.processes[2].samples.forEach((sample) => { sample.testPosition = 2; });
+  const interleavedProjectSamples = record();
+  interleavedProjectSamples.testPopulation.count = 4;
+  const secondPair = structuredClone(interleavedProjectSamples.browserLifecycle.processes[0].samples);
+  interleavedProjectSamples.browserLifecycle.processes[0].samples[1].recordedAt = "2026-08-27T08:00:03.000Z";
+  secondPair[0].recordedAt = "2026-08-27T08:00:02.000Z";
+  secondPair[1].recordedAt = "2026-08-27T08:00:04.000Z";
+  secondPair.forEach((sample) => { sample.testPosition = 2; });
+  interleavedProjectSamples.browserLifecycle.processes[0].samples = [
+    interleavedProjectSamples.browserLifecycle.processes[0].samples[0], secondPair[0],
+    interleavedProjectSamples.browserLifecycle.processes[0].samples[1], secondPair[1]
+  ];
+  const duplicateFreshTestPosition = record();
+  duplicateFreshTestPosition.matrix.isolationVariant = "fresh-test-browser";
+  duplicateFreshTestPosition.testPopulation.count = 4;
+  duplicateFreshTestPosition.browserLifecycle.processes.push(structuredClone(
+    duplicateFreshTestPosition.browserLifecycle.processes[0]));
+  duplicateFreshTestPosition.browserLifecycle.processes[3].processId = "browser-4";
+  const reversedFreshTestProcesses = record();
+  reversedFreshTestProcesses.matrix.isolationVariant = "fresh-test-browser";
+  reversedFreshTestProcesses.testPopulation.count = 4;
+  reversedFreshTestProcesses.browserLifecycle.processes[0].startedAt = "2026-08-27T08:01:00.000Z";
+  reversedFreshTestProcesses.browserLifecycle.processes[0].durationMs = 60_000;
+  reversedFreshTestProcesses.browserLifecycle.processes[0].samples[0].recordedAt = "2026-08-27T08:01:01.000Z";
+  reversedFreshTestProcesses.browserLifecycle.processes[0].samples[1].recordedAt = "2026-08-27T08:01:02.000Z";
+  const earlierCore = structuredClone(reversedFreshTestProcesses.browserLifecycle.processes[0]);
+  earlierCore.processId = "browser-4";
+  earlierCore.startedAt = "2026-08-27T08:00:00.000Z";
+  earlierCore.finishedAt = "2026-08-27T08:00:30.000Z";
+  earlierCore.durationMs = 30_000;
+  earlierCore.samples[0].recordedAt = "2026-08-27T08:00:01.000Z";
+  earlierCore.samples[1].recordedAt = "2026-08-27T08:00:02.000Z";
+  earlierCore.samples.forEach((sample) => { sample.testPosition = 2; });
+  reversedFreshTestProcesses.browserLifecycle.processes.push(earlierCore);
+  const missingFreshTestProjects = record();
+  missingFreshTestProjects.matrix.isolationVariant = "fresh-test-browser";
+  missingFreshTestProjects.browserLifecycle.processes.forEach((process, index) => {
+    process.projectName = "webkit-core";
+    process.samples.forEach((sample) => { sample.testPosition = index + 1; });
+  });
   const builtEvidence = record();
   builtEvidence.browserLifecycle.processes[0].exitState.oomKilled = true;
 
@@ -312,6 +355,12 @@ test("given unsafe or incomplete lifecycle evidence, when the run claims success
   assert.throws(() => validateReliabilityRecord(dockerError), /contradictory browser lifecycle/);
   assert.throws(() => validateReliabilityRecord(duplicateStart), /contradictory browser lifecycle/);
   assert.throws(() => validateReliabilityRecord(duplicateProject), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(duplicateProcess), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(projectPositionGap), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(interleavedProjectSamples), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(duplicateFreshTestPosition), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(reversedFreshTestProcesses), /contradictory browser lifecycle/);
+  assert.throws(() => validateReliabilityRecord(missingFreshTestProjects), /contradictory browser lifecycle/);
 });
 
 test("given twenty paired attempts per variant, when comparing isolation, then conditions and results stay visible", () => {
