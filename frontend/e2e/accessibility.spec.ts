@@ -116,6 +116,20 @@ for (const locale of ["de", "en"]) {
     // then
     await expectNoWcagViolations(page);
 
+    // when — an open cell editor is a surface of its own, and it is only on screen once chosen;
+    // the number cell carries a different control from the name cell, so both are scanned
+    for (const field of ["name", "number"]) {
+      await page.getByTestId(`edit-court-${field}-dddddddd-0000-0000-0000-000000000002`).click();
+      await expect(page.getByTestId("court-editor")).toBeFocused();
+
+      // then
+      await expectNoWcagViolations(page);
+
+      // when
+      await page.getByTestId("dismiss-court-edit").click();
+      await expect(page.getByTestId("court-editor")).toHaveCount(0);
+    }
+
     // when — the audit entry the last stage reads is written here, on the page that owns the court
     const courtToggled = page.waitForResponse((response) =>
       response.url().endsWith("/api/admin/courts/dddddddd-0000-0000-0000-000000000002/active")

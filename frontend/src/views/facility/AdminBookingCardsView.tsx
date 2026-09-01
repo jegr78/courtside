@@ -64,7 +64,7 @@ export function AdminBookingCardsView() {
                     <Link data-testid={`card-link-${card.id}`} className="font-semibold underline" to={`/admin/facility/booking-cards/${card.id}`}>{card.label}</Link>
                   </span>
                 </td>
-                <td data-testid={`card-status-${card.id}`} className="border-b p-2">{t(card.active ? "admin.facility.cardActive" : "admin.facility.cardInactive")}</td>
+                <td data-testid={`card-status-${card.id}`} className="border-b p-2">{t(card.active ? "admin.facility.statusActive" : "admin.facility.statusInactive")}</td>
               </tr>)}
             </tbody>
           </table>

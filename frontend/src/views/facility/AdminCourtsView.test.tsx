@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { api } from "../../api/client";
+import { ApiError, api } from "../../api/client";
 import i18n from "../../i18n";
 import { UnsavedChangesProvider } from "../../unsaved/UnsavedChangesProvider";
 import { UnsavedCount } from "../../test/UnsavedCount";
@@ -16,21 +16,42 @@ function show(counted = false) {
   </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 }
 
+async function openName(courtId: string) {
+  await userEvent.click(await screen.findByTestId(`edit-court-name-${courtId}`));
+  return screen.getByTestId("court-editor");
+}
+
 describe("AdminCourtsView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "adminCourts").mockResolvedValue([
-      { id: "court-1", number: 1, name: "Centre Court", active: true }
+      { id: "court-1", number: 3, name: "Centre Court", active: true }
     ]);
   });
 
-  it("given court data, when the view loads, then the courts are listed", async () => {
+  it("given court data, when the view loads, then every court is one row of one list", async () => {
     // when
     show();
 
     // then
-    expect(await screen.findByTestId("court-name-court-1")).toHaveValue("Centre Court");
+    const row = await screen.findByTestId("court-row-court-1");
+    expect(row.tagName).toBe("TR");
+    expect(screen.getByTestId("edit-court-number-court-1")).toHaveTextContent("3");
+    expect(screen.getByTestId("edit-court-name-court-1")).toHaveTextContent("Centre Court");
+    expect(screen.getByTestId("court-status-court-1")).toHaveTextContent("Active");
+    expect(screen.getByTestId("edit-court-name-court-1")).toHaveAccessibleName(/Change the name/);
+  });
+
+  // The five forms the list replaces each carried a save of their own, and that is what #415 is.
+  it("when the view loads, then no court carries a save of its own", async () => {
+    // when
+    show();
+
+    // then
+    await screen.findByTestId("court-row-court-1");
+    expect(screen.queryAllByTestId(/^save-court-/)).toHaveLength(0);
+    expect(screen.queryByTestId("court-editor")).not.toBeInTheDocument();
   });
 
   // The page's one primary action opens it, so a board never scrolls past the list to add a court.
@@ -40,73 +61,363 @@ describe("AdminCourtsView", () => {
 
     // then
     const create = await screen.findByTestId("create-court");
-    const first = screen.getByTestId("court-name-court-1");
+    const first = screen.getByTestId("court-row-court-1");
     expect(create.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("given a renamed court, when the change is saved, then the row stops saying it is unsaved", async () => {
+  it("given a court, when its name is chosen, then the cell becomes an input with confirm and dismiss beside it", async () => {
     // given
-    vi.spyOn(api, "changeAdminCourt").mockImplementation((id, court) =>
-      Promise.resolve({ id, number: court.number, name: court.name ?? null, active: true }));
+    show();
+
+    // when
+    const editor = await openName("court-1");
+
+    // then
+    expect(editor).toHaveValue("Centre Court");
+    expect(screen.getByTestId("confirm-court-edit")).toBeEnabled();
+    expect(screen.getByTestId("dismiss-court-edit")).toBeEnabled();
+    expect(screen.queryByTestId("edit-court-name-court-1")).not.toBeInTheDocument();
+  });
+
+  it("given a court, when its number is chosen, then the editor carries the number", async () => {
+    // given
+    show();
+
+    // when
+    await userEvent.click(await screen.findByTestId("edit-court-number-court-1"));
+
+    // then
+    expect(screen.getByTestId("court-editor")).toHaveValue(3);
+  });
+
+  it("given an open editor, when it is dismissed, then the cell reads as it did and nothing was written", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminCourt");
+    show();
+    const editor = await openName("court-1");
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "Garden Court");
+
+    // when
+    await userEvent.click(screen.getByTestId("dismiss-court-edit"));
+
+    // then
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveTextContent("Centre Court");
+    expect(screen.queryByTestId("court-editor")).not.toBeInTheDocument();
+    expect(change).not.toHaveBeenCalled();
+  });
+
+  // A name is confirmed on its own, but CourtRequest requires the number, so the row supplies it.
+  it("given a renamed court, when the edit is confirmed, then that one court is written with its number", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminCourt")
+      .mockResolvedValue({ id: "court-1", number: 3, name: "Garden Court", active: true });
     show(true);
-    await userEvent.type(await screen.findByTestId("court-name-court-1"), "!");
+    const editor = await openName("court-1");
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "Garden Court");
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
 
     // when
-    await userEvent.click(screen.getByTestId("save-court-court-1"));
+    await userEvent.click(screen.getByTestId("confirm-court-edit"));
 
     // then
+    expect(change).toHaveBeenCalledExactlyOnceWith("court-1", { number: 3, name: "Garden Court" });
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveTextContent("Garden Court");
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
-    expect(screen.queryByTestId("unsaved-mark-court:court-1")).not.toBeInTheDocument();
   });
 
-  it("given a court is renamed, when a screen reader reaches its save, then the mark explains it", async () => {
+  it("given a changed number, when the edit is confirmed, then the name it already carries goes with it", async () => {
     // given
+    const change = vi.spyOn(api, "changeAdminCourt")
+      .mockResolvedValue({ id: "court-1", number: 4, name: "Centre Court", active: true });
     show();
-    const name = await screen.findByTestId("court-name-court-1");
-    expect(screen.getByTestId("save-court-court-1")).not.toHaveAttribute("aria-describedby");
+    await userEvent.click(await screen.findByTestId("edit-court-number-court-1"));
+    fireEvent.change(screen.getByTestId("court-editor"), { target: { value: "4" } });
 
     // when
-    await userEvent.type(name, "!");
+    await userEvent.click(screen.getByTestId("confirm-court-edit"));
 
     // then
-    const mark = await screen.findByTestId("unsaved-mark-court:court-1");
-    expect(screen.getByTestId("save-court-court-1"))
-      .toHaveAttribute("aria-describedby", mark.getAttribute("id"));
+    expect(change).toHaveBeenCalledExactlyOnceWith("court-1", { number: 4, name: "Centre Court" });
   });
 
-  it("given a court is renamed, when the row is read, then it says so beside a save that stays usable", async () => {
+  // A number field takes "1e3" and "3.9" without complaint, and parseInt would read them as 1 and 3.
+  it.each(["", "0", "1000", "1e3", "3.9", "-2"])(
+    "given %s entered as a court number, when the editor is read, then it cannot be confirmed", async (entry) => {
+      // given
+      show();
+      await userEvent.click(await screen.findByTestId("edit-court-number-court-1"));
+
+      // when
+      fireEvent.change(screen.getByTestId("court-editor"), { target: { value: entry } });
+
+      // then
+      expect(screen.getByTestId("confirm-court-edit")).toBeDisabled();
+    });
+
+  it("given a number in range, when the editor is read, then it can be confirmed", async () => {
     // given
     show();
-    const name = await screen.findByTestId("court-name-court-1");
-    expect(screen.queryByTestId("unsaved-mark-court:court-1")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByTestId("edit-court-number-court-1"));
 
     // when
-    await userEvent.type(name, "!");
+    fireEvent.change(screen.getByTestId("court-editor"), { target: { value: "999" } });
 
     // then
-    expect(await screen.findByTestId("unsaved-mark-court:court-1")).toHaveTextContent("Not saved yet");
-    expect(screen.getByTestId("save-court-court-1")).toBeEnabled();
+    expect(screen.getByTestId("confirm-court-edit")).toBeEnabled();
   });
 
-  it("given a court is renamed, when the name is typed back, then nothing is left to lose", async () => {
+  it("given a number another court already carries, when the edit is confirmed, then the entry is still there to correct", async () => {
+    // given
+    vi.spyOn(api, "changeAdminCourt").mockRejectedValue(new ApiError(409, {
+      type: "urn:courtside:error:court-number-taken", status: 409,
+      title: "Court number taken", detail: "This court number is already in use"
+    }));
+    show();
+    await userEvent.click(await screen.findByTestId("edit-court-number-court-1"));
+    fireEvent.change(screen.getByTestId("court-editor"), { target: { value: "2" } });
+
+    // when
+    await userEvent.click(screen.getByTestId("confirm-court-edit"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("That court number is already taken.");
+    expect(screen.getByTestId("court-editor")).toHaveValue(2);
+  });
+
+  it("given an open editor, when a different value is typed, then the row says it has something to lose", async () => {
     // given
     show(true);
-    const name = await screen.findByTestId("court-name-court-1");
+    const editor = await openName("court-1");
     expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
 
     // when
-    await userEvent.type(name, "!");
+    await userEvent.type(editor, "!");
 
     // then
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+    expect(screen.getByTestId("unsaved-mark-court:court-1")).toHaveTextContent("Not saved yet");
+  });
+
+  it("given an edited name, when the old one is typed back, then nothing is left to lose", async () => {
+    // given
+    show(true);
+    const editor = await openName("court-1");
+    await userEvent.type(editor, "!");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
 
     // when
-    await userEvent.clear(name);
-    await userEvent.type(name, "Centre Court");
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "Centre Court");
 
     // then
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given an edited name, when the editor is dismissed, then nothing is left to lose", async () => {
+    // given
+    show(true);
+    const editor = await openName("court-1");
+    await userEvent.type(editor, "!");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+
+    // when
+    await userEvent.click(screen.getByTestId("dismiss-court-edit"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  // Closing the editor takes the focused input off the page, and without this somebody on a
+  // keyboard lands back at the top of the document instead of at the value they were editing.
+  it("given an open editor, when it is dismissed, then the value it belonged to takes the focus back", async () => {
+    // given
+    show();
+    await openName("court-1");
+
+    // when
+    await userEvent.click(screen.getByTestId("dismiss-court-edit"));
+
+    // then
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveFocus();
+  });
+
+  it("given an open editor, when the edit is confirmed, then the value it belonged to takes the focus back", async () => {
+    // given
+    vi.spyOn(api, "changeAdminCourt")
+      .mockResolvedValue({ id: "court-1", number: 3, name: "Garden Court", active: true });
+    show();
+    const editor = await openName("court-1");
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "Garden Court");
+
+    // when
+    await userEvent.click(screen.getByTestId("confirm-court-edit"));
+
+    // then
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveFocus();
+  });
+
+  it("given an edited name, when a screen reader reaches the confirm, then the mark explains it", async () => {
+    // given
+    show();
+    const editor = await openName("court-1");
+    expect(screen.getByTestId("confirm-court-edit")).not.toHaveAttribute("aria-describedby");
+
+    // when
+    await userEvent.type(editor, "!");
+
+    // then
+    const mark = await screen.findByTestId("unsaved-mark-court:court-1");
+    expect(screen.getByTestId("confirm-court-edit"))
+      .toHaveAttribute("aria-describedby", mark.getAttribute("id"));
+  });
+
+  // Taking a court out of service is not a save, so it must not answer for the name being edited.
+  it("given an unsaved name, when the court is deactivated, then what was entered is still there", async () => {
+    // given
+    vi.spyOn(api, "setAdminCourtActive")
+      .mockResolvedValue({ id: "court-1", number: 3, name: "Centre Court", active: false });
+    show();
+    const editor = await openName("court-1");
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "Garden Court");
+
+    // when
+    await userEvent.click(screen.getByTestId("toggle-court-court-1"));
+
+    // then
+    expect(await screen.findByTestId("court-status-court-1")).toHaveTextContent("Deactivated");
+    expect(screen.getByTestId("court-editor")).toHaveValue("Garden Court");
+  });
+
+  // The write echoes the whole court, so a second open cell would be overwritten by the answer to
+  // the first. One editor at a time is what makes that impossible rather than merely unlikely.
+  it("given an open editor, when another cell is chosen, then only the new one is open", async () => {
+    // given
+    show();
+    const editor = await openName("court-1");
+    await userEvent.type(editor, "!");
+
+    // when
+    await userEvent.click(screen.getByTestId("edit-court-number-court-1"));
+
+    // then
+    expect(screen.getAllByTestId("court-editor")).toHaveLength(1);
+    expect(screen.getByTestId("court-editor")).toHaveValue(3);
+    expect(screen.getByTestId("edit-court-name-court-1")).toHaveTextContent("Centre Court");
+  });
+
+  it("given an edited name, when Enter is pressed in the editor, then the court is written", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminCourt")
+      .mockResolvedValue({ id: "court-1", number: 3, name: "Centre Court!", active: true });
+    show();
+    const editor = await openName("court-1");
+
+    // when
+    await userEvent.type(editor, "!{Enter}");
+
+    // then
+    expect(change).toHaveBeenCalledExactlyOnceWith("court-1", { number: 3, name: "Centre Court!" });
+  });
+
+  it("given an edited name, when Escape is pressed in the editor, then nothing is written and the cell reads as it did", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminCourt");
+    show();
+    const editor = await openName("court-1");
+
+    // when
+    await userEvent.type(editor, "!{Escape}");
+
+    // then
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveTextContent("Centre Court");
+    expect(change).not.toHaveBeenCalled();
+  });
+
+  it("given a court number nobody may confirm, when Enter is pressed, then nothing is written", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminCourt");
+    show();
+    await userEvent.click(await screen.findByTestId("edit-court-number-court-1"));
+    const editor = screen.getByTestId("court-editor");
+
+    // when
+    fireEvent.change(editor, { target: { value: "1000" } });
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    // then
+    expect(change).not.toHaveBeenCalled();
+    expect(screen.getByTestId("court-editor")).toBeInTheDocument();
+  });
+
+  it("given a confirmed number, when the list is read again, then the row is where it was", async () => {
+    // given
+    vi.spyOn(api, "adminCourts").mockResolvedValue([
+      { id: "court-1", number: 3, name: "Centre Court", active: true },
+      { id: "court-2", number: 4, name: "Garden Court", active: true }
+    ]);
+    vi.spyOn(api, "changeAdminCourt")
+      .mockResolvedValue({ id: "court-1", number: 9, name: "Centre Court", active: true });
+    show();
+    await userEvent.click(await screen.findByTestId("edit-court-number-court-1"));
+    fireEvent.change(screen.getByTestId("court-editor"), { target: { value: "9" } });
+
+    // when
+    await userEvent.click(screen.getByTestId("confirm-court-edit"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("edit-court-number-court-1")).toHaveTextContent("9"));
+    expect(screen.getAllByTestId(/^court-row-/).map((row) => row.getAttribute("data-testid")))
+      .toEqual(["court-row-court-1", "court-row-court-2"]);
+  });
+
+  it("given a court nobody named, when the list is read, then the cell says so and still opens", async () => {
+    // given
+    vi.spyOn(api, "adminCourts").mockResolvedValue([
+      { id: "court-1", number: 3, name: null, active: true }
+    ]);
+    show();
+
+    // when
+    const editor = await openName("court-1");
+
+    // then
+    expect(editor).toHaveValue("");
+  });
+
+  it("given a court nobody named, when a name is confirmed, then it is written", async () => {
+    // given
+    vi.spyOn(api, "adminCourts").mockResolvedValue([
+      { id: "court-1", number: 3, name: null, active: true }
+    ]);
+    const change = vi.spyOn(api, "changeAdminCourt")
+      .mockResolvedValue({ id: "court-1", number: 3, name: "Garden Court", active: true });
+    show();
+    const editor = await openName("court-1");
+
+    // when
+    await userEvent.type(editor, "Garden Court{Enter}");
+
+    // then
+    expect(change).toHaveBeenCalledExactlyOnceWith("court-1", { number: 3, name: "Garden Court" });
+  });
+
+  it("given a name cleared away, when the edit is confirmed, then the court is left without one", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminCourt")
+      .mockResolvedValue({ id: "court-1", number: 3, name: null, active: true });
+    show();
+    const editor = await openName("court-1");
+
+    // when
+    await userEvent.clear(editor);
+    await userEvent.click(screen.getByTestId("confirm-court-edit"));
+
+    // then
+    expect(change).toHaveBeenCalledExactlyOnceWith("court-1", { number: 3, name: undefined });
   });
 
   it("given a filled create form, when the court is created, then it joins the list and nothing is left to lose", async () => {
@@ -123,33 +434,33 @@ describe("AdminCourtsView", () => {
 
     // then
     expect(createCourt).toHaveBeenCalledWith({ number: 2, name: "Garden Court" });
-    expect(await screen.findByTestId("court-name-court-2")).toBeInTheDocument();
+    expect(await screen.findByTestId("court-row-court-2")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
   });
 
-  // Taking a court out of service is not a save, so it must not answer for the name being edited.
-  it("given an unsaved name, when the court is deactivated, then what was entered is still there", async () => {
+  // The write behind the toggle answers with the whole court, and a record another board member
+  // has since changed would otherwise land in the row nobody asked it to.
+  it("given a court changed elsewhere, when it is deactivated here, then only its state follows the answer", async () => {
     // given
     vi.spyOn(api, "setAdminCourtActive")
-      .mockResolvedValue({ id: "court-1", number: 1, name: "Centre Court", active: false });
+      .mockResolvedValue({ id: "court-1", number: 7, name: "Somewhere else", active: false });
     show();
-    const name = await screen.findByTestId("court-name-court-1");
-    await userEvent.clear(name);
-    await userEvent.type(name, "Garden Court");
+    await screen.findByTestId("court-row-court-1");
 
     // when
     await userEvent.click(screen.getByTestId("toggle-court-court-1"));
 
     // then
-    expect(await screen.findByTestId("toggle-court-court-1")).toHaveTextContent("Activate");
-    expect(screen.getByTestId("court-name-court-1")).toHaveValue("Garden Court");
+    expect(await screen.findByTestId("court-status-court-1")).toHaveTextContent("Deactivated");
+    expect(screen.getByTestId("edit-court-name-court-1")).toHaveTextContent("Centre Court");
+    expect(screen.getByTestId("edit-court-number-court-1")).toHaveTextContent("3");
   });
 
   it("given an active court, when toggling it twice, then it disappears and can be restored", async () => {
     // given
     const setCourtActive = vi.spyOn(api, "setAdminCourtActive")
-      .mockResolvedValueOnce({ id: "court-1", number: 1, name: "Centre Court", active: false })
-      .mockResolvedValueOnce({ id: "court-1", number: 1, name: "Centre Court", active: true });
+      .mockResolvedValueOnce({ id: "court-1", number: 3, name: "Centre Court", active: false })
+      .mockResolvedValueOnce({ id: "court-1", number: 3, name: "Centre Court", active: true });
     show();
     const user = userEvent.setup();
 
@@ -175,15 +486,81 @@ describe("AdminCourtsView", () => {
 
     // then
     expect(toggle).toBeDisabled();
-    expect(screen.getByTestId("court-name-court-1")).toBeDisabled();
+    expect(screen.getByTestId("edit-court-name-court-1")).toBeDisabled();
+    expect(screen.getByTestId("edit-court-number-court-1")).toBeDisabled();
     await user.click(toggle);
     expect(setCourtActive).toHaveBeenCalledTimes(1);
 
     // when
-    response.resolve({ id: "court-1", number: 1, name: "Centre Court", active: false });
+    response.resolve({ id: "court-1", number: 3, name: "Centre Court", active: false });
 
     // then
     expect(await screen.findByTestId("toggle-court-court-1")).toBeEnabled();
+  });
+
+  // The rest of the list stays usable while one court is being written, so the answer to that
+  // write must close the editor it belonged to rather than whichever one is open by the time it lands.
+  it("given a write in flight, when another cell is opened and typed into, then the answer leaves it alone", async () => {
+    // given
+    vi.spyOn(api, "adminCourts").mockResolvedValue([
+      { id: "court-1", number: 3, name: "Centre Court", active: true },
+      { id: "court-2", number: 4, name: "Garden Court", active: true }
+    ]);
+    const response = deferred<Awaited<ReturnType<typeof api.changeAdminCourt>>>();
+    vi.spyOn(api, "changeAdminCourt").mockReturnValue(response.promise);
+    show(true);
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("edit-court-name-court-1"));
+    await user.type(screen.getByTestId("court-editor"), "!");
+    await user.click(screen.getByTestId("confirm-court-edit"));
+
+    // when
+    await user.click(screen.getByTestId("edit-court-name-court-2"));
+    await user.type(screen.getByTestId("court-editor"), "?");
+    response.resolve({ id: "court-1", number: 3, name: "Centre Court!", active: true });
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("edit-court-name-court-1")).toHaveTextContent("Centre Court!"));
+    expect(screen.getByTestId("court-editor")).toHaveValue("Garden Court?");
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1");
+  });
+
+  it("given a court whose name is a blank string, when the list is read, then the cell still says it has none", async () => {
+    // given
+    vi.spyOn(api, "adminCourts").mockResolvedValue([
+      { id: "court-1", number: 5, name: "", active: true }
+    ]);
+
+    // when
+    show();
+
+    // then
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveTextContent("No name");
+  });
+
+  it("given a confirmed edit is pending, when it is confirmed again, then the court is written once", async () => {
+    // given
+    const response = deferred<Awaited<ReturnType<typeof api.changeAdminCourt>>>();
+    const change = vi.spyOn(api, "changeAdminCourt").mockReturnValue(response.promise);
+    show();
+    const user = userEvent.setup();
+    const editor = await openName("court-1");
+    await user.type(editor, "!");
+
+    // when
+    await user.click(screen.getByTestId("confirm-court-edit"));
+
+    // then
+    expect(screen.getByTestId("confirm-court-edit")).toBeDisabled();
+    expect(screen.getByTestId("court-editor")).toBeDisabled();
+    await user.click(screen.getByTestId("confirm-court-edit"));
+    expect(change).toHaveBeenCalledTimes(1);
+
+    // when
+    response.resolve({ id: "court-1", number: 3, name: "Centre Court!", active: true });
+
+    // then
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveTextContent("Centre Court!");
   });
 
   it("given court data cannot load, when opening the view, then the failure replaces the loading state", async () => {
@@ -207,7 +584,7 @@ describe("AdminCourtsView", () => {
     const control = await screen.findByTestId("court-impact-court-1");
     expect(control.tagName).toBe("SUMMARY");
     expect(control.closest("details")).toBeInTheDocument();
-    expect(control).not.toHaveClass("bg-(--club-primary)");
+    expect(control.closest("tr")).toBe(screen.getByTestId("court-row-court-1"));
   });
 
   it("given the court changed since the impact was read, when the disclosure is opened again, then it is asked again", async () => {
@@ -268,13 +645,13 @@ describe("AdminCourtsView", () => {
     let answer: (impact: { affectedCount: number; truncated: boolean; nextCursor: null; bookings: [] }) => void = () => undefined;
     vi.spyOn(api, "courtImpact").mockReturnValue(new Promise((resolve) => { answer = resolve; }));
     vi.spyOn(api, "setAdminCourtActive")
-      .mockResolvedValue({ id: "court-1", number: 1, name: "Centre Court", active: false });
+      .mockResolvedValue({ id: "court-1", number: 3, name: "Centre Court", active: false });
     show();
     await userEvent.click(await screen.findByTestId("court-impact-court-1"));
 
     // when / then
     expect(screen.getByTestId("toggle-court-court-1")).toBeEnabled();
-    expect(screen.getByTestId("court-impact-court-1")).toBeEnabled();
+    expect(screen.getByTestId("edit-court-name-court-1")).toBeEnabled();
     answer({ affectedCount: 0, truncated: false, nextCursor: null, bookings: [] });
   });
 
