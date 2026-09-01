@@ -45,42 +45,51 @@ function outcome(execution) {
 function lifecycleEvidenceIsComplete(lifecycle, isolationVariant, testCount) {
   const expectedProcesses = isolationVariant === "fresh-test-browser" ? testCount : 3;
   if (lifecycle?.processes?.length !== expectedProcesses) return false;
-  const observedPositions = new Set();
+  const expectedProjects = new Set(["webkit-core", "webkit-pwa", "webkit-accessibility"]);
   const observedProjects = new Set();
+  const observedProcessIds = new Set();
+  const nextPositionByProject = new Map();
+  const previousFinishByProject = new Map();
+  let observedTestCount = 0;
   for (const process of lifecycle.processes) {
     const startedAt = Date.parse(process.startedAt);
     const finishedAt = Date.parse(process.finishedAt);
     if (!Number.isFinite(startedAt) || !Number.isFinite(finishedAt) || finishedAt < startedAt
-      || process.durationMs !== finishedAt - startedAt || process.projectName === undefined
+      || process.durationMs !== finishedAt - startedAt || !expectedProjects.has(process.projectName)
+      || observedProcessIds.has(process.processId)
       || observedProjects.has(process.projectName) && isolationVariant === "fresh-project-browser"
       || process.exitState === undefined || process.exitState.oomKilled || process.exitState.hasError) {
       return false;
     }
+    observedProcessIds.add(process.processId);
     observedProjects.add(process.projectName);
-    const samplesByPosition = new Map();
+    if (isolationVariant === "fresh-test-browser"
+      && startedAt < (previousFinishByProject.get(process.projectName) ?? 0)) return false;
+    previousFinishByProject.set(process.projectName, finishedAt);
     let previousSample = startedAt;
     for (const sample of process.samples) {
       const recordedAt = Date.parse(sample.recordedAt);
       if (!Number.isFinite(recordedAt) || recordedAt < previousSample || recordedAt > finishedAt) return false;
       previousSample = recordedAt;
-      const samples = samplesByPosition.get(sample.testPosition) ?? [];
-      samples.push(sample);
-      samplesByPosition.set(sample.testPosition, samples);
     }
-    for (const [position, samples] of samplesByPosition) {
-      if (samples.length !== 2 || samples[0].phase !== "start" || samples[1].phase !== "end"
-        || observedPositions.has(position)) {
+    if (process.samples.length === 0 || process.samples.length % 2 !== 0
+      || isolationVariant === "fresh-test-browser" && process.samples.length !== 2) return false;
+    let nextPosition = nextPositionByProject.get(process.projectName) ?? 1;
+    for (let index = 0; index < process.samples.length; index += 2) {
+      const start = process.samples[index];
+      const end = process.samples[index + 1];
+      if (start.phase !== "start" || end.phase !== "end" || start.testPosition !== end.testPosition
+        || start.testPosition !== nextPosition) {
         return false;
       }
-      observedPositions.add(position);
+      nextPosition += 1;
+      observedTestCount += 1;
     }
-    if (samplesByPosition.size === 0
-      || isolationVariant === "fresh-test-browser" && samplesByPosition.size !== 1) return false;
+    nextPositionByProject.set(process.projectName, nextPosition);
   }
-  return (isolationVariant === "fresh-test-browser" || observedProjects.size === 3)
-    && observedPositions.size === testCount
-    && [...observedPositions].toSorted((left, right) => left - right)
-      .every((position, index) => position === index + 1);
+  return observedProjects.size === expectedProjects.size
+    && [...expectedProjects].every((project) => observedProjects.has(project))
+    && observedTestCount === testCount;
 }
 
 export function buildReliabilityRecord(input) {
