@@ -236,7 +236,8 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   await page.getByTestId("admin-booking-cards-link").click();
   await page.getByTestId("new-card-label").fill("Restricted event");
   await page.getByTestId("new-card-role-MEMBER").check();
-  await page.getByTestId("new-card-counts").fill("2");
+  await page.getByTestId("new-card-counts-entry").fill("2");
+  await page.getByTestId("new-card-counts-add").click();
   const cardCreated = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/booking-cards") && response.request().method() === "POST"
   );
