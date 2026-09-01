@@ -5,7 +5,8 @@ const typeMessageKeys: Record<string, string> = {
   "urn:courtside:error:unauthenticated": "auth.failed",
   "urn:courtside:error:court-unavailable": "booking.courtUnavailable",
   "urn:courtside:error:username-taken": "roster.usernameTaken",
-  "urn:courtside:error:person-account-exists": "roster.accountExists"
+  "urn:courtside:error:person-account-exists": "roster.accountExists",
+  "urn:courtside:error:court-number-taken": "admin.facility.numberTaken"
 };
 
 export function problemMessage(failure: unknown, t: TFunction): string {
