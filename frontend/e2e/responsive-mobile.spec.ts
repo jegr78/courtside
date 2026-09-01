@@ -1,7 +1,22 @@
 import { expect, test } from "./fixtures";
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  const overflow = await page.evaluate(() => {
+    const viewportWidth = document.documentElement.clientWidth;
+    if (document.documentElement.scrollWidth <= viewportWidth) return [];
+    return [...document.querySelectorAll("body, main, [data-testid='admin-shell'], [data-testid='admin-configuration-view'], [data-testid='admin-configuration-view'] form, fieldset")]
+      .map((element) => ({
+        tag: element.tagName.toLowerCase(),
+        testId: element.getAttribute("data-testid"),
+        className: element.getAttribute("class"),
+        left: Math.round(element.getBoundingClientRect().left),
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        right: Math.round(element.getBoundingClientRect().right),
+        viewportWidth
+      }));
+  });
+  expect(overflow).toEqual([]);
 }
 
 async function signIn(page: import("@playwright/test").Page, username: string) {
@@ -92,7 +107,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await page.goto("/admin/audit");
 
   // then
-  await expect(page.getByTestId("audit-empty")).toBeVisible();
+  await expect(page.getByTestId("audit-row").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 
