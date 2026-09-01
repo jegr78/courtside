@@ -6,5 +6,6 @@
   "getCourt": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getBookingCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getParticipantCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
-  "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding."
+  "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding.",
+  "facilityUtilisation": "The board-facing utilisation page is not built yet; this endpoint is the reviewed aggregate contract it will consume."
 }

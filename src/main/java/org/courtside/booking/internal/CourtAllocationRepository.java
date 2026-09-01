@@ -46,6 +46,27 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
     List<CourtAllocation> findConfirmedStartingBetween(@Param("from") Instant from,
                                                        @Param("to") Instant to);
 
+    @Query(value = """
+            SELECT c.id AS "courtId",
+                   c.number AS "courtNumber",
+                   c.name AS "courtName",
+                   COUNT(a.id) AS "bookingCount",
+                   CAST(COALESCE(SUM(EXTRACT(EPOCH FROM
+                       (LEAST(a.ends_at, :to) - GREATEST(a.starts_at, :from))))
+                       FILTER (WHERE a.id IS NOT NULL), 0) / 60
+                       AS bigint) AS "occupiedMinutes"
+            FROM court c
+            LEFT JOIN court_allocation a
+              ON a.court_id = c.id
+             AND a.status = 'CONFIRMED'
+             AND a.starts_at < :to
+             AND a.ends_at > :from
+            GROUP BY c.id, c.number, c.name
+            ORDER BY c.number
+            """, nativeQuery = true)
+    List<CourtUtilisationRow> facilityUtilisation(@Param("from") Instant from,
+                                                   @Param("to") Instant to);
+
     @Query("""
             SELECT DISTINCT a.courtId FROM CourtAllocation a
             WHERE a.courtId IN :courtIds

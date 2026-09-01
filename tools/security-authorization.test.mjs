@@ -30,8 +30,8 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
   const matrix = buildOperationAuthorizationMatrix(api);
 
   // then
-  assert.equal(matrix.length, 98);
-  assert.equal(new Set(matrix.map((entry) => entry.operationId)).size, 98);
+  assert.equal(matrix.length, 99);
+  assert.equal(new Set(matrix.map((entry) => entry.operationId)).size, 99);
   assert.deepEqual(Object.keys(matrix[0].expectations).toSorted(), [...authorizationActors].toSorted());
   assert.ok(matrix.every((entry) => Object.keys(entry.expectations).length === authorizationActors.length));
   assert.deepEqual(matrix.find((entry) => entry.operationId === "getBookingEligibility").expectations, {
@@ -42,6 +42,17 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
     YOUTH_DIRECTOR: "allow",
     GROUNDSKEEPER: "allow",
     TREASURER: "allow",
+    ADMIN: "allow",
+    INITIAL_PASSWORD: "deny-forbidden"
+  });
+  assert.deepEqual(matrix.find((entry) => entry.operationId === "facilityUtilisation").expectations, {
+    ANONYMOUS: "deny-unauthenticated",
+    MEMBER: "deny-forbidden",
+    TRAINER: "deny-forbidden",
+    SPORT_DIRECTOR: "deny-forbidden",
+    YOUTH_DIRECTOR: "deny-forbidden",
+    GROUNDSKEEPER: "deny-forbidden",
+    TREASURER: "deny-forbidden",
     ADMIN: "allow",
     INITIAL_PASSWORD: "deny-forbidden"
   });
