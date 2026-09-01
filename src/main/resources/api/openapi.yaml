@@ -1786,6 +1786,32 @@ components:
           type: array
           items: { $ref: "#/components/schemas/AffectedBooking" }
 
+    CourtUtilisation:
+      type: object
+      description: Confirmed court time intersecting the requested local-date period.
+      required: [courtId, courtNumber, courtName, bookingCount, occupiedMinutes]
+      properties:
+        courtId: { type: string, format: uuid }
+        courtNumber: { type: integer, format: int32, minimum: 1, maximum: 999 }
+        courtName: { type: [string, "null"] }
+        bookingCount: { type: integer, format: int64, minimum: 0 }
+        occupiedMinutes: { type: integer, format: int64, minimum: 0 }
+
+    FacilityUtilisation:
+      type: object
+      description: |
+        Booked occupancy for every court, including inactive courts and courts with no confirmed
+        allocation in the period. Cancelled allocations do not contribute. The dates are interpreted
+        in `timeZone`; allocations crossing either boundary contribute only their intersecting minutes.
+      required: [from, to, timeZone, courts]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        timeZone: { type: string }
+        courts:
+          type: array
+          items: { $ref: "#/components/schemas/CourtUtilisation" }
+
     AuditEntry:
       type: object
       required: [id, occurredAt, eventType, parameters, subjectId]
@@ -5123,6 +5149,37 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Impact" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/reports/facility-utilisation:
+    get:
+      tags: [admin-reports]
+      operationId: facilityUtilisation
+      summary: How much confirmed booking time each court held in a local-date period.
+      description: |
+        `from` and `to` are inclusive dates in the club time zone. The period may span at most 366
+        days. Courts remain in number order even when inactive or unused, so exported comparisons
+        keep a stable shape.
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Booked court utilisation for the requested period.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FacilityUtilisation" }
         "400":
           $ref: "#/components/responses/Invalid"
         "401":
