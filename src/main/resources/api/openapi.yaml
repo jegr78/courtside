@@ -208,7 +208,7 @@ components:
     RuleType:
       type: string
       enum: [OPENING_HOURS, SLOT_GRID, ADVANCE_WINDOW, MAX_OPEN_BOOKINGS, MAX_BOOKING_DURATION,
-             NO_COURT_BOOKING]
+             CANCELLATION_DEADLINE, NO_COURT_BOOKING]
 
     CancelScope:
       type: string
@@ -2614,6 +2614,8 @@ paths:
         The creator, an administrator, or an account currently allowed by the booking card may
         cancel the booking. Cards without role restrictions do not grant management access to
         unrelated accounts.
+        A configured cancellation deadline is evaluated against the booking holder's current
+        rule set. Administrators override it. Cancelling exactly at the deadline is allowed.
         A booking the caller may not act on is answered `404` with
         `urn:courtside:error:booking-not-found`, the same answer an id naming no booking
         gets: whether an id is real is not something a refusal discloses.
@@ -2636,6 +2638,11 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "422":
+          description: The booking holder's rule set no longer permits cancellation.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 
   /api/my/bookings:
     get:
@@ -2872,6 +2879,8 @@ paths:
         gets: whether an id is real is not something a refusal discloses.
         The series is read only after that: a `seriesId` naming nothing and one the booking is
         not part of are both answered `400` with `booking.series.bookingNotInSeries`.
+        Cancellation is atomic. If the booking holder's current rule set refuses any affected
+        occurrence, none of the occurrences is cancelled. Administrators override that deadline.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2899,6 +2908,11 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "422":
+          description: At least one affected occurrence is past the cancellation deadline.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 
   /api/booking-series/{id}/move/preview:
     post:

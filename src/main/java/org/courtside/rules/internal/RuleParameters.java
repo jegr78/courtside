@@ -20,6 +20,7 @@ public final class RuleParameters {
             RuleType.ADVANCE_WINDOW, Map.of("maxDays", new Bounds(1, 365)),
             RuleType.MAX_OPEN_BOOKINGS, Map.of("limit", new Bounds(1, 99)),
             RuleType.MAX_BOOKING_DURATION, Map.of("maxMinutes", new Bounds(5, 1440)),
+            RuleType.CANCELLATION_DEADLINE, Map.of("minMinutes", new Bounds(0, 525600)),
             RuleType.NO_COURT_BOOKING, Map.of());
 
     private RuleParameters() {

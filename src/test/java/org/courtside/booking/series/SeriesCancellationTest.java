@@ -1,5 +1,6 @@
 package org.courtside.booking.series;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.PostgresDiagnostics;
 import org.courtside.facility.testfixture.FacilityTestFixture;
@@ -7,8 +8,12 @@ import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.BookingStatus;
+import org.courtside.booking.BookingRulesViolatedException;
+import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
+import org.courtside.rules.RuleViolation;
+import org.courtside.rules.testfixture.RulesTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import(FacilityTestFixture.class)
+@Import({FacilityTestFixture.class, ConfigTestFixture.class, RulesTestFixture.class})
 class SeriesCancellationTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -56,10 +61,19 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
     private FacilityTestFixture facilityFixture;
 
     @Autowired
+    private ConfigTestFixture config;
+
+    @Autowired
+    private RulesTestFixture rules;
+
+    @Autowired
     private JdbcClient jdbc;
 
     @Autowired
     private PlatformTransactionManager transactions;
+
+    @Autowired
+    private MeterRegistry meters;
 
     private UUID courtOne;
     private final UUID trainer = UUID.randomUUID();
@@ -87,6 +101,35 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         assertThat(statusesOf(result)).containsExactly(
                 BookingStatus.CONFIRMED, BookingStatus.CONFIRMED, BookingStatus.CANCELLED,
                 BookingStatus.CONFIRMED, BookingStatus.CONFIRMED);
+    }
+
+    @Test
+    void givenOneOccurrenceIsPastTheDeadline_whenCancellingTheSeries_thenNothingIsCancelled() {
+        // given
+        UUID standardRuleSet = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001");
+        config.bindPeopleWithoutAMembershipTypeTo(standardRuleSet);
+        rules.setCancellationDeadline(standardRuleSet, 10080);
+        SeriesCreationResult result = createSeries(3);
+        double rejectedBefore = cancellationDeadlineRejections();
+
+        // when
+        BookingRulesViolatedException failure = org.assertj.core.api.Assertions.catchThrowableOfType(
+                BookingRulesViolatedException.class,
+                () -> seriesService.cancel(result.seriesId(), result.bookingIds().getFirst(),
+                        CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER)));
+
+        // then
+        assertThat(failure.getViolations()).extracting(RuleViolation::code)
+                .containsExactly("booking.rule.cancellationDeadline.exceeded");
+        assertThat(statusesOf(result)).containsOnly(BookingStatus.CONFIRMED);
+        assertThat(cancellationDeadlineRejections()).isEqualTo(rejectedBefore + 1);
+    }
+
+    private double cancellationDeadlineRejections() {
+        var counter = meters.find("courtside.bookings.rejected")
+                .tag("rule", "booking.rule.cancellationDeadline.exceeded")
+                .counter();
+        return counter == null ? 0 : counter.count();
     }
 
     @Test

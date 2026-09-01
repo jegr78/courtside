@@ -18,6 +18,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RuleParametersTest {
 
     @Test
+    void givenACancellationDeadline_whenValidating_thenZeroAndOneYearAreSupported() {
+        // when / then
+        assertThat(RuleParameters.validated(
+                RuleType.CANCELLATION_DEADLINE, Map.of("minMinutes", 0)))
+                .containsExactly(Map.entry("minMinutes", 0));
+        assertThat(RuleParameters.validated(
+                RuleType.CANCELLATION_DEADLINE, Map.of("minMinutes", 525600)))
+                .containsExactly(Map.entry("minMinutes", 525600));
+    }
+
+    @Test
     void givenTheParameterAnAdvanceWindowNeeds_whenValidating_thenItIsAccepted() {
         // when / then
         assertThat(RuleParameters.validated(RuleType.ADVANCE_WINDOW, Map.of("maxDays", 7)))

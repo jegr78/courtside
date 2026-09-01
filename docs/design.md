@@ -131,7 +131,8 @@ browser admin surface for configuration, facilities and the club's people — ad
 correcting their name or address, giving them an account, changing its roles, correcting its
 username, sending it new credentials and disabling it. Membership types are administered there as
 well, each showing how many people hold it and whether it opens an account on import, and the
-configuration names the rule set that measures a person holding none. A rule set can bar its holders from booking a court at all. So is the whole
+configuration names the rule set that measures a person holding none. A rule set can bar its holders
+from booking a court at all and can require its holders to cancel before a configured deadline. So is the whole
 import: describing a source, linking the people a file cannot match by number, uploading a member
 list, reading what it would change, and running it. The column
 mapping is offered from the club's own export, read in the browser and never uploaded for that
@@ -755,6 +756,14 @@ What the bar does **not** govern is being named as a participant: a member barre
 still be recorded as somebody else's co-player, because participants are named inside the booking
 and only the booker is measured. A club that wants that closed as well is asking a different
 question — who may *play* — and the product does not answer it today.
+
+**A rule set may require cancellation before a deadline.** *Built.* `CANCELLATION_DEADLINE`
+stores the minimum whole minutes between cancellation and the first occupied slot. No rule means
+no deadline, and cancelling exactly at the boundary succeeds. The booking holder's current
+membership and rule-set assignment decide the deadline, including the configured fallback for a
+person without a membership type. An administrator overrides it. Series cancellation applies the
+same check to every affected occurrence in one transaction, so one refusal leaves the whole
+selected scope unchanged.
 
 ### Two kinds of rule: who may book, and what the grid is
 
