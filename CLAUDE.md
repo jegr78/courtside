@@ -344,8 +344,37 @@ enough to need.
 
   Plans and their numbering live in `docs/superpowers/`, which is git-ignored and stays local.
 
-* **A branch gets a whole-branch review before its pull request is merged.** Every batch of work
-  so far has had its most serious findings surface there rather than in the per-task reviews.
+* **Finalise a branch in cost order.** Complete targeted red/green checks first, then obtain the
+  required whole-branch review and resolve every finding with targeted verification. Only after the
+  review is clean, fetch `origin/main`, rebase the uncommitted work with autostash if the base moved,
+  inspect the resulting diff and conflicts, and run `node tools/courtside.mjs check --full`. That
+  command is the one final full verification and satisfies the general before-push `check` rule;
+  do not run a separate `./mvnw clean verify` as well. Commit and push immediately after that run.
+  Do not spend a full run on a base already known to be stale or before the review can still change
+  the branch.
+
+  Acquire the shared finalisation window before the fetch/rebase step by creating the annotated tag
+  `courtside-finalization-lock` at the branch HEAD. Its four message fields are a random, privacy-safe
+  `owner` token, the `workspace` label, the branch name and an ISO-8601 `acquired-at` time. Push that
+  tag without force; remote ref creation is atomic, so a rejection means another workspace owns the
+  window and this one waits. Delete the rejected local candidate and create a fresh tag with a new
+  owner and time before retrying.
+
+  After a successful acquire, retain the exact annotated-tag object ID as the ownership token. After
+  pushing the branch, delete the remote lock with `--force-with-lease` bound to that exact object ID,
+  then delete the local tag. A lease mismatch means ownership changed and must leave the remote tag
+  untouched. Never overwrite or delete another workspace's lock. Only the maintainer may declare a
+  lock orphaned after checking its message and object ID; recovery deletes that observed object with
+  the same lease protection before another acquisition.
+
+  If `main` advances after a green final run, inspect the intervening commits and the rebased diff
+  before choosing verification. A clean, non-overlapping base update does not by itself invalidate
+  the completed branch tests; conflicts or semantic overlap require the affected targeted checks
+  and, where the risk crosses profiles, another full run. Do not use a full rerun as a substitute
+  for that analysis.
+
+* **A branch gets a whole-branch review before its final verification and push.** Every batch of
+  work so far has had its most serious findings surface there rather than in the per-task reviews.
 
 ## The design specification
 

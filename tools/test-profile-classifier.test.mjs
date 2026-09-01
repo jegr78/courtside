@@ -108,6 +108,7 @@ test("given critical unknown or destructive changes, when classifying, then each
     [{ status: "M", path: "deploy/compose.yaml" }],
     [{ status: "M", path: "security/run-contract.json" }],
     [{ status: "M", path: "SECURITY.md" }],
+    [{ status: "M", path: "AGENTS.md" }],
     [{ status: "M", path: "src/main/resources/application.yaml" }],
     [{ status: "M", path: "tools/test-profile-classifier.mjs" }],
     [{ status: "M", path: "src/test/java/org/courtside/AbstractIntegrationTest.java" }],
