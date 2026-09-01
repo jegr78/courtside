@@ -1,11 +1,15 @@
 package org.courtside.booking.internal;
 
+import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRuleCheck;
 import org.courtside.booking.BookingRulesViolatedException;
+import org.courtside.booking.CourtAllocation;
+import org.courtside.booking.BookingStatus;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberService;
 import org.courtside.rules.BookingDurationLimit;
+import org.courtside.rules.CancellationDeadline;
 import org.courtside.rules.RuleContext;
 import org.courtside.rules.CourtBookingPermission;
 import org.courtside.rules.RuleEngine;
@@ -13,6 +17,7 @@ import org.courtside.rules.RuleViolation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +32,7 @@ public class BookingRuleGate {
     private final RuleEngine ruleEngine;
     private final CourtBookingPermission bookingPermission;
     private final BookingDurationLimit durationLimit;
+    private final CancellationDeadline cancellationDeadline;
     private final MemberService members;
     private final UserAccountRepository accounts;
 
@@ -67,6 +73,9 @@ public class BookingRuleGate {
     }
 
     public UUID personBehind(UUID accountId) {
+        if (accountId == null) {
+            return null;
+        }
         return accounts.findById(accountId)
                 .map(account -> account.getPerson().getId())
                 .orElse(null);
@@ -90,6 +99,19 @@ public class BookingRuleGate {
 
     public void requireNoViolations(BookingRuleCheck check) {
         requireEmpty(violationsFor(check));
+    }
+
+    public void requireCancellationAllowed(Booking booking, Set<Role> roles, Instant cancelledAt) {
+        if (roles.contains(Role.ADMIN) || booking.getStatus() == BookingStatus.CANCELLED) {
+            return;
+        }
+        Instant startsAt = booking.getAllocations().stream()
+                .map(CourtAllocation::getStartsAt)
+                .min(Instant::compareTo)
+                .orElseThrow(() -> new IllegalStateException("A confirmed booking must occupy a court"));
+        cancellationDeadline.violationFor(
+                        membershipTypeOf(personBehind(booking.getBookedBy())), startsAt, cancelledAt)
+                .ifPresent(violation -> requireEmpty(List.of(violation)));
     }
 
     // An ADMIN overrides every restriction; only opening hours and the slot grid bind them too.

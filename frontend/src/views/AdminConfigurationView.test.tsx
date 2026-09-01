@@ -41,6 +41,7 @@ describe("AdminConfigurationView", () => {
       { ruleType: "OPENING_HOURS", configurable: false, parameters: [] },
       { ruleType: "SLOT_GRID", configurable: false, parameters: [] },
       { ruleType: "ADVANCE_WINDOW", configurable: true, parameters: [{ name: "maxDays", minimum: 1, maximum: 365 }] },
+      { ruleType: "CANCELLATION_DEADLINE", configurable: true, parameters: [{ name: "minMinutes", minimum: 0, maximum: 525600 }] },
       { ruleType: "NO_COURT_BOOKING", configurable: true, parameters: [] }
     ]);
     vi.spyOn(api, "rules").mockResolvedValue([
@@ -583,6 +584,20 @@ describe("AdminConfigurationView", () => {
     // then — a Save button beside no field says nothing on its own
     expect(description).toHaveTextContent("nobody measured by that set may book a court or move a booking");
     expect(screen.getByTestId("save-rule-NO_COURT_BOOKING")).toBeInTheDocument();
+  });
+
+  it("given a cancellation deadline is offered, when editing rules, then its unit and range are clear", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+
+    // when
+    const deadline = await screen.findByTestId("rule-CANCELLATION_DEADLINE-minMinutes");
+
+    // then
+    expect(screen.getByTestId("rule-CANCELLATION_DEADLINE-title")).toHaveTextContent("Cancellation deadline");
+    expect(deadline).toHaveAccessibleName("Minimum minutes before the booking starts");
+    expect(screen.getByTestId("rule-CANCELLATION_DEADLINE-minMinutes-range"))
+      .toHaveTextContent("Allowed range: 0 to 525600");
   });
 
   it("given a rule with no parameters, when it is saved, then it is written without any parameter", async () => {

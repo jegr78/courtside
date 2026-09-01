@@ -28,6 +28,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -115,7 +116,9 @@ class BookingWriter {
         Booking booking = bookings.findWithAllocationsById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         accessControl.requireManagementAccess(booking, cancelledBy, cancellerRoles);
-        booking.cancel(cancelledBy, clock.instant());
+        Instant cancelledAt = clock.instant();
+        ruleGate.requireCancellationAllowed(booking, cancellerRoles, cancelledAt);
+        booking.cancel(cancelledBy, cancelledAt);
         bookings.saveAndFlush(booking);
     }
 

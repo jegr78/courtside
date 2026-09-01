@@ -13,6 +13,8 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
+import org.courtside.rules.testfixture.RulesTestFixture;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +49,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class,
+        RulesTestFixture.class})
 class BookingControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -79,6 +82,12 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
+    private RulesTestFixture rules;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -644,6 +653,30 @@ class BookingControllerTest extends AbstractIntegrationTest {
         // then
         assertThat(bookings.findById(id).orElseThrow().getStatus())
                 .isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenTheCancellationDeadlineHasPassed_whenAMemberCancels_thenTheViolationIsReturned()
+            throws Exception {
+        // given
+        UUID bookingId = bookingOf("doe.jane");
+        members.assignMembership(identity.personIdForUsername("doe.jane"),
+                UUID.fromString("cccccccc-0000-0000-0000-000000000001"));
+        rules.setCancellationDeadline(
+                UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001"), 361);
+
+        // when / then
+        mockMvc.perform(delete("/api/bookings/{id}", bookingId).with(csrf()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:booking-rules-violated"))
+                .andExpect(jsonPath("$.violations[0].code")
+                        .value("booking.rule.cancellationDeadline.exceeded"))
+                .andExpect(jsonPath("$.violations[0].params.minMinutes").value(361));
+        assertThat(bookings.findById(bookingId).orElseThrow().getStatus())
+                .isEqualTo(BookingStatus.CONFIRMED);
     }
 
     @Test

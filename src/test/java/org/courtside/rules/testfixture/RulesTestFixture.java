@@ -28,6 +28,11 @@ public class RulesTestFixture {
         return ruleSetId;
     }
 
+    public void setCancellationDeadline(UUID ruleSetId, int minMinutes) {
+        rules.setRule(ruleSetId, RuleType.CANCELLATION_DEADLINE,
+                Map.of("minMinutes", minMinutes));
+    }
+
     public void deactivate(UUID ruleSetId) {
         rules.setRuleSetActive(ruleSetId, false);
     }

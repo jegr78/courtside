@@ -111,7 +111,12 @@ public class BookingService {
         Booking visibleBooking = bookings.findWithAllocationsById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         accessControl.requireManagementAccess(visibleBooking, cancelledBy, cancellerRoles);
-        writer.cancel(bookingId, cancelledBy, cancellerRoles);
+        try {
+            writer.cancel(bookingId, cancelledBy, cancellerRoles);
+        } catch (BookingRulesViolatedException failure) {
+            recordRejections(failure);
+            throw failure;
+        }
     }
 
     @Transactional(readOnly = true)
