@@ -889,6 +889,15 @@ on purpose: every value it accepts exists, so there is no unknown one to answer.
 is never a bare key: every error this document declares answers `application/problem+json` with the
 `Problem` schema, so what a client is promised is the shape above.
 
+**Rule-set failures name how the rule set participates in the operation.** A rule-set identifier in
+a rule-set administration path names the resource itself, so a missing row answers `404` with
+`rule-set-not-found`. A membership-type or configuration body refers to a rule set as one of its
+fields, so an unresolved reference answers `400` with a violation such as
+`membershipType.ruleSet.unresolvable` and a problem type ending in `-unresolvable`. This naming
+distinction belongs to those contracts, not to identifier location in general. Other operations may
+choose different semantics to describe a compound invariant or avoid an existence oracle; their
+OpenAPI response remains authoritative.
+
 ### Four failure modes that are easy to get wrong
 
 **Concurrent booking of the same slot.** Rule evaluation in step 3 cannot prevent this in
