@@ -29,7 +29,7 @@ export function AdminBookingCardView() {
   const [card, setCard] = useState<BookingCard>();
   const [confirmed, setConfirmed] = useState<BookingCard>();
   const { error, success, pending, reportError, refuse, save } = useSaving();
-  const created = arrivedFromCardCreation(location.state as unknown);
+  const [created, setCreated] = useState(() => arrivedFromCardCreation(location.state as unknown));
   const disabled = pending.has(MARK);
 
   useEffect(() => {
@@ -47,12 +47,14 @@ export function AdminBookingCardView() {
   }, [cardId, refuse, reportError, t]);
 
   function confirm(changed: BookingCard) {
+    setCreated(false);
     setCard(changed);
     setConfirmed(changed);
   }
 
   function saveCard() {
     if (!card) return Promise.resolve();
+    setCreated(false);
     return save(MARK, async () => confirm(await api.changeAdminBookingCard(card.id, {
       label: card.label, color: card.color, allowedRoles: card.allowedRoles,
       managingRoles: card.managingRoles, allowedPlayerCounts: card.allowedPlayerCounts,
@@ -63,6 +65,7 @@ export function AdminBookingCardView() {
 
   function toggleActive() {
     if (!card) return Promise.resolve();
+    setCreated(false);
     return save(MARK, async () => confirm(await api.setAdminBookingCardActive(card.id, !card.active)));
   }
 

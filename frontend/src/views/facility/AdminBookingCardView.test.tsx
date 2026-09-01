@@ -15,8 +15,8 @@ const memberCard: BookingCard = {
   guestAllowed: true, showGenericOccupancy: false, active: true
 };
 
-function show(cardId = "card-1", counted = false) {
-  render(<MemoryRouter initialEntries={[`/admin/facility/booking-cards/${cardId}`]}>
+function show(cardId = "card-1", counted = false, state?: unknown) {
+  render(<MemoryRouter initialEntries={[{ pathname: `/admin/facility/booking-cards/${cardId}`, state }]}>
     <WithClubConfiguration><UnsavedChangesProvider>
       {counted && <UnsavedCount />}
       <Routes>
@@ -203,5 +203,21 @@ describe("AdminBookingCardView", () => {
 
     // then
     expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1");
+  });
+
+  // Two banners at once would have the page congratulate the board on a save that just failed.
+  it("given the card was just created, when the next save fails, then only the failure is shown", async () => {
+    // given
+    vi.spyOn(api, "changeAdminBookingCard").mockRejectedValue(new Error("nope"));
+    show("card-1", false, { cardCreated: true });
+    await screen.findByTestId("card-label");
+    expect(screen.getByRole("status")).toHaveTextContent("The booking card was created.");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });
