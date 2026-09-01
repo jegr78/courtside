@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -220,4 +220,65 @@ describe("AdminBookingCardView", () => {
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(screen.queryByRole("status")).toBeNull();
   });
+
+  // Deactivating is not a save, so it must not answer for the fields somebody is still editing.
+  it("given unsaved edits, when the card is deactivated, then what was entered is still there", async () => {
+    // given
+    vi.spyOn(api, "setAdminBookingCardActive").mockResolvedValue({ ...memberCard, active: false });
+    show();
+    await screen.findByTestId("card-label");
+    await userEvent.clear(screen.getByTestId("card-label"));
+    await userEvent.type(screen.getByTestId("card-label"), "Training");
+
+    // when
+    await userEvent.click(screen.getByTestId("toggle-card"));
+
+    // then
+    expect(await screen.findByTestId("toggle-card")).toHaveTextContent("Activate");
+    expect(screen.getByTestId("card-label")).toHaveValue("Training");
+  });
+
+  // An h1 that mirrors the field it edits empties itself while somebody clears the field.
+  it("given the label is being rewritten, when it is empty for a moment, then the heading still names the card", async () => {
+    // given
+    show();
+    await screen.findByTestId("card-label");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Member booking");
+
+    // when
+    await userEvent.clear(screen.getByTestId("card-label"));
+
+    // then
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Member booking");
+  });
+
+  it("given the page is open, when the language changes, then the card is not fetched again", async () => {
+    // given
+    const cards = vi.spyOn(api, "adminBookingCards").mockResolvedValue([memberCard]);
+    show();
+    await screen.findByTestId("card-label");
+    expect(cards).toHaveBeenCalledTimes(1);
+
+    // when
+    await i18n.changeLanguage("de");
+
+    // then
+    await waitFor(() => expect(cards).toHaveBeenCalledTimes(1));
+  });
+
+  // A number field accepts both of these, and parseInt read them as 1 and 2 rather than refusing.
+  it.each([["1e3", "a thousand is out of range"], ["3.9", "a fraction is not a player count"]])(
+    "given the player counts, when %s is entered, then it cannot be added because %s",
+    async (entry) => {
+      // given
+      show();
+      await screen.findByTestId("card-label");
+
+      // when
+      fireEvent.change(screen.getByTestId("card-counts-entry"), { target: { value: entry } });
+
+      // then
+      expect(screen.getByTestId("card-counts-add")).toBeDisabled();
+      expect(screen.getByTestId("card-counts-list")).toHaveTextContent(/^2 ×4 ×$/);
+    });
 });

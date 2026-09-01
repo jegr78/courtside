@@ -27,8 +27,9 @@ export function AdminBookingCardView() {
   const { cardId = "" } = useParams();
   const { club, error: clubError } = useClubConfiguration();
   const [card, setCard] = useState<BookingCard>();
+  const [missing, setMissing] = useState(false);
   const [confirmed, setConfirmed] = useState<BookingCard>();
-  const { error, success, pending, reportError, refuse, save } = useSaving();
+  const { error, success, pending, reportError, save } = useSaving();
   const [created, setCreated] = useState(() => arrivedFromCardCreation(location.state as unknown));
   const disabled = pending.has(MARK);
 
@@ -36,15 +37,12 @@ export function AdminBookingCardView() {
     void api.adminBookingCards()
       .then((cards) => {
         const found = cards.find((candidate) => candidate.id === cardId);
-        if (!found) {
-          refuse(t("admin.facility.cardNotFound"));
-          return;
-        }
+        setMissing(found === undefined);
         setCard(found);
         setConfirmed(found);
       })
       .catch(reportError);
-  }, [cardId, refuse, reportError, t]);
+  }, [cardId, reportError]);
 
   function confirm(changed: BookingCard) {
     setCreated(false);
@@ -63,16 +61,23 @@ export function AdminBookingCardView() {
     })));
   }
 
+  // Taking a card out of service is not a save, so it answers for `active` and for nothing else
+  // somebody may still be editing on this page.
   function toggleActive() {
     if (!card) return Promise.resolve();
     setCreated(false);
-    return save(MARK, async () => confirm(await api.setAdminBookingCardActive(card.id, !card.active)));
+    return save(MARK, async () => {
+      const { active } = await api.setAdminBookingCardActive(card.id, !card.active);
+      setCreated(false);
+      setCard((current) => current && { ...current, active });
+      setConfirmed((current) => current && { ...current, active });
+    });
   }
 
   return <FacilityPage
     testId="admin-booking-card-view"
-    title={card?.label ?? t("admin.facility.cards")}
-    error={error ?? clubError}
+    title={confirmed?.label ?? t("admin.facility.cards")}
+    error={error ?? (missing ? t("admin.facility.cardNotFound") : undefined) ?? clubError}
     success={success ?? (created ? t("admin.facility.cardCreated") : undefined)}
   >
     {card !== undefined && club !== undefined && <>

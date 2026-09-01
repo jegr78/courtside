@@ -127,6 +127,24 @@ describe("AdminCourtsView", () => {
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
   });
 
+  // Taking a court out of service is not a save, so it must not answer for the name being edited.
+  it("given an unsaved name, when the court is deactivated, then what was entered is still there", async () => {
+    // given
+    vi.spyOn(api, "setAdminCourtActive")
+      .mockResolvedValue({ id: "court-1", number: 1, name: "Centre Court", active: false });
+    show();
+    const name = await screen.findByTestId("court-name-court-1");
+    await userEvent.clear(name);
+    await userEvent.type(name, "Garden Court");
+
+    // when
+    await userEvent.click(screen.getByTestId("toggle-court-court-1"));
+
+    // then
+    expect(await screen.findByTestId("toggle-court-court-1")).toHaveTextContent("Activate");
+    expect(screen.getByTestId("court-name-court-1")).toHaveValue("Garden Court");
+  });
+
   it("given an active court, when toggling it twice, then it disappears and can be restored", async () => {
     // given
     const setCourtActive = vi.spyOn(api, "setAdminCourtActive")

@@ -4,9 +4,9 @@ import type { Role } from "../../api/client";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 
-export const MIN_PLAYER_COUNT = 1;
-export const MAX_PLAYER_COUNT = 20;
-export const MAX_PLAYER_COUNTS = 20;
+const MIN_PLAYER_COUNT = 1;
+const MAX_PLAYER_COUNT = 20;
+const MAX_PLAYER_COUNTS = 20;
 
 const roles: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER"];
 // The server strips MEMBER before matching a managing role.
@@ -41,7 +41,7 @@ export function ManagingRoleCheckboxes(props: { name?: string; selected: Role[];
 export function PlayerCounts({ counts, disabled, changed, idPrefix }: { counts: number[]; disabled?: boolean; changed: (counts: number[]) => void; idPrefix: string }) {
   const { t } = useTranslation();
   const [entry, setEntry] = useState("");
-  const candidate = Number.parseInt(entry, 10);
+  const candidate = Number(entry);
   const addable = Number.isInteger(candidate)
     && candidate >= MIN_PLAYER_COUNT && candidate <= MAX_PLAYER_COUNT
     && !counts.includes(candidate) && counts.length < MAX_PLAYER_COUNTS;
@@ -57,7 +57,7 @@ export function PlayerCounts({ counts, disabled, changed, idPrefix }: { counts: 
     <p id={`${idPrefix}-hint`} data-testid={`${idPrefix}-hint`} className="text-[var(--cs-muted)]">{t("admin.facility.playerCountsHint")}</p>
     <ul data-testid={`${idPrefix}-list`} className="flex flex-wrap gap-2">
       {counts.map((count) => <li key={count}>
-        <Button variant="secondary" type="button" disabled={disabled} data-testid={`${idPrefix}-remove-${count}`} aria-label={t("admin.facility.removePlayerCount", { players: count })} onClick={() => changed(counts.filter((candidate) => candidate !== count))}>
+        <Button variant="secondary" type="button" disabled={disabled} data-testid={`${idPrefix}-remove-${count}`} aria-label={t("admin.facility.removePlayerCount", { players: count })} onClick={() => changed(counts.filter((chosen) => chosen !== count))}>
           {count} <span aria-hidden="true">×</span>
         </Button>
       </li>)}
@@ -72,7 +72,8 @@ export function PlayerCounts({ counts, disabled, changed, idPrefix }: { counts: 
 export function ColorField({ value, disabled, changed, name, testId }: { value?: string; disabled?: boolean; changed?: (color: string) => void; name?: string; testId?: string }) {
   const { t } = useTranslation();
   return <TextField
-    className="h-12 w-24 cursor-pointer p-1"
+    className="cursor-pointer"
+    style={{ height: "3rem", width: "6rem", padding: "0.25rem" }}
     data-testid={testId}
     name={name}
     type="color"
