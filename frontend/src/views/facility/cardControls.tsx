@@ -41,6 +41,7 @@ export function ManagingRoleCheckboxes(props: { name?: string; selected: Role[];
 export function PlayerCounts({ counts, disabled, changed, idPrefix }: { counts: number[]; disabled?: boolean; changed: (counts: number[]) => void; idPrefix: string }) {
   const { t } = useTranslation();
   const [entry, setEntry] = useState("");
+  // Not parseInt: a number field accepts "1e3" and "3.9", which it would read as 1 and 3.
   const candidate = Number(entry);
   const addable = Number.isInteger(candidate)
     && candidate >= MIN_PLAYER_COUNT && candidate <= MAX_PLAYER_COUNT
@@ -73,6 +74,8 @@ export function ColorField({ value, disabled, changed, name, testId }: { value?:
   const { t } = useTranslation();
   return <TextField
     className="cursor-pointer"
+    // A padding class would compete with the field's own, and Tailwind decides that by
+    // the order it emitted the utilities in rather than the order they are written in.
     style={{ height: "3rem", width: "6rem", padding: "0.25rem" }}
     data-testid={testId}
     name={name}
