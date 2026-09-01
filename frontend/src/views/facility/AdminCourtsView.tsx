@@ -17,7 +17,10 @@ const MAX_NUMBER = 999;
 const MAX_NAME = 60;
 
 type Field = "number" | "name";
-type CellEditor = { courtId: string; field: Field; entry: string };
+type Cell = { courtId: string; field: Field };
+type CellEditor = Cell & { entry: string };
+
+const cellWidth: Record<Field, string> = { number: "w-20", name: "w-56" };
 
 function shown(court: AdminCourt, field: Field): string {
   return field === "number" ? String(court.number) : court.name ?? "";
@@ -36,7 +39,7 @@ export function AdminCourtsView() {
   const { club, error: clubError } = useClubConfiguration();
   const [courts, setCourts] = useState<AdminCourt[]>();
   const [editor, setEditor] = useState<CellEditor>();
-  const [restored, setRestored] = useState<CellEditor>();
+  const [restored, setRestored] = useState<Cell>();
   const { error, success, pending, reportError, save } = useSaving();
   const newCourt = useUnsavedForm("court:new");
 
@@ -46,11 +49,12 @@ export function AdminCourtsView() {
 
   const edited = courts?.find((court) => court.id === editor?.courtId);
 
-  // Closing an editor takes the focused input off the page, so the value it belonged to takes the
-  // focus back rather than dropping whoever is on a keyboard at the top of the document.
-  function close() {
-    setRestored(editor);
-    setEditor(undefined);
+  // Closing takes the focused input off the page, so the value it belonged to takes the focus back.
+  // It closes that cell and not whichever one is open by the time a write answers.
+  function close(closing: Cell) {
+    setRestored({ courtId: closing.courtId, field: closing.field });
+    setEditor((current) =>
+      current?.courtId === closing.courtId && current.field === closing.field ? undefined : current);
   }
 
   function replace(changed: AdminCourt) {
@@ -64,7 +68,7 @@ export function AdminCourtsView() {
       : { number: edited.number, name: editor.entry || undefined };
     return save(`court:${editor.courtId}`, async () => {
       replace(await api.changeAdminCourt(editor.courtId, request));
-      close();
+      close(editor);
     });
   }
 
@@ -85,7 +89,7 @@ export function AdminCourtsView() {
       const created = await api.createAdminCourt({
         number: Number(formString(form, "number")), name: formString(form, "name") || undefined
       });
-      setCourts((current) => [...(current ?? []), created]);
+      setCourts((current) => current && [...current, created]);
       formElement.reset();
     });
   }
@@ -123,7 +127,7 @@ export function AdminCourtsView() {
                 open={(field) => setEditor({ courtId: court.id, field, entry: shown(court, field) })}
                 entered={(entry) => setEditor((current) => current && { ...current, entry })}
                 confirm={confirmEdit}
-                dismiss={close}
+                dismiss={() => { if (editor) close(editor); }}
                 toggle={toggle}
                 reportError={reportError}
               />)}
@@ -179,12 +183,12 @@ function CellValue({ court, field, disabled, focused, open }: { court: AdminCour
   return <button
     autoFocus={focused}
     data-testid={`edit-court-${field}-${court.id}`}
-    className={`min-h-11 cursor-pointer rounded-lg border border-dashed px-3 py-2 text-left hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed ${field === "number" ? "w-20" : "w-56"}`}
+    className={`min-h-11 cursor-pointer rounded-lg border border-dashed px-3 py-2 text-left hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed ${cellWidth[field]}`}
     type="button"
     disabled={disabled}
     onClick={open}
   >
-    {value ?? t("admin.facility.unnamedCourt")}
+    {value || t("admin.facility.unnamedCourt")}
     <span className="sr-only">{t(field === "number" ? "admin.facility.editNumber" : "admin.facility.editName")}</span>
   </button>;
 }
@@ -210,7 +214,7 @@ function CellEditorControls({ editor, mark, unsaved, disabled, entered, confirm,
     <input
       autoFocus
       data-testid="court-editor"
-      className={`form-control min-h-11 rounded-lg border px-3 py-2 outline-none ${number ? "w-20" : "w-56"}`}
+      className={`form-control min-h-11 rounded-lg border px-3 py-2 outline-none ${cellWidth[editor.field]}`}
       aria-label={t(number ? "admin.facility.number" : "admin.facility.name")}
       type={number ? "number" : "text"}
       min={number ? MIN_NUMBER : undefined}

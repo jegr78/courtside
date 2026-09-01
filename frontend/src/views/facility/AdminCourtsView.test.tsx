@@ -498,6 +498,46 @@ describe("AdminCourtsView", () => {
     expect(await screen.findByTestId("toggle-court-court-1")).toBeEnabled();
   });
 
+  // The rest of the list stays usable while one court is being written, so the answer to that
+  // write must close the editor it belonged to rather than whichever one is open by the time it lands.
+  it("given a write in flight, when another cell is opened and typed into, then the answer leaves it alone", async () => {
+    // given
+    vi.spyOn(api, "adminCourts").mockResolvedValue([
+      { id: "court-1", number: 3, name: "Centre Court", active: true },
+      { id: "court-2", number: 4, name: "Garden Court", active: true }
+    ]);
+    const response = deferred<Awaited<ReturnType<typeof api.changeAdminCourt>>>();
+    vi.spyOn(api, "changeAdminCourt").mockReturnValue(response.promise);
+    show(true);
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("edit-court-name-court-1"));
+    await user.type(screen.getByTestId("court-editor"), "!");
+    await user.click(screen.getByTestId("confirm-court-edit"));
+
+    // when
+    await user.click(screen.getByTestId("edit-court-name-court-2"));
+    await user.type(screen.getByTestId("court-editor"), "?");
+    response.resolve({ id: "court-1", number: 3, name: "Centre Court!", active: true });
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("edit-court-name-court-1")).toHaveTextContent("Centre Court!"));
+    expect(screen.getByTestId("court-editor")).toHaveValue("Garden Court?");
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1");
+  });
+
+  it("given a court whose name is a blank string, when the list is read, then the cell still says it has none", async () => {
+    // given
+    vi.spyOn(api, "adminCourts").mockResolvedValue([
+      { id: "court-1", number: 5, name: "", active: true }
+    ]);
+
+    // when
+    show();
+
+    // then
+    expect(await screen.findByTestId("edit-court-name-court-1")).toHaveTextContent("No name");
+  });
+
   it("given a confirmed edit is pending, when it is confirmed again, then the court is written once", async () => {
     // given
     const response = deferred<Awaited<ReturnType<typeof api.changeAdminCourt>>>();
