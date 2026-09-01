@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { Role } from "../../api/client";
 import { Button } from "../../components/Button";
@@ -63,8 +63,31 @@ export function PlayerCounts({ counts, disabled, changed, idPrefix }: { counts: 
       </li>)}
     </ul>
     <div className="flex flex-wrap items-end gap-3">
-      <div className="w-28"><TextField data-testid={`${idPrefix}-entry`} type="number" min={MIN_PLAYER_COUNT} max={MAX_PLAYER_COUNT} disabled={disabled} label={t("admin.facility.addPlayerCount")} value={entry} onChange={(event) => setEntry(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); add(); } }} /></div>
+      <div className="w-28"><TextField className="w-full" data-testid={`${idPrefix}-entry`} type="number" min={MIN_PLAYER_COUNT} max={MAX_PLAYER_COUNT} disabled={disabled} label={t("admin.facility.addPlayerCount")} value={entry} onChange={(event) => setEntry(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); add(); } }} /></div>
       <Button variant="secondary" type="button" data-testid={`${idPrefix}-add`} disabled={disabled || !addable} onClick={add}>{t("admin.add")}</Button>
     </div>
+  </fieldset>;
+}
+
+export function ColorField({ value, disabled, changed, name, testId }: { value?: string; disabled?: boolean; changed?: (color: string) => void; name?: string; testId?: string }) {
+  const { t } = useTranslation();
+  return <TextField
+    className="h-12 w-24 cursor-pointer p-1"
+    data-testid={testId}
+    name={name}
+    type="color"
+    disabled={disabled}
+    label={t("admin.facility.color")}
+    defaultValue={changed ? undefined : "#b85c38"}
+    value={changed ? value : undefined}
+    onChange={changed ? (event) => changed(event.target.value) : undefined}
+  />;
+}
+
+export function BookingRules({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+  return <fieldset className="grid content-start gap-2">
+    <legend className="font-medium">{t("admin.facility.bookingRules")}</legend>
+    {children}
   </fieldset>;
 }

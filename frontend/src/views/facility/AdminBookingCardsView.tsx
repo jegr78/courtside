@@ -6,7 +6,7 @@ import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { formString } from "../../forms/formString";
 import { useUnsavedForm } from "../../unsaved/useUnsavedForm";
-import { AllowedRoleCheckboxes, Checkbox, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
+import { AllowedRoleCheckboxes, BookingRules, Checkbox, ColorField, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
 import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
 
@@ -47,7 +47,7 @@ export function AdminBookingCardsView() {
     {cards !== undefined && <>
       <CardCreateForm disabled={disabled} form={newCard.form} counts={counts} setCounts={setCounts} create={create} />
       <section className="grid gap-3">
-        <h2 className="text-2xl font-bold">{t("admin.facility.cards")}</h2>
+        <h2 className="text-2xl font-bold">{t("admin.facility.allCards")}</h2>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
@@ -78,17 +78,19 @@ function CardCreateForm({ disabled, form, counts, setCounts, create }: { disable
   const { t } = useTranslation();
   return <form noValidate {...form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
     <h2 className="font-bold">{t("admin.facility.newCard")}</h2>
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid items-start gap-4 md:grid-cols-3">
       <TextField disabled={disabled} data-testid="new-card-label" name="label" label={t("admin.facility.label")} />
-      <TextField disabled={disabled} name="color" type="color" defaultValue="#b85c38" label={t("admin.facility.color")} />
+      <div className="grid content-start gap-4">
+        <ColorField disabled={disabled} name="color" />
+        <Checkbox disabled={disabled} name="showGenericOccupancy" label={t("admin.facility.showGenericOccupancy")} />
+      </div>
       <PlayerCounts idPrefix="new-card-counts" disabled={disabled} counts={counts} changed={setCounts} />
       <AllowedRoleCheckboxes disabled={disabled} name="allowedRoles" selected={[]} testIdPrefix="new-card-role" />
       <ManagingRoleCheckboxes disabled={disabled} name="managingRoles" selected={[]} testIdPrefix="new-card-managing-roles" />
-      <div className="grid content-start gap-2">
+      <BookingRules>
         <Checkbox disabled={disabled} name="countsAgainstLimits" label={t("admin.facility.countsAgainstLimits")} />
         <Checkbox disabled={disabled} name="guestAllowed" label={t("admin.facility.guestAllowed")} />
-        <Checkbox disabled={disabled} name="showGenericOccupancy" label={t("admin.facility.showGenericOccupancy")} />
-      </div>
+      </BookingRules>
     </div>
     <Button variant="primary" data-testid="create-card" disabled={disabled} className="justify-self-start" type="submit">{t("admin.create")}</Button>
   </form>;
