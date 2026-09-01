@@ -305,7 +305,7 @@ describe("AppRoutes", () => {
       roles: ["ADMIN"],
       passwordChangeRequired: false
     }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
-    await screen.findByTestId("court-name-court-1");
+    await screen.findByTestId("court-row-court-1");
 
     // when
     await userEvent.click(screen.getByTestId("admin-opening-hours-link"));
