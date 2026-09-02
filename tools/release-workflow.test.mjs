@@ -59,3 +59,84 @@ test("given a tag, when the release runs, then it demands a nightly that verifie
   assert.match(workflow, /no green first-attempt nightly verified a commit this tag builds on/);
   assert.match(workflow, /actions: read/);
 });
+
+const SELF_SUFFICIENT = [
+  "courtside.mjs",
+  "courtside.uat-smoke.mjs",
+  "courtside.upgrade-smoke.mjs",
+  "courtside.restore-smoke.mjs"
+];
+
+function sourceOf(name) {
+  return readFileSync(fileURLToPath(new URL(name, import.meta.url)), "utf8");
+}
+
+function relativeImportsOf(source) {
+  return [...source.matchAll(/from\s+["'](\.\/[^"']+)["']/g)].map((match) => match[1].slice(2));
+}
+
+// A require bound at module level runs on import; the same call inside a function does not.
+function moduleLevelBareRequires(source) {
+  return source.split("\n")
+    .map((line, index) => ({ line, number: index + 1 }))
+    .filter(({ line }) => /^(?:const|let|var)\s+[^=]+=\s*(?:frontendRequire|require)\(\s*["'][^.]/.test(line))
+    .map(({ line, number }) => `${number}: ${line.trim()}`);
+}
+
+function moduleLevelBareImports(source) {
+  return source.split("\n")
+    .map((line, index) => ({ line, number: index + 1 }))
+    .filter(({ line }) => /^import\s/.test(line))
+    .filter(({ line }) => !/["'](?:node:|\.\/|\.\.\/)/.test(line))
+    .filter(({ line }) => /["'][^"']+["']/.test(line))
+    .map(({ line, number }) => `${number}: ${line.trim()}`);
+}
+
+function graphOf(entry) {
+  const seen = new Set();
+  const pending = [entry];
+  while (pending.length > 0) {
+    const name = pending.pop();
+    if (seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    relativeImportsOf(sourceOf(name)).forEach((next) => pending.push(next));
+  }
+  return [...seen];
+}
+
+test("given a tool a workflow runs on a bare checkout, when it is imported, then nothing outside this repository has to be installed first", () => {
+  // given
+  const offenders = [];
+
+  // when
+  for (const entry of SELF_SUFFICIENT) {
+    for (const module of graphOf(entry)) {
+      const source = sourceOf(module);
+      [...moduleLevelBareRequires(source), ...moduleLevelBareImports(source)]
+        .forEach((offence) => offenders.push(`${entry} -> tools/${module}:${offence}`));
+    }
+  }
+
+  // then
+  assert.deepEqual(offenders, [],
+    `These modules are loaded before a workflow installs anything, so they may not bind an external\n`
+    + `dependency at module level. Move the require or the import into the function that needs it:\n`
+    + `${offenders.join("\n")}`);
+});
+
+test("given the jobs that run a tool needing a validator, when the release starts them, then each installs the locked dependencies first", () => {
+  // given
+  const jobs = ["qualify:", "security-record:", "active-security:", "publish:"];
+
+  // when / then
+  jobs.forEach((job) => {
+    const section = workflow.slice(workflow.indexOf(`\n  ${job}`));
+    const install = section.indexOf("Install locked tool dependencies");
+    const runsATool = section.search(/node tools\/(security-|courtside\.)/);
+    assert.ok(install >= 0, `${job} runs a tool that binds a validator but installs nothing`);
+    assert.ok(install < runsATool,
+      `${job} runs a tool before installing what that tool loads`);
+  });
+});
