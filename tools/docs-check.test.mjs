@@ -8,12 +8,14 @@ import {
 } from "./docs-check.mjs";
 
 const admission = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   admittedPolicyFingerprint: "a".repeat(64),
   evidence: {
     runId: 101,
     attempt: 1,
     artifact: "profile-evidence-101-1",
+    windowStartedAt: "2026-08-28T00:00:00Z",
+    windowEndedAt: "2026-08-30T10:00:00Z",
     assessedAt: "2026-08-30T10:00:00Z",
     expiresOn: "2026-09-30",
     status: "ready-for-review",
@@ -23,7 +25,39 @@ const admission = {
     toolingPlans: 1,
     candidateMisses: 0,
     classificationErrors: 0,
-    incompleteObservations: 1
+    incompleteObservations: 2,
+    ciTiming: {
+      observedFirstAttempts: 22,
+      successfulFirstAttempts: 20,
+      medianDurationMs: 865000,
+      p95DurationMs: 894000,
+      runnerMinutes: 661.43,
+      successfulMedianDurationMs: 862000,
+      successfulP95DurationMs: 894000,
+      successfulRunnerMinutes: 599.82
+    },
+    localTiming: {
+      commit: "c".repeat(40),
+      policyFingerprint: "a".repeat(64),
+      status: "qualified",
+      firstAttempts: 18,
+      retries: 0,
+      interruptedAttempts: 0,
+      docs: { attempts: 3, medianMs: 204, maximumMs: 267 },
+      tooling: { attempts: 3, medianMs: 14412, maximumMs: 14870 },
+      backend: { attempts: 3, medianMs: 613648, maximumMs: 647435 },
+      frontend: { attempts: 3, medianMs: 711164, maximumMs: 717124 },
+      combined: { attempts: 3, medianMs: 1247036, maximumMs: 1310954 },
+      full: { attempts: 3, medianMs: 1326984, maximumMs: 1390647 }
+    },
+    nightlies: [
+      { runId: 201, attempt: 1, event: "schedule", commit: "d".repeat(40), outcome: "success",
+        startedAt: "2026-08-29T01:00:00Z",
+        jobs: ["docs", "backend", "frontend", "tooling", "security"] },
+      { runId: 202, attempt: 1, event: "schedule", commit: "e".repeat(40), outcome: "success",
+        startedAt: "2026-08-30T01:00:00Z",
+        jobs: ["docs", "backend", "frontend", "tooling", "security"] }
+    ]
   }
 };
 
@@ -37,6 +71,10 @@ test("given admission facts, when rendering the maintained section, then output 
   assert.match(first, /Profile Evidence run\n`101`/);
   assert.match(first, /expires on 2026-09-30/);
   assert.match(first, /1 tooling plans/);
+  assert.match(first, /22 observed CI first attempts/);
+  assert.match(first, /661\.43 runner minutes/);
+  assert.match(first, /6\.02 percent/);
+  assert.match(first, /scheduled runs `201` and `202`/);
   assert.doesNotMatch(first, /token|cookie|credential/i);
 });
 

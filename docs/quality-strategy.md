@@ -104,6 +104,11 @@ contain `admitted` or `full`; an empty or unknown value also selects `full`. The
 emergency escalation and can never request a reduced profile. Locally, `check --full` provides the
 same escalation, while the admission record remains mandatory for every reduced plan.
 
+If protected replay reports a candidate miss after activation, set `COURTSIDE_TEST_PROFILES` to
+`full` immediately and create a GitHub issue that links the affected run and failed job. Correct
+the rule and add a regression test before collecting new protected evidence and admission. Restore
+`admitted` only after the replacement fingerprint qualifies; a rerun cannot erase the miss.
+
 Each completed pull-request run joins its exact-attempt profile plan with the full job outcomes.
 The follow-up workflow recomputes that plan with the classifier from the immutable pull-request
 base commit. Its protected `workflow_run` event captures the pull request number, repositories,

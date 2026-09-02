@@ -97,6 +97,7 @@
     { "path": "tools/surfaceless-endpoints.json", "profiles": ["full"], "test": false },
     { "path": "tools/test-effectiveness-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/test-naming-policy.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/test-profile-activation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/test-profile-classifier.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/test-profile-classifier.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/test-profile-contract.mjs", "profiles": ["full"], "test": false },

@@ -11,19 +11,63 @@ const endMarker = "<!-- profile-admission:end -->";
 export function admissionSection(admission) {
   validateAdmissionRecord(admission, admission.evidence.expiresOn);
   const evidence = admission.evidence;
-  return [
+  const lines = [
     startMarker,
     "The admitted profile policy is backed by Profile Evidence run",
     `\`${evidence.runId}\`, artifact \`${evidence.artifact}\`, reported \`${evidence.status}\` at`,
     `${evidence.assessedAt} under policy fingerprint`,
     `\`${admission.admittedPolicyFingerprint}\`. The evidence expires on ${evidence.expiresOn}. It contains`,
     `${evidence.qualifyingFirstAttempts} qualifying first attempts, including ${evidence.backendPlans} backend and`,
-    admission.schemaVersion === 2
+    admission.schemaVersion >= 2
       ? `${evidence.frontendPlans} frontend and ${evidence.toolingPlans} tooling plans, with ${evidence.candidateMisses} candidate misses and`
       : `${evidence.frontendPlans} frontend plans, with ${evidence.candidateMisses} candidate misses and`,
-    `${evidence.classificationErrors} classification errors. ${evidence.incompleteObservations} incomplete observations were excluded.`,
-    endMarker
-  ].join("\n");
+    `${evidence.classificationErrors} classification errors. ${evidence.incompleteObservations} incomplete observations were excluded.`
+  ];
+  if (admission.schemaVersion === 3) lines.push(...qualificationLines(evidence));
+  lines.push(endMarker);
+  return lines.join("\n");
+}
+
+function qualificationLines(evidence) {
+  const ci = evidence.ciTiming;
+  const local = evidence.localTiming;
+  const [firstNightly, secondNightly] = evidence.nightlies;
+  return [
+    "",
+    `${ci.observedFirstAttempts} observed CI first attempts had a ${duration(ci.medianDurationMs)} median and`,
+    `${duration(ci.p95DurationMs)} p95, consuming ${ci.runnerMinutes.toFixed(2)} runner minutes. The`,
+    `${ci.successfulFirstAttempts} successful attempts had a ${duration(ci.successfulMedianDurationMs)} median and`,
+    `consumed ${ci.successfulRunnerMinutes.toFixed(2)} runner minutes. These are pre-activation full-execution`,
+    "figures; shadow classifications do not prove hosted-runner savings.",
+    "",
+    `Local qualification on commit \`${local.commit}\` retained ${local.firstAttempts} first attempts with`,
+    `${local.retries} retries and ${local.interruptedAttempts} interruptions. Docs measured ${duration(local.docs.medianMs)}`,
+    `median and ${duration(local.docs.maximumMs)} maximum; tooling measured ${duration(local.tooling.medianMs)} median and`,
+    `${duration(local.tooling.maximumMs)} maximum. Backend saved ${percentage(saving(local.backend, local.full))} with a`,
+    `${duration(local.backend.medianMs)} median, and frontend saved ${percentage(saving(local.frontend, local.full))} with a`,
+    `${duration(local.frontend.medianMs)} median, against the ${duration(local.full.medianMs)} full median. The`,
+    `representative combined plan saved ${percentage(saving(local.combined, local.full))} with a`,
+    `${duration(local.combined.medianMs)} median. Combined savings are reported evidence, not an admission gate or`,
+    "a general acceleration claim.",
+    "",
+    `Genuine scheduled runs \`${firstNightly.runId}\` and \`${secondNightly.runId}\` each passed docs, backend, frontend,`,
+    "tooling and security on their first attempt. Protected replay continues after activation without a fixed",
+    "waiting period; a candidate miss triggers immediate full escalation and requalification."
+  ];
+}
+
+function duration(milliseconds) {
+  if (milliseconds < 60_000) return `${(milliseconds / 1000).toFixed(3)} seconds`;
+  const minutes = Math.floor(milliseconds / 60_000);
+  return `${minutes}m ${((milliseconds % 60_000) / 1000).toFixed(3)}s`;
+}
+
+function percentage(value) {
+  return `${(value * 100).toFixed(2)} percent`;
+}
+
+function saving(timing, full) {
+  return 1 - timing.medianMs / full.medianMs;
 }
 
 export function renderAdmissionDocument(source, admission) {
