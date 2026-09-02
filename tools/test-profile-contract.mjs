@@ -5,38 +5,15 @@ import { fileURLToPath } from "node:url";
 const contractUrl = new URL("../ci/test-profile-contract.json", import.meta.url);
 
 export const semanticPolicySources = [
-  "ci/test-profile-contract.json",
-  "ci/node-toolchain.json",
-  "ci/github-profile-manifest.json",
   "ci/test-profiles.json",
+  "ci/github-profile-manifest.json",
   "ci/tool-profile-manifest.json",
-  "frontend/package.json",
-  "ci/test-profile-plan.schema.json",
-  "ci/test-profile-observation.json",
-  "ci/test-profile-observation.schema.json",
-  "ci/test-profile-observation-summary.schema.json",
-  "ci/test-profile-observation-inventory.schema.json",
-  "quality/local-profile-timing.schema.json",
-  "quality/local-profile-timing-policy.json",
-  ".github/workflows/build.yml",
-  ".github/workflows/ci-timing.yml",
-  ".github/workflows/profile-evidence.yml",
-  "tools/test-profile-contract.mjs",
-  "tools/docs-check.mjs",
-  "tools/github-metadata.test.mjs",
-  "tools/github-template-metadata.test.mjs",
+  "ci/test-profile-contract.json",
   "tools/test-profile-classifier.mjs",
+  "tools/test-profile-contract.mjs",
   "tools/local-check.mjs",
-  "tools/local-profile-timing.mjs",
-  "tools/node-toolchain.mjs",
   "tools/tool-tests.mjs",
-  "tools/workflow-action-pinning.test.mjs",
-  "tools/test-profile-observation.mjs",
-  "tools/test-profile-replay.mjs",
-  "tools/ci-timing.mjs",
-  "tools/ci-workflow-run.mjs",
-  "tools/ci-base-provenance.mjs",
-  "ci/ci-timing.schema.json"
+  ".github/workflows/build.yml"
 ];
 
 export function loadProfileContract() {

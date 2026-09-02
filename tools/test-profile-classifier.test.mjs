@@ -17,6 +17,8 @@ const profileRules = JSON.parse(readFileSync(
   new URL("../ci/test-profiles.json", import.meta.url), "utf8"));
 const toolManifest = JSON.parse(readFileSync(
   new URL("../ci/tool-profile-manifest.json", import.meta.url), "utf8"));
+const admissionRecord = JSON.parse(readFileSync(
+  new URL("../ci/test-profile-admission.json", import.meta.url), "utf8"));
 const githubManifest = JSON.parse(readFileSync(
   new URL("../ci/github-profile-manifest.json", import.meta.url), "utf8"));
 const validatePlan = new Ajv({ strict: true }).compile(planSchema);
@@ -299,6 +301,10 @@ test("given a repository path contains markdown, when rendering reasons, then it
 test("given a profile plan, when binding it to the workflow run, then every identity is retained", () => {
   // given
   const plan = classifyChanges([{ status: "M", path: "docs/design.md" }], []);
+  const fingerprint = profilePolicyFingerprint();
+  const admitted = { ...admissionRecord, admittedPolicyFingerprint: fingerprint,
+    evidence: { ...admissionRecord.evidence,
+      localTiming: { ...admissionRecord.evidence.localTiming, policyFingerprint: fingerprint } } };
 
   // when
   const bound = bindPlanToRun(plan, {
@@ -306,7 +312,7 @@ test("given a profile plan, when binding it to the workflow run, then every iden
     attempt: 1,
     baseCommit: "a".repeat(40),
     headCommit: "b".repeat(40)
-  });
+  }, "admitted", admitted);
 
   // then
   assert.equal(bound.schemaVersion, 4);

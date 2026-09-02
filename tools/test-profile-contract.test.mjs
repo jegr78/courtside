@@ -214,22 +214,31 @@ test("given semantic sources, when one changes, then the fingerprint changes but
     // then
     assert.notEqual(changed, original);
     assert.equal(readFileSync(first, "utf8"), "one");
-    assert.ok(semanticPolicySources.includes(".github/workflows/build.yml"));
-    assert.ok(semanticPolicySources.includes("tools/local-check.mjs"));
-    assert.ok(semanticPolicySources.includes("tools/test-profile-replay.mjs"));
-    assert.ok(semanticPolicySources.includes("tools/docs-check.mjs"));
-    assert.ok(semanticPolicySources.includes("tools/github-metadata.test.mjs"));
-    assert.ok(semanticPolicySources.includes("tools/github-template-metadata.test.mjs"));
-    assert.ok(semanticPolicySources.includes("tools/workflow-action-pinning.test.mjs"));
-    assert.ok(semanticPolicySources.includes("ci/github-profile-manifest.json"));
-    assert.ok(semanticPolicySources.includes("tools/tool-tests.mjs"));
-    assert.ok(semanticPolicySources.includes("tools/node-toolchain.mjs"));
-    assert.ok(semanticPolicySources.includes("frontend/package.json"));
-    assert.ok(semanticPolicySources.includes("ci/test-profile-plan.schema.json"));
     assert.ok(!semanticPolicySources.includes("ci/test-profile-admission.json"));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("given a policy source, when it cannot change the selection or what a profile runs, then it is not fingerprinted", () => {
+  // given
+  const deciding = [
+    ".github/workflows/build.yml",
+    "ci/github-profile-manifest.json",
+    "ci/test-profile-contract.json",
+    "ci/test-profiles.json",
+    "ci/tool-profile-manifest.json",
+    "tools/local-check.mjs",
+    "tools/test-profile-classifier.mjs",
+    "tools/test-profile-contract.mjs",
+    "tools/tool-tests.mjs"
+  ];
+  const frontendPackage = JSON.parse(readFileSync(
+    new URL("../frontend/package.json", import.meta.url), "utf8"));
+
+  // then
+  assert.deepEqual([...semanticPolicySources].sort(), deciding);
+  assert.equal(frontendPackage.scripts["test:tools"], "node ../tools/tool-tests.mjs");
 });
 
 test("given equivalent line endings, when fingerprinting policy sources, then checkout style has no effect", () => {
