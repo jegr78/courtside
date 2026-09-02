@@ -16,7 +16,7 @@ function boundedText(value, field) {
 }
 
 function safeText(value) {
-  return value.replace(/[^A-Za-z0-9 ._:/()-]/g, "?");
+  return value.replace(/[^A-Za-z0-9 ,._:/()-]/g, "?");
 }
 
 function validateRun(run) {
@@ -98,11 +98,11 @@ export function planFailureUpdates(failures, issues) {
     return [{
       action: "create",
       issueNumber: null,
-      title: `[nightly] ${failure.job} / ${failure.step} (${failure.fingerprint.slice(0, 12)})`,
+      title: `[nightly] ${failure.workflow} / ${failure.job} / ${failure.step} (${failure.fingerprint.slice(0, 12)})`,
       body: `${fingerprintMarker}\nA scheduled first-attempt run failed with this stable class.\n\n` +
         `${workflowMarker(failure.workflow)}\n- Job: \`${failure.job}\`\n- Step: \`${failure.step}\`\n` +
         `- Failure class: \`${failure.failureClass}\`\n\n${occurrence(failure)}\n\n` +
-        "Keep this issue open until the tracker marks seven consecutive first-attempt nightlies green and a human verifies closure.",
+        "Keep this issue open until the tracker marks seven consecutive scheduled first attempts of this workflow green and a human verifies closure.",
       labels: ["bug"]
     }];
   });

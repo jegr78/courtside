@@ -186,3 +186,17 @@ test("given one workflow's green streak, when issues are marked ready, then anot
   // then
   assert.deepEqual(plan.map((item) => item.issueNumber), [2]);
 });
+
+test("given a matrix job of a watched workflow, when an issue is opened, then it names the gate that failed", () => {
+  // given
+  const matrix = [{ name: "varied-order (configured, forward)", conclusion: "failure",
+    steps: [{ name: "Run the varied order", conclusion: "failure" }] }];
+
+  // when
+  const [planned] = planFailureUpdates(
+    classifyNightlyFailures({ ...run, run_attempt: 1, name: "test stability" }, matrix), []);
+
+  // then
+  assert.match(planned.title, /^\[nightly\] test stability \/ varied-order \(configured, forward\) \//);
+  assert.doesNotMatch(planned.body, /nightlies/);
+});
