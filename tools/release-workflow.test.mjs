@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -60,83 +60,117 @@ test("given a tag, when the release runs, then it demands a nightly that verifie
   assert.match(workflow, /actions: read/);
 });
 
-const SELF_SUFFICIENT = [
-  "courtside.mjs",
-  "courtside.uat-smoke.mjs",
-  "courtside.upgrade-smoke.mjs",
-  "courtside.restore-smoke.mjs"
-];
+const WORKFLOWS = "../.github/workflows";
 
-function sourceOf(name) {
-  return readFileSync(fileURLToPath(new URL(name, import.meta.url)), "utf8");
+function sourceOf(path) {
+  return readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 }
 
-function relativeImportsOf(source) {
+// Only static imports: a module reached by await import() loads when a command asks for it, not
+// when the file does, so it is the calling job's business rather than the entry point's.
+function staticImportsOf(source) {
   return [...source.matchAll(/from\s+["'](\.\/[^"']+)["']/g)].map((match) => match[1].slice(2));
 }
 
-// A require bound at module level runs on import; the same call inside a function does not.
-function moduleLevelBareRequires(source) {
-  return source.split("\n")
-    .map((line, index) => ({ line, number: index + 1 }))
-    .filter(({ line }) => /^(?:const|let|var)\s+[^=]+=\s*(?:frontendRequire|require)\(\s*["'][^.]/.test(line))
-    .map(({ line, number }) => `${number}: ${line.trim()}`);
+function isExternal(specifier) {
+  return !specifier.startsWith(".") && !specifier.startsWith("node:");
 }
 
-function moduleLevelBareImports(source) {
-  return source.split("\n")
-    .map((line, index) => ({ line, number: index + 1 }))
-    .filter(({ line }) => /^import\s/.test(line))
-    .filter(({ line }) => !/["'](?:node:|\.\/|\.\.\/)/.test(line))
-    .filter(({ line }) => /["'][^"']+["']/.test(line))
-    .map(({ line, number }) => `${number}: ${line.trim()}`);
+// Column zero is module level: an indented require sits inside a function and runs when called.
+// The require pattern deliberately allows anything between the assignment and the call, because
+// `new (require("ajv").default)()` binds just as eagerly as a bare `require("ajv")` does.
+function moduleLevelBindings(source) {
+  const bindings = [];
+  const imports = /^import\s(?:[\s\S]*?\sfrom\s)?\s*["']([^"']+)["'][^\n]*/gm;
+  const requires = /^(?:const|let|var)\s[^=\n]*=[^\n]*?(?:frontendRequire|require)\(\s*["']([^"']+)["'][^\n]*/gm;
+  for (const pattern of [imports, requires]) {
+    for (const match of source.matchAll(pattern)) {
+      if (isExternal(match[1])) {
+        bindings.push(`${lineOf(source, match.index)}: ${match[0].split("\n")[0].trim()}`);
+      }
+    }
+  }
+  return bindings;
 }
 
-function graphOf(entry) {
+function lineOf(source, index) {
+  return source.slice(0, index).split("\n").length;
+}
+
+function staticGraphOf(entry) {
   const seen = new Set();
   const pending = [entry];
   while (pending.length > 0) {
     const name = pending.pop();
-    if (seen.has(name)) {
+    if (seen.has(name) || !existsSync(fileURLToPath(new URL(name, import.meta.url)))) {
       continue;
     }
     seen.add(name);
-    relativeImportsOf(sourceOf(name)).forEach((next) => pending.push(next));
+    staticImportsOf(sourceOf(name)).forEach((next) => pending.push(next));
   }
   return [...seen];
 }
 
-test("given a tool a workflow runs on a bare checkout, when it is imported, then nothing outside this repository has to be installed first", () => {
+// Derived rather than listed: a workflow that starts a tool without installing first is exactly the
+// case this guards, and a hand-kept list would not know about the next one.
+function jobsRunningATool() {
+  return readdirSync(fileURLToPath(new URL(WORKFLOWS, import.meta.url)))
+    .filter((file) => file.endsWith(".yml"))
+    .flatMap((file) => {
+      const lines = sourceOf(`${WORKFLOWS}/${file}`).split("\n");
+      const jobs = [];
+      let current = null;
+      for (const line of lines) {
+        const header = /^ {2}([a-z][a-z0-9-]*):\s*$/.exec(line);
+        if (header) {
+          current = { workflow: file, job: header[1], body: [] };
+          jobs.push(current);
+        }
+        if (current) {
+          current.body.push(line);
+        }
+      }
+      return jobs
+        .map((job) => ({ ...job, text: job.body.join("\n") }))
+        .filter((job) => /node tools\/[\w.-]+\.mjs/.test(job.text))
+        .map((job) => ({
+          workflow: job.workflow,
+          job: job.job,
+          tools: [...new Set([...job.text.matchAll(/node (tools\/[\w.-]+\.mjs)/g)]
+            .map((match) => match[1].slice("tools/".length)))],
+          installsAt: job.text.search(/npm ci|npm install|\.\/mvnw/),
+          runsADependentToolAt: job.text.search(
+            /node tools\/(?!node-toolchain\.mjs)[\w.-]+\.mjs/)
+        }));
+    });
+}
+
+test("given a job that starts a tool without installing, when the tool is imported, then nothing outside this repository has to be there", () => {
   // given
   const offenders = [];
 
   // when
-  for (const entry of SELF_SUFFICIENT) {
-    for (const module of graphOf(entry)) {
-      const source = sourceOf(module);
-      [...moduleLevelBareRequires(source), ...moduleLevelBareImports(source)]
-        .forEach((offence) => offenders.push(`${entry} -> tools/${module}:${offence}`));
+  for (const { workflow, job, tools } of jobsRunningATool().filter(({ installsAt }) => installsAt < 0)) {
+    for (const tool of tools) {
+      for (const module of staticGraphOf(tool)) {
+        moduleLevelBindings(sourceOf(module))
+          .forEach((offence) => offenders.push(`${workflow}:${job} -> ${tool} -> tools/${module}:${offence}`));
+      }
     }
   }
 
   // then
   assert.deepEqual(offenders, [],
-    `These modules are loaded before a workflow installs anything, so they may not bind an external\n`
-    + `dependency at module level. Move the require or the import into the function that needs it:\n`
-    + `${offenders.join("\n")}`);
+    `A workflow starts these tools, so they load before anything is installed and may not bind an\n`
+    + `external dependency while loading. Move the require or the import into the function that\n`
+    + `needs it:\n${offenders.join("\n")}`);
 });
 
-test("given the jobs that run a tool needing a validator, when the release starts them, then each installs the locked dependencies first", () => {
-  // given
-  const jobs = ["qualify:", "security-record:", "active-security:", "publish:"];
-
+test("given a job that installs, when it starts a tool, then it installs first", () => {
   // when / then
-  jobs.forEach((job) => {
-    const section = workflow.slice(workflow.indexOf(`\n  ${job}`));
-    const install = section.indexOf("Install locked tool dependencies");
-    const runsATool = section.search(/node tools\/(security-|courtside\.)/);
-    assert.ok(install >= 0, `${job} runs a tool that binds a validator but installs nothing`);
-    assert.ok(install < runsATool,
-      `${job} runs a tool before installing what that tool loads`);
-  });
+  jobsRunningATool()
+    .filter(({ installsAt }) => installsAt >= 0)
+    .forEach(({ workflow, job, installsAt, runsADependentToolAt }) =>
+      assert.ok(runsADependentToolAt < 0 || installsAt < runsADependentToolAt,
+        `${workflow}:${job} runs a tool before installing what that tool loads`));
 });

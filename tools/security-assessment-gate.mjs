@@ -4,18 +4,31 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
-const Ajv = require("ajv/dist/2020").default;
 const manifestSchema = JSON.parse(readFileSync(new URL("../security/run-manifest.schema.json", import.meta.url), "utf8"));
 const gateSchema = JSON.parse(readFileSync(new URL("../security/assessment-gate.schema.json", import.meta.url), "utf8"));
 const contractSchema = JSON.parse(readFileSync(new URL("../security/run-contract.schema.json", import.meta.url), "utf8"));
 const runContract = JSON.parse(readFileSync(new URL("../security/run-contract.json", import.meta.url), "utf8"));
 const catalog = JSON.parse(readFileSync(new URL("../security/assessment-catalog.json", import.meta.url), "utf8"));
-const manifestAjv = new Ajv({ strict: true, strictRequired: false, allErrors: true });
-manifestAjv.addSchema(contractSchema);
-const validateManifest = manifestAjv.compile(manifestSchema);
-const gateAjv = new Ajv({ strict: true, strictRequired: false, allErrors: true });
-gateAjv.addSchema(contractSchema);
-const validateGate = gateAjv.compile(gateSchema);
+// Compiled on first use so that importing this module needs nothing installed; the workflows that
+// reach a validation install the dependency, the ones that only load the module do not have to.
+function lateValidator(schema) {
+  let compiled;
+  function validate(document) {
+    if (!compiled) {
+      const ajv = new (require("ajv/dist/2020").default)(
+          { strict: true, strictRequired: false, allErrors: true });
+      ajv.addSchema(contractSchema);
+      compiled = ajv.compile(schema);
+    }
+    const valid = compiled(document);
+    validate.errors = compiled.errors;
+    return valid;
+  }
+  return validate;
+}
+
+const validateManifest = lateValidator(manifestSchema);
+const validateGate = lateValidator(gateSchema);
 
 function fail(message) {
   throw new Error(`Invalid security assessment gate: ${message}`);
