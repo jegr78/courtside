@@ -128,6 +128,12 @@ schedule GitHub disabled after sixty quiet days and a label somebody removed all
 from the release job, and every one of them would leave the absence check green. The nightly build
 also answers to `workflow_dispatch`, so the whole chain — verification record, failure tracker,
 issue — can be summoned and watched rather than waited for.
+
+Every workflow that runs on a schedule feeds that tracker, not the nightly build alone, and the set
+is derived from the workflow files rather than listed, so a new periodic gate cannot join the
+repository without joining the tracking. Readiness for closure is counted per workflow over seven
+consecutive scheduled first attempts, which is seven nights for the build and correspondingly longer
+for a weekly or monthly gate.
 It deliberately excludes the mutable `ci:full` label so a later label change cannot rewrite the
 natural classification of a completed run. The retained record distinguishes required jobs from
 jobs skipped by the plan and fails closed when the actual topology disagrees. The activation review
