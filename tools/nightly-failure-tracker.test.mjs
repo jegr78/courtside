@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyNightlyFailures, planFailureUpdates, readyForReview, applyIssuePlan,
-  bindCommitRange, trustedCommentText } from "./nightly-failure-tracker.mjs";
+import { classifyNightlyFailures, planFailureUpdates, planReadyForReview, readyForReview,
+  applyIssuePlan, bindCommitRange, trustedCommentText } from "./nightly-failure-tracker.mjs";
+
+const workflowId = 4711;
 
 const run = {
   id: 42,
+  workflow_id: workflowId,
   run_attempt: 2,
   head_sha: "a".repeat(40),
   html_url: "https://github.com/example/courtside/actions/runs/42",
@@ -18,7 +21,7 @@ const jobs = [{ name: "backend", conclusion: "failure", steps: [
 ] }];
 
 test("given a retried nightly, when failures are classified, then the first attempt remains the occurrence", () => {
-  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs);
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
 
   assert.equal(failures[0].attempt, 1);
   assert.equal(failures[0].job, "backend");
@@ -27,10 +30,10 @@ test("given a retried nightly, when failures are classified, then the first atte
 });
 
 test("given repeated and distinct classes, when updates are planned, then only identical failures share an issue", () => {
-  const [backend] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs);
+  const [backend] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
   const [frontend] = classifyNightlyFailures({ ...run, run_attempt: 1 }, [
     { name: "frontend", conclusion: "failure", steps: [{ name: "Run browser journeys", conclusion: "failure" }] }
-  ]);
+  ], workflowId);
   const existing = [{ number: 8, state: "open", title: "[nightly] existing",
     body: `<!-- courtside-nightly-fingerprint:${backend.fingerprint} -->` }];
 
@@ -40,7 +43,7 @@ test("given repeated and distinct classes, when updates are planned, then only i
 });
 
 test("given an occurrence already recorded, when a retry is processed, then no duplicate comment is planned", () => {
-  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs);
+  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
   const marker = `<!-- courtside-nightly-occurrence:${failure.runId}:1 -->`;
   const existing = [{ number: 8, state: "open", title: "[nightly] existing",
     body: `<!-- courtside-nightly-fingerprint:${failure.fingerprint} -->\n${marker}` }];
@@ -49,14 +52,14 @@ test("given an occurrence already recorded, when a retry is processed, then no d
 });
 
 test("given malformed or attacker-controlled evidence, when classified, then it is rejected or encoded", () => {
-  assert.throws(() => classifyNightlyFailures({ ...run, name: "other" }, jobs), /workflow/);
-  assert.throws(() => classifyNightlyFailures({ ...run, run_attempt: 1, head_sha: "main" }, jobs), /commit/);
+  assert.throws(() => classifyNightlyFailures({ ...run, name: "" }, jobs, workflowId), /workflow/);
+  assert.throws(() => classifyNightlyFailures({ ...run, run_attempt: 1, head_sha: "main" }, jobs, workflowId), /commit/);
   const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, [
     { name: "backend", conclusion: "failure", steps: [{ name: "@team `boom` <tag>", conclusion: "failure" }] }
-  ]);
+  ], workflowId);
   const [different] = classifyNightlyFailures({ ...run, run_attempt: 1 }, [
     { name: "backend", conclusion: "failure", steps: [{ name: "#team `boom` <tag>", conclusion: "failure" }] }
-  ]);
+  ], workflowId);
   const [planned] = planFailureUpdates([failure], []);
 
   assert.doesNotMatch(JSON.stringify(planned), /@team|`boom`|<tag>/);
@@ -64,7 +67,7 @@ test("given malformed or attacker-controlled evidence, when classified, then it 
 });
 
 test("given a closed matching issue, when the failure recurs, then the same issue is reopened", () => {
-  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs);
+  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
   const existing = [{ number: 8, state: "closed", title: "[nightly] existing",
     body: `<!-- courtside-nightly-fingerprint:${failure.fingerprint} -->` }];
 
@@ -85,7 +88,7 @@ test("given seven consecutive successful first attempts, when reviewing failures
 });
 
 test("given a prior green nightly, when a failure is recorded, then its main commit range is retained", () => {
-  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs);
+  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
   const ranged = bindCommitRange([failure], [{ id: 41, run_attempt: 1, event: "schedule",
     conclusion: "success", head_sha: "b".repeat(40) }]);
   const [planned] = planFailureUpdates(ranged, []);
@@ -108,7 +111,7 @@ test("given a job the allowlist does not name, when it fails, then the failure i
   ] }];
 
   // when
-  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, renamed);
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, renamed, workflowId);
 
   // then
   assert.equal(failures.length, 1);
@@ -118,11 +121,11 @@ test("given a job the allowlist does not name, when it fails, then the failure i
 test("given a summoned run of the same workflow, when it is classified, then it is tracked like a nightly", () => {
   // when
   const failures = classifyNightlyFailures(
-    { ...run, run_attempt: 1, event: "workflow_dispatch" }, jobs);
+    { ...run, run_attempt: 1, event: "workflow_dispatch" }, jobs, workflowId);
 
   // then
   assert.equal(failures.length, 1);
-  assert.throws(() => classifyNightlyFailures({ ...run, run_attempt: 1, event: "push" }, jobs),
+  assert.throws(() => classifyNightlyFailures({ ...run, run_attempt: 1, event: "push" }, jobs, workflowId),
     /workflow is invalid/);
 });
 
@@ -149,4 +152,79 @@ test("given a comment somebody else wrote, when the tracker reads its own state,
   // then
   assert.equal(trusted.includes("courtside-nightly-occurrence"), false);
   assert.equal(trusted.includes("recorded by the tracker"), true);
+});
+
+test("given the same job name in two watched workflows, when both fail, then each keeps its own issue", () => {
+  // given
+  const [nightly] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
+
+  // when
+  const [smoke] = classifyNightlyFailures({ ...run, run_attempt: 1, name: "mail smoke" }, jobs, workflowId);
+
+  // then
+  assert.equal(smoke.workflow, "mail smoke");
+  assert.notEqual(nightly.fingerprint, smoke.fingerprint);
+});
+
+test("given issues opened while only the build was watched, when it fails again, then they still match", () => {
+  // given — the fingerprint is what those issues carry, so widening the tracker must not move it
+  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
+
+  // then
+  assert.equal(failure.fingerprint, "2e49949d3997447bf280779525e3fbee36308b1a2bb6e0022dc3070d4816f932");
+});
+
+test("given one workflow's green streak, when issues are marked ready, then another's stay untouched", () => {
+  // given
+  const issues = [
+    { number: 1, state: "open", comments: "",
+      body: "- Workflow: `build`\n<!-- courtside-nightly-occurrence:1:1 -->" },
+    { number: 2, state: "open", comments: "",
+      body: "- Workflow: `mail smoke`\n<!-- courtside-nightly-occurrence:2:1 -->" }
+  ];
+
+  // when
+  const plan = planReadyForReview(issues, "mail smoke");
+
+  // then
+  assert.deepEqual(plan.map((item) => item.issueNumber), [2]);
+});
+
+test("given a matrix job of a watched workflow, when an issue is opened, then it names the gate that failed", () => {
+  // given
+  const matrix = [{ name: "varied-order (configured, forward)", conclusion: "failure",
+    steps: [{ name: "Run the varied order", conclusion: "failure" }] }];
+
+  // when
+  const [planned] = planFailureUpdates(
+    classifyNightlyFailures({ ...run, run_attempt: 1, name: "test stability" }, matrix, workflowId), []);
+
+  // then
+  assert.match(planned.title, /^\[nightly\] test stability \/ varied-order \(configured, forward\) \//);
+  assert.doesNotMatch(planned.body, /nightlies/);
+});
+
+test("given evidence of a workflow other than the one that completed, when classified, then it is refused", () => {
+  // given — the history comes from the triggering id, so the identity has to answer to the same one
+  const evidence = { ...run, run_attempt: 1 };
+
+  // when / then
+  assert.throws(() => classifyNightlyFailures(evidence, jobs, workflowId + 1), /workflow/);
+  assert.throws(() => classifyNightlyFailures({ ...evidence, workflow_id: undefined }, jobs, workflowId),
+    /workflow/);
+});
+
+test("given names at their bound, when an issue is opened, then its title stays short enough to be accepted", () => {
+  // given — three fields of up to 120 characters each meet in one title
+  const filled = (letter) => letter.repeat(120);
+  const long = [{ name: filled("j"), conclusion: "failure",
+    steps: [{ name: filled("s"), conclusion: "failure" }] }];
+
+  // when
+  const [planned] = planFailureUpdates(classifyNightlyFailures(
+    { ...run, run_attempt: 1, name: filled("w") }, long, workflowId), []);
+
+  // then
+  assert.ok(planned.title.length <= 200, `the title is ${planned.title.length} characters long`);
+  assert.match(planned.title, /\([a-f0-9]{12}\)$/);
 });

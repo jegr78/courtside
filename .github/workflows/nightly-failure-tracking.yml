@@ -2,7 +2,14 @@ name: nightly failure tracking
 
 on:
   workflow_run:
-    workflows: [build]
+    workflows:
+      - backup restore smoke
+      - build
+      - mail smoke
+      - mutation testing
+      - performance smoke
+      - security assessment
+      - test stability
     types: [completed]
 
 permissions:
@@ -11,7 +18,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: nightly-failure-tracking
+  group: nightly-failure-tracking-${{ github.event.workflow_run.workflow_id }}
   cancel-in-progress: false
 
 jobs:
@@ -28,20 +35,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
         run: |
           mkdir -p build/nightly-tracker
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/1" \
             > build/nightly-tracker/run.json
           gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/1/jobs?per_page=100" \
             --slurp | jq '{jobs: map(.jobs[]) }' > build/nightly-tracker/jobs.json
-          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?event=schedule&status=completed&per_page=7" \
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs?event=schedule&status=completed&per_page=7" \
             > build/nightly-tracker/recent.json
       - name: Create or update actionable failures
         env:
           GH_TOKEN: ${{ github.token }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
         run: >
           node tools/nightly-failure-tracker.mjs
           --repository "$GITHUB_REPOSITORY"
+          --workflow-id "$WORKFLOW_ID"
           --run build/nightly-tracker/run.json
           --jobs build/nightly-tracker/jobs.json
           --recent build/nightly-tracker/recent.json

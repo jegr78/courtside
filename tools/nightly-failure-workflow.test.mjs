@@ -1,14 +1,56 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import test from "node:test";
 
-const workflow = readFileSync(new URL("../.github/workflows/nightly-failure-tracking.yml", import.meta.url), "utf8");
-const release = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
+const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+const yaml = require("js-yaml");
 
-test("given a completed nightly, when tracking it, then only scheduled build first-attempt evidence is fetched", () => {
-  assert.match(workflow, /workflow_run:[\s\S]*workflows: \[build\][\s\S]*types: \[completed\]/);
+const directory = new URL("../.github/workflows/", import.meta.url);
+const workflow = readFileSync(new URL("nightly-failure-tracking.yml", directory), "utf8");
+const tracker = yaml.load(workflow);
+const release = readFileSync(new URL("release.yml", directory), "utf8");
+
+function scheduledWorkflowNames() {
+  return readdirSync(directory)
+    .filter((entry) => entry.endsWith(".yml") || entry.endsWith(".yaml"))
+    .map((entry) => yaml.load(readFileSync(new URL(entry, directory), "utf8")))
+    .filter((definition) => definition?.on?.schedule)
+    .map((definition) => definition.name)
+    .sort();
+}
+
+test("given a workflow that runs on a schedule, when tracking is wired, then it is watched like the build", () => {
+  // given / when
+  const watched = [...tracker.on.workflow_run.workflows].sort();
+
+  // then
+  assert.deepEqual(watched, scheduledWorkflowNames());
+});
+
+test("given a completed run, when tracking it, then only scheduled first-attempt evidence is fetched", () => {
+  assert.match(workflow, /types: \[completed\]/);
   assert.match(workflow, /fromJSON\('\["schedule", "workflow_dispatch"\]'\), github\.event\.workflow_run\.event/);
   assert.match(workflow, /attempts\/1\/jobs/);
+});
+
+test("given evidence of a workflow other than the build, when it is read, then its own history is fetched", () => {
+  assert.match(workflow, /WORKFLOW_ID: \$\{\{ github\.event\.workflow_run\.workflow_id \}\}/);
+  assert.match(workflow, /actions\/workflows\/\$\{WORKFLOW_ID\}\/runs/);
+  assert.doesNotMatch(workflow, /actions\/workflows\/[A-Za-z0-9._-]+\.ya?ml/);
+  assert.match(workflow, /--workflow-id "\$WORKFLOW_ID"/);
+});
+
+test("given a second job added to the tracker, when a fork run completes, then it refuses the event too", () => {
+  // given — the fork path is closed by a condition, and a job added without it would open it again
+  const refusesForeignEvents = /fromJSON\('\["schedule", "workflow_dispatch"\]'\), github\.event\.workflow_run\.event/;
+  const jobs = Object.entries(tracker.jobs);
+
+  // then
+  assert.ok(jobs.length > 0);
+  for (const [name, definition] of jobs) {
+    assert.match(`${definition.if ?? ""}`, refusesForeignEvents, `job ${name} accepts any triggering event`);
+  }
 });
 
 test("given an unresolved nightly failure, when a release starts, then publication fails before building", () => {
@@ -17,8 +59,9 @@ test("given an unresolved nightly failure, when a release starts, then publicati
   assert.match(release, /courtside-nightly-fingerprint/);
 });
 
-test("given concurrent completions, when issues are updated, then one repository-wide writer owns the operation", () => {
-  assert.match(workflow, /group: nightly-failure-tracking/);
+test("given two watched workflows completing together, when issues are updated, then neither displaces the other", () => {
+  // given — GitHub keeps one pending run per group, so a shared group discards the second completion
+  assert.match(workflow, /group: nightly-failure-tracking-\$\{\{ github\.event\.workflow_run\.workflow_id \}\}/);
   assert.match(workflow, /cancel-in-progress: false/);
 });
 
