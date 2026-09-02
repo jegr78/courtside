@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyNightlyFailures, planFailureUpdates, readyForReview, applyIssuePlan,
-  bindCommitRange, trustedCommentText } from "./nightly-failure-tracker.mjs";
+import { classifyNightlyFailures, planFailureUpdates, planReadyForReview, readyForReview,
+  applyIssuePlan, bindCommitRange, trustedCommentText } from "./nightly-failure-tracker.mjs";
 
 const run = {
   id: 42,
@@ -49,7 +49,7 @@ test("given an occurrence already recorded, when a retry is processed, then no d
 });
 
 test("given malformed or attacker-controlled evidence, when classified, then it is rejected or encoded", () => {
-  assert.throws(() => classifyNightlyFailures({ ...run, name: "other" }, jobs), /workflow/);
+  assert.throws(() => classifyNightlyFailures({ ...run, name: "" }, jobs), /workflow/);
   assert.throws(() => classifyNightlyFailures({ ...run, run_attempt: 1, head_sha: "main" }, jobs), /commit/);
   const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, [
     { name: "backend", conclusion: "failure", steps: [{ name: "@team `boom` <tag>", conclusion: "failure" }] }
@@ -149,4 +149,40 @@ test("given a comment somebody else wrote, when the tracker reads its own state,
   // then
   assert.equal(trusted.includes("courtside-nightly-occurrence"), false);
   assert.equal(trusted.includes("recorded by the tracker"), true);
+});
+
+test("given the same job name in two watched workflows, when both fail, then each keeps its own issue", () => {
+  // given
+  const [nightly] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs);
+
+  // when
+  const [smoke] = classifyNightlyFailures({ ...run, run_attempt: 1, name: "mail smoke" }, jobs);
+
+  // then
+  assert.equal(smoke.workflow, "mail smoke");
+  assert.notEqual(nightly.fingerprint, smoke.fingerprint);
+});
+
+test("given issues opened while only the build was watched, when it fails again, then they still match", () => {
+  // given — the fingerprint is what those issues carry, so widening the tracker must not move it
+  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs);
+
+  // then
+  assert.equal(failure.fingerprint, "2e49949d3997447bf280779525e3fbee36308b1a2bb6e0022dc3070d4816f932");
+});
+
+test("given one workflow's green streak, when issues are marked ready, then another's stay untouched", () => {
+  // given
+  const issues = [
+    { number: 1, state: "open", comments: "",
+      body: "- Workflow: `build`\n<!-- courtside-nightly-occurrence:1:1 -->" },
+    { number: 2, state: "open", comments: "",
+      body: "- Workflow: `mail smoke`\n<!-- courtside-nightly-occurrence:2:1 -->" }
+  ];
+
+  // when
+  const plan = planReadyForReview(issues, "mail smoke");
+
+  // then
+  assert.deepEqual(plan.map((item) => item.issueNumber), [2]);
 });

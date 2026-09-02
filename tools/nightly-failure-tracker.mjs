@@ -20,7 +20,8 @@ function safeText(value) {
 }
 
 function validateRun(run) {
-  if (run?.name !== "build" || !trackedEvents.has(run.event)) throw new Error("workflow is invalid");
+  if (!trackedEvents.has(run?.event)) throw new Error("workflow is invalid");
+  boundedText(run.name, "workflow");
   if (!Number.isSafeInteger(run.id) || run.id < 1) throw new Error("run id is invalid");
   if (run.run_attempt !== 1) throw new Error("only the first attempt is valid");
   if (!/^[a-f0-9]{40}$/.test(run.head_sha ?? "")) throw new Error("commit is invalid");
@@ -44,11 +45,11 @@ export function classifyNightlyFailures(run, jobs) {
       const step = safeText(rawStep);
       const failureClass = failedStep.conclusion;
       const jobName = allowedJobs.has(job.name) ? job.name : safeText(boundedText(job.name, "job"));
-      const identity = JSON.stringify({ schemaVersion: 1, workflow: "build", job: jobName,
+      const identity = JSON.stringify({ schemaVersion: 1, workflow: run.name, job: jobName,
         step: rawStep, failureClass });
       return {
         fingerprint: createHash("sha256").update(identity).digest("hex"),
-        workflow: "build",
+        workflow: safeText(run.name),
         job: jobName,
         step,
         failureClass,
@@ -59,6 +60,10 @@ export function classifyNightlyFailures(run, jobs) {
       };
     });
   });
+}
+
+function workflowMarker(workflow) {
+  return `- Workflow: \`${safeText(workflow)}\``;
 }
 
 function occurrenceMarker(failure) {
@@ -94,8 +99,8 @@ export function planFailureUpdates(failures, issues) {
       action: "create",
       issueNumber: null,
       title: `[nightly] ${failure.job} / ${failure.step} (${failure.fingerprint.slice(0, 12)})`,
-      body: `${fingerprintMarker}\nA scheduled first-attempt build failed with this stable class.\n\n` +
-        `- Workflow: \`${failure.workflow}\`\n- Job: \`${failure.job}\`\n- Step: \`${failure.step}\`\n` +
+      body: `${fingerprintMarker}\nA scheduled first-attempt run failed with this stable class.\n\n` +
+        `${workflowMarker(failure.workflow)}\n- Job: \`${failure.job}\`\n- Step: \`${failure.step}\`\n` +
         `- Failure class: \`${failure.failureClass}\`\n\n${occurrence(failure)}\n\n` +
         "Keep this issue open until the tracker marks seven consecutive first-attempt nightlies green and a human verifies closure.",
       labels: ["bug"]
@@ -115,6 +120,19 @@ export function trustedCommentText(comments) {
 export function readyForReview(runs) {
   return Array.isArray(runs) && runs.length >= 7 && runs.slice(0, 7).every((run) =>
     run?.event === "schedule" && run.run_attempt === 1 && run.conclusion === "success");
+}
+
+export function planReadyForReview(issues, workflow) {
+  const marker = workflowMarker(workflow);
+  return issues.filter((issue) => {
+    const content = `${issue.body}\n${issue.comments}`;
+    return issue.state === "open" && content.includes(marker) &&
+      content.lastIndexOf(readyMarker) < content.lastIndexOf("<!-- courtside-nightly-occurrence:");
+  }).map((issue) => ({
+    action: "comment",
+    issueNumber: issue.number,
+    body: `${readyMarker}\nSeven consecutive scheduled first attempts passed. This issue is ready for human closure review; it remains open.`
+  }));
 }
 
 export async function applyIssuePlan(plan, request, repository = "example/courtside") {
@@ -197,16 +215,7 @@ async function main(args) {
   const failures = bindCommitRange(classifyNightlyFailures(run, jobs), recent.filter((item) => item.id !== run.id));
   await applyIssuePlan(planFailureUpdates(failures, issues), request, repository);
   if (failures.length === 0 && readyForReview(recent)) {
-    const plan = issues.filter((issue) => {
-      const content = `${issue.body}\n${issue.comments}`;
-      return issue.state === "open" && content.lastIndexOf(readyMarker) <
-        content.lastIndexOf("<!-- courtside-nightly-occurrence:");
-    }).map((issue) => ({
-      action: "comment",
-      issueNumber: issue.number,
-      body: `${readyMarker}\nSeven consecutive scheduled first attempts passed. This issue is ready for human closure review; it remains open.`
-    }));
-    await applyIssuePlan(plan, request, repository);
+    await applyIssuePlan(planReadyForReview(issues, run.name), request, repository);
   }
 }
 
