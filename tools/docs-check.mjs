@@ -5,6 +5,14 @@ import { fileURLToPath } from "node:url";
 import { validateAdmissionRecord } from "./test-profile-contract.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+export const documentationTests = [
+  "tools/docs-check.test.mjs",
+  "tools/github-template-metadata.test.mjs",
+  "tools/quality-strategy.test.mjs",
+  "tools/post-merge-policy.test.mjs",
+  "tools/test-profile-contract.test.mjs"
+];
+
 const startMarker = "<!-- profile-admission:start -->";
 const endMarker = "<!-- profile-admission:end -->";
 
@@ -178,10 +186,8 @@ function main() {
   if (process.argv.includes("--write")) writeAdmissionDocument(strategyPath, admission);
   else if (process.argv.includes("--check")) {
     checkDocumentation(repository, admission);
-    execFileSync(process.execPath, ["--test", "tools/docs-check.test.mjs",
-      "tools/github-template-metadata.test.mjs",
-      "tools/quality-strategy.test.mjs", "tools/post-merge-policy.test.mjs",
-      "tools/test-profile-contract.test.mjs"], { cwd: repository, shell: false, stdio: "inherit" });
+    execFileSync(process.execPath, ["--test", ...documentationTests],
+      { cwd: repository, shell: false, stdio: "inherit" });
   }
   else throw new Error("Use --check or --write");
 }

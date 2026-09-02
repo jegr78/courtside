@@ -81,9 +81,8 @@ test("given reviewed GitHub metadata changes, when planning locally, then the de
   const dependabot = localCheckPlan([{ status: "M", path: ".github/dependabot.yml" }]);
 
   // then
-  assert.deepEqual(template.profiles, ["docs", "tooling"]);
-  assert.deepEqual(template.tasks.map((task) => task.label),
-    ["docs-check", "frontend-toolchain", "tooling-test"]);
+  assert.deepEqual(template.profiles, ["docs"]);
+  assert.deepEqual(template.tasks.map((task) => task.label), ["docs-check"]);
   assert.deepEqual(dependabot.profiles, ["tooling"]);
   assert.deepEqual(dependabot.tasks.map((task) => task.label), ["frontend-toolchain", "tooling-test"]);
 });

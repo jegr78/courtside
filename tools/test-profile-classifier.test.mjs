@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { bindPlanToRun, classifyChanges, classifyPath, fallbackPlanToRun, parseNameStatus,
-  profileSummary, validateGitHubManifest, validateRules, validateToolManifest } from "./test-profile-classifier.mjs";
+  executedTests, profileSummary, validateGitHubManifest, validateRules,
+  validateToolManifest } from "./test-profile-classifier.mjs";
 import { ciJobsForProfiles, loadProfileContract,
   profilePolicyFingerprint } from "./test-profile-contract.mjs";
 
@@ -52,7 +53,7 @@ test("given the reviewed GitHub inventory, when tracked files change, then every
     { cwd: repository, encoding: "utf8" }).trim().split("\n").filter(Boolean);
 
   // when / then
-  validateGitHubManifest(githubManifest, trackedGitHub, toolManifest);
+  validateGitHubManifest(githubManifest, trackedGitHub, toolManifest, executedTests(toolManifest));
 });
 
 test("given stale unknown or unvalidated GitHub metadata, when validating or classifying, then it fails closed", () => {
@@ -79,21 +80,29 @@ test("given stale unknown or unvalidated GitHub metadata, when validating or cla
   assert.deepEqual(classifyChanges([{ status: "A", path: ".github/new-metadata.yml" }], []).profiles, ["full"]);
 });
 
-test("given a reduced GitHub entry, when its own profiles never run the named validator, then validation fails closed", () => {
+test("given a reduced GitHub entry, when no job of its own profiles runs the named validator, then validation fails closed", () => {
   // given
+  const executed = executedTests(toolManifest);
   const unreachable = { schemaVersion: 1, entries: [
+    { path: ".github/ISSUE_TEMPLATE/bug.md", profiles: ["docs"],
+      validators: ["tools/github-metadata.test.mjs"] }
+  ] };
+  const reachable = { schemaVersion: 1, entries: [
     { path: ".github/ISSUE_TEMPLATE/bug.md", profiles: ["docs"],
       validators: ["tools/github-template-metadata.test.mjs"] }
   ] };
-  const reachable = { schemaVersion: 1, entries: [
-    { path: ".github/ISSUE_TEMPLATE/bug.md", profiles: ["docs", "tooling"],
-      validators: ["tools/github-template-metadata.test.mjs"] }
+  const throughTooling = { schemaVersion: 1, entries: [
+    { path: ".github/ISSUE_TEMPLATE/bug.md", profiles: ["tooling"],
+      validators: ["tools/github-metadata.test.mjs"] }
   ] };
 
   // when / then
-  assert.throws(() => validateGitHubManifest(unreachable, undefined, toolManifest),
+  assert.ok(!executed.docs.includes("tools/github-metadata.test.mjs"));
+  assert.ok(executed.tooling.includes("tools/github-metadata.test.mjs"));
+  assert.throws(() => validateGitHubManifest(unreachable, undefined, toolManifest, executed),
     /validator is unreachable/i);
-  validateGitHubManifest(reachable, undefined, toolManifest);
+  validateGitHubManifest(reachable, undefined, toolManifest, executed);
+  validateGitHubManifest(throughTooling, undefined, toolManifest, executed);
 });
 
 test("given reviewed GitHub metadata, when classifying, then templates and validated automation use their declared checks", () => {
@@ -101,9 +110,8 @@ test("given reviewed GitHub metadata, when classifying, then templates and valid
   const contract = loadProfileContract();
 
   // when / then
-  assert.deepEqual(classifyChanges([{ status: "M", path: ".github/ISSUE_TEMPLATE/bug.md" }], []).profiles,
-    ["docs", "tooling"]);
-  assert.ok(ciJobsForProfiles(contract, ["docs", "tooling"]).includes("tooling"));
+  assert.deepEqual(classifyChanges([{ status: "M", path: ".github/ISSUE_TEMPLATE/bug.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(ciJobsForProfiles(contract, ["docs"]), ["docs"]);
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/dependabot.yml" }], []).profiles, ["tooling"]);
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/workflows/pr-title-lint.yml" }], []).profiles,
     ["tooling"]);

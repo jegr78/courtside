@@ -42,6 +42,13 @@ test("given tracked residual test risks, when reading the strategy, then their e
   }
 });
 
+test("given a reduced GitHub entry, when reading the strategy, then it names who runs the validator", () => {
+  // when / then
+  assert.match(strategy, /the documentation job runs their validators itself/i);
+  assert.match(strategy, /a job of its own profiles\s+actually executes/i);
+  assert.match(strategy, /derived from what those jobs run rather than from which profile happens to own/i);
+});
+
 test("given an active profile policy, when a candidate miss appears, then rollback and readmission are explicit", () => {
   // when / then
   assert.match(strategy, /set `COURTSIDE_TEST_PROFILES` to\s+`full` immediately/i);
