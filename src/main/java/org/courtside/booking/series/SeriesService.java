@@ -209,6 +209,9 @@ public class SeriesService {
         requireManagementAccessTo(request.seriesId(), request.fromBookingId(), movedBy, callerRoles);
         bookingGridCoordination.lock();
         lockSeries(request.seriesId());
+        // A cancellation locks the booking row it writes, so the move has to hold those rows too:
+        // it rewrites every column of them and would otherwise flush over a cancellation it never saw.
+        bookingRepository.lockBySeriesId(request.seriesId());
         discardPreLockState();
         MovePreview preview = previewMove(request, movedBy, callerRoles);
 

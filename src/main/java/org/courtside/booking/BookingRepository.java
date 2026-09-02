@@ -23,6 +23,11 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query(value = "SELECT id FROM booking WHERE id = :id FOR UPDATE", nativeQuery = true)
     Optional<UUID> lockById(@Param("id") UUID id);
 
+    // Ordered by id so two writers that need overlapping rows queue rather than deadlock.
+    @Query(value = "SELECT id FROM booking WHERE series_id = :seriesId ORDER BY id FOR UPDATE",
+            nativeQuery = true)
+    List<UUID> lockBySeriesId(@Param("seriesId") UUID seriesId);
+
     @EntityGraph(attributePaths = "participants")
     Optional<Booking> findWithParticipantsById(UUID id);
 
