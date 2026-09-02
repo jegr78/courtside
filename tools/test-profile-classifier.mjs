@@ -3,14 +3,10 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { documentationTests } from "./docs-check.mjs";
-import {
-  activeProfileDecision, ciJobsForProfiles, loadProfileContract, localTasksForProfiles,
-  profilePolicyFingerprint
-} from "./test-profile-contract.mjs";
+import { ciJobsForProfiles, loadProfileContract, localTasksForProfiles } from "./test-profile-contract.mjs";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const rulesUrl = new URL("../ci/test-profiles.json", import.meta.url);
-const admissionUrl = new URL("../ci/test-profile-admission.json", import.meta.url);
 const toolManifestUrl = new URL("../ci/tool-profile-manifest.json", import.meta.url);
 const githubManifestUrl = new URL("../ci/github-profile-manifest.json", import.meta.url);
 const rules = JSON.parse(readFileSync(rulesUrl, "utf8"));
@@ -205,7 +201,7 @@ export function classifyChanges(changes, labels) {
   return { schemaVersion: 1, profiles, isFull: requiresFull, reasons };
 }
 
-export function bindPlanToRun(plan, identity, mode = "admitted", admission = readAdmission()) {
+export function bindPlanToRun(plan, identity) {
   if (plan === null || typeof plan !== "object" || plan.schemaVersion !== 1
       || identity === null || typeof identity !== "object"
       || !Number.isSafeInteger(identity.runId) || identity.runId < 1
@@ -214,59 +210,34 @@ export function bindPlanToRun(plan, identity, mode = "admitted", admission = rea
       || !/^[a-f0-9]{40}$/.test(identity.headCommit)) {
     throw new Error("Profile plan run identity is invalid");
   }
-  const admitted = admitPlan(plan, mode, admission);
+  const contract = loadProfileContract();
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     runId: identity.runId,
     attempt: identity.attempt,
     baseCommit: identity.baseCommit,
     headCommit: identity.headCommit,
-    ...admitted,
     plannerOutcome: "passed",
+    profiles: [...plan.profiles],
+    ciJobs: ciJobsForProfiles(contract, plan.profiles),
+    localTasks: localTasksForProfiles(contract, plan.profiles),
+    isFull: plan.isFull,
     reasons: plan.reasons
-  };
-}
-
-export function admitPlan(plan, mode = "admitted", admission = readAdmission()) {
-  const contract = loadProfileContract();
-  const proposedPolicyFingerprint = profilePolicyFingerprint();
-  const decision = activeProfileDecision(plan.profiles, proposedPolicyFingerprint, admission, mode);
-  return {
-    activePolicyFingerprint: decision.admissionOutcome === "matched"
-      ? proposedPolicyFingerprint : null,
-    proposedPolicyFingerprint,
-    admissionOutcome: decision.admissionOutcome,
-    overrideOutcome: decision.overrideOutcome,
-    activeProfiles: decision.activeProfiles,
-    proposedProfiles: plan.profiles,
-    activeCiJobs: ciJobsForProfiles(contract, decision.activeProfiles),
-    proposedCiJobs: ciJobsForProfiles(contract, plan.profiles),
-    activeLocalTasks: localTasksForProfiles(contract, decision.activeProfiles),
-    proposedLocalTasks: localTasksForProfiles(contract, plan.profiles).map((task) => task.label),
-    isFull: decision.activeProfiles.includes("full")
   };
 }
 
 export function fallbackPlanToRun(identity) {
   const contract = loadProfileContract();
-  const proposedPolicyFingerprint = profilePolicyFingerprint();
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     runId: identity.runId,
     attempt: identity.attempt,
     baseCommit: identity.baseCommit,
     headCommit: identity.headCommit,
-    activePolicyFingerprint: null,
-    proposedPolicyFingerprint,
-    admissionOutcome: "invalid",
-    overrideOutcome: "invalid-full",
     plannerOutcome: "failed",
-    activeProfiles: ["full"],
-    proposedProfiles: ["full"],
-    activeCiJobs: ciJobsForProfiles(contract, ["full"]),
-    proposedCiJobs: ciJobsForProfiles(contract, ["full"]),
-    activeLocalTasks: localTasksForProfiles(contract, ["full"]),
-    proposedLocalTasks: ["full"],
+    profiles: ["full"],
+    ciJobs: ciJobsForProfiles(contract, ["full"]),
+    localTasks: localTasksForProfiles(contract, ["full"]),
     isFull: true,
     reasons: [{ code: "classifier-error", path: null, profile: "full", status: null }]
   };
@@ -291,8 +262,7 @@ export function profileSummary(plan) {
   return [
     "# Selected test profiles",
     "",
-    `Active: ${plan.activeProfiles.map((profile) => `\`${profile}\``).join(", ")}`,
-    `Proposed: ${plan.proposedProfiles.map((profile) => `\`${profile}\``).join(", ")}`,
+    `Selected: ${plan.profiles.map((profile) => `\`${profile}\``).join(", ")}`,
     "",
     "The required build runs only the jobs assigned to these conservative profiles.",
     "",
@@ -315,7 +285,6 @@ function main() {
   };
   const output = resolve(argument("--output"));
   const summaryOutput = resolve(argument("--summary"));
-  const mode = argument("--mode");
   mkdirSync(dirname(output), { recursive: true });
   mkdirSync(dirname(summaryOutput), { recursive: true });
   try {
@@ -323,7 +292,7 @@ function main() {
     const evidence = execFileSync("git", ["diff", "--name-status", "-z", "--find-renames", base, head, "--"], {
       cwd: repository, encoding: "utf8", maxBuffer: 10 * 1024 * 1024
     });
-    const plan = bindPlanToRun(classifyChanges(parseNameStatus(evidence), labels), identity, mode);
+    const plan = bindPlanToRun(classifyChanges(parseNameStatus(evidence), labels), identity);
     writeFileSync(output, `${JSON.stringify(plan, null, 2)}\n`, { mode: 0o600 });
     writeFileSync(summaryOutput, profileSummary(plan), { mode: 0o600 });
   } catch (error) {
@@ -332,14 +301,6 @@ function main() {
     writeFileSync(output, `${JSON.stringify(fallback, null, 2)}\n`, { mode: 0o600 });
     writeFileSync(summaryOutput, profileSummary(fallback), { mode: 0o600 });
     throw error;
-  }
-}
-
-function readAdmission() {
-  try {
-    return JSON.parse(readFileSync(admissionUrl, "utf8"));
-  } catch (error) {
-    return error?.code === "ENOENT" ? null : {};
   }
 }
 

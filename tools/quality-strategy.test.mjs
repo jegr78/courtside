@@ -49,10 +49,10 @@ test("given a reduced GitHub entry, when reading the strategy, then it names who
   assert.match(strategy, /derived from what those jobs run rather than from which profile happens to own/i);
 });
 
-test("given an active profile policy, when a candidate miss appears, then rollback and readmission are explicit", () => {
+test("given no admission step, when reading the strategy, then failing closed and the rollback are explicit", () => {
   // when / then
-  assert.match(strategy, /set `COURTSIDE_TEST_PROFILES` to\s+`full` immediately/i);
-  assert.match(strategy, /create a GitHub issue/i);
-  assert.match(strategy, /correct\s+the rule and add a regression test/i);
-  assert.match(strategy, /new protected evidence and admission/i);
+  assert.match(strategy, /no separate admission step/i);
+  assert.match(strategy, /everything unrecognised fails closed/i);
+  assert.match(strategy, /`COURTSIDE_TEST_PROFILES` set to `full` forces the complete\s+job set/i);
+  assert.match(strategy, /is the immediate rollback/i);
 });

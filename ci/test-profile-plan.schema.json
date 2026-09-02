@@ -1,50 +1,70 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:ci:test-profile-plan:v4",
+  "$id": "urn:courtside:ci:test-profile-plan:v5",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schemaVersion", "runId", "attempt", "baseCommit", "headCommit",
-    "activePolicyFingerprint", "proposedPolicyFingerprint", "admissionOutcome",
-    "overrideOutcome", "plannerOutcome", "activeProfiles", "proposedProfiles",
-    "activeCiJobs", "proposedCiJobs", "activeLocalTasks", "proposedLocalTasks",
-    "isFull", "reasons"
+    "schemaVersion",
+    "runId",
+    "attempt",
+    "baseCommit",
+    "headCommit",
+    "plannerOutcome",
+    "profiles",
+    "ciJobs",
+    "localTasks",
+    "isFull",
+    "reasons"
   ],
   "properties": {
-    "schemaVersion": { "const": 4 },
-    "runId": { "type": "integer", "minimum": 1 },
-    "attempt": { "type": "integer", "minimum": 1 },
-    "baseCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
-    "headCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
-    "activePolicyFingerprint": {
-      "type": ["string", "null"],
-      "pattern": "^[a-f0-9]{64}$"
+    "schemaVersion": {
+      "const": 5
     },
-    "proposedPolicyFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "admissionOutcome": { "enum": ["matched", "missing", "stale", "invalid"] },
-    "overrideOutcome": { "enum": ["admitted", "emergency-full", "invalid-full"] },
-    "plannerOutcome": { "enum": ["passed", "failed"] },
-    "activeProfiles": { "$ref": "#/$defs/profiles" },
-    "proposedProfiles": { "$ref": "#/$defs/profiles" },
-    "activeCiJobs": { "$ref": "#/$defs/jobs" },
-    "proposedCiJobs": { "$ref": "#/$defs/jobs" },
-    "activeLocalTasks": {
+    "runId": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "baseCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "headCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "plannerOutcome": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "profiles": {
+      "$ref": "#/$defs/profiles"
+    },
+    "ciJobs": {
+      "$ref": "#/$defs/jobs"
+    },
+    "localTasks": {
       "type": "array",
       "maxItems": 20,
-      "items": { "$ref": "#/$defs/task" }
+      "items": {
+        "$ref": "#/$defs/task"
+      }
     },
-    "proposedLocalTasks": {
-      "type": "array",
-      "maxItems": 20,
-      "items": { "type": "string", "minLength": 1, "maxLength": 100 },
-      "uniqueItems": true
+    "isFull": {
+      "type": "boolean"
     },
-    "isFull": { "type": "boolean" },
     "reasons": {
       "type": "array",
       "minItems": 1,
       "maxItems": 1000,
-      "items": { "$ref": "#/$defs/reason" }
+      "items": {
+        "$ref": "#/$defs/reason"
+      }
     }
   },
   "$defs": {
@@ -52,39 +72,103 @@
       "type": "array",
       "minItems": 1,
       "maxItems": 5,
-      "items": { "enum": ["docs", "backend", "frontend", "tooling", "full"] },
+      "items": {
+        "enum": [
+          "docs",
+          "backend",
+          "frontend",
+          "tooling",
+          "full"
+        ]
+      },
       "uniqueItems": true
     },
     "jobs": {
       "type": "array",
       "maxItems": 20,
-      "items": { "type": "string", "minLength": 1, "maxLength": 100 },
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
       "uniqueItems": true
     },
     "task": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["label", "workingDirectory", "executable", "arguments"],
+      "required": [
+        "label",
+        "workingDirectory",
+        "executable",
+        "arguments"
+      ],
       "properties": {
-        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
-        "workingDirectory": { "enum": ["repository", "frontend"] },
-        "executable": { "enum": ["maven", "node", "npm"] },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "workingDirectory": {
+          "enum": [
+            "repository",
+            "frontend"
+          ]
+        },
+        "executable": {
+          "enum": [
+            "maven",
+            "node",
+            "npm"
+          ]
+        },
         "arguments": {
           "type": "array",
           "maxItems": 20,
-          "items": { "type": "string", "maxLength": 300 }
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
         }
       }
     },
     "reason": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "path", "profile", "status"],
+      "required": [
+        "code",
+        "path",
+        "profile",
+        "status"
+      ],
       "properties": {
-        "code": { "type": "string", "minLength": 1, "maxLength": 300 },
-        "path": { "type": ["string", "null"], "maxLength": 1000 },
-        "profile": { "enum": ["docs", "backend", "frontend", "tooling", "full"] },
-        "status": { "type": ["string", "null"], "maxLength": 5 }
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000
+        },
+        "profile": {
+          "enum": [
+            "docs",
+            "backend",
+            "frontend",
+            "tooling",
+            "full"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 5
+        }
       }
     }
   }

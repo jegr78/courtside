@@ -45,7 +45,7 @@ test("given reduced profiles, when jobs are scheduled, then only their conservat
     /frontend:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.frontend == 'true'\)/);
   assert.match(workflow,
     /security:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
-  assert.match(workflow, /JOBS=\$\(jq -cer '\.activeCiJobs'/);
+  assert.match(workflow, /JOBS=\$\(jq -cer '\.ciJobs'/);
   assert.match(workflow,
     /SELECTED=\$\(jq -nr --argjson jobs "\$JOBS" --arg job "\$job" '\(\$jobs \| index\(\$job\)\) != null'\)/);
   assert.doesNotMatch(workflow, /\$job == "frontend" or \$job == "security"/);
@@ -55,17 +55,17 @@ test("given the classifier fails, when the plan runs, then full selection still 
   // when / then
   assert.match(workflow, /git worktree add[\s\S]+\|\| CLASSIFIER_EXIT=\$\?/);
   assert.match(workflow,
-    /if \.plannerOutcome == "failed" then \.isFull and \.activeProfiles == \["full"\]\s+else \$classifierExit == 0 end/);
+    /if \.plannerOutcome == "failed" then \.isFull and \.profiles == \["full"\]\s+else \$classifierExit == 0 end/);
   assert.match(workflow,
     /else\s+PROFILES='\["full"\]'\s+JOBS='\["docs","backend","frontend","tooling","security"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
 });
 
-test("given repository profile mode, when selecting coverage, then only admitted or full reaches the classifier", () => {
+test("given the emergency repository variable, when it demands full, then the classifier sees the full label", () => {
   // when / then
-  assert.match(workflow, /name: test-profile-plan \[\$\{\{ vars\.COURTSIDE_TEST_PROFILES == 'admitted'/);
-  assert.match(workflow, /PROFILE_MODE: \$\{\{ vars\.COURTSIDE_TEST_PROFILES == 'admitted'/);
-  assert.match(workflow, /--mode "\$PROFILE_MODE"/);
-  assert.match(workflow, /JOBS='\["docs","backend","frontend","tooling","security"\]'/);
+  assert.match(workflow, /FORCE_FULL: \$\{\{ vars\.COURTSIDE_TEST_PROFILES == 'full' \}\}/);
+  assert.match(workflow, /if \[\[ "\$FORCE_FULL" = "true" \]\]; then LABELS='\["ci:full"\]'; fi/);
+  assert.match(workflow, /--labels "\$LABELS"/);
+  assert.doesNotMatch(workflow, /--mode|PROFILE_MODE|admissionOutcome/);
 });
 
 test("given a profile plan, when the aggregate runs, then every selected and skipped job is explained", () => {

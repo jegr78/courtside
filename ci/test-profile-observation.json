@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "evidenceWindowStartedAt": "2026-08-31T20:13:44Z",
-  "requiredBaseCommit": "2722b3d4325a38e8e1bafc30865138134c2ff6b9",
-  "minimumDays": 0,
-  "minimumFirstAttempts": 20,
-  "minimumNaturalReducedProposals": 3,
-  "requiredNaturalProfiles": ["backend", "frontend", "tooling"]
-}

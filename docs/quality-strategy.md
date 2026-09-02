@@ -93,35 +93,18 @@ A second closed manifest assigns every tracked `.github/` file. Markdown issue a
 templates select `docs`, and the documentation job runs their validators itself: `docs-check.mjs`
 names the test files it executes, and the template tests are among them. Dependabot metadata and the
 PR-title workflow select `tooling` because closed structural tests validate their supported fields,
-permissions and pinned action. Build, release, security, nightly, profile-evidence and every other
-central workflow remain `full`. Every reduced entry names a validator that a job of its own profiles
-actually executes, derived from what those jobs run rather than from which profile happens to own
-the test file. Unknown files, missing validators, a validator no selected job runs, and stale or
+permissions and pinned action. Build, release, security, nightly and every other central workflow
+remain `full`. Every reduced entry names a validator that a job of its own profiles actually
+executes, derived from what those jobs run rather than from which profile happens to own the test
+file. Unknown files, missing validators, a validator no selected job runs, and stale or
 duplicate manifest entries fail closed.
 
-The classifier records two selections. The proposed selection describes the candidate policy. The
-active selection controls CI and local execution. They become equal only when the checked-in
-admission record names the exact candidate fingerprint and CI mode is `admitted`. A missing,
-malformed or stale admission selects `full`. The repository variable `COURTSIDE_TEST_PROFILES` may
-contain `admitted` or `full`; an empty or unknown value also selects `full`. The `full` value is an
-emergency escalation and can never request a reduced profile. Locally, `check --full` provides the
-same escalation, while the admission record remains mandatory for every reduced plan.
-
-If protected replay reports a candidate miss after activation, set `COURTSIDE_TEST_PROFILES` to
-`full` immediately and create a GitHub issue that links the affected run and failed job. Correct
-the rule and add a regression test before collecting new protected evidence and admission. Restore
-`admitted` only after the replacement fingerprint qualifies; a rerun cannot erase the miss.
-
-Each completed pull-request run joins its exact-attempt profile plan with the full job outcomes.
-The follow-up workflow recomputes that plan with the classifier from the immutable pull-request
-base commit. Its protected `workflow_run` event captures the pull request number, repositories,
-refs and base and head commits when the build completes. The collector binds that immutable event
-to the exact attempt returned by the Actions API and rejects missing, ambiguous or mismatched pull
-request provenance. It does not query current pull-request data, because GitHub may remove that
-association after a merge. The base must remain an ancestor of the immutable head. Classification,
-timing normalization and observation validation execute from that same base commit, while the
-collector itself is checked out at the exact protected default-branch commit that received the
-event.
+The selection has no separate admission step. What keeps it honest is that both inventories are
+closed and everything unrecognised fails closed: an unclassified path, a structural change such as a
+rename or a deletion, a manifest entry whose file no longer exists and a classifier that throws all
+select `full`. The repository variable `COURTSIDE_TEST_PROFILES` set to `full` forces the complete
+job set for every pull request and is the immediate rollback; any other value, including none, uses
+the classified selection. Locally, `check --full` is the same escalation.
 
 A release demands a nightly that verified it, rather than the absence of a complaint about one. The
 tag is refused unless a scheduled `build` run succeeded on its first attempt over a commit the
@@ -138,101 +121,6 @@ ones that carry a schedule and requires the tracker to name exactly those, so a 
 cannot join the repository without joining the tracking. Readiness for closure is counted per
 workflow over seven consecutive scheduled first attempts, which is seven nights for the build and
 correspondingly longer for a weekly or monthly gate.
-
-That verification record deliberately excludes the mutable `ci:full` label so a later label change cannot rewrite the
-natural classification of a completed run. The retained record distinguishes required jobs from
-jobs skipped by the plan and fails closed when the actual topology disagrees. The activation review
-used at least twenty comparable first attempts, including three naturally reduced plans and at
-least one observation of both the backend and frontend profiles. Any later policy change receives
-a new fingerprint and cannot borrow that earlier evidence.
-The protected profile-evidence workflow rebuilds every observation from the first-attempt run and
-job records returned by the GitHub Actions API. It recomputes the profile from the immutable base
-and head commits with the current policy, so a corrected observer can reassess retained builds
-without trusting an editable historical observation. The resulting `status.json` and workflow
-summary are the canonical current count. Locally assembled records and older aggregate `quality`
-runs are not evidence. Any candidate miss requires a rule correction plus a regression test before
-the review can qualify.
-
-An unadmitted candidate still executes the full job set. Replay treats the natural proposed profile
-as shadow evidence when every job required by that proposal succeeded. A failure outside the
-proposal remains a candidate miss, and an unsuccessful required job remains incomplete. The report
-records separately how many runs actually skipped jobs. That number measures saved work after
-activation; it is not an admission condition.
-
-Local qualification uses the exact tasks in the profile contract. Run
-`frontend/node/node tools/local-profile-timing.mjs --run-all` from one clean commit and machine.
-The runner checkpoints three first attempts for docs, tooling, backend, frontend, the combined
-backend and frontend plan, and full verification. It refuses a changed commit, machine, policy,
-task plan, environment, interrupted attempt, or failed attempt. Qualification requires docs below
-30 seconds, tooling below 120 seconds, and at least 20 percent median savings for both backend and
-frontend against full verification. A reservation below `~/.courtside/profile-timing/` prevents an
-accidentally deleted workspace record from starting a replacement study for the same commit,
-policy, and host; the first environment remains bound to that reservation. Both owner-only records
-are private evidence and workflows do not upload them. The evidence runner requires POSIX file
-permissions and refuses Windows rather than claiming privacy that its mode bits cannot enforce.
-
-The workflow also retains the closed observations and exact Actions inventory behind the status.
-For an independent local reproduction, run the same protected collector with a GitHub token that
-has read-only Actions and contents access:
-
-```bash
-GH_TOKEN="$(gh auth token)" node tools/test-profile-replay.mjs \
-  --repository jegr78/courtside --assessed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --inventory-output observation-inventory.json --observations-output observations.json \
-  --output observation-report.json --summary observation-report.md
-```
-
-The inventory comes directly from the paginated Actions API. Missing first attempts, mismatched
-repositories, ambiguous pull-request provenance or a base that is not the exact merge base stop the
-replay.
-
-#### Profile admission evidence
-
-<!-- profile-admission:start -->
-The admitted profile policy is backed by Profile Evidence run
-`33596385377`, artifact `profile-evidence-33596385377-1`, reported `ready-for-review` at
-2026-09-02T05:51:46Z under policy fingerprint
-`0d79329f01144eedd484410cacf70bf0c953641e9c0aeb070907f7548792d7d0`. The evidence expires on 2026-10-02. It contains
-21 qualifying first attempts, including 2 backend and
-6 frontend and 2 tooling plans, with 0 candidate misses and
-0 classification errors. 2 incomplete observations were excluded.
-
-23 observed CI first attempts had a 14m 25.000s median and
-14m 54.000s p95, consuming 690.10 runner minutes. The
-21 successful attempts had a 14m 19.000s median and
-consumed 628.48 runner minutes. These are pre-activation full-execution
-figures; shadow classifications do not prove hosted-runner savings.
-
-Local qualification on commit `c66c992aab057de03e0887972cc3ae5ad26b8c43` retained 18 first attempts with
-0 retries and 0 interruptions. Docs measured 0.215 seconds
-median and 0.232 seconds maximum; tooling measured 18.681 seconds median and
-18.800 seconds maximum. Backend saved 57.05 percent with a
-9m 59.738s median, and frontend saved 50.20 percent with a
-11m 35.401s median, against the 23m 16.409s full median. The
-representative combined plan saved 9.35 percent with a
-21m 5.786s median. Combined savings are reported evidence, not an admission gate or
-a general acceleration claim.
-
-Genuine scheduled runs `33474128562` and `33592874403` each passed docs, backend, frontend,
-tooling and security on their first attempt. Protected replay continues after activation without a fixed
-waiting period; a candidate miss triggers immediate full escalation and requalification.
-<!-- profile-admission:end -->
-
-The admitted policy became operative after PR #660 merged on 2026-09-02, when the repository
-variable `COURTSIDE_TEST_PROFILES` changed to `admitted`. That variable remains the authoritative
-runtime mode, and changing it to `full` is the immediate rollback. PR selection evidence must report
-the admitted fingerprint above and the jobs skipped by the active plan. The protected replay remains
-the source for later misses and classification errors.
-
-Any changed semantic contract has a different fingerprint. Until protected replay evidence admits
-that exact fingerprint, both CI and local checks execute `full`; the earlier figures remain
-historical evidence and cannot activate the changed policy.
-
-The admissible observation window for the five-job topology starts at 2026-08-31T20:13:44Z, when
-the topology was merged to `main`. A run also needs a merge base containing commit
-`2722b3d4325a38e8e1bafc30865138134c2ff6b9`. A stale pull-request branch can start after the time
-boundary while still using the earlier topology. Replay retains such runs as incompatible evidence
-but does not treat a job that did not yet exist as missing or successful.
 
 ### Release checklist
 
