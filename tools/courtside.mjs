@@ -22,15 +22,18 @@ import {
   buildSecurityPlan, clearEmergencyStop, executeSecurityPlan, fingerprintSecurityTarget, readSecurityManifest,
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
-import { runPassiveDeploymentAssessment } from "./security-passive-deployment.mjs";
-import { runAuthorizationAssessment } from "./security-authorization.mjs";
-import { renderAuthenticatedZapPlan, runAuthenticatedZapAssessment } from "./security-authenticated-zap.mjs";
-import {
-  prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment, runOpenApiImportCases, runOpenApiInputCases,
-  runOpenApiMutationCases
-} from "./security-openapi-fuzz.mjs";
-import { runResourceAbuseAssessment } from "./security-resource-abuse.mjs";
 import { executeLocalCheck } from "./local-check.mjs";
+
+async function securityAssessments() {
+  const [passive, authorization, authenticatedZap, openApiFuzz, resourceAbuse] = await Promise.all([
+    import("./security-passive-deployment.mjs"),
+    import("./security-authorization.mjs"),
+    import("./security-authenticated-zap.mjs"),
+    import("./security-openapi-fuzz.mjs"),
+    import("./security-resource-abuse.mjs")
+  ]);
+  return { ...passive, ...authorization, ...authenticatedZap, ...openApiFuzz, ...resourceAbuse };
+}
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devComposeFile = join(root, "deploy", "compose.dev.yaml");
@@ -629,6 +632,13 @@ async function execute(options) {
     return;
   }
   if (options.command === "security-run") {
+    // Loaded here rather than at the top: these five bind a schema validator as they load, and every
+    // other command of this tool has to start on a checkout where nothing has been installed yet.
+    const {
+      runPassiveDeploymentAssessment, runAuthorizationAssessment, renderAuthenticatedZapPlan,
+      runAuthenticatedZapAssessment, prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment,
+      runOpenApiImportCases, runOpenApiInputCases, runOpenApiMutationCases, runResourceAbuseAssessment
+    } = await securityAssessments();
     const plan = securityAssessmentPlan(options, false);
     const ca = readSecurityProxyCa(options.runId);
     const securityEnvironment = readSecurityEnvironment(options.runId);

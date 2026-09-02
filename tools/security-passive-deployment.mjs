@@ -7,10 +7,18 @@ import tls from "node:tls";
 import { createRequire } from "node:module";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
-const Ajv = require("ajv/dist/2020").default;
 const evidenceSchema = JSON.parse(readFileSync(new URL(
   "../security/passive-deployment-evidence.schema.json", import.meta.url)));
-const validateEvidence = new Ajv({ strict: true, allErrors: true }).compile(evidenceSchema);
+// Compiled on first use: security-environment.mjs imports this module, and that one loads on a
+// checkout where the validator has not been installed yet.
+let compiled;
+function validateEvidence(evidence) {
+  compiled ??= new (require("ajv/dist/2020").default)({ strict: true, allErrors: true })
+      .compile(evidenceSchema);
+  const valid = compiled(evidence);
+  validateEvidence.errors = compiled.errors;
+  return valid;
+}
 
 // Dependabot bumps the deployment and nothing beside it, so the scanner's version and digest are
 // read from there rather than repeated here, where nothing would keep them in step.
