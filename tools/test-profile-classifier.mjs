@@ -94,10 +94,15 @@ export function validateGitHubManifest(candidate, trackedPaths, validators) {
     throw new Error("GitHub profile manifest is invalid");
   }
   if (validators !== undefined) {
-    const executable = new Set(validators.entries
-      .filter((entry) => entry.test && entry.profiles.includes("tooling")).map((entry) => entry.path));
+    const executable = new Map(validators.entries
+      .filter((entry) => entry.test).map((entry) => [entry.path, entry.profiles]));
     if (candidate.entries.some((entry) => entry.validators.some((validator) => !executable.has(validator)))) {
       throw new Error("GitHub profile manifest validator is invalid");
+    }
+    if (candidate.entries.some((entry) => !entry.profiles.includes("full")
+        && entry.validators.some((validator) => !executable.get(validator)
+          .some((profile) => entry.profiles.includes(profile))))) {
+      throw new Error("GitHub profile manifest validator is unreachable");
     }
   }
   if (trackedPaths !== undefined && JSON.stringify([...paths].sort()) !== JSON.stringify([...trackedPaths].sort())) {

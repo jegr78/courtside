@@ -90,11 +90,13 @@ Three local first attempts of the declared tooling tasks completed in 14, 11 and
 11-second median. Each attempt reinstalled the locked dependencies and passed all 636 tool tests.
 
 A second closed manifest assigns every tracked `.github/` file. Markdown issue and pull-request
-templates select `docs`. Dependabot metadata and the PR-title workflow select `tooling` because
+templates select `docs` and `tooling`, because the tests that validate a template are tool tests and
+only `tooling` runs them. Dependabot metadata and the PR-title workflow select `tooling` because
 closed structural tests validate their supported fields, permissions and pinned action. Build,
 release, security, nightly, profile-evidence and every other central workflow remain `full`.
-Every reduced entry names an executable validator. Unknown files, missing validators and stale or
-duplicate manifest entries fail closed.
+Every reduced entry names an executable validator that a profile of that same entry runs. Unknown
+files, missing validators, a validator no selected profile executes, and stale or duplicate manifest
+entries fail closed.
 
 The classifier records two selections. The proposed selection describes the candidate policy. The
 active selection controls CI and local execution. They become equal only when the checked-in
