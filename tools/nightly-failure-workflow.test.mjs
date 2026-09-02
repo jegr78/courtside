@@ -13,7 +13,7 @@ const release = readFileSync(new URL("release.yml", directory), "utf8");
 
 function scheduledWorkflowNames() {
   return readdirSync(directory)
-    .filter((entry) => entry.endsWith(".yml"))
+    .filter((entry) => entry.endsWith(".yml") || entry.endsWith(".yaml"))
     .map((entry) => yaml.load(readFileSync(new URL(entry, directory), "utf8")))
     .filter((definition) => definition?.on?.schedule)
     .map((definition) => definition.name)
