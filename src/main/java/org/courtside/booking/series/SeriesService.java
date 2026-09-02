@@ -167,6 +167,7 @@ public class SeriesService {
                       UUID cancelledBy, Set<Role> cancellerRoles) {
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
         lockSeries(seriesId);
+        bookingRepository.lockBySeriesId(seriesId);
         discardPreLockState();
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
 

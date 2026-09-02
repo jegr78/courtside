@@ -50,7 +50,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     // The claim is the guard: whoever changes the row from null is the one that sends, so a second
     // sweep - or a second instance - finds nothing to do.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "UPDATE booking SET reminded_at = :at WHERE id = :id AND reminded_at IS NULL",
+    @Query(value = """
+            UPDATE booking SET reminded_at = :at
+            WHERE id = :id AND status = 'CONFIRMED' AND reminded_at IS NULL
+            """,
             nativeQuery = true)
     int claimReminder(@Param("id") UUID id, @Param("at") Instant at);
 
