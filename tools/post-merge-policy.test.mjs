@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const profiles = JSON.parse(readFileSync(new URL("../ci/test-profiles.json", import.meta.url)));
-const observation = JSON.parse(readFileSync(new URL("../ci/test-profile-observation.json", import.meta.url)));
 const contract = JSON.parse(readFileSync(new URL("../ci/test-profile-contract.json", import.meta.url)));
 
 test("given the checked-in profile policy, when a merge smoke reads it, then every profile uses known jobs", () => {
@@ -17,12 +16,4 @@ test("given the checked-in profile policy, when a merge smoke reads it, then eve
       assert.ok(full.has(job), `${job} is not part of the full profile`);
     }
   }
-});
-
-test("given reduced profiles, when observation policy qualifies them, then every application and tooling surface remains required", () => {
-  // when / then
-  assert.deepEqual([...observation.requiredNaturalProfiles].sort(), ["backend", "frontend", "tooling"]);
-  assert.ok(observation.minimumFirstAttempts >= observation.minimumNaturalReducedProposals);
-  assert.ok(Number.isFinite(Date.parse(observation.evidenceWindowStartedAt)));
-  assert.match(observation.requiredBaseCommit, /^[a-f0-9]{40}$/);
 });

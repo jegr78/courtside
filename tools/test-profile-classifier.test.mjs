@@ -7,8 +7,7 @@ import { test } from "node:test";
 import { bindPlanToRun, classifyChanges, classifyPath, fallbackPlanToRun, parseNameStatus,
   executedTests, profileSummary, validateGitHubManifest, validateRules,
   validateToolManifest } from "./test-profile-classifier.mjs";
-import { ciJobsForProfiles, loadProfileContract,
-  profilePolicyFingerprint } from "./test-profile-contract.mjs";
+import { ciJobsForProfiles, loadProfileContract } from "./test-profile-contract.mjs";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -19,8 +18,6 @@ const profileRules = JSON.parse(readFileSync(
   new URL("../ci/test-profiles.json", import.meta.url), "utf8"));
 const toolManifest = JSON.parse(readFileSync(
   new URL("../ci/tool-profile-manifest.json", import.meta.url), "utf8"));
-const admissionRecord = JSON.parse(readFileSync(
-  new URL("../ci/test-profile-admission.json", import.meta.url), "utf8"));
 const githubManifest = JSON.parse(readFileSync(
   new URL("../ci/github-profile-manifest.json", import.meta.url), "utf8"));
 const validatePlan = new Ajv({ strict: true }).compile(planSchema);
@@ -116,6 +113,27 @@ test("given reviewed GitHub metadata, when classifying, then templates and valid
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/workflows/pr-title-lint.yml" }], []).profiles,
     ["tooling"]);
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/workflows/build.yml" }], []).profiles, ["full"]);
+});
+
+test("given a file that decides the selection, when classifying it, then it can never select a reduced profile", () => {
+  // given
+  const deciding = [
+    ".github/workflows/build.yml", "ci/github-profile-manifest.json", "ci/node-toolchain.json",
+    "ci/test-profile-contract.json", "ci/test-profile-plan.schema.json", "ci/test-profiles.json",
+    "ci/tool-profile-manifest.json", "frontend/package.json", "tools/docs-check.mjs",
+    "tools/local-check.mjs", "tools/node-toolchain.mjs", "tools/test-profile-classifier.mjs",
+    "tools/test-profile-contract.mjs", "tools/tool-tests.mjs"
+  ];
+  const selfChecking = ["tools/github-metadata.test.mjs", "tools/github-template-metadata.test.mjs",
+    "tools/workflow-action-pinning.test.mjs"];
+
+  // when / then
+  for (const path of deciding) {
+    assert.deepEqual(classifyChanges([{ status: "M", path }], []).profiles, ["full"], path);
+  }
+  for (const path of selfChecking) {
+    assert.deepEqual(classifyChanges([{ status: "M", path }], []).profiles, ["tooling"], path);
+  }
 });
 
 test("given backend and frontend changes, when classifying, then both reduced profiles are observed", () => {
@@ -332,10 +350,6 @@ test("given a repository path contains markdown, when rendering reasons, then it
 test("given a profile plan, when binding it to the workflow run, then every identity is retained", () => {
   // given
   const plan = classifyChanges([{ status: "M", path: "docs/design.md" }], []);
-  const fingerprint = profilePolicyFingerprint();
-  const admitted = { ...admissionRecord, admittedPolicyFingerprint: fingerprint,
-    evidence: { ...admissionRecord.evidence,
-      localTiming: { ...admissionRecord.evidence.localTiming, policyFingerprint: fingerprint } } };
 
   // when
   const bound = bindPlanToRun(plan, {
@@ -343,21 +357,19 @@ test("given a profile plan, when binding it to the workflow run, then every iden
     attempt: 1,
     baseCommit: "a".repeat(40),
     headCommit: "b".repeat(40)
-  }, "admitted", admitted);
+  });
 
   // then
-  assert.equal(bound.schemaVersion, 4);
-  assert.match(bound.proposedPolicyFingerprint, /^[a-f0-9]{64}$/);
-  assert.equal(bound.proposedPolicyFingerprint, profilePolicyFingerprint());
+  assert.equal(bound.schemaVersion, 5);
   assert.equal(bound.runId, 101);
   assert.equal(bound.attempt, 1);
   assert.equal(bound.baseCommit, "a".repeat(40));
   assert.equal(bound.headCommit, "b".repeat(40));
   assert.equal(bound.plannerOutcome, "passed");
-  assert.deepEqual(bound.activeProfiles, ["docs"]);
-  assert.deepEqual(bound.proposedProfiles, ["docs"]);
-  assert.equal(bound.admissionOutcome, "matched");
-  assert.equal(bound.activePolicyFingerprint, bound.proposedPolicyFingerprint);
+  assert.deepEqual(bound.profiles, ["docs"]);
+  assert.deepEqual(bound.ciJobs, ["docs"]);
+  assert.deepEqual(bound.localTasks.map((task) => task.label), ["docs-check"]);
+  assert.equal(bound.isFull, false);
   assert.equal(validatePlan(bound), true, JSON.stringify(validatePlan.errors));
   assert.throws(() => bindPlanToRun(plan, { ...bound, runId: 0 }), /identity/);
 });
@@ -373,8 +385,8 @@ test("given the classifier fails, when binding fallback evidence, then the plan 
 
   // then
   assert.equal(fallback.plannerOutcome, "failed");
-  assert.deepEqual(fallback.activeProfiles, ["full"]);
-  assert.deepEqual(fallback.proposedProfiles, ["full"]);
+  assert.deepEqual(fallback.profiles, ["full"]);
+  assert.equal(fallback.isFull, true);
   assert.deepEqual(fallback.reasons, [
     { code: "classifier-error", path: null, profile: "full", status: null }
   ]);

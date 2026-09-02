@@ -16,12 +16,11 @@ const protectedFullTask = {
 };
 
 export function planTasks(classified) {
-  const profiles = classified.activeProfiles ?? classified.profiles;
-  const tasks = classified.activeLocalTasks
+  const tasks = classified.localTasks
     ?? classified.tasks
-    ?? (profiles.includes("full") ? [protectedFullTask]
-      : localTasksForProfiles(loadProfileContract(), profiles));
-  return { ...classified, profiles, tasks: structuredClone(tasks) };
+    ?? (classified.profiles.includes("full") ? [protectedFullTask]
+      : localTasksForProfiles(loadProfileContract(), classified.profiles));
+  return { ...classified, tasks: structuredClone(tasks) };
 }
 
 export function collectLocalChanges(git = runGit) {
@@ -133,12 +132,7 @@ export async function executeLocalCheck(options, runtime = {}) {
     headCommit: evidence.headCommit,
     fallbackReason: evidence.fallbackReason,
     changeFingerprint: evidence.changeFingerprint,
-    activePolicyFingerprint: plan.activePolicyFingerprint ?? null,
-    proposedPolicyFingerprint: plan.proposedPolicyFingerprint ?? null,
     profiles: plan.profiles,
-    proposedProfiles: plan.proposedProfiles ?? plan.profiles,
-    admissionOutcome: plan.admissionOutcome ?? null,
-    overrideOutcome: plan.overrideOutcome ?? null,
     reasons: plan.reasons,
     tasks: plan.tasks.map((task) => task.label),
     outcome: options.planOnly ? "planned" : "running"
@@ -183,9 +177,6 @@ export async function classifyProtectedChanges(evidence, forceFull, git = runGit
     const protectedClassifier = await loadClassifier(`${classifierUrl.href}?base=${evidence.baseCommit}`);
     const changes = protectedClassifier.parseNameStatus(evidence.changeEvidence);
     const classified = protectedClassifier.classifyChanges(changes, forceFull ? ["ci:full"] : []);
-    if (typeof protectedClassifier.admitPlan === "function") {
-      return protectedClassifier.admitPlan(classified, forceFull ? "full" : "admitted");
-    }
     const protectedLocalCheckUrl = pathToFileURL(join(worktree, "tools", "local-check.mjs"));
     const protectedLocalCheck = await loadClassifier(
       `${protectedLocalCheckUrl.href}?base=${evidence.baseCommit}`);
@@ -214,9 +205,7 @@ function fullClassification(reason) {
   return {
     schemaVersion: 1,
     profiles: ["full"],
-    activeProfiles: ["full"],
-    proposedProfiles: ["full"],
-    activeLocalTasks: [structuredClone(protectedFullTask)],
+    localTasks: [structuredClone(protectedFullTask)],
     isFull: true,
     reasons: [{ code: reason, path: null, profile: "full", status: null }]
   };
@@ -228,7 +217,6 @@ export function renderLocalCheckPlan(record) {
     : `full fallback: ${record.fallbackReason}`;
   return [
     `Local profiles: ${record.profiles.join(" + ")}`,
-    `Proposed profiles: ${record.proposedProfiles.join(" + ")}`,
     `Change evidence: ${source}`,
     `Tasks: ${record.tasks.length === 0 ? "diff-check only" : record.tasks.join(", ")}`,
     `Result: ${resultFile}`

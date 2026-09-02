@@ -1,8 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateAdmissionRecord } from "./test-profile-contract.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const documentationTests = [
@@ -13,101 +12,12 @@ export const documentationTests = [
   "tools/test-profile-contract.test.mjs"
 ];
 
-const startMarker = "<!-- profile-admission:start -->";
-const endMarker = "<!-- profile-admission:end -->";
-
-export function admissionSection(admission) {
-  validateAdmissionRecord(admission, admission.evidence.expiresOn);
-  const evidence = admission.evidence;
-  const lines = [
-    startMarker,
-    "The admitted profile policy is backed by Profile Evidence run",
-    `\`${evidence.runId}\`, artifact \`${evidence.artifact}\`, reported \`${evidence.status}\` at`,
-    `${evidence.assessedAt} under policy fingerprint`,
-    `\`${admission.admittedPolicyFingerprint}\`. The evidence expires on ${evidence.expiresOn}. It contains`,
-    `${evidence.qualifyingFirstAttempts} qualifying first attempts, including ${evidence.backendPlans} backend and`,
-    admission.schemaVersion >= 2
-      ? `${evidence.frontendPlans} frontend and ${evidence.toolingPlans} tooling plans, with ${evidence.candidateMisses} candidate misses and`
-      : `${evidence.frontendPlans} frontend plans, with ${evidence.candidateMisses} candidate misses and`,
-    `${evidence.classificationErrors} classification errors. ${evidence.incompleteObservations} incomplete observations were excluded.`
-  ];
-  if (admission.schemaVersion === 3) lines.push(...qualificationLines(evidence));
-  lines.push(endMarker);
-  return lines.join("\n");
-}
-
-function qualificationLines(evidence) {
-  const ci = evidence.ciTiming;
-  const local = evidence.localTiming;
-  const [firstNightly, secondNightly] = evidence.nightlies;
-  return [
-    "",
-    `${ci.observedFirstAttempts} observed CI first attempts had a ${duration(ci.medianDurationMs)} median and`,
-    `${duration(ci.p95DurationMs)} p95, consuming ${ci.runnerMinutes.toFixed(2)} runner minutes. The`,
-    `${ci.successfulFirstAttempts} successful attempts had a ${duration(ci.successfulMedianDurationMs)} median and`,
-    `consumed ${ci.successfulRunnerMinutes.toFixed(2)} runner minutes. These are pre-activation full-execution`,
-    "figures; shadow classifications do not prove hosted-runner savings.",
-    "",
-    `Local qualification on commit \`${local.commit}\` retained ${local.firstAttempts} first attempts with`,
-    `${local.retries} retries and ${local.interruptedAttempts} interruptions. Docs measured ${duration(local.docs.medianMs)}`,
-    `median and ${duration(local.docs.maximumMs)} maximum; tooling measured ${duration(local.tooling.medianMs)} median and`,
-    `${duration(local.tooling.maximumMs)} maximum. Backend saved ${percentage(saving(local.backend, local.full))} with a`,
-    `${duration(local.backend.medianMs)} median, and frontend saved ${percentage(saving(local.frontend, local.full))} with a`,
-    `${duration(local.frontend.medianMs)} median, against the ${duration(local.full.medianMs)} full median. The`,
-    `representative combined plan saved ${percentage(saving(local.combined, local.full))} with a`,
-    `${duration(local.combined.medianMs)} median. Combined savings are reported evidence, not an admission gate or`,
-    "a general acceleration claim.",
-    "",
-    `Genuine scheduled runs \`${firstNightly.runId}\` and \`${secondNightly.runId}\` each passed docs, backend, frontend,`,
-    "tooling and security on their first attempt. Protected replay continues after activation without a fixed",
-    "waiting period; a candidate miss triggers immediate full escalation and requalification."
-  ];
-}
-
-function duration(milliseconds) {
-  if (milliseconds < 60_000) return `${(milliseconds / 1000).toFixed(3)} seconds`;
-  const minutes = Math.floor(milliseconds / 60_000);
-  return `${minutes}m ${((milliseconds % 60_000) / 1000).toFixed(3)}s`;
-}
-
-function percentage(value) {
-  return `${(value * 100).toFixed(2)} percent`;
-}
-
-function saving(timing, full) {
-  return 1 - timing.medianMs / full.medianMs;
-}
-
-export function renderAdmissionDocument(source, admission) {
-  const start = source.indexOf(startMarker);
-  const end = source.indexOf(endMarker);
-  if (start < 0 || end < start || source.indexOf(startMarker, start + 1) >= 0
-      || source.indexOf(endMarker, end + 1) >= 0) {
-    throw new Error("Profile admission markers are invalid");
-  }
-  return `${source.slice(0, start)}${admissionSection(admission)}${source.slice(end + endMarker.length)}`;
-}
-
-export function writeAdmissionDocument(path, admission) {
-  const rendered = renderAdmissionDocument(readFileSync(path, "utf8"), admission);
-  const temporary = `${path}.tmp`;
-  writeFileSync(temporary, rendered, { mode: 0o600 });
-  renameSync(temporary, path);
-}
-
-export function checkDocumentation(root, admission, assessedOn = new Date().toISOString().slice(0, 10),
-    inventory = markdownFiles) {
-  validateAdmissionRecord(admission, assessedOn);
+export function checkDocumentation(root, inventory = markdownFiles) {
   const files = inventory(root);
   const documents = new Map(files.map((path) => [path, readFileSync(join(root, path), "utf8")]));
   for (const [path, source] of documents) {
     const prose = validateMarkdown(path, source);
     validateLinks(root, path, prose, documents);
-  }
-  const strategyPath = "docs/quality-strategy.md";
-  const strategy = documents.get(strategyPath);
-  if (strategy === undefined || renderAdmissionDocument(strategy, admission) !== strategy) {
-    throw new Error("The generated profile admission section is stale");
   }
 }
 
@@ -180,16 +90,12 @@ function headingAnchors(source) {
 }
 
 function main() {
-  const admissionPath = join(repository, "ci", "test-profile-admission.json");
-  const strategyPath = join(repository, "docs", "quality-strategy.md");
-  const admission = JSON.parse(readFileSync(admissionPath, "utf8"));
-  if (process.argv.includes("--write")) writeAdmissionDocument(strategyPath, admission);
-  else if (process.argv.includes("--check")) {
-    checkDocumentation(repository, admission);
+  if (process.argv.includes("--check")) {
+    checkDocumentation(repository);
     execFileSync(process.execPath, ["--test", ...documentationTests],
       { cwd: repository, shell: false, stdio: "inherit" });
   }
-  else throw new Error("Use --check or --write");
+  else throw new Error("Use --check");
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();

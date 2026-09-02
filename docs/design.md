@@ -1595,6 +1595,23 @@ whether it is built or designed. **Designed means absent today.**
   remove — a red gate nobody is told about. What bounds it: the window is the time between the
   scheduled run and the fix, and a reader of the issue learns that a gate failed, which the run
   history already showed them. *Built, as described.*
+- **Accepted: a reduced pull-request build carries no evidence that it was enough.** A pull request
+  runs only the quality jobs its changed paths select. Which paths select which jobs is decided by
+  two closed inventories and a classifier that answers `full` for anything it does not recognise, for
+  a rename or a deletion, and for its own failure. What used to sit beside that was a measurement:
+  every run recorded whether a job outside the reduced selection had failed, and a reduced selection
+  was permitted only after twenty first attempts had produced no such miss. That measurement is gone,
+  because it was observable only while every run executed everything, so keeping it meant paying for
+  the full set in order to prove the reduced one — and requalifying after any policy change, which
+  at this repository's rate of change was unreachable rather than strict. What an observer needs:
+  nothing; the selection is visible in every run's summary. What it means: if a mapping is wrong, no
+  pull-request gate says so. What bounds it: pushes to `main` and every scheduled run execute all
+  five jobs unconditionally and are required to pass, so a wrong mapping surfaces on `main` rather
+  than never; the inventories are closed, so an unlisted file selects `full`; the manifests and the
+  classifier are themselves classified `full` and carry their own tests; and the repository variable
+  `COURTSIDE_TEST_PROFILES` forces the complete set for every pull request, with any value other
+  than `admitted` or none escalating rather than reducing. It stays open because the alternative is
+  a permanent shadow campaign whose cost is the full build it exists to avoid. *Built, as described.*
 
 ### Roles
 
