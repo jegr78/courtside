@@ -12,14 +12,14 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 // The fixture is written for the schema of the upgrade origin, so it names no column a later
 // migration added as NOT NULL. Lending those a default while it loads keeps one fixture for both
 // smokes rather than a second copy that drifts away from the first.
-const COLUMNS_ADDED_SINCE_THE_FIXTURE = [
+export const columnsAddedSinceTheFixture = [
   { table: "member", column: "started_on", value: "DATE '2026-01-01'" }
 ];
 
 function seedWithLaterColumns(fixture) {
-  const lend = COLUMNS_ADDED_SINCE_THE_FIXTURE
+  const lend = columnsAddedSinceTheFixture
     .map(({ table, column, value }) => `ALTER TABLE ${table} ALTER COLUMN ${column} SET DEFAULT ${value};`);
-  const withdraw = COLUMNS_ADDED_SINCE_THE_FIXTURE
+  const withdraw = columnsAddedSinceTheFixture
     .map(({ table, column }) => `ALTER TABLE ${table} ALTER COLUMN ${column} DROP DEFAULT;`);
   return [...lend, fixture, ...withdraw].join("\n");
 }
