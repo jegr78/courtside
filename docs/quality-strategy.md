@@ -179,12 +179,32 @@ replay.
 
 <!-- profile-admission:start -->
 The admitted profile policy is backed by Profile Evidence run
-`33326145088`, artifact `profile-evidence-33326145088-1`, reported `ready-for-review` at
-2026-08-30T17:45:40Z under policy fingerprint
-`d65c7568d0abe78a00dc5285ce4f297946f176bed1bb05d672f40e644e50a14c`. The evidence expires on 2026-09-30. It contains
-60 qualifying first attempts, including 3 backend and
-1 frontend plans, with 0 candidate misses and
-0 classification errors. 3 incomplete observations were excluded.
+`33596385377`, artifact `profile-evidence-33596385377-1`, reported `ready-for-review` at
+2026-09-02T05:51:46Z under policy fingerprint
+`0d79329f01144eedd484410cacf70bf0c953641e9c0aeb070907f7548792d7d0`. The evidence expires on 2026-10-02. It contains
+21 qualifying first attempts, including 2 backend and
+6 frontend and 2 tooling plans, with 0 candidate misses and
+0 classification errors. 2 incomplete observations were excluded.
+
+23 observed CI first attempts had a 14m 25.000s median and
+14m 54.000s p95, consuming 690.10 runner minutes. The
+21 successful attempts had a 14m 19.000s median and
+consumed 628.48 runner minutes. These are pre-activation full-execution
+figures; shadow classifications do not prove hosted-runner savings.
+
+Local qualification on commit `c66c992aab057de03e0887972cc3ae5ad26b8c43` retained 18 first attempts with
+0 retries and 0 interruptions. Docs measured 0.215 seconds
+median and 0.232 seconds maximum; tooling measured 18.681 seconds median and
+18.800 seconds maximum. Backend saved 57.05 percent with a
+9m 59.738s median, and frontend saved 50.20 percent with a
+11m 35.401s median, against the 23m 16.409s full median. The
+representative combined plan saved 9.35 percent with a
+21m 5.786s median. Combined savings are reported evidence, not an admission gate or
+a general acceleration claim.
+
+Genuine scheduled runs `33474128562` and `33592874403` each passed docs, backend, frontend,
+tooling and security on their first attempt. Protected replay continues after activation without a fixed
+waiting period; a candidate miss triggers immediate full escalation and requalification.
 <!-- profile-admission:end -->
 
 Any changed semantic contract has a different fingerprint. Until protected replay evidence admits
@@ -196,27 +216,6 @@ the topology was merged to `main`. A run also needs a merge base containing comm
 `2722b3d4325a38e8e1bafc30865138134c2ff6b9`. A stale pull-request branch can start after the time
 boundary while still using the earlier topology. Replay retains such runs as incompatible evidence
 but does not treat a job that did not yet exist as missing or successful.
-
-Successful full-profile runs had a 14.27-minute median and 14.85-minute p95. Successful backend
-runs had a 10.40-minute median and 10.58-minute p95; the one frontend run measured 11.92 minutes.
-This meets the 15-minute p95 target and improves on the approximately 27-minute serial baseline.
-Successful runs consumed 1,687.75 runner minutes. Among the eight failed aggregate workflows, the
-median first failure arrived after 12.17 minutes and the p95 after 15.97 minutes. The reduced
-sample is deliberately small, so timing trends continue through the CI timing records; it is enough
-for admission because both reduced paths executed naturally and the classifier remains fail-closed.
-
-Eight otherwise qualifying classifications had a failed aggregate workflow. Seven failed in the
-paired assessment comparison, and one failed after its selected backend and security jobs passed
-because Maven Central rate-limited the old coverage-toolchain bootstrap. The latter path was removed
-before this decision. These runs remain classification evidence but are excluded from successful-run
-timing percentiles. None showed a required quality job being skipped.
-
-The admission window contained two scheduled full builds: runs `33240541977` and `33295334495`
-both passed on their first attempt, so it contained no nightly-only failure. Nightly completeness
-remains owned by the retained nightly verification record and release gate. The profile evidence
-contained no confirmed flake. All three excluded incomplete observations were frontend-job failures,
-but the retained profile record does not attribute them to a browser or test group. They remain
-unclassified failures unless their separate diagnostics prove a narrower cause.
 
 ### Release checklist
 

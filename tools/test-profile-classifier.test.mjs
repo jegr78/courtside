@@ -317,9 +317,10 @@ test("given a profile plan, when binding it to the workflow run, then every iden
   assert.equal(bound.baseCommit, "a".repeat(40));
   assert.equal(bound.headCommit, "b".repeat(40));
   assert.equal(bound.plannerOutcome, "passed");
-  assert.deepEqual(bound.activeProfiles, ["full"]);
+  assert.deepEqual(bound.activeProfiles, ["docs"]);
   assert.deepEqual(bound.proposedProfiles, ["docs"]);
-  assert.equal(bound.admissionOutcome, "stale");
+  assert.equal(bound.admissionOutcome, "matched");
+  assert.equal(bound.activePolicyFingerprint, bound.proposedPolicyFingerprint);
   assert.equal(validatePlan(bound), true, JSON.stringify(validatePlan.errors));
   assert.throws(() => bindPlanToRun(plan, { ...bound, runId: 0 }), /identity/);
 });
