@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -8,6 +8,7 @@ import { loadProfileContract, localTasksForProfiles } from "./test-profile-contr
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const resultFile = join(repository, "build", "local-check", "result.json");
+const verificationOwnerFile = ".courtside-verification-owner.json";
 const protectedFullTask = {
   label: "full",
   workingDirectory: "repository",
@@ -151,6 +152,8 @@ export async function executeLocalCheck(options, runtime = {}) {
     const createWorktree = runtime.createWorktree ?? ((candidate) =>
       createVerificationWorktree(candidate, runtime.git ?? runGit));
     const pinned = createWorktree(evidence);
+    const unregisterSignalCleanup = (runtime.registerSignalCleanup
+      ?? registerVerificationSignalCleanup)(pinned.release);
     let taskFailure;
     try {
       for (const processPlan of localVerificationPlans(plan.tasks, runtime.platform, pinned.path,
@@ -169,6 +172,8 @@ export async function executeLocalCheck(options, runtime = {}) {
           `${taskFailure.message}; verification worktree cleanup failed: ${cleanupFailure.message}`);
       }
       throw cleanupFailure;
+    } finally {
+      unregisterSignalCleanup();
     }
     if (taskFailure !== undefined) throw taskFailure;
     record.outcome = "passed";
@@ -183,29 +188,113 @@ export async function executeLocalCheck(options, runtime = {}) {
 }
 
 export function createVerificationWorktree(evidence, git = runGit) {
+  recoverVerificationWorktrees(git);
   const worktree = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const ownerFile = `${realpathSync(worktree)}${verificationOwnerFile}`;
   let attached = false;
+  let released = false;
   try {
+    writeFileSync(ownerFile, `${JSON.stringify({ schemaVersion: 1, pid: process.pid })}\n`,
+      { mode: 0o600 });
     git(["worktree", "add", "--detach", worktree, evidence.headCommit]);
     attached = true;
   } catch (failure) {
-    rmSync(worktree, { recursive: true, force: true });
+    let retained = false;
+    if (attached) {
+      try {
+        git(["worktree", "remove", "--force", worktree]);
+      } catch {
+        retained = true;
+      }
+    }
+    if (!retained) {
+      rmSync(worktree, { recursive: true, force: true });
+      rmSync(ownerFile, { force: true });
+    }
     throw failure;
   }
   return {
     path: worktree,
     release: () => {
+      if (released) return;
+      released = true;
       let cleanupFailure;
       try {
         if (attached) git(["worktree", "remove", "--force", worktree]);
       } catch (failure) {
         cleanupFailure = failure;
       } finally {
-        rmSync(worktree, { recursive: true, force: true });
+        if (cleanupFailure === undefined) {
+          rmSync(worktree, { recursive: true, force: true });
+          rmSync(ownerFile, { force: true });
+        }
       }
       if (cleanupFailure !== undefined) throw cleanupFailure;
     }
   };
+}
+
+export function recoverVerificationWorktrees(git = runGit, isProcessAlive = processIsAlive) {
+  const temporaryRoot = realpathSync(tmpdir());
+  const listing = git(["worktree", "list", "--porcelain"]);
+  const candidates = String(listing ?? "")
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("worktree "))
+    .map((line) => line.slice("worktree ".length));
+  for (const candidate of candidates) {
+    let candidatePath;
+    try {
+      candidatePath = realpathSync(candidate);
+    } catch {
+      continue;
+    }
+    if (dirname(candidatePath) !== temporaryRoot
+        || !candidatePath.startsWith(join(temporaryRoot, "courtside-verification-"))) continue;
+    let owner;
+    try {
+      owner = JSON.parse(readFileSync(`${candidatePath}${verificationOwnerFile}`, "utf8"));
+    } catch {
+      continue;
+    }
+    if (owner.schemaVersion !== 1 || !Number.isSafeInteger(owner.pid) || owner.pid <= 0
+        || isProcessAlive(owner.pid)) continue;
+    git(["worktree", "remove", "--force", candidatePath]);
+    rmSync(candidatePath, { recursive: true, force: true });
+    rmSync(`${candidatePath}${verificationOwnerFile}`, { force: true });
+  }
+}
+
+export function registerVerificationSignalCleanup(release, process_ = process) {
+  let handling = false;
+  const handlers = new Map();
+  const unregister = () => {
+    for (const [signal, handler] of handlers) process_.removeListener(signal, handler);
+    handlers.clear();
+  };
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    const handler = () => {
+      if (handling) return;
+      handling = true;
+      try {
+        release();
+      } finally {
+        unregister();
+        process_.kill(process_.pid, signal);
+      }
+    };
+    handlers.set(signal, handler);
+    process_.once(signal, handler);
+  }
+  return unregister;
+}
+
+function processIsAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (failure) {
+    return failure.code === "EPERM";
+  }
 }
 
 export async function classifyProtectedChanges(evidence, forceFull, git = runGit,

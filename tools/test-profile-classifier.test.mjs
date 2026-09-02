@@ -356,10 +356,6 @@ test("given a repository path contains markdown, when rendering reasons, then it
 test("given a profile plan, when binding it to the workflow run, then every identity is retained", () => {
   // given
   const plan = classifyChanges([{ status: "M", path: "docs/design.md" }], []);
-  const fingerprint = profilePolicyFingerprint();
-  const admission = JSON.parse(readFileSync(new URL("../ci/test-profile-admission.json", import.meta.url), "utf8"));
-  admission.admittedPolicyFingerprint = fingerprint;
-  admission.evidence.localTiming.policyFingerprint = fingerprint;
 
   // when
   const bound = bindPlanToRun(plan, {
@@ -367,7 +363,7 @@ test("given a profile plan, when binding it to the workflow run, then every iden
     attempt: 1,
     baseCommit: "a".repeat(40),
     headCommit: "b".repeat(40)
-  }, "admitted", admission);
+  });
 
   // then
   assert.equal(bound.schemaVersion, 5);

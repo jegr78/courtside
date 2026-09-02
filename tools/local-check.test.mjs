@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { EventEmitter } from "node:events";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import {
   classifyProtectedChanges, collectLocalChanges, createVerificationWorktree, executeLocalCheck,
-  localCheckPrerequisites, localVerificationPlans, planTasks, renderLocalCheckPlan
+  localCheckPrerequisites, localVerificationPlans, planTasks, recoverVerificationWorktrees,
+  registerVerificationSignalCleanup, renderLocalCheckPlan
 } from "./local-check.mjs";
 import { classifyChanges } from "./test-profile-classifier.mjs";
 
@@ -218,7 +222,10 @@ test("given origin cannot be refreshed, when collecting evidence, then the calle
 test("given a recorded head, when creating its verification worktree, then checkout and cleanup use that commit", () => {
   // given
   const calls = [];
-  const git = (arguments_) => calls.push(arguments_);
+  const git = (arguments_) => {
+    calls.push(arguments_);
+    return "";
+  };
 
   // when
   const pinned = createVerificationWorktree({ headCommit: "b".repeat(40) }, git);
@@ -227,8 +234,74 @@ test("given a recorded head, when creating its verification worktree, then check
 
   // then
   assert.equal(pinned.path, path);
-  assert.deepEqual(calls[0], ["worktree", "add", "--detach", path, "b".repeat(40)]);
-  assert.deepEqual(calls[1], ["worktree", "remove", "--force", path]);
+  assert.deepEqual(calls[0], ["worktree", "list", "--porcelain"]);
+  assert.deepEqual(calls[1], ["worktree", "add", "--detach", path, "b".repeat(40)]);
+  assert.deepEqual(calls[2], ["worktree", "remove", "--force", path]);
+});
+
+test("given owned stale and live verification worktrees, when recovering, then only the stale one is removed", () => {
+  // given
+  const stale = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const live = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const foreign = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const stalePath = realpathSync(stale);
+  const livePath = realpathSync(live);
+  const foreignPath = realpathSync(foreign);
+  const staleOwner = `${stalePath}.courtside-verification-owner.json`;
+  const liveOwner = `${livePath}.courtside-verification-owner.json`;
+  writeFileSync(staleOwner,
+    `${JSON.stringify({ schemaVersion: 1, pid: 101 })}\n`);
+  writeFileSync(liveOwner,
+    `${JSON.stringify({ schemaVersion: 1, pid: 202 })}\n`);
+  const calls = [];
+  const git = (arguments_) => {
+    calls.push(arguments_);
+    if (arguments_[1] === "list") {
+      return `worktree ${stalePath}\nHEAD a\n\nworktree ${livePath}\nHEAD b\n\nworktree ${foreignPath}\nHEAD c\n`;
+    }
+    return "";
+  };
+
+  try {
+    // when
+    recoverVerificationWorktrees(git, (pid) => pid === 202);
+
+    // then
+    assert.deepEqual(calls.filter((call) => call[1] === "remove"), [
+      ["worktree", "remove", "--force", stalePath]
+    ]);
+    assert.equal(existsSync(stalePath), false);
+    assert.equal(existsSync(staleOwner), false);
+    assert.doesNotThrow(() => readFileSync(liveOwner));
+    assert.equal(existsSync(foreignPath), true);
+  } finally {
+    rmSync(stale, { recursive: true, force: true });
+    rmSync(live, { recursive: true, force: true });
+    rmSync(foreign, { recursive: true, force: true });
+    rmSync(staleOwner, { force: true });
+    rmSync(liveOwner, { force: true });
+  }
+});
+
+test("given a verification signal, when handling it, then cleanup is idempotent and the signal is preserved", () => {
+  // given
+  const process_ = new EventEmitter();
+  process_.pid = 303;
+  const signals = [];
+  process_.kill = (pid, signal) => signals.push([pid, signal]);
+  let releases = 0;
+  const unregister = registerVerificationSignalCleanup(() => releases++, process_);
+
+  // when
+  process_.emit("SIGINT");
+  process_.emit("SIGINT");
+  unregister();
+
+  // then
+  assert.equal(releases, 1);
+  assert.deepEqual(signals, [[303, "SIGINT"]]);
+  assert.equal(process_.listenerCount("SIGINT"), 0);
+  assert.equal(process_.listenerCount("SIGTERM"), 0);
 });
 
 test("given supported platforms, when resolving tasks, then commands remain shell-free or fixed", () => {
