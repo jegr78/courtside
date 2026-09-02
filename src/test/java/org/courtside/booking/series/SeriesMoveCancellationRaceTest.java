@@ -9,11 +9,11 @@ import org.courtside.booking.BookingStatus;
 import org.courtside.facility.FacilityService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
-import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -39,10 +39,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import(FacilityTestFixture.class)
 class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
 
     private static final UUID TRAINING_CARD =
@@ -55,14 +56,11 @@ class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
     @Autowired
     private BookingService bookingService;
 
-    @Autowired
+    @MockitoSpyBean
     private BookingRepository bookings;
 
     @Autowired
     private FacilityTestFixture facilityFixture;
-
-    @Autowired
-    private IdentityTestFixture identity;
 
     @Autowired
     private JdbcClient jdbc;
@@ -77,7 +75,6 @@ class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
     void setUp() {
         court = facilityFixture.createCourt(1, "Court 1");
         trainer = UUID.randomUUID();
-        identity.createPerson("Jane", "Doe", "jane@example.org");
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
@@ -115,10 +112,20 @@ class SeriesMoveCancellationRaceTest extends AbstractIntegrationTest {
         }
 
         // then
+        assertTheMoveWasHeldAfterItRead(bookingId);
         Booking booking = bookings.findById(bookingId).orElseThrow();
         assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
         assertThat(booking.getCancelledAt()).isNotNull();
         assertThat(booking.getCancelledBy()).isEqualTo(trainer);
+    }
+
+    // Without this the hook could sit before the read, and the test would stay green while covering
+    // nothing: it would let the cancellation in at a moment the move never had a stale row to lose.
+    private void assertTheMoveWasHeldAfterItRead(UUID bookingId) {
+        InOrder order = inOrder(bookings, facility);
+        order.verify(bookings).lockBySeriesId(any());
+        order.verify(bookings).findWithAllocationsById(bookingId);
+        order.verify(facility).requireBookableCourts(any());
     }
 
     // The move must not run past the point where it has read the bookings until the cancellation has

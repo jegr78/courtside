@@ -23,7 +23,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query(value = "SELECT id FROM booking WHERE id = :id FOR UPDATE", nativeQuery = true)
     Optional<UUID> lockById(@Param("id") UUID id);
 
-    // Ordered by id so two writers that need overlapping rows queue rather than deadlock.
+    // Ordered by id, as the reminder sweep is, so the two writers that hold several booking rows
+    // without a lock in common acquire them the same way round.
     @Query(value = "SELECT id FROM booking WHERE series_id = :seriesId ORDER BY id FOR UPDATE",
             nativeQuery = true)
     List<UUID> lockBySeriesId(@Param("seriesId") UUID seriesId);
@@ -42,6 +43,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
               AND a.starts_at >= :now
               AND a.starts_at <= cast(:now AS timestamptz) + make_interval(hours => :leadHours)
               AND b.created_at + make_interval(hours => :leadHours) <= a.starts_at
+            ORDER BY b.id
             """, nativeQuery = true)
     List<UUID> findDueForReminder(@Param("now") Instant now, @Param("leadHours") int leadHours);
 
