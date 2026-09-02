@@ -207,6 +207,12 @@ tooling and security on their first attempt. Protected replay continues after ac
 waiting period; a candidate miss triggers immediate full escalation and requalification.
 <!-- profile-admission:end -->
 
+The admitted policy became operative after PR #660 merged on 2026-09-02, when the repository
+variable `COURTSIDE_TEST_PROFILES` changed to `admitted`. That variable remains the authoritative
+runtime mode, and changing it to `full` is the immediate rollback. PR selection evidence must report
+the admitted fingerprint above and the jobs skipped by the active plan. The protected replay remains
+the source for later misses and classification errors.
+
 Any changed semantic contract has a different fingerprint. Until protected replay evidence admits
 that exact fingerprint, both CI and local checks execute `full`; the earlier figures remain
 historical evidence and cannot activate the changed policy.
