@@ -50,6 +50,53 @@ function inventoryFor(observations, overrides = {}) {
   };
 }
 
+function qualifiedAdmission() {
+  const fingerprint = profilePolicyFingerprint();
+  const timingCase = (medianMs, maximumMs) => ({ attempts: 3, medianMs, maximumMs });
+  return {
+    schemaVersion: 3,
+    admittedPolicyFingerprint: fingerprint,
+    evidence: {
+      runId: 101,
+      attempt: 1,
+      artifact: "profile-evidence-101-1",
+      windowStartedAt: "2026-08-28T00:00:00Z",
+      windowEndedAt: "2026-08-31T10:00:00Z",
+      assessedAt: "2026-08-31T10:00:00Z",
+      expiresOn: "2026-09-30",
+      status: "ready-for-review",
+      qualifyingFirstAttempts: 20,
+      backendPlans: 2,
+      frontendPlans: 1,
+      toolingPlans: 1,
+      candidateMisses: 0,
+      classificationErrors: 0,
+      incompleteObservations: 0,
+      ciTiming: {
+        observedFirstAttempts: 20, successfulFirstAttempts: 20,
+        medianDurationMs: 800000, p95DurationMs: 850000, runnerMinutes: 600,
+        successfulMedianDurationMs: 800000, successfulP95DurationMs: 850000,
+        successfulRunnerMinutes: 600
+      },
+      localTiming: {
+        commit: "c".repeat(40), policyFingerprint: fingerprint, status: "qualified",
+        firstAttempts: 18, retries: 0, interruptedAttempts: 0,
+        docs: timingCase(200, 250), tooling: timingCase(14000, 15000),
+        backend: timingCase(600000, 650000), frontend: timingCase(700000, 720000),
+        combined: timingCase(1200000, 1300000), full: timingCase(1300000, 1400000)
+      },
+      nightlies: [
+        { runId: 201, attempt: 1, event: "schedule", commit: "d".repeat(40), outcome: "success",
+          startedAt: "2026-08-29T01:00:00Z",
+          jobs: ["docs", "backend", "frontend", "tooling", "security"] },
+        { runId: 202, attempt: 1, event: "schedule", commit: "e".repeat(40), outcome: "success",
+          startedAt: "2026-08-30T01:00:00Z",
+          jobs: ["docs", "backend", "frontend", "tooling", "security"] }
+      ]
+    }
+  };
+}
+
 const timing = {
   schemaVersion: 1,
   repository: "example/courtside",
@@ -97,25 +144,7 @@ test("given an admitted contract plan, when observing coverage, then active and 
     attempt: 1,
     baseCommit: "a".repeat(40),
     headCommit: "b".repeat(40)
-  }, "admitted", {
-    schemaVersion: 2,
-    admittedPolicyFingerprint: profilePolicyFingerprint(),
-    evidence: {
-      runId: 101,
-      attempt: 1,
-      artifact: "profile-evidence-101-1",
-      assessedAt: "2026-08-31T10:00:00Z",
-      expiresOn: "2026-09-30",
-      status: "ready-for-review",
-      qualifyingFirstAttempts: 20,
-      backendPlans: 2,
-      frontendPlans: 1,
-      toolingPlans: 1,
-      candidateMisses: 0,
-      classificationErrors: 0,
-      incompleteObservations: 0
-    }
-  });
+  }, "admitted", qualifiedAdmission());
 
   // when
   const observation = createProfileObservation(admittedPlan, timing);
@@ -141,25 +170,7 @@ test("given a version four plan, when active evidence is missing or contradictor
     attempt: 1,
     baseCommit: "a".repeat(40),
     headCommit: "b".repeat(40)
-  }, "admitted", {
-    schemaVersion: 2,
-    admittedPolicyFingerprint: profilePolicyFingerprint(),
-    evidence: {
-      runId: 101,
-      attempt: 1,
-      artifact: "profile-evidence-101-1",
-      assessedAt: "2026-08-31T10:00:00Z",
-      expiresOn: "2026-09-30",
-      status: "ready-for-review",
-      qualifyingFirstAttempts: 20,
-      backendPlans: 2,
-      frontendPlans: 1,
-      toolingPlans: 1,
-      candidateMisses: 0,
-      classificationErrors: 0,
-      incompleteObservations: 0
-    }
-  });
+  }, "admitted", qualifiedAdmission());
 
   // when / then
   assert.throws(() => createProfileObservation({ ...admittedPlan, activeLocalTasks: [] }, timing),

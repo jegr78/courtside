@@ -73,68 +73,128 @@ test("given any full profile, when resolving coverage, then only full coverage r
 test("given admission and override states, when selecting active coverage, then only an exact admission reduces", () => {
   // given
   const fingerprint = "a".repeat(64);
-  const evidence = {
-    runId: 101,
-    attempt: 1,
-    artifact: "profile-evidence-101-1",
-    assessedAt: "2026-08-31T10:00:00Z",
-    expiresOn: "2026-09-30",
-    status: "ready-for-review",
-    qualifyingFirstAttempts: 20,
-    backendPlans: 2,
-    frontendPlans: 1,
-    toolingPlans: 1,
-    candidateMisses: 0,
-    classificationErrors: 0,
-    incompleteObservations: 0
-  };
+  const evidence = qualifiedEvidence(fingerprint);
 
   // when / then
   assert.deepEqual(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: fingerprint, evidence
+    schemaVersion: 3, admittedPolicyFingerprint: fingerprint, evidence
   }, "admitted"), {
     activeProfiles: ["backend"], admissionOutcome: "matched", overrideOutcome: "admitted"
   });
-  const { toolingPlans: _toolingPlans, ...legacyEvidence } = evidence;
+  const { toolingPlans: _toolingPlans, ciTiming: _ciTiming, localTiming: _localTiming,
+    nightlies: _nightlies, windowStartedAt: _windowStartedAt, windowEndedAt: _windowEndedAt,
+    ...legacyEvidence } = evidence;
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
     schemaVersion: 1, admittedPolicyFingerprint: fingerprint, evidence: legacyEvidence
   }, "admitted").admissionOutcome, "stale");
+  const { ciTiming: _oldCiTiming, localTiming: _oldLocalTiming,
+    nightlies: _oldNightlies, windowStartedAt: _oldWindowStartedAt, windowEndedAt: _oldWindowEndedAt,
+    ...versionTwoEvidence } = evidence;
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
+    schemaVersion: 2, admittedPolicyFingerprint: fingerprint, evidence: versionTwoEvidence
+  }, "admitted").admissionOutcome, "stale");
+  assert.equal(activeProfileDecision(["backend"], fingerprint, {
+    schemaVersion: 3, admittedPolicyFingerprint: fingerprint,
     evidence: { ...evidence, toolingPlans: 0 }
   }, "admitted").admissionOutcome, "invalid");
   assert.deepEqual(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: "b".repeat(64), evidence
+    schemaVersion: 3, admittedPolicyFingerprint: "b".repeat(64), evidence
   }, "admitted").activeProfiles, ["full"]);
   assert.equal(activeProfileDecision(["backend"], fingerprint, null, "admitted").admissionOutcome,
     "missing");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {}, "admitted").admissionOutcome,
     "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: fingerprint, evidence
+    schemaVersion: 3, admittedPolicyFingerprint: fingerprint, evidence
   }, "full").overrideOutcome, "emergency-full");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: fingerprint, evidence
+    schemaVersion: 3, admittedPolicyFingerprint: fingerprint, evidence
   }, "").overrideOutcome, "invalid-full");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: fingerprint, evidence
+    schemaVersion: 3, admittedPolicyFingerprint: fingerprint, evidence
   }, "admitted", "2026-10-01").admissionOutcome, "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
+    schemaVersion: 3, admittedPolicyFingerprint: fingerprint,
     evidence: { ...evidence, artifact: "profile-evidence-999-1" }
   }, "admitted").admissionOutcome, "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
+    schemaVersion: 3, admittedPolicyFingerprint: fingerprint,
     evidence: { ...evidence, attempt: 2, artifact: "profile-evidence-101-2" }
   }, "admitted").admissionOutcome, "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
+    schemaVersion: 3, admittedPolicyFingerprint: fingerprint,
     evidence: { ...evidence, expiresOn: "2026-02-30" }
   }, "admitted", "2026-02-01").admissionOutcome, "invalid");
   assert.equal(activeProfileDecision(["backend"], fingerprint, {
-    schemaVersion: 2, admittedPolicyFingerprint: fingerprint,
+    schemaVersion: 3, admittedPolicyFingerprint: fingerprint,
     evidence: { ...evidence, assessedAt: "2026-02-30T10:00:00Z" }
   }, "admitted", "2026-02-01").admissionOutcome, "invalid");
+});
+
+test("given insufficient or contradictory admission evidence, when validating it, then reduced coverage stays disabled", () => {
+  // given
+  const fingerprint = "a".repeat(64);
+  const admission = (evidence) => ({ schemaVersion: 3, admittedPolicyFingerprint: fingerprint, evidence });
+  const valid = qualifiedEvidence(fingerprint);
+  const invalidEvidence = [
+    { ...valid, qualifyingFirstAttempts: 19 },
+    { ...valid, backendPlans: 0 },
+    { ...valid, frontendPlans: 0 },
+    { ...valid, toolingPlans: 0 },
+    { ...valid, candidateMisses: 1 },
+    { ...valid, classificationErrors: 1 },
+    { ...valid, ciTiming: { ...valid.ciTiming, successfulFirstAttempts: 19 } },
+    { ...valid, ciTiming: { ...valid.ciTiming, observedFirstAttempts: 21 } },
+    { ...valid, ciTiming: { ...valid.ciTiming, successfulRunnerMinutes: 700 } },
+    { ...valid, backendPlans: 21 },
+    { ...valid, localTiming: { ...valid.localTiming, policyFingerprint: "b".repeat(64) } },
+    { ...valid, localTiming: { ...valid.localTiming, backend: {
+      ...valid.localTiming.backend, medianMs: 1_100_000
+    } } },
+    { ...valid, localTiming: { ...valid.localTiming, frontend: {
+      ...valid.localTiming.frontend, medianMs: 1_100_000
+    } } },
+    { ...valid, localTiming: { ...valid.localTiming, full: {
+      ...valid.localTiming.full, medianMs: 0
+    } } },
+    { ...valid, windowEndedAt: "2026-08-31T09:59:59Z" },
+    { ...valid, nightlies: [valid.nightlies[0]] },
+    { ...valid, nightlies: [valid.nightlies[0], valid.nightlies[0]] },
+    { ...valid, nightlies: [valid.nightlies[0], { ...valid.nightlies[1], event: "workflow_dispatch" }] },
+    { ...valid, nightlies: [valid.nightlies[0], { ...valid.nightlies[1], jobs: ["backend"] }] },
+    { ...valid, nightlies: [{ ...valid.nightlies[0], startedAt: "2026-08-27T23:59:59Z" },
+      valid.nightlies[1]] },
+    { ...valid, nightlies: [valid.nightlies[0],
+      { ...valid.nightlies[1], startedAt: "2026-08-31T10:00:01Z" }] }
+  ];
+
+  // when / then
+  for (const evidence of invalidEvidence) {
+    assert.equal(activeProfileDecision(["backend"], fingerprint, admission(evidence), "admitted")
+      .admissionOutcome, "invalid");
+  }
+});
+
+test("given contradictory admission dates, when validating them, then future or empty evidence cannot activate", () => {
+  // given
+  const fingerprint = "a".repeat(64);
+  const valid = qualifiedEvidence(fingerprint);
+  const admission = (evidence) => ({ schemaVersion: 3, admittedPolicyFingerprint: fingerprint, evidence });
+  const invalidEvidence = [
+    { ...valid, windowStartedAt: valid.windowEndedAt },
+    { ...valid, windowStartedAt: "2027-01-01T00:00:00Z", windowEndedAt: "2027-01-02T00:00:00Z",
+      assessedAt: "2027-01-02T00:00:00Z", expiresOn: "2027-01-31",
+      nightlies: valid.nightlies.map((nightly, index) => ({
+        ...nightly, startedAt: `2027-01-01T${index === 0 ? "06" : "18"}:00:00Z`
+      })) },
+    { ...valid, expiresOn: "2026-08-30" }
+  ];
+
+  // when / then
+  for (const evidence of invalidEvidence) {
+    assert.equal(activeProfileDecision(["backend"], fingerprint, admission(evidence), "admitted", "2026-09-02")
+      .admissionOutcome, "invalid");
+  }
 });
 
 test("given semantic sources, when one changes, then the fingerprint changes but admission data does not", () => {
@@ -187,3 +247,60 @@ test("given equivalent line endings, when fingerprinting policy sources, then ch
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+function qualifiedEvidence(fingerprint) {
+  const timingCase = (medianMs, maximumMs) => ({
+    attempts: 3,
+    medianMs,
+    maximumMs
+  });
+  return {
+    runId: 101,
+    attempt: 1,
+    artifact: "profile-evidence-101-1",
+    windowStartedAt: "2026-08-28T00:00:00Z",
+    windowEndedAt: "2026-08-31T10:00:00Z",
+    assessedAt: "2026-08-31T10:00:00Z",
+    expiresOn: "2026-09-30",
+    status: "ready-for-review",
+    qualifyingFirstAttempts: 20,
+    backendPlans: 2,
+    frontendPlans: 1,
+    toolingPlans: 1,
+    candidateMisses: 0,
+    classificationErrors: 0,
+    incompleteObservations: 2,
+    ciTiming: {
+      observedFirstAttempts: 22,
+      successfulFirstAttempts: 20,
+      medianDurationMs: 865000,
+      p95DurationMs: 894000,
+      runnerMinutes: 661.43,
+      successfulMedianDurationMs: 862000,
+      successfulP95DurationMs: 894000,
+      successfulRunnerMinutes: 599.82
+    },
+    localTiming: {
+      commit: "c".repeat(40),
+      policyFingerprint: fingerprint,
+      status: "qualified",
+      firstAttempts: 18,
+      retries: 0,
+      interruptedAttempts: 0,
+      docs: timingCase(204, 267),
+      tooling: timingCase(14412, 14870),
+      backend: timingCase(613648, 647435),
+      frontend: timingCase(711164, 717124),
+      combined: timingCase(1247036, 1310954),
+      full: timingCase(1326984, 1390647)
+    },
+    nightlies: [
+      { runId: 201, attempt: 1, event: "schedule", commit: "d".repeat(40), outcome: "success",
+        startedAt: "2026-08-29T01:00:00Z",
+        jobs: ["docs", "backend", "frontend", "tooling", "security"] },
+      { runId: 202, attempt: 1, event: "schedule", commit: "e".repeat(40), outcome: "success",
+        startedAt: "2026-08-30T01:00:00Z",
+        jobs: ["docs", "backend", "frontend", "tooling", "security"] }
+    ]
+  };
+}

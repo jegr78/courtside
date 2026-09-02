@@ -41,3 +41,11 @@ test("given tracked residual test risks, when reading the strategy, then their e
     assert.match(strategy, new RegExp(`github\\.com/jegr78/courtside/issues/${issue}`));
   }
 });
+
+test("given an active profile policy, when a candidate miss appears, then rollback and readmission are explicit", () => {
+  // when / then
+  assert.match(strategy, /set `COURTSIDE_TEST_PROFILES` to\s+`full` immediately/i);
+  assert.match(strategy, /create a GitHub issue/i);
+  assert.match(strategy, /correct\s+the rule and add a regression test/i);
+  assert.match(strategy, /new protected evidence and admission/i);
+});

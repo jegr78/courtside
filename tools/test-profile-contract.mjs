@@ -59,7 +59,7 @@ export function activeProfileDecision(proposedProfiles, fingerprint, admission, 
   const validAdmission = validateAdmissionRecord(admission, assessedOn, false);
   const admissionOutcome = admission === null ? "missing"
     : !validAdmission ? "invalid"
-    : admission.schemaVersion === 2 && admission.admittedPolicyFingerprint === fingerprint ? "matched" : "stale";
+    : admission.schemaVersion === 3 && admission.admittedPolicyFingerprint === fingerprint ? "matched" : "stale";
   const overrideOutcome = mode === "full" ? "emergency-full"
     : mode === "admitted" ? "admitted" : "invalid-full";
   return {
@@ -73,37 +73,117 @@ export function activeProfileDecision(proposedProfiles, fingerprint, admission, 
 export function validateAdmissionRecord(admission, assessedOn = new Date().toISOString().slice(0, 10),
     throwOnInvalid = true) {
   const evidence = admission?.evidence;
+  const schemaVersion = admission?.schemaVersion;
+  const evidenceFields = schemaVersion === 1 ? 12 : schemaVersion === 2 ? 13 : schemaVersion === 3 ? 18 : -1;
   const valid = admission !== null && typeof admission === "object" && !Array.isArray(admission)
     && Object.keys(admission).sort().join() === ["admittedPolicyFingerprint", "evidence", "schemaVersion"].sort().join()
-    && [1, 2].includes(admission.schemaVersion)
+    && [1, 2, 3].includes(schemaVersion)
     && /^[a-f0-9]{64}$/.test(admission.admittedPolicyFingerprint ?? "")
     && evidence !== null && typeof evidence === "object" && !Array.isArray(evidence)
-    && Object.keys(evidence).length === (admission.schemaVersion === 2 ? 13 : 12)
+    && Object.keys(evidence).length === evidenceFields
     && Number.isSafeInteger(evidence.runId) && evidence.runId > 0
     && evidence.attempt === 1
     && typeof evidence.artifact === "string"
     && evidence.artifact === `profile-evidence-${evidence.runId}-${evidence.attempt}`
-    && typeof evidence.assessedAt === "string"
-    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(evidence.assessedAt)
-    && Number.isFinite(Date.parse(evidence.assessedAt))
+    && isUtcTimestamp(evidence.assessedAt)
     && isCalendarDate(evidence.assessedAt.slice(0, 10))
     && isCalendarDate(evidence.expiresOn)
     && evidence.status === "ready-for-review"
     && isCalendarDate(assessedOn)
+    && evidence.assessedAt.slice(0, 10) <= assessedOn
+    && evidence.expiresOn >= evidence.assessedAt.slice(0, 10)
     && evidence.expiresOn >= assessedOn
     && ["qualifyingFirstAttempts", "backendPlans", "frontendPlans",
-      ...(admission.schemaVersion === 2 ? ["toolingPlans"] : []), "candidateMisses",
+      ...(schemaVersion >= 2 ? ["toolingPlans"] : []), "candidateMisses",
       "classificationErrors", "incompleteObservations"]
       .every((field) => Number.isSafeInteger(evidence[field]) && evidence[field] >= 0)
-    && (admission.schemaVersion === 1 || evidence.toolingPlans > 0);
+    && (schemaVersion === 1 || evidence.qualifyingFirstAttempts >= 20
+      && evidence.backendPlans > 0 && evidence.frontendPlans > 0 && evidence.toolingPlans > 0
+      && evidence.candidateMisses === 0 && evidence.classificationErrors === 0)
+    && (schemaVersion !== 3 || isUtcTimestamp(evidence.windowStartedAt)
+      && isUtcTimestamp(evidence.windowEndedAt)
+      && Date.parse(evidence.windowStartedAt) < Date.parse(evidence.windowEndedAt)
+      && evidence.windowEndedAt === evidence.assessedAt
+      && validateCiTiming(evidence.ciTiming, evidence)
+      && validateLocalTiming(evidence.localTiming, admission.admittedPolicyFingerprint)
+      && validateNightlies(evidence.nightlies, evidence.windowStartedAt, evidence.windowEndedAt));
   if (!valid && throwOnInvalid) throw new Error("Profile admission record is invalid or expired");
   return valid;
+}
+
+function validateCiTiming(timing, evidence) {
+  const fields = ["observedFirstAttempts", "successfulFirstAttempts", "medianDurationMs", "p95DurationMs",
+    "runnerMinutes", "successfulMedianDurationMs", "successfulP95DurationMs", "successfulRunnerMinutes"];
+  return closedRecord(timing, fields)
+    && ["observedFirstAttempts", "successfulFirstAttempts", "medianDurationMs", "p95DurationMs",
+      "successfulMedianDurationMs", "successfulP95DurationMs"]
+      .every((field) => Number.isSafeInteger(timing[field]) && timing[field] >= 0)
+    && ["runnerMinutes", "successfulRunnerMinutes"]
+      .every((field) => Number.isFinite(timing[field]) && timing[field] >= 0)
+    && timing.observedFirstAttempts === evidence.qualifyingFirstAttempts + evidence.incompleteObservations
+    && timing.successfulFirstAttempts === evidence.qualifyingFirstAttempts
+    && timing.successfulRunnerMinutes <= timing.runnerMinutes
+    && [evidence.backendPlans, evidence.frontendPlans, evidence.toolingPlans]
+      .every((count) => count <= evidence.qualifyingFirstAttempts)
+    && timing.p95DurationMs >= timing.medianDurationMs
+    && timing.successfulP95DurationMs >= timing.successfulMedianDurationMs;
+}
+
+function validateLocalTiming(timing, fingerprint) {
+  const fields = ["commit", "policyFingerprint", "status", "firstAttempts", "retries", "interruptedAttempts",
+    "docs", "tooling", "backend", "frontend", "combined", "full"];
+  return closedRecord(timing, fields)
+    && /^[a-f0-9]{40}$/.test(timing.commit ?? "")
+    && timing.policyFingerprint === fingerprint
+    && timing.status === "qualified"
+    && timing.firstAttempts === 18 && timing.retries === 0 && timing.interruptedAttempts === 0
+    && [timing.docs, timing.tooling, timing.backend, timing.frontend, timing.combined, timing.full]
+      .every(validateTimingCase)
+    && timing.docs.medianMs < 30_000
+    && timing.tooling.medianMs < 120_000
+    && timing.full.medianMs > 0
+    && timing.backend.medianMs <= timing.full.medianMs * 0.8
+    && timing.frontend.medianMs <= timing.full.medianMs * 0.8;
+}
+
+function validateTimingCase(timing) {
+  return closedRecord(timing, ["attempts", "medianMs", "maximumMs"])
+    && timing.attempts === 3
+    && Number.isSafeInteger(timing.medianMs) && timing.medianMs >= 0
+    && Number.isSafeInteger(timing.maximumMs) && timing.maximumMs >= timing.medianMs;
+}
+
+function validateNightlies(nightlies, windowStartedAt, windowEndedAt) {
+  const jobs = ["docs", "backend", "frontend", "tooling", "security"];
+  return Array.isArray(nightlies) && nightlies.length === 2
+    && new Set(nightlies.map((nightly) => nightly.runId)).size === 2
+    && nightlies.every((nightly) => closedRecord(nightly,
+      ["runId", "attempt", "event", "commit", "outcome", "jobs", "startedAt"])
+      && Number.isSafeInteger(nightly.runId) && nightly.runId > 0
+      && nightly.attempt === 1 && nightly.event === "schedule" && nightly.outcome === "success"
+      && /^[a-f0-9]{40}$/.test(nightly.commit ?? "")
+      && isUtcTimestamp(nightly.startedAt)
+      && Date.parse(nightly.startedAt) >= Date.parse(windowStartedAt)
+      && Date.parse(nightly.startedAt) <= Date.parse(windowEndedAt)
+      && JSON.stringify(nightly.jobs) === JSON.stringify(jobs));
+}
+
+function closedRecord(value, fields) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join() === [...fields].sort().join();
 }
 
 function isCalendarDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return false;
   const date = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function isUtcTimestamp(value) {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(value)
+    && Number.isFinite(Date.parse(value))
+    && isCalendarDate(value.slice(0, 10));
 }
 
 export function profilePolicyFingerprint(sources = semanticPolicySources.map((path) =>
