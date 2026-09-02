@@ -4,10 +4,18 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
-const Ajv = require("ajv/dist/2020").default;
 const evidenceSchema = JSON.parse(readFileSync(
   new URL("../security/resource-abuse-evidence.schema.json", import.meta.url), "utf8"));
-const validateSchema = new Ajv({ strict: true, allErrors: true }).compile(evidenceSchema);
+// Compiled on first use: security-environment.mjs imports this module, and that one loads on a
+// checkout where the validator has not been installed yet.
+let compiled;
+function validateSchema(evidence) {
+  compiled ??= new (require("ajv/dist/2020").default)({ strict: true, allErrors: true })
+      .compile(evidenceSchema);
+  const valid = compiled(evidence);
+  validateSchema.errors = compiled.errors;
+  return valid;
+}
 const script = readFileSync(new URL("../security/resource-abuse.js", import.meta.url));
 const gateway = readFileSync(new URL("./security-request-gateway.py", import.meta.url));
 const policyFile = readFileSync(new URL("../security/resource-abuse-policy.json", import.meta.url));
