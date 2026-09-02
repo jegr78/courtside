@@ -228,7 +228,7 @@ test("given a recorded head, when creating its verification worktree, then check
   };
 
   // when
-  const pinned = createVerificationWorktree({ headCommit: "b".repeat(40) }, git);
+  const pinned = createVerificationWorktree({ headCommit: "b".repeat(40) }, git, "r".repeat(64));
   const path = pinned.path;
   pinned.release();
 
@@ -239,20 +239,31 @@ test("given a recorded head, when creating its verification worktree, then check
   assert.deepEqual(calls[2], ["worktree", "remove", "--force", path]);
 });
 
-test("given owned stale and live verification worktrees, when recovering, then only the stale one is removed", () => {
+test("given registered and unregistered worktrees, when recovering, then only dead owned candidates are removed", () => {
   // given
   const stale = mkdtempSync(join(tmpdir(), "courtside-verification-"));
   const live = mkdtempSync(join(tmpdir(), "courtside-verification-"));
   const foreign = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const unregistered = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const wrongRepository = mkdtempSync(join(tmpdir(), "courtside-verification-"));
   const stalePath = realpathSync(stale);
   const livePath = realpathSync(live);
   const foreignPath = realpathSync(foreign);
+  const unregisteredPath = realpathSync(unregistered);
+  const wrongRepositoryPath = realpathSync(wrongRepository);
   const staleOwner = `${stalePath}.courtside-verification-owner.json`;
   const liveOwner = `${livePath}.courtside-verification-owner.json`;
+  const unregisteredOwner = `${unregisteredPath}.courtside-verification-owner.json`;
+  const wrongRepositoryOwner = `${wrongRepositoryPath}.courtside-verification-owner.json`;
+  const repositoryId = "r".repeat(64);
   writeFileSync(staleOwner,
-    `${JSON.stringify({ schemaVersion: 1, pid: 101 })}\n`);
+    `${JSON.stringify({ schemaVersion: 2, repositoryId, pid: 101 })}\n`);
   writeFileSync(liveOwner,
-    `${JSON.stringify({ schemaVersion: 1, pid: 202 })}\n`);
+    `${JSON.stringify({ schemaVersion: 2, repositoryId, pid: 202 })}\n`);
+  writeFileSync(unregisteredOwner,
+    `${JSON.stringify({ schemaVersion: 2, repositoryId, pid: 303 })}\n`);
+  writeFileSync(wrongRepositoryOwner,
+    `${JSON.stringify({ schemaVersion: 2, repositoryId: "x".repeat(64), pid: 404 })}\n`);
   const calls = [];
   const git = (arguments_) => {
     calls.push(arguments_);
@@ -264,7 +275,7 @@ test("given owned stale and live verification worktrees, when recovering, then o
 
   try {
     // when
-    recoverVerificationWorktrees(git, (pid) => pid === 202);
+    recoverVerificationWorktrees(git, (pid) => pid === 202, repositoryId);
 
     // then
     assert.deepEqual(calls.filter((call) => call[1] === "remove"), [
@@ -272,14 +283,22 @@ test("given owned stale and live verification worktrees, when recovering, then o
     ]);
     assert.equal(existsSync(stalePath), false);
     assert.equal(existsSync(staleOwner), false);
+    assert.equal(existsSync(unregisteredPath), false);
+    assert.equal(existsSync(unregisteredOwner), false);
     assert.doesNotThrow(() => readFileSync(liveOwner));
     assert.equal(existsSync(foreignPath), true);
+    assert.equal(existsSync(wrongRepositoryPath), true);
+    assert.equal(existsSync(wrongRepositoryOwner), true);
   } finally {
     rmSync(stale, { recursive: true, force: true });
     rmSync(live, { recursive: true, force: true });
     rmSync(foreign, { recursive: true, force: true });
+    rmSync(unregistered, { recursive: true, force: true });
+    rmSync(wrongRepository, { recursive: true, force: true });
     rmSync(staleOwner, { force: true });
     rmSync(liveOwner, { force: true });
+    rmSync(unregisteredOwner, { force: true });
+    rmSync(wrongRepositoryOwner, { force: true });
   }
 });
 

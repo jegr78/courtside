@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -187,14 +189,15 @@ export async function executeLocalCheck(options, runtime = {}) {
   }
 }
 
-export function createVerificationWorktree(evidence, git = runGit) {
-  recoverVerificationWorktrees(git);
+export function createVerificationWorktree(evidence, git = runGit,
+    repositoryId = verificationRepositoryId(git)) {
+  recoverVerificationWorktrees(git, processIsAlive, repositoryId);
   const worktree = mkdtempSync(join(tmpdir(), "courtside-verification-"));
   const ownerFile = `${realpathSync(worktree)}${verificationOwnerFile}`;
   let attached = false;
   let released = false;
   try {
-    writeFileSync(ownerFile, `${JSON.stringify({ schemaVersion: 1, pid: process.pid })}\n`,
+    writeFileSync(ownerFile, `${JSON.stringify({ schemaVersion: 2, repositoryId, pid: process.pid })}\n`,
       { mode: 0o600 });
     git(["worktree", "add", "--detach", worktree, evidence.headCommit]);
     attached = true;
@@ -234,34 +237,50 @@ export function createVerificationWorktree(evidence, git = runGit) {
   };
 }
 
-export function recoverVerificationWorktrees(git = runGit, isProcessAlive = processIsAlive) {
+export function recoverVerificationWorktrees(git = runGit, isProcessAlive = processIsAlive,
+    repositoryId = verificationRepositoryId(git)) {
   const temporaryRoot = realpathSync(tmpdir());
   const listing = git(["worktree", "list", "--porcelain"]);
-  const candidates = String(listing ?? "")
+  const registered = new Set(String(listing ?? "")
     .split(/\r?\n/)
     .filter((line) => line.startsWith("worktree "))
-    .map((line) => line.slice("worktree ".length));
-  for (const candidate of candidates) {
-    let candidatePath;
-    try {
-      candidatePath = realpathSync(candidate);
-    } catch {
-      continue;
-    }
+    .map((line) => resolve(line.slice("worktree ".length))));
+  const ownerFiles = readdirSync(temporaryRoot, { withFileTypes: true })
+    .filter((entry) => entry.isFile()
+      && entry.name.startsWith("courtside-verification-")
+      && entry.name.endsWith(verificationOwnerFile));
+  for (const ownerEntry of ownerFiles) {
+    const ownerPath = join(temporaryRoot, ownerEntry.name);
+    const candidatePath = ownerPath.slice(0, -verificationOwnerFile.length);
     if (dirname(candidatePath) !== temporaryRoot
-        || !candidatePath.startsWith(join(temporaryRoot, "courtside-verification-"))) continue;
+        || !/^courtside-verification-[A-Za-z0-9_-]+$/.test(ownerEntry.name
+          .slice(0, -verificationOwnerFile.length))) continue;
     let owner;
     try {
-      owner = JSON.parse(readFileSync(`${candidatePath}${verificationOwnerFile}`, "utf8"));
+      owner = JSON.parse(readFileSync(ownerPath, "utf8"));
     } catch {
       continue;
     }
-    if (owner.schemaVersion !== 1 || !Number.isSafeInteger(owner.pid) || owner.pid <= 0
-        || isProcessAlive(owner.pid)) continue;
-    git(["worktree", "remove", "--force", candidatePath]);
-    rmSync(candidatePath, { recursive: true, force: true });
-    rmSync(`${candidatePath}${verificationOwnerFile}`, { force: true });
+    if (owner.schemaVersion !== 2 || owner.repositoryId !== repositoryId
+        || !Number.isSafeInteger(owner.pid) || owner.pid <= 0 || isProcessAlive(owner.pid)) continue;
+    let candidateExists = false;
+    try {
+      const candidate = lstatSync(candidatePath);
+      if (!candidate.isDirectory() || candidate.isSymbolicLink()) continue;
+      candidateExists = true;
+    } catch {
+      candidateExists = false;
+    }
+    if (registered.has(candidatePath)) git(["worktree", "remove", "--force", candidatePath]);
+    if (candidateExists) rmSync(candidatePath, { recursive: true, force: true });
+    rmSync(ownerPath, { force: true });
   }
+}
+
+function verificationRepositoryId(git) {
+  const commonDirectory = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]).trim();
+  if (commonDirectory.length === 0) throw new Error("Git did not identify its common directory");
+  return createHash("sha256").update(realpathSync(commonDirectory)).digest("hex");
 }
 
 export function registerVerificationSignalCleanup(release, process_ = process) {
