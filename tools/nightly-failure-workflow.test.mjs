@@ -37,7 +37,20 @@ test("given a completed run, when tracking it, then only scheduled first-attempt
 test("given evidence of a workflow other than the build, when it is read, then its own history is fetched", () => {
   assert.match(workflow, /WORKFLOW_ID: \$\{\{ github\.event\.workflow_run\.workflow_id \}\}/);
   assert.match(workflow, /actions\/workflows\/\$\{WORKFLOW_ID\}\/runs/);
-  assert.doesNotMatch(workflow, /actions\/workflows\/[a-z-]+\.yml/);
+  assert.doesNotMatch(workflow, /actions\/workflows\/[A-Za-z0-9._-]+\.ya?ml/);
+  assert.match(workflow, /--workflow-id "\$WORKFLOW_ID"/);
+});
+
+test("given a second job added to the tracker, when a fork run completes, then it refuses the event too", () => {
+  // given — the fork path is closed by a condition, and a job added without it would open it again
+  const refusesForeignEvents = /fromJSON\('\["schedule", "workflow_dispatch"\]'\), github\.event\.workflow_run\.event/;
+  const jobs = Object.entries(tracker.jobs);
+
+  // then
+  assert.ok(jobs.length > 0);
+  for (const [name, definition] of jobs) {
+    assert.match(`${definition.if ?? ""}`, refusesForeignEvents, `job ${name} accepts any triggering event`);
+  }
 });
 
 test("given an unresolved nightly failure, when a release starts, then publication fails before building", () => {

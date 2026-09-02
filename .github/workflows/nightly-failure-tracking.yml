@@ -47,9 +47,11 @@ jobs:
       - name: Create or update actionable failures
         env:
           GH_TOKEN: ${{ github.token }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
         run: >
           node tools/nightly-failure-tracker.mjs
           --repository "$GITHUB_REPOSITORY"
+          --workflow-id "$WORKFLOW_ID"
           --run build/nightly-tracker/run.json
           --jobs build/nightly-tracker/jobs.json
           --recent build/nightly-tracker/recent.json

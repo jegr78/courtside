@@ -19,8 +19,11 @@ function safeText(value) {
   return value.replace(/[^A-Za-z0-9 ,._:/()-]/g, "?");
 }
 
-function validateRun(run) {
-  if (!trackedEvents.has(run?.event)) throw new Error("workflow is invalid");
+function validateRun(run, workflowId) {
+  if (!trackedEvents.has(run?.event) || !Number.isSafeInteger(workflowId) || workflowId < 1 ||
+      run.workflow_id !== workflowId) {
+    throw new Error("workflow is invalid");
+  }
   boundedText(run.name, "workflow");
   if (!Number.isSafeInteger(run.id) || run.id < 1) throw new Error("run id is invalid");
   if (run.run_attempt !== 1) throw new Error("only the first attempt is valid");
@@ -33,8 +36,8 @@ function validateRun(run) {
   }
 }
 
-export function classifyNightlyFailures(run, jobs) {
-  validateRun(run);
+export function classifyNightlyFailures(run, jobs, workflowId) {
+  validateRun(run, workflowId);
   if (!Array.isArray(jobs) || jobs.length > 100) throw new Error("jobs are invalid");
   return jobs.filter((job) => ["failure", "cancelled", "timed_out"].includes(job?.conclusion)).flatMap((job) => {
     const failedSteps = (job.steps ?? []).filter((step) =>
@@ -60,6 +63,12 @@ export function classifyNightlyFailures(run, jobs) {
       };
     });
   });
+}
+
+// A title GitHub refuses opens no issue, and the release gate reads a missing issue as a green
+// night. The fingerprint identifies the failure, so the names are what may be cut.
+function boundedTitle(subject) {
+  return subject.length <= 175 ? subject : `${subject.slice(0, 172)}...`;
 }
 
 function workflowMarker(workflow) {
@@ -98,7 +107,8 @@ export function planFailureUpdates(failures, issues) {
     return [{
       action: "create",
       issueNumber: null,
-      title: `[nightly] ${failure.workflow} / ${failure.job} / ${failure.step} (${failure.fingerprint.slice(0, 12)})`,
+      title: `[nightly] ${boundedTitle(`${failure.workflow} / ${failure.job} / ${failure.step}`)}` +
+        ` (${failure.fingerprint.slice(0, 12)})`,
       body: `${fingerprintMarker}\nA scheduled first-attempt run failed with this stable class.\n\n` +
         `${workflowMarker(failure.workflow)}\n- Job: \`${failure.job}\`\n- Step: \`${failure.step}\`\n` +
         `- Failure class: \`${failure.failureClass}\`\n\n${occurrence(failure)}\n\n` +
@@ -203,6 +213,7 @@ async function main(args) {
     return pairs;
   }, []));
   const repository = values["--repository"];
+  const workflowId = Number(values["--workflow-id"]);
   const token = process.env.GH_TOKEN;
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository ?? "") || !token) {
     throw new Error("repository and GH_TOKEN are required");
@@ -212,7 +223,8 @@ async function main(args) {
   const recent = JSON.parse(readFileSync(values["--recent"], "utf8")).workflow_runs;
   const issues = await readTrackedIssues(repository, token);
   const request = (endpoint, options) => githubRequest(token, endpoint, options);
-  const failures = bindCommitRange(classifyNightlyFailures(run, jobs), recent.filter((item) => item.id !== run.id));
+  const failures = bindCommitRange(classifyNightlyFailures(run, jobs, workflowId),
+    recent.filter((item) => item.id !== run.id));
   await applyIssuePlan(planFailureUpdates(failures, issues), request, repository);
   if (failures.length === 0 && readyForReview(recent)) {
     await applyIssuePlan(planReadyForReview(issues, run.name), request, repository);
