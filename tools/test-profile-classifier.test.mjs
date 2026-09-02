@@ -5,8 +5,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { bindPlanToRun, classifyChanges, classifyPath, fallbackPlanToRun, parseNameStatus,
-  profileSummary, validateGitHubManifest, validateRules, validateToolManifest } from "./test-profile-classifier.mjs";
-import { profilePolicyFingerprint } from "./test-profile-contract.mjs";
+  executedTests, profileSummary, validateGitHubManifest, validateRules,
+  validateToolManifest } from "./test-profile-classifier.mjs";
+import { ciJobsForProfiles, loadProfileContract,
+  profilePolicyFingerprint } from "./test-profile-contract.mjs";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -17,6 +19,8 @@ const profileRules = JSON.parse(readFileSync(
   new URL("../ci/test-profiles.json", import.meta.url), "utf8"));
 const toolManifest = JSON.parse(readFileSync(
   new URL("../ci/tool-profile-manifest.json", import.meta.url), "utf8"));
+const admissionRecord = JSON.parse(readFileSync(
+  new URL("../ci/test-profile-admission.json", import.meta.url), "utf8"));
 const githubManifest = JSON.parse(readFileSync(
   new URL("../ci/github-profile-manifest.json", import.meta.url), "utf8"));
 const validatePlan = new Ajv({ strict: true }).compile(planSchema);
@@ -49,7 +53,7 @@ test("given the reviewed GitHub inventory, when tracked files change, then every
     { cwd: repository, encoding: "utf8" }).trim().split("\n").filter(Boolean);
 
   // when / then
-  validateGitHubManifest(githubManifest, trackedGitHub, toolManifest);
+  validateGitHubManifest(githubManifest, trackedGitHub, toolManifest, executedTests(toolManifest));
 });
 
 test("given stale unknown or unvalidated GitHub metadata, when validating or classifying, then it fails closed", () => {
@@ -76,9 +80,38 @@ test("given stale unknown or unvalidated GitHub metadata, when validating or cla
   assert.deepEqual(classifyChanges([{ status: "A", path: ".github/new-metadata.yml" }], []).profiles, ["full"]);
 });
 
+test("given a reduced GitHub entry, when no job of its own profiles runs the named validator, then validation fails closed", () => {
+  // given
+  const executed = executedTests(toolManifest);
+  const unreachable = { schemaVersion: 1, entries: [
+    { path: ".github/ISSUE_TEMPLATE/bug.md", profiles: ["docs"],
+      validators: ["tools/github-metadata.test.mjs"] }
+  ] };
+  const reachable = { schemaVersion: 1, entries: [
+    { path: ".github/ISSUE_TEMPLATE/bug.md", profiles: ["docs"],
+      validators: ["tools/github-template-metadata.test.mjs"] }
+  ] };
+  const throughTooling = { schemaVersion: 1, entries: [
+    { path: ".github/ISSUE_TEMPLATE/bug.md", profiles: ["tooling"],
+      validators: ["tools/github-metadata.test.mjs"] }
+  ] };
+
+  // when / then
+  assert.ok(!executed.docs.includes("tools/github-metadata.test.mjs"));
+  assert.ok(executed.tooling.includes("tools/github-metadata.test.mjs"));
+  assert.throws(() => validateGitHubManifest(unreachable, undefined, toolManifest, executed),
+    /validator is unreachable/i);
+  validateGitHubManifest(reachable, undefined, toolManifest, executed);
+  validateGitHubManifest(throughTooling, undefined, toolManifest, executed);
+});
+
 test("given reviewed GitHub metadata, when classifying, then templates and validated automation use their declared checks", () => {
+  // given
+  const contract = loadProfileContract();
+
   // when / then
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/ISSUE_TEMPLATE/bug.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(ciJobsForProfiles(contract, ["docs"]), ["docs"]);
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/dependabot.yml" }], []).profiles, ["tooling"]);
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/workflows/pr-title-lint.yml" }], []).profiles,
     ["tooling"]);
@@ -299,6 +332,10 @@ test("given a repository path contains markdown, when rendering reasons, then it
 test("given a profile plan, when binding it to the workflow run, then every identity is retained", () => {
   // given
   const plan = classifyChanges([{ status: "M", path: "docs/design.md" }], []);
+  const fingerprint = profilePolicyFingerprint();
+  const admitted = { ...admissionRecord, admittedPolicyFingerprint: fingerprint,
+    evidence: { ...admissionRecord.evidence,
+      localTiming: { ...admissionRecord.evidence.localTiming, policyFingerprint: fingerprint } } };
 
   // when
   const bound = bindPlanToRun(plan, {
@@ -306,7 +343,7 @@ test("given a profile plan, when binding it to the workflow run, then every iden
     attempt: 1,
     baseCommit: "a".repeat(40),
     headCommit: "b".repeat(40)
-  });
+  }, "admitted", admitted);
 
   // then
   assert.equal(bound.schemaVersion, 4);

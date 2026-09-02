@@ -87,13 +87,16 @@ file below `tools/` explicitly. Reviewed test files select `tooling`, while buil
 security, release, restore, upgrade and other execution-critical runners remain `full`. An
 unlisted new tool, duplicate assignment or stale manifest entry fails closed.
 Three local first attempts of the declared tooling tasks completed in 14, 11 and 11 seconds, for an
-11-second median. Each attempt reinstalled the locked dependencies and passed all 636 tool tests.
+11-second median. Each attempt reinstalled the locked dependencies and passed the complete tool suite.
 
 A second closed manifest assigns every tracked `.github/` file. Markdown issue and pull-request
-templates select `docs`. Dependabot metadata and the PR-title workflow select `tooling` because
-closed structural tests validate their supported fields, permissions and pinned action. Build,
-release, security, nightly, profile-evidence and every other central workflow remain `full`.
-Every reduced entry names an executable validator. Unknown files, missing validators and stale or
+templates select `docs`, and the documentation job runs their validators itself: `docs-check.mjs`
+names the test files it executes, and the template tests are among them. Dependabot metadata and the
+PR-title workflow select `tooling` because closed structural tests validate their supported fields,
+permissions and pinned action. Build, release, security, nightly, profile-evidence and every other
+central workflow remain `full`. Every reduced entry names a validator that a job of its own profiles
+actually executes, derived from what those jobs run rather than from which profile happens to own
+the test file. Unknown files, missing validators, a validator no selected job runs, and stale or
 duplicate manifest entries fail closed.
 
 The classifier records two selections. The proposed selection describes the candidate policy. The

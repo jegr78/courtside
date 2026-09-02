@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { documentationTests } from "./docs-check.mjs";
 import {
   activeProfileDecision, ciJobsForProfiles, loadProfileContract, localTasksForProfiles,
   profilePolicyFingerprint
@@ -18,7 +19,14 @@ const githubManifest = JSON.parse(readFileSync(githubManifestUrl, "utf8"));
 const reducedProfiles = ["docs", "backend", "frontend", "tooling"];
 validateRules(rules);
 validateToolManifest(toolManifest);
-validateGitHubManifest(githubManifest, undefined, toolManifest);
+validateGitHubManifest(githubManifest, undefined, toolManifest, executedTests(toolManifest));
+
+export function executedTests(tools) {
+  return {
+    docs: [...documentationTests],
+    tooling: tools.entries.filter((entry) => entry.test).map((entry) => entry.path)
+  };
+}
 
 export function validateRules(candidate) {
   const profileNames = ["full", ...reducedProfiles];
@@ -73,7 +81,7 @@ export function validateToolManifest(candidate, trackedPaths) {
   }
 }
 
-export function validateGitHubManifest(candidate, trackedPaths, validators) {
+export function validateGitHubManifest(candidate, trackedPaths, validators, executed) {
   if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)
       || Object.keys(candidate).sort().join() !== ["entries", "schemaVersion"].sort().join()
       || candidate.schemaVersion !== 1 || !Array.isArray(candidate.entries)) {
@@ -94,11 +102,15 @@ export function validateGitHubManifest(candidate, trackedPaths, validators) {
     throw new Error("GitHub profile manifest is invalid");
   }
   if (validators !== undefined) {
-    const executable = new Set(validators.entries
-      .filter((entry) => entry.test && entry.profiles.includes("tooling")).map((entry) => entry.path));
-    if (candidate.entries.some((entry) => entry.validators.some((validator) => !executable.has(validator)))) {
+    const declared = new Set(validators.entries.filter((entry) => entry.test).map((entry) => entry.path));
+    if (candidate.entries.some((entry) => entry.validators.some((validator) => !declared.has(validator)))) {
       throw new Error("GitHub profile manifest validator is invalid");
     }
+  }
+  if (executed !== undefined && candidate.entries.some((entry) => !entry.profiles.includes("full")
+      && entry.validators.some((validator) => !entry.profiles
+        .some((profile) => (executed[profile] ?? []).includes(validator))))) {
+    throw new Error("GitHub profile manifest validator is unreachable");
   }
   if (trackedPaths !== undefined && JSON.stringify([...paths].sort()) !== JSON.stringify([...trackedPaths].sort())) {
     throw new Error("GitHub profile manifest inventory is stale");
