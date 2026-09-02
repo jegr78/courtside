@@ -163,7 +163,7 @@ function qualifiedAdmission(fingerprint) {
     evidence: {
       runId: 101, attempt: 1, artifact: "profile-evidence-101-1",
       windowStartedAt: "2026-08-28T00:00:00Z", windowEndedAt: "2026-08-31T10:00:00Z",
-      assessedAt: "2026-08-31T10:00:00Z", expiresOn: "2026-09-30", status: "ready-for-review",
+      assessedAt: "2026-08-31T10:00:00Z", expiresOn: "9999-12-31", status: "ready-for-review",
       qualifyingFirstAttempts: 20, backendPlans: 2, frontendPlans: 1, toolingPlans: 1,
       candidateMisses: 0, classificationErrors: 0, incompleteObservations: 0,
       ciTiming: {

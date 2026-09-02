@@ -1,18 +1,65 @@
 {
-  "schemaVersion": 1,
-  "admittedPolicyFingerprint": "d65c7568d0abe78a00dc5285ce4f297946f176bed1bb05d672f40e644e50a14c",
+  "schemaVersion": 3,
+  "admittedPolicyFingerprint": "0d79329f01144eedd484410cacf70bf0c953641e9c0aeb070907f7548792d7d0",
   "evidence": {
-    "runId": 33326145088,
+    "runId": 33596385377,
     "attempt": 1,
-    "artifact": "profile-evidence-33326145088-1",
-    "assessedAt": "2026-08-30T17:45:40Z",
-    "expiresOn": "2026-09-30",
+    "artifact": "profile-evidence-33596385377-1",
+    "windowStartedAt": "2026-08-31T20:13:44Z",
+    "windowEndedAt": "2026-09-02T05:51:46Z",
+    "assessedAt": "2026-09-02T05:51:46Z",
+    "expiresOn": "2026-10-02",
     "status": "ready-for-review",
-    "qualifyingFirstAttempts": 60,
-    "backendPlans": 3,
-    "frontendPlans": 1,
+    "qualifyingFirstAttempts": 21,
+    "backendPlans": 2,
+    "frontendPlans": 6,
+    "toolingPlans": 2,
     "candidateMisses": 0,
     "classificationErrors": 0,
-    "incompleteObservations": 3
+    "incompleteObservations": 2,
+    "ciTiming": {
+      "observedFirstAttempts": 23,
+      "successfulFirstAttempts": 21,
+      "medianDurationMs": 865000,
+      "p95DurationMs": 894000,
+      "runnerMinutes": 690.1,
+      "successfulMedianDurationMs": 859000,
+      "successfulP95DurationMs": 894000,
+      "successfulRunnerMinutes": 628.48
+    },
+    "localTiming": {
+      "commit": "c66c992aab057de03e0887972cc3ae5ad26b8c43",
+      "policyFingerprint": "0d79329f01144eedd484410cacf70bf0c953641e9c0aeb070907f7548792d7d0",
+      "status": "qualified",
+      "firstAttempts": 18,
+      "retries": 0,
+      "interruptedAttempts": 0,
+      "docs": { "attempts": 3, "medianMs": 215, "maximumMs": 232 },
+      "tooling": { "attempts": 3, "medianMs": 18681, "maximumMs": 18800 },
+      "backend": { "attempts": 3, "medianMs": 599738, "maximumMs": 643782 },
+      "frontend": { "attempts": 3, "medianMs": 695401, "maximumMs": 706280 },
+      "combined": { "attempts": 3, "medianMs": 1265786, "maximumMs": 1362934 },
+      "full": { "attempts": 3, "medianMs": 1396409, "maximumMs": 1428066 }
+    },
+    "nightlies": [
+      {
+        "runId": 33474128562,
+        "attempt": 1,
+        "event": "schedule",
+        "commit": "652354acf31451500d83e8200c5dfe01ba708b3c",
+        "outcome": "success",
+        "jobs": ["docs", "backend", "frontend", "tooling", "security"],
+        "startedAt": "2026-09-01T05:34:38Z"
+      },
+      {
+        "runId": 33592874403,
+        "attempt": 1,
+        "event": "schedule",
+        "commit": "78dacad50e5e0840cf0c34a92f795cc24b9daada",
+        "outcome": "success",
+        "jobs": ["docs", "backend", "frontend", "tooling", "security"],
+        "startedAt": "2026-09-02T04:59:06Z"
+      }
+    ]
   }
 }
