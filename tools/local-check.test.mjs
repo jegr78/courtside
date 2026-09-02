@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
-  classifyProtectedChanges, collectLocalChanges, executeLocalCheck, localVerificationPlans, planTasks,
-  renderLocalCheckPlan
+  classifyProtectedChanges, collectLocalChanges, createVerificationWorktree, executeLocalCheck,
+  localCheckPrerequisites, localVerificationPlans, planTasks, renderLocalCheckPlan
 } from "./local-check.mjs";
 import { classifyChanges } from "./test-profile-classifier.mjs";
 
@@ -151,7 +151,7 @@ test("given a reduced change, when full is requested, then the local plan only e
   assert.equal(plan.reasons[0].code, "manual-full");
 });
 
-test("given committed dirty and untracked changes, when collecting evidence, then every path is classified", () => {
+test("given committed changes, when collecting evidence, then the pinned commit diff is classified", () => {
   // given
   const calls = [];
   const git = (arguments_) => {
@@ -159,13 +159,12 @@ test("given committed dirty and untracked changes, when collecting evidence, the
     if (arguments_[0] === "fetch") return "";
     if (arguments_[0] === "merge-base") return `${"a".repeat(40)}\n`;
     if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
+    if (arguments_[0] === "status") return "";
     if (arguments_[0] === "diff" && arguments_.includes("--check")) return "";
     if (arguments_[0] === "diff" && arguments_.includes("--name-status")) {
       return "M\0src/main/java/org/courtside/CourtsideApplication.java\0";
     }
     if (arguments_[0] === "diff") return "tracked-content";
-    if (arguments_[0] === "ls-files") return "docs/new.md\0";
-    if (arguments_[0] === "hash-object") return `${"c".repeat(40)}\n`;
     throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
   };
 
@@ -177,8 +176,22 @@ test("given committed dirty and untracked changes, when collecting evidence, the
   assert.equal(evidence.headCommit, "b".repeat(40));
   assert.match(evidence.changeFingerprint, /^[a-f0-9]{64}$/);
   assert.equal(evidence.changeEvidence,
-    "M\0src/main/java/org/courtside/CourtsideApplication.java\0A\0docs/new.md\0");
+    "M\0src/main/java/org/courtside/CourtsideApplication.java\0");
   assert.ok(calls.some((arguments_) => arguments_[0] === "diff" && arguments_.includes("--check")));
+});
+
+test("given an uncommitted working tree, when collecting evidence, then verification refuses an unstable source", () => {
+  // given
+  const git = (arguments_) => {
+    if (arguments_[0] === "fetch") return "";
+    if (arguments_[0] === "merge-base") return `${"a".repeat(40)}\n`;
+    if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
+    if (arguments_[0] === "status") return " M CLAUDE.md\0";
+    throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
+  };
+
+  // when / then
+  assert.throws(() => collectLocalChanges(git), /commit all changes/i);
 });
 
 test("given origin cannot be refreshed, when collecting evidence, then the caller receives a full fallback", () => {
@@ -186,6 +199,7 @@ test("given origin cannot be refreshed, when collecting evidence, then the calle
   const git = (arguments_) => {
     if (arguments_[0] === "fetch") throw new Error("offline");
     if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
+    if (arguments_[0] === "status") return "";
     if (arguments_[0] === "diff") return "";
     if (arguments_[0] === "ls-files") return "";
     throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
@@ -199,6 +213,22 @@ test("given origin cannot be refreshed, when collecting evidence, then the calle
   assert.equal(evidence.baseCommit, null);
   assert.equal(evidence.changeEvidence, "");
   assert.match(evidence.changeFingerprint, /^[a-f0-9]{64}$/);
+});
+
+test("given a recorded head, when creating its verification worktree, then checkout and cleanup use that commit", () => {
+  // given
+  const calls = [];
+  const git = (arguments_) => calls.push(arguments_);
+
+  // when
+  const pinned = createVerificationWorktree({ headCommit: "b".repeat(40) }, git);
+  const path = pinned.path;
+  pinned.release();
+
+  // then
+  assert.equal(pinned.path, path);
+  assert.deepEqual(calls[0], ["worktree", "add", "--detach", path, "b".repeat(40)]);
+  assert.deepEqual(calls[1], ["worktree", "remove", "--force", path]);
 });
 
 test("given supported platforms, when resolving tasks, then commands remain shell-free or fixed", () => {
@@ -223,6 +253,16 @@ test("given supported platforms, when resolving tasks, then commands remain shel
   ]).tasks, "win32", "C:/repo");
   assert.equal(docs[0].command, "C:/repo/frontend/node/node.exe");
   assert.deepEqual(docs[0].arguments, ["tools/docs-check.mjs", "--check"]);
+});
+
+test("given selected tasks, when checking prerequisites, then docs avoid Java and Docker", () => {
+  // when / then
+  assert.deepEqual(localCheckPrerequisites(["docs-check"]), { java: false, docker: false });
+  assert.deepEqual(localCheckPrerequisites(["frontend-toolchain", "tooling-test"]),
+    { java: true, docker: false });
+  assert.deepEqual(localCheckPrerequisites(["backend"]), { java: true, docker: true });
+  assert.deepEqual(localCheckPrerequisites(["frontend-e2e"]), { java: true, docker: true });
+  assert.deepEqual(localCheckPrerequisites(["full"]), { java: true, docker: true });
 });
 
 test("given a plan-only check, when executing it, then prerequisites and tasks do not run", async () => {
@@ -257,13 +297,17 @@ test("given a selected check, when every task passes, then the retained result i
     classify: async () => backendPlan(),
     output: { write: () => {} },
     beforeRun: () => events.push("before"),
-    execute: (plan) => events.push(plan.label),
+    createWorktree: () => ({ path: "/pinned", release: () => events.push("release") }),
+    execute: (plan) => {
+      assert.equal(plan.workingDirectory, "/pinned");
+      events.push(plan.label);
+    },
     writeResult: (candidate) => records.push(structuredClone(candidate))
   });
 
   // then
   assert.equal(record.outcome, "passed");
-  assert.deepEqual(events, ["before", "backend"]);
+  assert.deepEqual(events, ["before", "backend", "release"]);
   assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "passed"]);
 });
 
@@ -277,10 +321,11 @@ test("given a failing selected task, when executing it, then the retained result
     git,
     classify: async () => backendPlan(),
     output: { write: () => {} },
+    createWorktree: () => ({ path: "/pinned", release: () => records.push({ outcome: "released" }) }),
     execute: () => { throw new Error("backend failed"); },
     writeResult: (candidate) => records.push(structuredClone(candidate))
   }), /backend failed/);
-  assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "failed"]);
+  assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "released", "failed"]);
   assert.equal(records.at(-1).failure, "backend failed");
 });
 
@@ -395,24 +440,28 @@ test("given protected classification fails, when planning locally, then candidat
   assert.deepEqual(execution[0].arguments, ["clean", "verify"]);
 });
 
-test("given the working tree changes during verification, when finishing, then passed is never retained", async () => {
+test("given the live tree changes after pinning, when finishing, then the verified commit remains valid", async () => {
   // given
   const records = [];
-  let collection = 0;
-  const git = gitFor([{ status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }],
-    () => collection++ === 0 ? "a".repeat(64) : "b".repeat(64));
+  const events = [];
+  const git = gitFor([{ status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }]);
 
-  // when / then
-  await assert.rejects(() => executeLocalCheck({ planOnly: false, forceFull: false }, {
+  // when
+  const record = await executeLocalCheck({ planOnly: false, forceFull: false }, {
     git,
     classify: async () => localCheckPlan([
       { status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }
     ]),
     output: { write: () => {} },
-    execute: () => {},
+    createWorktree: () => ({ path: "/pinned", release: () => events.push("release") }),
+    execute: () => events.push("execute"),
     writeResult: (candidate) => records.push(structuredClone(candidate))
-  }), /working tree changed during local verification/i);
-  assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "failed"]);
+  });
+
+  // then
+  assert.equal(record.outcome, "passed");
+  assert.deepEqual(events, ["execute", "release"]);
+  assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "passed"]);
 });
 
 function gitFor(changes, fingerprint = () => "c".repeat(64)) {
@@ -420,6 +469,7 @@ function gitFor(changes, fingerprint = () => "c".repeat(64)) {
     if (arguments_[0] === "fetch") return "";
     if (arguments_[0] === "merge-base") return `${"a".repeat(40)}\n`;
     if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
+    if (arguments_[0] === "status") return "";
     if (arguments_[0] === "diff" && arguments_.includes("--check")) return "";
     if (arguments_[0] === "diff" && arguments_.includes("--name-status")) {
       return `${changes.flatMap((change) => [change.status, change.path]).join("\0")}\0`;

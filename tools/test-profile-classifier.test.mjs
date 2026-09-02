@@ -159,7 +159,6 @@ test("given critical unknown or destructive changes, when classifying, then each
     [{ status: "M", path: "deploy/compose.yaml" }],
     [{ status: "M", path: "security/run-contract.json" }],
     [{ status: "M", path: "SECURITY.md" }],
-    [{ status: "M", path: "AGENTS.md" }],
     [{ status: "M", path: "src/main/resources/application.yaml" }],
     [{ status: "M", path: "tools/test-profile-classifier.mjs" }],
     [{ status: "M", path: "src/test/java/org/courtside/AbstractIntegrationTest.java" }],
@@ -172,6 +171,13 @@ test("given critical unknown or destructive changes, when classifying, then each
 
   // when / then
   for (const changes of cases) assert.deepEqual(classifyChanges(changes, []).profiles, ["full"]);
+});
+
+test("given agent policy prose changes, when classifying, then bounded documentation checks apply", () => {
+  // when / then
+  assert.deepEqual(classifyChanges([{ status: "M", path: "AGENTS.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(classifyChanges([{ status: "M", path: "CLAUDE.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(classifyChanges([{ status: "D", path: "CLAUDE.md" }], []).profiles, ["full"]);
 });
 
 test("given every configured full trigger, when classifying, then each selects full", () => {
@@ -350,6 +356,10 @@ test("given a repository path contains markdown, when rendering reasons, then it
 test("given a profile plan, when binding it to the workflow run, then every identity is retained", () => {
   // given
   const plan = classifyChanges([{ status: "M", path: "docs/design.md" }], []);
+  const fingerprint = profilePolicyFingerprint();
+  const admission = JSON.parse(readFileSync(new URL("../ci/test-profile-admission.json", import.meta.url), "utf8"));
+  admission.admittedPolicyFingerprint = fingerprint;
+  admission.evidence.localTiming.policyFingerprint = fingerprint;
 
   // when
   const bound = bindPlanToRun(plan, {
@@ -357,7 +367,7 @@ test("given a profile plan, when binding it to the workflow run, then every iden
     attempt: 1,
     baseCommit: "a".repeat(40),
     headCommit: "b".repeat(40)
-  });
+  }, "admitted", admission);
 
   // then
   assert.equal(bound.schemaVersion, 5);

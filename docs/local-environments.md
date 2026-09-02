@@ -61,7 +61,7 @@ suite. Do not enable `demo` in UAT or production.
 ## Pull-request verification
 
 Run `node tools/courtside.mjs check` before the final push. It refreshes `origin/main`, finds the
-merge base, and classifies committed, staged, unstaged and untracked changes with
+merge base, requires a clean committed HEAD, and classifies its changes with
 `ci/test-profiles.json`, the same contract protected pull-request CI uses. Documentation changes
 need only clean change evidence. Backend changes run the Java profile; frontend changes run lint,
 unit tests, build, audit, application packaging and browser journeys. A mixed change runs both
@@ -69,10 +69,11 @@ profiles. Build, workflow, security, deployment, database, OpenAPI, shared test-
 unknown and structural changes run the complete Maven verification.
 
 The command writes `build/local-check/result.json` with the base and head commits, a content
-fingerprint, selected profiles, reasons, tasks and outcome. It verifies the fingerprint before and
-after execution, so a working-tree change cannot retain a passing result. If `origin/main` cannot
-be refreshed, classification falls back to `full`. `--full` only escalates. It cannot suppress a
-required task.
+fingerprint, selected profiles, reasons, tasks and outcome. It checks out the recorded head in a
+temporary detached worktree and runs every selected task there. Edits in the live workspace cannot
+change that source or invalidate the result. The temporary worktree is removed after success or
+failure. If `origin/main` cannot be refreshed, classification falls back to `full`. `--full` only
+escalates. It cannot suppress a required task.
 
 ## Development
 

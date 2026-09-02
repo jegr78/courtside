@@ -42,12 +42,13 @@ function collectLocalState(git, baseCommit, fallbackReason) {
       || !/^[a-f0-9]{40}$/.test(headCommit)) {
     throw new Error("Git did not return trustworthy commit identities");
   }
+  if (git(["status", "--porcelain=v1", "-z", "--untracked-files=all"]).length > 0) {
+    throw new Error("Commit all changes before running the final local verification");
+  }
   const comparison = baseCommit ?? "HEAD";
-  git(["diff", "--check", comparison, "--"]);
-  const trackedEvidence = git(["diff", "--name-status", "-z", "--find-renames", comparison, "--"]);
-  const untrackedEvidence = git(["ls-files", "--others", "--exclude-standard", "-z"]);
-  const untrackedPaths = untrackedEvidence.split("\0").filter(Boolean);
-  const changeEvidence = `${trackedEvidence}${untrackedPaths.map((path) => `A\0${path}\0`).join("")}`;
+  git(["diff", "--check", comparison, headCommit, "--"]);
+  const changeEvidence = git(["diff", "--name-status", "-z", "--find-renames",
+    comparison, headCommit, "--"]);
   if (changeEvidence.length === 0 && fallbackReason === null) {
     throw new Error("No local changes exist relative to origin/main");
   }
@@ -58,11 +59,7 @@ function collectLocalState(git, baseCommit, fallbackReason) {
     .update("\0")
     .update(changeEvidence)
     .update("\0")
-    .update(git(["diff", "--binary", "--full-index", comparison, "--"]));
-  for (const path of untrackedPaths) {
-    fingerprint.update("\0").update(path).update("\0")
-      .update(git(["hash-object", "--no-filters", "--", path]).trim());
-  }
+    .update(git(["diff", "--binary", "--full-index", comparison, headCommit, "--"]));
   return {
     baseCommit,
     headCommit,
@@ -72,7 +69,8 @@ function collectLocalState(git, baseCommit, fallbackReason) {
   };
 }
 
-export function localVerificationPlans(tasks, platform = process.platform, root = repository) {
+export function localVerificationPlans(tasks, platform = process.platform, root = repository,
+    hostNode = null) {
   const frontend = join(root, "frontend");
   const npmCli = join(frontend, "node", "node_modules", "npm", "bin", "npm-cli.js");
   const node = join(frontend, "node", platform === "win32" ? "node.exe" : "node");
@@ -80,7 +78,7 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
     if (task.executable === "node") {
       return {
         label: task.label,
-        command: node,
+        command: hostNode ?? node,
         arguments: task.arguments,
         workingDirectory: root,
         shell: false
@@ -114,6 +112,12 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
   });
 }
 
+export function localCheckPrerequisites(tasks) {
+  const java = tasks.some((task) => task !== "docs-check");
+  const docker = tasks.some((task) => ["backend", "frontend-e2e", "full"].includes(task));
+  return { java, docker };
+}
+
 export async function executeLocalCheck(options, runtime = {}) {
   const evidence = collectLocalChanges(runtime.git ?? runGit);
   let classified;
@@ -143,15 +147,30 @@ export async function executeLocalCheck(options, runtime = {}) {
   if (options.planOnly) return record;
   const execute = runtime.execute ?? runProcess;
   try {
-    requireUnchangedEvidence(evidence, collectLocalState(runtime.git ?? runGit,
-      evidence.baseCommit, evidence.fallbackReason));
     runtime.beforeRun?.(record);
-    for (const processPlan of localVerificationPlans(plan.tasks, runtime.platform, runtime.root)) {
-      output.write(`Running local check: ${processPlan.label}\n`);
-      execute(processPlan);
+    const createWorktree = runtime.createWorktree ?? ((candidate) =>
+      createVerificationWorktree(candidate, runtime.git ?? runGit));
+    const pinned = createWorktree(evidence);
+    let taskFailure;
+    try {
+      for (const processPlan of localVerificationPlans(plan.tasks, runtime.platform, pinned.path,
+        runtime.hostNode ?? process.execPath)) {
+        output.write(`Running local check: ${processPlan.label}\n`);
+        execute(processPlan);
+      }
+    } catch (failure) {
+      taskFailure = failure;
     }
-    requireUnchangedEvidence(evidence, collectLocalState(runtime.git ?? runGit,
-      evidence.baseCommit, evidence.fallbackReason));
+    try {
+      pinned.release();
+    } catch (cleanupFailure) {
+      if (taskFailure !== undefined) {
+        throw new AggregateError([taskFailure, cleanupFailure],
+          `${taskFailure.message}; verification worktree cleanup failed: ${cleanupFailure.message}`);
+      }
+      throw cleanupFailure;
+    }
+    if (taskFailure !== undefined) throw taskFailure;
     record.outcome = "passed";
     persist(record);
     return record;
@@ -161,6 +180,32 @@ export async function executeLocalCheck(options, runtime = {}) {
     persist(record);
     throw failure;
   }
+}
+
+export function createVerificationWorktree(evidence, git = runGit) {
+  const worktree = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  let attached = false;
+  try {
+    git(["worktree", "add", "--detach", worktree, evidence.headCommit]);
+    attached = true;
+  } catch (failure) {
+    rmSync(worktree, { recursive: true, force: true });
+    throw failure;
+  }
+  return {
+    path: worktree,
+    release: () => {
+      let cleanupFailure;
+      try {
+        if (attached) git(["worktree", "remove", "--force", worktree]);
+      } catch (failure) {
+        cleanupFailure = failure;
+      } finally {
+        rmSync(worktree, { recursive: true, force: true });
+      }
+      if (cleanupFailure !== undefined) throw cleanupFailure;
+    }
+  };
 }
 
 export async function classifyProtectedChanges(evidence, forceFull, git = runGit,
@@ -191,13 +236,6 @@ export async function classifyProtectedChanges(evidence, forceFull, git = runGit
       rmSync(worktree, { recursive: true, force: true });
     }
     if (cleanupFailure) throw cleanupFailure;
-  }
-}
-
-function requireUnchangedEvidence(expected, actual) {
-  if (expected.baseCommit !== actual.baseCommit || expected.headCommit !== actual.headCommit
-      || expected.changeFingerprint !== actual.changeFingerprint) {
-    throw new Error("The working tree changed during local verification; run the check again");
   }
 }
 

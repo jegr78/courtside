@@ -122,9 +122,9 @@ fails on the missing `BuildProperties` bean.
   * Without preconditions: `whenAction_thenResult()` is allowed
   * For exception tests: combine as `// when / then` around `assertThatThrownBy`
 * **Sequence:** unit tests → implementation → integration tests → E2E.
-* **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. Before the final push, run
-  `node tools/courtside.mjs check`; it uses the protected test-profile contract against
-  `origin/main` and includes committed, staged, unstaged and untracked changes. A `full`
+* **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. Before the final push, commit
+  the reviewed branch and run `node tools/courtside.mjs check`; it uses the protected test-profile
+  contract against `origin/main` and verifies that exact commit in a detached worktree. A `full`
   classification runs `./mvnw clean verify`. Unknown, structural or untrusted change evidence
   fails closed to `full`; `--full` may escalate but never reduce the selected verification.
 * **Cross-module test setup uses test fixtures.** A module exposes intent-revealing fixture
@@ -347,13 +347,15 @@ enough to need.
 * **Finalise a branch in cost order.** Complete targeted red/green checks first, then obtain the
   required whole-branch review and resolve every finding with targeted verification. Only after the
   review is clean, fetch `origin/main`, rebase the uncommitted work with autostash if the base moved,
-  inspect the resulting diff and conflicts, and run `node tools/courtside.mjs check --full`. That
-  command is the one final full verification and satisfies the general before-push `check` rule;
-  do not run a separate `./mvnw clean verify` as well. Commit immediately after that run.
-  Do not spend a full run on a base already known to be stale or before the review can still change
-  the branch.
+  inspect the resulting diff and conflicts, and commit. Run `node tools/courtside.mjs check` as the
+  final verification. It selects the protected profile and builds the committed HEAD in a detached
+  worktree, so the live tree remains available while it runs. Do not run a separate
+  `./mvnw clean verify` as well. `--full` remains the manual escalation when the selected profile is
+  insufficient for a known risk. Do not spend a final run on a base already known to be stale or
+  before the review can still change the branch.
 
-  Only after the verification is green and committed, acquire the shared finalisation window by
+  Only after the verification is green and its recorded head still equals the branch HEAD, acquire
+  the shared finalisation window by
   creating the annotated tag `courtside-finalization-lock` at the branch HEAD. Its four message
   fields are a random, privacy-safe `owner` token, the `workspace` label, the branch name and an
   ISO-8601 `acquired-at` time. Push that tag without force; remote ref creation is atomic, so a

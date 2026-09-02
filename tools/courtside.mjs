@@ -22,7 +22,7 @@ import {
   buildSecurityPlan, clearEmergencyStop, executeSecurityPlan, fingerprintSecurityTarget, readSecurityManifest,
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
-import { executeLocalCheck } from "./local-check.mjs";
+import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
 
 async function securityAssessments() {
   const [passive, authorization, authenticatedZap, openApiFuzz, resourceAbuse] = await Promise.all([
@@ -536,9 +536,9 @@ async function execute(options) {
   if (options.command === "check") {
     await executeLocalCheck(options, {
       beforeRun: (record) => {
-        if (record.tasks.length === 0) return;
-        validateJava();
-        validateDocker();
+        const prerequisites = localCheckPrerequisites(record.tasks);
+        if (prerequisites.java) validateJava();
+        if (prerequisites.docker) validateDocker();
       }
     });
     return;

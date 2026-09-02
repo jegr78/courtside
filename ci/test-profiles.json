@@ -5,8 +5,6 @@
       "exact": [
         ".dockerignore",
         ".gitignore",
-        "AGENTS.md",
-        "CLAUDE.md",
         "Dockerfile",
         "SECURITY.md",
         "frontend/.npmrc",
@@ -48,7 +46,7 @@
       ]
     },
     "docs": {
-      "exact": ["LICENSE", "NOTICE", "README.md"],
+      "exact": ["AGENTS.md", "CLAUDE.md", "LICENSE", "NOTICE", "README.md"],
       "prefixes": ["bruno/", "docs/"]
     },
     "backend": {

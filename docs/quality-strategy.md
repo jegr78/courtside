@@ -34,7 +34,8 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 |---|---:|---|
 | Local unit and contract feedback | under 2 minutes | Focused tests for the changed decision and its negative boundary. |
 | Required pull-request checks | under 15 minutes | Green required checks plus the pull-request risk and evidence declaration. |
-| Local pull-request verification | under 25 minutes | `node tools/courtside.mjs check` selects the protected profile; `full` runs a clean Maven verification. |
+| Local single-area pull-request verification | under 15 minutes | `node tools/courtside.mjs check` selects and runs one protected reduced profile against a pinned commit. |
+| Local combined or full pull-request verification | under 25 minutes | Mixed profiles run additively; `full` runs a clean Maven verification against the same pinned commit. |
 | Nightly qualification | under 90 minutes | Periodic browser, order, concurrency, security and bounded performance evidence assigned by risk. |
 | Release qualification | under 45 minutes | Candidate-image, upgrade, restore and release-risk evidence; long soak runs are recorded separately. |
 
@@ -79,6 +80,10 @@ deleted, renamed, copied, type-changed, conflicted or otherwise ambiguous change
 plan. Classifier failures also select `full` and cannot make the required aggregate check pass by
 skipping a quality job. The selector executes the classifier from the immutable pull-request base
 commit, so a classifier or rule change cannot reduce the verification required for itself.
+
+`CLAUDE.md` and its `AGENTS.md` indirection are documentation inputs. Modifying either selects the
+bounded documentation profile, which checks every tracked Markdown file and the maintained quality
+contracts. Deleting, renaming or otherwise changing their structure still selects `full`.
 
 The tooling profile installs the locked Node dependencies and runs every repository tool, policy
 and contract test without Java integration tests, Vitest or Playwright. CI additionally requires
