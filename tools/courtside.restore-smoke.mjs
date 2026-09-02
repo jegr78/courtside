@@ -9,6 +9,21 @@ import { fileURLToPath } from "node:url";
 import { localRequest, newBootstrapPassword } from "./courtside.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+// The fixture is written for the schema of the upgrade origin, so it names no column a later
+// migration added as NOT NULL. Lending those a default while it loads keeps one fixture for both
+// smokes rather than a second copy that drifts away from the first.
+export const columnsAddedSinceTheFixture = [
+  { table: "member", column: "started_on", value: "DATE '2026-01-01'" }
+];
+
+function seedWithLaterColumns(fixture) {
+  const lend = columnsAddedSinceTheFixture
+    .map(({ table, column, value }) => `ALTER TABLE ${table} ALTER COLUMN ${column} SET DEFAULT ${value};`);
+  const withdraw = columnsAddedSinceTheFixture
+    .map(({ table, column }) => `ALTER TABLE ${table} ALTER COLUMN ${column} DROP DEFAULT;`);
+  return [...lend, fixture, ...withdraw].join("\n");
+}
+
 const composeFile = join(root, "deploy", "compose.restore.yaml");
 
 function run(command, args, options = {}) {
@@ -177,7 +192,8 @@ async function execute() {
     compose(project, environment, ["down", "--volumes", "--remove-orphans"], { allowFailure: true });
     compose(project, environment, ["up", "-d", "--wait"]);
     psql(project, environment, ["-f", "/dev/stdin"], {
-      input: readFileSync(join(root, "upgrade", "fixtures", "pre-release-v17.sql"), "utf8")
+      input: seedWithLaterColumns(
+        readFileSync(join(root, "upgrade", "fixtures", "pre-release-v17.sql"), "utf8"))
     });
     const before = databaseEvidence(project, environment);
     writeFileSync(join(build, "before.json"), `${JSON.stringify(before, null, 2)}\n`);

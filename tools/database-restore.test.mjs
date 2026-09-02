@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
+import { columnsAddedSinceTheFixture } from "./courtside.restore-smoke.mjs";
 
 function source(path) {
   return readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -72,4 +74,140 @@ test("given operator documentation, when backup and restore are followed, then b
   assert.match(documentation, /mv "\$temporary" "\$backup"/);
   assert.match(documentation, /pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error/);
   assert.match(documentation, /matching Courtside image/);
+});
+
+const FIXTURE = "../upgrade/fixtures/pre-release-v17.sql";
+const MIGRATIONS = "../src/main/resources/db/migration";
+
+function tablesTheFixtureSeeds() {
+  return new Set([...source(FIXTURE).matchAll(/^INSERT INTO ([a-z_]+)/gm)].map((match) => match[1]));
+}
+
+// Read as a sequence rather than file by file: a migration can add a column with a default and a
+// later one take it away, which leaves the column required even though neither file says so alone.
+function withoutComments(sql) {
+  return sql.replace(/--[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+// A column clause runs until the next clause of the same ALTER, not until the next comma: a type
+// like numeric(10,2) carries one of its own.
+function clausesOf(alterBody) {
+  return alterBody.split(/,(?=\s*(?:ADD|ALTER|DROP)\s)/i);
+}
+
+function alterationsIn(sql) {
+  const alterations = [];
+  const statements = withoutComments(sql).split(/;\s*(?=\n|$)/);
+  for (const statement of statements) {
+    const table = /\bALTER TABLE\s+(?:ONLY\s+)?([a-z_]+)/i.exec(statement)?.[1];
+    if (!table) {
+      continue;
+    }
+    const body = statement.slice(statement.search(/\bALTER TABLE\b/i));
+    for (const clause of clausesOf(body)) {
+      const added = /\bADD COLUMN\s+([a-z_]+)\b/i.exec(clause);
+      if (added) {
+        alterations.push({
+          table, column: added[1], required: /\bNOT NULL\b/i.test(clause),
+          setsADefault: /\bDEFAULT\b/i.test(clause), dropsTheDefault: false
+        });
+        continue;
+      }
+      const altered = /\bALTER COLUMN\s+([a-z_]+)\s+(SET NOT NULL|DROP DEFAULT|SET DEFAULT)/i.exec(clause);
+      if (altered) {
+        alterations.push({
+          table, column: altered[1], required: /SET NOT NULL/i.test(altered[2]),
+          setsADefault: /SET DEFAULT/i.test(altered[2]),
+          dropsTheDefault: /DROP DEFAULT/i.test(altered[2])
+        });
+      }
+    }
+  }
+  return alterations;
+}
+
+function requiredColumnsAfter(migrations, floor) {
+  const state = new Map();
+  for (const { file, sql } of migrations) {
+    const version = Number(/^V(\d+)__/.exec(file)?.[1]);
+    if (!Number.isInteger(version)) {
+      continue;
+    }
+    for (const change of alterationsIn(sql)) {
+      const key = `${change.table}.${change.column}`;
+      const held = state.get(key) ?? { required: false, hasADefault: false, migration: file };
+      state.set(key, {
+        required: held.required || change.required,
+        hasADefault: change.dropsTheDefault ? false : held.hasADefault || change.setsADefault,
+        migration: version > floor && !held.required ? file : held.migration,
+        introduced: held.introduced ?? version
+      });
+    }
+  }
+  return [...state.entries()]
+    .filter(([, held]) => held.required && !held.hasADefault && held.introduced > floor)
+    .map(([key, held]) => ({
+      table: key.split(".")[0], column: key.split(".")[1], migration: held.migration
+    }));
+}
+
+function requiredColumnsAddedAfterTheFixture() {
+  const directory = fileURLToPath(new URL(MIGRATIONS, import.meta.url));
+  const migrations = readdirSync(directory)
+    .filter((file) => file.endsWith(".sql"))
+    .sort((left, right) => Number(/^V(\d+)__/.exec(left)[1]) - Number(/^V(\d+)__/.exec(right)[1]))
+    .map((file) => ({ file, sql: source(`${MIGRATIONS}/${file}`) }));
+  return requiredColumnsAfter(migrations, 17);
+}
+
+test("given a column a migration added as required after V17, when the restore smoke seeds the fixture, then that column is lent a value", () => {
+  // given
+  const seeded = tablesTheFixtureSeeds();
+  const lent = new Set(columnsAddedSinceTheFixture.map(({ table, column }) => `${table}.${column}`));
+
+  // when
+  const unmet = requiredColumnsAddedAfterTheFixture()
+    .filter(({ table }) => seeded.has(table))
+    .filter(({ table, column }) => !lent.has(`${table}.${column}`))
+    .map(({ table, column, migration }) => `${migration} makes ${table}.${column} required`);
+
+  // then
+  assert.deepEqual(unmet, [],
+    "The restore smoke seeds a fixture that predates these columns, so its INSERT will fail once the\n"
+    + "candidate image has migrated. Lend each one a value in columnsAddedSinceTheFixture:\n"
+    + `${unmet.join("\n")}`);
+});
+
+test("given a lent column, when the migrations are read, then it is one a migration after V17 actually requires", () => {
+  // given
+  const required = new Set(requiredColumnsAddedAfterTheFixture()
+    .map(({ table, column }) => `${table}.${column}`));
+
+  // when / then
+  columnsAddedSinceTheFixture.forEach(({ table, column }) =>
+    assert.ok(required.has(`${table}.${column}`),
+      `${table}.${column} is lent a value but no migration after V17 requires it; drop the entry`));
+});
+
+test("given the ways a migration can make a column required, when the migrations are read, then each way is found", () => {
+  // given
+  const migrations = [
+    { file: "V18__comma_in_the_type.sql", sql: "ALTER TABLE member ADD COLUMN fee numeric(10,2) NOT NULL;" },
+    { file: "V19__existing_column.sql", sql: "ALTER TABLE member ALTER COLUMN nickname SET NOT NULL;" },
+    { file: "V20__with_a_default.sql",
+      sql: "ALTER TABLE member ADD COLUMN joined date NOT NULL DEFAULT CURRENT_DATE;" },
+    { file: "V21__default_withdrawn_later.sql", sql: "ALTER TABLE member ALTER COLUMN joined DROP DEFAULT;" },
+    { file: "V22__keeps_its_default.sql", sql: "ALTER TABLE member ADD COLUMN note text NOT NULL DEFAULT '';" },
+    { file: "V23__only_in_a_comment.sql",
+      sql: "-- ALTER TABLE member ADD COLUMN ignored text NOT NULL;\nALTER TABLE member ADD COLUMN kept text;" }
+  ];
+
+  // when
+  const required = requiredColumnsAfter(migrations, 17).map(({ column }) => column).sort();
+
+  // then
+  assert.deepEqual(required, ["fee", "joined", "nickname"],
+    "fee carries a comma in its type, nickname is an existing column made required, and joined keeps\n"
+    + "no default once a later migration withdraws it. note keeps its default, ignored is commented\n"
+    + "out and kept is nullable, so none of those three is required.");
 });
