@@ -40,11 +40,14 @@ jobs:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           RUN_ID: ${{ github.run_id }}
           ATTEMPT: ${{ github.run_attempt }}
-          FORCE_FULL: ${{ vars.COURTSIDE_TEST_PROFILES == 'full' }}
+          FORCE_FULL: ${{ vars.COURTSIDE_TEST_PROFILES != '' && vars.COURTSIDE_TEST_PROFILES != 'admitted' }}
         run: |
           CLASSIFIER_EXIT=0
           LABELS="$LABELS_JSON"
-          if [[ "$FORCE_FULL" = "true" ]]; then LABELS='["ci:full"]'; fi
+          if [[ "$FORCE_FULL" = "true" ]]; then
+            LABELS='["ci:full"]'
+            echo 'The repository variable forces the complete job set.' >> "$GITHUB_STEP_SUMMARY"
+          fi
           PROFILE_ROOT="$RUNNER_TEMP/courtside-profile-base"
           git worktree add --detach "$PROFILE_ROOT" "$BASE_REF" || CLASSIFIER_EXIT=$?
           if [[ "$CLASSIFIER_EXIT" = 0 ]]; then
@@ -71,7 +74,8 @@ jobs:
               (.profiles | type == "array" and length >= 1 and length <= 5 and
                 all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or . == "full") and
                 (unique | length) == length) and
-              (.ciJobs | type == "array" and all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or . == "security")) and
+              (.ciJobs | type == "array" and length >= 1 and (unique | length) == length and
+                all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or . == "security")) and
               (.isFull | type == "boolean") and .isFull == (.profiles == ["full"]) and
               (.plannerOutcome == "passed" or .plannerOutcome == "failed") and
               (.reasons | type == "array" and length >= 1) and

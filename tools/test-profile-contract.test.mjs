@@ -48,9 +48,22 @@ test("given incomplete full coverage, when validating the contract, then no plan
   // when / then
   assert.throws(() => validateContract(partialJobs), /full test profile coverage is incomplete/i);
   assert.throws(() => validateContract(reducedTopology), /contract is invalid/i);
-  assert.throws(() => validateContract(emptyTasks), /full test profile coverage is incomplete/i);
+  assert.throws(() => validateContract(emptyTasks), /coverage is invalid/i);
   assert.throws(() => validateContract(weakenedCommand), /full local verification task is invalid/i);
   assert.throws(() => validateContract(openDifference), /coverage difference is invalid/i);
+});
+
+test("given a profile that runs nothing, when validating the contract, then the empty coverage is refused", () => {
+  // given
+  const contract = loadProfileContract();
+  const withoutJobs = structuredClone(contract);
+  const withoutTasks = structuredClone(contract);
+  withoutJobs.profiles.docs.ciJobs = [];
+  withoutTasks.profiles.docs.localTasks = [];
+
+  // when / then
+  assert.throws(() => validateContract(withoutJobs), /coverage is invalid/i);
+  assert.throws(() => validateContract(withoutTasks), /coverage is invalid/i);
 });
 
 test("given any full profile, when resolving coverage, then only full coverage remains", () => {

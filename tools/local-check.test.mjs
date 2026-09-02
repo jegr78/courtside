@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
-  classifyProtectedChanges, collectLocalChanges, executeLocalCheck, localVerificationPlans, planTasks
+  classifyProtectedChanges, collectLocalChanges, executeLocalCheck, localVerificationPlans, planTasks,
+  renderLocalCheckPlan
 } from "./local-check.mjs";
 import { classifyChanges } from "./test-profile-classifier.mjs";
 
@@ -321,6 +322,30 @@ test("given a protected base, when classifying, then its classifier runs from an
   assert.equal(calls[3][0], "load");
   assert.match(calls[3][1], /tools\/local-check\.mjs\?base=a{40}$/);
   assert.deepEqual(calls[4].slice(0, 3), ["worktree", "remove", "--force"]);
+});
+
+test("given a planned local check, when rendering it, then the profiles tasks and evidence are all named", () => {
+  // given
+  const planned = {
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40),
+    fallbackReason: null,
+    profiles: ["docs", "tooling"],
+    tasks: ["docs-check", "tooling-test"]
+  };
+  const fallback = { ...planned, fallbackReason: "base-refresh-failed", profiles: ["full"], tasks: [] };
+
+  // when
+  const rendered = renderLocalCheckPlan(planned);
+  const renderedFallback = renderLocalCheckPlan(fallback);
+
+  // then
+  assert.match(rendered, /^Local profiles: docs \+ tooling$/m);
+  assert.match(rendered, /^Change evidence: a{40}\.\.b{40}$/m);
+  assert.match(rendered, /^Tasks: docs-check, tooling-test$/m);
+  assert.match(rendered, /^Result: .*build\/local-check\/result\.json$/m);
+  assert.match(renderedFallback, /^Change evidence: full fallback: base-refresh-failed$/m);
+  assert.match(renderedFallback, /^Tasks: diff-check only$/m);
 });
 
 test("given a protected base classifier, when classifying locally, then its answer decides the run", async () => {

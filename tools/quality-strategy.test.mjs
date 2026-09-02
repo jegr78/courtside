@@ -45,7 +45,7 @@ test("given tracked residual test risks, when reading the strategy, then their e
 test("given a reduced GitHub entry, when reading the strategy, then it names who runs the validator", () => {
   // when / then
   assert.match(strategy, /the documentation job runs their validators itself/i);
-  assert.match(strategy, /a job of its own profiles\s+actually executes/i);
+  assert.match(strategy, /a job of its own profiles\s+actually\s+executes/i);
   assert.match(strategy, /derived from what those jobs run rather than from which profile happens to own/i);
 });
 
@@ -53,6 +53,7 @@ test("given no admission step, when reading the strategy, then failing closed an
   // when / then
   assert.match(strategy, /no separate admission step/i);
   assert.match(strategy, /everything unrecognised fails closed/i);
-  assert.match(strategy, /`COURTSIDE_TEST_PROFILES` set to `full` forces the complete\s+job set/i);
+  assert.match(strategy, /`COURTSIDE_TEST_PROFILES` forces the complete job set/i);
+  assert.match(strategy, /a typo escalates rather than silently\s+reducing/i);
   assert.match(strategy, /is the immediate rollback/i);
 });

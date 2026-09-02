@@ -50,7 +50,8 @@ export function validateContract(contract) {
     const coverage = contract.profiles[profile];
     if (coverage === null || typeof coverage !== "object" || Array.isArray(coverage)
         || Object.keys(coverage).some((field) => !["ciJobs", "localTasks"].includes(field))
-        || !Array.isArray(coverage.ciJobs) || !Array.isArray(coverage.localTasks)
+        || !Array.isArray(coverage.ciJobs) || coverage.ciJobs.length < 1
+        || !Array.isArray(coverage.localTasks) || coverage.localTasks.length < 1
         || new Set(coverage.ciJobs).size !== coverage.ciJobs.length
         || new Set(coverage.localTasks).size !== coverage.localTasks.length
         || coverage.ciJobs.some((job) => !contract.ciJobOrder.includes(job))

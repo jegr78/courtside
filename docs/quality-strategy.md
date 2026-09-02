@@ -102,9 +102,10 @@ duplicate manifest entries fail closed.
 The selection has no separate admission step. What keeps it honest is that both inventories are
 closed and everything unrecognised fails closed: an unclassified path, a structural change such as a
 rename or a deletion, a manifest entry whose file no longer exists and a classifier that throws all
-select `full`. The repository variable `COURTSIDE_TEST_PROFILES` set to `full` forces the complete
-job set for every pull request and is the immediate rollback; any other value, including none, uses
-the classified selection. Locally, `check --full` is the same escalation.
+select `full`. The repository variable `COURTSIDE_TEST_PROFILES` forces the complete job set for every
+pull request unless it is empty or reads `admitted`, so a typo escalates rather than silently
+reducing, and the run summary says when it did. That is the immediate rollback. Locally,
+`check --full` is the same escalation.
 
 A release demands a nightly that verified it, rather than the absence of a complaint about one. The
 tag is refused unless a scheduled `build` run succeeded on its first attempt over a commit the

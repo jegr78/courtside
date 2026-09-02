@@ -47,6 +47,8 @@ test("given reduced profiles, when jobs are scheduled, then only their conservat
     /security:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
   assert.match(workflow, /JOBS=\$\(jq -cer '\.ciJobs'/);
   assert.match(workflow,
+    /\(\.ciJobs \| type == "array" and length >= 1 and \(unique \| length\) == length and/);
+  assert.match(workflow,
     /SELECTED=\$\(jq -nr --argjson jobs "\$JOBS" --arg job "\$job" '\(\$jobs \| index\(\$job\)\) != null'\)/);
   assert.doesNotMatch(workflow, /\$job == "frontend" or \$job == "security"/);
 });
@@ -60,10 +62,12 @@ test("given the classifier fails, when the plan runs, then full selection still 
     /else\s+PROFILES='\["full"\]'\s+JOBS='\["docs","backend","frontend","tooling","security"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
 });
 
-test("given the emergency repository variable, when it demands full, then the classifier sees the full label", () => {
+test("given an unrecognised repository variable, when selecting coverage, then anything but the classified default escalates", () => {
   // when / then
-  assert.match(workflow, /FORCE_FULL: \$\{\{ vars\.COURTSIDE_TEST_PROFILES == 'full' \}\}/);
-  assert.match(workflow, /if \[\[ "\$FORCE_FULL" = "true" \]\]; then LABELS='\["ci:full"\]'; fi/);
+  assert.match(workflow,
+    /FORCE_FULL: \$\{\{ vars\.COURTSIDE_TEST_PROFILES != '' && vars\.COURTSIDE_TEST_PROFILES != 'admitted' \}\}/);
+  assert.match(workflow, /if \[\[ "\$FORCE_FULL" = "true" \]\]; then\s+LABELS='\["ci:full"\]'/);
+  assert.match(workflow, /forces the complete job set[\s\S]+GITHUB_STEP_SUMMARY/);
   assert.match(workflow, /--labels "\$LABELS"/);
   assert.doesNotMatch(workflow, /--mode|PROFILE_MODE|admissionOutcome/);
 });

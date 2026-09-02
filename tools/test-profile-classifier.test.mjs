@@ -115,6 +115,27 @@ test("given reviewed GitHub metadata, when classifying, then templates and valid
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/workflows/build.yml" }], []).profiles, ["full"]);
 });
 
+test("given a file that decides the selection, when classifying it, then it can never select a reduced profile", () => {
+  // given
+  const deciding = [
+    ".github/workflows/build.yml", "ci/github-profile-manifest.json", "ci/node-toolchain.json",
+    "ci/test-profile-contract.json", "ci/test-profile-plan.schema.json", "ci/test-profiles.json",
+    "ci/tool-profile-manifest.json", "frontend/package.json", "tools/docs-check.mjs",
+    "tools/local-check.mjs", "tools/node-toolchain.mjs", "tools/test-profile-classifier.mjs",
+    "tools/test-profile-contract.mjs", "tools/tool-tests.mjs"
+  ];
+  const selfChecking = ["tools/github-metadata.test.mjs", "tools/github-template-metadata.test.mjs",
+    "tools/workflow-action-pinning.test.mjs"];
+
+  // when / then
+  for (const path of deciding) {
+    assert.deepEqual(classifyChanges([{ status: "M", path }], []).profiles, ["full"], path);
+  }
+  for (const path of selfChecking) {
+    assert.deepEqual(classifyChanges([{ status: "M", path }], []).profiles, ["tooling"], path);
+  }
+});
+
 test("given backend and frontend changes, when classifying, then both reduced profiles are observed", () => {
   // given
   const changes = [
