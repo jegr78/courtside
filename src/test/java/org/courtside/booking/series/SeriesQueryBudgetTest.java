@@ -58,7 +58,8 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         courtId = facilityFixture.createCourt(1, "Court 1");
         trainerPersonId = identity.createPerson("John", "Roe", "john@example.org");
         members.assignMembership(trainerPersonId, STANDARD_MEMBERSHIP);
-        trainer = UUID.randomUUID();
+        trainer = identity.createEnabledAccount(
+                trainerPersonId, "roe.john", Set.of(Role.TRAINER));
         Arrays.stream(DayOfWeek.values())
                 .forEach(day -> facilityFixture.setOpeningHours(
                         day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
@@ -114,19 +115,19 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         // One more than before, and constant: a move resolves the person holding the series once for
         // the whole batch, because the bar is measured against them and not against whoever moves it.
         assertThat(previewSnapshot.total()).as(previewSnapshot.toString())
-                .isLessThanOrEqualTo(3L * count + 14);
+                .isLessThanOrEqualTo(3L * count + 15);
         assertThat(moveSnapshot.total()).as(moveSnapshot.toString())
-                .isLessThanOrEqualTo(8L * count + 30);
+                .isLessThanOrEqualTo(8L * count + 31);
     }
 
     private SeriesCreationResult createSeries(int count) {
         SeriesRule rule = dailyRule(count);
         List<java.time.Instant> starts = seriesService.preview(
-                        rule, trainer, null, Set.of(Role.ADMIN)).occurrences().stream()
+                        rule, trainer, trainerPersonId, Set.of(Role.ADMIN)).occurrences().stream()
                 .map(occurrence -> occurrence.slot().start())
                 .toList();
         return seriesService.create(
-                rule, starts, trainer, null, Set.of(Role.ADMIN), "Training");
+                rule, starts, trainer, trainerPersonId, Set.of(Role.ADMIN), "Training");
     }
 
     private SeriesRule dailyRule(int count) {

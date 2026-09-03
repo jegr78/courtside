@@ -179,6 +179,11 @@ public class SeriesService {
 
     @Transactional(readOnly = true)
     public MovePreview previewMove(MoveRequest request, UUID movedBy, Set<Role> callerRoles) {
+        return previewMove(request, movedBy, callerRoles, true);
+    }
+
+    private MovePreview previewMove(MoveRequest request, UUID movedBy, Set<Role> callerRoles,
+                                    boolean includeViolations) {
         requireManagementAccessTo(request.seriesId(), request.fromBookingId(), movedBy, callerRoles);
 
         List<Booking> affected =
@@ -192,11 +197,9 @@ public class SeriesService {
                 .toList();
         List<ParticipantCardCapacity.Target> targets = participantTargets(planned);
 
-        Map<UUID, Optional<UUID>> owners = new HashMap<>();
-        List<List<RuleViolation>> ruleViolations = ruleGate.moveViolationsFor(
-                planned.stream().map(move -> ownerCheck(
-                        move.courts(), move.cardId(), move.to(), move.bookedBy(), callerRoles, owners))
-                        .toList());
+        List<List<RuleViolation>> ruleViolations = includeViolations
+                ? moveRuleViolations(planned, callerRoles)
+                : planned.stream().map(ignored -> List.<RuleViolation>of()).toList();
         List<MovePreview.Move> moves = IntStream.range(0, planned.size())
                 .mapToObj(index -> toPreviewMove(
                         planned.get(index), planned, movingIds, targets, ruleViolations.get(index)))
@@ -214,7 +217,9 @@ public class SeriesService {
         // it rewrites every column of them and would otherwise flush over a cancellation it never saw.
         bookingRepository.lockBySeriesId(request.seriesId());
         discardPreLockState();
-        MovePreview preview = previewMove(request, movedBy, callerRoles);
+        // Rule evaluation is omitted from this internal preview and happens once, authoritatively,
+        // below. Caching its membership input across both phases could conceal a concurrent change.
+        MovePreview preview = previewMove(request, movedBy, callerRoles, false);
 
         List<UUID> blocked = preview.moves().stream()
                 .filter(move -> !move.blockedCourtIds().isEmpty())
@@ -333,6 +338,15 @@ public class SeriesService {
         if (!violations.isEmpty()) {
             throw new BookingRulesViolatedException(violations);
         }
+    }
+
+    private List<List<RuleViolation>> moveRuleViolations(List<PlannedMove> planned,
+                                                         Set<Role> callerRoles) {
+        Map<UUID, Optional<UUID>> owners = new HashMap<>();
+        return ruleGate.moveViolationsFor(planned.stream()
+                .map(move -> ownerCheck(move.courts(), move.cardId(), move.to(), move.bookedBy(),
+                        callerRoles, owners))
+                .toList());
     }
 
     private List<ParticipantCardCapacity.Target> participantTargets(List<PlannedMove> planned) {
