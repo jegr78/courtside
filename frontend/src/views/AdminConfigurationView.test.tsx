@@ -343,7 +343,9 @@ describe("AdminConfigurationView", () => {
 
   it("given a typed rule set name, when the set is taken out of service, then the typing is still there", async () => {
     // given — the answer speaks for `active` and carries the name the club still has stored
-    vi.spyOn(api, "setRuleSetActive").mockResolvedValue({ id: "rule-set", name: "Standard", active: false });
+    vi.spyOn(api, "setRuleSetActive")
+      .mockResolvedValueOnce({ id: "rule-set", name: "Standard", active: false })
+      .mockResolvedValueOnce({ id: "rule-set", name: "Standard", active: true });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("rule-set-name");
     fireEvent.change(screen.getByTestId("rule-set-name"), { target: { value: "Standard plus" } });
@@ -353,6 +355,12 @@ describe("AdminConfigurationView", () => {
 
     // then
     await waitFor(() => expect(screen.getByTestId("toggle-rule-set")).toHaveTextContent("Activate"));
+    expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
+    expect(screen.getByTestId("unsaved-mark-rule-set:rule-set")).toBeInTheDocument();
+
+    // then — and the way back is the same change, so it keeps the typing too
+    await userEvent.click(screen.getByTestId("toggle-rule-set"));
+    await waitFor(() => expect(screen.getByTestId("toggle-rule-set")).toHaveTextContent("Deactivate"));
     expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
     expect(screen.getByTestId("unsaved-mark-rule-set:rule-set")).toBeInTheDocument();
   });

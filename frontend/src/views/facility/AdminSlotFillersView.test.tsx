@@ -131,7 +131,8 @@ describe("AdminSlotFillersView", () => {
   it("given a typed label, when the filler is taken out of service, then the typing is still there", async () => {
     // given — the answer speaks for `active` and carries the label the club still has stored
     vi.spyOn(api, "setParticipantCardActive")
-      .mockResolvedValue({ id: "filler-1", label: "Ball machine", capacity: 1, active: false });
+      .mockResolvedValueOnce({ id: "filler-1", label: "Ball machine", capacity: 1, active: false })
+      .mockResolvedValueOnce({ id: "filler-1", label: "Ball machine", capacity: 1, active: true });
     show();
     await screen.findByTestId("participant-card-label-filler-1");
     await userEvent.type(screen.getByTestId("participant-card-label-filler-1"), " two");
@@ -141,6 +142,12 @@ describe("AdminSlotFillersView", () => {
 
     // then
     await waitFor(() => expect(screen.getByTestId("toggle-participant-card-filler-1")).toHaveTextContent("Activate"));
+    expect(screen.getByTestId("participant-card-label-filler-1")).toHaveValue("Ball machine two");
+    expect(screen.getByTestId("unsaved-mark-participant-card:filler-1")).toBeInTheDocument();
+
+    // then — and the way back is the same change, so it keeps the typing too
+    await userEvent.click(screen.getByTestId("toggle-participant-card-filler-1"));
+    await waitFor(() => expect(screen.getByTestId("toggle-participant-card-filler-1")).toHaveTextContent("Deactivate"));
     expect(screen.getByTestId("participant-card-label-filler-1")).toHaveValue("Ball machine two");
     expect(screen.getByTestId("unsaved-mark-participant-card:filler-1")).toBeInTheDocument();
   });
