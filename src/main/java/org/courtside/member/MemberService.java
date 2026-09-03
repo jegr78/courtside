@@ -5,6 +5,7 @@ import org.courtside.member.internal.MembershipTypeInactiveException;
 import org.courtside.member.internal.MembershipTypeNameTakenException;
 import org.courtside.member.internal.MembershipTypeNotFoundException;
 import org.courtside.member.internal.MembershipTypeRepository;
+import org.courtside.shared.SqlConstraintViolation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -171,12 +172,12 @@ public class MemberService {
     }
 
     private boolean isNameTaken(DataIntegrityViolationException e) {
-        String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(UNIQUE_NAME_CONSTRAINT);
+        return SqlConstraintViolation.matches(
+                e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_NAME_CONSTRAINT);
     }
 
     private boolean isRuleSetInvalid(DataIntegrityViolationException e) {
-        String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(RULE_SET_FOREIGN_KEY);
+        return SqlConstraintViolation.matches(
+                e, SqlConstraintViolation.FOREIGN_KEY_VIOLATION, RULE_SET_FOREIGN_KEY);
     }
 }

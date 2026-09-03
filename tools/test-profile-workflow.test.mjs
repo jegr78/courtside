@@ -98,6 +98,14 @@ test("given backend and security jobs, when they build java, then maven skips ev
     /<id>java-only<\/id>[\s\S]+<frontend\.skip>true<\/frontend\.skip>[\s\S]+<frontend\.test\.skip>true<\/frontend\.test\.skip>/);
 });
 
+test("given npm audit has its own gate, when dependencies are installed, then install does not audit twice", () => {
+  // when / then
+  assert.match(pom,
+    /<id>npm-ci<\/id>[\s\S]+?<arguments>ci --no-audit<\/arguments>/);
+  assert.match(pom,
+    /<id>npm-audit<\/id>[\s\S]+?<arguments>audit --audit-level=high<\/arguments>/);
+});
+
 test("given split coverage artifacts, when the aggregate downloads them, then it uses their archive roots", () => {
   // when / then
   assert.match(workflow, /--java build\/aggregate\/backend\/site\/jacoco\/jacoco\.xml/);

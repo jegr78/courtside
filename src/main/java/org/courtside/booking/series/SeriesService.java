@@ -39,6 +39,7 @@ import org.courtside.facility.FacilityService;
 import org.courtside.identity.Role;
 import org.courtside.rules.RuleViolation;
 import org.courtside.shared.TimeSlot;
+import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -289,8 +290,8 @@ public class SeriesService {
     }
 
     private boolean isOverlap(DataIntegrityViolationException e) {
-        String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(OVERLAP_CONSTRAINT);
+        return SqlConstraintViolation.matches(
+                e, SqlConstraintViolation.EXCLUSION_VIOLATION, OVERLAP_CONSTRAINT);
     }
 
     private record PlannedMove(UUID bookingId, UUID cardId, UUID bookedBy,

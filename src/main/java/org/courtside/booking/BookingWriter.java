@@ -20,6 +20,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.shared.BookingConfirmed;
 import org.courtside.shared.ParticipantRecorded;
+import org.courtside.shared.SqlConstraintViolation;
 import org.courtside.shared.TimeSlot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -123,12 +124,13 @@ class BookingWriter {
     }
 
     private boolean isOverlap(DataIntegrityViolationException e) {
-        return isConstraint(e, OVERLAP_CONSTRAINT);
+        return SqlConstraintViolation.matches(
+                e, SqlConstraintViolation.EXCLUSION_VIOLATION, OVERLAP_CONSTRAINT);
     }
 
     private boolean isConstraint(DataIntegrityViolationException e, String constraint) {
-        String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(constraint);
+        return SqlConstraintViolation.matches(
+                e, SqlConstraintViolation.UNIQUE_VIOLATION, constraint);
     }
 
     private List<ParticipantSpec> resolveSlots(BookingCard card, CreateBookingCommand command) {

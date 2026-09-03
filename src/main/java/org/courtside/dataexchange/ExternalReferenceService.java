@@ -7,6 +7,7 @@ import org.courtside.dataexchange.internal.MemberNumber;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.shared.CursorPage;
+import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -78,15 +79,13 @@ public class ExternalReferenceService {
         try {
             return references.saveAndFlush(reference);
         } catch (DataIntegrityViolationException e) {
-            String message = e.getMostSpecificCause().getMessage();
-            if (message == null) {
-                throw e;
-            }
-            if (message.contains(UNIQUE_EXTERNAL_ID_CONSTRAINT)) {
+            if (SqlConstraintViolation.matches(
+                    e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_EXTERNAL_ID_CONSTRAINT)) {
                 throw new ExternalIdTakenException(
                         "Member number '" + externalId + "' already names another person", e);
             }
-            if (message.contains(UNIQUE_PERSON_CONSTRAINT)) {
+            if (SqlConstraintViolation.matches(
+                    e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_PERSON_CONSTRAINT)) {
                 throw new PersonAlreadyLinkedException(
                         "This person already holds a reference from import source "
                                 + reference.getSourceId(), e);

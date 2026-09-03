@@ -4,6 +4,7 @@ import org.courtside.card.internal.BookingCardRepository;
 import org.courtside.card.internal.CardLabelTakenException;
 import org.courtside.card.internal.ParticipantCardRepository;
 import org.courtside.identity.Role;
+import org.courtside.shared.SqlConstraintViolation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -199,8 +200,8 @@ public class CardService {
     }
 
     private static boolean isLabelTaken(DataIntegrityViolationException e, String constraint) {
-        String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(constraint);
+        return SqlConstraintViolation.matches(
+                e, SqlConstraintViolation.UNIQUE_VIOLATION, constraint);
     }
 
     private static List<Short> boxed(short[] values) {

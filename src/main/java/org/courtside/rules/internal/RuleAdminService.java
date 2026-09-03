@@ -3,6 +3,7 @@ package org.courtside.rules.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.rules.RuleType;
 import org.courtside.rules.RulesEvent;
+import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -117,7 +118,7 @@ public class RuleAdminService {
     }
 
     private boolean isNameTaken(DataIntegrityViolationException e) {
-        String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(UNIQUE_NAME_CONSTRAINT);
+        return SqlConstraintViolation.matches(
+                e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_NAME_CONSTRAINT);
     }
 }

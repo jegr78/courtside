@@ -20,6 +20,7 @@ import org.courtside.member.internal.PersonText;
 import org.courtside.member.internal.RosterCursorUnknownException;
 import org.courtside.member.internal.UsernameTakenException;
 import org.courtside.shared.CursorPage;
+import org.courtside.shared.SqlConstraintViolation;
 import org.courtside.shared.SupportedLanguages;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -344,8 +345,8 @@ public class RosterService {
     }
 
     private static boolean isUsernameTaken(DataIntegrityViolationException e) {
-        String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(UNIQUE_USERNAME_CONSTRAINT);
+        return SqlConstraintViolation.matches(
+                e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_USERNAME_CONSTRAINT);
     }
 
     private UserAccount requireAccount(UUID personId) {

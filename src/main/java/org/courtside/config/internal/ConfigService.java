@@ -5,6 +5,7 @@ import org.courtside.config.BookingGridSettings;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.CredentialValidity;
 import org.courtside.shared.CredentialsRequested;
+import org.courtside.shared.SqlConstraintViolation;
 import org.courtside.shared.SupportedLanguages;
 import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
@@ -20,7 +21,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -37,7 +37,6 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         CredentialValidity, ClubIdentity, BookingReminderPolicy {
 
     private static final String RULE_SET_CONSTRAINT = "club_config_no_membership_type_rule_set";
-    private static final String FOREIGN_KEY_VIOLATION = "23503";
 
     private final ClubConfigurationRepository configurations;
     private final ClubTimeZoneConfigurationRepository timeZones;
@@ -177,9 +176,8 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     // The SQL state as well as the name: a club that types the constraint's name into a field of
     // its own must not be able to have an unrelated violation answered with this code.
     private static boolean namesTheRuleSetReference(DataIntegrityViolationException failure) {
-        return failure.getMostSpecificCause() instanceof SQLException cause
-                && FOREIGN_KEY_VIOLATION.equals(cause.getSQLState())
-                && String.valueOf(cause.getMessage()).contains(RULE_SET_CONSTRAINT);
+        return SqlConstraintViolation.matches(
+                failure, SqlConstraintViolation.FOREIGN_KEY_VIOLATION, RULE_SET_CONSTRAINT);
     }
 
     private void refuseAConflictingGrid(ChangeClubConfigurationCommand command, ZoneId zoneId,
