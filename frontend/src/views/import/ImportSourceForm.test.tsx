@@ -9,6 +9,8 @@ import { ImportSourceForm } from "./ImportSourceForm";
 
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
 const passive: MembershipType = { id: "type-2", name: "Passive", ruleSetId: null, active: true, grantsAccount: false };
+const retired: MembershipType = { id: "type-3", name: "Youth", ruleSetId: null, active: false, grantsAccount: false };
+const dormant: MembershipType = { id: "type-4", name: "Students", ruleSetId: null, active: false, grantsAccount: false };
 
 const existing: ImportSource = {
   id: "source-1",
@@ -25,16 +27,50 @@ function file(content: string, name = "members.csv") {
   return new File([content], name, { type: "text/csv" });
 }
 
-function show(source: ImportSource | undefined, save: (request: ImportSourceRequest) => Promise<unknown>) {
+function show(source: ImportSource | undefined, save: (request: ImportSourceRequest) => Promise<unknown>,
+              types: MembershipType[] = [adults, passive]) {
   render(<UnsavedChangesProvider>
     <UnsavedCount />
-    <ImportSourceForm source={source} types={[adults, passive]} disabled={false} save={save} />
+    <ImportSourceForm source={source} types={types} disabled={false} save={save} />
   </UnsavedChangesProvider>);
 }
 
 describe("ImportSourceForm", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
+  });
+
+  it("given a type nobody offers any more, when the default is chosen, then it is not on the list", () => {
+    // given / when
+    show(undefined, vi.fn(), [adults, passive, retired]);
+
+    // then
+    expect([...screen.getByTestId("source-default-type").querySelectorAll("option")]
+      .map((option) => option.value)).toEqual(["", "type-1", "type-2"]);
+  });
+
+  it("given the source already names a retired type, when the form opens, then it stays and says so", () => {
+    // given / when — withholding it would clear the club's own choice on the next save
+    show({ ...existing, defaultMembershipTypeId: "type-3" }, vi.fn(), [adults, passive, retired]);
+
+    // then
+    const chosen = screen.getByTestId("source-default-type").querySelector("option[value='type-3']");
+    expect(chosen).toHaveTextContent("Youth (no longer offered)");
+  });
+
+  it("given a category assigned a retired type, when the source is read, then that select holds it and no other retired one", () => {
+    // given / when — the mapping select carries the same trap as the default one
+    show({
+      ...existing,
+      columns: { ...existing.columns, Category: "MEMBERSHIP_TYPE" },
+      membershipTypes: { Youth: "type-3" }
+    }, vi.fn(), [adults, passive, retired, dormant]);
+
+    // then
+    const select = screen.getByTestId("category-Youth");
+    expect([...select.querySelectorAll("option")].map((option) => option.value))
+      .toEqual(["", "type-1", "type-2", "type-3"]);
+    expect(select.querySelector("option[value='type-3']")).toHaveTextContent("Youth (no longer offered)");
   });
 
   it("given a chosen file, when it is read, then its headers become the columns to map", async () => {

@@ -1190,6 +1190,13 @@ Import and export:
   overwrites it — and above what share of the roster disappearing an execution needs confirming.
   Every part of it is correctable, and a change decides what the *next* snapshot means rather than
   touching the people an earlier one created.
+- **The preview refuses whatever the run would refuse.** A file is measured against the source's
+  configuration as well as against its own rows, so a category the source maps to nothing, a
+  category mapped to a membership type nobody offers any more, and a source whose default type is no
+  longer offered while rows would be created with it all stop the upload rather than producing a
+  change set that cannot execute. The default is weighed only where a row would reach it: a run of
+  updates and endings names its own types, and refusing that file over a fallback nothing falls back
+  to would block work the club can do.
 - **The file is read as the club's own system wrote it, and the club says how.** The separator and
   the character set are both part of the source, because both are properties of the export tool
   rather than of one file: the club answers once, and every later upload is read by that answer.

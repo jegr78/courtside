@@ -187,6 +187,49 @@ class ChangeSetResolverTest {
     }
 
     @Test
+    void givenRowsNamingNoCategory_whenTheSourceDefaultIsNoLongerOffered_thenTheRunIsBlocked() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe"),
+                row(2, "4712", "John", "Roe"));
+
+        // when / then — nothing is wrong with the file, so the refusal names the source's own default
+        assertThatThrownBy(() -> resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, emptyRoster(),
+                defaultingToARetiredType()))
+                .isInstanceOf(SnapshotBlockedException.class)
+                .extracting("code").isEqualTo("import.snapshot.membershipType.defaultInactive");
+    }
+
+    @Test
+    void givenASourceNamingNoDefaultAtAll_whenARowWouldFallBackToIt_thenTheRunIsBlocked() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe"));
+        SourceConfiguration base = defaultingToARetiredType();
+        SourceConfiguration nameless = new SourceConfiguration(base.sourceId(), base.sourceKey(),
+                base.displayName(), base.separator(), base.encoding(), base.columns(),
+                base.membershipTypes(), null, base.ownedFields(), base.removalWarningPercent());
+
+        // when / then
+        assertThatThrownBy(() -> resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, emptyRoster(), nameless))
+                .isInstanceOf(SnapshotBlockedException.class)
+                .extracting("code").isEqualTo("import.snapshot.membershipType.defaultInactive");
+    }
+
+    @Test
+    void givenNoRowWouldFallBackToTheDefault_whenItIsNoLongerOffered_thenTheRunIsNotBlocked() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Roe"));
+
+        // when — an update leaves a blank category alone, so the retired default is never reached
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT,
+                rosterHolding(JANE, "4711", "Jane", "Doe"), defaultingToARetiredType());
+
+        // then
+        assertThat(resolved.changes()).singleElement()
+                .extracting(ResolvedChangeSet.PersonChange::kind)
+                .isEqualTo(ResolvedChangeSet.ChangeKind.UPDATE);
+    }
+
+    @Test
     void givenACreationNamingSomebodyTheRosterAlreadyHolds_whenResolving_thenItIsStillACreation() {
         // given
         CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe"));
@@ -517,6 +560,13 @@ class ChangeSetResolverTest {
                 base.separator(), base.encoding(), base.columns(), base.membershipTypes(),
                 base.defaultMembershipTypeId(),
                 Set.of(CanonicalField.MEMBERSHIP_TYPE), base.removalWarningPercent());
+    }
+
+    private static SourceConfiguration defaultingToARetiredType() {
+        SourceConfiguration base = configuration();
+        return new SourceConfiguration(base.sourceId(), base.sourceKey(), base.displayName(),
+                base.separator(), base.encoding(), base.columns(), base.membershipTypes(),
+                RETIRED_TYPE, base.ownedFields(), base.removalWarningPercent());
     }
 
     private static CurrentRoster rosterHoldingType(UUID membershipTypeId) {
