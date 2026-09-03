@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -65,6 +65,22 @@ describe("AdminImportView", () => {
     // then
     expect(await screen.findByTestId("no-sources")).toBeInTheDocument();
     expect(screen.getByTestId("new-source")).toBeInTheDocument();
+  });
+
+  it("given a described source being edited, when the language changes, then the sources are not fetched again", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await userEvent.type(await screen.findByTestId("source-name"), " export");
+
+    // when
+    await act(() => i18n.changeLanguage("de"));
+
+    // then
+    expect(screen.getByTestId("new-source")).toHaveTextContent("Neue Quelle");
+    expect(api.importSources).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("source-name")).toHaveValue("Membership system export");
   });
 
   it("given a chosen source, when its name is corrected, then the change is written to that source", async () => {

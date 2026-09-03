@@ -12,7 +12,7 @@ import {
   type RuleType,
   type RuleTypeConfiguration
 } from "../api/client";
-import { problemMessage } from "../api/problem-message";
+import { useFailureMessage } from "../api/useFailureMessage";
 import { LocaleSelect } from "../components/LocaleSelect";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -93,6 +93,7 @@ function timeZones(current: string): string[] {
 
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
+  const failureMessage = useFailureMessage();
   const newRuleSet = useUnsavedForm("rule-set:new");
   const [pendingRuleSetId, setPendingRuleSetId] = useState<string>();
   const [config, setConfig] = useState<ClubConfigRequest>();
@@ -131,12 +132,12 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         setRuleSetName(loadedRuleSets[0]?.name ?? "");
       })
       .catch((failure) => {
-        if (active) setError(problemMessage(failure, t));
+        if (active) setError(failureMessage(failure));
       });
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [failureMessage]);
 
   useEffect(() => {
     setRules([]);
@@ -153,12 +154,12 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         }
       })
       .catch((failure) => {
-        if (active) setError(problemMessage(failure, t));
+        if (active) setError(failureMessage(failure));
       });
     return () => {
       active = false;
     };
-  }, [selectedRuleSetId, t]);
+  }, [failureMessage, selectedRuleSetId]);
 
   async function addRuleSet(formElement: HTMLFormElement) {
     const name = formString(new FormData(formElement), "name");
@@ -203,7 +204,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       return true;
     } catch (failure) {
       setSuccess(undefined);
-      setError(problemMessage(failure, t));
+      setError(failureMessage(failure));
       return false;
     } finally {
       setPending(false);
@@ -239,7 +240,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       setSuccess(t("admin.rules.saved"));
     } catch (failure) {
       setSuccess(undefined);
-      setError(problemMessage(failure, t));
+      setError(failureMessage(failure));
     } finally {
       setPending(false);
     }
@@ -287,7 +288,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       if (logoInput.current) logoInput.current.value = "";
       setSuccess(t("admin.config.logoUploaded"));
     } catch (failure) {
-      setError(problemMessage(failure, t));
+      setError(failureMessage(failure));
     } finally {
       setConfigurationPending(false);
     }
@@ -303,7 +304,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       applyConfiguration(changed);
       setSuccess(t("admin.config.logoRemoved"));
     } catch (failure) {
-      setError(problemMessage(failure, t));
+      setError(failureMessage(failure));
     } finally {
       setConfigurationPending(false);
     }
@@ -319,7 +320,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       applyConfiguration(await api.changeAdminConfig(config));
       setSuccess(t("admin.config.saved"));
     } catch (failure) {
-      setError(problemMessage(failure, t));
+      setError(failureMessage(failure));
     } finally {
       setConfigurationPending(false);
     }
@@ -337,7 +338,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         setSuccess(t("admin.rules.saved"));
       }
     } catch (failure) {
-      if (selectedRuleSetIdRef.current === ruleSetId) setError(problemMessage(failure, t));
+      if (selectedRuleSetIdRef.current === ruleSetId) setError(failureMessage(failure));
     }
   }
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type MembershipType, type RosterEntry } from "../api/client";
-import { problemMessage } from "../api/problem-message";
+import { useFailureMessage } from "../api/useFailureMessage";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
@@ -40,7 +40,8 @@ export function AdminRosterView() {
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
 
-  const reportError = useCallback((failure: unknown) => setError(problemMessage(failure, t)), [t]);
+  const failureMessage = useFailureMessage();
+  const reportError = useCallback((failure: unknown) => setError(failureMessage(failure)), [failureMessage]);
 
   useEffect(() => {
     void Promise.all([api.roster(undefined, undefined, PAGE_SIZE, undefined), api.membershipTypes()])

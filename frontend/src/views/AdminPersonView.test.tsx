@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -59,6 +59,21 @@ describe("AdminPersonView", () => {
 
     // then
     expect(screen.getByTestId("admin-person-view")).toHaveClass("[&>*]:max-w-5xl");
+  });
+
+  it("given an edited username, when the language changes, then the person is not fetched again", async () => {
+    // given
+    showPerson();
+    await screen.findByTestId("account-username");
+    await userEvent.type(screen.getByTestId("account-username"), ".2");
+
+    // when
+    await act(() => i18n.changeLanguage("de"));
+
+    // then
+    expect(screen.getByTestId("back-to-roster")).toHaveTextContent("Zurück zu Personen und Konten");
+    expect(api.person).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("account-username")).toHaveValue("doe.jane.2");
   });
 
   it("given the membership and the account are edited, when they are counted, then each one is asked about on its own", async () => {

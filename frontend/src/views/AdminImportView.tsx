@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type ImportPreview, type ImportSource, type ImportSourceRequest, type MembershipType } from "../api/client";
-import { problemMessage } from "../api/problem-message";
+import { useFailureMessage } from "../api/useFailureMessage";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
@@ -18,6 +18,7 @@ type Editing = { source: ImportSource } | { source: undefined } | undefined;
 
 export function AdminImportView() {
   const { t } = useTranslation();
+  const failureMessage = useFailureMessage();
   const [sources, setSources] = useState<ImportSource[]>();
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [editing, setEditing] = useState<Editing>();
@@ -57,8 +58,8 @@ export function AdminImportView() {
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
-    setError(problemMessage(failure, t));
-  }, [t]);
+    setError(failureMessage(failure));
+  }, [failureMessage]);
 
   useEffect(() => {
     void Promise.all([api.importSources(), api.membershipTypes()])

@@ -536,47 +536,33 @@ describe("AdminConfigurationView", () => {
     expect(changeConfig.mock.calls[0][0]).not.toHaveProperty("supportedLocales");
   });
 
-  it("given an edited setting, when a locale change finishes an older reload, then the edit is retained", async () => {
+  it("given a chosen rule set and typed names, when the language changes, then nothing is fetched again", async () => {
     // given
-    const reload = deferred<Awaited<ReturnType<typeof api.adminConfig>>>();
-    const adminConfig = vi.mocked(api.adminConfig);
-    adminConfig.mockReturnValueOnce(Promise.resolve({
-      clubName: "Example Tennis Club",
-      primaryColor: "#b85c38",
-      accentColor: "#d7e24b",
-      defaultLocale: "en",
-      supportedLocales: ["de", "en"],
-      slotMinutes: 30,
-      timeZone: "Europe/Berlin",
-      newAccountCredentialHours: 168,
-      passwordResetCredentialHours: 24,
-      bookingReminderHours: 24, logoUploaded: false
-    })).mockReturnValueOnce(reload.promise);
+    vi.mocked(api.ruleSets).mockResolvedValue([
+      { id: "rule-set", name: "Standard", active: true },
+      { id: "rule-set-2", name: "Juniors", active: true }
+    ]);
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
-    const clubName = await screen.findByTestId("club-name");
-    fireEvent.change(clubName, { target: { value: "Example Racquet Club" } });
+    await screen.findByTestId("rule-set-name");
+    await userEvent.selectOptions(screen.getByTestId("rule-set"), "rule-set-2");
+    await waitFor(() => expect(screen.getByTestId("rule-set-name")).toHaveValue("Juniors"));
+    fireEvent.change(screen.getByTestId("rule-set-name"), { target: { value: "Juniors plus" } });
+    fireEvent.change(screen.getByTestId("club-name"), { target: { value: "Example Racquet Club" } });
+    const reads = [api.adminConfig, api.ruleSets, api.ruleTypes, api.membershipTypes, api.rules]
+      .map((read) => vi.mocked(read).mock.calls.length);
 
     // when
-    await i18n.changeLanguage("de");
-    await waitFor(() => expect(adminConfig).toHaveBeenCalledTimes(2));
-    await act(() => {
-      reload.resolve({
-        clubName: "Example Tennis Club",
-        primaryColor: "#b85c38",
-        accentColor: "#d7e24b",
-        defaultLocale: "en",
-        supportedLocales: ["de", "en"],
-        slotMinutes: 30,
-        timeZone: "Europe/Berlin",
-        newAccountCredentialHours: 168,
-        passwordResetCredentialHours: 24,
-        bookingReminderHours: 24, logoUploaded: false
-      });
-      return reload.promise;
-    });
+    await act(() => i18n.changeLanguage("de"));
 
-    // then
-    await waitFor(() => expect(clubName).toHaveValue("Example Racquet Club"));
+    // then — the text is translated and no load runs again
+    expect(screen.getByTestId("save-club-config")).toHaveTextContent("Speichern");
+    expect([api.adminConfig, api.ruleSets, api.ruleTypes, api.membershipTypes, api.rules]
+      .map((read) => vi.mocked(read).mock.calls.length)).toEqual(reads);
+
+    // then — and the selection and both typed names are still there
+    expect(screen.getByTestId("rule-set")).toHaveValue("rule-set-2");
+    expect(screen.getByTestId("rule-set-name")).toHaveValue("Juniors plus");
+    expect(screen.getByTestId("club-name")).toHaveValue("Example Racquet Club");
   });
 
   it("given the API rejects a club setting, when saving, then its validation code is reported", async () => {

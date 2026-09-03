@@ -1,25 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { problemMessage } from "../../api/problem-message";
+import { useFailureMessage } from "../../api/useFailureMessage";
 
 export function useSaving() {
   const { t } = useTranslation();
+  const failureMessage = useFailureMessage();
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const pendingRef = useRef(new Set<string>());
   const [pending, setPending] = useState(new Set<string>());
 
-  // Reporting a failure must not change identity with the language, or every view that loads
-  // behind this hook reloads whenever somebody switches it.
-  const translate = useRef(t);
-  useEffect(() => {
-    translate.current = t;
-  }, [t]);
-
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
-    setError(problemMessage(failure, translate.current));
-  }, []);
+    setError(failureMessage(failure));
+  }, [failureMessage]);
 
   // A form that refuses its own body has a better answer than "please try again", and it still
   // has to take back whatever the last save said.

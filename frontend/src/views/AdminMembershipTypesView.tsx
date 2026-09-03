@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, type MembershipType, type MembershipTypeRequest, type RuleSet } from "../api/client";
-import { problemMessage } from "../api/problem-message";
+import { useFailureMessage } from "../api/useFailureMessage";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
@@ -24,6 +24,7 @@ interface Holders {
 export function AdminMembershipTypesView() {
   const newType = useUnsavedForm("membership-type:new");
   const { t } = useTranslation();
+  const failureMessage = useFailureMessage();
   const [types, setTypes] = useState<MembershipType[]>();
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
   const [holders, setHolders] = useState<Record<string, Holders>>({});
@@ -33,8 +34,8 @@ export function AdminMembershipTypesView() {
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
-    setError(problemMessage(failure, t));
-  }, [t]);
+    setError(failureMessage(failure));
+  }, [failureMessage]);
 
   const countHolders = useCallback(async (membershipTypes: MembershipType[]) => {
     const counted = await Promise.all(membershipTypes.map(async (type) => {

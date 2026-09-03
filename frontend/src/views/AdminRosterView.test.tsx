@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes, useLocation } from "react-router-dom";
@@ -262,5 +262,26 @@ describe("AdminRosterView", () => {
     expect(await screen.findByTestId("roster-empty")).toHaveTextContent(
       "People matching the current filters appear here. Change the search or add a person below."
     );
+  });
+  it("given a filtered and paged roster, when the language changes, then the page is not fetched again", async () => {
+    // given
+    const reading = vi.spyOn(api, "roster")
+      .mockResolvedValue({ entries: [withAccount], nextCursor: "cursor-2" });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
+    await userEvent.selectOptions(screen.getByTestId("roster-filter"), "type-1");
+    await waitFor(() => expect(screen.getByTestId("roster-filter")).toHaveValue("type-1"));
+    reading.mockResolvedValueOnce({ entries: [departed], nextCursor: null });
+    await userEvent.click(screen.getByTestId("roster-load-more"));
+    await waitFor(() => expect(reading).toHaveBeenCalledTimes(3));
+
+    // when
+    await act(() => i18n.changeLanguage("de"));
+
+    // then — the text is translated, the roster is not asked again
+    expect(screen.getByTestId("roster-search-submit")).toHaveTextContent("Suchen");
+    expect(reading).toHaveBeenCalledTimes(3);
+    expect(screen.getByTestId("roster-filter")).toHaveValue("type-1");
+    expect(reading).toHaveBeenLastCalledWith(undefined, "cursor-2", 50, "type-1");
   });
 });
