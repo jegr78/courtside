@@ -64,9 +64,9 @@ Property tests use fixed, printed QuickTheories seeds and automatic shrinking so
 The repository pull-request template requires affected risk IDs, positive and negative evidence, residual risk and any contract change. The required build result is linked from the pull request rather than copied into this document.
 
 The pull-request workflow uses a conservative test-profile plan to select its required jobs. One
-closed contract defines each profile's CI jobs and local tasks. Its semantic fingerprint also binds
-the classifier, workflow selection, local runner and observation logic. A fingerprint
-therefore names one exact CI and local coverage policy.
+closed contract defines each profile's CI jobs and local tasks. CI reads it from the pull request's
+base commit and the local runner from its merge base with `origin/main`, so a branch cannot classify
+itself with rules it brings, and every file that decides a selection is itself classified `full`.
 Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, `tooling`, or an additive
 combination. Backend changes run backend and security verification; frontend changes run frontend
 and security verification, including the complete Chromium and WebKit browser matrix. Documentation
