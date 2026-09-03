@@ -1,6 +1,7 @@
 package org.courtside.identity.internal;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.courtside.api.AccountApi;
 import org.courtside.api.ApiAccountLocaleRequest;
 import org.courtside.api.ApiInitialPasswordChangeRequest;
@@ -18,7 +19,14 @@ class AccountController implements AccountApi {
     @Override
     public ResponseEntity<Void> changeInitialPassword(ApiInitialPasswordChangeRequest change) {
         passwords.change(change.getPassword());
-        request.getSession(false).invalidate();
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            try {
+                session.invalidate();
+            } catch (IllegalStateException ignored) {
+                // Another request already achieved the required state.
+            }
+        }
         return ResponseEntity.noContent().build();
     }
 
