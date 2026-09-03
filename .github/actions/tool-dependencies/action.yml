@@ -1,0 +1,32 @@
+name: Locked tool dependencies
+description: Installs the locked Node and npm versions and the repository tool dependencies.
+
+runs:
+  using: composite
+  steps:
+    - id: toolchain
+      name: Read locked tooling versions
+      shell: bash
+      run: node tools/node-toolchain.mjs --github-output "$GITHUB_OUTPUT"
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      with:
+        node-version: ${{ steps.toolchain.outputs.node }}
+        cache: npm
+        cache-dependency-path: frontend/package-lock.json
+    - name: Install locked npm
+      shell: bash
+      env:
+        NPM_VERSION: ${{ steps.toolchain.outputs.npm }}
+      run: npm install --global "npm@$NPM_VERSION"
+    - name: Verify locked toolchain
+      shell: bash
+      env:
+        NODE_VERSION: ${{ steps.toolchain.outputs.node }}
+        NPM_VERSION: ${{ steps.toolchain.outputs.npm }}
+      run: |
+        test "$(node --version)" = "v$NODE_VERSION"
+        test "$(npm --version)" = "$NPM_VERSION"
+    - name: Install locked tool dependencies
+      shell: bash
+      working-directory: frontend
+      run: npm ci

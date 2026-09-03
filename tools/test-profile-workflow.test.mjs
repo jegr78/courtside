@@ -4,6 +4,8 @@ import { test } from "node:test";
 
 const workflow = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
 const pom = readFileSync(new URL("../pom.xml", import.meta.url), "utf8");
+const toolDependencies = readFileSync(
+  new URL("../.github/actions/tool-dependencies/action.yml", import.meta.url), "utf8");
 
 test("given profile classification, when the pull request runs, then selected quality jobs control the gate", () => {
   // when / then
@@ -26,8 +28,9 @@ test("given profile classification, when the pull request runs, then selected qu
     /frontend:[\s\S]+npm-cli\.js audit --audit-level=high[\s\S]+npm-cli\.js run test:e2e/);
   assert.match(workflow, /security:[\s\S]+github\/codeql-action\/init@[a-f0-9]{40}/);
   assert.match(workflow, /tooling:[\s\S]+name: Verify repository tooling[\s\S]+npm run test:tools/);
-  assert.match(workflow,
-    /tooling:[\s\S]+node tools\/node-toolchain\.mjs --github-output "\$GITHUB_OUTPUT"[\s\S]+node-version: \$\{\{ steps\.tooling-toolchain\.outputs\.node \}\}[\s\S]+NPM_VERSION: \$\{\{ steps\.tooling-toolchain\.outputs\.npm \}\}[\s\S]+npm install --global "npm@\$NPM_VERSION"[\s\S]+test "\$\(node --version\)" = "v\$NODE_VERSION"[\s\S]+test "\$\(npm --version\)" = "\$NPM_VERSION"/);
+  assert.match(workflow, /tooling:[\s\S]+uses: \.\/\.github\/actions\/tool-dependencies/);
+  assert.match(toolDependencies,
+    /node tools\/node-toolchain\.mjs --github-output "\$GITHUB_OUTPUT"[\s\S]+node-version: \$\{\{ steps\.toolchain\.outputs\.node \}\}[\s\S]+NPM_VERSION: \$\{\{ steps\.toolchain\.outputs\.npm \}\}[\s\S]+npm install --global "npm@\$NPM_VERSION"[\s\S]+test "\$\(node --version\)" = "v\$NODE_VERSION"[\s\S]+test "\$\(npm --version\)" = "\$NPM_VERSION"[\s\S]+working-directory: frontend\n\s+run: npm ci/);
 });
 
 test("given a selected quality job, when it does not succeed, then the aggregate fails closed", () => {

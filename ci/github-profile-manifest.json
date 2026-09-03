@@ -6,6 +6,7 @@
     { "path": ".github/ISSUE_TEMPLATE/decision.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs", "tools/github-template-metadata.test.mjs"] },
     { "path": ".github/ISSUE_TEMPLATE/known-limit.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs", "tools/github-template-metadata.test.mjs"] },
     { "path": ".github/ISSUE_TEMPLATE/operations.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs", "tools/github-template-metadata.test.mjs"] },
+    { "path": ".github/actions/tool-dependencies/action.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/codeql/codeql-config.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/dependabot.yml", "profiles": ["tooling"], "validators": ["tools/github-metadata.test.mjs"] },
     { "path": ".github/pull_request_template.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs"] },

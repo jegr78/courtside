@@ -8,8 +8,14 @@ const require = createRequire(new URL("../frontend/package.json", import.meta.ur
 const yaml = require("js-yaml");
 
 const repository = new URL("../", import.meta.url);
+const toolDirectory = new URL("tools/", repository);
 const workflowDirectory = new URL(".github/workflows/", repository);
-const spawnedTests = new Map([["tools/docs-check.mjs", documentationTests]]);
+const toolManifest = JSON.parse(readFileSync(new URL("ci/tool-profile-manifest.json", repository), "utf8"));
+const declaredToolTests = toolManifest.entries.filter((entry) => entry.test).map((entry) => entry.path);
+const spawnedTests = new Map([
+  ["tools/docs-check.mjs", documentationTests],
+  ["tools/tool-tests.mjs", declaredToolTests]
+]);
 const mavenInstallPhases = ["package", "verify", "install", "deploy"];
 
 function workflows() {
@@ -48,12 +54,23 @@ function packageDependencies(entry, seen = new Set()) {
   return dependencies;
 }
 
+function executedFiles(tool) {
+  return [tool, ...(spawnedTests.get(tool) ?? [])];
+}
+
+function toolsSpawningTests() {
+  return readdirSync(toolDirectory)
+    .filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs"))
+    .filter((name) => readFileSync(new URL(name, toolDirectory), "utf8").includes('"--test"'))
+    .map((name) => `tools/${name}`);
+}
+
 function jobs(definition) {
   return Object.entries(definition.jobs ?? {}).map(([name, job]) => ({ job: name, ...job }));
 }
 
 function steps(job) {
-  return (Array.isArray(job.steps) ? job.steps : []).filter((step) => typeof step.run === "string");
+  return Array.isArray(job.steps) ? job.steps : [];
 }
 
 function workingDirectory(definition, job, step) {
@@ -61,19 +78,15 @@ function workingDirectory(definition, job, step) {
     ?? definition.defaults?.run?.["working-directory"] ?? ".";
 }
 
-function environment(definition, job, step) {
-  return { ...(definition.env ?? {}), ...(job.env ?? {}), ...(step.env ?? {}) };
-}
-
 function invokesGitHubCli(run) {
-  return /(?:^|[\s;&|(])gh\s/.test(run);
+  return /(?:^|[\s;&|(])["']?(?:[^\s"';&|()]*[/\\])?gh(?:\.exe|\.cmd|\.bat)?["']?\s/.test(run);
 }
 
 function invokedTools(run) {
   return [...run.matchAll(/(?:^|\s)\S*node\s+\S*?(tools\/[\w.-]+\.mjs)/g)].map((match) => match[1]);
 }
 
-function installsToolDependencies(run, directory) {
+function installsFromShell(run, directory) {
   if (/(?:^|\s)(?:\S*npm|\S*npm-cli\.js)\s+(?:ci|install)\b/.test(run) && !/\s-(?:-global|g)\b/.test(run)) {
     return directory === "frontend" || /--prefix\s+frontend\b/.test(run) || /\bcd\s+frontend\b/.test(run);
   }
@@ -84,14 +97,30 @@ function installsToolDependencies(run, directory) {
   return false;
 }
 
-function stepsInvokingGitHubCliWithoutToken(definitions) {
+function installsFromLocalAction(uses) {
+  if (!uses.startsWith("./")) return false;
+  const definition = ["action.yml", "action.yaml"]
+    .map((name) => new URL(`${uses.slice(2)}/${name}`, repository))
+    .find((candidate) => existsSync(candidate));
+  assert.ok(definition !== undefined, `${uses} names a local action that does not exist`);
+  const action = yaml.load(readFileSync(definition, "utf8"));
+  return (action?.runs?.steps ?? []).some((step) => step.if === undefined && typeof step.run === "string"
+    && installsFromShell(step.run, step["working-directory"] ?? "."));
+}
+
+function installsToolDependencies(definition, job, step) {
+  if (step.if !== undefined) return false;
+  if (typeof step.uses === "string") return installsFromLocalAction(step.uses);
+  return typeof step.run === "string" && installsFromShell(step.run, workingDirectory(definition, job, step));
+}
+
+function stepsInvokingGitHubCliWithoutOwnToken(definitions) {
   const found = [];
   for (const { workflow, definition } of definitions) {
     for (const job of jobs(definition)) {
       for (const step of steps(job)) {
-        if (!invokesGitHubCli(step.run)) continue;
-        const variables = environment(definition, job, step);
-        if (variables.GH_TOKEN === undefined && variables.GITHUB_TOKEN === undefined) {
+        if (typeof step.run !== "string" || !invokesGitHubCli(step.run)) continue;
+        if (step.env?.GH_TOKEN === undefined && step.env?.GITHUB_TOKEN === undefined) {
           found.push(`${workflow} :: ${job.job} :: ${step.name ?? step.run.split("\n")[0]}`);
         }
       }
@@ -106,25 +135,24 @@ function stepsRunningToolsWithoutDependencies(definitions) {
     for (const job of jobs(definition)) {
       let installed = false;
       for (const step of steps(job)) {
-        for (const tool of invokedTools(step.run)) {
-          const executed = [tool, ...(spawnedTests.get(tool) ?? [])];
-          if (!installed && executed.some((entry) => packageDependencies(entry).length > 0)) {
+        for (const tool of typeof step.run === "string" ? invokedTools(step.run) : []) {
+          if (!installed && executedFiles(tool).some((entry) => packageDependencies(entry).length > 0)) {
             found.push(`${workflow} :: ${job.job} :: ${tool}`);
           }
         }
-        if (installsToolDependencies(step.run, workingDirectory(definition, job, step))) installed = true;
+        if (installsToolDependencies(definition, job, step)) installed = true;
       }
     }
   }
   return found;
 }
 
-test("given a step that calls the GitHub CLI, when the workflow, job and step environments are merged, then a token is in scope", () => {
+test("given a step that calls the GitHub CLI, when its own environment is read, then the token is scoped to that step", () => {
   // given
   const definitions = workflows();
 
   // when
-  const unauthenticated = stepsInvokingGitHubCliWithoutToken(definitions);
+  const unauthenticated = stepsInvokingGitHubCliWithoutOwnToken(definitions);
 
   // then
   assert.deepEqual(unauthenticated, []);
@@ -141,6 +169,18 @@ test("given a step that runs a tool importing a package, when the steps before i
   assert.deepEqual(uninstalled, []);
 });
 
+test("given a tool that runs other files as tests, when the guard walks what a step executes, then that tool declares them", () => {
+  // given
+  const spawning = toolsSpawningTests();
+
+  // when
+  const undeclared = spawning.filter((tool) => !spawnedTests.has(tool));
+
+  // then
+  assert.ok(spawning.length >= 2);
+  assert.deepEqual(undeclared, []);
+});
+
 test("given one tool that reaches a package and one that does not, when their import closures are walked, then only the first reports a dependency", () => {
   // given
   const reaching = "tools/courtside.mjs";
@@ -149,4 +189,13 @@ test("given one tool that reaches a package and one that does not, when their im
   // when / then
   assert.ok(packageDependencies(reaching).includes("ajv/dist/2020"));
   assert.deepEqual(packageDependencies(selfContained), []);
+});
+
+test("given the GitHub CLI named with a path, a quote or a Windows extension, when a step invokes it, then the guard still sees it", () => {
+  // given
+  const spellings = ["gh api", "/usr/bin/gh api", "\"gh\" api", "gh.exe api", "result=$(gh api x)", "a && gh api"];
+
+  // when / then
+  assert.deepEqual(spellings.filter((run) => !invokesGitHubCli(run)), []);
+  assert.deepEqual(["ghcr.io/example push", "high water", "echo gherkin"].filter(invokesGitHubCli), []);
 });
