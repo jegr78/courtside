@@ -45,7 +45,6 @@ function packageDependencies(entry, seen = new Set()) {
     if (specifier.startsWith(".")) dependencies.push(...packageDependencies(resolveRelative(entry, specifier), seen));
     else dependencies.push(specifier);
   }
-  for (const spawned of spawnedTests.get(entry) ?? []) dependencies.push(...packageDependencies(spawned, seen));
   return dependencies;
 }
 
@@ -108,7 +107,8 @@ function stepsRunningToolsWithoutDependencies(definitions) {
       let installed = false;
       for (const step of steps(job)) {
         for (const tool of invokedTools(step.run)) {
-          if (!installed && packageDependencies(tool).length > 0) {
+          const executed = [tool, ...(spawnedTests.get(tool) ?? [])];
+          if (!installed && executed.some((entry) => packageDependencies(entry).length > 0)) {
             found.push(`${workflow} :: ${job.job} :: ${tool}`);
           }
         }
