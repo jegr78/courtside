@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { classifyNightlyFailures, planFailureUpdates, planReadyForReview, readyForReview,
-  applyIssuePlan, bindCommitRange, trackerLabel, trustedCommentText } from "./nightly-failure-tracker.mjs";
+  applyIssuePlan, bindCommitRange, isGitHubLogin, trackerLabel, trustedCommentText } from "./nightly-failure-tracker.mjs";
 
 const workflowId = 4711;
 
@@ -253,13 +253,34 @@ test("given a maintainer, when the issue is planned, then it is assigned so the 
   assert.deepEqual(planFailureUpdates(failures, [])[0].assignees, []);
 });
 
-test("given an assignee that is not a login, when the issue is planned, then the plan is refused", () => {
+test("given an assignee that is not a login, when the issue is planned, then the failure is still recorded", () => {
   // given
   const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
 
+  // when
+  const [created] = planFailureUpdates(failures, [], { assignee: "not a login" });
+
+  // then
+  assert.equal(created.action, "create");
+  assert.deepEqual(created.assignees, []);
+});
+
+test("given a login and the values around it, when each is offered, then only a real login is accepted", () => {
   // when / then
-  assert.throws(() => planFailureUpdates(failures, [], { assignee: "not a login" }),
-    /tracker assignee is invalid/);
+  assert.deepEqual(["jegr78", "a", "a-b", "0start", "A".repeat(39)].filter((v) => !isGitHubLogin(v)), []);
+  assert.deepEqual(["", "-abc", "abc-", "a--b", "ab_c", "a".repeat(40), "a\nb"].filter(isGitHubLogin), []);
+});
+
+test("given a failure the required check does not carry, when the issue is written, then its layout is unchanged", () => {
+  // given
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
+
+  // when
+  const [created] = planFailureUpdates(failures, []);
+
+  // then
+  assert.match(created.body, /Failure class: `failure`\n\n<!-- courtside-nightly-occurrence:/);
+  assert.doesNotMatch(created.body, /\n\n\n/);
 });
 
 test("given the workflow behind the required check, when the issue is planned, then it says what the failure blocks", () => {

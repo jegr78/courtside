@@ -44,6 +44,14 @@ jobs:
             --slurp | jq '{jobs: map(.jobs[]) }' > build/nightly-tracker/jobs.json
           gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs?event=schedule&status=completed&per_page=7" \
             > build/nightly-tracker/recent.json
+      - name: Ensure the tracker owns a label of its own
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create nightly --force \
+            --color B60205 \
+            --description "A scheduled run failed; the tracker owns this issue"
+
       - name: Create or update actionable failures
         env:
           GH_TOKEN: ${{ github.token }}

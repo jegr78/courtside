@@ -80,10 +80,15 @@ function occurrenceMarker(failure) {
   return `<!-- courtside-nightly-occurrence:${failure.runId}:${failure.attempt} -->`;
 }
 
+export function isGitHubLogin(value) {
+  return typeof value === "string"
+    && /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/.test(value);
+}
+
 function blocked(failure, blockingWorkflow) {
   return failure.workflow === blockingWorkflow
-    ? `\n\nThis workflow carries the required check, so every open pull request inherits the failure until it is fixed.\n`
-    : "\n";
+    ? "\nThis workflow carries the required check, so every open pull request inherits the failure until it is fixed.\n"
+    : "";
 }
 
 function occurrence(failure) {
@@ -99,9 +104,6 @@ export function bindCommitRange(failures, recentRuns) {
 
 export function planFailureUpdates(failures, issues, { assignee, blockingWorkflow } = {}) {
   if (!Array.isArray(failures) || !Array.isArray(issues)) throw new Error("tracker input is invalid");
-  if (assignee !== undefined && !/^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/.test(assignee)) {
-    throw new Error("tracker assignee is invalid");
-  }
   if (issues.some((issue) => !["open", "closed"].includes(issue?.state))) throw new Error("issue state is invalid");
   return failures.flatMap((failure) => {
     const fingerprintMarker = `<!-- courtside-nightly-fingerprint:${failure.fingerprint} -->`;
@@ -125,7 +127,7 @@ export function planFailureUpdates(failures, issues, { assignee, blockingWorkflo
         `\n${occurrence(failure)}\n\n` +
         "Keep this issue open until the tracker marks seven consecutive scheduled first attempts of this workflow green and a human verifies closure.",
       labels: [trackerLabel],
-      assignees: assignee === undefined ? [] : [assignee]
+      assignees: isGitHubLogin(assignee) ? [assignee] : []
     }];
   });
 }
@@ -237,8 +239,12 @@ async function main(args) {
   const request = (endpoint, options) => githubRequest(token, endpoint, options);
   const failures = bindCommitRange(classifyNightlyFailures(run, jobs, workflowId),
     recent.filter((item) => item.id !== run.id));
+  const assignee = values["--assignee"];
+  if (assignee !== undefined && !isGitHubLogin(assignee)) {
+    process.stderr.write("the tracker assignee is not a login; the issue is recorded unassigned\n");
+  }
   await applyIssuePlan(planFailureUpdates(failures, issues,
-    { assignee: values["--assignee"], blockingWorkflow: values["--blocking-workflow"] }), request, repository);
+    { assignee, blockingWorkflow: values["--blocking-workflow"] }), request, repository);
   if (failures.length === 0 && readyForReview(recent)) {
     await applyIssuePlan(planReadyForReview(issues, run.name), request, repository);
   }

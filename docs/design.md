@@ -1585,8 +1585,10 @@ whether it is built or designed. **Designed means absent today.**
   scheduled run whose cost nobody has weighed yet. *Built, as described.*
 - **Accepted: a red scheduled gate names itself in a public issue.** The failure tracker watches
   every workflow that runs on a schedule, so a red `security assessment` opens an issue in this
-  repository — which is public — naming the workflow, the job, the step that failed and the commit
-  range it covers. What an observer needs: nothing, an issue list is readable by anybody. What it
+  repository — which is public — naming the workflow, the job, the step that failed, the commit
+  range it covers and, where that workflow carries the required check, that the failure blocks every
+  open pull request. The issue is assigned to the repository owner, whose account already owns the
+  repository publicly. What an observer needs: nothing, an issue list is readable by anybody. What it
   does not say: the finding, its severity and the code it concerns stay in the run's retained
   evidence, which needs repository access. The issue says a gate is red, not why. Part of this was
   already true, because the required build's `security` job is visible on every pull request; what
