@@ -86,6 +86,15 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   const [unreadableHere, setUnreadableHere] = useState(false);
   const [asksEncoding, setAsksEncoding] = useState(false);
 
+  // A type that went inactive after it was chosen stays on its own list and says so: withholding it
+  // would clear the club's own choice the next time anybody saves this form.
+  function typeOptions(chosen: string) {
+    return types.filter((type) => type.active || type.id === chosen)
+      .map((type) => <option key={type.id} value={type.id}>
+        {type.active ? type.name : t("admin.import.retiredType", { name: type.name })}
+      </option>);
+  }
+
   const categoryColumn = mapping.MEMBERSHIP_TYPE;
   const knownValues = [...new Set([...Object.keys(categories), ...readValues])];
   const mapped = new Set(Object.values(mapping).filter(Boolean));
@@ -216,7 +225,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
         <label className="font-semibold" htmlFor={`${group}-category-${value}`}>{value}</label>
         <select data-testid={`category-${value}`} id={`${group}-category-${value}`} className="rounded-md border p-2" disabled={disabled} value={categories[value] ?? ""} onChange={(event) => setCategories({ ...categories, [value]: event.target.value })}>
           <option value="">{t("admin.import.noType")}</option>
-          {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+          {typeOptions(categories[value] ?? "")}
         </select>
       </div>)}
     </div>}
@@ -225,7 +234,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       <label className="font-semibold" htmlFor={`${group}-default-type`}>{t("admin.import.defaultType")}</label>
       <select data-testid="source-default-type" id={`${group}-default-type`} className="rounded-md border p-2" disabled={disabled} value={defaultType} onChange={(event) => setDefaultType(event.target.value)}>
         <option value="">{t("admin.import.noType")}</option>
-        {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+        {typeOptions(defaultType)}
       </select>
     </div>
 
