@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSnapshot, packageUrl, parseDependencyList } from "./dependency-snapshot.mjs";
+import { buildSnapshot, packageUrl, parseDependencyList, submitSnapshot } from "./dependency-snapshot.mjs";
 
 const resolvedList = `The following files have been resolved:
    org.springframework.boot:spring-boot-starter-webmvc:jar:4.1.1:compile -- module spring.boot.starter.webmvc [auto]
@@ -49,6 +49,21 @@ test("given a line Maven would never print, when it is parsed, then the snapshot
   assert.throws(() => parseDependencyList("   org.example:broken:jar:1.0.0\n"), /is not a coordinate/);
   assert.throws(() => parseDependencyList("   a:b:jar:1:c:d:e:f\n"), /is not a coordinate/);
   assert.throws(() => parseDependencyList("   org.example:a:jar:1.0.0:imaginary\n"), /has an unknown scope/);
+  assert.throws(() => parseDependencyList("   org.example:a:jar:1.0.0:\n"), /is not a coordinate/);
+  assert.deepEqual(parseDependencyList("The following files have been resolved:\n"), []);
+});
+
+test("given anything but a created snapshot, when GitHub answers, then the submission is a failure", async () => {
+  // given
+  const snapshot = { version: 0 };
+  const answering = (status) => async () => ({ status });
+
+  // when / then
+  await assert.rejects(() => submitSnapshot(snapshot, "example/courtside", "token", answering(202)),
+    /GitHub API returned 202/);
+  await assert.rejects(() => submitSnapshot(snapshot, "example/courtside", "token", answering(403)),
+    /GitHub API returned 403/);
+  assert.equal((await submitSnapshot(snapshot, "example/courtside", "token", answering(201))).status, 201);
 });
 
 test("given the dependency Maven resolved transitively, when the snapshot is built, then it is reported as indirect", () => {

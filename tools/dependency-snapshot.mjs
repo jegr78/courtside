@@ -4,10 +4,12 @@ import { pathToFileURL } from "node:url";
 const developmentScopes = new Set(["test", "provided", "system"]);
 const runtimeScopes = new Set(["compile", "runtime"]);
 
+const listHeader = "The following files have been resolved:";
+
 export function parseDependencyList(text) {
   if (typeof text !== "string") throw new Error("dependency list is invalid");
   return text.split("\n").map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.endsWith(":"))
+    .filter((line) => line.length > 0 && line !== listHeader)
     .map((line) => {
       const fields = line.split(" ")[0].split(":");
       if (fields.length < 5 || fields.length > 6 || fields.some((field) => field.length === 0)) {
@@ -59,7 +61,7 @@ export function buildSnapshot({ resolved, direct, sha, ref, runId, correlator, r
   };
 }
 
-async function submit(snapshot, repository, token, send = fetch) {
+export async function submitSnapshot(snapshot, repository, token, send = fetch) {
   const response = await send(`https://api.github.com/repos/${repository}/dependency-graph/snapshots`, {
     method: "POST",
     headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`,
@@ -90,7 +92,7 @@ async function main(args) {
     repository,
     scanned: new Date().toISOString()
   });
-  await submit(snapshot, repository, token);
+  await submitSnapshot(snapshot, repository, token);
   process.stdout.write(`submitted ${Object.keys(snapshot.manifests["pom.xml"].resolved).length} dependencies\n`);
 }
 
