@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api } from "../api/client";
@@ -53,6 +53,21 @@ beforeEach(async () => {
     }]
   });
   vi.spyOn(api, "moveSeries").mockResolvedValue({ moved: 1 });
+});
+
+it("given the bookings on screen, when the language changes, then they are not fetched again", async () => {
+  // given
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await screen.findByTestId(`booking-${upcomingId}`);
+  const reads = [api.personalBookings, api.participations, api.courts, api.bookingGrid]
+    .map((read) => vi.mocked(read).mock.calls.length);
+
+  // when
+  await act(() => i18n.changeLanguage("de"));
+
+  // then
+  expect([api.personalBookings, api.participations, api.courts, api.bookingGrid]
+    .map((read) => vi.mocked(read).mock.calls.length)).toEqual(reads);
 });
 
 it("given past and upcoming occurrences, when loaded, then the series is grouped in both sections", async () => {
