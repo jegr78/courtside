@@ -405,8 +405,47 @@ jobs:
           # diagnostics that opened it have to still be there when somebody looks.
           retention-days: ${{ github.event_name == 'schedule' && 30 || 14 }}
 
+  dependency-graph:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - name: Resolve what Maven actually puts on the classpath
+        run: |
+          mkdir -p build/dependency-graph
+          ./mvnw -B dependency:list \
+            -DoutputFile=build/dependency-graph/resolved.txt -DappendOutput=false
+          ./mvnw -B dependency:list -DexcludeTransitive=true \
+            -DoutputFile=build/dependency-graph/direct.txt -DappendOutput=false
+      - name: Submit the resolved tree to the dependency graph
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SNAPSHOT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          SNAPSHOT_REF: ${{ github.event.pull_request
+            && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        run: >
+          node tools/dependency-snapshot.mjs
+          --repository "$GITHUB_REPOSITORY"
+          --resolved build/dependency-graph/resolved.txt
+          --direct build/dependency-graph/direct.txt
+          --sha "$SNAPSHOT_SHA"
+          --ref "$SNAPSHOT_REF"
+          --run-id "$GITHUB_RUN_ID"
+          --correlator "build/dependency-graph"
+
   security:
-    needs: test-profile-plan
+    needs: [test-profile-plan, dependency-graph]
     if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.security == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -423,7 +462,7 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: never
-          retry-on-snapshot-warnings: false
+          retry-on-snapshot-warnings: true
       - uses: github/codeql-action/init@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef
         with:
           languages: java-kotlin,javascript-typescript

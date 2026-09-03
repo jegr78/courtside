@@ -47,7 +47,10 @@ test("given reduced profiles, when jobs are scheduled, then only their conservat
   assert.match(workflow,
     /frontend:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.frontend == 'true'\)/);
   assert.match(workflow,
-    /security:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
+    /security:\n\s+needs: \[test-profile-plan, dependency-graph\]\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
+  assert.match(workflow,
+    /dependency-graph:\n\s+if: github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.match(workflow, /dependency-graph:[\s\S]+contents: write[\s\S]+dependency-snapshot\.mjs/);
   assert.match(workflow, /JOBS=\$\(jq -cer '\.ciJobs'/);
   assert.match(workflow,
     /\(\.ciJobs \| type == "array" and length >= 1 and \(unique \| length\) == length and/);

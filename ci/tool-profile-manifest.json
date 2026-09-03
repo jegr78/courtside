@@ -15,6 +15,8 @@
     { "path": "tools/coverage-diff.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/database-restore.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/database-upgrade.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/dependency-snapshot.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/dependency-snapshot.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/docs-check.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/docs-check.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/endpoint-surface.test.mjs", "profiles": ["tooling"], "test": true },
