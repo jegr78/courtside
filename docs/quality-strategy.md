@@ -127,8 +127,9 @@ ones that carry a schedule and requires the tracker to name exactly those, so a 
 cannot join the repository without joining the tracking. Readiness for closure is counted per
 workflow over seven consecutive scheduled first attempts, which is seven nights for the build and
 correspondingly longer for a weekly or monthly gate. A recorded failure carries the tracker's own
-label rather than the one product defects use, and it is assigned to the repository owner, so a red
-gate reaches somebody instead of waiting in a list to be found. Where the failing workflow is the one
+label rather than the one product defects use, and it is assigned to the repository owner where that
+owner is a user account, so a red gate reaches somebody instead of waiting in a list to be found. An
+organisation cannot be an assignee, so an instance owned by one is told by the label alone. Where the failing workflow is the one
 behind the required check, the issue says so, because every open pull request inherits that failure
 until it is fixed.
 

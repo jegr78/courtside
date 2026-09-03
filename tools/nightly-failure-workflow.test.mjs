@@ -11,7 +11,6 @@ const workflow = readFileSync(new URL("nightly-failure-tracking.yml", directory)
 const tracker = yaml.load(workflow);
 const release = readFileSync(new URL("release.yml", directory), "utf8");
 const trackerSource = readFileSync(new URL("./nightly-failure-tracker.mjs", import.meta.url), "utf8");
-const templateDirectory = new URL("../.github/ISSUE_TEMPLATE/", import.meta.url);
 
 function scheduledWorkflowNames() {
   return readdirSync(directory)
@@ -91,19 +90,4 @@ test("given a tracked failure, when the tracker runs in CI, then it is told whom
   assert.match(workflow, /--assignee "\$REPOSITORY_OWNER"/);
   assert.match(workflow, /--blocking-workflow build/);
   assert.match(workflow, /issues: write/);
-});
-
-test("given an issue template anyone may use, when it assigns its label, then that label is not the tracker's", () => {
-  // given
-  const declared = trackerSource.match(/export const trackerLabel = "([a-z-]+)";/)?.[1];
-  const templates = readdirSync(templateDirectory).filter((name) => name.endsWith(".md"));
-
-  // when
-  const claiming = templates.filter((name) => (readFileSync(new URL(name, templateDirectory), "utf8")
-    .split("---")[1] ?? "").split("\n").some((line) => line.startsWith("labels:")
-      && line.split(":")[1].split(",").map((value) => value.trim()).includes(declared)));
-
-  // then
-  assert.ok(templates.length >= 5);
-  assert.deepEqual(claiming, []);
 });

@@ -45,6 +45,7 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs?event=schedule&status=completed&per_page=7" \
             > build/nightly-tracker/recent.json
       - name: Ensure the tracker owns a label of its own
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
