@@ -135,8 +135,8 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
   ruleSets: RuleSet[];
   holders: Holders | undefined;
   disabled: boolean;
-  save: (request: MembershipTypeRequest) => Promise<void>;
-  toggle: () => Promise<void>;
+  save: (request: MembershipTypeRequest) => Promise<boolean>;
+  toggle: () => Promise<boolean>;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(type.name);
