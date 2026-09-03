@@ -43,8 +43,12 @@ export function AdminSlotFillersView() {
   }
 
   function toggle(card: ParticipantCard) {
-    return save(`filler:${card.id}`, async () =>
-      confirm(await api.setParticipantCardActive(card.id, !card.active)));
+    return save(`filler:${card.id}`, async () => {
+      // Taking a filler out of service is not a save, so it answers for `active` and for nothing else
+      const { active } = await api.setParticipantCardActive(card.id, !card.active);
+      setFillers((current) => current?.map((item) => item.id === card.id ? { ...item, active } : item));
+      setConfirmed((current) => ({ ...current, [card.id]: { ...current[card.id], active } }));
+    });
   }
 
   function create(event: FormEvent<HTMLFormElement>) {

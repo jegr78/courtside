@@ -128,6 +128,23 @@ describe("AdminSlotFillersView", () => {
     expect(toggling).toHaveBeenCalledWith("filler-1", false);
   });
 
+  it("given a typed label, when the filler is taken out of service, then the typing is still there", async () => {
+    // given — the answer speaks for `active` and carries the label the club still has stored
+    vi.spyOn(api, "setParticipantCardActive")
+      .mockResolvedValue({ id: "filler-1", label: "Ball machine", capacity: 1, active: false });
+    show();
+    await screen.findByTestId("participant-card-label-filler-1");
+    await userEvent.type(screen.getByTestId("participant-card-label-filler-1"), " two");
+
+    // when
+    await userEvent.click(screen.getByTestId("toggle-participant-card-filler-1"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("toggle-participant-card-filler-1")).toHaveTextContent("Activate"));
+    expect(screen.getByTestId("participant-card-label-filler-1")).toHaveValue("Ball machine two");
+    expect(screen.getByTestId("unsaved-mark-participant-card:filler-1")).toBeInTheDocument();
+  });
+
   it("given slot fillers cannot load, when opening the view, then the failure replaces the loading state", async () => {
     // given
     vi.spyOn(api, "adminParticipantCards").mockRejectedValue(new Error("unavailable"));

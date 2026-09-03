@@ -54,8 +54,8 @@ export function AdminMembershipTypesView() {
       .catch(reportError);
   }, [countHolders, reportError]);
 
-  async function mutate(change: () => Promise<MembershipType>) {
-    if (pending) return;
+  async function mutate(change: () => Promise<MembershipType>): Promise<boolean> {
+    if (pending) return false;
     setPending(true);
     try {
       const changed = await change();
@@ -67,8 +67,10 @@ export function AdminMembershipTypesView() {
       });
       setError(undefined);
       setSuccess(t("admin.membershipTypes.saved"));
+      return true;
     } catch (failure) {
       reportError(failure);
+      return false;
     } finally {
       setPending(false);
     }
@@ -78,12 +80,12 @@ export function AdminMembershipTypesView() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const formElement = event.currentTarget;
-    await mutate(() => api.createMembershipType({
+    const created = await mutate(() => api.createMembershipType({
       name: formString(form, "name"),
       ruleSetId: formString(form, "ruleSetId") || null,
       grantsAccount: form.get("grantsAccount") === "on"
     }));
-    formElement.reset();
+    if (created) formElement.reset();
   }
 
   return <section data-testid="admin-membership-types-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
