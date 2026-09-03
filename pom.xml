@@ -32,6 +32,7 @@
         <java.version>25</java.version>
         <maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
         <spring-modulith.version>2.1.1</spring-modulith.version>
+        <tomcat.version>11.0.25</tomcat.version>
         <lombok.version>1.18.46</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
         <skipTests>false</skipTests>
