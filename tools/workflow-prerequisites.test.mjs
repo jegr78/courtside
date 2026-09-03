@@ -37,7 +37,9 @@ function packageDependencies(entry, seen = new Set()) {
   const file = new URL(entry, repository);
   assert.ok(existsSync(file), `${entry} is invoked by a workflow but does not exist`);
   const source = readFileSync(file, "utf8");
-  const dependencies = /\b(?:import|require)\s*\(\s*[^"')\s]/.test(source) ? [`${entry} imports an expression`] : [];
+  const unresolvable = /\b(?:import|require)\s*\(\s*[^"')\s]/.test(source)
+    || /createRequire\s*\([^;]*\)\s*\(/.test(source);
+  const dependencies = unresolvable ? [`${entry} imports an expression`] : [];
   for (const specifier of importedSpecifiers(source)) {
     if (specifier.startsWith("node:")) continue;
     if (specifier.startsWith(".")) dependencies.push(...packageDependencies(resolveRelative(entry, specifier), seen));
