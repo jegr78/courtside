@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { EventEmitter } from "node:events";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import {
-  classifyProtectedChanges, collectLocalChanges, executeLocalCheck, localVerificationPlans, planTasks,
-  renderLocalCheckPlan
+  classifyProtectedChanges, collectLocalChanges, createVerificationWorktree, executeLocalCheck,
+  localCheckPrerequisites, localVerificationPlans, planTasks, recoverVerificationWorktrees,
+  registerVerificationSignalCleanup, renderLocalCheckPlan
 } from "./local-check.mjs";
 import { classifyChanges } from "./test-profile-classifier.mjs";
 
@@ -151,7 +155,7 @@ test("given a reduced change, when full is requested, then the local plan only e
   assert.equal(plan.reasons[0].code, "manual-full");
 });
 
-test("given committed dirty and untracked changes, when collecting evidence, then every path is classified", () => {
+test("given committed changes, when collecting evidence, then the pinned commit diff is classified", () => {
   // given
   const calls = [];
   const git = (arguments_) => {
@@ -159,13 +163,12 @@ test("given committed dirty and untracked changes, when collecting evidence, the
     if (arguments_[0] === "fetch") return "";
     if (arguments_[0] === "merge-base") return `${"a".repeat(40)}\n`;
     if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
+    if (arguments_[0] === "status") return "";
     if (arguments_[0] === "diff" && arguments_.includes("--check")) return "";
     if (arguments_[0] === "diff" && arguments_.includes("--name-status")) {
       return "M\0src/main/java/org/courtside/CourtsideApplication.java\0";
     }
     if (arguments_[0] === "diff") return "tracked-content";
-    if (arguments_[0] === "ls-files") return "docs/new.md\0";
-    if (arguments_[0] === "hash-object") return `${"c".repeat(40)}\n`;
     throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
   };
 
@@ -177,8 +180,22 @@ test("given committed dirty and untracked changes, when collecting evidence, the
   assert.equal(evidence.headCommit, "b".repeat(40));
   assert.match(evidence.changeFingerprint, /^[a-f0-9]{64}$/);
   assert.equal(evidence.changeEvidence,
-    "M\0src/main/java/org/courtside/CourtsideApplication.java\0A\0docs/new.md\0");
+    "M\0src/main/java/org/courtside/CourtsideApplication.java\0");
   assert.ok(calls.some((arguments_) => arguments_[0] === "diff" && arguments_.includes("--check")));
+});
+
+test("given an uncommitted working tree, when collecting evidence, then verification refuses an unstable source", () => {
+  // given
+  const git = (arguments_) => {
+    if (arguments_[0] === "fetch") return "";
+    if (arguments_[0] === "merge-base") return `${"a".repeat(40)}\n`;
+    if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
+    if (arguments_[0] === "status") return " M CLAUDE.md\0";
+    throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
+  };
+
+  // when / then
+  assert.throws(() => collectLocalChanges(git), /commit all changes/i);
 });
 
 test("given origin cannot be refreshed, when collecting evidence, then the caller receives a full fallback", () => {
@@ -186,6 +203,7 @@ test("given origin cannot be refreshed, when collecting evidence, then the calle
   const git = (arguments_) => {
     if (arguments_[0] === "fetch") throw new Error("offline");
     if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
+    if (arguments_[0] === "status") return "";
     if (arguments_[0] === "diff") return "";
     if (arguments_[0] === "ls-files") return "";
     throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
@@ -199,6 +217,110 @@ test("given origin cannot be refreshed, when collecting evidence, then the calle
   assert.equal(evidence.baseCommit, null);
   assert.equal(evidence.changeEvidence, "");
   assert.match(evidence.changeFingerprint, /^[a-f0-9]{64}$/);
+});
+
+test("given a recorded head, when creating its verification worktree, then checkout and cleanup use that commit", () => {
+  // given
+  const calls = [];
+  const git = (arguments_) => {
+    calls.push(arguments_);
+    return "";
+  };
+
+  // when
+  const pinned = createVerificationWorktree({ headCommit: "b".repeat(40) }, git, "r".repeat(64));
+  const path = pinned.path;
+  pinned.release();
+
+  // then
+  assert.equal(pinned.path, path);
+  assert.deepEqual(calls[0], ["worktree", "list", "--porcelain"]);
+  assert.deepEqual(calls[1], ["worktree", "add", "--detach", path, "b".repeat(40)]);
+  assert.deepEqual(calls[2], ["worktree", "remove", "--force", path]);
+});
+
+test("given registered and unregistered worktrees, when recovering, then only dead owned candidates are removed", () => {
+  // given
+  const stale = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const live = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const foreign = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const unregistered = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const wrongRepository = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const stalePath = realpathSync(stale);
+  const livePath = realpathSync(live);
+  const foreignPath = realpathSync(foreign);
+  const unregisteredPath = realpathSync(unregistered);
+  const wrongRepositoryPath = realpathSync(wrongRepository);
+  const staleOwner = `${stalePath}.courtside-verification-owner.json`;
+  const liveOwner = `${livePath}.courtside-verification-owner.json`;
+  const unregisteredOwner = `${unregisteredPath}.courtside-verification-owner.json`;
+  const wrongRepositoryOwner = `${wrongRepositoryPath}.courtside-verification-owner.json`;
+  const repositoryId = "r".repeat(64);
+  writeFileSync(staleOwner,
+    `${JSON.stringify({ schemaVersion: 2, repositoryId, pid: 101 })}\n`);
+  writeFileSync(liveOwner,
+    `${JSON.stringify({ schemaVersion: 2, repositoryId, pid: 202 })}\n`);
+  writeFileSync(unregisteredOwner,
+    `${JSON.stringify({ schemaVersion: 2, repositoryId, pid: 303 })}\n`);
+  writeFileSync(wrongRepositoryOwner,
+    `${JSON.stringify({ schemaVersion: 2, repositoryId: "x".repeat(64), pid: 404 })}\n`);
+  const calls = [];
+  const git = (arguments_) => {
+    calls.push(arguments_);
+    if (arguments_[1] === "list") {
+      return `worktree ${stalePath}\nHEAD a\n\nworktree ${livePath}\nHEAD b\n\nworktree ${foreignPath}\nHEAD c\n`;
+    }
+    return "";
+  };
+
+  try {
+    // when
+    recoverVerificationWorktrees(git, (pid) => pid === 202, repositoryId);
+
+    // then
+    assert.deepEqual(calls.filter((call) => call[1] === "remove"), [
+      ["worktree", "remove", "--force", stalePath]
+    ]);
+    assert.equal(existsSync(stalePath), false);
+    assert.equal(existsSync(staleOwner), false);
+    assert.equal(existsSync(unregisteredPath), false);
+    assert.equal(existsSync(unregisteredOwner), false);
+    assert.doesNotThrow(() => readFileSync(liveOwner));
+    assert.equal(existsSync(foreignPath), true);
+    assert.equal(existsSync(wrongRepositoryPath), true);
+    assert.equal(existsSync(wrongRepositoryOwner), true);
+  } finally {
+    rmSync(stale, { recursive: true, force: true });
+    rmSync(live, { recursive: true, force: true });
+    rmSync(foreign, { recursive: true, force: true });
+    rmSync(unregistered, { recursive: true, force: true });
+    rmSync(wrongRepository, { recursive: true, force: true });
+    rmSync(staleOwner, { force: true });
+    rmSync(liveOwner, { force: true });
+    rmSync(unregisteredOwner, { force: true });
+    rmSync(wrongRepositoryOwner, { force: true });
+  }
+});
+
+test("given a verification signal, when handling it, then cleanup is idempotent and the signal is preserved", () => {
+  // given
+  const process_ = new EventEmitter();
+  process_.pid = 303;
+  const signals = [];
+  process_.kill = (pid, signal) => signals.push([pid, signal]);
+  let releases = 0;
+  const unregister = registerVerificationSignalCleanup(() => releases++, process_);
+
+  // when
+  process_.emit("SIGINT");
+  process_.emit("SIGINT");
+  unregister();
+
+  // then
+  assert.equal(releases, 1);
+  assert.deepEqual(signals, [[303, "SIGINT"]]);
+  assert.equal(process_.listenerCount("SIGINT"), 0);
+  assert.equal(process_.listenerCount("SIGTERM"), 0);
 });
 
 test("given supported platforms, when resolving tasks, then commands remain shell-free or fixed", () => {
@@ -223,6 +345,16 @@ test("given supported platforms, when resolving tasks, then commands remain shel
   ]).tasks, "win32", "C:/repo");
   assert.equal(docs[0].command, "C:/repo/frontend/node/node.exe");
   assert.deepEqual(docs[0].arguments, ["tools/docs-check.mjs", "--check"]);
+});
+
+test("given selected tasks, when checking prerequisites, then docs avoid Java and Docker", () => {
+  // when / then
+  assert.deepEqual(localCheckPrerequisites(["docs-check"]), { java: false, docker: false });
+  assert.deepEqual(localCheckPrerequisites(["frontend-toolchain", "tooling-test"]),
+    { java: true, docker: false });
+  assert.deepEqual(localCheckPrerequisites(["backend"]), { java: true, docker: true });
+  assert.deepEqual(localCheckPrerequisites(["frontend-e2e"]), { java: true, docker: true });
+  assert.deepEqual(localCheckPrerequisites(["full"]), { java: true, docker: true });
 });
 
 test("given a plan-only check, when executing it, then prerequisites and tasks do not run", async () => {
@@ -257,13 +389,17 @@ test("given a selected check, when every task passes, then the retained result i
     classify: async () => backendPlan(),
     output: { write: () => {} },
     beforeRun: () => events.push("before"),
-    execute: (plan) => events.push(plan.label),
+    createWorktree: () => ({ path: "/pinned", release: () => events.push("release") }),
+    execute: (plan) => {
+      assert.equal(plan.workingDirectory, "/pinned");
+      events.push(plan.label);
+    },
     writeResult: (candidate) => records.push(structuredClone(candidate))
   });
 
   // then
   assert.equal(record.outcome, "passed");
-  assert.deepEqual(events, ["before", "backend"]);
+  assert.deepEqual(events, ["before", "backend", "release"]);
   assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "passed"]);
 });
 
@@ -277,10 +413,11 @@ test("given a failing selected task, when executing it, then the retained result
     git,
     classify: async () => backendPlan(),
     output: { write: () => {} },
+    createWorktree: () => ({ path: "/pinned", release: () => records.push({ outcome: "released" }) }),
     execute: () => { throw new Error("backend failed"); },
     writeResult: (candidate) => records.push(structuredClone(candidate))
   }), /backend failed/);
-  assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "failed"]);
+  assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "released", "failed"]);
   assert.equal(records.at(-1).failure, "backend failed");
 });
 
@@ -395,24 +532,28 @@ test("given protected classification fails, when planning locally, then candidat
   assert.deepEqual(execution[0].arguments, ["clean", "verify"]);
 });
 
-test("given the working tree changes during verification, when finishing, then passed is never retained", async () => {
+test("given the live tree changes after pinning, when finishing, then the verified commit remains valid", async () => {
   // given
   const records = [];
-  let collection = 0;
-  const git = gitFor([{ status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }],
-    () => collection++ === 0 ? "a".repeat(64) : "b".repeat(64));
+  const events = [];
+  const git = gitFor([{ status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }]);
 
-  // when / then
-  await assert.rejects(() => executeLocalCheck({ planOnly: false, forceFull: false }, {
+  // when
+  const record = await executeLocalCheck({ planOnly: false, forceFull: false }, {
     git,
     classify: async () => localCheckPlan([
       { status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }
     ]),
     output: { write: () => {} },
-    execute: () => {},
+    createWorktree: () => ({ path: "/pinned", release: () => events.push("release") }),
+    execute: () => events.push("execute"),
     writeResult: (candidate) => records.push(structuredClone(candidate))
-  }), /working tree changed during local verification/i);
-  assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "failed"]);
+  });
+
+  // then
+  assert.equal(record.outcome, "passed");
+  assert.deepEqual(events, ["execute", "release"]);
+  assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "passed"]);
 });
 
 function gitFor(changes, fingerprint = () => "c".repeat(64)) {
@@ -420,6 +561,7 @@ function gitFor(changes, fingerprint = () => "c".repeat(64)) {
     if (arguments_[0] === "fetch") return "";
     if (arguments_[0] === "merge-base") return `${"a".repeat(40)}\n`;
     if (arguments_[0] === "rev-parse") return `${"b".repeat(40)}\n`;
+    if (arguments_[0] === "status") return "";
     if (arguments_[0] === "diff" && arguments_.includes("--check")) return "";
     if (arguments_[0] === "diff" && arguments_.includes("--name-status")) {
       return `${changes.flatMap((change) => [change.status, change.path]).join("\0")}\0`;

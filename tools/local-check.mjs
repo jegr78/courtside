@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -8,6 +10,7 @@ import { loadProfileContract, localTasksForProfiles } from "./test-profile-contr
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const resultFile = join(repository, "build", "local-check", "result.json");
+const verificationOwnerFile = ".courtside-verification-owner.json";
 const protectedFullTask = {
   label: "full",
   workingDirectory: "repository",
@@ -42,12 +45,13 @@ function collectLocalState(git, baseCommit, fallbackReason) {
       || !/^[a-f0-9]{40}$/.test(headCommit)) {
     throw new Error("Git did not return trustworthy commit identities");
   }
+  if (git(["status", "--porcelain=v1", "-z", "--untracked-files=all"]).length > 0) {
+    throw new Error("Commit all changes before running the final local verification");
+  }
   const comparison = baseCommit ?? "HEAD";
-  git(["diff", "--check", comparison, "--"]);
-  const trackedEvidence = git(["diff", "--name-status", "-z", "--find-renames", comparison, "--"]);
-  const untrackedEvidence = git(["ls-files", "--others", "--exclude-standard", "-z"]);
-  const untrackedPaths = untrackedEvidence.split("\0").filter(Boolean);
-  const changeEvidence = `${trackedEvidence}${untrackedPaths.map((path) => `A\0${path}\0`).join("")}`;
+  git(["diff", "--check", comparison, headCommit, "--"]);
+  const changeEvidence = git(["diff", "--name-status", "-z", "--find-renames",
+    comparison, headCommit, "--"]);
   if (changeEvidence.length === 0 && fallbackReason === null) {
     throw new Error("No local changes exist relative to origin/main");
   }
@@ -58,11 +62,7 @@ function collectLocalState(git, baseCommit, fallbackReason) {
     .update("\0")
     .update(changeEvidence)
     .update("\0")
-    .update(git(["diff", "--binary", "--full-index", comparison, "--"]));
-  for (const path of untrackedPaths) {
-    fingerprint.update("\0").update(path).update("\0")
-      .update(git(["hash-object", "--no-filters", "--", path]).trim());
-  }
+    .update(git(["diff", "--binary", "--full-index", comparison, headCommit, "--"]));
   return {
     baseCommit,
     headCommit,
@@ -72,7 +72,8 @@ function collectLocalState(git, baseCommit, fallbackReason) {
   };
 }
 
-export function localVerificationPlans(tasks, platform = process.platform, root = repository) {
+export function localVerificationPlans(tasks, platform = process.platform, root = repository,
+    hostNode = null) {
   const frontend = join(root, "frontend");
   const npmCli = join(frontend, "node", "node_modules", "npm", "bin", "npm-cli.js");
   const node = join(frontend, "node", platform === "win32" ? "node.exe" : "node");
@@ -80,7 +81,7 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
     if (task.executable === "node") {
       return {
         label: task.label,
-        command: node,
+        command: hostNode ?? node,
         arguments: task.arguments,
         workingDirectory: root,
         shell: false
@@ -114,6 +115,12 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
   });
 }
 
+export function localCheckPrerequisites(tasks) {
+  const java = tasks.some((task) => task !== "docs-check");
+  const docker = tasks.some((task) => ["backend", "frontend-e2e", "full"].includes(task));
+  return { java, docker };
+}
+
 export async function executeLocalCheck(options, runtime = {}) {
   const evidence = collectLocalChanges(runtime.git ?? runGit);
   let classified;
@@ -143,15 +150,34 @@ export async function executeLocalCheck(options, runtime = {}) {
   if (options.planOnly) return record;
   const execute = runtime.execute ?? runProcess;
   try {
-    requireUnchangedEvidence(evidence, collectLocalState(runtime.git ?? runGit,
-      evidence.baseCommit, evidence.fallbackReason));
     runtime.beforeRun?.(record);
-    for (const processPlan of localVerificationPlans(plan.tasks, runtime.platform, runtime.root)) {
-      output.write(`Running local check: ${processPlan.label}\n`);
-      execute(processPlan);
+    const createWorktree = runtime.createWorktree ?? ((candidate) =>
+      createVerificationWorktree(candidate, runtime.git ?? runGit));
+    const pinned = createWorktree(evidence);
+    const unregisterSignalCleanup = (runtime.registerSignalCleanup
+      ?? registerVerificationSignalCleanup)(pinned.release);
+    let taskFailure;
+    try {
+      for (const processPlan of localVerificationPlans(plan.tasks, runtime.platform, pinned.path,
+        runtime.hostNode ?? process.execPath)) {
+        output.write(`Running local check: ${processPlan.label}\n`);
+        execute(processPlan);
+      }
+    } catch (failure) {
+      taskFailure = failure;
     }
-    requireUnchangedEvidence(evidence, collectLocalState(runtime.git ?? runGit,
-      evidence.baseCommit, evidence.fallbackReason));
+    try {
+      pinned.release();
+    } catch (cleanupFailure) {
+      if (taskFailure !== undefined) {
+        throw new AggregateError([taskFailure, cleanupFailure],
+          `${taskFailure.message}; verification worktree cleanup failed: ${cleanupFailure.message}`);
+      }
+      throw cleanupFailure;
+    } finally {
+      unregisterSignalCleanup();
+    }
+    if (taskFailure !== undefined) throw taskFailure;
     record.outcome = "passed";
     persist(record);
     return record;
@@ -160,6 +186,133 @@ export async function executeLocalCheck(options, runtime = {}) {
     record.failure = failure.message;
     persist(record);
     throw failure;
+  }
+}
+
+export function createVerificationWorktree(evidence, git = runGit,
+    repositoryId = verificationRepositoryId(git)) {
+  recoverVerificationWorktrees(git, processIsAlive, repositoryId);
+  const worktree = mkdtempSync(join(tmpdir(), "courtside-verification-"));
+  const ownerFile = `${realpathSync(worktree)}${verificationOwnerFile}`;
+  let attached = false;
+  let released = false;
+  try {
+    writeFileSync(ownerFile, `${JSON.stringify({ schemaVersion: 2, repositoryId, pid: process.pid })}\n`,
+      { mode: 0o600 });
+    git(["worktree", "add", "--detach", worktree, evidence.headCommit]);
+    attached = true;
+  } catch (failure) {
+    let retained = false;
+    if (attached) {
+      try {
+        git(["worktree", "remove", "--force", worktree]);
+      } catch {
+        retained = true;
+      }
+    }
+    if (!retained) {
+      rmSync(worktree, { recursive: true, force: true });
+      rmSync(ownerFile, { force: true });
+    }
+    throw failure;
+  }
+  return {
+    path: worktree,
+    release: () => {
+      if (released) return;
+      released = true;
+      let cleanupFailure;
+      try {
+        if (attached) git(["worktree", "remove", "--force", worktree]);
+      } catch (failure) {
+        cleanupFailure = failure;
+      } finally {
+        if (cleanupFailure === undefined) {
+          rmSync(worktree, { recursive: true, force: true });
+          rmSync(ownerFile, { force: true });
+        }
+      }
+      if (cleanupFailure !== undefined) throw cleanupFailure;
+    }
+  };
+}
+
+export function recoverVerificationWorktrees(git = runGit, isProcessAlive = processIsAlive,
+    repositoryId = verificationRepositoryId(git)) {
+  const temporaryRoot = realpathSync(tmpdir());
+  const listing = git(["worktree", "list", "--porcelain"]);
+  const registered = new Set(String(listing ?? "")
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("worktree "))
+    .map((line) => resolve(line.slice("worktree ".length))));
+  const ownerFiles = readdirSync(temporaryRoot, { withFileTypes: true })
+    .filter((entry) => entry.isFile()
+      && entry.name.startsWith("courtside-verification-")
+      && entry.name.endsWith(verificationOwnerFile));
+  for (const ownerEntry of ownerFiles) {
+    const ownerPath = join(temporaryRoot, ownerEntry.name);
+    const candidatePath = ownerPath.slice(0, -verificationOwnerFile.length);
+    if (dirname(candidatePath) !== temporaryRoot
+        || !/^courtside-verification-[A-Za-z0-9_-]+$/.test(ownerEntry.name
+          .slice(0, -verificationOwnerFile.length))) continue;
+    let owner;
+    try {
+      owner = JSON.parse(readFileSync(ownerPath, "utf8"));
+    } catch {
+      continue;
+    }
+    if (owner.schemaVersion !== 2 || owner.repositoryId !== repositoryId
+        || !Number.isSafeInteger(owner.pid) || owner.pid <= 0 || isProcessAlive(owner.pid)) continue;
+    let candidateExists = false;
+    try {
+      const candidate = lstatSync(candidatePath);
+      if (!candidate.isDirectory() || candidate.isSymbolicLink()) continue;
+      candidateExists = true;
+    } catch {
+      candidateExists = false;
+    }
+    if (registered.has(candidatePath)) git(["worktree", "remove", "--force", candidatePath]);
+    if (candidateExists) rmSync(candidatePath, { recursive: true, force: true });
+    rmSync(ownerPath, { force: true });
+  }
+}
+
+function verificationRepositoryId(git) {
+  const commonDirectory = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]).trim();
+  if (commonDirectory.length === 0) throw new Error("Git did not identify its common directory");
+  return createHash("sha256").update(realpathSync(commonDirectory)).digest("hex");
+}
+
+export function registerVerificationSignalCleanup(release, process_ = process) {
+  let handling = false;
+  const handlers = new Map();
+  const unregister = () => {
+    for (const [signal, handler] of handlers) process_.removeListener(signal, handler);
+    handlers.clear();
+  };
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    const handler = () => {
+      if (handling) return;
+      handling = true;
+      try {
+        release();
+      } finally {
+        unregister();
+        process_.kill(process_.pid, signal);
+      }
+    };
+    handlers.set(signal, handler);
+    process_.once(signal, handler);
+  }
+  return unregister;
+}
+
+function processIsAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (failure) {
+    return failure.code === "EPERM";
   }
 }
 
@@ -191,13 +344,6 @@ export async function classifyProtectedChanges(evidence, forceFull, git = runGit
       rmSync(worktree, { recursive: true, force: true });
     }
     if (cleanupFailure) throw cleanupFailure;
-  }
-}
-
-function requireUnchangedEvidence(expected, actual) {
-  if (expected.baseCommit !== actual.baseCommit || expected.headCommit !== actual.headCommit
-      || expected.changeFingerprint !== actual.changeFingerprint) {
-    throw new Error("The working tree changed during local verification; run the check again");
   }
 }
 

@@ -159,7 +159,6 @@ test("given critical unknown or destructive changes, when classifying, then each
     [{ status: "M", path: "deploy/compose.yaml" }],
     [{ status: "M", path: "security/run-contract.json" }],
     [{ status: "M", path: "SECURITY.md" }],
-    [{ status: "M", path: "AGENTS.md" }],
     [{ status: "M", path: "src/main/resources/application.yaml" }],
     [{ status: "M", path: "tools/test-profile-classifier.mjs" }],
     [{ status: "M", path: "src/test/java/org/courtside/AbstractIntegrationTest.java" }],
@@ -172,6 +171,13 @@ test("given critical unknown or destructive changes, when classifying, then each
 
   // when / then
   for (const changes of cases) assert.deepEqual(classifyChanges(changes, []).profiles, ["full"]);
+});
+
+test("given agent policy prose changes, when classifying, then bounded documentation checks apply", () => {
+  // when / then
+  assert.deepEqual(classifyChanges([{ status: "M", path: "AGENTS.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(classifyChanges([{ status: "M", path: "CLAUDE.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(classifyChanges([{ status: "D", path: "CLAUDE.md" }], []).profiles, ["full"]);
 });
 
 test("given every configured full trigger, when classifying, then each selects full", () => {

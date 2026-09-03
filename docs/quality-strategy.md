@@ -34,7 +34,8 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 |---|---:|---|
 | Local unit and contract feedback | under 2 minutes | Focused tests for the changed decision and its negative boundary. |
 | Required pull-request checks | under 15 minutes | Green required checks plus the pull-request risk and evidence declaration. |
-| Local pull-request verification | under 25 minutes | `node tools/courtside.mjs check` selects the protected profile; `full` runs a clean Maven verification. |
+| Local single-area pull-request verification | under 15 minutes | `node tools/courtside.mjs check` selects and runs one protected reduced profile against a pinned commit. |
+| Local combined or full pull-request verification | under 25 minutes | Mixed profiles run additively; `full` runs a clean Maven verification against the same pinned commit. |
 | Nightly qualification | under 90 minutes | Periodic browser, order, concurrency, security and bounded performance evidence assigned by risk. |
 | Release qualification | under 45 minutes | Candidate-image, upgrade, restore and release-risk evidence; long soak runs are recorded separately. |
 
@@ -64,13 +65,13 @@ The repository pull-request template requires affected risk IDs, positive and ne
 
 The pull-request workflow uses a conservative test-profile plan to select its required jobs. One
 closed contract defines each profile's CI jobs and local tasks. Its semantic fingerprint also binds
-the classifier, workflow selection, local runner, observation and admission logic. A fingerprint
+the classifier, workflow selection, local runner and observation logic. A fingerprint
 therefore names one exact CI and local coverage policy.
 Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, `tooling`, or an additive
 combination. Backend changes run backend and security verification; frontend changes run frontend
 and security verification, including the complete Chromium and WebKit browser matrix. Documentation
 changes run a bounded documentation job in CI and the same checks locally. It validates Markdown,
-internal references, maintained quality contracts and the generated admission section without
+internal references and maintained quality contracts without
 starting Java, Vitest or Playwright. Build, workflow, security, deployment, migration, OpenAPI, and
 shared test-infrastructure changes select `full`. Added files follow the same closed path rules as
 modified files. Playwright specifications and their reviewed visual baselines select `frontend`;
@@ -79,6 +80,10 @@ deleted, renamed, copied, type-changed, conflicted or otherwise ambiguous change
 plan. Classifier failures also select `full` and cannot make the required aggregate check pass by
 skipping a quality job. The selector executes the classifier from the immutable pull-request base
 commit, so a classifier or rule change cannot reduce the verification required for itself.
+
+`CLAUDE.md` and its `AGENTS.md` indirection are documentation inputs. Modifying either selects the
+bounded documentation profile, which checks every tracked Markdown file and the maintained quality
+contracts. Deleting, renaming or otherwise changing their structure still selects `full`.
 
 The tooling profile installs the locked Node dependencies and runs every repository tool, policy
 and contract test without Java integration tests, Vitest or Playwright. CI additionally requires
@@ -279,10 +284,9 @@ days; the safe records remain available for 90 days. Validate one record with
 `npm run reliability:validate -- <record>` and summarize downloaded records with
 `npm run reliability:summarize -- <directory>`.
 
-Thirty consecutive hosted successes satisfy the streak input for the later admission decision.
-They do not demonstrate a failure rate below 0.5 percent: zero failures in thirty trials still
-leave substantial statistical uncertainty. Admission remains governed by its separate criteria
-and decision rather than being inferred by this command.
+Thirty consecutive hosted successes document the observed streak. They do not demonstrate a
+failure rate below 0.5 percent: zero failures in thirty trials still leave substantial statistical
+uncertainty, so this report must not turn a historical streak into a broader reliability claim.
 
 ### Operations and release
 
