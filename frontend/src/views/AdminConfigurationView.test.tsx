@@ -341,6 +341,47 @@ describe("AdminConfigurationView", () => {
     expect(await screen.findByTestId("rule-set")).toHaveValue("rule-set-2");
   });
 
+  it("given a typed rule set name, when the set is taken out of service, then the typing is still there", async () => {
+    // given — the answer speaks for `active` and carries the name the club still has stored
+    vi.spyOn(api, "setRuleSetActive")
+      .mockResolvedValueOnce({ id: "rule-set", name: "Standard", active: false })
+      .mockResolvedValueOnce({ id: "rule-set", name: "Standard", active: true });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("rule-set-name");
+    fireEvent.change(screen.getByTestId("rule-set-name"), { target: { value: "Standard plus" } });
+
+    // when
+    await userEvent.click(screen.getByTestId("toggle-rule-set"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("toggle-rule-set")).toHaveTextContent("Activate"));
+    expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
+    expect(screen.getByTestId("unsaved-mark-rule-set:rule-set")).toBeInTheDocument();
+
+    // when — the way back is the same change
+    await userEvent.click(screen.getByTestId("toggle-rule-set"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("toggle-rule-set")).toHaveTextContent("Deactivate"));
+    expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
+    expect(screen.getByTestId("unsaved-mark-rule-set:rule-set")).toBeInTheDocument();
+  });
+
+  it("given a refused rule set creation, when the answer arrives, then the form still holds what was typed", async () => {
+    // given
+    vi.spyOn(api, "createRuleSet").mockRejectedValue(new ApiError(409));
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("new-rule-set-name");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-rule-set-name"), "Juniors");
+    await userEvent.click(screen.getByTestId("create-rule-set"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
+    expect(screen.getByTestId("new-rule-set-name")).toHaveValue("Juniors");
+  });
+
   it("given membership types pointing at a rule set, when it is read, then retiring it says what that does not change", async () => {
     // given / when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);

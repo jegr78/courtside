@@ -162,8 +162,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
 
   async function addRuleSet(formElement: HTMLFormElement) {
     const name = formString(new FormData(formElement), "name");
-    await mutateRuleSet(() => api.createRuleSet({ name }));
-    formElement.reset();
+    if (await mutateRuleSet(() => api.createRuleSet({ name }))) formElement.reset();
   }
 
   // A set that went inactive after it was chosen stays on the list: dropping it would clear the
@@ -194,24 +193,40 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     if (unsavedRuleSetName) setPendingRuleSetId(ruleSetId); else chooseRuleSet(ruleSetId);
   }
 
-  async function mutateRuleSet(change: () => Promise<RuleSet>) {
-    if (pending) return;
+  async function applyRuleSetChange(change: () => Promise<void>): Promise<boolean> {
+    if (pending) return false;
     setPending(true);
     try {
+      await change();
+      setError(undefined);
+      setSuccess(t("admin.rules.ruleSetSaved"));
+      return true;
+    } catch (failure) {
+      setSuccess(undefined);
+      setError(problemMessage(failure, t));
+      return false;
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function mutateRuleSet(change: () => Promise<RuleSet>): Promise<boolean> {
+    return applyRuleSetChange(async () => {
       const written = await change();
       setRuleSets((current) => current.some((ruleSet) => ruleSet.id === written.id)
         ? current.map((ruleSet) => ruleSet.id === written.id ? written : ruleSet)
         : [...current, written]);
       selectRuleSet(written.id);
       setRuleSetName(written.name);
-      setError(undefined);
-      setSuccess(t("admin.rules.ruleSetSaved"));
-    } catch (failure) {
-      setSuccess(undefined);
-      setError(problemMessage(failure, t));
-    } finally {
-      setPending(false);
-    }
+    });
+  }
+
+  function toggleRuleSet(ruleSet: RuleSet): Promise<boolean> {
+    return applyRuleSetChange(async () => {
+      // Retiring a rule set is not a save, so it answers for `active` and for nothing else
+      const { active } = await api.setRuleSetActive(ruleSet.id, !ruleSet.active);
+      setRuleSets((current) => current.map((item) => item.id === ruleSet.id ? { ...item, active } : item));
+    });
   }
 
   async function removeRule(ruleType: RuleType) {
@@ -420,7 +435,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
               <TextField data-testid="rule-set-name" disabled={pending} maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.ruleSetName")} value={ruleSetName} onChange={(event) => setRuleSetName(event.target.value)} />
               <Button variant="primary" data-testid="save-rule-set" aria-describedby={describedByMark(`rule-set:${selectedRuleSet.id}`, unsavedRuleSetName)} disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.changeRuleSet(selectedRuleSet.id, { name: ruleSetName }))}>{t("admin.save")}</Button>
-              <Button variant={selectedRuleSet.active ? "destructive" : "primary"} data-testid="toggle-rule-set" disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.setRuleSetActive(selectedRuleSet.id, !selectedRuleSet.active))}>{t(selectedRuleSet.active ? "admin.deactivate" : "admin.activate")}</Button>
+              <Button variant={selectedRuleSet.active ? "destructive" : "primary"} data-testid="toggle-rule-set" disabled={pending} type="button" onClick={() => void toggleRuleSet(selectedRuleSet)}>{t(selectedRuleSet.active ? "admin.deactivate" : "admin.activate")}</Button>
               <UnsavedMark id={`rule-set:${selectedRuleSet.id}`} unsaved={unsavedRuleSetName} />
             </div>
             <p data-testid="rule-set-retire-note" className="text-muted text-sm">

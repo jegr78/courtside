@@ -141,8 +141,9 @@ bookings sit on it — information beside the control, never a gate in front of 
 surface loses work by accident: an edited row, a described import source and a half-filled creation
 form each count as something to lose, and leaving asks first — the page, whether inside the
 application or by closing the tab, and equally the editor on it when another rule set or another
-import source is opened in its place. What a board still
-cannot reach from a browser is listed with the endpoints that have no surface, in
+import source is opened in its place. A change that answers for one attribute leaves the rest of
+the row as it was typed, and a refused creation leaves the form as the board left it. What a board
+still cannot reach from a browser is listed with the endpoints that have no surface, in
 `tools/surfaceless-endpoints.json`; every entry left in it now names a
 decision rather than a gap.
 

@@ -62,7 +62,7 @@ export function AdminBookingCardView() {
   }
 
   // Taking a card out of service is not a save, so it answers for `active` and for nothing else
-  // somebody may still be editing on this page.
+  // that somebody may still be editing on this page.
   function toggleActive() {
     if (!card) return Promise.resolve();
     setCreated(false);

@@ -54,8 +54,8 @@ export function AdminMembershipTypesView() {
       .catch(reportError);
   }, [countHolders, reportError]);
 
-  async function mutate(change: () => Promise<MembershipType>) {
-    if (pending) return;
+  async function mutate(change: () => Promise<MembershipType>): Promise<boolean> {
+    if (pending) return false;
     setPending(true);
     try {
       const changed = await change();
@@ -67,23 +67,33 @@ export function AdminMembershipTypesView() {
       });
       setError(undefined);
       setSuccess(t("admin.membershipTypes.saved"));
+      return true;
     } catch (failure) {
       reportError(failure);
+      return false;
     } finally {
       setPending(false);
     }
+  }
+
+  async function saveType(id: string, request: MembershipTypeRequest) {
+    await mutate(() => api.changeMembershipType(id, request));
+  }
+
+  async function toggleType(type: MembershipType) {
+    await mutate(() => api.setMembershipTypeActive(type.id, !type.active));
   }
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const formElement = event.currentTarget;
-    await mutate(() => api.createMembershipType({
+    const created = await mutate(() => api.createMembershipType({
       name: formString(form, "name"),
       ruleSetId: formString(form, "ruleSetId") || null,
       grantsAccount: form.get("grantsAccount") === "on"
     }));
-    formElement.reset();
+    if (created) formElement.reset();
   }
 
   return <section data-testid="admin-membership-types-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
@@ -101,8 +111,8 @@ export function AdminMembershipTypesView() {
             ruleSets={ruleSets}
             holders={holders[type.id]}
             disabled={pending}
-            save={(request) => mutate(() => api.changeMembershipType(type.id, request))}
-            toggle={() => mutate(() => api.setMembershipTypeActive(type.id, !type.active))}
+            save={(request) => saveType(type.id, request)}
+            toggle={() => toggleType(type)}
           />)}
         </section>
         <form noValidate {...newType.form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">

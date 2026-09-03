@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { api, type MembershipType, type RosterEntry, type RuleSet } from "../api/client";
+import { ApiError, api, type MembershipType, type RosterEntry, type RuleSet } from "../api/client";
 import i18n from "../i18n";
 import { UnsavedCount } from "../test/UnsavedCount";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
@@ -167,7 +167,7 @@ describe("AdminMembershipTypesView", () => {
 
   it("given an active type, when retiring it, then the control offers to offer it again", async () => {
     // given
-    vi.spyOn(api, "setMembershipTypeActive").mockResolvedValue({ ...adults, active: false });
+    const toggling = vi.spyOn(api, "setMembershipTypeActive").mockResolvedValue({ ...adults, active: false });
     render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
     const toggle = await screen.findByTestId("toggle-membership-type-type-1");
     expect(toggle).toHaveClass("button-destructive");
@@ -178,6 +178,7 @@ describe("AdminMembershipTypesView", () => {
     // then
     await waitFor(() => expect(toggle).toHaveTextContent("Activate"));
     expect(toggle).toHaveClass("button-primary");
+    expect(toggling).toHaveBeenCalledWith("type-1", false);
   });
 
   it("given a retired type, when the view is read, then it is still listed and says so", async () => {
@@ -201,6 +202,23 @@ describe("AdminMembershipTypesView", () => {
     // then
     expect(api.createMembershipType).toHaveBeenCalledWith({ name: "Seniors", ruleSetId: null, grantsAccount: true });
     expect(await screen.findByTestId("membership-type-type-9")).toBeInTheDocument();
+  });
+
+  it("given a refused creation, when the answer arrives, then the form still holds what was typed", async () => {
+    // given
+    vi.spyOn(api, "createMembershipType").mockRejectedValue(new ApiError(409));
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-1");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-membership-type-name"), "Seniors");
+    await userEvent.click(screen.getByTestId("new-membership-type-grants-account"));
+    await userEvent.click(screen.getByTestId("create-membership-type"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
+    expect(screen.getByTestId("new-membership-type-name")).toHaveValue("Seniors");
+    expect(screen.getByTestId("new-membership-type-grants-account")).toBeChecked();
   });
 
   it("given a type that grants no account, when switching that on and saving, then the change is sent", async () => {
