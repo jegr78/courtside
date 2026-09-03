@@ -76,6 +76,14 @@ export function AdminMembershipTypesView() {
     }
   }
 
+  async function saveType(id: string, request: MembershipTypeRequest) {
+    await mutate(() => api.changeMembershipType(id, request));
+  }
+
+  async function toggleType(type: MembershipType) {
+    await mutate(() => api.setMembershipTypeActive(type.id, !type.active));
+  }
+
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -103,8 +111,8 @@ export function AdminMembershipTypesView() {
             ruleSets={ruleSets}
             holders={holders[type.id]}
             disabled={pending}
-            save={(request) => mutate(() => api.changeMembershipType(type.id, request))}
-            toggle={() => mutate(() => api.setMembershipTypeActive(type.id, !type.active))}
+            save={(request) => saveType(type.id, request)}
+            toggle={() => toggleType(type)}
           />)}
         </section>
         <form noValidate {...newType.form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
@@ -135,8 +143,8 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
   ruleSets: RuleSet[];
   holders: Holders | undefined;
   disabled: boolean;
-  save: (request: MembershipTypeRequest) => Promise<boolean>;
-  toggle: () => Promise<boolean>;
+  save: (request: MembershipTypeRequest) => Promise<void>;
+  toggle: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(type.name);

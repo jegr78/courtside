@@ -145,8 +145,10 @@ describe("AdminSlotFillersView", () => {
     expect(screen.getByTestId("participant-card-label-filler-1")).toHaveValue("Ball machine two");
     expect(screen.getByTestId("unsaved-mark-participant-card:filler-1")).toBeInTheDocument();
 
-    // then — and the way back is the same change, so it keeps the typing too
+    // when — the way back is the same change
     await userEvent.click(screen.getByTestId("toggle-participant-card-filler-1"));
+
+    // then
     await waitFor(() => expect(screen.getByTestId("toggle-participant-card-filler-1")).toHaveTextContent("Deactivate"));
     expect(screen.getByTestId("participant-card-label-filler-1")).toHaveValue("Ball machine two");
     expect(screen.getByTestId("unsaved-mark-participant-card:filler-1")).toBeInTheDocument();

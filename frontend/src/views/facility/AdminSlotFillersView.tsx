@@ -47,7 +47,10 @@ export function AdminSlotFillersView() {
       // Taking a filler out of service is not a save, so it answers for `active` and for nothing else
       const { active } = await api.setParticipantCardActive(card.id, !card.active);
       setFillers((current) => current?.map((item) => item.id === card.id ? { ...item, active } : item));
-      setConfirmed((current) => ({ ...current, [card.id]: { ...current[card.id], active } }));
+      setConfirmed((current) => {
+        const stored = current[card.id];
+        return stored ? { ...current, [card.id]: { ...stored, active } } : current;
+      });
     });
   }
 

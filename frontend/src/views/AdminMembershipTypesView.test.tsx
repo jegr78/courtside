@@ -167,7 +167,7 @@ describe("AdminMembershipTypesView", () => {
 
   it("given an active type, when retiring it, then the control offers to offer it again", async () => {
     // given
-    vi.spyOn(api, "setMembershipTypeActive").mockResolvedValue({ ...adults, active: false });
+    const toggling = vi.spyOn(api, "setMembershipTypeActive").mockResolvedValue({ ...adults, active: false });
     render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
     const toggle = await screen.findByTestId("toggle-membership-type-type-1");
     expect(toggle).toHaveClass("button-destructive");
@@ -178,6 +178,7 @@ describe("AdminMembershipTypesView", () => {
     // then
     await waitFor(() => expect(toggle).toHaveTextContent("Activate"));
     expect(toggle).toHaveClass("button-primary");
+    expect(toggling).toHaveBeenCalledWith("type-1", false);
   });
 
   it("given a retired type, when the view is read, then it is still listed and says so", async () => {
@@ -215,7 +216,7 @@ describe("AdminMembershipTypesView", () => {
     await userEvent.click(screen.getByTestId("create-membership-type"));
 
     // then
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
     expect(screen.getByTestId("new-membership-type-name")).toHaveValue("Seniors");
     expect(screen.getByTestId("new-membership-type-grants-account")).toBeChecked();
   });

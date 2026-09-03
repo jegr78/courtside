@@ -358,8 +358,10 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
     expect(screen.getByTestId("unsaved-mark-rule-set:rule-set")).toBeInTheDocument();
 
-    // then — and the way back is the same change, so it keeps the typing too
+    // when — the way back is the same change
     await userEvent.click(screen.getByTestId("toggle-rule-set"));
+
+    // then
     await waitFor(() => expect(screen.getByTestId("toggle-rule-set")).toHaveTextContent("Deactivate"));
     expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
     expect(screen.getByTestId("unsaved-mark-rule-set:rule-set")).toBeInTheDocument();
@@ -376,7 +378,7 @@ describe("AdminConfigurationView", () => {
     await userEvent.click(screen.getByTestId("create-rule-set"));
 
     // then
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
     expect(screen.getByTestId("new-rule-set-name")).toHaveValue("Juniors");
   });
 

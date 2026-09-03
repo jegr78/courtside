@@ -144,7 +144,8 @@ application or by closing the tab, and equally the editor on it when another rul
 import source is opened in its place. A change that answers for one attribute leaves the rest of
 the row as it was typed, and a refused creation leaves the form as the board left it. What a board
 still cannot reach from a browser is listed with the endpoints that have no surface, in
-`tools/surfaceless-endpoints.json`; every entry left in it now names a decision rather than a gap.
+`tools/surfaceless-endpoints.json`; every entry left in it now names a
+decision rather than a gap.
 
 A booking now writes to the people it concerns: the member who made it gets a confirmation carrying
 the day, the period, every court it holds and the kind of booking, in the account's own language; a
