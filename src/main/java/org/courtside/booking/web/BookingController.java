@@ -30,6 +30,7 @@ import org.courtside.booking.internal.ManagedAppointmentQuery;
 import org.courtside.booking.internal.AllocationVisibilityService.AllocationVisibility;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
+import org.courtside.config.ClubTimeZone;
 import org.courtside.identity.CurrentUser;
 import org.courtside.identity.UserAccount;
 import org.courtside.shared.TimeSlot;
@@ -41,7 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.time.LocalDate;
-import org.courtside.config.ClubTimeZone;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -252,9 +253,10 @@ class BookingController implements BookingsApi {
 
     @Override
     public ResponseEntity<List<ApiAllocation>> listAllocations(LocalDate date) {
+        ZoneId zone = timeZone.zoneId();
         List<CourtAllocation> allocations = bookings.allocationsBetween(
-                date.atStartOfDay(timeZone.zoneId()).toInstant(),
-                date.plusDays(1).atStartOfDay(timeZone.zoneId()).toInstant());
+                date.atStartOfDay(zone).toInstant(),
+                date.plusDays(1).atStartOfDay(zone).toInstant());
 
         Map<UUID, BookingCard> cardsById = cards.allCards().stream()
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));
