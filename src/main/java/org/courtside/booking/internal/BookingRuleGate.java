@@ -66,7 +66,10 @@ public class BookingRuleGate {
         if (checks.isEmpty()) {
             return List.of();
         }
-        List<RuleContext> contexts = checks.stream().map(this::contextOf).toList();
+        Map<UUID, Optional<UUID>> membershipTypes = new HashMap<>();
+        List<RuleContext> contexts = checks.stream()
+                .map(check -> contextOf(check, membershipTypes))
+                .toList();
         return restrictionsApplyTo(checks.getFirst())
                 ? ruleEngine.evaluateForAMove(contexts)
                 : ruleEngine.evaluateNonOverridable(contexts);
