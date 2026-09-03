@@ -10,6 +10,7 @@ const directory = new URL("../.github/workflows/", import.meta.url);
 const workflow = readFileSync(new URL("nightly-failure-tracking.yml", directory), "utf8");
 const tracker = yaml.load(workflow);
 const release = readFileSync(new URL("release.yml", directory), "utf8");
+const trackerSource = readFileSync(new URL("./nightly-failure-tracker.mjs", import.meta.url), "utf8");
 
 function scheduledWorkflowNames() {
   return readdirSync(directory)
@@ -70,4 +71,23 @@ test("given issue writes, when permissions are declared, then only required read
   assert.match(workflow, /contents: read/);
   assert.match(workflow, /issues: write/);
   assert.doesNotMatch(workflow, /pull-requests: write|security-events: write/);
+});
+
+test("given the one label four places share, when any of them names it, then all four name the same one", () => {
+  // given
+  const declared = trackerSource.match(/export const trackerLabel = "([a-z-]+)";/)?.[1];
+
+  // when / then
+  assert.ok(declared !== undefined);
+  assert.match(trackerSource, new RegExp(`labels=\\$\\{trackerLabel\\}`));
+  assert.match(release, new RegExp(`issues\\?state=open&labels=${declared}&per_page=100`));
+  assert.match(workflow, new RegExp(`gh label create ${declared} --force`));
+});
+
+test("given a tracked failure, when the tracker runs in CI, then it is told whom to assign and what blocks a merge", () => {
+  // when / then
+  assert.match(workflow, /REPOSITORY_OWNER: \$\{\{ github\.repository_owner \}\}/);
+  assert.match(workflow, /--assignee "\$REPOSITORY_OWNER"/);
+  assert.match(workflow, /--blocking-workflow build/);
+  assert.match(workflow, /issues: write/);
 });

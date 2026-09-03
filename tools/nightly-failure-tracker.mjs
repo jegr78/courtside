@@ -6,6 +6,7 @@ const allowedJobs = new Set(["backend", "frontend", "tooling", "security", "buil
 // A run that can be summoned is a path that can be proven; only a scheduled one counts
 // towards the consecutive green nights that make an issue ready for closure.
 const trackedEvents = new Set(["schedule", "workflow_dispatch"]);
+export const trackerLabel = "nightly";
 const readyMarker = "<!-- courtside-nightly-ready-for-review -->";
 
 function boundedText(value, field) {
@@ -79,6 +80,17 @@ function occurrenceMarker(failure) {
   return `<!-- courtside-nightly-occurrence:${failure.runId}:${failure.attempt} -->`;
 }
 
+export function isGitHubLogin(value) {
+  return typeof value === "string"
+    && /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/.test(value);
+}
+
+function blocked(failure, blockingWorkflow) {
+  return failure.workflow === blockingWorkflow
+    ? "\nThis workflow carries the required check, so every open pull request inherits the failure until it is fixed.\n"
+    : "";
+}
+
 function occurrence(failure) {
   const range = failure.baseCommit ? `${failure.baseCommit}..${failure.commit}` : failure.commit;
   return `${occurrenceMarker(failure)}\n- First-attempt commit range \`${range}\`: ${failure.runUrl}`;
@@ -90,7 +102,7 @@ export function bindCommitRange(failures, recentRuns) {
   return failures.map((failure) => ({ ...failure, baseCommit: previous?.head_sha ?? null }));
 }
 
-export function planFailureUpdates(failures, issues) {
+export function planFailureUpdates(failures, issues, { assignee, blockingWorkflow } = {}) {
   if (!Array.isArray(failures) || !Array.isArray(issues)) throw new Error("tracker input is invalid");
   if (issues.some((issue) => !["open", "closed"].includes(issue?.state))) throw new Error("issue state is invalid");
   return failures.flatMap((failure) => {
@@ -111,9 +123,11 @@ export function planFailureUpdates(failures, issues) {
         ` (${failure.fingerprint.slice(0, 12)})`,
       body: `${fingerprintMarker}\nA scheduled first-attempt run failed with this stable class.\n\n` +
         `${workflowMarker(failure.workflow)}\n- Job: \`${failure.job}\`\n- Step: \`${failure.step}\`\n` +
-        `- Failure class: \`${failure.failureClass}\`\n\n${occurrence(failure)}\n\n` +
+        `- Failure class: \`${failure.failureClass}\`\n${blocked(failure, blockingWorkflow)}` +
+        `\n${occurrence(failure)}\n\n` +
         "Keep this issue open until the tracker marks seven consecutive scheduled first attempts of this workflow green and a human verifies closure.",
-      labels: ["bug"]
+      labels: [trackerLabel],
+      assignees: isGitHubLogin(assignee) ? [assignee] : []
     }];
   });
 }
@@ -158,7 +172,7 @@ export async function applyIssuePlan(plan, request, repository = "example/courts
       ? `https://api.github.com/repos/${repository}/issues`
       : `https://api.github.com/repos/${repository}/issues/${item.issueNumber}/comments`;
     const payload = item.action === "create"
-      ? { title: item.title, body: item.body, labels: item.labels }
+      ? { title: item.title, body: item.body, labels: item.labels, assignees: item.assignees ?? [] }
       : { body: item.body };
     const response = await request(endpoint, { method: "POST", body: JSON.stringify(payload) });
     if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
@@ -196,7 +210,7 @@ async function readPages(request, endpoint, maximumPages = 10) {
 async function readTrackedIssues(repository, token) {
   const request = (endpoint, options) => githubRequest(token, endpoint, options);
   const raw = await readPages(request,
-    `https://api.github.com/repos/${repository}/issues?state=all&labels=bug&per_page=100`);
+    `https://api.github.com/repos/${repository}/issues?state=all&labels=${trackerLabel}&per_page=100`);
   const issues = raw.filter((issue) => !issue.pull_request && `${issue.title ?? ""}`.startsWith("[nightly] ") &&
     `${issue.body ?? ""}`.includes("courtside-nightly-fingerprint"));
   for (const issue of issues) {
@@ -225,7 +239,12 @@ async function main(args) {
   const request = (endpoint, options) => githubRequest(token, endpoint, options);
   const failures = bindCommitRange(classifyNightlyFailures(run, jobs, workflowId),
     recent.filter((item) => item.id !== run.id));
-  await applyIssuePlan(planFailureUpdates(failures, issues), request, repository);
+  const assignee = values["--assignee"];
+  if (assignee !== undefined && !isGitHubLogin(assignee)) {
+    process.stderr.write("the tracker assignee is not a login; the issue is recorded unassigned\n");
+  }
+  await applyIssuePlan(planFailureUpdates(failures, issues,
+    { assignee, blockingWorkflow: values["--blocking-workflow"] }), request, repository);
   if (failures.length === 0 && readyForReview(recent)) {
     await applyIssuePlan(planReadyForReview(issues, run.name), request, repository);
   }

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
+import { trackerLabel } from "./nightly-failure-tracker.mjs";
+
+const directory = new URL("../.github/ISSUE_TEMPLATE/", import.meta.url);
 
 export function validateIssueTemplate(source) {
   assert.equal(typeof source, "string");
@@ -16,15 +19,18 @@ export function validateIssueTemplate(source) {
   assert.match(frontmatter.name, /^(?!null$|true$|false$|~$).+$/iu);
   assert.match(frontmatter.about, /^(?!null$|true$|false$|~$).+$/iu);
   assert.match(frontmatter.labels, /^[a-z0-9-]+(?:,\s*[a-z0-9-]+)*$/);
+  assert.ok(!frontmatter.labels.split(",").map((label) => label.trim()).includes(trackerLabel));
 }
 
 test("given issue templates, when validating frontmatter, then GitHub metadata is closed and typed", () => {
   // given
-  const names = ["bug", "debt", "decision", "known-limit", "operations"];
+  const names = readdirSync(directory);
 
   // when / then
-  for (const name of names) {
-    validateIssueTemplate(readFileSync(new URL(`../.github/ISSUE_TEMPLATE/${name}.md`, import.meta.url), "utf8"));
+  assert.ok(names.length >= 5);
+  assert.deepEqual(names.filter((name) => !name.endsWith(".md") && name !== "config.yml"), []);
+  for (const name of names.filter((name) => name.endsWith(".md"))) {
+    validateIssueTemplate(readFileSync(new URL(name, directory), "utf8"));
   }
 });
 
