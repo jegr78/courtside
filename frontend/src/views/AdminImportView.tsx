@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type ImportPreview, type ImportSource, type ImportSourceRequest, type MembershipType } from "../api/client";
-import { problemMessage } from "../api/problem-message";
+import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
@@ -18,13 +18,13 @@ type Editing = { source: ImportSource } | { source: undefined } | undefined;
 
 export function AdminImportView() {
   const { t } = useTranslation();
+  const { message: error, report, clear } = useReportedFailure();
   const [sources, setSources] = useState<ImportSource[]>();
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [editing, setEditing] = useState<Editing>();
   const [removing, setRemoving] = useState(false);
   const [preview, setPreview] = useState<ImportPreview>();
   const [runCount, setRunCount] = useState(0);
-  const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
   // Wrapped because a choice of undefined is one the board can make — it means no source open —
@@ -57,8 +57,8 @@ export function AdminImportView() {
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
-    setError(problemMessage(failure, t));
-  }, [t]);
+    report(failure);
+  }, [report]);
 
   useEffect(() => {
     void Promise.all([api.importSources(), api.membershipTypes()])
@@ -85,7 +85,7 @@ export function AdminImportView() {
       });
       setEditing({ source: written });
       setPreview(undefined);
-      setError(undefined);
+      clear();
       setSuccess(t("admin.import.saved"));
     } catch (failure) {
       reportError(failure);
@@ -102,7 +102,7 @@ export function AdminImportView() {
       setSources((current) => (current ?? []).filter((known) => known.id !== source.id));
       setEditing(undefined);
       setRemoving(false);
-      setError(undefined);
+      clear();
       setSuccess(t("admin.import.saved"));
     } catch (failure) {
       setRemoving(false);

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -202,6 +202,21 @@ describe("AdminMembershipTypesView", () => {
     // then
     expect(api.createMembershipType).toHaveBeenCalledWith({ name: "Seniors", ruleSetId: null, grantsAccount: true });
     expect(await screen.findByTestId("membership-type-type-9")).toBeInTheDocument();
+  });
+
+  it("when the language changes, then the types are not fetched again", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-1");
+    await userEvent.type(screen.getByTestId("membership-type-name-type-1"), " and seniors");
+
+    // when
+    await act(() => i18n.changeLanguage("de"));
+
+    // then
+    expect(screen.getByTestId("create-membership-type")).toHaveTextContent("Anlegen");
+    expect(api.membershipTypes).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("membership-type-name-type-1")).toHaveValue("Adults and seniors");
   });
 
   it("given a refused creation, when the answer arrives, then the form still holds what was typed", async () => {

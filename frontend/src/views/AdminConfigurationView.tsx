@@ -12,7 +12,7 @@ import {
   type RuleType,
   type RuleTypeConfiguration
 } from "../api/client";
-import { problemMessage } from "../api/problem-message";
+import { useReportedFailure } from "../failures/useReportedFailure";
 import { LocaleSelect } from "../components/LocaleSelect";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -93,6 +93,7 @@ function timeZones(current: string): string[] {
 
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
+  const { message: error, report, refuse, clear } = useReportedFailure();
   const newRuleSet = useUnsavedForm("rule-set:new");
   const [pendingRuleSetId, setPendingRuleSetId] = useState<string>();
   const [config, setConfig] = useState<ClubConfigRequest>();
@@ -111,7 +112,6 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
   const [ruleSetName, setRuleSetName] = useState("");
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   useFragmentTarget("slot-minutes", config !== undefined);
 
@@ -127,16 +127,18 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         setRuleSets(loadedRuleSets);
         setRuleTypes(loadedRuleTypes);
         setMembershipTypes(loadedMembershipTypes);
-        selectRuleSet(loadedRuleSets[0]?.id ?? "");
-        setRuleSetName(loadedRuleSets[0]?.name ?? "");
+        if (selectedRuleSetIdRef.current === "") {
+          selectRuleSet(loadedRuleSets[0]?.id ?? "");
+          setRuleSetName(loadedRuleSets[0]?.name ?? "");
+        }
       })
       .catch((failure) => {
-        if (active) setError(problemMessage(failure, t));
+        if (active) report(failure);
       });
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [report]);
 
   useEffect(() => {
     setRules([]);
@@ -153,12 +155,12 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         }
       })
       .catch((failure) => {
-        if (active) setError(problemMessage(failure, t));
+        if (active) report(failure);
       });
     return () => {
       active = false;
     };
-  }, [selectedRuleSetId, t]);
+  }, [report, selectedRuleSetId]);
 
   async function addRuleSet(formElement: HTMLFormElement) {
     const name = formString(new FormData(formElement), "name");
@@ -198,12 +200,12 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     setPending(true);
     try {
       await change();
-      setError(undefined);
+      clear();
       setSuccess(t("admin.rules.ruleSetSaved"));
       return true;
     } catch (failure) {
       setSuccess(undefined);
-      setError(problemMessage(failure, t));
+      report(failure);
       return false;
     } finally {
       setPending(false);
@@ -235,11 +237,11 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     try {
       await api.removeRule(selectedRuleSetId, ruleType);
       setRules((current) => current.filter((rule) => rule.ruleType !== ruleType));
-      setError(undefined);
+      clear();
       setSuccess(t("admin.rules.saved"));
     } catch (failure) {
       setSuccess(undefined);
-      setError(problemMessage(failure, t));
+      report(failure);
     } finally {
       setPending(false);
     }
@@ -254,16 +256,16 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     setLogoFile(undefined);
     if (!selected) return;
     if (selected.size > MAX_LOGO_BYTES) {
-      setError(t("config.logo.tooLarge"));
+      refuse(t("config.logo.tooLarge"));
       event.target.value = "";
       return;
     }
     if (selected.type && selected.type !== "image/png" && selected.type !== "image/jpeg") {
-      setError(t("config.logo.format"));
+      refuse(t("config.logo.format"));
       event.target.value = "";
       return;
     }
-    setError(undefined);
+    clear();
     setLogoFile(selected);
   }
 
@@ -278,7 +280,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   async function uploadLogo() {
     if (!logoFile || configurationPending) return;
     setConfigurationPending(true);
-    setError(undefined);
+    clear();
     setSuccess(undefined);
     try {
       const changed = await api.uploadClubLogo(logoFile);
@@ -287,7 +289,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       if (logoInput.current) logoInput.current.value = "";
       setSuccess(t("admin.config.logoUploaded"));
     } catch (failure) {
-      setError(problemMessage(failure, t));
+      report(failure);
     } finally {
       setConfigurationPending(false);
     }
@@ -296,14 +298,14 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   async function removeLogo() {
     if (configurationPending) return;
     setConfigurationPending(true);
-    setError(undefined);
+    clear();
     setSuccess(undefined);
     try {
       const changed = await api.deleteClubLogo();
       applyConfiguration(changed);
       setSuccess(t("admin.config.logoRemoved"));
     } catch (failure) {
-      setError(problemMessage(failure, t));
+      report(failure);
     } finally {
       setConfigurationPending(false);
     }
@@ -313,13 +315,13 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     event.preventDefault();
     if (!config || configurationPending) return;
     setConfigurationPending(true);
-    setError(undefined);
+    clear();
     setSuccess(undefined);
     try {
       applyConfiguration(await api.changeAdminConfig(config));
       setSuccess(t("admin.config.saved"));
     } catch (failure) {
-      setError(problemMessage(failure, t));
+      report(failure);
     } finally {
       setConfigurationPending(false);
     }
@@ -328,7 +330,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   async function saveRule(ruleType: RuleType, params: Record<string, number>) {
     const ruleSetId = selectedRuleSetId;
     if (!ruleSetId || loadedRuleSetId !== ruleSetId) return;
-    setError(undefined);
+    clear();
     setSuccess(undefined);
     try {
       const changed = await api.setRule(ruleSetId, ruleType, params);
@@ -337,7 +339,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         setSuccess(t("admin.rules.saved"));
       }
     } catch (failure) {
-      if (selectedRuleSetIdRef.current === ruleSetId) setError(problemMessage(failure, t));
+      if (selectedRuleSetIdRef.current === ruleSetId) report(failure);
     }
   }
 

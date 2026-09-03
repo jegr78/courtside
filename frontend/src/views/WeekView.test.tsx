@@ -252,6 +252,41 @@ it("given eligibility cannot be read, when showing the plan, then booking stays 
   expect(freeSlot(1, "12:30").tagName).toBe("DIV");
 });
 
+it("given a plan on screen, when the language changes, then the week is not fetched again", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  await findFreeSlot(1, "12:30");
+  const reads = [api.bookingGrid, api.courts, api.bookingEligibility]
+    .map((read) => vi.mocked(read).mock.calls.length);
+
+  // when
+  await act(() => i18n.changeLanguage("de"));
+
+  // then
+  expect([api.bookingGrid, api.courts, api.bookingEligibility]
+    .map((read) => vi.mocked(read).mock.calls.length)).toEqual(reads);
+});
+
+it("given a chosen booking card, when the language changes, then the choice is still made", async () => {
+  // given
+  vi.mocked(api.bookingCards).mockResolvedValue([
+    { id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [2, 4], guestAllowed: true },
+    { id: "88888888-8888-8888-8888-888888888888", label: "Trial session", color: "#176b55", allowedPlayerCounts: [2], guestAllowed: false }
+  ]);
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "12:30");
+  await waitFor(() => expect(slot).toHaveRole("button"));
+  await userEvent.click(slot);
+  await userEvent.selectOptions(await screen.findByTestId("booking-card"), "88888888-8888-8888-8888-888888888888");
+
+  // when
+  await act(() => i18n.changeLanguage("de"));
+
+  // then
+  expect(api.bookingCards).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId("booking-card")).toHaveValue("88888888-8888-8888-8888-888888888888");
+});
+
 it("given a booking dialog is open, when the member becomes barred, then the dialog closes", async () => {
   // given
   vi.mocked(api.bookingEligibility)

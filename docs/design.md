@@ -258,7 +258,9 @@ startup; the upgrade path is explicitly tested (see section 10).
 Code, identifiers, comments, commit messages, documentation, API field names and the
 database schema are **English**. User-facing text — UI strings and email templates — goes
 through message bundles. German is the default locale, English the second. Locale is
-stored per user account with a fallback to the instance setting.
+stored per user account with a fallback to the instance setting. Switching it re-renders the text
+and nothing else: no view reloads, so a selection, a typed value and a page already fetched all
+survive the switch, and a failure already on screen is read out again in the language now chosen.
 
 **Which languages an instance has is derived, not declared.** A language exists because the image
 carries a `messages_<tag>` bundle for the screen and a `mail_<tag>` bundle for what is sent, and
