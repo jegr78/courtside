@@ -100,6 +100,7 @@
     { "path": "tools/ui-selector-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/webkit-reliability.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/webkit-reliability.test.mjs", "profiles": ["tooling"], "test": true },
-    { "path": "tools/workflow-action-pinning.test.mjs", "profiles": ["tooling"], "test": true }
+    { "path": "tools/workflow-action-pinning.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/workflow-prerequisites.test.mjs", "profiles": ["tooling"], "test": true }
   ]
 }
