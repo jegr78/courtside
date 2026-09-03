@@ -257,13 +257,11 @@ public final class ChangeSetResolver {
                                                      CurrentRoster roster) {
         Set<String> unmapped = new TreeSet<>();
         Set<String> inactive = new TreeSet<>();
-        Set<Integer> fallingBack = new TreeSet<>();
+        boolean anyRowFallsBack = false;
         for (CsvSnapshot.SnapshotRow row : snapshot.rows()) {
             String value = row.values().get(CanonicalField.MEMBERSHIP_TYPE);
             if (value == null || value.isBlank()) {
-                if (roster.personIdsByExternalId().get(row.externalId()) == null) {
-                    fallingBack.add(row.rowNumber());
-                }
+                anyRowFallsBack |= roster.personIdsByExternalId().get(row.externalId()) == null;
                 continue;
             }
             UUID typeId = configuration.membershipTypes().get(value);
@@ -282,10 +280,9 @@ public final class ChangeSetResolver {
                     Map.of("values", List.copyOf(inactive)));
         }
         UUID fallback = configuration.defaultMembershipTypeId();
-        if (!fallingBack.isEmpty()
+        if (anyRowFallsBack
                 && (fallback == null || !roster.activeMembershipTypeIds().contains(fallback))) {
-            throw new SnapshotBlockedException("import.snapshot.membershipType.defaultInactive",
-                    Map.of("rows", List.copyOf(fallingBack)));
+            throw new SnapshotBlockedException("import.snapshot.membershipType.defaultInactive", Map.of());
         }
     }
 

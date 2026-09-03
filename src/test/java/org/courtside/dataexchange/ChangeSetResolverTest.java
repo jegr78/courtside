@@ -208,7 +208,7 @@ class ChangeSetResolverTest {
                 base.displayName(), base.separator(), base.encoding(), base.columns(),
                 base.membershipTypes(), null, base.ownedFields(), base.removalWarningPercent());
 
-        // when / then — asking an immutable set whether it holds null answers with a 500 otherwise
+        // when / then
         assertThatThrownBy(() -> resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, emptyRoster(), nameless))
                 .isInstanceOf(SnapshotBlockedException.class)
                 .extracting("code").isEqualTo("import.snapshot.membershipType.defaultInactive");
