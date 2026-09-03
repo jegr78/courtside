@@ -423,7 +423,7 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: never
-          retry-on-snapshot-warnings: false
+          retry-on-snapshot-warnings: true
       - uses: github/codeql-action/init@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef
         with:
           languages: java-kotlin,javascript-typescript

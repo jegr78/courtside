@@ -1492,7 +1492,10 @@ whether it is built or designed. **Designed means absent today.**
   API may sit on the path of a booking. `crypto.getRandomValues` is one that carries no such
   condition and is what the booking form draws its idempotency key from. *Built.*
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
-  release. *Dependabot is configured, and the release workflow signs each image keylessly with
+  release. *Dependabot is configured, and the build submits the tree Maven resolves so its alerts
+  reach the transitive Java dependencies a POM does not name — the graph carried the declared ones
+  alone until then, and an advisory against anything the Spring Boot BOM brought in was seen by the
+  nightly source scan and by nothing else. The release workflow signs each image keylessly with
   cosign and attaches an SBOM attestation. Trivy scans the application's extracted layers and the
   source tree on every pull request and every release; the container image's own base layers are
   not, so that half is designed and not built.*
