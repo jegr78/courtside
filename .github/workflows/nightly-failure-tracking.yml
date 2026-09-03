@@ -48,10 +48,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: >
           node tools/nightly-failure-tracker.mjs
           --repository "$GITHUB_REPOSITORY"
           --workflow-id "$WORKFLOW_ID"
+          --assignee "$REPOSITORY_OWNER"
+          --blocking-workflow build
           --run build/nightly-tracker/run.json
           --jobs build/nightly-tracker/jobs.json
           --recent build/nightly-tracker/recent.json

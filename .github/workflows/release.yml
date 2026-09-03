@@ -63,7 +63,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          count=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues?state=open&labels=bug&per_page=100" \
+          count=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues?state=open&labels=nightly&per_page=100" \
             --slurp | jq '[map(.[])[] | select(.pull_request == null) |
               select(.title | startswith("[nightly] ")) |
               select(.body | contains("courtside-nightly-fingerprint"))] | length')

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { classifyNightlyFailures, planFailureUpdates, planReadyForReview, readyForReview,
-  applyIssuePlan, bindCommitRange, trustedCommentText } from "./nightly-failure-tracker.mjs";
+  applyIssuePlan, bindCommitRange, trackerLabel, trustedCommentText } from "./nightly-failure-tracker.mjs";
 
 const workflowId = 4711;
 
@@ -227,4 +227,50 @@ test("given names at their bound, when an issue is opened, then its title stays 
   // then
   assert.ok(planned.title.length <= 200, `the title is ${planned.title.length} characters long`);
   assert.match(planned.title, /\([a-f0-9]{12}\)$/);
+});
+
+test("given a scheduled failure, when the issue is planned, then it carries the tracker's own label and no other", () => {
+  // given
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
+
+  // when
+  const [created] = planFailureUpdates(failures, []);
+
+  // then
+  assert.deepEqual(created.labels, [trackerLabel]);
+  assert.notEqual(trackerLabel, "bug");
+});
+
+test("given a maintainer, when the issue is planned, then it is assigned so the failure reaches somebody", () => {
+  // given
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
+
+  // when
+  const [created] = planFailureUpdates(failures, [], { assignee: "example-maintainer" });
+
+  // then
+  assert.deepEqual(created.assignees, ["example-maintainer"]);
+  assert.deepEqual(planFailureUpdates(failures, [])[0].assignees, []);
+});
+
+test("given an assignee that is not a login, when the issue is planned, then the plan is refused", () => {
+  // given
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
+
+  // when / then
+  assert.throws(() => planFailureUpdates(failures, [], { assignee: "not a login" }),
+    /tracker assignee is invalid/);
+});
+
+test("given the workflow behind the required check, when the issue is planned, then it says what the failure blocks", () => {
+  // given
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
+
+  // when
+  const [blocking] = planFailureUpdates(failures, [], { blockingWorkflow: "build" });
+  const [unrelated] = planFailureUpdates(failures, [], { blockingWorkflow: "mail smoke" });
+
+  // then
+  assert.match(blocking.body, /every open pull request inherits the failure/);
+  assert.doesNotMatch(unrelated.body, /every open pull request inherits/);
 });
