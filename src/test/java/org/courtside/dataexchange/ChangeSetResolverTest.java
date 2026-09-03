@@ -200,6 +200,21 @@ class ChangeSetResolverTest {
     }
 
     @Test
+    void givenASourceNamingNoDefaultAtAll_whenARowWouldFallBackToIt_thenTheRunIsBlocked() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe"));
+        SourceConfiguration base = defaultingToARetiredType();
+        SourceConfiguration nameless = new SourceConfiguration(base.sourceId(), base.sourceKey(),
+                base.displayName(), base.separator(), base.encoding(), base.columns(),
+                base.membershipTypes(), null, base.ownedFields(), base.removalWarningPercent());
+
+        // when / then — asking an immutable set whether it holds null answers with a 500 otherwise
+        assertThatThrownBy(() -> resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, emptyRoster(), nameless))
+                .isInstanceOf(SnapshotBlockedException.class)
+                .extracting("code").isEqualTo("import.snapshot.membershipType.defaultInactive");
+    }
+
+    @Test
     void givenNoRowWouldFallBackToTheDefault_whenItIsNoLongerOffered_thenTheRunIsNotBlocked() {
         // given
         CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Roe"));

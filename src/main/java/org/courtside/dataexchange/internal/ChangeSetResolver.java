@@ -281,8 +281,9 @@ public final class ChangeSetResolver {
             throw new SnapshotBlockedException("import.snapshot.membershipType.inactive",
                     Map.of("values", List.copyOf(inactive)));
         }
+        UUID fallback = configuration.defaultMembershipTypeId();
         if (!fallingBack.isEmpty()
-                && !roster.activeMembershipTypeIds().contains(configuration.defaultMembershipTypeId())) {
+                && (fallback == null || !roster.activeMembershipTypeIds().contains(fallback))) {
             throw new SnapshotBlockedException("import.snapshot.membershipType.defaultInactive",
                     Map.of("rows", List.copyOf(fallingBack)));
         }
