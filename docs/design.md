@@ -1493,7 +1493,9 @@ whether it is built or designed. **Designed means absent today.**
   condition and is what the booking form draws its idempotency key from. *Built.*
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the release workflow signs each image keylessly with
-  cosign and attaches an SBOM attestation. Image scanning is designed and not built.*
+  cosign and attaches an SBOM attestation. Trivy scans the application's extracted layers and the
+  source tree on every pull request and every release; the container image's own base layers are
+  not, so that half is designed and not built.*
 - **The servlet container runs a version the platform does not manage.** Spring Boot 4.1.1 manages
   Tomcat 11.0.24, and `pom.xml` overrides that to 11.0.25 through the property Spring Boot documents
   for it. The earlier reading of this — that the advisories Apache published on 2026-08-25 reached
