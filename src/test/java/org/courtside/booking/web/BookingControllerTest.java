@@ -2,6 +2,7 @@ package org.courtside.booking.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.SqlStatementCounter;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingStatus;
@@ -16,6 +17,7 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.rules.testfixture.RulesTestFixture;
 import org.hamcrest.Matchers;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -69,6 +71,9 @@ class BookingControllerTest extends AbstractIntegrationTest {
     private JdbcClient jdbc;
 
     @Autowired
+    private SqlStatementCounter queries;
+
+    @Autowired
     private CardService cards;
 
     @Autowired
@@ -95,6 +100,11 @@ class BookingControllerTest extends AbstractIntegrationTest {
     private MockMvc mockMvc;
     private UUID courtId;
     private UUID secondCourtId;
+
+    @AfterEach
+    void stopCountingQueries() {
+        queries.pause();
+    }
 
     @BeforeEach
     void setUp() {
@@ -353,6 +363,22 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].cardLabel").value("Member booking"));
+    }
+
+    @Test
+    void givenAnEmptyDay_whenLoadingThePublicGrid_thenItsQueryBudgetIsStable() throws Exception {
+        // given
+        queries.reset();
+
+        // when
+        mockMvc.perform(get("/api/bookings").param("date", "2026-05-12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        SqlStatementCounter.Snapshot snapshot = queries.snapshot();
+
+        // then
+        assertThat(snapshot.total()).as(snapshot.toString()).isLessThanOrEqualTo(11);
+        assertThat(snapshot.category("other")).as(snapshot.toString()).isLessThanOrEqualTo(1);
     }
 
     @Test

@@ -20,9 +20,48 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 class ConfigServiceTest {
+
+    @Test
+    void givenAConfiguredTimeZone_whenReadingIt_thenOnlyTheLightweightViewIsRequested() {
+        // given
+        ClubConfigurationRepository configurations = mock();
+        ClubTimeZoneConfigurationRepository timeZones = mock();
+        ClubTimeZoneConfiguration timeZone = mock();
+        when(timeZones.findById(ClubConfiguration.SINGLETON_ID))
+                .thenReturn(Optional.of(timeZone));
+        when(timeZone.getTimeZone()).thenReturn("Europe/Berlin");
+        ConfigService service = new ConfigService(configurations, timeZones, mock(),
+                shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class));
+
+        // when
+        ZoneId result = service.zoneId();
+
+        // then
+        assertThat(result).isEqualTo(ZoneId.of("Europe/Berlin"));
+        verify(timeZones).findById(ClubConfiguration.SINGLETON_ID);
+        verifyNoInteractions(configurations);
+        verifyNoMoreInteractions(timeZones);
+    }
+
+    @Test
+    void givenTheConfigurationRowIsMissing_whenReadingTheTimeZone_thenTheFailureIsExplicit() {
+        // given
+        ClubConfigurationRepository configurations = mock();
+        ClubTimeZoneConfigurationRepository timeZones = mock();
+        when(timeZones.findById(ClubConfiguration.SINGLETON_ID))
+                .thenReturn(Optional.empty());
+        ConfigService service = new ConfigService(configurations, timeZones, mock(),
+                shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class));
+
+        // when / then
+        assertThatThrownBy(service::zoneId)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("The club configuration row is missing");
+    }
 
     @Test
     void givenGridAndTimeZoneChange_whenUpdating_thenGridConstraintReceivesBothNewValues() {
@@ -38,7 +77,7 @@ class ConfigServiceTest {
         when(configuration.getTimeZone()).thenReturn("Europe/Berlin");
         when(constraint.timeZoneConflictCode()).thenReturn(Optional.empty());
         when(constraint.conflictCode(any(), any())).thenReturn(Optional.empty());
-        ConfigService service = new ConfigService(configurations, mock(),
+        ConfigService service = new ConfigService(configurations, mock(), mock(),
                 shipping("de", "en"), List.of(constraint), mock(ApplicationEventPublisher.class));
 
         // when
@@ -59,7 +98,7 @@ class ConfigServiceTest {
     void givenALanguageTheImageShipsNoBundleFor_whenUpdating_thenNothingIsWritten() {
         // given
         ClubConfigurationRepository configurations = mock();
-        ConfigService service = new ConfigService(configurations, mock(),
+        ConfigService service = new ConfigService(configurations, mock(), mock(),
                 shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class));
 
         // when / then — the guard sits before the row is locked, so no caller can leave it half done

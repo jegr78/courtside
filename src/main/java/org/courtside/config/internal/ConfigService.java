@@ -40,6 +40,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     private static final String FOREIGN_KEY_VIOLATION = "23503";
 
     private final ClubConfigurationRepository configurations;
+    private final ClubTimeZoneConfigurationRepository timeZones;
     private final RuleSetAvailability ruleSets;
     private final SupportedLanguages languages;
     private final List<BookingGridConstraint> bookingGridConstraints;
@@ -93,7 +94,10 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
 
     @Override
     public ZoneId zoneId() {
-        return ZoneId.of(current().timeZone());
+        return ZoneId.of(timeZones.findById(ClubConfiguration.SINGLETON_ID)
+                .map(ClubTimeZoneConfiguration::getTimeZone)
+                .orElseThrow(() -> new IllegalStateException(
+                        "The club configuration row is missing")));
     }
 
     @Override
