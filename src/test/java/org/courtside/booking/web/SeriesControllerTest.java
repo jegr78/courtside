@@ -370,9 +370,12 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                                   "weekdays": ["TUESDAY"],
                                   "occurrenceCount": 2
                                 }
-                                """.formatted(courtId))
+                        """.formatted(courtId))
                         .with(csrf()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("durationMinutes"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Max"));
     }
 
     @Test
@@ -383,7 +386,10 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewJson(32768))
                         .with(csrf()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("occurrenceCount"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Max"));
     }
 
     @Test
@@ -403,9 +409,12 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                                   "weekdays": ["TUESDAY"],
                                   "occurrenceCount": 2
                                 }
-                                """.formatted(courtId))
+                        """.formatted(courtId))
                         .with(csrf()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("confirmedStarts"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
     }
 
     private String createSeriesAs(String username) throws Exception {

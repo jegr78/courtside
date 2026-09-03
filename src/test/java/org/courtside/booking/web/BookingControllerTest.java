@@ -30,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -177,10 +178,11 @@ class BookingControllerTest extends AbstractIntegrationTest {
     void givenNoIdempotencyKey_whenCreatingABooking_thenBadRequestIsReturned() throws Exception {
         // when / then
         mockMvc.perform(post("/api/bookings")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
-                        .with(csrf()))
-                .andExpect(status().isBadRequest());
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:request-rejected"));
 
         assertThat(bookings.count()).isZero();
     }
@@ -342,9 +344,10 @@ class BookingControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
-                        .with(csrf()))
+                .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                .with(csrf()))
                 .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:court-unavailable"))
                 .andExpect(jsonPath("$.title").value("Court unavailable"));
     }
 
@@ -732,21 +735,28 @@ class BookingControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnEndBeforeItsStart_whenCreatingABooking_thenBadRequest() throws Exception {
         // when / then
-        expectBadRequest(bookingJson("2026-05-12T19:00:00+02:00", "2026-05-12T18:00:00+02:00"));
+        expectBadRequest(bookingJson("2026-05-12T19:00:00+02:00", "2026-05-12T18:00:00+02:00"),
+                "urn:courtside:error:validation-failed")
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("endsAt"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.ChronologicalSlot"));
     }
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnUnknownCard_whenCreatingABooking_thenBadRequest() throws Exception {
         // when / then
-        expectBadRequest(bookingJson(courtId, UUID.randomUUID(), GUEST_PARTICIPANT));
+        expectBadRequest(bookingJson(courtId, UUID.randomUUID(), GUEST_PARTICIPANT),
+                "urn:courtside:error:card-not-bookable")
+                .andExpect(jsonPath("$.violations[0].code").value("card.unknown"));
     }
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnUnknownCourt_whenCreatingABooking_thenBadRequest() throws Exception {
         // when / then
-        expectBadRequest(bookingJson(UUID.randomUUID(), MEMBER_BOOKING_CARD, GUEST_PARTICIPANT));
+        expectBadRequest(bookingJson(UUID.randomUUID(), MEMBER_BOOKING_CARD, GUEST_PARTICIPANT),
+                "urn:courtside:error:court-not-bookable")
+                .andExpect(jsonPath("$.violations[0].code").value("court.unknown"));
     }
 
     @Test
@@ -756,7 +766,9 @@ class BookingControllerTest extends AbstractIntegrationTest {
         UUID retiredId = facilityFixture.createInactiveCourt(9, "Court 9");
 
         // when / then
-        expectBadRequest(bookingJson(retiredId, MEMBER_BOOKING_CARD, GUEST_PARTICIPANT));
+        expectBadRequest(bookingJson(retiredId, MEMBER_BOOKING_CARD, GUEST_PARTICIPANT),
+                "urn:courtside:error:court-not-bookable")
+                .andExpect(jsonPath("$.violations[0].code").value("court.inactive"));
     }
 
     @Test
@@ -764,7 +776,10 @@ class BookingControllerTest extends AbstractIntegrationTest {
     void givenAParticipantIdThatIsNoPerson_whenCreatingABooking_thenBadRequest() throws Exception {
         // when / then
         expectBadRequest(bookingJson(courtId, MEMBER_BOOKING_CARD,
-                "{ \"personId\": \"%s\" }".formatted(UUID.randomUUID())));
+                        "{ \"personId\": \"%s\" }".formatted(UUID.randomUUID())),
+                "urn:courtside:error:participants-invalid")
+                .andExpect(jsonPath("$.violations[0].code")
+                        .value("booking.participants.unknownPerson"));
     }
 
     @Test
@@ -773,7 +788,9 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // when / then
         expectBadRequest(bookingJson(courtId, MEMBER_BOOKING_CARD,
-                "{ \"personId\": \"%s\", \"guestName\": \"   \" }".formatted(UUID.randomUUID())));
+                        "{ \"personId\": \"%s\", \"guestName\": \"   \" }".formatted(UUID.randomUUID())),
+                "urn:courtside:error:participants-invalid")
+                .andExpect(jsonPath("$.violations[0].code").value("booking.participants.invalid"));
     }
 
     @Test
@@ -787,6 +804,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:participants-invalid"))
                 .andExpect(jsonPath("$.violations[0].code").value("booking.participants.slotCount"))
                 .andExpect(jsonPath("$.violations[0].params.cardLabel").value("Member booking"))
                 .andExpect(jsonPath("$.violations[0].params.allowed").value("2 / 4"))
@@ -807,9 +825,12 @@ class BookingControllerTest extends AbstractIntegrationTest {
                                   "endsAt": "2026-05-12T19:00:00+02:00"
                                 }
                                 """.formatted(MEMBER_BOOKING_CARD))
-                        .with(csrf()))
+                .with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("courtIds"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
     }
 
     @Test
@@ -1062,18 +1083,24 @@ class BookingControllerTest extends AbstractIntegrationTest {
                                   "endsAt": "2026-05-13T19:00:00+02:00",
                                   "participants": [{"guestName": "John Roe"}]
                                 }
-                                """)
+                        """)
                         .with(csrf()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("courtIds"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"))
+                .andExpect(jsonPath("$.fieldErrors[0].params.min").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].params.max").value(999));
     }
 
-    private void expectBadRequest(String body) throws Exception {
-        mockMvc.perform(bookingPost()
+    private ResultActions expectBadRequest(String body, String type) throws Exception {
+        return mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value(type));
     }
 
     private String trainingJson() {

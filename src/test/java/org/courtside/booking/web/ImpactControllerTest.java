@@ -302,7 +302,10 @@ class ImpactControllerTest extends AbstractIntegrationTest {
     void givenAnImpactRequest_whenTheLimitExceedsTheMaximum_thenItIsRejected() throws Exception {
         // when / then
         mockMvc.perform(get("/api/admin/impact/courts/" + UUID.randomUUID()).param("limit", "101"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("limit"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Max"));
     }
 
     @Test
