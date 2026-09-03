@@ -1,26 +1,25 @@
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useFailureMessage } from "../../api/useFailureMessage";
+import { useReportedFailure } from "../../failures/useReportedFailure";
 
 export function useSaving() {
   const { t } = useTranslation();
-  const failureMessage = useFailureMessage();
-  const [error, setError] = useState<string>();
+  const { message: error, report, refuse: refuseWith, clear } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
   const pendingRef = useRef(new Set<string>());
   const [pending, setPending] = useState(new Set<string>());
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
-    setError(failureMessage(failure));
-  }, [failureMessage]);
+    report(failure);
+  }, [report]);
 
   // A form that refuses its own body has a better answer than "please try again", and it still
   // has to take back whatever the last save said.
   const refuse = useCallback((message: string) => {
     setSuccess(undefined);
-    setError(message);
-  }, []);
+    refuseWith(message);
+  }, [refuseWith]);
 
   function replacePending(changed: Set<string>) {
     pendingRef.current = changed;
@@ -34,7 +33,7 @@ export function useSaving() {
     replacePending(new Set(pendingRef.current).add(key));
     try {
       await work();
-      setError(undefined);
+      clear();
       setSuccess(t("admin.facility.saved"));
     } catch (failure) {
       reportError(failure);

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, type MembershipType, type MembershipTypeRequest, type RuleSet } from "../api/client";
-import { useFailureMessage } from "../api/useFailureMessage";
+import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
@@ -24,18 +24,17 @@ interface Holders {
 export function AdminMembershipTypesView() {
   const newType = useUnsavedForm("membership-type:new");
   const { t } = useTranslation();
-  const failureMessage = useFailureMessage();
+  const { message: error, report, clear } = useReportedFailure();
   const [types, setTypes] = useState<MembershipType[]>();
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
   const [holders, setHolders] = useState<Record<string, Holders>>({});
-  const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
-    setError(failureMessage(failure));
-  }, [failureMessage]);
+    report(failure);
+  }, [report]);
 
   const countHolders = useCallback(async (membershipTypes: MembershipType[]) => {
     const counted = await Promise.all(membershipTypes.map(async (type) => {
@@ -66,7 +65,7 @@ export function AdminMembershipTypesView() {
           ? known.map((type) => type.id === changed.id ? changed : type)
           : [...known, changed];
       });
-      setError(undefined);
+      clear();
       setSuccess(t("admin.membershipTypes.saved"));
       return true;
     } catch (failure) {

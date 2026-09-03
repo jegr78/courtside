@@ -2,7 +2,8 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type Allocation, type BookingGrid, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
-import { problemMessage, problemReference } from "../api/problem-message";
+import { problemReference } from "../api/problem-message";
+import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
@@ -40,7 +41,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [selectedMembers, setSelectedMembers] = useState<PublicParticipantMember[]>([]);
   const [note, setNote] = useState("");
   const [violations, setViolations] = useState<Array<{ field: string; code: string; message: string }>>([]);
-  const [error, setError] = useState<string>();
+  const { message: error, report, clear } = useReportedFailure();
   const [submitting, setSubmitting] = useState(false);
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
@@ -50,8 +51,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       setBookingCards(cards);
       setParticipantCards(participants);
       setCardId(cards[0]?.id ?? "");
-    }).catch((failure: unknown) => setError(problemMessage(failure, t)));
-  }, [t]);
+    }).catch((failure: unknown) => report(failure));
+  }, [report]);
 
   useEffect(() => {
     const query = memberQuery.trim();
@@ -64,18 +65,18 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       void api.participantMembers(query).then((matches) => {
         if (active) setMemberMatches(matches.filter((match) =>
           !selectedMembers.some((selected) => selected.personId === match.personId)));
-      }).catch((failure: unknown) => { if (active) setError(problemMessage(failure, t)); });
+      }).catch((failure: unknown) => { if (active) report(failure); });
     }, 250);
     return () => {
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [memberQuery, selectedMembers, t]);
+  }, [memberQuery, report, selectedMembers]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
-    setError(undefined);
+    clear();
     setViolations([]);
     try {
       const { startsAt, endsAt } = bookingTimeSlot(
@@ -106,12 +107,10 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         if (translated.some((violation) => BEHIND_THE_DISCLOSURE.includes(violation.field))) {
           setShowsMore(true);
         }
-        setError(translated.length > 0
-          ? problemReference(failure, t)
-          : problemMessage(failure, t));
+        if (translated.length > 0) report(failure, problemReference); else report(failure);
         setRequestKey(idempotencyKey());
       } else {
-        setError(problemMessage(failure, t));
+        report(failure);
       }
     } finally {
       setSubmitting(false);

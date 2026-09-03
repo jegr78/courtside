@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type MembershipType, type RosterEntry } from "../api/client";
-import { useFailureMessage } from "../api/useFailureMessage";
+import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
@@ -37,11 +37,8 @@ export function AdminRosterView() {
   const [cursor, setCursor] = useState<string>();
   const [query, setQuery] = useState<string>();
   const [membershipTypeId, setMembershipTypeId] = useState<string>();
-  const [error, setError] = useState<string>();
+  const { message: error, report: reportError, clear } = useReportedFailure();
   const [pending, setPending] = useState(false);
-
-  const failureMessage = useFailureMessage();
-  const reportError = useCallback((failure: unknown) => setError(failureMessage(failure)), [failureMessage]);
 
   useEffect(() => {
     void Promise.all([api.roster(undefined, undefined, PAGE_SIZE, undefined), api.membershipTypes()])
@@ -62,7 +59,7 @@ export function AdminRosterView() {
       setMembershipTypeId(typeId);
       setEntries(page.entries);
       setCursor(page.nextCursor ?? undefined);
-      setError(undefined);
+      clear();
     } catch (failure) {
       reportError(failure);
     } finally {
@@ -77,7 +74,7 @@ export function AdminRosterView() {
       const page = await api.roster(query, cursor, PAGE_SIZE, membershipTypeId);
       setEntries((current) => [...(current ?? []), ...page.entries]);
       setCursor(page.nextCursor ?? undefined);
-      setError(undefined);
+      clear();
     } catch (failure) {
       reportError(failure);
     } finally {

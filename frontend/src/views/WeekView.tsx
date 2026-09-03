@@ -1,7 +1,7 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type Allocation, type BookingEligibility, type BookingGrid, type PublicCourt } from "../api/client";
-import { problemMessage } from "../api/problem-message";
+import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
@@ -40,10 +40,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const [selectedDate, setSelectedDate] = useState<string>();
   const [selectedCourtId, setSelectedCourtId] = useState<string>();
   const [data, setData] = useState<WeekData>();
-  const [error, setError] = useState<string>();
+  const { message: error, report, clear } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
   const [eligibility, setEligibility] = useState<BookingEligibility>();
-  const [eligibilityError, setEligibilityError] = useState<string>();
+  const { message: eligibilityError, report: reportEligibility, clear: clearEligibility } = useReportedFailure();
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
   const [drag, setDrag] = useState<{ courtId: string; anchor: string; head: string }>();
   const [cancellation, setCancellation] = useState<Allocation>();
@@ -56,7 +56,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   useEffect(() => {
     let active = true;
     setData(undefined);
-    setError(undefined);
+    clear();
     void Promise.all([api.bookingGrid(), api.courts()]).then(async ([grid, courts]) => {
       const clubToday = dateInTimeZone(referenceInstant, grid.timeZone);
       const weekStart = addDays(startOfWeek(clubToday), weekOffset * 7);
@@ -73,32 +73,32 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       }
     }).catch((failure: unknown) => {
       if (active) {
-        setError(problemMessage(failure, t));
+        report(failure);
       }
     });
     return () => { active = false; };
-  }, [referenceInstant, t, weekOffset]);
+  }, [clear, referenceInstant, report, weekOffset]);
 
   useEffect(() => {
     if (!canBook) {
       setEligibility(undefined);
-      setEligibilityError(undefined);
+      clearEligibility();
       return;
     }
     let active = true;
     setEligibility(undefined);
-    setEligibilityError(undefined);
+    clearEligibility();
     const refresh = () => {
       const request = ++eligibilityRequest.current;
       void api.bookingEligibility().then((current) => {
         if (active && request === eligibilityRequest.current) {
           setEligibility(current);
-          setEligibilityError(undefined);
+          clearEligibility();
         }
       }).catch((failure: unknown) => {
         if (active && request === eligibilityRequest.current) {
           setEligibility(undefined);
-          setEligibilityError(problemMessage(failure, t));
+          reportEligibility(failure);
         }
       });
     };
@@ -110,7 +110,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
     };
-  }, [canBook, t]);
+  }, [canBook, clearEligibility, reportEligibility]);
 
   useEffect(() => {
     if (eligibilityError || eligibility?.violations.length) setBookingSelection(undefined);
@@ -195,7 +195,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     if (!selectedDate || !data) return;
     const refresh = () => {
       setCurrentInstant(clock());
-      void refreshDate(selectedDate).catch((failure: unknown) => setError(problemMessage(failure, t)));
+      void refreshDate(selectedDate).catch((failure: unknown) => report(failure));
     };
     const interval = window.setInterval(refresh, 60_000);
     window.addEventListener("focus", refresh);
@@ -203,7 +203,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
     };
-  }, [clock, data, refreshDate, selectedDate, t]);
+  }, [clock, data, refreshDate, report, selectedDate]);
 
   useEffect(() => {
     if (!isToday || !currentSlot) return;
@@ -394,7 +394,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         try {
           await refreshDate(bookingSelection.date);
         } catch (failure) {
-          setError(problemMessage(failure, t));
+          report(failure);
         }
       }}
       conflicted={() => refreshDate(bookingSelection.date)}
@@ -410,7 +410,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         try {
           await refreshDate(selectedDate);
         } catch (failure) {
-          setError(problemMessage(failure, t));
+          report(failure);
         }
       }}
     />}

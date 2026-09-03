@@ -263,6 +263,19 @@ describe("AdminRosterView", () => {
       "People matching the current filters appear here. Change the search or add a person below."
     );
   });
+  it("given a failure on screen, when the language changes, then it is read out in the new language", async () => {
+    // given
+    vi.spyOn(api, "roster").mockRejectedValue(new Error("unavailable"));
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
+
+    // when
+    await act(() => i18n.changeLanguage("de"));
+
+    // then
+    expect(screen.getByRole("alert")).toHaveTextContent("Das hat nicht funktioniert. Bitte versuche es erneut.");
+  });
+
   it("given a filtered and paged roster, when the language changes, then the page is not fetched again", async () => {
     // given
     const reading = vi.spyOn(api, "roster")

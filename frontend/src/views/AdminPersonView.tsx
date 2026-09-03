@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api, type ClubConfig, type MembershipType, type MessageEntry, type PersonRequest, type Role, type RosterEntry } from "../api/client";
-import { useFailureMessage } from "../api/useFailureMessage";
+import { useReportedFailure } from "../failures/useReportedFailure";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -32,13 +32,12 @@ function arrivedFromPersonCreation(state: unknown): boolean {
 
 export function AdminPersonView() {
   const { t } = useTranslation();
-  const failureMessage = useFailureMessage();
+  const { message: error, report, clear } = useReportedFailure();
   const location = useLocation();
   const { personId = "" } = useParams();
   const { club, error: clubError } = useClubConfiguration();
   const [entry, setEntry] = useState<RosterEntry>();
   const [types, setTypes] = useState<MembershipType[]>([]);
-  const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string | undefined>(() => arrivedFromPersonCreation(location.state as unknown)
     ? t("admin.roster.personCreated")
     : undefined);
@@ -46,8 +45,8 @@ export function AdminPersonView() {
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
-    setError(failureMessage(failure));
-  }, [failureMessage]);
+    report(failure);
+  }, [report]);
 
   useEffect(() => {
     void Promise.all([api.person(personId), api.membershipTypes()])
@@ -65,7 +64,7 @@ export function AdminPersonView() {
     try {
       const changed = await change();
       setEntry(changed);
-      setError(undefined);
+      clear();
       setSuccess(t(message));
       return changed;
     } catch (failure) {
@@ -81,7 +80,7 @@ export function AdminPersonView() {
     setPending(true);
     try {
       downloadJson(`courtside-subject-access-${personId}.json`, await api.exportPersonData(personId));
-      setError(undefined);
+      clear();
       setSuccess(t("admin.person.subjectAccessProduced"));
     } catch (failure) {
       reportError(failure);
