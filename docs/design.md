@@ -1493,19 +1493,27 @@ whether it is built or designed. **Designed means absent today.**
   condition and is what the booking form draws its idempotency key from. *Built.*
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the release workflow signs each image keylessly with
-  cosign and attaches an SBOM attestation. Image scanning is designed and not built.*
-- **Accepted: the servlet container carries advisories no released platform version fixes.** Spring
-  Boot 4.1.1 manages Tomcat 11.0.24, and the advisories Apache published on 2026-08-25 name every
-  version through it — an allocation leak in HTTP/2 backlog tracking, a principal lookup that can
-  fail open, a rewrite valve that restarts at its second rule, and two constraint bypasses. What an
-  observer needs: a feature this application does not configure. Nothing sets `server.http2.enabled`
-  and the reverse proxy speaks HTTP/1.1 to the container, so neither HTTP/2 entry is reachable, and
-  there is no container realm, no client certificate, no rewrite valve, no `web.xml` and no security
-  constraint, because every authorization decision is made by the Spring Security filter chain. It
-  stays open because no Spring Boot release manages 11.0.25 yet, and overriding a version the
-  platform manages is how a dependency falls behind it instead. What bounds it: the fixed container
-  arrives with the next Boot patch, and the source scan names it as soon as the advisories reach the
-  vulnerability databases. *Built, as described.*
+  cosign and attaches an SBOM attestation. Trivy scans the application's extracted layers and the
+  source tree on every pull request and every release; the container image's own base layers are
+  not, so that half is designed and not built.*
+- **The servlet container runs a version the platform does not manage.** Spring Boot 4.1.1 manages
+  Tomcat 11.0.24, and `pom.xml` overrides that to 11.0.25 through the property Spring Boot documents
+  for it. The earlier reading of this — that the advisories Apache published on 2026-08-25 reached
+  nothing this application configures, and that overriding a managed version is how a dependency
+  falls behind the platform instead — held for that batch: no HTTP/2, no container realm, no client
+  certificate, no rewrite valve, no `web.xml` and no security constraint, because every
+  authorization decision is made by the Spring Security filter chain. It did not survive the next
+  batch. CVE-2026-65182, CVE-2026-65905 and CVE-2026-68525 are critical, they are improper access
+  control, an authentication bypass by capture-replay in the DIGEST authenticator and incorrect
+  authorization in FORM authentication, and 11.0.25 is the first version that fixes them. A
+  reachability argument is a reason to wait for a platform release, not a reason to sit on three
+  critical authentication defects, and no Spring Boot release manages 11.0.25.
+
+  What the override costs: the version is pinned here rather than by the platform, so it stops
+  moving when Spring Boot moves and somebody has to notice. What bounds that: the property names one
+  artifact and one version in one place, the nightly source scan reports whichever version is
+  resolved against the advisory databases, and a Boot release that manages 11.0.25 or later makes
+  the property removable. *Built, as described.*
 - **Accepted: the mail server fetches its admin interface unpinned.** The reference deployment
   pins every image it names by digest, and the mail image is no exception — but on first start
   that image downloads its own web interface from the latest GitHub release, outside the digest
