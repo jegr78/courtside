@@ -304,15 +304,12 @@ export function parseNpmReport(input, metadata = {}) {
       subject: metadata.subject ?? "unknown", reason: input.reason, findings: []
     };
   }
-  if (typeof input?.auditReportVersion !== "number") throw new Error("npm audit report requires auditReportVersion");
-  if (!input.vulnerabilities || Array.isArray(input.vulnerabilities) || typeof input.vulnerabilities !== "object") {
-    throw new Error("npm audit report requires vulnerabilities");
-  }
+  validateNpmReport(input);
   const findings = Object.entries(input.vulnerabilities).map(([name, finding]) => {
-    const advisory = finding.via?.find((entry) => typeof entry === "object");
+    const advisory = finding.via.find((entry) => typeof entry === "object");
     return {
       id: String(advisory?.source ?? advisory?.url ?? `npm:${name}`),
-      severity: String(finding.severity).toUpperCase(),
+      severity: finding.severity.toUpperCase(),
       target: `${name}@${finding.range}`,
       component: name,
       advisorySource: advisory?.url ?? null,
@@ -328,6 +325,30 @@ export function parseNpmReport(input, metadata = {}) {
     scanner: "npm", version: metadata.version ?? "unknown", status: "completed",
     subject: metadata.subject ?? "unknown", findings
   };
+}
+
+export function validateNpmReport(input) {
+  if (input?.auditReportVersion !== 2) throw new Error("npm audit report requires auditReportVersion 2");
+  if (!input.vulnerabilities || Array.isArray(input.vulnerabilities) || typeof input.vulnerabilities !== "object") {
+    throw new Error("npm audit report requires vulnerabilities");
+  }
+  const severities = new Set(["info", "low", "moderate", "high", "critical"]);
+  for (const [name, finding] of Object.entries(input.vulnerabilities)) {
+    if (name.trim() === "" || finding === null || typeof finding !== "object" || Array.isArray(finding)) {
+      throw new Error("npm audit vulnerability requires a name and object");
+    }
+    if (!severities.has(finding.severity)) throw new Error(`npm audit vulnerability ${name} has an invalid severity`);
+    if (typeof finding.range !== "string" || finding.range.trim() === "") {
+      throw new Error(`npm audit vulnerability ${name} requires a range`);
+    }
+    if (!Array.isArray(finding.via) || finding.via.some((advisory) =>
+      (typeof advisory !== "string" || advisory.trim() === "")
+      && (advisory === null || typeof advisory !== "object" || Array.isArray(advisory)
+        || (advisory.cwe !== undefined && (!Array.isArray(advisory.cwe)
+          || advisory.cwe.some((cwe) => typeof cwe !== "string")))))) {
+      throw new Error(`npm audit vulnerability ${name} has invalid via evidence`);
+    }
+  }
 }
 
 function trivyReport(path, metadata) {

@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { classifyAuditAttempt, runAudit } from "./npm-audit.mjs";
+import { auditTimeoutMilliseconds, classifyAuditAttempt, executeNpmAudit, runAudit } from "./npm-audit.mjs";
 
 const cleanReport = JSON.stringify({ auditReportVersion: 2, vulnerabilities: {} });
 
@@ -27,6 +27,12 @@ test("given a valid vulnerable report, when npm exits nonzero, then findings rem
   // then
   assert.equal(result.status, "completed");
   assert.equal(result.report.vulnerabilities.example.severity, "high");
+});
+
+test("given npm returns a report with an unexpected exit code, when classification runs, then it fails closed", () => {
+  // when / then
+  assert.throws(() => classifyAuditAttempt({ status: 2, stdout: cleanReport, stderr: "" }),
+    /unexpected exit code/);
 });
 
 test("given the audit service is unavailable, when npm returns no report, then evidence says skipped", () => {
@@ -63,6 +69,31 @@ test("given the audit request times out, when npm returns no report, then eviden
   assert.equal(result.report.reason, "network-unavailable");
 });
 
+test("given the npm process exceeds its budget without network evidence, when execution ends, then it fails closed", () => {
+  // when / then
+  assert.throws(() => classifyAuditAttempt({
+    status: null, stdout: "", stderr: "", error: { code: "ETIMEDOUT" }
+  }), /process budget/);
+});
+
+test("given npm is executed, when planning the child process, then it has a bounded six-minute budget", () => {
+  // given
+  let invocation;
+  const execute = (...args) => {
+    invocation = args;
+    return { status: 0, stdout: cleanReport, stderr: "" };
+  };
+
+  // when
+  executeNpmAudit(execute, { npm_execpath: "/opt/npm-cli.js" }, "/repo/frontend");
+
+  // then
+  assert.equal(auditTimeoutMilliseconds, 360_000);
+  assert.equal(invocation[2].timeout, auditTimeoutMilliseconds);
+  assert.equal(invocation[2].maxBuffer, 10 * 1024 * 1024);
+  assert.equal(invocation[2].killSignal, "SIGKILL");
+});
+
 test("given malformed or unknown output, when classification runs, then it fails closed", () => {
   // when / then
   assert.throws(() => classifyAuditAttempt({ status: 1, stdout: "not json", stderr: "network timeout" }),
@@ -76,6 +107,13 @@ test("given malformed or unknown output, when classification runs, then it fails
   }), /unclassified/);
   assert.throws(() => classifyAuditAttempt({ status: 0, stdout: "", stderr: "" }),
     /produced no report/);
+  assert.throws(() => classifyAuditAttempt({
+    status: 1,
+    stdout: JSON.stringify({ auditReportVersion: 2, vulnerabilities: {
+      example: { range: "<2", via: [] }
+    } }),
+    stderr: ""
+  }), /severity/);
 });
 
 test("given an unavailable service, when the audit runner writes evidence, then it exits successfully with a skipped record", () => {

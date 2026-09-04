@@ -66,7 +66,8 @@ jobs:
           count=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues?state=open&labels=nightly&per_page=100" \
             --slurp | jq '[map(.[])[] | select(.pull_request == null) |
               select(.title | startswith("[nightly] ")) |
-              select(.body | contains("courtside-nightly-fingerprint"))] | length')
+              select(.body | contains("courtside-nightly-fingerprint")) |
+              select(.body | contains("- Workflow: `npm audit`") | not)] | length')
           test "$count" = 0 || { echo "::error::$count nightly failure issue(s) remain open"; exit 1; }
 
       - name: Take the version from the tag

@@ -186,6 +186,15 @@ test("given structurally incomplete scanner reports, when parsing them, then the
   // when / then
   assert.throws(() => parseTrivyReport({}), /Results/);
   assert.throws(() => parseNpmReport({ vulnerabilities: {} }), /auditReportVersion/);
+  assert.throws(() => parseNpmReport({ auditReportVersion: 2, vulnerabilities: {
+    example: { range: "<2", via: [] }
+  } }), /severity/);
+  assert.throws(() => parseNpmReport({ auditReportVersion: 2, vulnerabilities: {
+    example: { severity: "high", range: "<2", via: "advisory" }
+  } }), /via/);
+  assert.throws(() => parseNpmReport({ auditReportVersion: 2, vulnerabilities: {
+    example: { severity: "unknown", range: "<2", via: [] }
+  } }), /severity/);
   assert.throws(() => parseCodeqlReport({}), /runs/);
 });
 

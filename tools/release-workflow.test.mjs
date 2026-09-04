@@ -39,6 +39,8 @@ test("given npm audit is unavailable, when building a release, then explicit ski
   // when / then
   assert.match(workflow, /npm-cli\.js run audit:security --[\s\\]+--output \.\.\/build\/security\/npm\.json/);
   assert.doesNotMatch(workflow, /npm-cli\.js --prefix frontend audit --json/);
+  assert.match(workflow,
+    /Refuse unresolved nightly failures[\s\S]+select\(\.body \| contains\("- Workflow: `npm audit`"\) \| not\)/);
 });
 
 test("given a qualified manifest, when publishing it, then tags and signatures address that manifest without rebuilding", () => {
