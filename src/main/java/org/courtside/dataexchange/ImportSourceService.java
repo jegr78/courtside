@@ -7,6 +7,7 @@ import org.courtside.dataexchange.internal.ImportRunRepository;
 import org.courtside.dataexchange.internal.ImportSourceRepository;
 import org.courtside.dataexchange.internal.ReportedValue;
 import org.courtside.member.MemberService;
+import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -188,8 +189,8 @@ public class ImportSourceService {
         try {
             return sources.saveAndFlush(source);
         } catch (DataIntegrityViolationException e) {
-            String message = e.getMostSpecificCause().getMessage();
-            if (message != null && message.contains(UNIQUE_KEY_CONSTRAINT)) {
+            if (SqlConstraintViolation.matches(
+                    e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_KEY_CONSTRAINT)) {
                 throw new ImportSourceKeyTakenException(
                         "Import source key '" + source.getSourceKey() + "' is already taken", e);
             }

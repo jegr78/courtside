@@ -126,6 +126,19 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenARejectedValueNamingAnotherConstraint_whenLinking_thenTheActualConstraintWins() {
+        // given
+        UUID source = source("roster-system");
+        UUID jane = person("Jane", "Doe");
+        references.link(source, "4711", jane);
+
+        // when / then
+        assertThatThrownBy(() -> references.link(
+                source, "import_external_reference_unique_external_id", jane))
+                .isInstanceOf(PersonAlreadyLinkedException.class);
+    }
+
+    @Test
     void givenALinkThatAlreadySaysThis_whenItIsMadeAgain_thenItStands() {
         // given
         UUID source = source("roster-system");

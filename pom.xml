@@ -128,7 +128,6 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
@@ -220,7 +219,7 @@
                         <id>npm-ci</id>
                         <phase>prepare-package</phase>
                         <goals><goal>npm</goal></goals>
-                        <configuration><arguments>ci</arguments></configuration>
+                        <configuration><arguments>ci --no-audit</arguments></configuration>
                     </execution>
                     <execution>
                         <id>npm-lint</id>

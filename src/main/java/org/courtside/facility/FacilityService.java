@@ -6,6 +6,7 @@ import org.courtside.facility.internal.OpeningHoursRepository;
 import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.InvalidOpeningWindowException;
 import org.courtside.shared.OpeningWindow;
+import org.courtside.shared.SqlConstraintViolation;
 import org.courtside.config.BookingGridSettings;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.BookingGridCoordination;
@@ -252,7 +253,7 @@ public class FacilityService {
     }
 
     private boolean isNumberTaken(DataIntegrityViolationException e) {
-        String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(UNIQUE_NUMBER_CONSTRAINT);
+        return SqlConstraintViolation.matches(
+                e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_NUMBER_CONSTRAINT);
     }
 }
