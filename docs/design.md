@@ -1802,6 +1802,12 @@ deliver the implementation.
   *what was executed* needs, and no member's name, address or number. A scheduled sweep enforces the
   bound, a preview past it answers without its change set, and a swept preview is refused rather
   than executed against one that is no longer there. **Built.**
+- **An import outlives whoever ran it.** A run and the preview it came from record the account that
+  took the action, and neither carries a foreign key to it — the same arrangement `domain_event`
+  uses and for the same reason. Removing the account leaves an id naming nobody, which is what makes
+  the record anonymous rather than gone: what an audit of the roster needs is that an import
+  happened, when, and with which counts, and none of that is personal data about the person who
+  pressed the button. Cascading would have deleted the evidence along with them. **Built.**
 - **Describing a source uploads nothing at all.** The column mapping and the category values a
   board picks from are read out of the club's file in the browser; no request carries it, and the
   instance learns the headers only as the mapping the board saved. This is a stronger promise than
