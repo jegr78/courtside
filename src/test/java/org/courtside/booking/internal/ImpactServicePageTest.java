@@ -5,6 +5,8 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.shared.OpeningWindow;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -26,12 +28,27 @@ class ImpactServicePageTest extends AbstractIntegrationTest {
     @Autowired
     private EntityManagerFactory entityManagerFactory;
 
+    private Statistics statistics;
+    private boolean statisticsWereEnabled;
+
+    @BeforeEach
+    void enableStatistics() {
+        statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statisticsWereEnabled = statistics.isStatisticsEnabled();
+        statistics.setStatisticsEnabled(true);
+        statistics.clear();
+    }
+
+    @AfterEach
+    void restoreStatistics() {
+        statistics.clear();
+        statistics.setStatisticsEnabled(statisticsWereEnabled);
+    }
+
     @Test
     void givenAnAnnouncementPage_whenReadingIt_thenItOmitsTheInteractiveCountQuery() {
         // given
-        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-        statistics.setStatisticsEnabled(true);
-        statistics.clear();
+        assertThat(statistics.getQueryExecutionCount()).isZero();
 
         // when
         ImpactService.ImpactPage page = impact.pageOfOpeningHours(
@@ -46,9 +63,7 @@ class ImpactServicePageTest extends AbstractIntegrationTest {
     @Test
     void givenAnInteractivePreview_whenReadingIt_thenItStillComputesTheAffectedCount() {
         // given
-        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-        statistics.setStatisticsEnabled(true);
-        statistics.clear();
+        assertThat(statistics.getQueryExecutionCount()).isZero();
 
         // when
         ImpactService.Impact preview = impact.ofOpeningHours(
