@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError } from "../api/client";
@@ -210,6 +210,26 @@ it("given signing out fails, when it is attempted, then the failure is shown and
   // then
   expect(await screen.findByRole("alert")).toBeInTheDocument();
   expect(signedOut).not.toHaveBeenCalled();
+});
+
+it("given the instance has already ended the session, when signing out, then it ends signed out without a failure", async () => {
+  // given
+  const signedOut = vi.fn();
+  vi.spyOn(api, "logout").mockRejectedValue(new ApiError(401, {
+    type: "urn:courtside:error:unauthenticated",
+    title: "Not authenticated",
+    status: 401
+  }));
+  render(<Preferences authenticated signedOut={signedOut} />);
+  await openPreferences();
+
+  // when
+  await userEvent.click(screen.getByTestId("logout"));
+
+  // then
+  await waitFor(() => expect(signedOut).toHaveBeenCalled());
+  expect(screen.queryByTestId("preferences-failure")).not.toBeInTheDocument();
+  expect(screen.getByTestId("preferences-menu").closest("details")).not.toHaveAttribute("open");
 });
 
 it("given nobody is signed in, when the menu is opened, then it offers nothing to sign out of", async () => {

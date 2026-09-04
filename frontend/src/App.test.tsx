@@ -331,6 +331,29 @@ describe("App build identity", () => {
     await i18n.changeLanguage("en");
   });
 
+  it("given a failure raised while signed in, when the session ends and the shell returns to sign-in, then the message does not outlive it", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue({
+      authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false, displayName: "Jane Doe"
+    });
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingHours: [] });
+    vi.spyOn(api, "courts").mockResolvedValue([]);
+    vi.spyOn(api, "logout").mockRejectedValue(new Error("network"));
+    render(<RoutedShell><App /></RoutedShell>);
+    await userEvent.click(await screen.findByTestId("preferences-menu"));
+    await userEvent.click(screen.getByTestId("logout"));
+    expect(await screen.findByTestId("preferences-failure")).toBeInTheDocument();
+
+    // when
+    fireEvent(window, new Event("courtside:unauthenticated"));
+
+    // then
+    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("preferences-failure")).not.toBeInTheDocument();
+  });
+
   it("given an account that reads another language, when it signs in, then the navigation never appears in the language it is about to leave", async () => {
     // given — the shell starts in the club's default language and the account reads English
     await i18n.changeLanguage("de");

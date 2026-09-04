@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api } from "../api/client";
+import { api, ApiError } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { setLocale, supportedLocale, type SupportedLocale } from "../i18n";
 import { initialTheme, setTheme, type Theme } from "../theme";
@@ -40,11 +40,15 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
     setFailure(undefined);
     try {
       await api.logout();
-      setOpen(false);
-      signedOut?.();
     } catch (rejected) {
-      setFailure(problemMessage(rejected, t));
+      // A session the instance has already ended refuses the request that would have ended it.
+      if (!(rejected instanceof ApiError) || rejected.status !== 401) {
+        setFailure(problemMessage(rejected, t));
+        return;
+      }
     }
+    setOpen(false);
+    signedOut?.();
   }
 
   function changeTheme(value: Theme) {
