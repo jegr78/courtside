@@ -409,14 +409,17 @@ test("an initial password change ends every active session for the account", asy
   await Promise.all([first.close(), second.close()]);
 });
 
-// The account keeps its stored session row and only its epoch moves, which is the one shape that
-// reaches the refusal: a deleted row leaves the request anonymous and the logout filter answers 204.
+// Whichever request arrives first consumes the revocation, so the epoch moves while the sign-out is
+// in flight rather than before it, where the week view's next refresh would take the refusal instead.
 test("a session the instance revoked signs out onto sign-in without an error", async ({ pinnedBrowser, journeyService }) => {
   // given
   const context = await memberContext(pinnedBrowser, journeyService, "doe.jane");
   const [page] = context.pages();
-  await journeyService.executeSql(
-    "UPDATE user_account SET security_epoch = security_epoch + 1 WHERE username = 'doe.jane'");
+  await page.route("**/api/session/logout", async (route) => {
+    await journeyService.executeSql(
+      "UPDATE user_account SET security_epoch = security_epoch + 1 WHERE username = 'doe.jane'");
+    await route.continue();
+  });
 
   // when
   const refused = page.waitForResponse((response) => response.url().endsWith("/api/session/logout"));
