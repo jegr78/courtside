@@ -4,7 +4,6 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.dataexchange.internal.ImportPreviewRepository;
 import org.courtside.dataexchange.internal.ImportRunRepository;
 import org.courtside.identity.Role;
-import org.courtside.identity.UserAccountRepository;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,9 +46,6 @@ class ImportRecordSurvivalTest extends AbstractIntegrationTest {
     private ImportRunRepository storedRuns;
 
     @Autowired
-    private UserAccountRepository accounts;
-
-    @Autowired
     private IdentityTestFixture identity;
 
     private UUID source;
@@ -77,11 +73,10 @@ class ImportRecordSurvivalTest extends AbstractIntegrationTest {
         UUID runId = executions.execute(previewId, false, account).runId();
 
         // when
-        accounts.deleteById(account);
-        accounts.flush();
+        identity.removeAccount(account);
 
         // then
-        assertThat(accounts.existsById(account)).isFalse();
+        assertThat(identity.accountExists(account)).isFalse();
         assertThat(storedRuns.findById(runId).orElseThrow().getExecutedByAccountId())
                 .isEqualTo(account);
         assertThat(storedPreviews.findById(previewId).orElseThrow().getCreatedByAccountId())
