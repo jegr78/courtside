@@ -139,6 +139,17 @@ function logoUpload(jar) {
   };
 }
 
+async function createBooking(jar, port, courtId, cardId, startsAt, idempotencyKey) {
+  return expectJson(jar, port, {
+    path: "/api/bookings", method: "POST",
+    headers: mutationHeaders(jar, { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey }),
+    body: JSON.stringify({
+      courtIds: [courtId], cardId, startsAt: startsAt.toISOString(),
+      endsAt: new Date(startsAt.getTime() + 3_600_000).toISOString(), participants: []
+    })
+  }, 201);
+}
+
 async function populateThroughApplication(password, permanentPassword, port) {
   const jar = new Map();
   await logIn(jar, port, password);
@@ -179,17 +190,13 @@ async function populateThroughApplication(password, permanentPassword, port) {
   const startsAt = new Date();
   startsAt.setUTCDate(startsAt.getUTCDate() + 2);
   startsAt.setUTCHours(12, 0, 0, 0);
-  const booking = await expectJson(jar, port, {
-    path: "/api/bookings", method: "POST",
-    headers: mutationHeaders(jar, {
-      "Content-Type": "application/json", "Idempotency-Key": "application-restore-write"
-    }),
-    body: JSON.stringify({
-      courtIds: [court.id], cardId: card.id, startsAt: startsAt.toISOString(),
-      endsAt: new Date(startsAt.getTime() + 3_600_000).toISOString(), participants: []
-    })
-  }, 201);
-  return { bookingId: booking.id, logoDigest: configuration.logoUrl.split("v=")[1] };
+  const booking = await createBooking(
+    jar, port, court.id, card.id, startsAt, "application-restore-write");
+  return {
+    bookingId: booking.id,
+    logoDigest: configuration.logoUrl.split("v=")[1],
+    session: { jar, courtId: court.id, cardId: card.id, startsAt }
+  };
 }
 
 function applicationEvidence(project, environment) {
@@ -229,9 +236,7 @@ async function waitForApplicationWrites(project, environment) {
       'settledMessage', (SELECT count(*) FROM message_record WHERE state <> 'QUEUED'),
       'session', (SELECT count(*) FROM spring_session),
       'storedLogo', (SELECT count(*) FROM club_config WHERE logo_content IS NOT NULL))`]).stdout.trim());
-    const written = Object.entries(observed)
-      .filter(([name]) => name !== "eventPublication")
-      .every(([, count]) => count > 0);
+    const written = Object.values(observed).every((count) => count > 0);
     if (written) return;
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 250));
   }
@@ -361,11 +366,25 @@ async function execute() {
     compose(project, environment, ["up", "-d", "--wait"]);
     const applicationIdentity = await populateThroughApplication(
       password, permanentPassword, publishedPort(project, environment));
+    await waitForDatabase(project, environment,
+      "SELECT count(*) FROM message_record WHERE state <> 'QUEUED'", "1");
+    compose(project, environment, ["stop", "mail"]);
+    const pendingStartsAt = new Date(applicationIdentity.session.startsAt);
+    pendingStartsAt.setUTCDate(pendingStartsAt.getUTCDate() + 1);
+    await createBooking(
+      applicationIdentity.session.jar,
+      publishedPort(project, environment),
+      applicationIdentity.session.courtId,
+      applicationIdentity.session.cardId,
+      pendingStartsAt,
+      "application-restore-pending-publication");
     await waitForApplicationWrites(project, environment);
     compose(project, environment, ["stop", "app"]);
     const applicationBefore = applicationEvidence(project, environment);
     assert.deepEqual(Object.keys(applicationBefore.tables).sort(), applicationStateTables,
       "application evidence does not name the required tables");
+    assert.ok(applicationBefore.tables.event_publication.rows > 0,
+      "application evidence contains no outstanding event publication");
     writeFileSync(join(build, "application-before.json"), `${JSON.stringify(applicationBefore, null, 2)}\n`);
     const applicationDump = compose(project, environment,
       ["exec", "-T", "db", "pg_dump", "-Fc", "--no-owner", "-U", "courtside", "courtside"],
@@ -389,6 +408,7 @@ async function execute() {
       "restored application database differs from its backup source");
     await proveInterruptedRestore(
       project, environment, applicationDump, applicationAfter, applicationEvidence);
+    compose(project, environment, ["start", "mail"]);
     compose(project, environment, ["up", "-d", "--wait", "app"]);
     await verifyRestoredApplication(
       permanentPassword, publishedPort(project, environment), applicationIdentity);
