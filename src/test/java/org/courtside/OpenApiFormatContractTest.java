@@ -80,6 +80,27 @@ class OpenApiFormatContractTest {
         assertThat(stringHasPattern).isTrue();
     }
 
+    @Test
+    void givenBookingCardRoles_whenReadingTheirContract_thenBothEmptyCasesAreActionable() {
+        // when / then
+        List.of("BookingCard", "BookingCardRequest").forEach(schema -> {
+            assertThat(normalizedDescription(schema, "allowedRoles"))
+                    .as("%s.allowedRoles", schema)
+                    .contains("Holding any listed role is sufficient")
+                    .contains("Empty permits every authenticated member account")
+                    .contains("Future external accounts require `EXTERNAL_BOOKER` explicitly")
+                    .contains("Administrators may always book");
+            assertThat(normalizedDescription(schema, "managingRoles").toLowerCase())
+                    .as("%s.managingRoles", schema)
+                    .contains("empty means only an admin may");
+        });
+    }
+
+    private String normalizedDescription(String schema, String property) {
+        Object description = property(schema, property).get("description");
+        return description == null ? null : description.toString().replaceAll("\\s+", " ").trim();
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> parameter(String path, String name) {
         Map<String, Object> paths = (Map<String, Object>) document.get("paths");
