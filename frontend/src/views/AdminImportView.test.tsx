@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api, type ImportSource, type MembershipType } from "../api/client";
 import i18n from "../i18n";
+import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
+import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { AdminImportView } from "./AdminImportView";
 
@@ -23,10 +25,23 @@ const rosterSystem: ImportSource = {
 const clubRegistry: ImportSource = { ...rosterSystem, id: "source-2", sourceKey: "club-registry", displayName: "Club registry" };
 
 function show() {
-  render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+  render(<MemoryRouter><WithClubConfiguration><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 }
 
 describe("AdminImportView", () => {
+
+  it("given the club configuration cannot be read, when the view opens, then it says so instead of waiting in silence", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><ClubConfigurationProvider><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></ClubConfigurationProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
   it("when the page is shown, then its content keeps a readable line length", () => {
     // when
     show();
@@ -194,7 +209,7 @@ describe("AdminImportView", () => {
   it("given a described source is edited, when another source is opened, then the edit is not dropped silently", async () => {
     // given
     vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
-    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    show();
     await userEvent.click(await screen.findByTestId("source-choice-source-1"));
     await userEvent.type(await screen.findByTestId("source-name"), " plus");
 
@@ -223,7 +238,7 @@ describe("AdminImportView", () => {
   it("given a source with nothing edited, when another source is opened, then it opens without a question", async () => {
     // given
     vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
-    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    show();
     await userEvent.click(await screen.findByTestId("source-choice-source-1"));
     await screen.findByTestId("source-name");
 
@@ -238,7 +253,7 @@ describe("AdminImportView", () => {
   it("given a described source is edited, when the same source is chosen again, then nothing is asked", async () => {
     // given
     vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
-    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    show();
     await userEvent.click(await screen.findByTestId("source-choice-source-1"));
     await userEvent.type(await screen.findByTestId("source-name"), " plus");
 
@@ -254,7 +269,7 @@ describe("AdminImportView", () => {
     // given
     vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem, clubRegistry]);
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
-    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    show();
     await userEvent.click(await screen.findByTestId("source-choice-source-1"));
     await userEvent.type(await screen.findByTestId("reference-external-id"), "4711");
 
@@ -268,7 +283,7 @@ describe("AdminImportView", () => {
   it("given a source being described for the first time, when another is opened, then it is asked about", async () => {
     // given
     vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
-    render(<MemoryRouter><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></MemoryRouter>);
+    show();
     await userEvent.click(await screen.findByTestId("new-source"));
     await userEvent.type(await screen.findByTestId("source-name"), "Club registry");
 

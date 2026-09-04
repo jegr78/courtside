@@ -1,4 +1,5 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { api, type ImportPersonChange, type ImportPreview, type SnapshotMode } from "../../api/client";
 import { NotUtf8Error, readCsvHeader } from "../../import/read-csv";
@@ -14,8 +15,9 @@ function accountsOpenedBy(preview: ImportPreview): number {
   return preview.changes.filter((change) => change.account === "CREATE").length;
 }
 
-function changed(change: ImportPersonChange): string {
-  return Object.entries(change.values).map(([field, value]) => `${field}: ${value}`).join(", ");
+function changed(change: ImportPersonChange, t: TFunction): string {
+  return Object.entries(change.values)
+    .map(([field, value]) => `${t(`admin.import.field.${field}`)}: ${value}`).join(", ");
 }
 
 export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled, previewed, reportError }: {
@@ -123,7 +125,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
             <span className="font-semibold">{t(`admin.import.kind.${change.kind}`)}</span>
             {" "}<span className="font-mono">{change.externalId}</span>
             {change.personName && <> — {change.personName}</>}
-            {Object.keys(change.values).length > 0 && <> — {changed(change)}</>}
+            {Object.keys(change.values).length > 0 && <> — {changed(change, t)}</>}
             {change.account !== "NOT_ASKED" && <> — {t(`admin.import.account.${change.account}`)}</>}
           </li>)}
         </ul>

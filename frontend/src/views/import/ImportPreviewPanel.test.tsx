@@ -46,6 +46,20 @@ describe("ImportPreviewPanel", () => {
     vi.spyOn(api, "supportedEncodings").mockResolvedValue(["ISO-8859-15", "UTF-8", "windows-1252"]);
   });
 
+
+  it("given a change to a person's data, when the preview lists it, then the field is named the way the rest of the administration names it", async () => {
+    // given
+    show(preview);
+
+    // when
+    const row = await screen.findByTestId("change-CREATE-4711");
+
+    // then
+    expect(row).toHaveTextContent("First name: Jane");
+    expect(row).toHaveTextContent("Last name: Doe");
+    expect(row).not.toHaveTextContent("FIRST_NAME");
+    expect(row).not.toHaveTextContent("LAST_NAME");
+  });
   it("when nothing is uploaded yet, then a partial list is what an upload would mean", () => {
     // given / when
     show(undefined);

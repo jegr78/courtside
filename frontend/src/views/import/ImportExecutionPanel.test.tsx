@@ -41,11 +41,12 @@ const run: ImportRun = {
   executedAt: "2026-08-21T10:05:00Z"
 };
 
-function show(current: ImportPreview | undefined, executed = vi.fn()) {
+function show(current: ImportPreview | undefined, executed = vi.fn(), timeZone: string | undefined = "Europe/Berlin") {
   render(<ImportExecutionPanel
     sourceId="source-1"
     preview={current}
     disabled={false}
+    timeZone={timeZone}
     executed={executed}
     reportError={vi.fn()}
   />);
@@ -56,6 +57,38 @@ describe("ImportExecutionPanel", () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "importRuns").mockResolvedValue([]);
+  });
+
+  it("given a browser in another zone than the club, when a past run is listed, then its time reads in the club's zone", async () => {
+    // given — the run happened on 21 August at 10:05 UTC, which is already the 22nd in the club's zone
+    vi.spyOn(api, "importRuns").mockResolvedValue([run]);
+
+    // when
+    show(preview, vi.fn(), "Pacific/Kiritimati");
+
+    // then
+    const entry = await screen.findByTestId("import-run-run-1");
+    expect(entry).toHaveTextContent("Aug 22, 2026");
+    expect(entry).not.toHaveTextContent("Aug 21, 2026");
+  });
+
+  it("given the club's zone is not known yet, when the run log renders, then it names no time at all", async () => {
+    // given
+    vi.spyOn(api, "importRuns").mockResolvedValue([run]);
+
+    // when — rendered here rather than through the helper, whose default would fill the zone in
+    render(<ImportExecutionPanel
+      sourceId="source-1"
+      preview={preview}
+      disabled={false}
+      timeZone={undefined}
+      executed={vi.fn()}
+      reportError={vi.fn()}
+    />);
+
+    // then
+    expect(await screen.findByTestId("runs-loading")).toHaveTextContent("Earlier runs are being loaded");
+    expect(screen.queryByTestId("import-run-run-1")).not.toBeInTheDocument();
   });
 
   it("given a reviewed preview, when it is executed, then the run is confirmed first", async () => {
