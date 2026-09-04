@@ -23,7 +23,8 @@ test("given no external fingerprint, when checking the recipient, then evidence 
 
 test("given another anchored fingerprint, when checking the recipient, then evidence sealing is refused", () => {
   // given
-  const otherFingerprint = `00:${fingerprint.slice(3)}`;
+  const replacementByte = fingerprint.startsWith("00:") ? "FF" : "00";
+  const otherFingerprint = `${replacementByte}:${fingerprint.slice(3)}`;
 
   // when / then
   assert.throws(() => verifyRecipientFingerprint(certificate, otherFingerprint), /does not match/);

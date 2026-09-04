@@ -1,7 +1,7 @@
 import { X509Certificate } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 export function verifyRecipientFingerprint(certificateBytes, expectedFingerprint) {
   if (typeof expectedFingerprint !== "string" || expectedFingerprint.trim() === "") {
