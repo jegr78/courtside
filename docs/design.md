@@ -1804,10 +1804,13 @@ deliver the implementation.
   than executed against one that is no longer there. **Built.**
 - **An import outlives whoever ran it.** A run and the preview it came from record the account that
   took the action, and neither carries a foreign key to it — the same arrangement `domain_event`
-  uses and for the same reason. Removing the account leaves an id naming nobody, which is what makes
-  the record anonymous rather than gone: what an audit of the roster needs is that an import
-  happened, when, and with which counts, and none of that is personal data about the person who
-  pressed the button. Cascading would have deleted the evidence along with them. **Built.**
+  uses and for the same reason. Removing the account no longer has to take the record with it, which
+  is what cascading would have done: what an audit of the roster needs is that an import happened,
+  when, and with which counts, and none of that is personal data about the person who pressed the
+  button. The id beside it stops naming anybody on the same terms as the log above — when the
+  *person* goes, not when the account does, because the log itself still holds the pair. This says
+  nothing about the rest of a preview: its change set is a club's membership list and is bounded by
+  the retention in the point above, not by this one. **Built.**
 - **Describing a source uploads nothing at all.** The column mapping and the category values a
   board picks from are read out of the club's file in the browser; no request carries it, and the
   instance learns the headers only as the mapping the board saved. This is a stronger promise than
