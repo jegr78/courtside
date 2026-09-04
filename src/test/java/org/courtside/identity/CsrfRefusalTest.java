@@ -1,5 +1,6 @@
 package org.courtside.identity;
 
+import jakarta.servlet.http.Cookie;
 import org.courtside.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,21 @@ class CsrfRefusalTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("username", "doe.jane")
                         .param("password", "secret"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value(ACCESS_DENIED));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenARotatedTokenCookie_whenAWriteEchoesTheOldOne_thenTheRefusalNamesAccessDenied()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}")
+                        .cookie(new Cookie("XSRF-TOKEN", "the-token-that-survived"))
+                        .header("X-XSRF-TOKEN", "the-token-that-was-replaced"))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value(ACCESS_DENIED));

@@ -148,7 +148,7 @@ components:
         parameter because it is consumed before the operation runs and is never part of its input.
 
         A write without it answers `403` carrying `urn:courtside:error:access-denied`, the same
-        problem an authorisation refusal carries. The token is checked before the request reaches
+        problem an authorization refusal carries. The token is checked before the request reaches
         an operation, so the refusal says nothing about the caller's session or rights.
 
   parameters:

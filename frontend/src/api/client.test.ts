@@ -12,9 +12,9 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-function refusal(type = "urn:courtside:error:access-denied", status = 403) {
-  return HttpResponse.json({ type, title: "Refused", status },
-    { status, headers: { "Content-Type": "application/problem+json" } });
+function refusal(type = "urn:courtside:error:access-denied") {
+  return HttpResponse.json({ type, title: "Refused", status: 403 },
+    { status: 403, headers: { "Content-Type": "application/problem+json" } });
 }
 
 function booking() {
@@ -395,7 +395,7 @@ it("given a rotated token cookie, when the write is refused, then it goes out ag
   expect(sent).toEqual(["lost-token", "surviving-token"]);
 });
 
-it("given a write refused while its token cookie stands, when it is refused, then it does not go out again", async () => {
+it("given a token cookie that still stands, when the write is refused, then it does not go out again", async () => {
   // given
   document.cookie = "XSRF-TOKEN=standing-token";
   let attempts = 0;
@@ -439,7 +439,7 @@ it("given a read refused, when its token cookie rotates meanwhile, then it does 
   expect(attempts).toBe(1);
 });
 
-it("given a refusal the account earned, when its token cookie rotates meanwhile, then it does not go out again", async () => {
+it("given a refusal the account earned, when the token cookie rotates meanwhile, then it is not repeated", async () => {
   // given
   document.cookie = "XSRF-TOKEN=first-token";
   let attempts = 0;
