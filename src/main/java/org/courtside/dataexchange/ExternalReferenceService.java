@@ -8,9 +8,9 @@ import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.shared.CursorPage;
 import org.courtside.shared.SqlConstraintViolation;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

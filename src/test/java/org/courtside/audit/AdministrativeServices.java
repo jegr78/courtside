@@ -12,6 +12,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
@@ -32,7 +33,8 @@ final class AdministrativeServices {
     static List<Class<?>> derived() {
         Set<Class<?>> found = new TreeSet<>(Comparator.comparing(Class::getName));
         Deque<Class<?>> pending = new ArrayDeque<>();
-        administrativeControllers().forEach(controller -> pending.addAll(servicesInjectedInto(controller)));
+        administrativeControllers()
+                .forEach(controller -> pending.addAll(servicesInjectedInto(controller)));
         while (!pending.isEmpty()) {
             Class<?> service = pending.poll();
             if (found.add(service)) {
@@ -65,7 +67,8 @@ final class AdministrativeServices {
             }
             for (Method operation : api.getMethods()) {
                 RequestMapping mapping = AnnotationUtils.findAnnotation(operation, RequestMapping.class);
-                if (mapping != null && List.of(mapping.value()).stream().anyMatch(AdministrativeServices::isAdmin)) {
+                if (mapping != null
+                        && Arrays.stream(mapping.value()).anyMatch(AdministrativeServices::isAdmin)) {
                     return true;
                 }
             }
