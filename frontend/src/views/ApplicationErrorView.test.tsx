@@ -83,7 +83,7 @@ it("given the sign-out is refused, when it is attempted from the error page, the
       authenticated: true, roles: [], passwordChangeRequired: false
     })),
     http.post("/api/session/logout", () => HttpResponse.json({
-      type: "urn:courtside:error:csrf-token-missing", title: "Refused", status: 403
+      type: "urn:courtside:error:access-denied", title: "Refused", status: 403
     }, { status: 403, headers: { "Content-Type": "application/problem+json" } }))
   );
   render(<ApplicationErrorView />);

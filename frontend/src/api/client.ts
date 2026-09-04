@@ -85,20 +85,20 @@ export class ApiError extends Error {
   }
 }
 
+const ACCESS_DENIED = "urn:courtside:error:access-denied";
+
 async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true): Promise<T> {
-  const headers = new Headers(init.headers);
-  if (init.method && init.method !== "GET" && init.method !== "HEAD") {
-    const held = csrfToken();
-    const token = held || await reissuedCsrfToken();
-    if (token) {
-      headers.set("X-XSRF-TOKEN", token);
-    }
+  const write = Boolean(init.method) && init.method !== "GET" && init.method !== "HEAD";
+  const sent = write ? await usableCsrfToken() : undefined;
+  let response = await fetch(path, carrying(init, sent));
+  let problem = await problemIn(response);
+  // A request that started alongside this one can mint a token of its own and replace the cookie,
+  // and the rotation is what tells that refusal apart from one the account has actually earned.
+  if (write && problem?.type === ACCESS_DENIED && csrfToken() !== sent) {
+    response = await fetch(path, carrying(init, await usableCsrfToken()));
+    problem = await problemIn(response);
   }
-  const response = await fetch(path, { ...init, headers, credentials: "same-origin" });
   if (!response.ok) {
-    const problem = response.headers.get("content-type")?.includes("application/problem+json")
-      ? (await response.json()) as Problem
-      : undefined;
     if (response.status === 401 && notifyUnauthorized) {
       window.dispatchEvent(new Event("courtside:unauthenticated"));
     }
@@ -109,6 +109,24 @@ async function request<T>(path: string, init: RequestInit = {}, notifyUnauthoriz
   }
   const body = await response.text();
   return body ? JSON.parse(body) as T : undefined as T;
+}
+
+async function problemIn(response: Response): Promise<Problem | undefined> {
+  return response.ok || !response.headers.get("content-type")?.includes("application/problem+json")
+    ? undefined
+    : (await response.json()) as Problem;
+}
+
+function carrying(init: RequestInit, token: string | undefined): RequestInit {
+  const headers = new Headers(init.headers);
+  if (token) {
+    headers.set("X-XSRF-TOKEN", token);
+  }
+  return { ...init, headers, credentials: "same-origin" };
+}
+
+async function usableCsrfToken(): Promise<string | undefined> {
+  return csrfToken() || await reissuedCsrfToken();
 }
 
 // Writes that start together would otherwise each ask for a token and read a different one.
