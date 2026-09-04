@@ -35,6 +35,12 @@ test("given a candidate image, when qualifying it, then deployment and vulnerabi
   assert.match(workflow, /release-security-record/);
 });
 
+test("given npm audit is unavailable, when building a release, then explicit skipped evidence does not block publication", () => {
+  // when / then
+  assert.match(workflow, /npm-cli\.js run audit:security --[\s\\]+--output \.\.\/build\/security\/npm\.json/);
+  assert.doesNotMatch(workflow, /npm-cli\.js --prefix frontend audit --json/);
+});
+
 test("given a qualified manifest, when publishing it, then tags and signatures address that manifest without rebuilding", () => {
   // when / then
   const publish = workflow.slice(workflow.indexOf("\n  publish:"));

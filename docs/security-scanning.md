@@ -1,8 +1,12 @@
 # Security scanning
 
-Courtside treats scanners as evidence, not as proof that the product is secure. The required build scans dependency changes, hand-written Java and TypeScript, the assembled application JAR, npm dependencies, repository secrets and deployment configuration. Release qualification separately scans the exact candidate image on both supported architectures.
+Courtside treats scanners as evidence, not as proof that the product is secure. The required build scans dependency changes, hand-written Java and TypeScript, the assembled application JAR, repository secrets and deployment configuration. Release qualification separately scans the exact candidate image on both supported architectures.
 
-CodeQL runs the `security-extended` query suite. Trivy scans the unpacked runtime JAR as a root filesystem so that transitive Java libraries are included, then scans repository secrets and deployment configuration separately. Dependency Review rejects newly introduced High and Critical vulnerable dependencies. A scanner outage or a missing report fails its named workflow step and is never reported as a clean scan.
+CodeQL runs the `security-extended` query suite. Trivy scans the unpacked runtime JAR as a root filesystem so that transitive Java libraries are included, then scans repository secrets and deployment configuration separately. Dependency Review rejects newly introduced High and Critical vulnerable dependencies.
+
+The `npm audit` workflow checks the complete locked frontend dependency tree every Tuesday and on manual request. Pull requests do not call the remote audit service because Dependency Review evaluates their dependency changes. Releases run the complete audit again. A valid report with High or Critical findings blocks both paths. A recognized network timeout or service-unavailable response records npm as `skipped` and does not block a release. The scheduled workflow still fails when its audit is skipped, so the nightly failure tracker makes a prolonged outage visible without stopping publication. Empty, malformed and unknown responses fail both paths. The retained source status therefore distinguishes a completed clean scan from an unavailable service.
+
+Every other scanner outage or missing report fails its named workflow step and is never reported as a clean scan. Maintainers can run the same classified npm audit locally with `cd frontend && npm run audit:security -- --output ../build/security/npm.json`.
 
 The importer records each scanner's name, version, completion state, subject and finding count. A
 zero count therefore means a completed clean scan, not missing evidence. Findings retain their
@@ -46,8 +50,8 @@ candidate has passed qualification. It then verifies all three against the diges
 The final release record contains the image digest, SBOM digest and hashes of the verification
 outputs. Publication stops if a proof is absent, empty or bound to another digest.
 
-The required build owns static analysis, dependency checks, image scanning and supply-chain
-verification. The penetration-testing framework imports their normalized evidence. It owns dynamic
+The required build owns static analysis, dependency-change checks, image scanning and supply-chain
+verification. The scheduled npm workflow owns the complete frontend dependency audit. The penetration-testing framework imports their normalized evidence. It owns dynamic
 test authorization, target identity, candidate validation, retests and manual WSTG evidence; it
 does not rerun the static scanners.
 

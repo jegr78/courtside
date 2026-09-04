@@ -1,0 +1,48 @@
+name: npm audit
+
+on:
+  schedule:
+    - cron: '17 3 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+      - name: Capture npm audit evidence
+        working-directory: frontend
+        run: npm run audit:security -- --output ../build/security/npm.json
+      - name: Enforce npm vulnerability policy
+        run: >
+          node tools/security-findings.mjs
+          --npm build/security/npm.json
+          --npm-version "$(npm --version)"
+          --exceptions security/exceptions.json
+          --assessment-policy not-applicable
+          --scope scheduled-npm-audit
+          --subject ${{ github.sha }}
+          --output build/security/npm-audit-summary.json
+      - name: Require a completed scheduled audit
+        run: >
+          jq -e '.evidenceSources[] |
+          select(.scanner == "npm") |
+          .status == "completed"'
+          build/security/npm-audit-summary.json
+      - name: Remove raw npm audit report
+        if: always()
+        run: rm -f build/security/npm.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: npm-audit-evidence-${{ github.run_id }}
+          path: build/security/npm-audit-summary.json
+          retention-days: 14
+          if-no-files-found: error
