@@ -2,6 +2,7 @@ package org.courtside.shared.web;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.persistence.PessimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.DuplicateItemException;
@@ -11,6 +12,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -59,6 +62,35 @@ class SharedExceptionHandler {
             "Size", Set.of("min", "max"),
             "Min", Set.of("value"),
             "Max", Set.of("value"));
+
+    @ExceptionHandler({PessimisticLockException.class, PessimisticLockingFailureException.class})
+    ProblemDetail handleUnavailableDatabaseLock(Exception exception) {
+        ProblemDetail problem = unavailableDatabaseLock();
+        logAnswered(problem);
+        return problem;
+    }
+
+    @ExceptionHandler(UncategorizedSQLException.class)
+    ProblemDetail handleUncategorizedDatabaseFailure(UncategorizedSQLException exception) {
+        if ("55P03".equals(exception.getSQLException().getSQLState())) {
+            ProblemDetail problem = unavailableDatabaseLock();
+            logAnswered(problem);
+            return problem;
+        }
+        ProblemDetail problem = ContainerErrorController.problemFor(HttpStatus.INTERNAL_SERVER_ERROR);
+        logAnswered(problem);
+        return problem;
+    }
+
+    private ProblemDetail unavailableDatabaseLock() {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "The database is busy with another change; retry the request");
+        problem.setType(URI.create("urn:courtside:error:database-lock-unavailable"));
+        problem.setTitle("Database lock unavailable");
+        problem.setProperty("retryable", true);
+        return problem;
+    }
 
     // Only for a violation nothing upstream recognised.
     @ExceptionHandler(DataIntegrityViolationException.class)

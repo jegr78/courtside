@@ -52,6 +52,8 @@ server:
 courtside:
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}
   environment: ${COURTSIDE_ENVIRONMENT:PRODUCTION}
+  database:
+    lock-timeout: ${COURTSIDE_DB_LOCK_TIMEOUT:5s}
   clock:
     fixed-instant: ${COURTSIDE_CLOCK_FIXED_INSTANT:}
   mail:

@@ -2,6 +2,7 @@ package org.courtside.shared.web;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,7 @@ import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.ServletRequestBindingException;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +18,37 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 class SharedExceptionHandlerTest {
+
+    @Test
+    void whenPostgresRefusesAContendedLock_thenTheProblemIsAnActionableTemporaryFailure() {
+        // given
+        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
+
+        // when
+        ProblemDetail problem = handler.handleUncategorizedDatabaseFailure(
+                new UncategorizedSQLException("query", "select for update",
+                        new SQLException("lock timeout", "55P03")));
+
+        // then
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+        assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:database-lock-unavailable");
+        assertThat(problem.getProperties()).containsEntry("retryable", true);
+    }
+
+    @Test
+    void whenAnUncategorisedDatabaseFailureIsNotLockContention_thenItRemainsAnInternalFailure() {
+        // given
+        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
+        UncategorizedSQLException failure = new UncategorizedSQLException(
+                "query", "select something", new SQLException("broken", "XX000"));
+
+        // when
+        ProblemDetail problem = handler.handleUncategorizedDatabaseFailure(failure);
+
+        // then
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:internal-error");
+    }
 
     // No known write path reaches this handler unclaimed.
     @Test
