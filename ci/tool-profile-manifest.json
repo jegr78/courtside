@@ -24,6 +24,7 @@
     { "path": "tools/github-template-metadata.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/i18n-bundle-parity.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/i18n-bundle.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/import-field-labels.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/journey-world-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/local-check.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/local-check.test.mjs", "profiles": ["tooling"], "test": true },
