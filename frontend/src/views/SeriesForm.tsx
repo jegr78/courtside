@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   api, type CreateSeriesRequest, type DayOfWeek, type Occurrence, type PublicBookingCard,
@@ -75,6 +75,15 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
   const [chosen, setChosen] = useState<string[]>([]);
   const [result, setResult] = useState<SeriesCreated>();
   const [pending, setPending] = useState(false);
+  const opener = useRef<HTMLButtonElement>(null);
+  const restoresFocus = useRef(false);
+
+  useEffect(() => {
+    if (!open && restoresFocus.current) {
+      restoresFocus.current = false;
+      opener.current?.focus();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -130,7 +139,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
   }
 
   if (!open) {
-    return <Button variant="primary" data-testid="new-series" className="mt-6 justify-self-start" type="button" onClick={() => setOpen(true)}>
+    return <Button ref={opener} variant="primary" data-testid="new-series" className="mt-6 justify-self-start" type="button" onClick={() => setOpen(true)}>
       {t("series.new")}
     </Button>;
   }
@@ -141,7 +150,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
     <div className="grid gap-2">
       <label className="font-semibold" htmlFor="series-courts">{t("series.courts")}</label>
       <select data-testid="series-courts" id="series-courts" multiple size={Math.min(courts.length, 5)} className="form-control rounded-lg border p-2" disabled={pending} value={draft.courtIds} onChange={(event) => change({ courtIds: [...event.target.selectedOptions].map((option) => option.value) })}>
-        {courts.map((court) => <option key={court.id} value={court.id}>{court.name ?? court.number}</option>)}
+        {courts.map((court) => <option key={court.id} value={court.id}>{court.name ?? t("court.number", { number: court.number })}</option>)}
       </select>
       <p className="text-muted text-sm">{t("series.courtsHint")}</p>
     </div>
@@ -188,7 +197,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
       <Button variant="secondary" data-testid="preview-series" disabled={pending || !isComplete(draft)} type="button" onClick={() => void readPreview()}>
         {t("series.preview")}
       </Button>
-      <Button variant="secondary" data-testid="cancel-series" type="button" onClick={() => { setOpen(false); setDraft(EMPTY); setPreview(undefined); setChosen([]); setResult(undefined); }}>
+      <Button variant="secondary" data-testid="cancel-series" type="button" onClick={() => { restoresFocus.current = true; setOpen(false); setDraft(EMPTY); setPreview(undefined); setChosen([]); setResult(undefined); }}>
         {t("admin.cancel")}
       </Button>
     </div>
@@ -228,7 +237,9 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
 
 function blockedBy(occurrence: Occurrence, t: (key: string, params?: Record<string, unknown>) => string): string {
   if (occurrence.violations.length > 0) {
-    return occurrence.violations.map((violation) => t(violation.code, violation.params)).join(", ");
+    return occurrence.violations.map((violation) => t(violation.code, {
+      ...violation.params, defaultValue: t("error.generic")
+    })).join(", ");
   }
   return t("series.courtTaken");
 }

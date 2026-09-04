@@ -140,6 +140,19 @@ describe("ImportPreviewPanel", () => {
     expect(screen.getByTestId("duplicates-heading")).toHaveTextContent("1");
   });
 
+  it("given an unknown row error, when the preview is read, then a generic failure replaces its translation key", async () => {
+    // given
+    show({ ...preview, rowErrors: [{ rowNumber: 4, code: "import.snapshot.row.unknown", params: {} }] });
+
+    // when
+    await userEvent.click(screen.getByTestId("row-errors-heading"));
+
+    // then
+    const error = screen.getByTestId("row-error-4");
+    expect(error).toHaveTextContent("That did not work. Please try again.");
+    expect(error).not.toHaveTextContent("import.snapshot.row.unknown");
+  });
+
   it("given a change touching somebody the club holds, when it is read, then it names them", async () => {
     // given
     show(preview);
