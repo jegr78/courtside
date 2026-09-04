@@ -12,6 +12,11 @@ const jane: RosterEntry = {
   accountId: null, username: null, enabled: false, roles: []
 };
 
+const mary: RosterEntry = {
+  personId: "person-2", firstName: "Mary", lastName: "Major", email: "mary.major@example.org",
+  accountId: null, username: null, enabled: false, roles: []
+};
+
 const linked: ExternalReference = {
   referenceId: "ref-1", sourceId: "source-1", externalId: "4711",
   personId: "person-1", personName: "Jane Doe", linkedAt: "2026-08-21T10:00:00Z"
@@ -74,6 +79,46 @@ describe("ExternalReferencePanel", () => {
     expect(linking).toHaveBeenCalledWith("source-1", { externalId: "4711", personId: "person-1" });
     expect(await screen.findByTestId("reference-4711")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Reference linked.");
+  });
+
+  it("given a search still in flight, when the field is emptied, then its answer cannot fill the list back in", async () => {
+    // given
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    let answer: (page: { entries: RosterEntry[]; nextCursor: string | null }) => void = () => undefined;
+    vi.spyOn(api, "roster").mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    show();
+    await screen.findByTestId("no-references");
+    await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
+
+    // when — the board deletes the query, then the answer to it arrives
+    await userEvent.clear(screen.getByTestId("reference-person-search"));
+    answer({ entries: [jane], nextCursor: null });
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("reference-person-search")).toHaveValue(""));
+    expect(screen.queryByTestId("reference-person-person-1")).not.toBeInTheDocument();
+  });
+
+  it("given a query the board has replaced, when the earlier answer arrives last, then the newer one stands", async () => {
+    // given
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    const answers: ((page: { entries: RosterEntry[]; nextCursor: string | null }) => void)[] = [];
+    vi.spyOn(api, "roster").mockImplementation(() =>
+      new Promise((resolve) => { answers.push(resolve); }));
+    show();
+    await screen.findByTestId("no-references");
+    await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
+    await userEvent.clear(screen.getByTestId("reference-person-search"));
+    await userEvent.type(screen.getByTestId("reference-person-search"), "Major");
+
+    // when — the replaced query answers after the one that replaced it
+    answers[answers.length - 1]({ entries: [mary], nextCursor: null });
+    await screen.findByTestId("reference-person-person-2");
+    answers[0]({ entries: [jane], nextCursor: null });
+
+    // then
+    await waitFor(() => expect(screen.queryByTestId("reference-person-person-1")).not.toBeInTheDocument());
+    expect(screen.getByTestId("reference-person-person-2")).toBeInTheDocument();
   });
 
   it("given a link that was a mistake, when it is undone, then no dialog stands in the way", async () => {
