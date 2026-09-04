@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SourceOffer } from "../api/client";
@@ -76,6 +76,55 @@ describe("BuildIdentity", () => {
 
     // then
     expect(screen.getByTestId("build-identity")).toHaveFocus();
+  });
+
+  it("given a pending clipboard write, when copying diagnostics, then success waits for the write", async () => {
+    // given
+    let resolveWrite: (() => void) | undefined;
+    const writeText = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
+      resolveWrite = resolve;
+    }));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    render(<BuildIdentity source={source} />);
+
+    // when
+    await userEvent.click(screen.getByTestId("build-identity"));
+    await userEvent.click(screen.getByTestId("copy-build-identity"));
+
+    // then
+    expect(screen.getByTestId("copy-build-identity")).toHaveTextContent("Copy system information");
+    expect(screen.getByTestId("copy-build-identity")).toBeDisabled();
+
+    // when
+    resolveWrite?.();
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("copy-build-identity")).toHaveTextContent("Copied"));
+    expect(screen.getByTestId("copy-build-identity")).toBeEnabled();
+  });
+
+  it("given a rejected clipboard write, when copying diagnostics, then the dialog reports the failure", async () => {
+    // given
+    const writeText = vi.fn()
+      .mockRejectedValueOnce(new DOMException("Denied", "NotAllowedError"))
+      .mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    render(<BuildIdentity source={source} />);
+
+    // when
+    await userEvent.click(screen.getByTestId("build-identity"));
+    await userEvent.click(screen.getByTestId("copy-build-identity"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not copy the system information. Allow clipboard access and try again.");
+    expect(screen.getByTestId("copy-build-identity")).not.toHaveTextContent("Copied");
+
+    // when
+    await userEvent.click(screen.getByTestId("copy-build-identity"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("copy-build-identity")).toHaveTextContent("Copied"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("given unavailable metadata, when rendered, then a localized fallback remains visible", () => {

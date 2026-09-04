@@ -31,6 +31,8 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
   const [isCopied, setCopied] = useState(false);
+  const [isCopying, setCopying] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
 
@@ -44,8 +46,17 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
     if (!source) {
       return;
     }
-    await navigator.clipboard.writeText(diagnosticText(source));
-    setCopied(true);
+    setCopied(false);
+    setCopyFailed(false);
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(diagnosticText(source));
+      setCopied(true);
+    } catch {
+      setCopyFailed(true);
+    } finally {
+      setCopying(false);
+    }
   }
 
   return <>
@@ -74,8 +85,9 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
         <dt>{t("build.environment")}</dt><dd>{source.environment}</dd>
       </dl>
       <a className="mt-4 inline-block underline hover:no-underline" href={source.sourceUrl}>{t("footer.source")}</a>
+      {copyFailed && <p role="alert" className="mt-4 text-sm text-red-800 dark:text-red-200">{t("build.copyFailed")}</p>}
       <div className="mt-6 flex justify-end gap-3">
-        <Button variant="primary" type="button" autoFocus data-testid="copy-build-identity" className="px-4 py-2" onClick={() => void copyDiagnostics()}>
+        <Button variant="primary" type="button" autoFocus data-testid="copy-build-identity" className="px-4 py-2" disabled={isCopying} onClick={() => void copyDiagnostics()}>
           {isCopied ? t("build.copied") : t("build.copy")}
         </Button>
         <Button variant="secondary" type="button" data-testid="close-build-identity" className="px-4 py-2" onClick={() => dialog.current?.close()}>{t("build.close")}</Button>
