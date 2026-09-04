@@ -64,8 +64,7 @@ class SignOutTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value(UNAUTHENTICATED));
     }
 
-    // Nothing refuses a sign-out that names no session: LogoutFilter answers it before the
-    // authorization rule for this path is ever reached.
+    // Nothing refuses a sign-out that names no session, and none is started to refuse it with.
     @Test
     void givenNoSession_whenSigningOut_thenItSucceedsWithoutStartingOne() throws Exception {
         // when

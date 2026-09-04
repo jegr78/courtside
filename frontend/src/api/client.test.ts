@@ -9,7 +9,19 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
   document.cookie = "XSRF-TOKEN=; Max-Age=0";
+  unauthenticatedListeners.forEach((listener) =>
+    window.removeEventListener("courtside:unauthenticated", listener));
+  unauthenticatedListeners.length = 0;
 });
+
+const unauthenticatedListeners: EventListener[] = [];
+
+function notifiedOfUnauthenticated() {
+  const listener = vi.fn();
+  unauthenticatedListeners.push(listener);
+  window.addEventListener("courtside:unauthenticated", listener);
+  return listener;
+}
 afterAll(() => server.close());
 
 function refusal(type = "urn:courtside:error:access-denied") {
@@ -48,8 +60,7 @@ it("given a session response, when loading it, then the typed session is returne
 
 it("given an expired session, when an API call is rejected, then the app is notified", async () => {
   // given
-  const listener = vi.fn();
-  window.addEventListener("courtside:unauthenticated", listener);
+  const listener = notifiedOfUnauthenticated();
   server.use(http.get("/api/public/config", () => HttpResponse.json({
     type: "urn:courtside:error:unauthenticated",
     title: "Not authenticated",
@@ -63,8 +74,7 @@ it("given an expired session, when an API call is rejected, then the app is noti
 
 it("given a sign-out the instance refuses, when the refusal arrives, then the app is not notified as well", async () => {
   // given
-  const listener = vi.fn();
-  window.addEventListener("courtside:unauthenticated", listener);
+  const listener = notifiedOfUnauthenticated();
   server.use(http.post("/api/session/logout", () => HttpResponse.json({
     type: "urn:courtside:error:unauthenticated",
     title: "Not authenticated",

@@ -13,7 +13,7 @@ const controlClass = "form-control rounded-lg border px-3 py-2 text-sm font-semi
 export function Preferences({ authenticated = false, supported, signedOut }: {
   authenticated?: boolean;
   supported?: string[];
-  signedOut?: () => void;
+  signedOut: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const [theme, updateTheme] = useState<Theme>(initialTheme);
@@ -48,7 +48,7 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
       }
     }
     setOpen(false);
-    signedOut?.();
+    signedOut();
   }
 
   function changeTheme(value: Theme) {

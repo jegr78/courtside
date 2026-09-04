@@ -25,7 +25,7 @@ async function openPreferences() {
 
 it("given preferences chosen once, when the header is shown, then they stay inside a compact account menu", async () => {
   // given
-  render(<Preferences authenticated />);
+  render(<Preferences authenticated signedOut={() => undefined} />);
 
   // when
   const menu = screen.getByTestId("preferences-menu");
@@ -45,7 +45,7 @@ it("given preferences chosen once, when the header is shown, then they stay insi
 
 it("when no theme was selected, then dark mode is the default", () => {
   // when
-  render(<Preferences />);
+  render(<Preferences signedOut={() => undefined} />);
 
   // then
   expect(document.documentElement).toHaveClass("dark");
@@ -54,7 +54,7 @@ it("when no theme was selected, then dark mode is the default", () => {
 
 it("given dark mode, when selecting light mode, then the preference is applied and stored", async () => {
   // given
-  render(<Preferences />);
+  render(<Preferences signedOut={() => undefined} />);
   await openPreferences();
 
   // when
@@ -69,7 +69,7 @@ it("given dark mode, when selecting light mode, then the preference is applied a
 
 it("given German, when selecting English, then the whole interface uses and stores English", async () => {
   // given
-  render(<Preferences />);
+  render(<Preferences signedOut={() => undefined} />);
   await openPreferences();
 
   // when
@@ -105,7 +105,7 @@ it("given an explicit language preference, when an account has another locale, t
 it("given a signed in member, when selecting another language, then the account is told so the next message follows", async () => {
   // given
   const stored = vi.spyOn(api, "changeOwnLocale").mockResolvedValue(undefined);
-  render(<Preferences authenticated />);
+  render(<Preferences authenticated signedOut={() => undefined} />);
   await openPreferences();
 
   // when
@@ -118,7 +118,7 @@ it("given a signed in member, when selecting another language, then the account 
 it("given nobody signed in, when selecting another language, then no account is written to", async () => {
   // given
   const stored = vi.spyOn(api, "changeOwnLocale").mockResolvedValue(undefined);
-  render(<Preferences />);
+  render(<Preferences signedOut={() => undefined} />);
   await openPreferences();
 
   // when
@@ -132,7 +132,7 @@ it("given nobody signed in, when selecting another language, then no account is 
 it("given the account refuses the change, when selecting another language, then the member is told rather than nothing", async () => {
   // given
   vi.spyOn(api, "changeOwnLocale").mockRejectedValue(new ApiError(403));
-  render(<Preferences authenticated />);
+  render(<Preferences authenticated signedOut={() => undefined} />);
   await openPreferences();
 
   // when
@@ -146,7 +146,7 @@ it("given the account refuses the change, when selecting another language, then 
 
 it("given an instance that ships one language, when offering the choice, then only that one is offered", () => {
   // when
-  render(<Preferences supported={["de"]} />);
+  render(<Preferences supported={["de"]} signedOut={() => undefined} />);
 
   // then
   expect(Array.from(document.getElementById("locale-preference")!.children)
@@ -234,7 +234,7 @@ it("given the instance has already ended the session, when signing out, then it 
 
 it("given nobody is signed in, when the menu is opened, then it offers nothing to sign out of", async () => {
   // given
-  render(<Preferences />);
+  render(<Preferences signedOut={() => undefined} />);
 
   // when
   await openPreferences();

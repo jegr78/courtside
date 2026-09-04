@@ -409,6 +409,27 @@ test("an initial password change ends every active session for the account", asy
   await Promise.all([first.close(), second.close()]);
 });
 
+// The account keeps its stored session row and only its epoch moves, which is the one shape that
+// reaches the refusal: a deleted row leaves the request anonymous and the logout filter answers 204.
+test("a session the instance revoked signs out onto sign-in without an error", async ({ pinnedBrowser, journeyService }) => {
+  // given
+  const context = await memberContext(pinnedBrowser, journeyService, "doe.jane");
+  const [page] = context.pages();
+  await journeyService.executeSql(
+    "UPDATE user_account SET security_epoch = security_epoch + 1 WHERE username = 'doe.jane'");
+
+  // when
+  const refused = page.waitForResponse((response) => response.url().endsWith("/api/session/logout"));
+  await page.getByTestId("preferences-menu").click();
+  await page.getByTestId("logout").click();
+
+  // then
+  expect((await refused).status()).toBe(401);
+  await expect(page.getByTestId("login-view")).toBeVisible();
+  await expect(page.getByTestId("preferences-failure")).toHaveCount(0);
+  await context.close();
+});
+
 test("an application restart preserves the browser session and booking data", async ({ page, journeyService }, testInfo) => {
   // given
   await login(page, journeyService.baseURL, "doe.jane");
