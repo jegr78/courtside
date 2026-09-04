@@ -1513,6 +1513,12 @@ whether it is built or designed. **Designed means absent today.**
   cosign and attaches an SBOM attestation. Trivy scans the application's extracted layers and the
   source tree on every pull request and every release; the container image's own base layers are
   not, so that half is designed and not built.*
+- **Security assessment evidence:** hosted assessments upload normalized public records and a CMS
+  envelope encrypted to the tracked recipient certificate. The expected certificate fingerprint
+  lives in a GitHub repository variable, outside commit history, so changing the certificate and a
+  tracked expectation together cannot make the seal pass. A missing or mismatched value blocks
+  sealing. The private key remains outside the repository, and the tracked key inventory records
+  its custodian and decrypt-canary window rather than another copy of the fingerprint. *Built.*
 - **The servlet container runs a version the platform does not manage.** Spring Boot 4.1.1 manages
   Tomcat 11.0.24, and `pom.xml` overrides that to 11.0.25 through the property Spring Boot documents
   for it. The earlier reading of this — that the advisories Apache published on 2026-08-25 reached

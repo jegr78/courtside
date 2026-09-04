@@ -146,10 +146,22 @@ never introduced by changing a default or cron expression.
 
 The public certificate in [`.github/security-evidence-recipient.pem`](../.github/security-evidence-recipient.pem)
 encrypts that envelope with AES-256-GCM through OpenSSL CMS. Its security evidence private key is
-kept outside the repository. The workflow verifies the certificate fingerprint and the current
-decrypt-canary window against [the key inventory](../.github/security-evidence-key.json), then
-attests the encrypted envelope through GitHub artifact attestation. Verify that attestation before
-decrypting the downloaded envelope:
+kept outside the repository. The workflow compares the certificate fingerprint with the
+`COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256` GitHub repository variable. The expected value
+therefore cannot move in the same commit as the certificate. A missing or stale variable blocks
+evidence sealing. Configure it from the checked certificate and verify the stored value:
+
+```bash
+openssl x509 -in .github/security-evidence-recipient.pem -noout -fingerprint -sha256 \
+  | cut -d= -f2 \
+  | gh variable set COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256
+gh variable get COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256
+```
+
+The workflow separately validates the current decrypt-canary window against
+[the key inventory](../.github/security-evidence-key.json), then attests the encrypted envelope
+through GitHub artifact attestation. Verify that attestation before decrypting the downloaded
+envelope:
 
 ```bash
 gh attestation verify protected-evidence.cms --repo jegr78/courtside
@@ -170,8 +182,11 @@ tar -xzf protected-evidence.tar.gz
 Before `canaryValidThrough`, the custodian encrypts and decrypts synthetic content with the tracked
 certificate and external private key and records the new verification window in the inventory.
 Rotation additionally requires proving that retained envelopes have either expired or been
-re-encrypted before the previous private key is retired. A lost or unavailable private key blocks
-the inventory renewal and therefore the next hosted assessment.
+re-encrypted before the previous private key is retired. Merge the reviewed certificate and
+inventory update, immediately replace `COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256` with the new
+certificate's fingerprint, and run the assessment manually. The fail-closed mismatch prevents an
+envelope from being sealed during that short handover. A lost or unavailable private key blocks the
+inventory renewal and therefore the next hosted assessment.
 
 The release workflow runs the complete `active` profile after both architectures qualify the
 candidate and before the security record can be assembled. The active manifest, normalized gate,
