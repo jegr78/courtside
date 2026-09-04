@@ -49,8 +49,10 @@ describe("SeriesForm", () => {
     await userEvent.click(await screen.findByTestId("new-series"));
 
     // then
-    expect(screen.getByRole("option", { name: "Court 2" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "2" })).not.toBeInTheDocument();
+    const unnamed = screen.getByTestId("series-courts")
+      .querySelector<HTMLOptionElement>('option[value="court-2"]');
+    expect(unnamed).toHaveTextContent("Court 2");
+    expect(unnamed).not.toHaveTextContent(/^2$/);
   });
 
   it("given focus inside the series form, when the form is cancelled, then focus returns to its opener", async () => {
