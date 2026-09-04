@@ -1298,6 +1298,32 @@ test("given nothing names the repository, when a version is qualified, then it s
   });
 });
 
+test("given a remote that only carries github.com somewhere, when it is read, then no repository is named", () => {
+  // when / then — every one of these resolved to a repository while the host was merely scanned for
+  assert.equal(repositoryFromRemote("https://elsewhere.example//github.com/attacker/courtside.git"), undefined);
+  assert.equal(repositoryFromRemote("https://elsewhere.example/redirect@github.com/attacker/courtside.git"), undefined);
+  assert.equal(repositoryFromRemote("git@evil.example:mirror/of@github.com/attacker/courtside.git"), undefined);
+  assert.equal(repositoryFromRemote("ssh://git@evil.example:22/@github.com/attacker/repo.git"), undefined);
+  assert.equal(repositoryFromRemote("https://github.com@evil.example/attacker/repo.git"), undefined);
+  assert.equal(repositoryFromRemote("https://github.com.evil.example/attacker/courtside.git"), undefined);
+});
+
+test("given a repository named in capitals, when the image is named, then the reference a registry accepts is used", () => {
+  // when
+  const reference = uatImageReference("v1.2.3", { GITHUB_REPOSITORY: "Example-Club/Courtside" }, () => undefined);
+
+  // then
+  assert.equal(reference, "ghcr.io/example-club/courtside:v1.2.3");
+});
+
+test("given something that is not a repository, when the image is named, then it is refused by name", () => {
+  // when / then
+  assert.throws(() => uatImageReference("v1.2.3", { GITHUB_REPOSITORY: "not-a-repository" }, () => undefined),
+    /not-a-repository/);
+  assert.throws(() => uatImageReference("v1.2.3", { GITHUB_REPOSITORY: "owner/name/extra" }, () => undefined),
+    /owner\/name\/extra/);
+});
+
 test("given a remote in either form, when the repository is read from it, then owner and name are kept", () => {
   // when / then
   assert.equal(repositoryFromRemote("git@github.com:example-club/courtside.git"), "example-club/courtside");

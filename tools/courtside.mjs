@@ -23,6 +23,7 @@ import {
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
+import { isGitHubLogin } from "./nightly-failure-tracker.mjs";
 
 async function securityAssessments() {
   const [passive, authorization, authenticatedZap, openApiFuzz, resourceAbuse] = await Promise.all([
@@ -810,9 +811,25 @@ export function uatStartupSummary(password, needsBootstrap, options) {
   ].join("\n") + "\n";
 }
 
+// Scanning the string for the host let any URL that merely contained it name a repository, so the
+// remote is parsed and its host has to be the one it claims to be.
 export function repositoryFromRemote(url) {
-  return /(?:^|\/\/|@)github\.com[:/](?<repository>[^/\s]+\/[^/\s]+?)(?:\.git)?$/
-    .exec((url ?? "").trim())?.groups.repository;
+  const remote = (url ?? "").trim();
+  const scp = /^(?:[^@/\s]+@)?(?<host>[^:/\s]+):(?<path>\S+)$/.exec(remote);
+  const location = scp && !remote.includes("://")
+    ? { hostname: scp.groups.host, pathname: `/${scp.groups.path}` }
+    : parsedUrl(remote);
+  if (location?.hostname !== "github.com") return undefined;
+  const path = location.pathname.replace(/^\/+/, "").replace(/\.git$/, "");
+  return /^[^/\s]+\/[^/\s]+$/.test(path) ? path : undefined;
+}
+
+function parsedUrl(value) {
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
 }
 
 function checkoutRepository() {
@@ -823,12 +840,17 @@ function checkoutRepository() {
 // A fork qualifies the image it published, not the one this repository happens to be named after.
 export function uatImageReference(version, environment = process.env, checkout = checkoutRepository) {
   if (!version) return "courtside:uat-local";
-  const repository = environment.GITHUB_REPOSITORY || checkout();
-  if (!repository) {
+  const named = environment.GITHUB_REPOSITORY || checkout();
+  if (!named) {
     throw new Error("Cannot name the image to qualify: set GITHUB_REPOSITORY, "
       + "or give this checkout an origin remote on GitHub");
   }
-  return `ghcr.io/${repository}:${version}`;
+  const [owner, name, ...beyond] = named.split("/");
+  if (beyond.length > 0 || !isGitHubLogin(owner) || !/^[A-Za-z0-9._-]{1,100}$/.test(name ?? "")) {
+    throw new Error(`Cannot name the image to qualify: '${named}' is not a GitHub repository`);
+  }
+  // A registry takes a lowercase name, and a club's own is whatever they capitalised it as.
+  return `ghcr.io/${owner.toLowerCase()}/${name.toLowerCase()}:${version}`;
 }
 
 function uatEnvironment(version, password) {
