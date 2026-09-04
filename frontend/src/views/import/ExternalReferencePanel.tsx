@@ -42,12 +42,12 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
       setCandidates([]);
       return;
     }
-    let asked = true;
+    let active = true;
     void api.roster(query, undefined, SEARCH_RESULTS)
-      .then((page) => asked && setCandidates(page.entries))
-      .catch((failure: unknown) => asked && reportError(failure));
+      .then((page) => { if (active) setCandidates(page.entries); })
+      .catch((failure: unknown) => { if (active) reportError(failure); });
     return () => {
-      asked = false;
+      active = false;
     };
   }, [query, reportError]);
 
