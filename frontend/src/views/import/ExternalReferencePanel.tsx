@@ -35,14 +35,20 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
     void read().catch(reportError);
   }, [read, reportError]);
 
+  // The list has to agree with the field, and the last answer to arrive is not the answer to the
+  // last question the board asked.
   useEffect(() => {
     if (!query.trim()) {
       setCandidates([]);
       return;
     }
+    let active = true;
     void api.roster(query, undefined, SEARCH_RESULTS)
-      .then((page) => setCandidates(page.entries))
-      .catch(reportError);
+      .then((page) => { if (active) setCandidates(page.entries); })
+      .catch((failure: unknown) => { if (active) reportError(failure); });
+    return () => {
+      active = false;
+    };
   }, [query, reportError]);
 
   async function link() {
