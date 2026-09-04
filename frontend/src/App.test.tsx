@@ -331,6 +331,30 @@ describe("App build identity", () => {
     await i18n.changeLanguage("en");
   });
 
+  it("given a failure raised while signed in, when the session ends and the shell returns to sign-in, then the message does not outlive it", async () => {
+    // given — a sign-out that failed on the network leaves its message standing beside the menu
+    vi.spyOn(api, "session").mockResolvedValue({
+      authenticated: true, roles: ["MEMBER"], passwordChangeRequired: true, displayName: "Jane Doe"
+    });
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "logout").mockRejectedValue(new Error("network"));
+    vi.spyOn(api, "changeInitialPassword").mockResolvedValue();
+    render(<RoutedShell><App /></RoutedShell>);
+    await userEvent.click(await screen.findByTestId("preferences-menu"));
+    await userEvent.click(screen.getByTestId("logout"));
+    expect(await screen.findByTestId("preferences-failure")).toBeInTheDocument();
+
+    // when — the account sets its own password, which ends the session it was signed in with
+    await userEvent.type(screen.getByTestId("new-password"), "permanent-password");
+    await userEvent.type(screen.getByTestId("confirm-password"), "permanent-password");
+    await userEvent.click(screen.getByTestId("password-submit"));
+
+    // then
+    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("preferences-failure")).not.toBeInTheDocument();
+  });
+
   it("given an account that reads another language, when it signs in, then the navigation never appears in the language it is about to leave", async () => {
     // given — the shell starts in the club's default language and the account reads English
     await i18n.changeLanguage("de");
