@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { localRequest, newBootstrapPassword } from "./courtside.mjs";
+import { localRequest, newBootstrapPassword, uatImageReference } from "./courtside.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const confirmation = process.argv.slice(2);
@@ -217,7 +217,7 @@ try {
   assert.equal(appInspection.NetworkSettings.Ports["8080/tcp"], null);
 
   if (version) {
-    const imageReference = `ghcr.io/jegr78/courtside:${version}`;
+    const imageReference = uatImageReference(version);
     const repoDigests = JSON.parse(run("docker", ["image", "inspect", imageReference]))[0].RepoDigests;
     assert.ok(repoDigests.some((digest) => digest.endsWith(`@${version.split("@")[1]}`)));
   }

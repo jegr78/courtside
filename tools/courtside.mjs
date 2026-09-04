@@ -810,10 +810,31 @@ export function uatStartupSummary(password, needsBootstrap, options) {
   ].join("\n") + "\n";
 }
 
+export function repositoryFromRemote(url) {
+  return /(?:github\.com[:/])(?<repository>[^/\s]+\/[^/\s]+?)(?:\.git)?$/
+    .exec((url ?? "").trim())?.groups.repository;
+}
+
+function checkoutRepository() {
+  const remote = spawnSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf8" });
+  return remote.status === 0 ? repositoryFromRemote(remote.stdout) : undefined;
+}
+
+// A fork qualifies the image it published, not the one this repository happens to be named after.
+export function uatImageReference(version, environment = process.env, checkout = checkoutRepository) {
+  if (!version) return "courtside:uat-local";
+  const repository = environment.GITHUB_REPOSITORY || checkout();
+  if (!repository) {
+    throw new Error("Cannot name the image to qualify: set GITHUB_REPOSITORY, "
+      + "or give this checkout an origin remote on GitHub");
+  }
+  return `ghcr.io/${repository}:${version}`;
+}
+
 function uatEnvironment(version, password) {
   return {
     ...process.env,
-    COURTSIDE_UAT_IMAGE: version ? `ghcr.io/jegr78/courtside:${version}` : "courtside:uat-local",
+    COURTSIDE_UAT_IMAGE: uatImageReference(version),
     COURTSIDE_UAT_ADMIN_PASSWORD: password
   };
 }

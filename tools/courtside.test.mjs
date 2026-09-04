@@ -12,7 +12,8 @@ import {
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
-  resolvePublicFunnelAddresses, uatStartupSummary, validateNode, validatePublicAddress
+  resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference, repositoryFromRemote,
+  validateNode, validatePublicAddress
 } from "./courtside.mjs";
 
 function composeService(compose, service) {
@@ -1261,4 +1262,47 @@ test("given UAT reset modes, when planning cleanup, then the CA is removed only 
   assert.deepEqual(databaseOnly[1].args, ["volume", "rm", "courtside-uat_db"]);
   assert.equal(databaseOnly.flatMap((plan) => plan.args).includes("--volumes"), false);
   assert.equal(all[0].args.includes("--volumes"), true);
+});
+
+test("given no version to qualify, when the image is named, then the locally built one is used", () => {
+  // when
+  const reference = uatImageReference(undefined, {}, () => undefined);
+
+  // then
+  assert.equal(reference, "courtside:uat-local");
+});
+
+test("given the repository the workflow runs in, when a version is qualified, then its image is named", () => {
+  // when
+  const reference = uatImageReference("v1.2.3", { GITHUB_REPOSITORY: "example-club/courtside" },
+    () => "somebody-else/courtside");
+
+  // then
+  assert.equal(reference, "ghcr.io/example-club/courtside:v1.2.3");
+});
+
+test("given no workflow environment, when a version is qualified, then the checkout names the repository", () => {
+  // when
+  const reference = uatImageReference("v1.2.3", {}, () => "example-club/courtside");
+
+  // then
+  assert.equal(reference, "ghcr.io/example-club/courtside:v1.2.3");
+});
+
+test("given nothing names the repository, when a version is qualified, then it says what would name it", () => {
+  // when / then
+  assert.throws(() => uatImageReference("v1.2.3", {}, () => undefined), (failure) => {
+    assert.match(failure.message, /GITHUB_REPOSITORY/);
+    assert.match(failure.message, /origin/);
+    return true;
+  });
+});
+
+test("given a remote in either form, when the repository is read from it, then owner and name are kept", () => {
+  // when / then
+  assert.equal(repositoryFromRemote("git@github.com:example-club/courtside.git"), "example-club/courtside");
+  assert.equal(repositoryFromRemote("https://github.com/example-club/courtside.git"), "example-club/courtside");
+  assert.equal(repositoryFromRemote("https://github.com/example-club/courtside\n"), "example-club/courtside");
+  assert.equal(repositoryFromRemote("https://gitlab.example.org/example-club/courtside.git"), undefined);
+  assert.equal(repositoryFromRemote(""), undefined);
 });
