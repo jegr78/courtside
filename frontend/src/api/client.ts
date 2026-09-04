@@ -86,15 +86,14 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true): Promise<T> {
-  const headers = new Headers(init.headers);
-  if (init.method && init.method !== "GET" && init.method !== "HEAD") {
-    const held = csrfToken();
-    const token = held || await reissuedCsrfToken();
-    if (token) {
-      headers.set("X-XSRF-TOKEN", token);
-    }
-  }
-  const response = await fetch(path, { ...init, headers, credentials: "same-origin" });
+  const write = Boolean(init.method) && init.method !== "GET" && init.method !== "HEAD";
+  const sent = write ? await usableCsrfToken() : undefined;
+  const answered = await fetch(path, carrying(init, sent));
+  // A request that started alongside this one can mint a token of its own and replace the cookie,
+  // and the rotation is what tells that refusal apart from one the account has actually earned.
+  const response = answered.status === 403 && write && csrfToken() !== sent
+    ? await fetch(path, carrying(init, await usableCsrfToken()))
+    : answered;
   if (!response.ok) {
     const problem = response.headers.get("content-type")?.includes("application/problem+json")
       ? (await response.json()) as Problem
@@ -109,6 +108,18 @@ async function request<T>(path: string, init: RequestInit = {}, notifyUnauthoriz
   }
   const body = await response.text();
   return body ? JSON.parse(body) as T : undefined as T;
+}
+
+function carrying(init: RequestInit, token: string | undefined): RequestInit {
+  const headers = new Headers(init.headers);
+  if (token) {
+    headers.set("X-XSRF-TOKEN", token);
+  }
+  return { ...init, headers, credentials: "same-origin" };
+}
+
+async function usableCsrfToken(): Promise<string | undefined> {
+  return csrfToken() || await reissuedCsrfToken();
 }
 
 // Writes that start together would otherwise each ask for a token and read a different one.

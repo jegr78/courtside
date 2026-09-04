@@ -358,3 +358,74 @@ it("given two writes starting together without a token, when they run, then one 
   // then
   expect(asked).toBe(1);
 });
+
+it("given a rotated token cookie, when the write is refused, then it goes out again with the surviving token", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=lost-token";
+  const sent: (string | null)[] = [];
+  server.use(http.post("/api/session/logout", ({ request }) => {
+    sent.push(request.headers.get("X-XSRF-TOKEN"));
+    if (sent.length > 1) {
+      return new HttpResponse(null, { status: 204 });
+    }
+    document.cookie = "XSRF-TOKEN=surviving-token";
+    return new HttpResponse(null, { status: 403 });
+  }));
+
+  // when
+  await api.logout();
+
+  // then
+  expect(sent).toEqual(["lost-token", "surviving-token"]);
+});
+
+it("given a write refused while its token cookie stands, when it is refused, then it does not go out again", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=standing-token";
+  let attempts = 0;
+  server.use(http.post("/api/session/logout", () => {
+    attempts += 1;
+    return refusal();
+  }));
+
+  // when / then
+  await expect(api.logout()).rejects.toMatchObject({ status: 403 });
+  expect(attempts).toBe(1);
+});
+
+it("given a repeated write refused again, when that refusal arrives, then it does not go out a third time", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=first-token";
+  let attempts = 0;
+  server.use(http.post("/api/session/logout", () => {
+    attempts += 1;
+    document.cookie = `XSRF-TOKEN=token-${attempts}`;
+    return refusal();
+  }));
+
+  // when / then
+  await expect(api.logout()).rejects.toMatchObject({ status: 403 });
+  expect(attempts).toBe(2);
+});
+
+it("given a read refused, when its token cookie rotates meanwhile, then it does not go out again", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=; Max-Age=0";
+  let attempts = 0;
+  server.use(http.get("/api/admin/config", () => {
+    attempts += 1;
+    document.cookie = "XSRF-TOKEN=minted-token";
+    return refusal();
+  }));
+
+  // when / then
+  await expect(api.adminConfig()).rejects.toMatchObject({ status: 403 });
+  expect(attempts).toBe(1);
+});
+
+function refusal() {
+  return HttpResponse.json(
+    { type: "urn:courtside:error:access-denied", title: "Access denied", status: 403 },
+    { status: 403, headers: { "Content-Type": "application/problem+json" } }
+  );
+}
