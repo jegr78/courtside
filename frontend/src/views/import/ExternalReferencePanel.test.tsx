@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type ExternalReference, type RosterEntry } from "../../api/client";
@@ -84,27 +84,39 @@ describe("ExternalReferencePanel", () => {
   it("given a search still in flight, when the field is emptied, then its answer cannot fill the list back in", async () => {
     // given
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
-    let answer: (page: { entries: RosterEntry[]; nextCursor: string | null }) => void = () => undefined;
-    vi.spyOn(api, "roster").mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    let answer!: (page: { entries: RosterEntry[]; nextCursor: null }) => void;
+    const asked = new Promise<{ entries: RosterEntry[]; nextCursor: null }>((resolve) => {
+      answer = resolve;
+    });
+    vi.spyOn(api, "roster").mockReturnValue(asked);
     show();
     await screen.findByTestId("no-references");
     await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
 
-    // when — the board deletes the query, then the answer to it arrives
+    // when — the board deletes the query, then the answer to it arrives and is committed
     await userEvent.clear(screen.getByTestId("reference-person-search"));
-    answer({ entries: [jane], nextCursor: null });
+    await act(async () => {
+      answer({ entries: [jane], nextCursor: null });
+      await asked;
+    });
 
     // then
-    await waitFor(() => expect(screen.getByTestId("reference-person-search")).toHaveValue(""));
+    expect(screen.getByTestId("reference-person-search")).toHaveValue("");
     expect(screen.queryByTestId("reference-person-person-1")).not.toBeInTheDocument();
   });
 
   it("given a query the board has replaced, when the earlier answer arrives last, then the newer one stands", async () => {
     // given
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
-    const answers: ((page: { entries: RosterEntry[]; nextCursor: string | null }) => void)[] = [];
-    vi.spyOn(api, "roster").mockImplementation(() =>
-      new Promise((resolve) => { answers.push(resolve); }));
+    const answers: ((page: { entries: RosterEntry[]; nextCursor: null }) => void)[] = [];
+    const asked: Promise<{ entries: RosterEntry[]; nextCursor: null }>[] = [];
+    vi.spyOn(api, "roster").mockImplementation(() => {
+      const answer = new Promise<{ entries: RosterEntry[]; nextCursor: null }>((resolve) => {
+        answers.push(resolve);
+      });
+      asked.push(answer);
+      return answer;
+    });
     show();
     await screen.findByTestId("no-references");
     await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
@@ -112,13 +124,62 @@ describe("ExternalReferencePanel", () => {
     await userEvent.type(screen.getByTestId("reference-person-search"), "Major");
 
     // when — the replaced query answers after the one that replaced it
-    answers[answers.length - 1]({ entries: [mary], nextCursor: null });
-    await screen.findByTestId("reference-person-person-2");
-    answers[0]({ entries: [jane], nextCursor: null });
+    await act(async () => {
+      answers[answers.length - 1]({ entries: [mary], nextCursor: null });
+      await asked[asked.length - 1];
+    });
+    expect(await screen.findByTestId("reference-person-person-2")).toBeInTheDocument();
+    await act(async () => {
+      answers[0]({ entries: [jane], nextCursor: null });
+      await asked[0];
+    });
 
     // then
-    await waitFor(() => expect(screen.queryByTestId("reference-person-person-1")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("reference-person-person-1")).not.toBeInTheDocument();
     expect(screen.getByTestId("reference-person-person-2")).toBeInTheDocument();
+  });
+
+  it("given a search that fails, when it is the query on screen, then the failure is reported", async () => {
+    // given
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    let refuse!: (failure: Error) => void;
+    const asked = new Promise<never>((_resolve, reject) => { refuse = reject; });
+    vi.spyOn(api, "roster").mockReturnValue(asked);
+    const reportError = vi.fn();
+    show(reportError);
+    await screen.findByTestId("no-references");
+    await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
+
+    // when
+    await act(async () => {
+      refuse(new Error("unavailable"));
+      await asked.catch(() => undefined);
+    });
+
+    // then
+    expect(reportError).toHaveBeenCalled();
+  });
+
+  it("given a search that fails, when the board has already replaced the query, then the failure is not reported", async () => {
+    // given
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    let refuse!: (failure: Error) => void;
+    const asked = new Promise<never>((_resolve, reject) => { refuse = reject; });
+    vi.spyOn(api, "roster").mockReturnValue(asked);
+    const reportError = vi.fn();
+    show(reportError);
+    await screen.findByTestId("no-references");
+    await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
+
+    // when
+    await userEvent.clear(screen.getByTestId("reference-person-search"));
+    await act(async () => {
+      refuse(new Error("unavailable"));
+      await asked.catch(() => undefined);
+    });
+
+    // then
+    expect(reportError).not.toHaveBeenCalled();
   });
 
   it("given a link that was a mistake, when it is undone, then no dialog stands in the way", async () => {
