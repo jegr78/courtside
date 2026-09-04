@@ -35,7 +35,7 @@ class ClosureAnnouncements {
         if (changed.active()) {
             return;
         }
-        announce((from, cursor) -> impact.ofDeactivating(changed.courtId(), from, cursor, PAGE_SIZE),
+        announce((from, cursor) -> impact.pageOfDeactivating(changed.courtId(), from, cursor, PAGE_SIZE),
                 BookingDisplaced.Closure.COURT_OUT_OF_SERVICE);
     }
 
@@ -46,7 +46,7 @@ class ClosureAnnouncements {
         if (changed.active()) {
             return;
         }
-        announce((from, cursor) -> impact.ofRetiringCard(changed.cardId(), from, cursor, PAGE_SIZE),
+        announce((from, cursor) -> impact.pageOfRetiringCard(changed.cardId(), from, cursor, PAGE_SIZE),
                 BookingDisplaced.Closure.CARD_OUT_OF_SERVICE);
     }
 
@@ -54,7 +54,7 @@ class ClosureAnnouncements {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void on(FacilityEvent.OpeningHoursClosed closed) {
-        announce((from, cursor) -> impact.ofClosingWeekday(
+        announce((from, cursor) -> impact.pageOfClosingWeekday(
                         DayOfWeek.of(closed.dayOfWeek()), from, cursor, PAGE_SIZE),
                 BookingDisplaced.Closure.DAY_CLOSED);
     }
@@ -64,19 +64,19 @@ class ClosureAnnouncements {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void on(FacilityEvent.OpeningHoursSet set) {
-        announce((from, cursor) -> impact.ofOpeningHours(DayOfWeek.of(set.dayOfWeek()),
+        announce((from, cursor) -> impact.pageOfOpeningHours(DayOfWeek.of(set.dayOfWeek()),
                         new OpeningWindow(set.opensAt(), set.closesAt()), from, cursor, PAGE_SIZE),
                 BookingDisplaced.Closure.HOURS_NARROWED);
     }
 
     // One instant for every page: a clock read per page lets a booking that starts in between drop
     // out of the cursor's own comparison, and whoever is behind it is never told.
-    private void announce(BiFunction<Instant, UUID, ImpactService.Impact> page,
+    private void announce(BiFunction<Instant, UUID, ImpactService.ImpactPage> page,
                           BookingDisplaced.Closure closure) {
         Instant from = clock.instant();
         UUID cursor = null;
         do {
-            ImpactService.Impact impacted = page.apply(from, cursor);
+            ImpactService.ImpactPage impacted = page.apply(from, cursor);
             impacted.bookings().forEach(booking ->
                     events.publishEvent(new BookingDisplaced(booking.bookingId(), closure)));
             cursor = impacted.nextCursor();
