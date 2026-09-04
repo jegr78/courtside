@@ -20,16 +20,15 @@ class AuditedOperationCoverageTest {
     private static final String INVENTORY = "audited-operations.properties";
     private static final String NONE = "none";
 
-    private static final List<String> SERVICES = List.of(
-            "org.courtside.facility.FacilityService",
-            "org.courtside.card.CardService",
-            "org.courtside.config.internal.ConfigService",
-            "org.courtside.rules.internal.RuleAdminService",
-            "org.courtside.member.MemberService",
-            "org.courtside.member.RosterService",
-            "org.courtside.member.RosterSyncService");
-
     private static final List<String> KNOWN_OPERATIONS = List.of(
+            "AccountCredentials#issueTo",
+            "AccountSessions#endFor",
+            "AccountSessions#endIfRevoked",
+            "AccountSessions#revoke",
+            "AuditService#namesFor",
+            "AuditService#page",
+            "AuditService#recordedAbout",
+            "AuditService#recordedBy",
             "CardService#activeCards",
             "CardService#activeParticipantCards",
             "CardService#allCards",
@@ -58,6 +57,11 @@ class AuditedOperationCoverageTest {
             "ConfigService#uploadLogo",
             "ConfigService#validFor",
             "ConfigService#zoneId",
+            "ExecutionService#execute",
+            "ExecutionService#runsOf",
+            "ExternalReferenceService#link",
+            "ExternalReferenceService#list",
+            "ExternalReferenceService#unlink",
             "FacilityService#activeCourts",
             "FacilityService#allCourts",
             "FacilityService#allOpeningHours",
@@ -73,6 +77,17 @@ class AuditedOperationCoverageTest {
             "FacilityService#setOpeningHours",
             "FacilityService#setWeeklyOpeningHours",
             "FacilityService#weeklyOpeningHours",
+            "FacilityUtilisationService#report",
+            "ImpactService#ofClosingWeekday",
+            "ImpactService#ofDeactivating",
+            "ImpactService#ofOpeningHours",
+            "ImpactService#ofRetiringCard",
+            "ImportSourceService#all",
+            "ImportSourceService#change",
+            "ImportSourceService#configurationForUpdate",
+            "ImportSourceService#configurationOf",
+            "ImportSourceService#create",
+            "ImportSourceService#delete",
             "MemberService#activeMembershipTypeIds",
             "MemberService#allMembershipTypes",
             "MemberService#changeMembershipType",
@@ -84,9 +99,12 @@ class AuditedOperationCoverageTest {
             "MemberService#membershipTypeNameOf",
             "MemberService#requireMembershipType",
             "MemberService#setMembershipTypeActive",
+            "MessageLogService#page",
+            "PreviewService#create",
+            "PreviewService#read",
+            "RosterService#changeLocale",
             "RosterService#changePerson",
             "RosterService#changeRoles",
-            "RosterService#changeLocale",
             "RosterService#changeUsername",
             "RosterService#correctPerson",
             "RosterService#createAccount",
@@ -106,7 +124,8 @@ class AuditedOperationCoverageTest {
             "RuleAdminService#requireRuleSet",
             "RuleAdminService#rulesOf",
             "RuleAdminService#setRule",
-            "RuleAdminService#setRuleSetActive");
+            "RuleAdminService#setRuleSetActive",
+            "SubjectAccessService#answerFor");
 
     @Test
     void givenAWriteOperation_whenItIsNotInTheInventory_thenTheBuildSaysSo() {
@@ -125,7 +144,7 @@ class AuditedOperationCoverageTest {
     }
 
     @Test
-    void givenTheOperationDiscovery_whenItScansTheSevenServices_thenItFindsExactlyTheKnownOperations() {
+    void givenTheOperationDiscovery_whenItScansTheAdministrativeServices_thenItFindsExactlyTheKnownOperations() {
         // given / when
         List<String> operations = declaredOperations();
 
@@ -161,10 +180,9 @@ class AuditedOperationCoverageTest {
     }
 
     @Test
-    void givenTheSevenServices_whenCheckingTheirSuperclass_thenNoneExtendsAnythingButObject() {
+    void givenAnAdministrativeService_whenCheckingItsSuperclass_thenItExtendsNothingButObject() {
         // given / when
-        List<String> withSuperclass = SERVICES.stream()
-                .map(AuditedOperationCoverageTest::loadClass)
+        List<String> withSuperclass = AdministrativeServices.derived().stream()
                 .filter(service -> service.getSuperclass() != Object.class)
                 .map(Class::getSimpleName)
                 .toList();
@@ -196,8 +214,7 @@ class AuditedOperationCoverageTest {
     }
 
     private static List<String> duplicateMethodNames() {
-        return SERVICES.stream()
-                .map(AuditedOperationCoverageTest::loadClass)
+        return AdministrativeServices.derived().stream()
                 .flatMap(AuditedOperationCoverageTest::duplicateNamesOn)
                 .sorted()
                 .toList();
@@ -213,22 +230,13 @@ class AuditedOperationCoverageTest {
     }
 
     private static List<String> declaredOperations() {
-        return SERVICES.stream()
-                .map(AuditedOperationCoverageTest::loadClass)
+        return AdministrativeServices.derived().stream()
                 .flatMap(service -> Arrays.stream(service.getDeclaredMethods())
                         .filter(method -> Modifier.isPublic(method.getModifiers()))
                         .map(method -> service.getSimpleName() + "#" + method.getName()))
                 .distinct()
                 .sorted()
                 .toList();
-    }
-
-    private static Class<?> loadClass(String name) {
-        try {
-            return Class.forName(name);
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException("Cannot load " + name, e);
-        }
     }
 
     private static Properties inventory() {

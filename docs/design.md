@@ -23,10 +23,13 @@ refuses to start unless its environment guard confirms the database it is about 
 disposable one it names (`courtside_dev` for `demo`, `courtside_perf` for `performance`), not
 whatever the deployment happens to point at. The `reporting` and `integration` modules of section 3
 are designed and not built. `audit` is built: every configuration change made
-through the admin API — facility, cards, config, rule sets and the roster — is recorded in the
-append-only `domain_event` table before the commit that makes it: actor, time, entity, and, except
-for free text, the values. A free-text field never carries its value — a create event omits it, a
-change event names it in `changedFields` (`fields` for `roster.person.corrected`) — which is what
+through the admin API — facility, cards, config, rule sets, the roster and the import
+configuration — is recorded in the append-only `domain_event` table before the commit that makes
+it: actor, time, entity, and, except for free text, the values. Which services that covers is
+derived from the admin API rather than listed, so a surface is covered on the day its controller is
+written instead of on the day somebody remembers to name it. A free-text field never carries its
+value — a create event omits it, a change event names it in `changedFields` (`fields` for
+`roster.person.corrected`) — which is what
 keeps section 11's erasure working, since the log then holds nothing personal to remove. Bookings
 are not included; they carry their own status history. Coverage is enforced by a test, not by
 memory: it inventories every public method of the seven administrative services against an event

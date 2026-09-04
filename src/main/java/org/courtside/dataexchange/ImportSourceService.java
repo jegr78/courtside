@@ -8,11 +8,14 @@ import org.courtside.dataexchange.internal.ImportSourceRepository;
 import org.courtside.dataexchange.internal.ReportedValue;
 import org.courtside.member.MemberService;
 import org.courtside.shared.SqlConstraintViolation;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -35,10 +38,27 @@ public class ImportSourceService {
     private static final int MAX_ENTRY_LENGTH = 120;
     private static final int MAX_MEMBERSHIP_TYPE_MAPPINGS = 200;
 
+    private record DescribedField(String name, Function<SourceConfiguration, Object> read) {
+    }
+
+    // The log names which part of the description moved, never what it moved to: a column mapping
+    // and a category assignment both carry the club's own vocabulary.
+    private static final List<DescribedField> DESCRIBED_FIELDS = List.of(
+            new DescribedField("sourceKey", SourceConfiguration::sourceKey),
+            new DescribedField("displayName", SourceConfiguration::displayName),
+            new DescribedField("separator", SourceConfiguration::separator),
+            new DescribedField("encoding", SourceConfiguration::encoding),
+            new DescribedField("columns", SourceConfiguration::columns),
+            new DescribedField("membershipTypes", SourceConfiguration::membershipTypes),
+            new DescribedField("defaultMembershipTypeId", SourceConfiguration::defaultMembershipTypeId),
+            new DescribedField("ownedFields", SourceConfiguration::ownedFields),
+            new DescribedField("removalWarningPercent", SourceConfiguration::removalWarningPercent));
+
     private final ImportSourceRepository sources;
     private final ExternalReferenceRepository references;
     private final ImportRunRepository runs;
     private final MemberService memberships;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public List<SourceConfiguration> all() {
@@ -76,7 +96,10 @@ public class ImportSourceService {
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
                 requiredSeparator(separator), requiredEncoding(encoding), storedColumns, storedTypes,
                 defaultMembershipTypeId, ownedFields, removalWarningPercent);
-        return toConfiguration(saveOrRejectTakenKey(source));
+        SourceConfiguration described = toConfiguration(saveOrRejectTakenKey(source));
+        events.publishEvent(
+                new DataExchangeEvent.SourceDescribed(described.sourceId(), described.sourceKey()));
+        return described;
     }
 
     @Transactional
@@ -91,10 +114,17 @@ public class ImportSourceService {
         requireUsable(storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
                 removalWarningPercent);
         ImportSource source = require(sourceId);
+        SourceConfiguration before = toConfiguration(source);
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
                 requiredSeparator(separator), requiredEncoding(encoding), storedColumns, storedTypes,
                 defaultMembershipTypeId, ownedFields, removalWarningPercent);
-        return toConfiguration(saveOrRejectTakenKey(source));
+        SourceConfiguration after = toConfiguration(saveOrRejectTakenKey(source));
+        List<String> changedFields = differingFields(before, after);
+        if (!changedFields.isEmpty()) {
+            events.publishEvent(new DataExchangeEvent.SourceChanged(after.sourceId(),
+                    after.sourceKey(), changedFields));
+        }
+        return after;
     }
 
     @Transactional
@@ -109,6 +139,15 @@ public class ImportSourceService {
                     "Import source " + source.getId() + " has been executed against");
         }
         sources.delete(source);
+        events.publishEvent(
+                new DataExchangeEvent.SourceDeleted(source.getId(), source.getSourceKey()));
+    }
+
+    private static List<String> differingFields(SourceConfiguration before, SourceConfiguration after) {
+        return DESCRIBED_FIELDS.stream()
+                .filter(field -> !Objects.equals(field.read().apply(before), field.read().apply(after)))
+                .map(DescribedField::name)
+                .toList();
     }
 
     private void requireUsable(Map<String, CanonicalField> columns,

@@ -10,6 +10,7 @@ import org.courtside.shared.CursorPage;
 import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +34,7 @@ public class ExternalReferenceService {
     private final ExternalReferenceRepository references;
     private final ImportSourceService sources;
     private final PersonRepository persons;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public CursorPage.Result<ExternalLink> list(UUID sourceId, UUID cursor, int limit) {
@@ -55,16 +57,22 @@ public class ExternalReferenceService {
         if (existing != null && existing.getPersonId().equals(person)) {
             return toLink(existing);
         }
-        return toLink(saveOrTranslateCollision(
+        ExternalLink linked = toLink(saveOrTranslateCollision(
                 new ExternalReference(source, reference, person, clock.instant()), reference.value()));
+        events.publishEvent(
+                new DataExchangeEvent.ExternalReferenceLinked(person, source, reference.value()));
+        return linked;
     }
 
     @Transactional
     public void unlink(UUID sourceId, String externalId) {
         UUID source = requireKnownSource(sourceId);
-        references.delete(heldReference(source, externalId)
+        ExternalReference held = heldReference(source, externalId)
                 .orElseThrow(() -> new ExternalReferenceNotFoundException(
-                        "No such reference from import source " + source)));
+                        "No such reference from import source " + source));
+        references.delete(held);
+        events.publishEvent(new DataExchangeEvent.ExternalReferenceUnlinked(
+                held.getPersonId(), source, held.getExternalId()));
     }
 
     // A member number no reference can hold reaches this from a path segment, where no validation
