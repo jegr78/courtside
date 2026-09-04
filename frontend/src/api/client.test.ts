@@ -61,6 +61,21 @@ it("given an expired session, when an API call is rejected, then the app is noti
   expect(listener).toHaveBeenCalledOnce();
 });
 
+it("given a sign-out the instance refuses, when the refusal arrives, then the app is not notified as well", async () => {
+  // given
+  const listener = vi.fn();
+  window.addEventListener("courtside:unauthenticated", listener);
+  server.use(http.post("/api/session/logout", () => HttpResponse.json({
+    type: "urn:courtside:error:unauthenticated",
+    title: "Not authenticated",
+    status: 401
+  }, { status: 401, headers: { "Content-Type": "application/problem+json" } })));
+
+  // when / then
+  await expect(api.logout()).rejects.toMatchObject({ status: 401 });
+  expect(listener).not.toHaveBeenCalled();
+});
+
 it("given a CSRF cookie, when logging out, then the token is echoed in the header", async () => {
   // given
   document.cookie = "XSRF-TOKEN=test-token";

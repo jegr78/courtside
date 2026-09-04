@@ -430,5 +430,5 @@ export const api = {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password })
   }),
-  logout: () => request<void>("/api/session/logout", { method: "POST" })
+  logout: () => request<void>("/api/session/logout", { method: "POST" }, false)
 };

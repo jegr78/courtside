@@ -332,22 +332,23 @@ describe("App build identity", () => {
   });
 
   it("given a failure raised while signed in, when the session ends and the shell returns to sign-in, then the message does not outlive it", async () => {
-    // given
+    // given — a sign-out that failed on the network leaves its message standing beside the menu
     vi.spyOn(api, "session").mockResolvedValue({
-      authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false, displayName: "Jane Doe"
+      authenticated: true, roles: ["MEMBER"], passwordChangeRequired: true, displayName: "Jane Doe"
     });
     vi.spyOn(api, "config").mockResolvedValue(club);
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
-    vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingHours: [] });
-    vi.spyOn(api, "courts").mockResolvedValue([]);
     vi.spyOn(api, "logout").mockRejectedValue(new Error("network"));
+    vi.spyOn(api, "changeInitialPassword").mockResolvedValue();
     render(<RoutedShell><App /></RoutedShell>);
     await userEvent.click(await screen.findByTestId("preferences-menu"));
     await userEvent.click(screen.getByTestId("logout"));
     expect(await screen.findByTestId("preferences-failure")).toBeInTheDocument();
 
-    // when
-    fireEvent(window, new Event("courtside:unauthenticated"));
+    // when — the account sets its own password, which ends the session it was signed in with
+    await userEvent.type(screen.getByTestId("new-password"), "permanent-password");
+    await userEvent.type(screen.getByTestId("confirm-password"), "permanent-password");
+    await userEvent.click(screen.getByTestId("password-submit"));
 
     // then
     expect(await screen.findByTestId("login-view")).toBeInTheDocument();

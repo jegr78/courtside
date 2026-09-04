@@ -8,10 +8,13 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -64,10 +67,15 @@ class SignOutTest extends AbstractIntegrationTest {
     // Nothing refuses a sign-out that names no session: LogoutFilter answers it before the
     // authorization rule for this path is ever reached.
     @Test
-    void givenNoSession_whenSigningOut_thenItSucceedsAllTheSame() throws Exception {
-        // when / then
-        mockMvc.perform(post("/api/session/logout").with(csrf()))
-                .andExpect(status().isNoContent());
+    void givenNoSession_whenSigningOut_thenItSucceedsWithoutStartingOne() throws Exception {
+        // when
+        MvcResult result = mockMvc.perform(post("/api/session/logout").with(csrf()))
+                .andExpect(status().isNoContent())
+                .andReturn();
+
+        // then
+        assertThat(result.getResponse().getContentAsString()).isEmpty();
+        assertThat(result.getRequest().getSession(false)).isNull();
     }
 
     @Test
