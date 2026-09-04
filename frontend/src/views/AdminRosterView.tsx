@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, type MembershipType, type RosterEntry } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
@@ -32,23 +32,33 @@ export function AdminRosterView() {
   const { t } = useTranslation();
   const newPerson = useUnsavedForm("person:new");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedMembershipTypeId = searchParams.get("membershipTypeId") || undefined;
   const [entries, setEntries] = useState<RosterEntry[]>();
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [cursor, setCursor] = useState<string>();
   const [query, setQuery] = useState<string>();
-  const [membershipTypeId, setMembershipTypeId] = useState<string>();
+  const [membershipTypeId, setMembershipTypeId] = useState<string | undefined>(requestedMembershipTypeId);
   const { message: error, report: reportError, clear } = useReportedFailure();
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    void Promise.all([api.roster(undefined, undefined, PAGE_SIZE, undefined), api.membershipTypes()])
+    let active = true;
+    void Promise.all([api.roster(undefined, undefined, PAGE_SIZE, requestedMembershipTypeId), api.membershipTypes()])
       .then(([page, membershipTypes]) => {
+        if (!active) return;
+        setMembershipTypeId(requestedMembershipTypeId);
         setEntries(page.entries);
         setCursor(page.nextCursor ?? undefined);
         setTypes(membershipTypes);
       })
-      .catch(reportError);
-  }, [reportError]);
+      .catch((failure: unknown) => {
+        if (active) reportError(failure);
+      });
+    return () => {
+      active = false;
+    };
+  }, [reportError, requestedMembershipTypeId]);
 
   async function read(term: string | undefined, typeId: string | undefined) {
     if (pending) return;
