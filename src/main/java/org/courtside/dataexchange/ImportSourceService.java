@@ -8,16 +8,20 @@ import org.courtside.dataexchange.internal.ImportSourceRepository;
 import org.courtside.dataexchange.internal.ReportedValue;
 import org.courtside.member.MemberService;
 import org.courtside.shared.SqlConstraintViolation;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.RecordComponent;
 import java.time.Clock;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,10 +39,18 @@ public class ImportSourceService {
     private static final int MAX_ENTRY_LENGTH = 120;
     private static final int MAX_MEMBERSHIP_TYPE_MAPPINGS = 200;
 
+    // Read off the record rather than listed, so a field added to the configuration is reported the
+    // day it is added. The log names which part moved and never what it moved to.
+    private static final List<RecordComponent> DESCRIBED_FIELDS =
+            Arrays.stream(SourceConfiguration.class.getRecordComponents())
+                    .filter(component -> !component.getName().equals("sourceId"))
+                    .toList();
+
     private final ImportSourceRepository sources;
     private final ExternalReferenceRepository references;
     private final ImportRunRepository runs;
     private final MemberService memberships;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public List<SourceConfiguration> all() {
@@ -76,7 +88,10 @@ public class ImportSourceService {
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
                 requiredSeparator(separator), requiredEncoding(encoding), storedColumns, storedTypes,
                 defaultMembershipTypeId, ownedFields, removalWarningPercent);
-        return toConfiguration(saveOrRejectTakenKey(source));
+        SourceConfiguration described = toConfiguration(saveOrRejectTakenKey(source));
+        events.publishEvent(
+                new DataExchangeEvent.SourceDescribed(described.sourceId(), described.sourceKey()));
+        return described;
     }
 
     @Transactional
@@ -91,10 +106,17 @@ public class ImportSourceService {
         requireUsable(storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
                 removalWarningPercent);
         ImportSource source = require(sourceId);
+        SourceConfiguration before = toConfiguration(source);
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
                 requiredSeparator(separator), requiredEncoding(encoding), storedColumns, storedTypes,
                 defaultMembershipTypeId, ownedFields, removalWarningPercent);
-        return toConfiguration(saveOrRejectTakenKey(source));
+        SourceConfiguration after = toConfiguration(saveOrRejectTakenKey(source));
+        List<String> changedFields = differingFields(before, after);
+        if (!changedFields.isEmpty()) {
+            events.publishEvent(new DataExchangeEvent.SourceChanged(after.sourceId(),
+                    after.sourceKey(), changedFields));
+        }
+        return after;
     }
 
     @Transactional
@@ -109,6 +131,23 @@ public class ImportSourceService {
                     "Import source " + source.getId() + " has been executed against");
         }
         sources.delete(source);
+        events.publishEvent(
+                new DataExchangeEvent.SourceDeleted(source.getId(), source.getSourceKey()));
+    }
+
+    private static List<String> differingFields(SourceConfiguration before, SourceConfiguration after) {
+        return DESCRIBED_FIELDS.stream()
+                .filter(field -> !Objects.equals(valueOf(field, before), valueOf(field, after)))
+                .map(RecordComponent::getName)
+                .toList();
+    }
+
+    private static Object valueOf(RecordComponent field, SourceConfiguration configuration) {
+        try {
+            return field.getAccessor().invoke(configuration);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read " + field.getName() + " of a source", e);
+        }
     }
 
     private void requireUsable(Map<String, CanonicalField> columns,

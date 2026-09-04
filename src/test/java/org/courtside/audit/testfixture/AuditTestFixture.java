@@ -6,11 +6,14 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.audit.internal.AuditService;
 import org.courtside.audit.internal.DomainEvent;
 import org.courtside.audit.internal.DomainEventRepository;
+import org.courtside.shared.DomainEventRecord;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @RequiredArgsConstructor
 public class AuditTestFixture {
@@ -52,6 +55,19 @@ public class AuditTestFixture {
 
     public String nameOf(UUID subjectId) {
         return audit.namesFor(List.of(subjectId)).get(subjectId);
+    }
+
+    // Every type of the family is asserted, not only the expected ones, so an event nobody asked
+    // for fails the test that was counting the ones somebody did.
+    public void assertEventCounts(UUID subjectId, Class<? extends DomainEventRecord> eventFamily,
+                                  Map<String, Long> expectedCounts) {
+        List<String> known = DomainEventTypes.typesOf(eventFamily);
+        assertThat(expectedCounts.keySet()).as("every expected count names a known event type")
+                .isSubsetOf(known);
+        Map<String, Long> actual = eventCountsAbout(subjectId);
+        known.forEach(type -> assertThat(actual.getOrDefault(type, 0L))
+                .as(type)
+                .isEqualTo(expectedCounts.getOrDefault(type, 0L)));
     }
 
     private RecordedEvent toRecordedEvent(DomainEvent event) {
