@@ -19,7 +19,7 @@ type Editing = { source: ImportSource } | { source: undefined } | undefined;
 
 export function AdminImportView() {
   const { t } = useTranslation();
-  const { club } = useClubConfiguration();
+  const { club, error: clubError } = useClubConfiguration();
   const { message: error, report, clear } = useReportedFailure();
   const [sources, setSources] = useState<ImportSource[]>();
   const [types, setTypes] = useState<MembershipType[]>([]);
@@ -118,7 +118,7 @@ export function AdminImportView() {
 
   return <section data-testid="admin-import-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.import.title")}</h1>
-    {error && <Alert>{error}</Alert>}
+    {(error ?? clubError) && <Alert>{error ?? clubError}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
 
     {sources && <div className="grid gap-3">

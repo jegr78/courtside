@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api, type ImportSource, type MembershipType } from "../api/client";
 import i18n from "../i18n";
+import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { AdminImportView } from "./AdminImportView";
@@ -28,6 +29,19 @@ function show() {
 }
 
 describe("AdminImportView", () => {
+
+  it("given the club configuration cannot be read, when the view opens, then it says so instead of waiting in silence", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<MemoryRouter><ClubConfigurationProvider><UnsavedChangesProvider><AdminImportView /></UnsavedChangesProvider></ClubConfigurationProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
   it("when the page is shown, then its content keeps a readable line length", () => {
     // when
     show();
