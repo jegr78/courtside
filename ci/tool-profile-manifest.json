@@ -60,6 +60,8 @@
     { "path": "tools/security-baseline-continuation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-baseline-pair.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/security-baseline-pair.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/security-evidence-recipient.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/security-evidence-recipient.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-environment.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/security-environment.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-findings.mjs", "profiles": ["full"], "test": false },

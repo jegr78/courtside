@@ -1,6 +1,5 @@
 {
   "version": 1,
-  "certificateSha256": "37:8B:2F:27:CA:78:6A:56:8B:35:2D:E6:77:44:66:01:88:24:88:AB:E1:F3:B3:62:0D:83:0C:27:A2:D0:7B:41",
   "custodianRole": "repository-maintainer",
   "canaryVerifiedOn": "2026-08-24",
   "canaryValidThrough": "2026-11-24"

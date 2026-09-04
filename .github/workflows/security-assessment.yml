@@ -116,12 +116,12 @@ jobs:
       - id: seal
         name: Seal protected assessment evidence
         if: always() && (env.PROFILE != 'baseline' || steps.pair.outcome == 'success')
+        env:
+          COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256: ${{ vars.COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256 }}
         run: |
           umask 077
           set -o pipefail
-          EXPECTED_FINGERPRINT="$(jq -r '.certificateSha256' .github/security-evidence-key.json)"
-          ACTUAL_FINGERPRINT="$(openssl x509 -in .github/security-evidence-recipient.pem -noout -fingerprint -sha256 | cut -d= -f2)"
-          test "$ACTUAL_FINGERPRINT" = "$EXPECTED_FINGERPRINT"
+          frontend/node/node tools/security-evidence-recipient.mjs .github/security-evidence-recipient.pem
           TODAY="$(date -u +%F)"
           jq -e --arg today "$TODAY" \
             '.canaryVerifiedOn <= $today and $today <= .canaryValidThrough' \
