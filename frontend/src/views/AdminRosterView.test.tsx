@@ -121,8 +121,9 @@ describe("AdminRosterView", () => {
     // when
     await act(() => router.navigate("/admin/roster"));
     expect(await screen.findByTestId("roster-row-person-2")).toBeInTheDocument();
-    await act(() => {
+    await act(async () => {
       resolveFiltered({ entries: [withAccount], nextCursor: null });
+      await filtered;
     });
 
     // then
