@@ -41,6 +41,33 @@ describe("SeriesForm", () => {
     ]);
   });
 
+  it("given a court without a name, when the form opens, then its number uses the product vocabulary", async () => {
+    // given
+    show();
+
+    // when
+    await userEvent.click(await screen.findByTestId("new-series"));
+
+    // then
+    expect(screen.getByRole("option", { name: "Court 2" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "2" })).not.toBeInTheDocument();
+  });
+
+  it("given focus inside the series form, when the form is cancelled, then focus returns to its opener", async () => {
+    // given
+    show();
+    const opener = await screen.findByTestId("new-series");
+    await userEvent.click(opener);
+    const cancel = screen.getByTestId("cancel-series");
+    cancel.focus();
+
+    // when
+    await userEvent.click(cancel);
+
+    // then
+    expect(screen.getByTestId("new-series")).toHaveFocus();
+  });
+
   it("given a rule set bounds the booking duration, when the form opens, then the duration field carries that ceiling", async () => {
     // given
     vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [], maxBookingMinutes: 90 });
@@ -115,6 +142,27 @@ describe("SeriesForm", () => {
     // then
     expect(await screen.findByTestId("series-occurrence-chosen-1")).toBeDisabled();
     expect(screen.getByTestId("series-occurrence-1")).toHaveTextContent("14");
+  });
+
+  it("given an unknown rule violation, when the preview is read, then a generic failure replaces its translation key", async () => {
+    // given
+    vi.spyOn(api, "previewSeries").mockResolvedValue({
+      creatableCount: 0, truncatedByHorizon: false, horizonLimit: null,
+      occurrences: [{
+        startsAt: "2026-09-14T16:00:00Z", endsAt: "2026-09-14T17:00:00Z", blockedCourtIds: ["court-1"],
+        violations: [{ code: "booking.rule.unknown", params: {} }], creatable: false
+      }]
+    });
+    show();
+    await describeRule();
+
+    // when
+    await userEvent.click(screen.getByTestId("preview-series"));
+
+    // then
+    const occurrence = await screen.findByTestId("series-occurrence-0");
+    expect(occurrence).toHaveTextContent("That did not work. Please try again.");
+    expect(occurrence).not.toHaveTextContent("booking.rule.unknown");
   });
 
   it("given a date the court is already taken on, when the preview is read, then it says so rather than staying blank", async () => {
