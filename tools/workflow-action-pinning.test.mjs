@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+
+const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+const { parse } = require("yaml");
 
 const github = join(dirname(fileURLToPath(import.meta.url)), "..", ".github");
 const workflows = join(github, "workflows");
@@ -54,4 +58,21 @@ test("given a workflow that names no action at all, when the scan reports it, th
   assert.deepEqual(definitionsIn(workflows)
     .filter((path) => referencesIn(path).length === 0)
     .map((path) => relative(github, path)), []);
+});
+
+test("given every workflow checkout, when repository code runs, then the GitHub token is not persisted", () => {
+  // given
+  const definitions = definitionsIn(workflows);
+
+  // when
+  const unsafeCheckouts = definitions.flatMap((path) => {
+    const workflow = parse(readFileSync(path, "utf8"));
+    return Object.entries(workflow.jobs ?? {}).flatMap(([jobName, job]) => (job.steps ?? [])
+      .filter((step) => typeof step.uses === "string" && step.uses.startsWith("actions/checkout@"))
+      .filter((step) => step.with?.["persist-credentials"] !== false)
+      .map(() => `${relative(github, path)}:${jobName}`));
+  });
+
+  // then
+  assert.deepEqual(unsafeCheckouts, []);
 });
