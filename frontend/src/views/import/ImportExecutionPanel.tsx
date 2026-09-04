@@ -74,7 +74,7 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, ex
     <div className="grid gap-2 border-t pt-4">
       <h3 className="text-lg font-semibold">{t("admin.import.runLog")}</h3>
       {!timeZone
-        ? <p role="status" data-testid="runs-awaiting-zone">{t("status.loading")}</p>
+        ? <p role="status" data-testid="runs-loading">{t("admin.import.runsLoading")}</p>
         : runs && (runs.length === 0
         ? <p data-testid="no-runs">{t("admin.import.noRuns")}</p>
         : <ul className="grid gap-2">

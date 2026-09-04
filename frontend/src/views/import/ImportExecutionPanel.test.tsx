@@ -87,7 +87,7 @@ describe("ImportExecutionPanel", () => {
     />);
 
     // then
-    expect(await screen.findByTestId("runs-awaiting-zone")).toBeInTheDocument();
+    expect(await screen.findByTestId("runs-loading")).toHaveTextContent("Earlier runs are being loaded");
     expect(screen.queryByTestId("import-run-run-1")).not.toBeInTheDocument();
   });
 
