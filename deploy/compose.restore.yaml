@@ -1,6 +1,21 @@
 name: courtside-restore
 
 services:
+  mail:
+    image: axllent/mailpit:v1.31@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
+    command:
+      - --smtp-tls-cert
+      - /certs/cert.pem
+      - --smtp-tls-key
+      - /certs/key.pem
+      - --smtp-require-starttls
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - ${COURTSIDE_RESTORE_MAIL_CERT_DIR}:/certs:ro
+
   db:
     image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     environment:
@@ -37,7 +52,9 @@ services:
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: admin
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_RESTORE_ADMIN_PASSWORD}
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
-      COURTSIDE_MAIL_RELAY_HOST: mail.invalid
+      COURTSIDE_MAIL_RELAY_HOST: mail
+      COURTSIDE_MAIL_RELAY_PORT: "1025"
+      COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true"
       COURTSIDE_MAIL_FROM: no-reply@example.org
       COURTSIDE_MAIL_REPLY_TO: board@example.org
     ports:
