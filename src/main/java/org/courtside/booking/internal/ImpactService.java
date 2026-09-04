@@ -49,6 +49,9 @@ public class ImpactService {
     public record Impact(int affectedCount, boolean truncated, UUID nextCursor, List<AffectedBooking> bookings) {
     }
 
+    record ImpactPage(UUID nextCursor, List<AffectedBooking> bookings) {
+    }
+
     public Impact ofDeactivating(UUID courtId, UUID cursor, int limit) {
         return ofDeactivating(courtId, clock.instant(), cursor, limit);
     }
@@ -56,12 +59,12 @@ public class ImpactService {
     // The caller pins the instant when it walks every page: reading the clock again per page lets a
     // booking that starts in between drop out of the cursor's own comparison, and the walk ends there.
     Impact ofDeactivating(UUID courtId, Instant from, UUID cursor, int limit) {
-        validateLimit(limit);
-        facility.findCourt(courtId).orElseThrow(
-                () -> new CourtNotFoundException("No court with id " + courtId));
-        return impactOf(allocations.findImpactBookingIdsByCourt(
-                        courtId, from, cursor == null, cursorOrFirstPage(cursor), page(limit)),
+        return impactOf(deactivatingBookingIds(courtId, from, cursor, limit),
                 allocations.countImpactBookingsByCourt(courtId, from), limit);
+    }
+
+    ImpactPage pageOfDeactivating(UUID courtId, Instant from, UUID cursor, int limit) {
+        return pageOf(deactivatingBookingIds(courtId, from, cursor, limit), limit);
     }
 
     public Impact ofRetiringCard(UUID cardId, UUID cursor, int limit) {
@@ -69,12 +72,12 @@ public class ImpactService {
     }
 
     Impact ofRetiringCard(UUID cardId, Instant from, UUID cursor, int limit) {
-        validateLimit(limit);
-        cards.findCard(cardId).orElseThrow(
-                () -> new CardNotFoundException("No booking card with id " + cardId));
-        return impactOf(allocations.findImpactBookingIdsByCard(
-                        cardId, from, cursor == null, cursorOrFirstPage(cursor), page(limit)),
+        return impactOf(retiringCardBookingIds(cardId, from, cursor, limit),
                 allocations.countImpactBookingsByCard(cardId, from), limit);
+    }
+
+    ImpactPage pageOfRetiringCard(UUID cardId, Instant from, UUID cursor, int limit) {
+        return pageOf(retiringCardBookingIds(cardId, from, cursor, limit), limit);
     }
 
     public Impact ofClosingWeekday(DayOfWeek day, UUID cursor, int limit) {
@@ -83,6 +86,10 @@ public class ImpactService {
 
     Impact ofClosingWeekday(DayOfWeek day, Instant from, UUID cursor, int limit) {
         return openingHoursImpact(day, true, LocalTime.MIN, LocalTime.MAX, from, cursor, limit);
+    }
+
+    ImpactPage pageOfClosingWeekday(DayOfWeek day, Instant from, UUID cursor, int limit) {
+        return openingHoursPage(day, true, LocalTime.MIN, LocalTime.MAX, from, cursor, limit);
     }
 
     public Impact ofOpeningHours(DayOfWeek day, OpeningWindow window, UUID cursor, int limit) {
@@ -94,18 +101,56 @@ public class ImpactService {
         return openingHoursImpact(day, false, required.opensAt(), required.closesAt(), from, cursor, limit);
     }
 
+    ImpactPage pageOfOpeningHours(DayOfWeek day, OpeningWindow window, Instant from, UUID cursor, int limit) {
+        OpeningWindow required = OpeningWindow.required(window);
+        return openingHoursPage(day, false, required.opensAt(), required.closesAt(), from, cursor, limit);
+    }
+
     private Impact openingHoursImpact(DayOfWeek day, boolean closed, LocalTime opensAt, LocalTime closesAt,
                                       Instant from, UUID cursor, int limit) {
-        validateLimit(limit);
-        List<UUID> bookingIds = allocations.findImpactBookingIdsByOpeningHours(
-                from, timeZone.id(), day.getValue(), closed, opensAt, closesAt,
-                cursor == null, cursorOrFirstPage(cursor), page(limit));
+        List<UUID> bookingIds = openingHoursBookingIds(
+                day, closed, opensAt, closesAt, from, cursor, limit);
         long affectedCount = allocations.countImpactBookingsByOpeningHours(
                 from, timeZone.id(), day.getValue(), closed, opensAt, closesAt);
         return impactOf(bookingIds, affectedCount, limit);
     }
 
+    private ImpactPage openingHoursPage(DayOfWeek day, boolean closed, LocalTime opensAt,
+                                        LocalTime closesAt, Instant from, UUID cursor, int limit) {
+        return pageOf(openingHoursBookingIds(day, closed, opensAt, closesAt, from, cursor, limit), limit);
+    }
+
+    private List<UUID> deactivatingBookingIds(UUID courtId, Instant from, UUID cursor, int limit) {
+        validateLimit(limit);
+        facility.findCourt(courtId).orElseThrow(
+                () -> new CourtNotFoundException("No court with id " + courtId));
+        return allocations.findImpactBookingIdsByCourt(
+                courtId, from, cursor == null, cursorOrFirstPage(cursor), page(limit));
+    }
+
+    private List<UUID> retiringCardBookingIds(UUID cardId, Instant from, UUID cursor, int limit) {
+        validateLimit(limit);
+        cards.findCard(cardId).orElseThrow(
+                () -> new CardNotFoundException("No booking card with id " + cardId));
+        return allocations.findImpactBookingIdsByCard(
+                cardId, from, cursor == null, cursorOrFirstPage(cursor), page(limit));
+    }
+
+    private List<UUID> openingHoursBookingIds(DayOfWeek day, boolean closed, LocalTime opensAt,
+                                              LocalTime closesAt, Instant from, UUID cursor, int limit) {
+        validateLimit(limit);
+        return allocations.findImpactBookingIdsByOpeningHours(
+                from, timeZone.id(), day.getValue(), closed, opensAt, closesAt,
+                cursor == null, cursorOrFirstPage(cursor), page(limit));
+    }
+
     private Impact impactOf(List<UUID> bookingIds, long affectedCount, int limit) {
+        ImpactPage page = pageOf(bookingIds, limit);
+        return new Impact(Math.toIntExact(affectedCount), page.nextCursor() != null,
+                page.nextCursor(), page.bookings());
+    }
+
+    private ImpactPage pageOf(List<UUID> bookingIds, int limit) {
         boolean truncated = bookingIds.size() > limit;
         List<UUID> visibleIds = truncated ? bookingIds.subList(0, limit) : bookingIds;
         Map<UUID, List<CourtAllocation>> allocationsByBooking = new HashMap<>();
@@ -120,7 +165,7 @@ public class ImpactService {
                 .map(ImpactService::toAffectedBooking)
                 .toList();
         UUID nextCursor = truncated ? visibleIds.getLast() : null;
-        return new Impact(Math.toIntExact(affectedCount), truncated, nextCursor, listed);
+        return new ImpactPage(nextCursor, listed);
     }
 
     private static PageRequest page(int limit) {
