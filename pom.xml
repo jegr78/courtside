@@ -243,12 +243,6 @@
                         <configuration><arguments>run build</arguments></configuration>
                     </execution>
                     <execution>
-                        <id>npm-audit</id>
-                        <phase>prepare-package</phase>
-                        <goals><goal>npm</goal></goals>
-                        <configuration><arguments>audit --audit-level=high</arguments></configuration>
-                    </execution>
-                    <execution>
                         <id>npm-e2e</id>
                         <phase>integration-test</phase>
                         <goals><goal>npm</goal></goals>

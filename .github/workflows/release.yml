@@ -66,7 +66,8 @@ jobs:
           count=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues?state=open&labels=nightly&per_page=100" \
             --slurp | jq '[map(.[])[] | select(.pull_request == null) |
               select(.title | startswith("[nightly] ")) |
-              select(.body | contains("courtside-nightly-fingerprint"))] | length')
+              select(.body | contains("courtside-nightly-fingerprint")) |
+              select(.body | contains("- Workflow: `npm audit`") | not)] | length')
           test "$count" = 0 || { echo "::error::$count nightly failure issue(s) remain open"; exit 1; }
 
       - name: Take the version from the tag
@@ -100,10 +101,11 @@ jobs:
           extract --layers --launcher --destination build/layers
 
       - name: Capture npm audit evidence
+        working-directory: frontend
         run: |
-          mkdir -p build/security/codeql
-          frontend/node/node frontend/node/node_modules/npm/bin/npm-cli.js --prefix frontend audit --json \
-            > build/security/npm.json || true
+          mkdir -p ../build/security/codeql
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security -- \
+            --output ../build/security/npm.json
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

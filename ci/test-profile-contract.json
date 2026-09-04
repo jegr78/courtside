@@ -18,7 +18,6 @@
         "frontend-lint",
         "frontend-test",
         "frontend-build",
-        "frontend-audit",
         "frontend-package",
         "frontend-e2e"
       ]
@@ -65,11 +64,6 @@
       "workingDirectory": "frontend",
       "executable": "npm",
       "arguments": ["run", "build"]
-    },
-    "frontend-audit": {
-      "workingDirectory": "frontend",
-      "executable": "npm",
-      "arguments": ["audit", "--audit-level=high"]
     },
     "frontend-package": {
       "workingDirectory": "repository",

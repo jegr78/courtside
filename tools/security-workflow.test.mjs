@@ -411,7 +411,7 @@ test("given security evidence, when workflows retain it, then only normalized re
   assert.match(build, /rm -rf build\/security\/trivy-runtime\.json build\/security\/trivy-source\.json build\/security\/codeql/);
   assert.match(release, /build\/uat-smoke\/security-summary-/);
   assert.match(release, /rm -f build\/uat-smoke\/trivy-/);
-  assert.match(release, /npm-cli\.js --prefix frontend audit --json/);
+  assert.match(release, /npm-cli\.js run audit:security/);
   assert.match(release, /release-security-record/);
   assert.match(release, /--summary build\/security-input\/release-build\.json/);
   assert.match(release, /--assessment-policy not-applicable/g);

@@ -63,6 +63,7 @@ export function evaluateSecurityReports({
     evidenceSources: reports.map((report) => ({
       scanner: report.scanner, version: report.version ?? "unknown", status: report.status ?? "completed",
       subject: report.subject ?? subject,
+      ...(report.reason ? { reason: report.reason } : {}),
       ...((report.subject ?? subject).startsWith("sha256:") ? { artifactDigest: report.subject ?? subject } : {}),
       findingCount: report.findings.length
     })).toSorted((left, right) => left.scanner.localeCompare(right.scanner)),
@@ -138,11 +139,21 @@ export function combineSecuritySummaries({
     status: acceptedFindings.length > 0 ? "passed-with-exceptions" : "passed",
     sources: summaries.map((summary) => ({
       scope: summary.scope, subject: summary.subject, status: summary.status,
-      assessmentPolicy: summary.assessmentPolicy
+      assessmentPolicy: summary.assessmentPolicy,
+      evidenceSources: (summary.evidenceSources ?? []).map(releaseEvidenceSource)
     })),
     blockingFindings, acceptedFindings, informationalFindings,
     ...(assessments.length > 0 ? { assessments } : {}),
     ...(assessmentGates.length > 0 ? { assessmentGates: structuredClone(assessmentGates) } : {})
+  };
+}
+
+function releaseEvidenceSource(source) {
+  return {
+    scanner: source.scanner, version: source.version, status: source.status, subject: source.subject,
+    ...(source.reason ? { reason: source.reason } : {}),
+    ...(source.artifactDigest ? { artifactDigest: source.artifactDigest } : {}),
+    ...(Number.isInteger(source.findingCount) ? { findingCount: source.findingCount } : {})
   };
 }
 
@@ -282,15 +293,23 @@ export function parseTrivyReport(input, metadata = {}) {
 }
 
 export function parseNpmReport(input, metadata = {}) {
-  if (typeof input?.auditReportVersion !== "number") throw new Error("npm audit report requires auditReportVersion");
-  if (!input.vulnerabilities || Array.isArray(input.vulnerabilities) || typeof input.vulnerabilities !== "object") {
-    throw new Error("npm audit report requires vulnerabilities");
+  if (input?.status === "skipped") {
+    if (Object.keys(input).sort().join() !== ["reason", "schemaVersion", "status"].sort().join()
+      || input.schemaVersion !== 1
+      || !["network-unavailable", "service-unavailable"].includes(input.reason)) {
+      throw new Error("npm audit evidence has an invalid skip reason");
+    }
+    return {
+      scanner: "npm", version: metadata.version ?? "unknown", status: "skipped",
+      subject: metadata.subject ?? "unknown", reason: input.reason, findings: []
+    };
   }
+  validateNpmReport(input);
   const findings = Object.entries(input.vulnerabilities).map(([name, finding]) => {
-    const advisory = finding.via?.find((entry) => typeof entry === "object");
+    const advisory = finding.via.find((entry) => typeof entry === "object");
     return {
       id: String(advisory?.source ?? advisory?.url ?? `npm:${name}`),
-      severity: String(finding.severity).toUpperCase(),
+      severity: finding.severity.toUpperCase(),
       target: `${name}@${finding.range}`,
       component: name,
       advisorySource: advisory?.url ?? null,
@@ -306,6 +325,30 @@ export function parseNpmReport(input, metadata = {}) {
     scanner: "npm", version: metadata.version ?? "unknown", status: "completed",
     subject: metadata.subject ?? "unknown", findings
   };
+}
+
+export function validateNpmReport(input) {
+  if (input?.auditReportVersion !== 2) throw new Error("npm audit report requires auditReportVersion 2");
+  if (!input.vulnerabilities || Array.isArray(input.vulnerabilities) || typeof input.vulnerabilities !== "object") {
+    throw new Error("npm audit report requires vulnerabilities");
+  }
+  const severities = new Set(["info", "low", "moderate", "high", "critical"]);
+  for (const [name, finding] of Object.entries(input.vulnerabilities)) {
+    if (name.trim() === "" || finding === null || typeof finding !== "object" || Array.isArray(finding)) {
+      throw new Error("npm audit vulnerability requires a name and object");
+    }
+    if (!severities.has(finding.severity)) throw new Error(`npm audit vulnerability ${name} has an invalid severity`);
+    if (typeof finding.range !== "string" || finding.range.trim() === "") {
+      throw new Error(`npm audit vulnerability ${name} requires a range`);
+    }
+    if (!Array.isArray(finding.via) || finding.via.some((advisory) =>
+      (typeof advisory !== "string" || advisory.trim() === "")
+      && (advisory === null || typeof advisory !== "object" || Array.isArray(advisory)
+        || (advisory.cwe !== undefined && (!Array.isArray(advisory.cwe)
+          || advisory.cwe.some((cwe) => typeof cwe !== "string")))))) {
+      throw new Error(`npm audit vulnerability ${name} has invalid via evidence`);
+    }
+  }
 }
 
 function trivyReport(path, metadata) {
@@ -437,8 +480,14 @@ function main(args) {
       ...values.npm.map((path) => npmReport(path, { version: values.npmVersion, subject: values.subject })),
       ...values.codeql.flatMap((path) => codeqlReports(path, { subject: values.subject }))
     ];
-    if (reports.some((report) => report.version === "unknown" || report.status !== "completed")) {
+    if (reports.some((report) => report.version === "unknown"
+      || !["completed", "skipped"].includes(report.status))) {
       throw new Error("Security scanner identity or completion status is missing");
+    }
+    const skippedReports = reports.filter((report) => report.status === "skipped");
+    if (skippedReports.some((report) => report.scanner !== "npm")
+      || (skippedReports.length > 0 && !["release-build", "scheduled-npm-audit"].includes(values.scope))) {
+      throw new Error("Skipped scanner evidence is not allowed for this scope");
     }
     const assessment = values.lifecycle
       ? summarizeFindingLifecycle(JSON.parse(readFileSync(values.lifecycle, "utf8")), policy)

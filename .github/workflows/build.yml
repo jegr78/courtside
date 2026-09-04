@@ -379,7 +379,6 @@ jobs:
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run lint
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run test:frontend
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run build
-          ./node/node ./node/node_modules/npm/bin/npm-cli.js audit --audit-level=high
       - name: Package the E2E application
         run: ./mvnw -B package -DskipTests -Pjava-only
       - name: Run browser journeys

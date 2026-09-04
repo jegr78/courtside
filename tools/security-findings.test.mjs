@@ -186,7 +186,38 @@ test("given structurally incomplete scanner reports, when parsing them, then the
   // when / then
   assert.throws(() => parseTrivyReport({}), /Results/);
   assert.throws(() => parseNpmReport({ vulnerabilities: {} }), /auditReportVersion/);
+  assert.throws(() => parseNpmReport({ auditReportVersion: 2, vulnerabilities: {
+    example: { range: "<2", via: [] }
+  } }), /severity/);
+  assert.throws(() => parseNpmReport({ auditReportVersion: 2, vulnerabilities: {
+    example: { severity: "high", range: "<2", via: "advisory" }
+  } }), /via/);
+  assert.throws(() => parseNpmReport({ auditReportVersion: 2, vulnerabilities: {
+    example: { severity: "unknown", range: "<2", via: [] }
+  } }), /severity/);
   assert.throws(() => parseCodeqlReport({}), /runs/);
+});
+
+test("given npm could not reach its audit service, when parsing the evidence, then it remains visibly skipped", () => {
+  // when
+  const report = parseNpmReport({ schemaVersion: 1, status: "skipped", reason: "service-unavailable" }, {
+    version: "11.6.0", subject: "commit:abcdef0"
+  });
+
+  // then
+  assert.deepEqual(report, {
+    scanner: "npm", version: "11.6.0", status: "skipped", subject: "commit:abcdef0",
+    reason: "service-unavailable", findings: []
+  });
+});
+
+test("given an invented npm skip reason, when parsing the evidence, then it fails closed", () => {
+  // when / then
+  assert.throws(() => parseNpmReport({ schemaVersion: 1, status: "skipped", reason: "unknown" }),
+    /skip reason/);
+  assert.throws(() => parseNpmReport({
+    schemaVersion: 1, status: "skipped", reason: "service-unavailable", detail: "untrusted"
+  }), /skip reason/);
 });
 
 test("given npm vulnerabilities, when parsing the audit report, then they become policy findings", () => {
@@ -339,6 +370,37 @@ test("given normalized build and image evidence, when combining a release record
   assert.equal(result.assessmentGates[0].profile, "active");
 });
 
+test("given a release build skipped npm, when combining release evidence, then the final record retains that state", () => {
+  // given
+  const source = (scope, subject, evidenceSources) => ({
+    schemaVersion: 1, scope, subject, assessmentPolicy: "not-applicable",
+    generatedAt: "2026-08-15T00:00:00.000Z", status: "passed", evidenceSources,
+    blockingFindings: [], acceptedFindings: [], informationalFindings: []
+  });
+  const summaries = [
+    source("release-build", releaseCommit, [{
+      scanner: "npm", status: "skipped", subject: releaseCommit, version: "11.6.0",
+      reason: "service-unavailable", findingCount: 0
+    }]),
+    source("release-image-amd64", releaseDigest, [{
+      scanner: "trivy", status: "completed", subject: releaseDigest
+    }]),
+    source("release-image-arm64", releaseDigest, [{
+      scanner: "trivy", status: "completed", subject: releaseDigest
+    }])
+  ];
+
+  // when
+  const result = combineSecuritySummaries({
+    summaries, scope: "release", subject: releaseDigest, sourceSubject: releaseCommit,
+    assessmentGates: [activeAssessmentGate()], today
+  });
+
+  // then
+  assert.equal(result.sources[0].evidenceSources[0].status, "skipped");
+  assert.equal(result.sources[0].evidenceSources[0].reason, "service-unavailable");
+});
+
 test("given stale or digest-mismatched inputs, when combining release evidence, then publication fails closed", () => {
   // given
   const source = (scope, subject, generatedAt = "2026-08-15T00:00:00.000Z") => ({
@@ -468,6 +530,57 @@ test("given separate runtime and source reports, when invoking the policy, then 
     assert.equal(result.status, 1);
     assert.deepEqual(JSON.parse(readFileSync(output, "utf8")).blockingFindings.map((finding) => finding.id),
       ["CVE-2026-4000", "DS-001"]);
+  } finally {
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("given skipped npm evidence, when invoking release policy, then the visible skip does not block", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-security-"));
+  const report = join(directory, "npm.json");
+  const exceptions = join(directory, "exceptions.json");
+  const output = join(directory, "summary.json");
+  writeFileSync(report, JSON.stringify({ schemaVersion: 1, status: "skipped", reason: "service-unavailable" }));
+  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [] }));
+
+  try {
+    // when
+    const result = spawnSync(process.execPath, [join(toolsDirectory, "security-findings.mjs"),
+      "--npm", report, "--npm-version", "11.6.0", "--exceptions", exceptions,
+      "--assessment-policy", "not-applicable", "--scope", "release-build",
+      "--subject", "commit", "--output", output]);
+
+    // then
+    assert.equal(result.status, 0, result.stderr.toString());
+    assert.deepEqual(JSON.parse(readFileSync(output, "utf8")).evidenceSources[0], {
+      scanner: "npm", version: "11.6.0", status: "skipped", subject: "commit",
+      reason: "service-unavailable", findingCount: 0
+    });
+  } finally {
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("given skipped npm evidence, when invoking pull-request policy, then the gate fails closed", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-security-"));
+  const report = join(directory, "npm.json");
+  const exceptions = join(directory, "exceptions.json");
+  const output = join(directory, "summary.json");
+  writeFileSync(report, JSON.stringify({ schemaVersion: 1, status: "skipped", reason: "network-unavailable" }));
+  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [] }));
+
+  try {
+    // when
+    const result = spawnSync(process.execPath, [join(toolsDirectory, "security-findings.mjs"),
+      "--npm", report, "--npm-version", "11.6.0", "--exceptions", exceptions,
+      "--assessment-policy", "not-applicable", "--scope", "required-build",
+      "--subject", "commit", "--output", output]);
+
+    // then
+    assert.equal(result.status, 1);
+    assert.match(result.stderr.toString(), /not allowed for this scope/);
   } finally {
     rmSync(directory, { recursive: true });
   }

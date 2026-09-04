@@ -7,6 +7,7 @@ on:
       - build
       - mail smoke
       - mutation testing
+      - npm audit
       - performance smoke
       - security assessment
       - test stability

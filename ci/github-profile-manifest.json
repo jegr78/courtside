@@ -17,6 +17,7 @@
     { "path": ".github/workflows/mail-smoke.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/mutation-testing.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/nightly-failure-tracking.yml", "profiles": ["full"], "validators": [] },
+    { "path": ".github/workflows/npm-audit.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/performance-smoke.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/post-merge-smoke.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/pr-title-lint.yml", "profiles": ["tooling"], "validators": ["tools/github-metadata.test.mjs", "tools/workflow-action-pinning.test.mjs"] },

@@ -28,6 +28,7 @@
     "test:tools": "node ../tools/tool-tests.mjs",
     "test:uat": "node ../tools/courtside.uat-smoke.mjs",
     "test:e2e": "playwright test",
+    "audit:security": "node ../tools/npm-audit.mjs",
     "reliability:webkit": "node ../tools/webkit-reliability.mjs run",
     "reliability:webkit-experiment": "node ../tools/webkit-reliability.mjs experiment",
     "reliability:validate": "node ../tools/webkit-reliability.mjs validate",

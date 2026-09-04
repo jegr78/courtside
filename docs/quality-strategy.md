@@ -26,6 +26,8 @@ Likelihood never lowers security breaches, privilege escalation, double occupanc
 | Deployment smoke | A built image starts in the reference topology and its TLS, session, persistence and isolation boundaries work. | Historical-schema upgrades, restored backups or sustained capacity. |
 | Release qualification | The exact candidate artifact satisfies required functional, upgrade, restore, security and operational evidence. | The absence of unknown defects or vulnerabilities in a club-specific installation. |
 
+The remote npm advisory audit runs every Tuesday, on manual request and during a release. Pull requests use Dependency Review for changed dependencies instead of waiting for that remote service. A release records an npm-reported network failure or HTTP 502, 503 or 504 response as `skipped` and continues; an audit that completed with High or Critical findings still blocks publication. A locally expired process budget remains a failure because it carries no evidence about the service.
+
 Tests are placed at the lowest level that can prove the risk. Database guarantees are never replaced by mocks, and a higher-level journey complements rather than duplicates focused lower-level evidence.
 
 ## Gates and budgets

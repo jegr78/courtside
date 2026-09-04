@@ -65,7 +65,6 @@ test("given frontend changes, when planning the local check, then its tasks matc
     ["frontend-lint", "npm", ["run", "lint"]],
     ["frontend-test", "npm", ["run", "test:frontend"]],
     ["frontend-build", "npm", ["run", "build"]],
-    ["frontend-audit", "npm", ["audit", "--audit-level=high"]],
     ["frontend-package", "maven", ["package", "-DskipTests", "-Pjava-only"]],
     ["frontend-e2e", "npm", ["run", "test:e2e"]]
   ]);
@@ -124,7 +123,7 @@ test("given an added e2e specification, when planning locally, then the complete
   // then
   assert.deepEqual(plan.profiles, ["frontend"]);
   assert.deepEqual(plan.tasks.map((task) => task.label), [
-    "frontend-toolchain", "frontend-lint", "frontend-test", "frontend-build", "frontend-audit",
+    "frontend-toolchain", "frontend-lint", "frontend-test", "frontend-build",
     "frontend-package", "frontend-e2e"
   ]);
   assert.deepEqual(localCheckPlan([

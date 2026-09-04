@@ -24,8 +24,7 @@ test("given profile classification, when the pull request runs, then selected qu
     /docs:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.docs == 'true'\)/);
   assert.match(workflow,
     /frontend:[\s\S]+name: Verify frontend[\s\S]+npm-cli\.js run lint[\s\S]+npm-cli\.js run test:frontend[\s\S]+npm-cli\.js run build/);
-  assert.match(workflow,
-    /frontend:[\s\S]+npm-cli\.js audit --audit-level=high[\s\S]+npm-cli\.js run test:e2e/);
+  assert.doesNotMatch(workflow, /npm-cli\.js audit/);
   assert.match(workflow, /security:[\s\S]+github\/codeql-action\/init@[a-f0-9]{40}/);
   assert.match(workflow, /tooling:[\s\S]+name: Verify repository tooling[\s\S]+npm run test:tools/);
   assert.match(workflow, /tooling:[\s\S]+uses: \.\/\.github\/actions\/tool-dependencies/);
@@ -98,12 +97,11 @@ test("given backend and security jobs, when they build java, then maven skips ev
     /<id>java-only<\/id>[\s\S]+<frontend\.skip>true<\/frontend\.skip>[\s\S]+<frontend\.test\.skip>true<\/frontend\.test\.skip>/);
 });
 
-test("given npm audit has its own gate, when dependencies are installed, then install does not audit twice", () => {
+test("given remote npm audit is scheduled separately, when dependencies are installed, then regular builds do not call it", () => {
   // when / then
   assert.match(pom,
     /<id>npm-ci<\/id>[\s\S]+?<arguments>ci --no-audit<\/arguments>/);
-  assert.match(pom,
-    /<id>npm-audit<\/id>[\s\S]+?<arguments>audit --audit-level=high<\/arguments>/);
+  assert.doesNotMatch(pom, /<id>npm-audit<\/id>/);
 });
 
 test("given split coverage artifacts, when the aggregate downloads them, then it uses their archive roots", () => {
