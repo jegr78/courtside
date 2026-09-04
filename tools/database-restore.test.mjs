@@ -3,7 +3,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { columnsAddedSinceTheFixture } from "./courtside.restore-smoke.mjs";
+import {
+  applicationStateTables,
+  columnsAddedSinceTheFixture
+} from "./courtside.restore-smoke.mjs";
 
 function source(path) {
   return readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -20,6 +23,13 @@ test("given a restore qualification, when resources are inspected, then each run
   assert.match(compose, /127\.0\.0\.1::8080/);
   assert.match(compose, /read_only: true/);
   assert.match(compose, /no-new-privileges:true/);
+  assert.match(compose, /axllent\/mailpit:v1\.31@sha256:/);
+  assert.match(compose, /--smtp-require-starttls/);
+  assert.match(compose, /COURTSIDE_RESTORE_MAIL_CERT_DIR/);
+  assert.match(compose, /COURTSIDE_MAIL_RELAY_HOST: mail/);
+  assert.match(compose, /COURTSIDE_MAIL_RELAY_PORT: "1025"/);
+  assert.match(compose, /COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true"/);
+  assert.match(runner, /openssl.*req.*-x509.*subjectAltName=DNS:mail/s);
 });
 
 test("given a backup archive, when qualification runs, then corruption is rejected atomically before restore", () => {
@@ -61,6 +71,57 @@ test("given the recurring restore workflow, when it runs, then evidence is retai
   assert.match(workflow, /retention-days: 14/);
   assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.dump/);
   assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.sql/);
+});
+
+test("given a real instance backup, when qualification creates its source, then writes go through HTTP", () => {
+  // given
+  const runner = source("./courtside.restore-smoke.mjs");
+  const start = runner.indexOf("async function populateThroughApplication");
+  const body = runner.slice(start, runner.indexOf("\n}\n\nfunction", start) + 2);
+
+  // when / then
+  assert.match(runner, /populateThroughApplication/);
+  assert.match(runner, /path: "\/api\/account\/initial-password", method: "PUT"/);
+  assert.match(runner, /path: "\/api\/admin\/config\/logo", method: "PUT"/);
+  assert.match(runner, /path: "\/api\/bookings", method: "POST"/);
+  assert.doesNotMatch(body, /\bpsql\(/);
+});
+
+test("given application-written state, when it is restored, then representative tables and sequences are compared", () => {
+  // given
+  const runner = source("./courtside.restore-smoke.mjs");
+
+  // when / then
+  assert.deepEqual(applicationStateTables, [
+    "booking", "booking_card", "club_config", "court", "court_allocation", "domain_event", "event_publication",
+    "message_record", "opening_hours", "person", "spring_session", "user_account", "user_account_role"
+  ]);
+  assert.match(runner, /application-before\.json/);
+  assert.match(runner, /application-after\.json/);
+  assert.match(runner, /pg_sequences/);
+  assert.match(runner, /restored application database differs from its backup source/);
+});
+
+test("given a restored application database, when the image starts, then the written logo and booking remain readable", () => {
+  // given
+  const runner = source("./courtside.restore-smoke.mjs");
+
+  // when / then
+  assert.match(runner, /verifyRestoredApplication/);
+  assert.match(runner, /path: `\/api\/public\/config\/logo\?v=\$\{logoDigest\}`/);
+  assert.match(runner, /path: "\/api\/my\/bookings"/);
+});
+
+test("given private database archives, when mail TLS is configured, then the mail container cannot read the archives", () => {
+  // given
+  const runner = source("./courtside.restore-smoke.mjs");
+
+  // when / then
+  assert.match(runner, /privateDirectory = mkdtempSync\(join\(tmpdir\(\), "courtside-restore-"\)\)/);
+  assert.match(runner,
+    /mailCertificateDirectory = mkdtempSync\(join\(tmpdir\(\), "courtside-restore-mail-"\)\)/);
+  assert.match(runner, /COURTSIDE_RESTORE_MAIL_CERT_DIR: mailCertificateDirectory/);
+  assert.doesNotMatch(runner, /COURTSIDE_RESTORE_MAIL_CERT_DIR: privateDirectory/);
 });
 
 test("given operator documentation, when backup and restore are followed, then both use the qualified archive format", () => {
