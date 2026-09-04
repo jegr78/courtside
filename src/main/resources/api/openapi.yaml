@@ -147,8 +147,9 @@ components:
         echo its value in this header. Modelled as a security scheme rather than as a header
         parameter because it is consumed before the operation runs and is never part of its input.
 
-        A write without it answers `401`, not `403`: for an unauthenticated caller the missing
-        token is indistinguishable from a missing session.
+        A write without it answers `403` carrying `urn:courtside:error:access-denied`, the same
+        problem an authorisation refusal carries. The token is checked before the request reaches
+        an operation, so the refusal says nothing about the caller's session or rights.
 
   parameters:
     PageCursor:

@@ -85,19 +85,20 @@ export class ApiError extends Error {
   }
 }
 
+const ACCESS_DENIED = "urn:courtside:error:access-denied";
+
 async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true): Promise<T> {
   const write = Boolean(init.method) && init.method !== "GET" && init.method !== "HEAD";
   const sent = write ? await usableCsrfToken() : undefined;
-  const answered = await fetch(path, carrying(init, sent));
+  let response = await fetch(path, carrying(init, sent));
+  let problem = await problemIn(response);
   // A request that started alongside this one can mint a token of its own and replace the cookie,
   // and the rotation is what tells that refusal apart from one the account has actually earned.
-  const response = answered.status === 403 && write && csrfToken() !== sent
-    ? await fetch(path, carrying(init, await usableCsrfToken()))
-    : answered;
+  if (write && problem?.type === ACCESS_DENIED && csrfToken() !== sent) {
+    response = await fetch(path, carrying(init, await usableCsrfToken()));
+    problem = await problemIn(response);
+  }
   if (!response.ok) {
-    const problem = response.headers.get("content-type")?.includes("application/problem+json")
-      ? (await response.json()) as Problem
-      : undefined;
     if (response.status === 401 && notifyUnauthorized) {
       window.dispatchEvent(new Event("courtside:unauthenticated"));
     }
@@ -108,6 +109,12 @@ async function request<T>(path: string, init: RequestInit = {}, notifyUnauthoriz
   }
   const body = await response.text();
   return body ? JSON.parse(body) as T : undefined as T;
+}
+
+async function problemIn(response: Response): Promise<Problem | undefined> {
+  return response.ok || !response.headers.get("content-type")?.includes("application/problem+json")
+    ? undefined
+    : (await response.json()) as Problem;
 }
 
 function carrying(init: RequestInit, token: string | undefined): RequestInit {
