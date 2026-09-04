@@ -43,14 +43,21 @@ export function AdminRosterView() {
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
+    let active = true;
     void Promise.all([api.roster(undefined, undefined, PAGE_SIZE, requestedMembershipTypeId), api.membershipTypes()])
       .then(([page, membershipTypes]) => {
+        if (!active) return;
         setMembershipTypeId(requestedMembershipTypeId);
         setEntries(page.entries);
         setCursor(page.nextCursor ?? undefined);
         setTypes(membershipTypes);
       })
-      .catch(reportError);
+      .catch((failure: unknown) => {
+        if (active) reportError(failure);
+      });
+    return () => {
+      active = false;
+    };
   }, [reportError, requestedMembershipTypeId]);
 
   async function read(term: string | undefined, typeId: string | undefined) {

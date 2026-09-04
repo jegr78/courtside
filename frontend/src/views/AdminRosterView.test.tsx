@@ -101,6 +101,36 @@ describe("AdminRosterView", () => {
     await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith(undefined, undefined, 50, "type-1"));
   });
 
+  it("given the URL filter changes while its roster is loading, when the old answer arrives last, then it is discarded", async () => {
+    // given
+    let resolveFiltered!: (page: { entries: RosterEntry[]; nextCursor: null }) => void;
+    const filtered = new Promise<{ entries: RosterEntry[]; nextCursor: null }>((resolve) => {
+      resolveFiltered = resolve;
+    });
+    vi.spyOn(api, "roster").mockImplementation((_query, _cursor, _limit, membershipTypeId) =>
+      membershipTypeId === "type-1"
+        ? filtered
+        : Promise.resolve({ entries: [withoutAccount], nextCursor: null }));
+    const router = createMemoryRouter([{
+      path: "/admin/roster",
+      element: <UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider>
+    }], { initialEntries: ["/admin/roster?membershipTypeId=type-1"] });
+    render(<RouterProvider router={router} />);
+    await waitFor(() => expect(api.roster).toHaveBeenCalledWith(undefined, undefined, 50, "type-1"));
+
+    // when
+    await act(() => router.navigate("/admin/roster"));
+    expect(await screen.findByTestId("roster-row-person-2")).toBeInTheDocument();
+    await act(() => {
+      resolveFiltered({ entries: [withAccount], nextCursor: null });
+    });
+
+    // then
+    expect(screen.getByTestId("roster-filter")).toHaveValue("");
+    expect(screen.getByTestId("roster-row-person-2")).toBeInTheDocument();
+    expect(screen.queryByTestId("roster-row-person-1")).not.toBeInTheDocument();
+  });
+
   it("given a name to look for, when searching, then the roster is read again for that name", async () => {
     // given
     render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);

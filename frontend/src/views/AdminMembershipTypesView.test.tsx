@@ -110,7 +110,7 @@ describe("AdminMembershipTypesView", () => {
         nextCursor: null
       }));
 
-    // when
+    // given
     render(<MemoryRouter initialEntries={["/admin/membership-types"]}><UnsavedChangesProvider>
       <Routes>
         <Route path="/admin/membership-types" element={<AdminMembershipTypesView />} />
