@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type ImportPreview, type ImportSource, type ImportSourceRequest, type MembershipType } from "../api/client";
+import { useClubConfiguration } from "../club/registry";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -18,6 +19,7 @@ type Editing = { source: ImportSource } | { source: undefined } | undefined;
 
 export function AdminImportView() {
   const { t } = useTranslation();
+  const { club } = useClubConfiguration();
   const { message: error, report, clear } = useReportedFailure();
   const [sources, setSources] = useState<ImportSource[]>();
   const [types, setTypes] = useState<MembershipType[]>([]);
@@ -164,6 +166,7 @@ export function AdminImportView() {
       sourceId={chosen.id}
       preview={preview}
       disabled={pending}
+      timeZone={club?.timeZone}
       executed={() => {
         setPreview(undefined);
         setRunCount((runs) => runs + 1);

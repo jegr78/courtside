@@ -4,6 +4,7 @@ import { api, type ImportPreview, type ImportRun } from "../../api/client";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { SuccessFeedback } from "../../components/SuccessFeedback";
+import { formatDateTime } from "../../time/clubZone";
 
 const NUMBERS = [
   "created", "corrected", "membershipsEnded", "accountsCreated", "accountsDisabled",
@@ -14,14 +15,16 @@ function isExecutable(preview: ImportPreview): boolean {
   return !preview.superseded && Date.parse(preview.expiresAt) > Date.now();
 }
 
-export function ImportExecutionPanel({ sourceId, preview, disabled, executed, reportError }: {
+export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, executed, reportError }: {
   sourceId: string;
   preview: ImportPreview | undefined;
   disabled: boolean;
+  timeZone: string | undefined;
   executed: (run: ImportRun) => void;
   reportError: (failure: unknown) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage ?? i18n.language;
   const [runs, setRuns] = useState<ImportRun[]>();
   const [result, setResult] = useState<ImportRun>();
   const [confirming, setConfirming] = useState(false);
@@ -70,11 +73,13 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, executed, re
 
     <div className="grid gap-2 border-t pt-4">
       <h3 className="text-lg font-semibold">{t("admin.import.runLog")}</h3>
-      {runs && (runs.length === 0
+      {!timeZone
+        ? <p role="status" data-testid="runs-awaiting-zone">{t("status.loading")}</p>
+        : runs && (runs.length === 0
         ? <p data-testid="no-runs">{t("admin.import.noRuns")}</p>
         : <ul className="grid gap-2">
           {runs.map((held) => <li key={held.runId} data-testid={`import-run-${held.runId}`} className="rounded-lg border p-2">
-            <p>{t("admin.import.runAt", { at: new Date(held.executedAt).toLocaleString() })}</p>
+            <p>{t("admin.import.runAt", { at: formatDateTime(held.executedAt, language, timeZone) })}</p>
             <p>{NUMBERS.map((number) => t(`admin.import.run.${number}`, { value: held[number] })).join(" · ")}</p>
           </li>)}
         </ul>)}
