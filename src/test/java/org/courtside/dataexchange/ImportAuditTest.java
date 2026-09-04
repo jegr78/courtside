@@ -56,8 +56,8 @@ class ImportAuditTest extends AbstractIntegrationTest {
 
         // then
         Map<String, Object> payload = audit.latestPayload(source, DataExchangeEvent.SourceChanged.TYPE);
-        assertThat(payload).containsEntry("changedFields", List.of("removalWarningPercent"));
-        assertThat(payload.toString()).doesNotContain("40");
+        assertThat(payload).containsEntry("changedFields", List.of("removalWarningPercent"))
+                .containsOnlyKeys("sourceId", "sourceKey", "changedFields");
         assertEventCounts(source, Map.of(DataExchangeEvent.SourceDescribed.TYPE, 1L,
                 DataExchangeEvent.SourceChanged.TYPE, 1L));
     }
@@ -90,7 +90,7 @@ class ImportAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenAMemberNumberIsLinkedToAPerson_thenTheLogSaysWhichNumberAndAgainstWhichSource() {
+    void whenAMemberNumberIsLinkedToAPerson_thenTheLogSaysAgainstWhichSourceAndNotWhichNumber() {
         // given
         UUID source = source("roster-system");
         UUID jane = identities.createPerson("Jane", "Doe");
@@ -98,12 +98,13 @@ class ImportAuditTest extends AbstractIntegrationTest {
         // when
         references.link(source, "4711", jane);
 
-        // then — the number is the change itself, so a board can see which assignment moved
+        // then
         Map<String, Object> payload =
                 audit.latestPayload(jane, DataExchangeEvent.ExternalReferenceLinked.TYPE);
         assertThat(payload)
-                .containsEntry("externalId", "4711")
-                .containsEntry("sourceId", source.toString());
+                .containsEntry("sourceKey", "roster-system")
+                .containsEntry("sourceId", source.toString())
+                .containsOnlyKeys("personId", "sourceId", "sourceKey");
         assertThat(payload.toString()).doesNotContain("Jane").doesNotContain("Doe");
     }
 
@@ -119,7 +120,8 @@ class ImportAuditTest extends AbstractIntegrationTest {
 
         // then
         assertThat(audit.latestPayload(jane, DataExchangeEvent.ExternalReferenceUnlinked.TYPE))
-                .containsEntry("externalId", "4711");
+                .containsEntry("sourceKey", "roster-system")
+                .containsOnlyKeys("personId", "sourceId", "sourceKey");
         assertEventCounts(jane, Map.of(DataExchangeEvent.ExternalReferenceLinked.TYPE, 1L,
                 DataExchangeEvent.ExternalReferenceUnlinked.TYPE, 1L));
     }

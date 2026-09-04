@@ -76,9 +76,9 @@ public sealed interface DataExchangeEvent extends DomainEventRecord {
         }
     }
 
-    // The member number is what the link decides, not something the link is about, so it is
-    // recorded where a court's number is and a member's name is not.
-    record ExternalReferenceLinked(UUID personId, UUID sourceId, String externalId)
+    // The member number names that person in a system this instance never erases, so the log holds
+    // which source the link was against and leaves the number to the reference table.
+    record ExternalReferenceLinked(UUID personId, UUID sourceId, String sourceKey)
             implements DataExchangeEvent {
 
         static final String TYPE = "dataexchange.externalReference.linked";
@@ -94,7 +94,7 @@ public sealed interface DataExchangeEvent extends DomainEventRecord {
         }
     }
 
-    record ExternalReferenceUnlinked(UUID personId, UUID sourceId, String externalId)
+    record ExternalReferenceUnlinked(UUID personId, UUID sourceId, String sourceKey)
             implements DataExchangeEvent {
 
         static final String TYPE = "dataexchange.externalReference.unlinked";

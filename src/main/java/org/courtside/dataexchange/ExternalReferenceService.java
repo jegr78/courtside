@@ -41,7 +41,7 @@ public class ExternalReferenceService {
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new IllegalStateException("A reference page holds between 1 and " + MAX_PAGE_SIZE);
         }
-        UUID source = requireKnownSource(sourceId);
+        UUID source = sources.configurationOf(sourceId).sourceId();
         requireKnownCursor(source, cursor);
         List<UUID> ids = references.findIdsBySourceIdAfter(source, cursor, PageRequest.of(0, limit + 1));
         return CursorPage.of(ids, limit, this::load, ExternalReferenceService::idOf);
@@ -49,7 +49,8 @@ public class ExternalReferenceService {
 
     @Transactional
     public ExternalLink link(UUID sourceId, String externalId, UUID personId) {
-        UUID source = requireKnownSource(sourceId);
+        SourceConfiguration configuration = sources.configurationOf(sourceId);
+        UUID source = configuration.sourceId();
         MemberNumber reference = new MemberNumber(externalId);
         UUID person = requiredPersonId(personId);
         ExternalReference existing = references.findBySourceIdAndExternalId(source, reference.value())
@@ -59,20 +60,21 @@ public class ExternalReferenceService {
         }
         ExternalLink linked = toLink(saveOrTranslateCollision(
                 new ExternalReference(source, reference, person, clock.instant()), reference.value()));
-        events.publishEvent(
-                new DataExchangeEvent.ExternalReferenceLinked(person, source, reference.value()));
+        events.publishEvent(new DataExchangeEvent.ExternalReferenceLinked(
+                person, source, configuration.sourceKey()));
         return linked;
     }
 
     @Transactional
     public void unlink(UUID sourceId, String externalId) {
-        UUID source = requireKnownSource(sourceId);
+        SourceConfiguration configuration = sources.configurationOf(sourceId);
+        UUID source = configuration.sourceId();
         ExternalReference held = heldReference(source, externalId)
                 .orElseThrow(() -> new ExternalReferenceNotFoundException(
                         "No such reference from import source " + source));
         references.delete(held);
         events.publishEvent(new DataExchangeEvent.ExternalReferenceUnlinked(
-                held.getPersonId(), source, held.getExternalId()));
+                held.getPersonId(), source, configuration.sourceKey()));
     }
 
     // A member number no reference can hold reaches this from a path segment, where no validation
@@ -100,10 +102,6 @@ public class ExternalReferenceService {
             }
             throw e;
         }
-    }
-
-    private UUID requireKnownSource(UUID sourceId) {
-        return sources.configurationOf(sourceId).sourceId();
     }
 
     private void requireKnownCursor(UUID sourceId, UUID cursor) {
