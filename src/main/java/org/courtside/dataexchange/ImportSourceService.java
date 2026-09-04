@@ -13,7 +13,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.RecordComponent;
 import java.time.Clock;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -22,7 +24,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -38,21 +39,12 @@ public class ImportSourceService {
     private static final int MAX_ENTRY_LENGTH = 120;
     private static final int MAX_MEMBERSHIP_TYPE_MAPPINGS = 200;
 
-    private record DescribedField(String name, Function<SourceConfiguration, Object> read) {
-    }
-
-    // The log names which part of the description moved, never what it moved to: a column mapping
-    // and a category assignment both carry the club's own vocabulary.
-    private static final List<DescribedField> DESCRIBED_FIELDS = List.of(
-            new DescribedField("sourceKey", SourceConfiguration::sourceKey),
-            new DescribedField("displayName", SourceConfiguration::displayName),
-            new DescribedField("separator", SourceConfiguration::separator),
-            new DescribedField("encoding", SourceConfiguration::encoding),
-            new DescribedField("columns", SourceConfiguration::columns),
-            new DescribedField("membershipTypes", SourceConfiguration::membershipTypes),
-            new DescribedField("defaultMembershipTypeId", SourceConfiguration::defaultMembershipTypeId),
-            new DescribedField("ownedFields", SourceConfiguration::ownedFields),
-            new DescribedField("removalWarningPercent", SourceConfiguration::removalWarningPercent));
+    // Read off the record rather than listed, so a field added to the configuration is reported the
+    // day it is added. The log names which part moved and never what it moved to.
+    private static final List<RecordComponent> DESCRIBED_FIELDS =
+            Arrays.stream(SourceConfiguration.class.getRecordComponents())
+                    .filter(component -> !component.getName().equals("sourceId"))
+                    .toList();
 
     private final ImportSourceRepository sources;
     private final ExternalReferenceRepository references;
@@ -145,9 +137,17 @@ public class ImportSourceService {
 
     private static List<String> differingFields(SourceConfiguration before, SourceConfiguration after) {
         return DESCRIBED_FIELDS.stream()
-                .filter(field -> !Objects.equals(field.read().apply(before), field.read().apply(after)))
-                .map(DescribedField::name)
+                .filter(field -> !Objects.equals(valueOf(field, before), valueOf(field, after)))
+                .map(RecordComponent::getName)
                 .toList();
+    }
+
+    private static Object valueOf(RecordComponent field, SourceConfiguration configuration) {
+        try {
+            return field.getAccessor().invoke(configuration);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read " + field.getName() + " of a source", e);
+        }
     }
 
     private void requireUsable(Map<String, CanonicalField> columns,

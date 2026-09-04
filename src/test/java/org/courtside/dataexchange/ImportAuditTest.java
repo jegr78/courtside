@@ -2,7 +2,6 @@ package org.courtside.dataexchange;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
-import org.courtside.audit.testfixture.DomainEventTypes;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,8 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ImportAuditTest extends AbstractIntegrationTest {
 
     private static final UUID ACTIVE_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
-    private static final List<String> CHANGE_EVENT_TYPES =
-            DomainEventTypes.typesOf(DataExchangeEvent.class);
+    private static final UUID OTHER_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000002");
 
     @Autowired
     private ImportSourceService sources;
@@ -43,7 +41,8 @@ class ImportAuditTest extends AbstractIntegrationTest {
         Map<String, Object> payload = audit.latestPayload(source, DataExchangeEvent.SourceDescribed.TYPE);
         assertThat(payload).containsEntry("sourceKey", "roster-system");
         assertThat(payload.toString()).doesNotContain("Membership system");
-        assertEventCounts(source, Map.of(DataExchangeEvent.SourceDescribed.TYPE, 1L));
+        audit.assertEventCounts(source, DataExchangeEvent.class,
+                Map.of(DataExchangeEvent.SourceDescribed.TYPE, 1L));
     }
 
     @Test
@@ -58,8 +57,53 @@ class ImportAuditTest extends AbstractIntegrationTest {
         Map<String, Object> payload = audit.latestPayload(source, DataExchangeEvent.SourceChanged.TYPE);
         assertThat(payload).containsEntry("changedFields", List.of("removalWarningPercent"))
                 .containsOnlyKeys("sourceId", "sourceKey", "changedFields");
-        assertEventCounts(source, Map.of(DataExchangeEvent.SourceDescribed.TYPE, 1L,
+        audit.assertEventCounts(source, DataExchangeEvent.class,
+                Map.of(DataExchangeEvent.SourceDescribed.TYPE, 1L,
                 DataExchangeEvent.SourceChanged.TYPE, 1L));
+    }
+
+    @Test
+    void givenASource_whenEveryDescribedFieldChanges_thenTheLogNamesThemAll() {
+        // given
+        UUID source = source("roster-system");
+
+        // when
+        sources.change(source, "member-system", "Member system", ";", "ISO-8859-1",
+                Map.of("No", CanonicalField.EXTERNAL_ID, "Given", CanonicalField.FIRST_NAME,
+                        "Family", CanonicalField.LAST_NAME),
+                Map.of("Adults", OTHER_TYPE), OTHER_TYPE, Set.of(CanonicalField.FIRST_NAME), 25);
+
+        // then
+        assertThat(audit.latestPayload(source, DataExchangeEvent.SourceChanged.TYPE))
+                .containsEntry("changedFields", List.of("sourceKey", "displayName", "separator",
+                        "encoding", "columns", "membershipTypes", "defaultMembershipTypeId",
+                        "ownedFields", "removalWarningPercent"));
+    }
+
+    @Test
+    void givenASource_whenTheLogNamesItsSubject_thenItReadsAsWhatTheClubCalledIt() {
+        // given
+        UUID source = source("roster-system");
+
+        // when
+        String name = audit.nameOf(source);
+
+        // then
+        assertThat(name).isEqualTo("Membership system");
+    }
+
+    @Test
+    void givenALinkedMemberNumber_whenTheSameLinkIsMadeAgain_thenNothingIsRecorded() {
+        // given
+        UUID source = source("roster-system");
+        UUID jane = identities.createPerson("Jane", "Doe");
+        references.link(source, "4711", jane);
+
+        // when
+        references.link(source, "4711", jane);
+
+        // then
+        assertThat(audit.eventsAbout(jane, DataExchangeEvent.ExternalReferenceLinked.TYPE)).hasSize(1);
     }
 
     @Test
@@ -85,7 +129,8 @@ class ImportAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.latestPayload(source, DataExchangeEvent.SourceDeleted.TYPE))
                 .containsEntry("sourceKey", "roster-system");
-        assertEventCounts(source, Map.of(DataExchangeEvent.SourceDescribed.TYPE, 1L,
+        audit.assertEventCounts(source, DataExchangeEvent.class,
+                Map.of(DataExchangeEvent.SourceDescribed.TYPE, 1L,
                 DataExchangeEvent.SourceDeleted.TYPE, 1L));
     }
 
@@ -122,7 +167,8 @@ class ImportAuditTest extends AbstractIntegrationTest {
         assertThat(audit.latestPayload(jane, DataExchangeEvent.ExternalReferenceUnlinked.TYPE))
                 .containsEntry("sourceKey", "roster-system")
                 .containsOnlyKeys("personId", "sourceId", "sourceKey");
-        assertEventCounts(jane, Map.of(DataExchangeEvent.ExternalReferenceLinked.TYPE, 1L,
+        audit.assertEventCounts(jane, DataExchangeEvent.class,
+                Map.of(DataExchangeEvent.ExternalReferenceLinked.TYPE, 1L,
                 DataExchangeEvent.ExternalReferenceUnlinked.TYPE, 1L));
     }
 
@@ -140,14 +186,5 @@ class ImportAuditTest extends AbstractIntegrationTest {
         return Map.of("Member number", CanonicalField.EXTERNAL_ID,
                 "First name", CanonicalField.FIRST_NAME,
                 "Last name", CanonicalField.LAST_NAME);
-    }
-
-    private void assertEventCounts(UUID subjectId, Map<String, Long> expectedCounts) {
-        assertThat(expectedCounts.keySet()).as("every expected count names a known event type")
-                .isSubsetOf(CHANGE_EVENT_TYPES);
-        Map<String, Long> actual = audit.eventCountsAbout(subjectId);
-        CHANGE_EVENT_TYPES.forEach(type -> assertThat(actual.getOrDefault(type, 0L))
-                .as(type)
-                .isEqualTo(expectedCounts.getOrDefault(type, 0L)));
     }
 }

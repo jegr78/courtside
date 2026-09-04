@@ -3,7 +3,6 @@ package org.courtside.facility;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.audit.testfixture.AuditTestFixture.RecordedEvent;
-import org.courtside.audit.testfixture.DomainEventTypes;
 import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.Test;
@@ -37,7 +36,8 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         assertThat(audit.latestPayload(court.getId(), FacilityEvent.CourtAdded.TYPE))
                 .containsEntry("number", 7)
                 .doesNotContainKey("name");
-        assertEventCounts(court.getId(), Map.of(FacilityEvent.CourtAdded.TYPE, 1L));
+        audit.assertEventCounts(court.getId(), FacilityEvent.class,
+                Map.of(FacilityEvent.CourtAdded.TYPE, 1L));
     }
 
     @Test
@@ -54,7 +54,7 @@ class FacilityAuditTest extends AbstractIntegrationTest {
                 .containsEntry("number", 7)
                 .containsEntry("changedFields", List.of("name"));
         assertThat(payload.toString()).doesNotContain("Show Court");
-        assertEventCounts(court.getId(),
+        audit.assertEventCounts(court.getId(), FacilityEvent.class,
                 Map.of(FacilityEvent.CourtAdded.TYPE, 1L, FacilityEvent.CourtChanged.TYPE, 1L));
     }
 
@@ -105,7 +105,7 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.latestPayload(court.getId(), FacilityEvent.CourtAvailabilityChanged.TYPE))
                 .containsEntry("active", false);
-        assertEventCounts(court.getId(), Map.of(FacilityEvent.CourtAdded.TYPE, 1L,
+        audit.assertEventCounts(court.getId(), FacilityEvent.class, Map.of(FacilityEvent.CourtAdded.TYPE, 1L,
                 FacilityEvent.CourtAvailabilityChanged.TYPE, 1L));
     }
 
@@ -121,7 +121,8 @@ class FacilityAuditTest extends AbstractIntegrationTest {
                 .containsEntry("dayOfWeek", DayOfWeek.SATURDAY.getValue())
                 .containsEntry("opensAt", "08:00:00")
                 .containsEntry("closesAt", "22:00:00");
-        assertEventCounts(hours.getId(), Map.of(FacilityEvent.OpeningHoursSet.TYPE, 1L));
+        audit.assertEventCounts(hours.getId(), FacilityEvent.class,
+                Map.of(FacilityEvent.OpeningHoursSet.TYPE, 1L));
     }
 
     @Test
@@ -149,7 +150,8 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         List<RecordedEvent> closed = audit.eventsOfType(FacilityEvent.OpeningHoursClosed.TYPE);
         assertThat(closed).hasSize(1);
         assertThat(closed.getFirst().payload()).containsEntry("dayOfWeek", DayOfWeek.SATURDAY.getValue());
-        assertEventCounts(hours.getId(), Map.of(FacilityEvent.OpeningHoursSet.TYPE, 1L,
+        audit.assertEventCounts(hours.getId(), FacilityEvent.class,
+                Map.of(FacilityEvent.OpeningHoursSet.TYPE, 1L,
                 FacilityEvent.OpeningHoursClosed.TYPE, 1L));
     }
 
@@ -225,14 +227,4 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         assertThat(audit.nameOf(court.getId())).isEqualTo("Centre Court");
     }
 
-    private static final List<String> CHANGE_EVENT_TYPES = DomainEventTypes.typesOf(FacilityEvent.class);
-
-    private void assertEventCounts(UUID subjectId, Map<String, Long> expectedCounts) {
-        assertThat(expectedCounts.keySet()).as("every expected count names a known event type")
-                .isSubsetOf(CHANGE_EVENT_TYPES);
-        Map<String, Long> actual = audit.eventCountsAbout(subjectId);
-        CHANGE_EVENT_TYPES.forEach(type -> assertThat(actual.getOrDefault(type, 0L))
-                .as(type)
-                .isEqualTo(expectedCounts.getOrDefault(type, 0L)));
-    }
 }

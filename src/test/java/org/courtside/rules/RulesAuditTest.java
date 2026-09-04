@@ -2,7 +2,6 @@ package org.courtside.rules;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
-import org.courtside.audit.testfixture.DomainEventTypes;
 import org.courtside.rules.internal.RuleAdminService;
 import org.courtside.rules.internal.RuleParameterInvalidException;
 import org.courtside.rules.internal.RuleSet;
@@ -34,7 +33,7 @@ class RulesAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.latestPayload(ruleSet.getId(), RulesEvent.RuleSetAdded.TYPE))
                 .containsEntry("ruleSetId", ruleSet.getId().toString());
-        assertEventCounts(ruleSet.getId(), Map.of(RulesEvent.RuleSetAdded.TYPE, 1L));
+        audit.assertEventCounts(ruleSet.getId(), RulesEvent.class, Map.of(RulesEvent.RuleSetAdded.TYPE, 1L));
     }
 
     @Test
@@ -50,7 +49,7 @@ class RulesAuditTest extends AbstractIntegrationTest {
         assertThat(payload).containsEntry("changedFields", List.of("name"));
         assertThat(payload).doesNotContainKey("name");
         assertThat(payload.toString()).doesNotContain("Winter");
-        assertEventCounts(ruleSet.getId(),
+        audit.assertEventCounts(ruleSet.getId(), RulesEvent.class,
                 Map.of(RulesEvent.RuleSetAdded.TYPE, 1L, RulesEvent.RuleSetChanged.TYPE, 1L));
     }
 
@@ -77,7 +76,7 @@ class RulesAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.latestPayload(ruleSet.getId(), RulesEvent.RuleSetAvailabilityChanged.TYPE))
                 .containsEntry("active", false);
-        assertEventCounts(ruleSet.getId(),
+        audit.assertEventCounts(ruleSet.getId(), RulesEvent.class,
                 Map.of(RulesEvent.RuleSetAdded.TYPE, 1L, RulesEvent.RuleSetAvailabilityChanged.TYPE, 1L));
     }
 
@@ -105,7 +104,7 @@ class RulesAuditTest extends AbstractIntegrationTest {
         assertThat(audit.latestPayload(ruleSet.getId(), RulesEvent.RuleDefinitionSet.TYPE))
                 .containsEntry("ruleType", "MAX_OPEN_BOOKINGS")
                 .extracting("params").isEqualTo(Map.of("limit", 2));
-        assertEventCounts(ruleSet.getId(),
+        audit.assertEventCounts(ruleSet.getId(), RulesEvent.class,
                 Map.of(RulesEvent.RuleSetAdded.TYPE, 1L, RulesEvent.RuleDefinitionSet.TYPE, 1L));
     }
 
@@ -145,7 +144,7 @@ class RulesAuditTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.latestPayload(ruleSet.getId(), RulesEvent.RuleDefinitionRemoved.TYPE))
                 .containsEntry("ruleType", "MAX_OPEN_BOOKINGS");
-        assertEventCounts(ruleSet.getId(), Map.of(
+        audit.assertEventCounts(ruleSet.getId(), RulesEvent.class, Map.of(
                 RulesEvent.RuleSetAdded.TYPE, 1L,
                 RulesEvent.RuleDefinitionSet.TYPE, 1L,
                 RulesEvent.RuleDefinitionRemoved.TYPE, 1L));
@@ -172,14 +171,4 @@ class RulesAuditTest extends AbstractIntegrationTest {
         assertThat(audit.nameOf(ruleSet.getId())).isEqualTo("Summer");
     }
 
-    private static final List<String> CHANGE_EVENT_TYPES = DomainEventTypes.typesOf(RulesEvent.class);
-
-    private void assertEventCounts(UUID ruleSetId, Map<String, Long> expectedCounts) {
-        assertThat(expectedCounts.keySet()).as("every expected count names a known event type")
-                .isSubsetOf(CHANGE_EVENT_TYPES);
-        Map<String, Long> actual = audit.eventCountsAbout(ruleSetId);
-        CHANGE_EVENT_TYPES.forEach(type -> assertThat(actual.getOrDefault(type, 0L))
-                .as(type)
-                .isEqualTo(expectedCounts.getOrDefault(type, 0L)));
-    }
 }
