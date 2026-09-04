@@ -1303,6 +1303,9 @@ test("given a remote in either form, when the repository is read from it, then o
   assert.equal(repositoryFromRemote("git@github.com:example-club/courtside.git"), "example-club/courtside");
   assert.equal(repositoryFromRemote("https://github.com/example-club/courtside.git"), "example-club/courtside");
   assert.equal(repositoryFromRemote("https://github.com/example-club/courtside\n"), "example-club/courtside");
+  assert.equal(repositoryFromRemote("https://user@github.com/example-club/courtside.git"), "example-club/courtside");
+  assert.equal(repositoryFromRemote("ssh://git@github.com/example-club/courtside.git"), "example-club/courtside");
   assert.equal(repositoryFromRemote("https://gitlab.example.org/example-club/courtside.git"), undefined);
+  assert.equal(repositoryFromRemote("https://elsewhere.example/github.com/example-club/courtside.git"), undefined);
   assert.equal(repositoryFromRemote(""), undefined);
 });

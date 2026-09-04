@@ -811,7 +811,7 @@ export function uatStartupSummary(password, needsBootstrap, options) {
 }
 
 export function repositoryFromRemote(url) {
-  return /(?:github\.com[:/])(?<repository>[^/\s]+\/[^/\s]+?)(?:\.git)?$/
+  return /(?:^|\/\/|@)github\.com[:/](?<repository>[^/\s]+\/[^/\s]+?)(?:\.git)?$/
     .exec((url ?? "").trim())?.groups.repository;
 }
 
