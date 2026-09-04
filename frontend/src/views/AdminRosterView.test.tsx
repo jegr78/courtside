@@ -53,6 +53,7 @@ describe("AdminRosterView", () => {
     expect(await screen.findByTestId("roster-row-person-1")).toBeInTheDocument();
     expect(within(row("person-1")).getByTestId("roster-account-person-1")).toHaveTextContent("Active");
     expect(within(row("person-2")).getByTestId("roster-account-person-2")).toHaveTextContent("No account");
+    expect(api.roster).toHaveBeenCalledWith(undefined, undefined, 50, undefined);
   });
 
   it("given the roster cannot load, when opening the view, then the failure replaces the loading state", async () => {

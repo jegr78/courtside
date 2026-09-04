@@ -1,12 +1,13 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ApiError, api, type MembershipType, type RosterEntry, type RuleSet } from "../api/client";
 import i18n from "../i18n";
 import { UnsavedCount } from "../test/UnsavedCount";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { AdminMembershipTypesView } from "./AdminMembershipTypesView";
+import { AdminRosterView } from "./AdminRosterView";
 
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: "rules-1", active: true, grantsAccount: false };
 const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null, active: false, grantsAccount: true };
@@ -101,7 +102,7 @@ describe("AdminMembershipTypesView", () => {
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 
-  it("given a membership type, when reading it, then its holder count links to those holders", async () => {
+  it("given a membership type, when following its holders link, then the roster shows only those holders", async () => {
     // given
     vi.spyOn(api, "roster").mockImplementation((_query, _cursor, _limit, membershipTypeId) =>
       Promise.resolve({
@@ -110,12 +111,23 @@ describe("AdminMembershipTypesView", () => {
       }));
 
     // when
-    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/membership-types"]}><UnsavedChangesProvider>
+      <Routes>
+        <Route path="/admin/membership-types" element={<AdminMembershipTypesView />} />
+        <Route path="/admin/roster" element={<AdminRosterView />} />
+      </Routes>
+    </UnsavedChangesProvider></MemoryRouter>);
 
-    // then
+    // when
     const holders = await screen.findByTestId("membership-type-holders-type-1");
     expect(holders).toHaveTextContent("2");
-    expect(holders).toHaveAttribute("href", "/admin/roster?membershipTypeId=type-1");
+    await userEvent.click(holders);
+
+    // then
+    expect(await screen.findByTestId("roster-filter")).toHaveValue("type-1");
+    expect(await screen.findByTestId("roster-row-p1")).toBeInTheDocument();
+    expect(screen.getByTestId("roster-row-p2")).toBeInTheDocument();
+    expect(api.roster).toHaveBeenLastCalledWith(undefined, undefined, 50, "type-1");
   });
 
   it("given more holders than one page carries, when counting them, then the count says it is a floor", async () => {
