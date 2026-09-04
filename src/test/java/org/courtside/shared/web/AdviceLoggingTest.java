@@ -16,6 +16,7 @@ import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
@@ -28,6 +29,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -167,6 +169,26 @@ class AdviceLoggingTest {
                     .contains("400 BAD_REQUEST", "urn:courtside:error:constraint-violation")
                     .doesNotContain("doe.jane");
             assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
+    void givenAnUnexpectedDatabaseFailure_whenItIsAnswered_thenTheWarnLineCarriesItsCause() {
+        // given
+        UncategorizedSQLException failure = new UncategorizedSQLException(
+                "query", "select something", new SQLException("database unavailable", "XX000"));
+
+        // when
+        new SharedExceptionHandler(mock(ProblemTraceReference.class))
+                .handleUncategorizedDatabaseFailure(failure);
+
+        // then
+        assertThat(sharedAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage())
+                    .contains("500 INTERNAL_SERVER_ERROR", "urn:courtside:error:internal-error")
+                    .doesNotContain("database unavailable");
+            assertThat(causeChainOf(event)).contains("database unavailable");
         });
     }
 

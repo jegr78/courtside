@@ -78,7 +78,8 @@ class SharedExceptionHandler {
             return problem;
         }
         ProblemDetail problem = ContainerErrorController.problemFor(HttpStatus.INTERNAL_SERVER_ERROR);
-        logAnswered(problem);
+        traceReference.addTo(problem);
+        log.warn("Answering {} for {}", HttpStatus.INTERNAL_SERVER_ERROR, problem.getType(), exception);
         return problem;
     }
 

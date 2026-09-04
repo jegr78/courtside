@@ -41,4 +41,23 @@ class DatabaseLockConfigurationTest {
         // then
         assertThat(dataSource.getConnectionInitSql()).isEqualTo("SET lock_timeout TO 2750");
     }
+
+    @Test
+    void whenThePoolAlreadyHasInitializationSql_thenTheLockBoundDoesNotDiscardIt() {
+        // given
+        DatabaseLockProperties properties = new DatabaseLockProperties(Duration.ofSeconds(5));
+        StaticListableBeanFactory beans = new StaticListableBeanFactory();
+        beans.addBean("databaseLockProperties", properties);
+        BeanPostProcessor postProcessor = DatabaseLockConfiguration.databaseLockTimeout(
+                beans.getBeanProvider(DatabaseLockProperties.class));
+        HikariDataSource dataSource = new HikariDataSource();
+        dataSource.setConnectionInitSql("SET statement_timeout TO 30000");
+
+        // when
+        postProcessor.postProcessBeforeInitialization(dataSource, "dataSource");
+
+        // then
+        assertThat(dataSource.getConnectionInitSql())
+                .isEqualTo("SET statement_timeout TO 30000; SET lock_timeout TO 5000");
+    }
 }

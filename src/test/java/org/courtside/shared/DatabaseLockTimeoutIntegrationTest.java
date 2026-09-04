@@ -20,13 +20,17 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-@TestPropertySource(properties = "courtside.database.lock-timeout=1s")
+@TestPropertySource(properties = {
+        "courtside.database.lock-timeout=1s",
+        "spring.datasource.hikari.connection-init-sql=SET statement_timeout TO 30000"
+})
 class DatabaseLockTimeoutIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void whenBorrowingAnApplicationConnection_thenPostgresBoundsEveryLockWait(
             @Autowired JdbcClient jdbc) {
         assertThat(jdbc.sql("SHOW lock_timeout").query(String.class).single()).isEqualTo("1s");
+        assertThat(jdbc.sql("SHOW statement_timeout").query(String.class).single()).isEqualTo("30s");
     }
 
     @Test

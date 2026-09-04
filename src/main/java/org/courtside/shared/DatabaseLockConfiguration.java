@@ -18,7 +18,11 @@ class DatabaseLockConfiguration {
             public Object postProcessBeforeInitialization(Object bean, String beanName) {
                 if (bean instanceof HikariDataSource dataSource) {
                     long milliseconds = properties.getObject().lockTimeout().toMillis();
-                    dataSource.setConnectionInitSql("SET lock_timeout TO " + milliseconds);
+                    String lockTimeoutSql = "SET lock_timeout TO " + milliseconds;
+                    String existingSql = dataSource.getConnectionInitSql();
+                    dataSource.setConnectionInitSql(existingSql == null || existingSql.isBlank()
+                            ? lockTimeoutSql
+                            : existingSql + "; " + lockTimeoutSql);
                 }
                 return bean;
             }
