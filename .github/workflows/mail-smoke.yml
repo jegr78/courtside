@@ -8,6 +8,9 @@ on:
       - 'deploy/mail/**'
       - 'deploy/compose.mail-smoke.yaml'
       - 'deploy/compose.yaml'
+      - 'deploy/Caddyfile'
+      - 'deploy/Caddyfile.mail-smoke'
+      - 'deploy/mail-certificate.sh'
       - 'tools/courtside.mail-smoke.mjs'
       - '.github/workflows/mail-smoke.yml'
       # The code that talks to the relay decides whether a message goes out, so a change to it is

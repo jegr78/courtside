@@ -129,13 +129,13 @@ class Smtp {
     return this.reply();
   }
 
-  // The application's posture, without weakening the handshake to reach it: what the relay presents
-  // is its own anchor, and the name on it decides nothing — which is what the exception it runs with means.
-  async startTls(served) {
+  // Against the authority that issued it, not against what the server itself presented: the chain is
+  // checked, and only the name is not, which is exactly what the exception the instance runs with means.
+  async startTls(anchor) {
     await this.send("EHLO courtside-smoke", "250");
     await this.send("STARTTLS", "220");
     const secure = connectTls({
-      socket: this.socket, ca: [served], checkServerIdentity: () => undefined
+      socket: this.socket, ca: [anchor], checkServerIdentity: () => undefined
     });
     await new Promise((ready, fail) => secure.once("secureConnect", ready).once("error", fail));
     return new Smtp(secure);
@@ -169,9 +169,9 @@ async function awaitListener(port, what) {
   });
 }
 
-async function submit(port, from, to, password, served) {
+async function submit(port, from, to, password, anchor) {
   const plain = await Smtp.open(port);
-  const session = await plain.startTls(served);
+  const session = await plain.startTls(anchor);
   const greeting = await session.send("EHLO courtside-smoke", "250");
   assert.match(greeting, /AUTH[^\r\n]*PLAIN/,
     "the submission listener offers no PLAIN authentication after STARTTLS");
@@ -186,11 +186,37 @@ async function submit(port, from, to, password, served) {
   session.socket.end();
 }
 
+
+// What the helper says it handed over, which is also how a run knows a rotation arrived: the
+// version names the pair, so a second one is a different line and not the same one again.
+function published() {
+  const lines = compose(["logs", "mail-certificate"]).split("\n")
+    .filter((line) => line.includes("published the certificate"));
+  return lines.length === 0 ? undefined : lines[lines.length - 1].trim().split(" ").pop();
+}
+
+function digestInside(service, path) {
+  const output = compose(["exec", "-T", service, "sh", "-c", `sha256sum ${path}`],
+    { allowFailure: true });
+  const found = /^[0-9a-f]{64}/m.exec(output);
+  return found === null ? "" : found[0];
+}
+
+// Every file the mail server keeps, so a key it holds under a name nobody guessed is found too.
+function occurrencesInside(service, digest) {
+  const output = compose(["exec", "-T", service, "sh", "-c",
+    "find /etc/stalwart /var/lib/stalwart -type f -exec sha256sum {} + 2>/dev/null"],
+    { allowFailure: true });
+  return output.split("\n").filter((line) => line.startsWith(digest)).length;
+}
 async function main() {
   try {
     console.log(`Bringing up the shipped mail server as ${project}`);
-    compose(["up", "-d", "mail", "sink"]);
+    compose(["up", "-d", "mail", "sink", "proxy", "mail-certificate"]);
     await until("the mail server to report healthy", mailIsHealthy);
+
+    console.log("Waiting for the proxy's certificate to reach the mail server's volume");
+    await until("the helper to publish a certificate", () => published() !== undefined);
 
     console.log("Rendering and applying the shipped plans");
     compose(["run", "--rm", "plan"]);
@@ -218,11 +244,13 @@ async function main() {
 
     const served = servedCertificate(submission);
     const names = namesOn(served);
-    // The reason `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` exists, checked rather than assumed: when
-    // this stops holding, the exception can go and the instance can validate the hop in full.
-    assert.deepEqual(names.filter((name) => [hostname, "mail", "127.0.0.1"].includes(name)), [],
-      `the mail server now names a host the instance reaches it at (${names.join(", ")}), `
-      + "so the certificate exception is no longer what makes the handover possible");
+    assert.ok(names.includes(hostname),
+      `the mail server serves a certificate for ${names.join(", ")} and not for ${hostname}, `
+      + "so the proxy's certificate never reached the listener a receiver connects to");
+    // The instance reaches the relay as `mail` on the compose network, which is not a name any
+    // certificate carries, so the exception this deployment sets is still what the hop rests on.
+    assert.ok(!names.includes("mail"),
+      "the relay now answers to the name the instance dials, so the trust exception can go");
 
     console.log("Offering the shipped mail server somebody else's mail on the published port");
     await awaitListener(inbound, "the inbound listener to accept connections");
@@ -234,13 +262,52 @@ async function main() {
       + "and an open relay is the one state in which this instance harms people who are not its members");
 
     console.log("Submitting as the instance, with the account the shipped plan gave it");
-    await submit(submission, sender, recipient, applicationPassword, served);
+    const authority = compose(["exec", "-T", "proxy", "cat",
+      "/data/caddy/pki/authorities/local/root.crt"]);
+    assert.match(authority, /-----BEGIN CERTIFICATE-----/,
+      "without the proxy's own root there is nothing to check the mail server's chain against");
+    await submit(submission, sender, recipient, applicationPassword, authority);
 
     await until("the message to arrive in the sink", async () => {
       const response = await fetch(`http://127.0.0.1:${sink}/api/v1/messages`);
       const { messages } = await response.json();
       return messages.some((message) => message.To.some((address) => address.Address === recipient));
     });
+
+    console.log("Reading what the mail server can reach of the proxy's store");
+    const foreignKey = `/data/caddy/certificates/local/${domain}/${domain}.key`;
+    const foreignDigest = digestInside("proxy", foreignKey);
+    assert.match(foreignDigest, /^[0-9a-f]{64}$/,
+      "the proxy manages no second name here, so nothing in this run withholds anything");
+    assert.equal(occurrencesInside("mail", foreignDigest), 0,
+      `the mail server holds the private key the proxy uses for ${domain}, `
+      + "so the handover passed on the store instead of one certificate out of it");
+    assert.equal(digestInside("mail", "/etc/stalwart/tls/current/tls.key"),
+      digestInside("proxy", `/data/caddy/certificates/local/${hostname}/${hostname}.key`),
+      "the mail server reads a key the proxy did not issue for its hostname");
+
+    console.log("Replacing the stored key with one that does not match the certificate");
+    const beforeBreak = published();
+    compose(["exec", "-T", "proxy", "sh", "-c",
+      `cp ${foreignKey} /data/caddy/certificates/local/${hostname}/${hostname}.key`]);
+    await until("the helper to refuse the mismatched pair", () =>
+      compose(["logs", "mail-certificate"]).includes("incomplete or mismatched"));
+    assert.equal(published(), beforeBreak,
+      "a mismatched pair replaced the published one, and a mail server loading it serves nothing");
+
+    console.log("Letting the proxy issue the mail certificate again");
+    compose(["exec", "-T", "proxy", "sh", "-c",
+      `rm -rf /data/caddy/certificates/local/${hostname}`]);
+    compose(["restart", "proxy"]);
+    await until("the helper to publish the reissued certificate", () => {
+      const now = published();
+      return now !== undefined && now !== beforeBreak;
+    });
+    // The log line says the rename succeeded; only reading through `current` says it moved. The
+    // first publish finds no link there at all, so this is the swap that can regress.
+    assert.equal(digestInside("mail", "/etc/stalwart/tls/current/tls.key"),
+      digestInside("proxy", `/data/caddy/certificates/local/${hostname}/${hostname}.key`),
+      "the mail server still reads the pair from before the reissue, so `current` was not swapped");
 
     console.log("The shipped mail server, configured only from the shipped plans, delivered a message.");
   } finally {

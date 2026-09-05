@@ -75,8 +75,8 @@ services:
       COURTSIDE_MAIL_REPLY_TO: ${COURTSIDE_MAIL_REPLY_TO:?set COURTSIDE_MAIL_REPLY_TO in .env}
       COURTSIDE_MAIL_USERNAME: ${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}@${COURTSIDE_MAIL_DOMAIN}
       COURTSIDE_MAIL_PASSWORD: ${COURTSIDE_MAIL_PASSWORD:?set COURTSIDE_MAIL_PASSWORD in .env}
-      # Caddy issues for COURTSIDE_DOMAIN and not for the mail server, so the submission listener on
-      # this private network presents a self-signed certificate. Clear it when the relay is foreign.
+      # The mail server serves Caddy's certificate now, but this instance dials it as `mail` on the
+      # compose network, which is a name on no certificate. Clear it when the relay is foreign.
       COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: ${COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE:-true}
       LOGGING_LEVEL_ORG_COURTSIDE: ${COURTSIDE_LOG_LEVEL:-INFO}
     ports:
@@ -100,9 +100,38 @@ services:
     volumes:
       - mail-config:/etc/stalwart
       - mail-data:/var/lib/stalwart
+      - mail-tls:/etc/stalwart/tls:ro
     ports:
       - "25:25"
       - "127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT:-8081}:8080"
+
+  mail-certificate:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    profiles: [mail]
+    restart: unless-stopped
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The kernel refuses to exec a file whose own capability is outside the bounding set, and the
+    # caddy binary carries cap_net_bind_service. Nothing here binds a port: it has no network.
+    cap_add:
+      - NET_BIND_SERVICE
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Caddy's store is readable by root alone, and the mail server runs as 2000: writing as root in
+    # that group is what hands over one certificate without handing over the store.
+    user: "0:2000"
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+    volumes:
+      - ./mail-certificate.sh:/mail-certificate.sh:ro
+      - caddy-data:/caddy:ro
+      - mail-tls:/tls
+    entrypoint: ["sh", "/mail-certificate.sh"]
 
   mail-plan:
     image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
@@ -205,6 +234,7 @@ services:
         condition: service_healthy
     environment:
       COURTSIDE_DOMAIN: ${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
     ports:
       - "80:80"
       - "443:443"
@@ -217,6 +247,7 @@ volumes:
   db:
   mail-config:
   mail-data:
+  mail-tls:
   mail-plan:
   caddy-data:
   caddy-config:

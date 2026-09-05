@@ -1,0 +1,19 @@
+{
+	auto_https disable_redirects
+}
+
+# The name the application is served under, here only so that its private key exists: what the mail
+# server must not be able to read has to be in the store before anything can prove it cannot.
+{$COURTSIDE_DOMAIN} {
+	tls internal
+	respond 404
+}
+
+{$COURTSIDE_MAIL_HOSTNAME} {
+	tls internal
+	header {
+		-Server
+		-Via
+	}
+	respond 404
+}

@@ -33,3 +33,13 @@
 		header_up X-Forwarded-Proto {scheme}
 	}
 }
+
+# Caddy issues only for the names it serves, and the mail server needs one for its own. Nothing
+# here answers a browser: the block exists so that the certificate does.
+{$COURTSIDE_MAIL_HOSTNAME} {
+	header {
+		-Server
+		-Via
+	}
+	respond 404
+}

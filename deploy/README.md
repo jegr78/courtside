@@ -134,17 +134,24 @@ readable and diffable — and `stalwart-cli apply` loads them. The values that d
 come from `.env`, so `.env` is the only place any of it is written down.
 
 ```sh
-docker compose --profile mail up -d mail
+docker compose --profile proxy up -d proxy
+docker compose --profile mail up -d mail mail-certificate
+docker compose --profile mail logs mail-certificate
 docker compose --profile mail-setup run --rm mail-bootstrap
 docker compose --profile mail restart mail
 docker compose --profile mail-setup run --rm mail-configure
 docker compose --profile mail up -d --force-recreate mail
 ```
 
+The proxy comes first because `mail-configure` writes a certificate that points at two files, and
+Caddy is what puts them there. Read the helper's log before going on: it says `published the
+certificate for <hostname>` once the pair has arrived, and until then there is nothing to point at.
+`COURTSIDE_MAIL_HOSTNAME` must resolve to this host by then, or Caddy has no way to prove the name.
+
 Two applies with a restart between them, because the first one answers the questions the wizard
 would have asked — hostname, domain, whether to generate DKIM keys — and the server only leaves
-setup mode on the next start. The second one loads the listeners, the delivery routes and the
-administrator account.
+setup mode on the next start. The second one loads the listeners, the delivery routes, the
+administrator account and the certificate.
 
 Before the first command, `.env` needs four values: `COURTSIDE_MAIL_HOSTNAME`,
 `COURTSIDE_MAIL_DOMAIN`, `COURTSIDE_MAIL_ADMIN_PASSWORD` for the club's mail administrator, and
@@ -190,11 +197,11 @@ Two things about the mail container are worth knowing regardless:
   interface is the one artefact fetched at runtime from a release URL, and it is the component with
   full control over the mail server. Its integrity rests on TLS to GitHub and nothing else. A
   deliberate exception, not an oversight.
-- **There is no ACME here.** Caddy is this deployment's only certificate client and it issues for
-  `COURTSIDE_DOMAIN`, not for `COURTSIDE_MAIL_HOSTNAME`, so the mail server serves a self-signed
-  certificate on port 25. For inbound STARTTLS that is the ordinary state of affairs between mail
-  servers; it becomes a real gap the day you want MTA-STS or DANE.
-  [#755](https://github.com/jegr78/courtside/issues/755) decides where that certificate comes from.
+- **One ACME client, two names.** Caddy is still the only thing here that talks to a certificate
+  authority, and it now issues for `COURTSIDE_MAIL_HOSTNAME` as well as `COURTSIDE_DOMAIN`. The
+  `mail-certificate` helper copies that one certificate and its key into a volume of its own, which
+  the mail server mounts read-only. Caddy's store, which holds a private key for every name it
+  manages, is never mounted into the mail server. MTA-STS and DANE remain out of scope.
 
 ### What DNS has to say before anyone believes this server
 
@@ -290,10 +297,10 @@ on trust. It tears the project down afterwards and needs Docker and `openssl`. T
 workflow runs it whenever anything under `deploy/mail/` or in the application's own mail path
 changes, so the configuration a club applies is configuration that has been applied.
 
-One thing the run does differently on purpose: it issues itself a throwaway authority and installs
-a certificate for the mail hostname, where your instance serves the self-signed one it generated.
-That is what lets the run validate the handshake instead of accepting whatever it is handed, and it
-is the single point at which the smoke world and your world differ.
+One thing the run does differently on purpose: its Caddy issues from a local authority rather than
+from Let's Encrypt, because a smoke world has no public name to prove. Everything after that is the
+shipped path — the same site block, the same helper, the same volume — so the certificate the run's
+mail server presents arrived the way yours does.
 
 ### The test that counts is a message that arrived somewhere else
 
@@ -359,7 +366,7 @@ default.
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
 | `COURTSIDE_DOMAIN` | *required with the proxy* | The public name Caddy obtains a certificate for. |
 | `COURTSIDE_MAIL_DOMAIN` | *required with the mail server* | The domain Courtside sends from, and the domain SPF, DKIM and DMARC are published for. |
-| `COURTSIDE_MAIL_HOSTNAME` | *required with the mail server* | The mail server's own name. Its forward and reverse DNS must agree. |
+| `COURTSIDE_MAIL_HOSTNAME` | *required with the proxy and with the mail server* | The mail server's own name. Its forward and reverse DNS must agree, and Caddy obtains a certificate for it, so it must point at this host. **Running the proxy without this deployment's mail server?** Delete that site block from `Caddyfile` and the variable's line from the `proxy` service — Caddy would otherwise retry forever for a name it cannot prove, and Compose would refuse to start without a value. The rest of the proxy is unaffected. |
 | `COURTSIDE_MAIL_DKIM_SELECTOR` | *required with the mail server* | The selector of the DKIM key the setup wizard generated, as it appears in the admin interface. |
 | `COURTSIDE_MAIL_ADMIN_PASSWORD` | *required with the mail server* | Password for the club's mail administrator, written into the account by `mail-configure`. |
 | `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. |
@@ -370,7 +377,7 @@ default.
 | `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from and authenticates as, in `COURTSIDE_MAIL_DOMAIN`. |
 | `COURTSIDE_MAIL_RELAY_HOST` | `mail` | Where the instance hands its messages in. The mail server on the compose network by default; point it at the club's provider instead if this deployment runs without one. |
 | `COURTSIDE_MAIL_RELAY_PORT` | `587` | Submission port on that host. |
-| `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `true` in this deployment, `false` in the application | Accept the certificate the relay presents without authenticating it — neither its issuer nor the name on it. Set because Caddy issues for `COURTSIDE_DOMAIN` and not for the mail server, which generates its own naming `localhost` alone. Clear it when you point `COURTSIDE_MAIL_RELAY_HOST` at a provider that has a real one. |
+| `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `true` in this deployment, `false` in the application | Accept the certificate the relay presents without authenticating it — neither its issuer nor the name on it. The mail server now serves Caddy's certificate for `COURTSIDE_MAIL_HOSTNAME`, but the instance dials it as `mail` on the compose network, which is on no certificate. Clear it when you point `COURTSIDE_MAIL_RELAY_HOST` at a name that is. |
 | `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
 | `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`. Needed for the initial setup, and a way back in afterwards. **The server serves no mail while it is set.** |
 | `COURTSIDE_MAIL_OUTBOUND_PROBE` | `gmail-smtp-in.l.google.com` | The host `mail-check` opens port 25 to when testing whether outbound mail leaves at all. A third party by default; point it at a server of your own if you would rather not tell one. |
@@ -545,7 +552,9 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
   reach the instance rather than vanishing, but nothing acts on them. The instance records that it
   handed a message to this server and learns nothing after that, so a bounce arriving here
   afterwards is the answer nobody reads — and DMARC reports have no reader either.
-- **The mail server serves a self-signed certificate.** Caddy issues for `COURTSIDE_DOMAIN`, not for
-  the mail hostname. Ordinary between mail servers today, and the thing to fix before MTA-STS or
-  DANE. [#755](https://github.com/jegr78/courtside/issues/755) decides where that certificate comes
-  from.
+- **The mail server serves Caddy's certificate, and reloads it only on a restart.** The helper
+  publishes a renewed pair as soon as Caddy writes it, but nothing tells the running mail server to
+  read the files again, so a renewal reaches the listener at the next restart.
+  [#765](https://github.com/jegr78/courtside/issues/765) closes that.
+- **MTA-STS and DANE are not provided.** Neither is published, and neither is planned by this
+  work.

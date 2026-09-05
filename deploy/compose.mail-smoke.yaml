@@ -14,12 +14,46 @@ services:
     volumes:
       - mail-config:/etc/stalwart
       - mail-data:/var/lib/stalwart
+      - mail-tls:/etc/stalwart/tls:ro
     ports:
       # 25 is published for the same reason the deployment publishes it, and so that the smoke can
       # offer this server somebody else's mail on it and watch it refuse.
       - "127.0.0.1::25"
       - "127.0.0.1::587"
       - "127.0.0.1::8080"
+
+  proxy:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      COURTSIDE_DOMAIN: ${COURTSIDE_MAIL_DOMAIN}
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME}
+    volumes:
+      - ./Caddyfile.mail-smoke:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  mail-certificate:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "0:2000"
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME}
+    volumes:
+      - ./mail-certificate.sh:/mail-certificate.sh:ro
+      - caddy-data:/caddy:ro
+      - mail-tls:/tls
+    entrypoint: ["sh", "/mail-certificate.sh"]
 
   sink:
     image: axllent/mailpit:v1.31@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
@@ -67,4 +101,7 @@ services:
 volumes:
   mail-config:
   mail-data:
+  mail-tls:
+  caddy-data:
+  caddy-config:
   plan:
