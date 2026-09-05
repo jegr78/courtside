@@ -10,19 +10,20 @@ const setup = readFileSync(new URL("../frontend/e2e/global-setup.ts", import.met
 const snapshots = new URL("../frontend/e2e/visual-regression.spec.ts-snapshots/", import.meta.url);
 
 test("given stable product views, when qualifying the UI, then reviewed pixel baselines cover every principal surface", () => {
-  for (const surface of [
+  const principalSurfaces = [
     "court-plan", "booking-dialog", "booking-validation", "personal-bookings",
     "my-messages", "series-preview", "primary-navigation", "admin-navigation",
-    "admin-configuration", "admin-courts", "admin-opening-hours", "admin-booking-cards",
+    "admin-setup", "admin-configuration", "admin-courts", "admin-opening-hours", "admin-booking-cards",
     "admin-booking-card",
     "admin-slot-fillers", "admin-roster", "admin-membership-types",
     "admin-import", "admin-audit", "admin-messages"
-  ]) {
+  ];
+  for (const surface of principalSurfaces) {
     assert.match(visual, new RegExp(`\\"${surface}\\.png\\"`));
   }
   assert.equal(existsSync(snapshots), true);
   const reviewed = readdirSync(snapshots).filter((file) => file.endsWith(".png"));
-  assert.equal(reviewed.length, 19);
+  assert.equal(reviewed.length, principalSurfaces.length);
   assert.deepEqual(reviewed.filter((file) => /-(darwin|linux)\.png$/.test(file)), []);
 });
 
