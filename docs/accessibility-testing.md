@@ -4,10 +4,9 @@ Courtside treats WCAG 2.2 AA as a functional release requirement. The required b
 automated axe checks for the public court plan, authentication, password change, member bookings,
 booking dialogs and administration in German and English. Chromium covers all browser journeys;
 Chromium is the blocking automated WCAG rule gate. WebKit runs blocking core compatibility
-journeys. The WebKit plus axe combination runs in reliability and release qualification until its
-first-attempt evidence meets the admission criteria. Keyboard, dialog focus, reflow,
-reduced-motion and forced-colour checks complement axe because a scanner cannot decide whether a
-workflow is usable.
+journeys. The WebKit plus axe combination runs in the scheduled reliability path and is not a
+merge gate. Keyboard, dialog focus, reflow, reduced-motion and forced-colour checks complement
+axe because a scanner cannot decide whether a workflow is usable.
 
 ## Manual release check
 

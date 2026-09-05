@@ -329,9 +329,11 @@ days; the safe records remain available for 90 days. Validate one record with
 `npm run reliability:validate -- <record>` and summarize downloaded records with
 `npm run reliability:summarize -- <directory>`.
 
-Thirty consecutive hosted successes document the observed streak. They do not demonstrate a
-failure rate below 0.5 percent: zero failures in thirty trials still leave substantial statistical
-uncertainty, so this report must not turn a historical streak into a broader reliability claim.
+The summary counts attempts, streaks and first-attempt failure rates, and a streak is not a failure
+rate. Zero failures in thirty trials still leave substantial statistical uncertainty, so a historical
+streak never becomes a broader reliability claim. These records exist to explain a concrete failure
+when one happens, not to earn an admission: WebKit plus axe stays out of the merge gate, so there is
+no threshold for the streak to reach.
 
 ### Operations and release
 
