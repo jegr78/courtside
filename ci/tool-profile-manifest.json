@@ -47,6 +47,8 @@
     { "path": "tools/post-merge-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/pwa-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/quality-strategy.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/risk-register.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/risk-register.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/regression-evidence-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/role-inventory.test.mjs", "profiles": ["tooling"], "test": true },

@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 1,
+  "reviewPolicyDays": { "P0": 90, "P1": 180, "P2": 365, "P3": 365 },
+  "areas": [
+    {
+      "name": "Identity and security",
+      "risks": [
+        {
+          "id": "ID-1", "impact": "P0", "likelihood": "Medium",
+          "invariant": "Anonymous and lower-privileged callers cannot reach another role's operation or data.",
+          "positiveBoundaries": "Each role performs its permitted operations on owned data.",
+          "negativeBoundaries": "Anonymous, lower-privileged, non-owner and stale-session access is rejected.",
+          "level": "PostgreSQL integration, OpenAPI contract, E2E", "frequency": ["PR", "release"],
+          "environment": "Testcontainers, packaged app", "syntheticData": "Two accounts per relevant role and ownership class",
+          "evidenceType": "Required build and role-journey reports", "owner": "Identity",
+          "openGap": "Full browser role matrix is tracked by #218.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        },
+        {
+          "id": "ID-2", "impact": "P0", "likelihood": "High",
+          "invariant": "Login, initial-password, CSRF, session and rate-limit controls fail closed without exposing credentials or account existence.",
+          "positiveBoundaries": "Valid login, password transition, CSRF token and session lifecycle succeed.",
+          "negativeBoundaries": "Incorrect credentials, encoded paths, missing CSRF, concurrency, restart and logout cannot bypass controls.",
+          "level": "Unit, PostgreSQL integration, E2E, deployment smoke", "frequency": ["PR", "nightly", "release"],
+          "environment": "Testcontainers, reference proxy", "syntheticData": "Bootstrap admin and synthetic accounts",
+          "evidenceType": "Required build, session journey and deployment report", "owner": "Identity",
+          "openGap": "Adversarial timing analysis remains assigned to #218.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        },
+        {
+          "id": "ID-3", "impact": "P0", "likelihood": "Low",
+          "invariant": "Secrets and personal data do not enter public responses, logs, caches or retained artifacts.",
+          "positiveBoundaries": "Approved public and role-scoped data remains available to its intended caller.",
+          "negativeBoundaries": "Success, error and diagnostic paths expose no credentials, unrelated personal data or retained secrets.",
+          "level": "Unit, contract, static analysis, E2E, deployment and image smoke", "frequency": ["PR", "release"],
+          "environment": "Packaged app and proxy", "syntheticData": "Approved placeholder identities only",
+          "evidenceType": "Wire assertions, CodeQL, Trivy and redacted artifacts", "owner": "Security and operations",
+          "openGap": "Automated scanning cannot prove the absence of unknown vulnerabilities.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-09-24",
+          "acceptanceIds": ["remote-https-club-logo-2026"],
+          "protectedEvidence": [
+            {
+              "id": "issue471-closed-passive", "digest": "sha256:337874e6daaf6b696e3ad97b4f977ac8d4dc5155c79b85a0bbe7c8b268571247",
+              "status": "retained", "expiresOn": "2026-09-24"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Booking",
+      "risks": [
+        {
+          "id": "BK-1", "impact": "P0", "likelihood": "Medium",
+          "invariant": "No two active allocations occupy the same court and time range.",
+          "positiveBoundaries": "Single and series allocations accept free and exactly adjacent ranges.",
+          "negativeBoundaries": "Overlapping ranges, retries and concurrent commits cannot create double occupancy.",
+          "level": "PostgreSQL integration, E2E", "frequency": ["PR", "nightly"],
+          "environment": "PostgreSQL 17, packaged app", "syntheticData": "Fixed courts, slots and competing accounts",
+          "evidenceType": "Constraint and coordinated-race results", "owner": "Booking",
+          "openGap": "Browser-visible concurrent races remain assigned to #218.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        },
+        {
+          "id": "BK-2", "impact": "P1", "likelihood": "Medium",
+          "invariant": "Creation, move, cancellation and series previews apply the intended rules, authorization and calendar semantics.",
+          "positiveBoundaries": "Authorized changes succeed across DST directions and month or year boundaries.",
+          "negativeBoundaries": "Partial conflicts, inactive cards or courts, rule violations and non-owner actions are rejected completely.",
+          "level": "Unit, PostgreSQL integration, contract, E2E", "frequency": ["PR", "release"],
+          "environment": "Club time zone with PostgreSQL", "syntheticData": "Deterministic bookings and rule sets",
+          "evidenceType": "Required build and journey traces", "owner": "Booking and rules",
+          "openGap": "Series preview limitations remain explicitly tracked in existing issues.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2027-03-04"
+        },
+        {
+          "id": "BK-3", "impact": "P0", "likelihood": "Low",
+          "invariant": "Retry and failure paths create one logical operation or no partial state.",
+          "positiveBoundaries": "An identical idempotent retry returns the one completed operation.",
+          "negativeBoundaries": "Mismatched keys, timeouts, constraint failures and concurrent delivery leave no duplicate or partial state.",
+          "level": "PostgreSQL integration, E2E", "frequency": ["PR", "nightly"],
+          "environment": "PostgreSQL 17", "syntheticData": "Stable request and operation IDs",
+          "evidenceType": "Row-state and typed-error assertions", "owner": "Booking",
+          "openGap": "Cross-browser ambiguous-timeout evidence remains assigned to #218.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        },
+        {
+          "id": "BK-4", "impact": "P1", "likelihood": "Medium",
+          "invariant": "A member finds every booking that records them as a co-player without having made it, and can take themselves out of it, and neither operation resolves another person's name.",
+          "positiveBoundaries": "Listing and withdrawing work across pages, for a booking that has already happened as much as for one ahead.",
+          "negativeBoundaries": "Own bookings, a booking they are not recorded in and a repeated withdrawal are refused identically, and no response carries a name.",
+          "level": "Unit, PostgreSQL integration, contract, React, E2E", "frequency": ["PR"],
+          "environment": "PostgreSQL 17, packaged app", "syntheticData": "Two members and a booking naming one of them",
+          "evidenceType": "Row state, typed-error and wire assertions", "owner": "Booking and identity",
+          "openGap": "Removing oneself from a managed card's roster reaches the managing role through the appointment detail, not through a notification.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2027-03-04"
+        }
+      ]
+    },
+    {
+      "name": "Membership and synchronization",
+      "risks": [
+        {
+          "id": "MB-1", "impact": "P0", "likelihood": "Medium",
+          "invariant": "Person, account, role and membership changes cannot cross authorization or leak another person's data.",
+          "positiveBoundaries": "Authorized create, update, deactivate and membership transitions persist for the intended person.",
+          "negativeBoundaries": "Duplicate identities and every unauthorized role or cross-person operation are rejected without disclosure.",
+          "level": "PostgreSQL integration, contract, React, E2E", "frequency": ["PR", "release"],
+          "environment": "PostgreSQL 17, packaged app", "syntheticData": "Approved placeholder roster",
+          "evidenceType": "Required build and administration journey", "owner": "Membership and identity",
+          "openGap": "A membership type does not yet gate account creation or booking; that is tracked by #354.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        },
+        {
+          "id": "MB-2", "impact": "P0", "likelihood": "Medium",
+          "invariant": "A full synchronization creates new records, updates matched records and handles absent records without partial state or account takeover.",
+          "positiveBoundaries": "First and repeated imports create, match, update and deactivate by stable external reference.",
+          "negativeBoundaries": "Duplicate or missing references, malformed rows and conflicting usernames cannot cause partial state or account takeover.",
+          "level": "Unit, property, PostgreSQL integration, React, E2E", "frequency": ["PR", "release"],
+          "environment": "PostgreSQL 17, packaged app", "syntheticData": "NetXP-like and eBusy-like CSV fixtures with no real data",
+          "evidenceType": "Preview, transaction and post-sync invariants, and seeded parsing and partition properties", "owner": "Membership and integration",
+          "openGap": "An import does not create accounts for the people it creates; that is tracked by #354.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        }
+      ]
+    },
+    {
+      "name": "Administration",
+      "risks": [
+        {
+          "id": "AD-1", "impact": "P1", "likelihood": "Medium",
+          "invariant": "Configuration changes validate at both HTTP and service boundaries and take effect consistently.",
+          "positiveBoundaries": "Valid time zones, opening windows, numbering, URLs, active states and rule references take effect.",
+          "negativeBoundaries": "Invalid values are rejected at the request edge and guarded again where used.",
+          "level": "Unit, PostgreSQL integration, contract, React, E2E", "frequency": ["PR"],
+          "environment": "Testcontainers, packaged app", "syntheticData": "Example Tennis Club configuration",
+          "evidenceType": "Typed-error and member-impact assertions", "owner": "Configuration and facility",
+          "openGap": "Deactivating every court remains a known limit tracked by #41.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2027-03-04"
+        },
+        {
+          "id": "AD-2", "impact": "P1", "likelihood": "Medium",
+          "invariant": "Concurrent or failed administration writes neither lose confirmed state nor display stale success.",
+          "positiveBoundaries": "A confirmed write remains the final persisted and displayed state.",
+          "negativeBoundaries": "Double submits, out-of-order responses, constraint conflicts and refresh failures cannot claim stale success.",
+          "level": "PostgreSQL integration, React, E2E", "frequency": ["PR", "nightly"],
+          "environment": "PostgreSQL 17, browser", "syntheticData": "Deterministic conflicting updates",
+          "evidenceType": "Final row state and UI trace", "owner": "Administration",
+          "openGap": "None open: optimistic locking refuses a stale write, and a browser journey proves that a court and a role changed behind an open dialog fail closed.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2027-03-04"
+        }
+      ]
+    },
+    {
+      "name": "PWA and UI",
+      "risks": [
+        {
+          "id": "UI-1", "impact": "P1", "likelihood": "Medium",
+          "invariant": "Core public, member and administration journeys are keyboard-operable and meet automatable WCAG 2.2 AA requirements.",
+          "positiveBoundaries": "German and English journeys remain operable by keyboard with correct dialog and focus behaviour.",
+          "negativeBoundaries": "Error states, zoom and user preferences introduce no automatable WCAG 2.2 AA violation or focus loss.",
+          "level": "React, E2E, manual", "frequency": ["PR", "release"],
+          "environment": "Browser matrix", "syntheticData": "Stable accessible fixtures",
+          "evidenceType": "Axe, journey trace and release checklist", "owner": "Frontend",
+          "openGap": "Full automation and manual evidence are tracked by #216.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2027-03-04"
+        },
+        {
+          "id": "UI-2", "impact": "P0", "likelihood": "Low",
+          "invariant": "PWA caching and browser history never serve personal API data after logout, expiry or offline transition.",
+          "positiveBoundaries": "Install, update, offline shell and reconnect preserve public application availability.",
+          "negativeBoundaries": "Logout, expiry, Back or Forward, old assets and multiple tabs cannot reveal cached personal API data.",
+          "level": "React, E2E, deployment smoke", "frequency": ["PR", "nightly", "release"],
+          "environment": "Chromium, WebKit and periodic Firefox", "syntheticData": "Synthetic member sessions",
+          "evidenceType": "Browser traces, cache inspection and linked device record", "owner": "Frontend and identity",
+          "openGap": "Physical-device evidence remains manual because emulation cannot prove operating-system integration.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        },
+        {
+          "id": "UI-3", "impact": "P2", "likelihood": "Medium",
+          "invariant": "Layout, localization and interaction remain usable at supported viewports and content extremes.",
+          "positiveBoundaries": "Supported mobile, tablet and desktop layouts work in both themes and locales.",
+          "negativeBoundaries": "Long content and empty, single or many-court states do not hide or block interaction.",
+          "level": "React, E2E", "frequency": ["PR", "periodic"],
+          "environment": "Chromium plus supported matrix, including a WebKit and a Chromium phone viewport on every frontend change",
+          "syntheticData": "Deterministic visual dataset", "evidenceType": "Semantic assertions and reviewed pixel baselines",
+          "owner": "Frontend",
+          "openGap": "Broad locale, theme and viewport captures remain diagnostic; seven principal surfaces have blocking stable baselines, rendered in a pinned browser image.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2027-09-05"
+        }
+      ]
+    },
+    {
+      "name": "Operations and release",
+      "risks": [
+        {
+          "id": "OP-1", "impact": "P0", "likelihood": "Medium",
+          "invariant": "The exact released image starts securely behind the reference proxy and preserves data across restart.",
+          "positiveBoundaries": "The exact image starts on an empty database and preserves data across a controlled restart.",
+          "negativeBoundaries": "Read-only filesystem, non-root execution, TLS, cookie and management-isolation checks cannot be bypassed.",
+          "level": "Deployment smoke, release qualification", "frequency": ["release"],
+          "environment": "Reference Compose topology", "syntheticData": "Production-shaped synthetic club",
+          "evidenceType": "Image-digest qualification report", "owner": "Operations and release",
+          "openGap": "Exact-image qualification is tracked by #219.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        },
+        {
+          "id": "OP-2", "impact": "P0", "likelihood": "Medium",
+          "invariant": "Every supported upgrade preserves data and either completes atomically or fails without serving inconsistent state.",
+          "positiveBoundaries": "Previous patch, minor and supported skipped-version upgrades preserve data and invariants.",
+          "negativeBoundaries": "Interrupted or invalid migrations fail without serving an inconsistent schema.",
+          "level": "Release qualification", "frequency": ["release"],
+          "environment": "PostgreSQL 17 and candidate image", "syntheticData": "Version-owned synthetic dataset",
+          "evidenceType": "Migration logs and invariant checksums", "owner": "Database and release",
+          "openGap": "Upgrade harness is tracked by #220.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        },
+        {
+          "id": "OP-3", "impact": "P0", "likelihood": "Low",
+          "invariant": "A documented backup restores into an empty compatible environment and passes functional and integrity checks.",
+          "positiveBoundaries": "The application writes a synthetic club through its public API; its backup and the legacy-schema fixture each restore into empty PostgreSQL 17, and the matching image reads the restored login, booking and logo.",
+          "negativeBoundaries": "A corrupt archive leaves no database objects, an interrupted restore preserves the usable database, and the restored exclusion constraint still rejects overlap.",
+          "level": "Release qualification", "frequency": ["periodic", "release"],
+          "environment": "Fresh PostgreSQL 17", "syntheticData": "API-written and legacy-schema synthetic datasets, including an outstanding event publication",
+          "evidenceType": "Before-and-after table and sequence evidence, backup sizes, image ID and schema version", "owner": "Operations",
+          "openGap": "The relay is stopped before a second API booking so the backup contains an application-written outstanding Modulith publication.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+        },
+        {
+          "id": "OP-4", "impact": "P1", "likelihood": "Medium",
+          "invariant": "Required gates are reproducible, isolated, diagnosable and cannot turn a missing tool or retry into success.",
+          "positiveBoundaries": "Independent fixtures pass under normal and varied order with retained first-attempt evidence.",
+          "negativeBoundaries": "Concurrency timeout, tool outage, cleanup failure and rerun cannot be reported as a clean first attempt.",
+          "level": "All levels", "frequency": ["PR", "nightly"],
+          "environment": "CI and reference runners", "syntheticData": "Independent deterministic fixtures",
+          "evidenceType": "First-attempt result and privacy-safe diagnostics", "owner": "Build and quality",
+          "openGap": "Periodic backend order and configured/reversed browser-project runs measure isolation without retries.",
+          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2027-03-04"
+        }
+      ]
+    }
+  ],
+  "automationGaps": [
+    {
+      "id": "GAP-COURT-DEACTIVATION", "riskIds": ["AD-1"],
+      "summary": "The product permits an administrator to deactivate every court.",
+      "owner": "Configuration and facility", "reviewOn": "2027-03-04",
+      "decision": "The existing issue remains authoritative; do not duplicate it.", "issue": 41
+    }
+  ]
+}

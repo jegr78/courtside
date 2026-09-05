@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:quality:risk-register:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "reviewPolicyDays", "areas", "automationGaps"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "reviewPolicyDays": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["P0", "P1", "P2", "P3"],
+      "properties": {
+        "P0": { "const": 90 },
+        "P1": { "const": 180 },
+        "P2": { "const": 365 },
+        "P3": { "const": 365 }
+      }
+    },
+    "areas": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "risks"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "risks": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/risk" }
+          }
+        }
+      }
+    },
+    "automationGaps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/automationGap" }
+    }
+  },
+  "$defs": {
+    "date": { "type": "string", "format": "date" },
+    "riskId": { "type": "string", "pattern": "^[A-Z]{2}-[1-9][0-9]*$" },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "impact", "likelihood", "invariant", "positiveBoundaries", "negativeBoundaries",
+        "level", "frequency", "environment", "syntheticData", "evidenceType", "owner", "openGap",
+        "lastReviewedOn", "nextReviewOn"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/riskId" },
+        "impact": { "enum": ["P0", "P1", "P2", "P3"] },
+        "likelihood": { "enum": ["Low", "Medium", "High"] },
+        "invariant": { "type": "string", "minLength": 1 },
+        "positiveBoundaries": { "type": "string", "minLength": 1 },
+        "negativeBoundaries": { "type": "string", "minLength": 1 },
+        "level": { "type": "string", "minLength": 1 },
+        "frequency": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["PR", "nightly", "periodic", "release"] }
+        },
+        "environment": { "type": "string", "minLength": 1 },
+        "syntheticData": { "type": "string", "minLength": 1 },
+        "evidenceType": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "openGap": { "type": ["string", "null"], "minLength": 1 },
+        "lastReviewedOn": { "$ref": "#/$defs/date" },
+        "nextReviewOn": { "$ref": "#/$defs/date" },
+        "acceptanceIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "protectedEvidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protectedEvidence" }
+        }
+      }
+    },
+    "protectedEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "digest", "status", "expiresOn"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "status": { "enum": ["retained", "withheld", "discarded"] },
+        "expiresOn": { "$ref": "#/$defs/date" }
+      }
+    },
+    "automationGap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "riskIds", "summary", "owner", "reviewOn", "decision", "issue"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^GAP-[A-Z0-9-]+$" },
+        "riskIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/riskId" }
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "reviewOn": { "$ref": "#/$defs/date" },
+        "decision": { "type": "string", "minLength": 1 },
+        "issue": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -12,7 +12,9 @@
 
 ## Quality evidence
 
-See the maintained [quality strategy](https://github.com/jegr78/courtside/blob/main/docs/quality-strategy.md).
+Use the machine-readable [risk register](https://github.com/jegr78/courtside/blob/main/quality/risk-register.json)
+for maintained IDs and governance dates. The [quality strategy](https://github.com/jegr78/courtside/blob/main/docs/quality-strategy.md)
+renders its risk and automation-gap tables.
 
 - Affected risk IDs:
 - Positive boundaries exercised:
