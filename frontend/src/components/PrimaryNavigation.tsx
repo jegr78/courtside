@@ -29,7 +29,9 @@ function isCurrent(destination: Destination, pathname: string): boolean {
 
 // Above the breakpoint every declaration here is undone again, so the row stays the row it was and
 // only a phone gets the bar.
-const BAR = "fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t px-2 py-2 "
+// Below the modal overlay at z-20 and the account menu at z-30: page chrome, and a dialog covers
+// the page. At z-40 it intercepted the taps meant for the booking dialog's own buttons.
+const BAR = "fixed inset-x-0 bottom-0 z-10 flex items-center justify-around border-t px-2 py-2 "
   + "pb-[max(0.5rem,env(safe-area-inset-bottom))] surface-panel "
   + "sm:static sm:flex-wrap sm:justify-start sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0";
 

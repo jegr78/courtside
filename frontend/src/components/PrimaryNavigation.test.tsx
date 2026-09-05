@@ -37,6 +37,8 @@ describe("PrimaryNavigation", () => {
     // then
     const bar = screen.getByTestId("primary-navigation-bar");
     expect(bar).toHaveClass("fixed", "inset-x-0", "bottom-0");
+    // then — under the modal overlay at z-20, so a dialog's own buttons stay tappable
+    expect(bar).toHaveClass("z-10");
     expect(bar).toHaveClass("sm:static");
   });
 
