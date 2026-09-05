@@ -1576,18 +1576,23 @@ whether it is built or designed. **Designed means absent today.**
   runtime already holds and the name on it. The reference deployment reaches the relay under
   `COURTSIDE_MAIL_HOSTNAME`, the name Caddy issued the certificate for, which the mail server
   answers to as a second name on a network shared with the instance and nothing else, so nothing
-  there needs an exception. `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` still exists and still switches both checks
-  off for a club whose relay serves a certificate this container cannot follow; it defaults to
-  false everywhere now, and what it costs when it is set is that whoever can redirect the connection
-  reads the mail. The failure direction is closed rather than open: a relay serving the wrong name,
-  an unknown issuer, an expired certificate or a chain that stops short of its issuer stops the
-  handover, and the mail waits instead of leaving. *Built.*
+  there needs an exception. `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` still exists and still
+  switches both checks off for a club whose relay serves a certificate this container cannot
+  follow; it defaults to false everywhere now, and what it costs when it is set is that whoever
+  can redirect the connection reads the mail. The failure direction is closed rather than open: a
+  relay serving the wrong name, an unknown issuer, an expired certificate or a chain that stops
+  short of its issuer stops the handover. What that costs is recorded rather than hidden — the
+  message is attempted four times across about a minute and is then settled `FAILED` with its
+  reason, and the event behind it stays outstanding and is replayed when the instance restarts,
+  which writes a second row and issues a fresh credential. Repairing the certificate releases
+  nothing that has already failed. *Built.*
 - **Accepted: a reload the mail server refuses leaves it serving a certificate it made itself.**
   A renewed certificate reaches the running listener without a restart: the helper publishes the
   pair, a reloader asks the mail server to load it, and the listener answers with the new one.
-  Stalwart 0.16.20 does not keep the pair it had when that load fails — it drops the certificate and
-  falls back to a self-signed one — so a refused reload downgrades the hop rather than leaving it as
-  it was. An observer needs to watch container health or the reloader's log, both of which say so:
+  Stalwart 0.16.20 does not keep the pair it had when it refuses that load — it answers
+  `notCreated`, drops the certificate and falls back to a self-signed one — so a refused reload
+  downgrades the hop rather than leaving it as it was. An observer needs to watch container health
+  or the reloader's log, both of which say so:
   a reload stays owed until one is accepted, so a refused one is named, retried, and reported by a
   container that stays unhealthy rather than by one a later read-back turns green again. The
   fallback is refused on its own terms too — it is valid from 1975 to 4096, and the reloader treats

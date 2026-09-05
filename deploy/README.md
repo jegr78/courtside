@@ -571,9 +571,12 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
   the certificate, and the listener falls back to a self-signed one valid from 1975 to 4096. Nothing
   about the fallback is silent here — the reload stays owed until one is accepted, so `mail-reload`
   names the refusal, retries it, and stays unhealthy while it is owed — and the instance stops
-  handing messages over rather than handing them to something it cannot authenticate, which shows
-  as an outbox that stops draining. Nothing undoes the fallback, though, short of fixing the pair
-  and reloading again. What bounds it is that `mail-certificate` swaps `current` only after Caddy
+  handing messages over rather than handing them to something it cannot authenticate. That is
+  visible in two places, neither of them a queue: `mail-reload` stays unhealthy, and every message
+  settles `FAILED` with its reason in the admin message list. Repairing the pair resends none of
+  them; the events still outstanding are replayed when `app` restarts, and a replayed credential is
+  a new one, because the first exists only as a hash. Nothing undoes the fallback either, short of
+  fixing the pair and reloading again. What bounds it is that `mail-certificate` swaps `current` only after Caddy
   has validated the pair behind it, so a reload is asked for a pair that has already been read
   once.
 - **MTA-STS and DANE are not provided.** Neither is published, and neither is planned by this
