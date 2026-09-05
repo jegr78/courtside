@@ -265,8 +265,8 @@ attempt identity and cannot replace the original result.
 is each peak from the retained unconstrained reference run at commit
 `7b6cb5891ea052c8eec31be33e6d257f6c35f1dd`, multiplied by 1.25 and rounded up. The stress profile
 is 75 percent of those normal limits. Run it explicitly with
-`npm run reliability:webkit -- --resource-profile stress`. The application receives JVM CPU and
-memory limits. Docker enforces memory, CPU, PID and shared-memory limits for PostgreSQL, the proxy
+`npm run reliability:webkit -- --resource-profile stress`. The application receives JVM processor
+and RAM settings. Docker enforces memory, CPU, PID and shared-memory limits for PostgreSQL, the proxy
 and every browser container. Startup fails before the journey if the Docker host cannot supply the
 selected total capacity or does not support memory and PID limits.
 
@@ -275,8 +275,16 @@ Requalify the reference only on a clean committed tree. From `frontend`, run
 Then, from the repository root, run
 `node tools/browser-resource-profile.mjs derive frontend/test-results/resource-timeline.json $(git rev-parse HEAD)`.
 Review the measured peaks and replace `quality/browser-resource-profiles.json` with that command's
-output. Contract validation recomputes every normal and stress limit from the retained peaks, so a
+output. Contract validation recomputes every normal and stress threshold from the retained peaks, so a
 hand-edited limit cannot claim the documented derivation.
+
+Docker applies hard CPU, total-memory, PID and shared-memory limits to PostgreSQL, the proxy and
+each browser container, and the record verifies their inspected `HostConfig`. The application runs
+as a host process. Its CPU, complete process-tree RSS and process count are sampled and checked
+against the same profile after the run. `ActiveProcessorCount` and the JVM RAM settings reduce
+runtime variance but are not reported as operating-system limits. A sample above an application
+threshold makes the attempt incomplete; the current setup does not claim a hard application
+resource limit.
 
 | Target | Normal CPU | Normal memory | Normal PIDs | Normal shared memory | Stress CPU | Stress memory | Stress PIDs | Stress shared memory |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -309,7 +317,7 @@ The closed record retains the commit and whether its working tree was clean, the
 non-identifying host capacity, project order, browser-isolation variant, resource-profile name,
 experiment and pair identity, planned test-population fingerprint, browser-process identity,
 lifetime, test position, one-second CPU, memory, PID and shared-memory samples, the inspected runtime
-limits for every container, application JVM limits, exit state, duration and outcome classes.
+limits for every container, application JVM settings, exit state, duration and outcome classes.
 It retains
 no test title, URL, log, request, cookie or credential. Raw traces and diagnostics expire after 14
 days; the safe records remain available for 90 days. Validate one record with

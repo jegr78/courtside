@@ -36,7 +36,8 @@ function resourceEnvironment() {
     profileDigest: `sha256:${createHash("sha256").update(resourceProfileContents).digest("hex")}`,
     docker: { cpuCount: 8, memoryBytes: 16_000_000_000, memoryLimit: true, pidsLimit: true },
     targets: {
-      application: { processId: 1234, activeProcessorCount: 3, maxRamMegabytes: 1280, maxRamPercentage: 75 },
+      application: { processId: 1234, enforcement: "observed-threshold", configuredProcessorCount: 3,
+        jvmMaxRamMegabytes: 1280, jvmMaxRamPercentage: 75 },
       proxy: container("proxy", "a"),
       postgres: container("postgres", "b"),
       browser: [container("browser", "c"), container("browser", "d"), container("browser", "e")]
@@ -415,6 +416,34 @@ test("given claimed resource limits differ from the runtime, when validating, th
   assert.throws(() => validateReliabilityRecord(missingBrowser), /resource environment/);
   assert.throws(() => validateReliabilityRecord(wrongMemory), /resource environment/);
   assert.throws(() => validateReliabilityRecord(staleProfile), /resource environment/);
+});
+
+test("given malformed raw resource evidence, when building the record, then the attempt remains retainable", () => {
+  // given
+  const evidence = record();
+  const invalidEnvironment = structuredClone(evidence.resourceEnvironment);
+  invalidEnvironment.targets.application = null;
+  const invalidTimeline = structuredClone(evidence.resourceTimeline);
+  invalidTimeline.samples.push({ ...invalidTimeline.samples[0], target: "mail-sink" });
+  const gateOutcome = { schemaVersion: 1, testPopulation: evidence.testPopulation, claims: [
+    { id: "webkit-core-compatibility", status: "passed" },
+    { id: "webkit-axe-qualification", status: "passed" },
+    { id: "browser-harness", status: "passed" }
+  ] };
+
+  // when
+  const environmentResult = record({ execution: { exitCode: 0, gateOutcome,
+    browserLifecycle: evidence.browserLifecycle, resourceTimeline: evidence.resourceTimeline,
+    resourceEnvironment: invalidEnvironment } });
+  const timelineResult = record({ execution: { exitCode: 0, gateOutcome,
+    browserLifecycle: evidence.browserLifecycle, resourceTimeline: invalidTimeline,
+    resourceEnvironment: evidence.resourceEnvironment } });
+
+  // then
+  assert.equal(environmentResult.outcome.status, "incomplete");
+  assert.equal(timelineResult.outcome.status, "incomplete");
+  assert.equal(validate(environmentResult), true, JSON.stringify(validate.errors));
+  assert.equal(validate(timelineResult), true, JSON.stringify(validate.errors));
 });
 
 test("given twenty paired attempts per variant, when comparing isolation, then conditions and results stay visible", () => {

@@ -93,6 +93,8 @@ test("given a completed run, when validating its timeline, then all targets and 
   assert.throws(() => validateResourceTimeline({ schemaVersion: 1, intervalMs: 1_000,
     samples: samples.map((sample) => sample.target === "browser" && sample.sequence === 2
       ? { ...sample, recordedAt: "2026-09-05T08:00:08.000Z" } : sample) }), /sampling gap/);
+  assert.throws(() => validateResourceTimeline({ schemaVersion: 1, intervalMs: 1_000,
+    samples: [...samples, { ...samples[0], target: "mail-sink" }] }), /target/);
   const derived = deriveResourceProfilesFromTimeline({ schemaVersion: 1, intervalMs: 1_000, samples },
     "a".repeat(40), "018f47a2-9e4c-7a61-8000-123456789abc");
   assert.equal(derived.derivation.reference.measuredAt, "2026-09-05T08:00:02.000Z");

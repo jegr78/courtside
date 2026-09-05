@@ -169,12 +169,13 @@
             "application": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["processId", "activeProcessorCount", "maxRamMegabytes", "maxRamPercentage"],
+              "required": ["processId", "enforcement", "configuredProcessorCount", "jvmMaxRamMegabytes", "jvmMaxRamPercentage"],
               "properties": {
                 "processId": { "type": "integer", "minimum": 1 },
-                "activeProcessorCount": { "type": "integer", "minimum": 1 },
-                "maxRamMegabytes": { "type": "integer", "minimum": 1 },
-                "maxRamPercentage": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 }
+                "enforcement": { "const": "observed-threshold" },
+                "configuredProcessorCount": { "type": "integer", "minimum": 1 },
+                "jvmMaxRamMegabytes": { "type": "integer", "minimum": 1 },
+                "jvmMaxRamPercentage": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 }
               }
             },
             "proxy": { "$ref": "#/$defs/containerLimits" },

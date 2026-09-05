@@ -66,6 +66,29 @@ function resourceEvidenceIsComplete(timeline, profileName) {
   });
 }
 
+function resourceTimelineForRecord(timeline) {
+  const fallback = { schemaVersion: 1, intervalMs: 1_000, samples: [] };
+  if (timeline === undefined) return fallback;
+  try {
+    validateResourceTimeline(timeline);
+    return timeline;
+  } catch {
+    return fallback;
+  }
+}
+
+function resourceEnvironmentForRecord(environment) {
+  const fallback = { schemaVersion: 1, targets: {} };
+  if (environment === undefined || environment === null || typeof environment !== "object"
+      || environment.schemaVersion !== 1 || environment.targets === null
+      || typeof environment.targets !== "object" || Array.isArray(environment.targets)) return fallback;
+  const values = Object.values(environment.targets);
+  if (values.some((value) => value === null || typeof value !== "object")) return fallback;
+  if (environment.targets.browser !== undefined && (!Array.isArray(environment.targets.browser)
+      || environment.targets.browser.some((value) => value === null || typeof value !== "object"))) return fallback;
+  return environment;
+}
+
 function resourceEnvironmentIsComplete(environment, profileName, lifecycle) {
   if (environment?.schemaVersion !== 1 || environment.profile !== profileName
       || environment.profileDigest !== resourceProfileDigest
@@ -79,8 +102,10 @@ function resourceEnvironmentIsComplete(environment, profileName, lifecycle) {
   if (JSON.stringify(Object.keys(environment.targets ?? {}).toSorted())
       !== JSON.stringify(["application", "browser", "postgres", "proxy"])) return false;
   const application = environment.targets.application;
-  if (!Number.isInteger(application.processId) || application.activeProcessorCount !== Math.max(1, Math.ceil(profile.application.cpu))
-      || application.maxRamMegabytes !== profile.application.memoryMegabytes || application.maxRamPercentage !== 75) return false;
+  if (!Number.isInteger(application.processId) || application.enforcement !== "observed-threshold"
+      || application.configuredProcessorCount !== Math.max(1, Math.ceil(profile.application.cpu))
+      || application.jvmMaxRamMegabytes !== profile.application.memoryMegabytes
+      || application.jvmMaxRamPercentage !== 75) return false;
   for (const target of ["proxy", "postgres"]) {
     const observed = environment.targets[target];
     const expected = resourceLimits(resourceProfileContract, profileName, target);
@@ -168,16 +193,18 @@ export function buildReliabilityRecord(input) {
     count: 0,
     fingerprint: `sha256:${"0".repeat(64)}`
   };
+  const resourceTimeline = resourceTimelineForRecord(input.execution.resourceTimeline);
+  const resourceEnvironment = resourceEnvironmentForRecord(input.execution.resourceEnvironment);
   let result = outcome(input.execution);
   if (result.status !== "incomplete"
     && (!lifecycleEvidenceIsComplete(input.execution.browserLifecycle, input.isolationVariant, testPopulation.count)
-      || !resourceEvidenceIsComplete(input.execution.resourceTimeline, input.resourceProfile))) {
+      || !resourceEvidenceIsComplete(resourceTimeline, input.resourceProfile))) {
     result = { status: "incomplete",
       classifications: [...new Set([...result.classifications.filter((classification) => classification !== "none"), "harness"])],
       exitCode: input.execution.exitCode };
   }
   if (result.status !== "incomplete"
-      && !resourceEnvironmentIsComplete(input.execution.resourceEnvironment, input.resourceProfile,
+      && !resourceEnvironmentIsComplete(resourceEnvironment, input.resourceProfile,
         input.execution.browserLifecycle)) {
     result = { status: "incomplete",
       classifications: [...new Set([...result.classifications.filter((classification) => classification !== "none"), "harness"])],
@@ -215,8 +242,8 @@ export function buildReliabilityRecord(input) {
     },
     testPopulation,
     browserLifecycle: input.execution.browserLifecycle ?? { schemaVersion: 1, processes: [] },
-    resourceTimeline: input.execution.resourceTimeline ?? { schemaVersion: 1, intervalMs: 1_000, samples: [] },
-    resourceEnvironment: input.execution.resourceEnvironment ?? { schemaVersion: 1, targets: {} },
+    resourceTimeline,
+    resourceEnvironment,
     outcome: result
   };
 }

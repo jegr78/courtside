@@ -21,20 +21,19 @@ export interface ApplicationResourceCommand {
   memoryUnit: "bytes" | "kibibytes";
 }
 
-export function applicationResourceCommand(hostPlatform: NodeJS.Platform, processId: number,
-  environment: NodeJS.ProcessEnv): ApplicationResourceCommand {
+export function applicationResourceCommand(hostPlatform: NodeJS.Platform, processId: number): ApplicationResourceCommand {
   if (!Number.isInteger(processId) || processId < 1) throw new Error("Application process ID must be positive");
   if (hostPlatform === "win32") {
-    const systemRoot = environment.SystemRoot;
-    if (!systemRoot) throw new Error("SystemRoot is required to measure application resources on Windows");
     return {
-      command: `${systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`,
+      command: "powershell.exe",
       args: ["-NoProfile", "-NonInteractive", "-Command",
-        `$p=Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -Filter "IDProcess = ${processId}"; Write-Output "$($p.PercentProcessorTime) $($p.WorkingSetPrivate)"`],
+        "$perf=@{}; Get-CimInstance Win32_PerfFormattedData_PerfProc_Process | ForEach-Object {$perf[$_.IDProcess]=$_}; "
+          + "Get-CimInstance Win32_Process | ForEach-Object {$m=$perf[$_.ProcessId]; "
+          + "if ($m) {Write-Output \"$($_.ProcessId) $($_.ParentProcessId) $($m.PercentProcessorTime) $($m.WorkingSetPrivate)\"}}"],
       memoryUnit: "bytes"
     };
   }
-  return { command: "/bin/ps", args: ["-o", "%cpu=,rss=", "-p", String(processId)], memoryUnit: "kibibytes" };
+  return { command: "/bin/ps", args: ["-axo", "pid=,ppid=,%cpu=,rss="], memoryUnit: "kibibytes" };
 }
 
 function memoryBytes(value: string): number {
@@ -62,15 +61,35 @@ export function containerResourceUsage(stats: unknown): Pick<ResourceObservation
 
 export function applicationResourceUsage(output: string, processId: number,
   memoryUnit: ApplicationResourceCommand["memoryUnit"] = "kibibytes"): Omit<ResourceObservation, "target"> {
-  const values = /^(?<cpu>[0-9]+(?:\.[0-9]+)?)\s+(?<rss>[0-9]+)$/.exec(output.trim())?.groups;
-  if (!values || !Number.isInteger(processId) || processId < 1) {
+  if (!Number.isInteger(processId) || processId < 1) {
     throw new Error("Host reported malformed application process resource usage");
   }
+  const processes = output.trim().split("\n").map((line) => {
+    const values = /^(?<pid>[0-9]+)\s+(?<parent>[0-9]+)\s+(?<cpu>[0-9]+(?:\.[0-9]+)?)\s+(?<rss>[0-9]+)$/.exec(line.trim())?.groups;
+    if (!values) throw new Error("Host reported malformed application process resource usage");
+    return { pid: Number(values.pid), parent: Number(values.parent), cpu: Number(values.cpu), rss: Number(values.rss) };
+  });
+  if (!processes.some((process) => process.pid === processId)) {
+    throw new Error("Host reported no application process resource usage");
+  }
+  const owned = new Set([processId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const process of processes) {
+      if (owned.has(process.parent) && !owned.has(process.pid)) {
+        owned.add(process.pid);
+        changed = true;
+      }
+    }
+  }
+  const usage = processes.filter((process) => owned.has(process.pid));
   return {
     processId,
-    cpuPercent: Number(values.cpu),
-    memoryUsageBytes: Number(values.rss) * (memoryUnit === "kibibytes" ? 1024 : 1),
-    pids: 1,
+    cpuPercent: usage.reduce((sum, process) => sum + process.cpu, 0),
+    memoryUsageBytes: usage.reduce((sum, process) => sum + process.rss, 0)
+      * (memoryUnit === "kibibytes" ? 1024 : 1),
+    pids: usage.length,
     sharedMemoryUsageBytes: 0
   };
 }

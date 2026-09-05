@@ -180,6 +180,9 @@ export function validateResourceTimeline(timeline) {
   if (timeline?.schemaVersion !== 1) throw new Error("Resource timeline schema version is unsupported");
   positiveInteger(timeline.intervalMs, "Resource sampling interval");
   if (!Array.isArray(timeline.samples)) throw new Error("Resource timeline samples are missing");
+  if (timeline.samples.some((sample) => !targets.includes(sample.target))) {
+    throw new Error("Resource timeline contains an unknown target");
+  }
   for (const target of targets) {
     const samples = timeline.samples.filter((sample) => sample.target === target);
     if (samples.length < 2) throw new Error(`Resource timeline requires at least two ${target} samples`);

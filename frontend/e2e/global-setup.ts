@@ -511,7 +511,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const retainResourceSample = async (): Promise<void> => {
     const observations: Array<Promise<ResourceObservation>> = [];
     if (application?.pid) {
-      const telemetry = applicationResourceCommand(process.platform, application.pid, process.env);
+      const telemetry = applicationResourceCommand(process.platform, application.pid);
       observations.push(executeFile(telemetry.command, telemetry.args, { timeout: 5_000 })
         .then(({ stdout }) => ({ target: "application",
           ...applicationResourceUsage(stdout, application!.pid!, telemetry.memoryUnit) })));
@@ -679,8 +679,9 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         stdio: ["ignore", "pipe", "pipe"]
       });
       if (limits && application.pid) {
-        resourceEnvironment.targets.application = { processId: application.pid, activeProcessorCount: Math.max(1, Math.ceil(limits.cpu)),
-          maxRamMegabytes: limits.memoryMegabytes, maxRamPercentage: 75 };
+        resourceEnvironment.targets.application = { processId: application.pid, enforcement: "observed-threshold",
+          configuredProcessorCount: Math.max(1, Math.ceil(limits.cpu)), jvmMaxRamMegabytes: limits.memoryMegabytes,
+          jvmMaxRamPercentage: 75 };
         retainResourceEnvironment();
       }
       for (const stream of [application.stdout, application.stderr]) {
