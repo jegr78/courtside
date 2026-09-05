@@ -396,7 +396,8 @@ test("given a selected check, when every task passes, then the retained result i
     beforeRun: () => events.push("before"),
     createWorktree: () => ({ path: "/pinned", release: () => events.push("release") }),
     execute: (plan) => {
-      assert.ok(plan.workingDirectory.startsWith("/pinned"), plan.workingDirectory);
+      assert.ok(plan.workingDirectory === "/pinned" || plan.workingDirectory.startsWith("/pinned/"),
+        plan.workingDirectory);
       events.push(plan.label);
     },
     writeResult: (candidate) => records.push(structuredClone(candidate))
@@ -551,13 +552,13 @@ test("given the live tree changes after pinning, when finishing, then the verifi
     ]),
     output: { write: () => {} },
     createWorktree: () => ({ path: "/pinned", release: () => events.push("release") }),
-    execute: () => events.push("execute"),
+    execute: (plan) => events.push(plan.label),
     writeResult: (candidate) => records.push(structuredClone(candidate))
   });
 
   // then
   assert.equal(record.outcome, "passed");
-  assert.deepEqual(events, ["execute", "execute", "execute", "release"]);
+  assert.deepEqual(events, ["backend", "frontend-toolchain", "tooling-test", "release"]);
   assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "passed"]);
 });
 

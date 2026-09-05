@@ -95,7 +95,7 @@
     },
     {
       "scope": "tooling",
-      "ci": "Repository tool tests plus the required security job",
+      "ci": "Repository tool tests; the security job runs beside them for every profile except documentation",
       "local": "Repository tool tests; hosted CodeQL, dependency review and container scanning unavailable"
     }
   ]
