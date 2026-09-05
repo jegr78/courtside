@@ -10,6 +10,8 @@ function deploymentFile(name) {
 const compose = deploymentFile("compose.yaml");
 const readme = deploymentFile("README.md");
 const example = deploymentFile(".env.example");
+// A README wraps its lines, so a message quoted in a table may be split anywhere a space is.
+const reflowed = readme.replace(/\s+/g, " ");
 const scripts = {
   "mail-certificate.sh": deploymentFile("mail-certificate.sh"),
   "mail-reload.sh": deploymentFile("mail-reload.sh"),
@@ -19,14 +21,16 @@ function named(source, pattern) {
   return new Set([...source.matchAll(pattern)].map((match) => match[1]));
 }
 
+const PLACEHOLDER = "\u0000";
+
 // A message reads `no certificate for $hostname in the proxy's store yet`, and the documentation
 // writes the placeholder rather than a value, so what both sides share are the words around it.
 function fragments(message) {
   return message
-    .replace(/\$\([^)]*\)/g, " ")
-    .replace(/\$\{[^}]*\}/g, " ")
-    .replace(/\$[A-Za-z_][A-Za-z0-9_]*/g, " ")
-    .split(" ")
+    .replace(/\$\([^)]*\)/g, PLACEHOLDER)
+    .replace(/\$\{[^}]*\}/g, PLACEHOLDER)
+    .replace(/\$[A-Za-z_][A-Za-z0-9_]*/g, PLACEHOLDER)
+    .split(PLACEHOLDER)
     .filter((fragment) => fragment.length >= 8);
 }
 
@@ -67,7 +71,7 @@ test("given a certificate container, when it announces a state, then the documen
       assert.ok(states.length >= 8, `${name} announces only ${states.length} states`);
       for (const state of states) {
         for (const fragment of fragments(state)) {
-          assert.ok(readme.includes(fragment),
+          assert.ok(reflowed.includes(fragment.replace(/\s+/g, " ")),
             `${name} puts "${state}" into its health file and README.md explains no state saying `
             + `"${fragment}", so an unhealthy container names something nobody documented`);
         }
