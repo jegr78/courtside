@@ -56,8 +56,12 @@ test("a member reaches every destination from the bottom of a touch viewport", a
   await expect(page.getByTestId("my-messages-view")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
-  // when
-  await page.getByTestId("footer-product-identity").scrollIntoViewIfNeeded();
+  // when — the end of the document, not merely far enough for the element to enter the viewport
+  // rectangle, which counts the band behind the bar as in view
+  await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight }));
+  await expect.poll(async () => page.evaluate(() =>
+    Math.round(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 1
+  )).toBe(true);
 
   // then — visible is not reachable, so the footer has to end above where the bar begins
   const footer = await page.getByTestId("footer-product-identity").boundingBox();
