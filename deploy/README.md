@@ -92,10 +92,14 @@ tailscale funnel 8080
 
 Three things this path costs you, all worth knowing before you choose it:
 
-- **The security headers are Caddy's, not the application's.** Without the proxy there is no HSTS,
-  no `X-Content-Type-Options`, no `X-Frame-Options`, no CSP and no referrer policy. Funnel
-  terminates TLS the same way Caddy does; it does not add headers. For today's JSON-only API that
-  is a small gap, and it grows the day the web client lands.
+- **Funnel keeps the application's headers.** The application sets `Content-Security-Policy`,
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and
+  `Referrer-Policy: strict-origin-when-cross-origin` on its own responses. For a request it
+  recognizes as secure, Spring Security also sets `Strict-Transport-Security`. Caddy repeats
+  nosniff, frame denial and the referrer policy at the edge and sets HSTS independently;
+  `Permissions-Policy` is the only response policy here that comes only from Caddy. The Funnel path
+  therefore keeps those five application headers when Funnel supplies the trusted HTTPS forwarding
+  signal required below. It loses only Caddy's `Permissions-Policy` response header.
 - **Funnel makes the instance reachable from anywhere in the world**, exactly like a public
   address does. Everything in "What this deployment does not solve yet" applies with full force.
 - **The application trusts forwarded headers.** Funnel or any replacement must discard incoming

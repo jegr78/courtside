@@ -37,12 +37,23 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/login"))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/index.html"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("X-Frame-Options", "DENY"))
+                .andExpect(header().string("Referrer-Policy", "strict-origin-when-cross-origin"))
+                .andExpect(header().doesNotExist("Strict-Transport-Security"))
                 .andExpect(header().string("Content-Security-Policy",
                         allOf(containsString("default-src 'self'"),
                                 containsString("img-src 'self' https:"),
                                 not(containsString("http:")),
                                 not(containsString("data:")))));
+    }
+
+    @Test
+    void givenASecureRequest_whenOpeningAClientRoute_thenTheAppSetsHsts() throws Exception {
+        // when / then
+        mockMvc.perform(get("/login").secure(true))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Strict-Transport-Security", containsString("max-age=")));
     }
 
     @Test

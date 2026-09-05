@@ -214,6 +214,35 @@ class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void whenReadingSecurityHeaderDocumentation_thenApplicationAndProxyResponsibilitiesStayDistinct()
+            throws IOException {
+        // given
+        String deploymentGuide = normalized(Files.readString(Path.of("deploy/README.md")));
+        String design = normalized(Files.readString(Path.of("docs/design.md")));
+
+        // when / then
+        for (String document : List.of(deploymentGuide, design)) {
+            assertThat(document)
+                    .contains("application sets `Content-Security-Policy`, "
+                            + "`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and "
+                            + "`Referrer-Policy: strict-origin-when-cross-origin` on its own responses")
+                    .contains("Spring Security also sets `Strict-Transport-Security`")
+                    .contains("Caddy repeats nosniff, frame denial and the referrer policy at the edge")
+                    .contains("`Permissions-Policy` is the only response policy here that comes only from Caddy");
+        }
+        assertThat(deploymentGuide)
+                .contains("Funnel keeps the application's headers")
+                .contains("keeps those five application headers when Funnel supplies the trusted HTTPS "
+                        + "forwarding signal")
+                .contains("loses only Caddy's `Permissions-Policy` response header")
+                .doesNotContain("Without the proxy there is no HSTS");
+    }
+
+    private static String normalized(String document) {
+        return document.replaceAll("\\s+", " ").strip();
+    }
+
+    @Test
     void whenReadingEveryCaddyfile_thenProxyImplementationDisclosureIsRemoved() throws IOException {
         // given
         List<Path> caddyfiles;

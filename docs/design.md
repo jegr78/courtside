@@ -1497,10 +1497,15 @@ whether it is built or designed. **Designed means absent today.**
   firewall does not recognise it at all — as it does for a request target the HTTP grammar does not
   allow, which the connector refuses before any dispatch. All of those answers are RFC 9457, so a
   club running without the reference proxy loses nothing: the application is what answers. *Built.*
-- **Security headers and TLS** are terminated at the reverse proxy (Caddy in the reference
-  deployment, which sets HSTS, `X-Content-Type-Options`, `X-Frame-Options` and a referrer policy
-  and obtains its own certificate). An operator without a public address can use Tailscale Funnel
-  instead, which terminates TLS the same way; that is documented as an option, not a dependency.
+- **Security headers and TLS:** the application sets `Content-Security-Policy`,
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and
+  `Referrer-Policy: strict-origin-when-cross-origin` on its own responses. For a request it
+  recognizes as secure, Spring Security also sets `Strict-Transport-Security`. Caddy repeats
+  nosniff, frame denial and the referrer policy at the edge, sets HSTS independently and terminates
+  TLS; `Permissions-Policy` is the only response policy here that comes only from Caddy. An operator
+  without a public address can use Tailscale Funnel instead. When it supplies the trusted HTTPS
+  forwarding signal, the response keeps all five application headers and loses only Caddy's
+  `Permissions-Policy`. Funnel is documented as an option, not a dependency.
   That sentence binds the client too: a browser withholds `crypto.randomUUID`, service workers and
   the rest of the secure-context APIs from a plain-HTTP origin that is not `localhost`, so no such
   API may sit on the path of a booking. `crypto.getRandomValues` is one that carries no such
