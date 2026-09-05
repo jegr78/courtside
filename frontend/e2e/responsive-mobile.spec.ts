@@ -88,7 +88,6 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   // when
   await page.getByTestId("court-plan-link").tap();
   await page.getByTestId("selected-date").fill(journeyService.visualDate);
-  await page.getByTestId("court-selector-2").tap();
   await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
 
   // then
@@ -188,21 +187,30 @@ test("the initial-password form remains usable on a touch viewport", async ({ pa
   await expect(page.getByTestId("password-submit")).toBeVisible();
 });
 
-test("a court selector wider than the phone shows where more courts continue", async ({ page }) => {
+test("the phone plan shows every court's availability at once", async ({ page, journeyService }) => {
   // given
+  await page.route("**/api/public/courts", async (route) => route.fulfill({
+    json: Array.from({ length: 8 }, (_, index) => ({
+      id: index < 4
+        ? `dddddddd-0000-0000-0000-00000000000${index + 1}`
+        : `90000000-0000-0000-0000-00000000000${index + 1}`,
+      number: index + 1,
+      name: index === 0 ? "Centre Court" : null
+    }))
+  }));
   await signIn(page, "doe.jane");
-  const selector = page.getByTestId("court-selector");
-  await expect(selector).toBeVisible();
-  expect(await selector.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  await page.getByTestId("selected-date").fill(journeyService.visualDate);
+  const plan = page.getByTestId("week-grid");
+  const headings = page.locator('[data-testid^="court-heading-"]');
+  await expect(plan).toBeVisible();
 
-  // then
-  await expect(page.getByTestId("court-selector-continuation")).toBeVisible();
-
-  // when
-  await selector.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
-
-  // then
-  await expect(page.getByTestId("court-selector-continuation")).toBeHidden();
+  // then — eight courts cover the density called out by the issue, not just the smaller seed fixture
+  await expect(headings).toHaveCount(8);
+  await expect(page.getByTestId("court-selector")).toHaveCount(0);
+  for (const heading of await headings.all()) await expect(heading).toBeVisible();
+  await expect(page.getByTestId("allocation").first()).toBeVisible();
+  await expect(page.getByTestId("free-slot").first()).toBeVisible();
+  expect(await plan.evaluate((element) => element.scrollWidth)).toBe(await plan.evaluate((element) => element.clientWidth));
 });
 
 test("a vertical gesture over the phone plan scrolls the page rather than a nested grid", async ({ page }) => {

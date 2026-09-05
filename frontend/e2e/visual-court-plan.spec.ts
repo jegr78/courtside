@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { type Page } from "@playwright/test";
+import { type Locator, type Page } from "@playwright/test";
 import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { journeyDate } from "./global-setup";
 
@@ -53,14 +53,6 @@ for (const locale of locales) {
       await page.getByTestId("week-grid").evaluate((plan) => plan.scrollTo(0, 0));
       await captureFullPage(page, locale, viewport.name, "03-court-plan-dark");
 
-      if (viewport.width < 1024) {
-        for (const court of [2, 3, 4]) {
-          await page.getByTestId(`court-selector-${court}`).click();
-          await captureFullPage(page, locale, viewport.name, `04-court-${court}-dark`);
-        }
-        await page.getByTestId("court-selector-1").click();
-      }
-
       // when
       await selectPreference(page, "#theme-preference", "light");
 
@@ -68,7 +60,7 @@ for (const locale of locales) {
       await captureFullPage(page, locale, viewport.name, "05-court-plan-light");
 
       // when
-      await targetSlot.click();
+      await openBooking(targetSlot, viewport.width);
       await expect(page.getByTestId("booking-dialog")).toBeVisible();
 
       // then
@@ -81,7 +73,7 @@ for (const locale of locales) {
       await page.getByTestId("booking-close").click();
       await expect(page.getByTestId("booking-dialog")).not.toBeVisible();
       await selectPreference(page, "#theme-preference", "dark");
-      await targetSlot.click();
+      await openBooking(targetSlot, viewport.width);
       await expect(page.getByTestId("booking-dialog")).toBeVisible();
 
       // then
@@ -89,6 +81,14 @@ for (const locale of locales) {
       expect(pngDimensions(darkDialog)).toEqual({ width: viewport.width, height: viewport.height });
     });
   }
+}
+
+async function openBooking(slot: Locator, viewportWidth: number): Promise<void> {
+  if (viewportWidth < 1024) {
+    await slot.press("Enter");
+    return;
+  }
+  await slot.click();
 }
 
 function captureFullPage(page: Page, locale: string, viewport: string, step: string): Promise<Buffer> {
