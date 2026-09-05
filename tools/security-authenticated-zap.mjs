@@ -14,7 +14,9 @@ const lifecycleSchema = JSON.parse(readFileSync(
 const ajv = new Ajv({ strict: true, allErrors: true });
 ajv.addSchema(lifecycleSchema);
 const validateEvidenceSchema = ajv.compile(evidenceSchema);
-import { classifyCandidate, createCandidate } from "./security-triage.mjs";
+import {
+  classifyCandidate, createCandidate, createFinding, recordRetest, transitionFinding
+} from "./security-triage.mjs";
 
 export const authenticatedZapPolicy = Object.freeze(JSON.parse(readFileSync(
   new URL("../security/zap-authenticated-policy.json", import.meta.url), "utf8")));
@@ -27,8 +29,55 @@ export function authenticatedZapPolicyDigest(policy = authenticatedZapPolicy) {
 export function authenticatedZapPlanDigest(plans = authenticatedZapPolicy.roles.map((role) => ({
   role,
   plan: renderAuthenticatedZapPlan(role, authenticatedZapPlanSessionPlaceholder)
-}))) {
+})).concat([{ role: "CANARY_RETEST", plan: renderAuthenticatedZapCanaryRetestPlan() }])) {
   return `sha256:${createHash("sha256").update(JSON.stringify(plans)).digest("hex")}`;
+}
+
+export function renderAuthenticatedZapCanaryRetestPlan() {
+  return `env:
+  contexts:
+    - name: courtside-canary-retest
+      urls:
+        - http://scanner-gateway:8090${authenticatedZapPolicy.canary.path}
+      includePaths:
+        - ^http://scanner-gateway:8090${authenticatedZapPolicy.canary.path}$
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    continueOnFailure: false
+jobs:
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 1
+      scanOnlyInScope: true
+      maxBodySizeInBytesToScan: 65536
+      disableAllRules: true
+    rules:
+      - id: ${authenticatedZapPolicy.canary.passiveRuleId}
+        threshold: Low
+  - type: requestor
+    requests:
+      - url: http://scanner-gateway:8090${authenticatedZapPolicy.canary.path}
+        name: scanner-canary-remediation-retest
+        method: GET
+        responseCode: 404
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 1
+    tests:
+      - name: scanner canary remains absent
+        type: alert
+        action: passIfAbsent
+        scanRuleId: ${authenticatedZapPolicy.canary.passiveRuleId}
+        url: http://scanner-gateway:8090${authenticatedZapPolicy.canary.path}
+        onFail: error
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk
+      reportFile: report-canary-retest.json
+      reportTitle: Courtside scanner canary remediation retest
+`;
 }
 
 export function renderAuthenticatedZapPlan(role, cookieHeader) {
@@ -175,6 +224,7 @@ ${rules}
 export function normalizeAuthenticatedZapAlerts(reports, run) {
   const candidates = new Map();
   let canaryDetected = false;
+  let lifecycleSeed;
   for (const report of reports) {
     for (const alert of (report.site ?? []).flatMap((site) => site.alerts ?? [])) {
       const ruleId = String(alert.pluginid);
@@ -188,7 +238,9 @@ export function normalizeAuthenticatedZapAlerts(reports, run) {
         if (Number(ruleId) === authenticatedZapPolicy.canary.passiveRuleId
             && target.pathname === authenticatedZapPolicy.canary.path) {
           canaryDetected = true;
-          const candidate = classifyZapCanary(zapCandidate(alert, instance, run), run);
+          const seed = zapCandidate(alert, instance, run);
+          lifecycleSeed ??= seed;
+          const candidate = classifyZapCanary(seed, run);
           candidates.set(candidate.fingerprint, candidate);
           continue;
         }
@@ -201,7 +253,61 @@ export function normalizeAuthenticatedZapAlerts(reports, run) {
     }
   }
   if (!canaryDetected) throw new Error("ZAP did not detect the isolated scanner canary");
-  return { candidates: [...candidates.values()], canaryDetected };
+  return { candidates: [...candidates.values()], canaryDetected, lifecycleSeed };
+}
+
+export function authenticatedZapCanaryRetestDetected(report) {
+  if (!report || !Array.isArray(report.site)) throw new Error("ZAP canary retest produced no valid report");
+  let detected = false;
+  for (const site of report.site) {
+    if (!Array.isArray(site.alerts)) throw new Error("ZAP canary retest produced an invalid alert list");
+    for (const alert of site.alerts) {
+      if (Number(alert.pluginid) !== authenticatedZapPolicy.canary.passiveRuleId
+          || !Array.isArray(alert.instances) || alert.instances.length === 0) {
+        throw new Error("ZAP canary retest produced evidence outside its closed schema");
+      }
+      for (const instance of alert.instances) {
+        const target = new URL(instance.uri);
+        if (target.origin !== "http://scanner-gateway:8090"
+            || target.pathname !== authenticatedZapPolicy.canary.path) {
+          throw new Error("ZAP canary retest reported traffic outside its isolated target");
+        }
+        detected = true;
+      }
+    }
+  }
+  return detected;
+}
+
+export function createCanaryLifecycleProof(candidate, run) {
+  const reference = "authenticated-zap.json#scanner-canary";
+  const retestReference = "authenticated-zap.json#scanner-canary-remediation-retest";
+  let finding = createFinding(candidate, {
+    priority: "P3",
+    cvssVector: "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N",
+    mappings: {
+      cwe: ["CWE-200"],
+      wstg: ["WSTG-v4.2-CONF-02"],
+      asvs: ["v5.0.0-13.2.1"],
+      apiTop10: ["API8:2023"]
+    },
+    context: {
+      impact: "The seeded response exists only inside the isolated assessment gateway.",
+      reachability: "Only scanner containers on the private assessment network can reach it."
+    },
+    validation: {
+      method: "regression-test", reference, reproducedAt: run.observedAt, actor: run.actor
+    }
+  });
+  finding = transitionFinding(finding, {
+    state: "remediation-in-progress", actor: run.actor, changedAt: run.observedAt, reference
+  });
+  finding = transitionFinding(finding, {
+    state: "fixed", actor: run.actor, changedAt: run.observedAt, reference: retestReference
+  });
+  return recordRetest(finding, {
+    outcome: "passed", testedAt: run.observedAt, actor: run.actor, reference: retestReference
+  });
 }
 
 export function classifyZapCanary(candidate, run) {
@@ -237,6 +343,15 @@ export function validateAuthenticatedZapEvidence(evidence) {
   }
   const derived = evidence.candidates.some(({ state }) => state === "candidate") ? "incomplete" : "passed";
   if (evidence.outcome !== derived) throw new Error("Authenticated ZAP evidence outcome is inconsistent");
+  const canary = evidence.candidates.find((candidate) => candidate.ruleId === "10037"
+    && candidate.normalizedSurface === authenticatedZapPolicy.canary.path);
+  const expectedTransitions = ["validated", "remediation-in-progress", "fixed", "retest-passed"];
+  if (!canary || evidence.lifecycleProof.fingerprint !== canary.fingerprint
+      || evidence.lifecycleProof.state !== "retest-passed"
+      || JSON.stringify(evidence.lifecycleProof.transitions.map(({ state }) => state))
+        !== JSON.stringify(expectedTransitions)) {
+    throw new Error("Authenticated ZAP evidence has no matching remediation lifecycle proof");
+  }
 }
 
 export async function runAuthenticatedZapAssessment(plan, context) {
@@ -291,9 +406,20 @@ export async function runAuthenticatedZapAssessment(plan, context) {
       expiresOn: new Date(new Date(observedAt).getTime() + 30 * 86_400_000).toISOString().slice(0, 10),
       actor: "local-maintainer"
     });
+    const canaryRetestDetected = scanner.canaryRetest?.detected
+      ?? authenticatedZapCanaryRetestDetected(scanner.canaryRetest?.report);
+    if (canaryRetestDetected !== false
+        || !Number.isSafeInteger(scanner.canaryRetest.requestCount)
+        || scanner.canaryRetest.requestCount < 1) {
+      throw new Error("Authenticated ZAP canary remediation retest did not pass");
+    }
+    const lifecycleProof = createCanaryLifecycleProof(normalized.lifecycleSeed, {
+      observedAt,
+      actor: "local-maintainer"
+    });
     const unresolved = normalized.candidates.some(({ state }) => state === "candidate");
     const evidence = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       testId: "CSA-DAST-001",
       targetFingerprint: plan.targetFingerprint,
       image: authenticatedZapPolicy.image,
@@ -304,6 +430,7 @@ export async function runAuthenticatedZapAssessment(plan, context) {
       passiveEvidence: "separate-csa-deploy-001",
       canaryDetected: normalized.canaryDetected,
       candidates: normalized.candidates,
+      lifecycleProof,
       requestCount,
       generatedDataMegabytes: scanner.generatedDataMegabytes ?? 0,
       outcome: unresolved ? "incomplete" : "passed"

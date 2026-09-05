@@ -4,9 +4,12 @@ import {
   authenticatedZapPolicy,
   authenticatedZapPolicyDigest,
   authenticatedZapPlanDigest,
+  authenticatedZapCanaryRetestDetected,
   normalizeAuthenticatedZapAlerts,
+  renderAuthenticatedZapCanaryRetestPlan,
   renderAuthenticatedZapPlan,
-  runAuthenticatedZapAssessment
+  runAuthenticatedZapAssessment,
+  validateAuthenticatedZapEvidence
 } from "./security-authenticated-zap.mjs";
 import { zapImage } from "./security-passive-deployment.mjs";
 import { mkdtempSync, readFileSync } from "node:fs";
@@ -32,6 +35,12 @@ test("given the pinned authenticated policy, when rendering role plans, then act
   assert.match(authenticatedZapPolicyDigest(), /^sha256:[a-f0-9]{64}$/);
   assert.match(authenticatedZapPlanDigest(), /^sha256:[a-f0-9]{64}$/);
   assert.match(member, /defaultThreshold: "Off"/);
+  assert.match(renderAuthenticatedZapCanaryRetestPlan(), /action: passIfAbsent/);
+  assert.match(renderAuthenticatedZapCanaryRetestPlan(), /scanner-canary-remediation-retest/);
+  assert.equal(authenticatedZapCanaryRetestDetected({ site: [] }), false);
+  assert.throws(() => authenticatedZapCanaryRetestDetected({ site: [{ alerts: [{
+    pluginid: "10037", instances: [{ uri: "http://foreign.example/__security/zap-canary" }]
+  }] }] }), /outside its isolated target/);
   for (const ruleId of authenticatedZapPolicy.active.ruleIds) assert.match(member, new RegExp(`id: ${ruleId}`));
   assert.doesNotMatch(trainer, /type: activeScan$/m);
   assert.match(trainer, /authenticated-session-proof/);
@@ -104,7 +113,8 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
     runZap: async (_selectedPlan, input) => ({
       reports: [report], requestCount: 70, runtimeHardened: true,
       roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
-      planDigest: authenticatedZapPlanDigest()
+      planDigest: authenticatedZapPlanDigest(),
+      canaryRetest: { report: { site: [] }, requestCount: 1 }
     })
   });
 
@@ -112,7 +122,42 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
   assert.equal(evidence.outcome, "passed");
   assert.equal(evidence.requestCount, 91);
   assert.equal(evidence.candidates[0].state, "false-positive");
+  assert.equal(evidence.lifecycleProof.state, "retest-passed");
+  assert.deepEqual(evidence.lifecycleProof.transitions.map(({ state }) => state),
+    ["validated", "remediation-in-progress", "fixed", "retest-passed"]);
+  const mismatchedProof = structuredClone(evidence);
+  mismatchedProof.lifecycleProof.fingerprint = `sha256:${"f".repeat(64)}`;
+  assert.throws(() => validateAuthenticatedZapEvidence(mismatchedProof), /lifecycle proof/);
   assert.doesNotMatch(readFileSync(join(evidenceDirectory, "authenticated-zap.json"), "utf8"), /secret-/);
+});
+
+test("given the seeded canary remains after remediation, when assessing, then the lifecycle proof fails closed", async () => {
+  // given
+  const plan = {
+    profile: "active", environment: "SECURITY", runId: "run-0001",
+    target: "https://localhost:9443", targetFingerprint: run.targetFingerprint,
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"]
+  };
+  const report = { site: [{ alerts: [{ pluginid: "10037", instances: [{
+    uri: "http://scanner-gateway:8090/__security/zap-canary", method: "GET"
+  }] }] }] };
+
+  // when / then
+  await assert.rejects(runAuthenticatedZapAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-zap-evidence-")),
+    stopFile: join(tmpdir(), "courtside-zap-stop"),
+    deadline: new Date(Date.now() + 60_000),
+    now: () => new Date("2026-08-21T08:00:00.000Z"),
+    attempt: 1,
+    maxRequests: 1000,
+    authenticateRole: async (role) => ({ cookieHeader: `SESSION=secret-${role}`, requestCount: 3 }),
+    runZap: async (_selectedPlan, input) => ({
+      reports: [report], requestCount: 70, runtimeHardened: true,
+      roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
+      planDigest: authenticatedZapPlanDigest(),
+      canaryRetest: { report, requestCount: 1 }
+    })
+  }), /canary remediation retest/);
 });
 
 test("given a changed executed plan, when assessing, then the evidence fails closed", async () => {
@@ -134,7 +179,8 @@ test("given a changed executed plan, when assessing, then the evidence fails clo
     runZap: async (_selectedPlan, input) => ({
       reports: [], requestCount: 70, runtimeHardened: true,
       roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
-      planDigest: `sha256:${"b".repeat(64)}`
+      planDigest: `sha256:${"b".repeat(64)}`,
+      canaryRetest: { detected: false, requestCount: 1 }
     })
   }), /plan digest/);
 });
