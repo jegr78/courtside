@@ -13,7 +13,7 @@ import { ImportPreviewPanel } from "./import/ImportPreviewPanel";
 import { ImportProgress } from "./import/ImportProgress";
 import { ImportSourceForm } from "./import/ImportSourceForm";
 import { isExecutable } from "./import/previewState";
-import { type ImportStep } from "./import/steps";
+import type { ImportStep } from "./import/steps";
 import { importSourceMark } from "./import/importSourceMark";
 import { useUnsavedChanges } from "../unsaved/registry";
 import { UnsavedChangesQuestion } from "../unsaved/UnsavedChangesQuestion";
