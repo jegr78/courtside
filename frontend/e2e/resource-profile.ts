@@ -62,6 +62,25 @@ export async function enforceContainerPidLimit(containerId: string, profile: Res
   if (observed !== pids) throw new Error(`${target} PID limit is ${observed}, expected ${pids}`);
 }
 
+export function assertedContainerLimits(profile: ResourceProfileName, target: ContainerResourceTarget,
+  observed: unknown): { memoryBytes: number; nanoCpus: number; pids: number; sharedMemoryBytes: number } {
+  const values = observed as { Memory?: unknown; NanoCpus?: unknown; PidsLimit?: unknown; ShmSize?: unknown };
+  const limits = contract.profiles[profile].targets[target];
+  const expected = {
+    memoryBytes: limits.memoryMegabytes * bytesPerMebibyte,
+    nanoCpus: Math.ceil(limits.cpu * 1_000_000_000),
+    pids: limits.pids,
+    sharedMemoryBytes: limits.sharedMemoryMegabytes * bytesPerMebibyte
+  };
+  const failures = [];
+  if (values.Memory !== expected.memoryBytes) failures.push("memory");
+  if (values.NanoCpus !== expected.nanoCpus) failures.push("CPU");
+  if (values.PidsLimit !== expected.pids) failures.push("PIDs");
+  if (values.ShmSize !== expected.sharedMemoryBytes) failures.push("shared memory");
+  if (failures.length > 0) throw new Error(`${target} resource limits differ for ${failures.join(", ")}`);
+  return expected;
+}
+
 export function assertDockerResourceCapacity(profile: ResourceProfileName, observed: unknown): void {
   const capacity = observed as DockerCapacity;
   const limits = Object.values(contract.profiles[profile].targets);

@@ -255,11 +255,27 @@ red for reasons nobody can reproduce is answered from that file, not from a reru
 
 #### WebKit reliability evidence
 
-Run `npm run reliability:webkit -- --order configured` from `frontend` for the same bounded
+Run `npm run reliability:webkit -- --order configured --resource-profile normal` from `frontend` for the same bounded
 first-attempt sequence used by the scheduled workflow. Use `reversed` for the alternate project
 order. The command runs WebKit core, installed-PWA and axe projects without a retry and writes one
 immutable record below `test-results/webkit-reliability`. A diagnostic repetition gets a new
 attempt identity and cannot replace the original result.
+
+`quality/browser-resource-profiles.json` is the executable resource contract. Its normal profile
+is each peak from the retained unconstrained reference run at commit
+`7b6cb5891ea052c8eec31be33e6d257f6c35f1dd`, multiplied by 1.25 and rounded up. The stress profile
+is 75 percent of those normal limits. Run it explicitly with
+`npm run reliability:webkit -- --resource-profile stress`. The application receives JVM CPU and
+memory limits. Docker enforces memory, CPU, PID and shared-memory limits for PostgreSQL, the proxy
+and every browser container. Startup fails before the journey if the Docker host cannot supply the
+selected total capacity or does not support memory and PID limits.
+
+| Target | Normal CPU | Normal memory | Normal PIDs | Normal shared memory | Stress CPU | Stress memory | Stress PIDs | Stress shared memory |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Application | 2.9 | 1280 MiB | 16 | 16 MiB | 2.175 | 960 MiB | 12 | 12 MiB |
+| Proxy | 0.15 | 64 MiB | 32 | 16 MiB | 0.1125 | 48 MiB | 24 | 12 MiB |
+| PostgreSQL | 0.3 | 128 MiB | 32 | 16 MiB | 0.225 | 96 MiB | 24 | 12 MiB |
+| Browser | 4.05 | 1408 MiB | 240 | 16 MiB | 3.0375 | 1056 MiB | 180 | 12 MiB |
 
 Use `npm run reliability:webkit-experiment -- --pairs 20 --order configured` for the browser
 isolation comparison. Each pair runs the project-scoped and test-scoped browser lifecycle against
@@ -284,7 +300,8 @@ cleanup or turn the first attempt green.
 The closed record retains the commit and whether its working tree was clean, the pinned toolchain,
 non-identifying host capacity, project order, browser-isolation variant, resource-profile name,
 experiment and pair identity, planned test-population fingerprint, browser-process identity,
-lifetime, test position, bounded CPU and memory samples, exit state, duration and outcome classes.
+lifetime, test position, one-second CPU, memory, PID and shared-memory samples, the inspected runtime
+limits for every container, application JVM limits, exit state, duration and outcome classes.
 It retains
 no test title, URL, log, request, cookie or credential. Raw traces and diagnostics expire after 14
 days; the safe records remain available for 90 days. Validate one record with

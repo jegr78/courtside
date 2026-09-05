@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applicationResourceCommand,
   applicationResourceUsage,
   containerResourceUsage,
   ResourceTimelineRecorder,
@@ -18,6 +19,19 @@ describe("journey resource timeline", () => {
       sharedMemoryUsageBytes: 0, processId: 1234 });
     expect(sharedMemoryUsage("Filesystem 1024-blocks Used Available Capacity Mounted on\nshm 65536 512 65024 1% /dev/shm"))
       .toBe(524_288);
+  });
+
+  it("given a supported host, when selecting process telemetry, then it uses a fixed platform command", () => {
+    // given / when
+    const unix = applicationResourceCommand("linux", 1234, {});
+    const windows = applicationResourceCommand("win32", 1234, { SystemRoot: "C:\\Windows" });
+
+    // then
+    expect(unix).toEqual({ command: "/bin/ps", args: ["-o", "%cpu=,rss=", "-p", "1234"],
+      memoryUnit: "kibibytes" });
+    expect(windows.command).toBe("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+    expect(windows.args.at(-1)).toContain("IDProcess = 1234");
+    expect(applicationResourceUsage("2.50 268435456", 1234, windows.memoryUnit).memoryUsageBytes).toBe(268_435_456);
   });
 
   it("given all journey resources, when sampling twice, then identities and chronological evidence remain", () => {
@@ -56,6 +70,7 @@ describe("journey resource timeline", () => {
     expect(() => containerResourceUsage({ MemUsage: "unknown", CPUPerc: "3%", PIDs: "1" }))
       .toThrow("memory");
     expect(() => applicationResourceUsage("secret", 1234)).toThrow("process resource");
+    expect(() => applicationResourceCommand("win32", 1234, {})).toThrow("SystemRoot");
     expect(() => sharedMemoryUsage("no mounted filesystem")).toThrow("shared memory");
   });
 });

@@ -15,6 +15,28 @@ export interface ResourceSample extends ResourceObservation {
   sequence: number;
 }
 
+export interface ApplicationResourceCommand {
+  command: string;
+  args: string[];
+  memoryUnit: "bytes" | "kibibytes";
+}
+
+export function applicationResourceCommand(hostPlatform: NodeJS.Platform, processId: number,
+  environment: NodeJS.ProcessEnv): ApplicationResourceCommand {
+  if (!Number.isInteger(processId) || processId < 1) throw new Error("Application process ID must be positive");
+  if (hostPlatform === "win32") {
+    const systemRoot = environment.SystemRoot;
+    if (!systemRoot) throw new Error("SystemRoot is required to measure application resources on Windows");
+    return {
+      command: `${systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`,
+      args: ["-NoProfile", "-NonInteractive", "-Command",
+        `$p=Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -Filter "IDProcess = ${processId}"; Write-Output "$($p.PercentProcessorTime) $($p.WorkingSetPrivate)"`],
+      memoryUnit: "bytes"
+    };
+  }
+  return { command: "/bin/ps", args: ["-o", "%cpu=,rss=", "-p", String(processId)], memoryUnit: "kibibytes" };
+}
+
 function memoryBytes(value: string): number {
   const amount = /^(?<number>[0-9]+(?:\.[0-9]+)?)(?<unit>B|kB|KiB|MB|MiB|GB|GiB)$/.exec(value.trim());
   if (!amount?.groups) throw new Error("Docker reported an unsupported resource memory value");
@@ -38,7 +60,8 @@ export function containerResourceUsage(stats: unknown): Pick<ResourceObservation
   return { memoryUsageBytes: memoryBytes(input.MemUsage.split("/")[0]), cpuPercent: Number(cpu), pids };
 }
 
-export function applicationResourceUsage(output: string, processId: number): Omit<ResourceObservation, "target"> {
+export function applicationResourceUsage(output: string, processId: number,
+  memoryUnit: ApplicationResourceCommand["memoryUnit"] = "kibibytes"): Omit<ResourceObservation, "target"> {
   const values = /^(?<cpu>[0-9]+(?:\.[0-9]+)?)\s+(?<rss>[0-9]+)$/.exec(output.trim())?.groups;
   if (!values || !Number.isInteger(processId) || processId < 1) {
     throw new Error("Host reported malformed application process resource usage");
@@ -46,7 +69,7 @@ export function applicationResourceUsage(output: string, processId: number): Omi
   return {
     processId,
     cpuPercent: Number(values.cpu),
-    memoryUsageBytes: Number(values.rss) * 1024,
+    memoryUsageBytes: Number(values.rss) * (memoryUnit === "kibibytes" ? 1024 : 1),
     pids: 1,
     sharedMemoryUsageBytes: 0
   };

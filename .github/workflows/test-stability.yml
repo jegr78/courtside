@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '17 2 * * 2,5'
   workflow_dispatch:
+    inputs:
+      resource_profile:
+        description: Browser resource profile
+        required: true
+        default: normal
+        type: choice
+        options:
+          - normal
+          - stress
 
 permissions:
   contents: read
@@ -70,9 +79,13 @@ jobs:
         working-directory: frontend
         env:
           COURTSIDE_PROJECT_ORDER: ${{ matrix.project_order }}
+          COURTSIDE_BROWSER_RESOURCE_PROFILE: ${{ inputs.resource_profile || 'normal' }}
           COURTSIDE_WEBKIT_AXE: 'true'
           COURTSIDE_WEBKIT_RELIABILITY: 'true'
-        run: npm run reliability:webkit -- --order "${COURTSIDE_PROJECT_ORDER}"
+        run: >
+          npm run reliability:webkit --
+          --order "${COURTSIDE_PROJECT_ORDER}"
+          --resource-profile "${COURTSIDE_BROWSER_RESOURCE_PROFILE}"
       - name: Validate the closed first-attempt result
         id: validate-webkit-record
         if: always()
@@ -93,6 +106,8 @@ jobs:
             frontend/test-results/**/error-context.md
             frontend/test-results/browser-diagnostics/*.json
             frontend/test-results/browser-gate-outcome.json
+            frontend/test-results/resource-environment.json
+            frontend/test-results/resource-timeline.json
           if-no-files-found: warn
           retention-days: 14
       - name: Upload redacted WebKit reliability history
@@ -102,6 +117,7 @@ jobs:
           name: webkit-reliability-${{ matrix.project_order }}-${{ github.run_id }}
           path: |
             frontend/test-results/webkit-reliability/*.json
+            quality/browser-resource-profiles.json
             quality/webkit-reliability.schema.json
           if-no-files-found: error
           retention-days: 90

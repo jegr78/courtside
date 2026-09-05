@@ -86,4 +86,7 @@ test("given a completed run, when validating its timeline, then all targets and 
     samples: samples.filter(({ target }) => target !== "proxy") }), /proxy/);
   assert.throws(() => validateResourceTimeline({ schemaVersion: 1, intervalMs: 1_000,
     samples: samples.map(({ pids, ...sample }) => sample) }), /pids/);
+  assert.throws(() => validateResourceTimeline({ schemaVersion: 1, intervalMs: 1_000,
+    samples: samples.map((sample) => sample.target === "browser" && sample.sequence === 2
+      ? { ...sample, recordedAt: "2026-09-05T08:00:08.000Z" } : sample) }), /sampling gap/);
 });

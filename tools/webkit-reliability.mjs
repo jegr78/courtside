@@ -16,6 +16,8 @@ const frontend = resolve(root, "frontend");
 const schemaPath = resolve(root, "quality", "webkit-reliability.schema.json");
 const resourceProfileContract = JSON.parse(readFileSync(resolve(root, "quality", "browser-resource-profiles.json"), "utf8"));
 validateResourceProfileContract(resourceProfileContract);
+const resourceProfileDigest = `sha256:${createHash("sha256")
+  .update(readFileSync(resolve(root, "quality", "browser-resource-profiles.json"))).digest("hex")}`;
 const frontendRequire = createRequire(resolve(frontend, "package.json"));
 const executionDeadlineMs = 25 * 60 * 1_000;
 const terminationGraceMs = 10_000;
@@ -62,6 +64,46 @@ function resourceEvidenceIsComplete(timeline, profileName) {
       && sample.pids <= limits.pids
       && sample.sharedMemoryUsageBytes <= limits.sharedMemoryBytes;
   });
+}
+
+function resourceEnvironmentIsComplete(environment, profileName, lifecycle) {
+  if (environment?.schemaVersion !== 1 || environment.profile !== profileName
+      || environment.profileDigest !== resourceProfileDigest
+      || environment.docker?.memoryLimit !== true || environment.docker?.pidsLimit !== true) return false;
+  const profile = resourceProfileContract.profiles[profileName]?.targets;
+  if (!profile) return false;
+  const requiredCpu = Object.values(profile).reduce((sum, limits) => sum + limits.cpu, 0);
+  const requiredMemory = Object.values(profile)
+    .reduce((sum, limits) => sum + limits.memoryMegabytes * 1024 * 1024, 0);
+  if (environment.docker.cpuCount < requiredCpu || environment.docker.memoryBytes < requiredMemory) return false;
+  if (JSON.stringify(Object.keys(environment.targets ?? {}).toSorted())
+      !== JSON.stringify(["application", "browser", "postgres", "proxy"])) return false;
+  const application = environment.targets.application;
+  if (!Number.isInteger(application.processId) || application.activeProcessorCount !== Math.max(1, Math.ceil(profile.application.cpu))
+      || application.maxRamMegabytes !== profile.application.memoryMegabytes || application.maxRamPercentage !== 75) return false;
+  for (const target of ["proxy", "postgres"]) {
+    const observed = environment.targets[target];
+    const expected = resourceLimits(resourceProfileContract, profileName, target);
+    if (!/^[a-f0-9]{12,64}$/.test(observed.containerId ?? "")
+        || observed.memoryBytes !== expected.memoryBytes
+        || observed.nanoCpus !== Math.ceil(expected.cpu * 1_000_000_000)
+        || observed.pids !== expected.pids
+        || observed.sharedMemoryBytes !== expected.sharedMemoryBytes) return false;
+  }
+  if (!Array.isArray(environment.targets.browser) || environment.targets.browser.length === 0) return false;
+  const browserIds = new Set();
+  const expectedBrowser = resourceLimits(resourceProfileContract, profileName, "browser");
+  for (const observed of environment.targets.browser) {
+    if (!/^[a-f0-9]{12,64}$/.test(observed.containerId ?? "") || browserIds.has(observed.containerId)
+        || observed.memoryBytes !== expectedBrowser.memoryBytes
+        || observed.nanoCpus !== Math.ceil(expectedBrowser.cpu * 1_000_000_000)
+        || observed.pids !== expectedBrowser.pids
+        || observed.sharedMemoryBytes !== expectedBrowser.sharedMemoryBytes) return false;
+    browserIds.add(observed.containerId);
+  }
+  const lifecycleIds = new Set(lifecycle?.processes?.map((process) => process.processId));
+  if (browserIds.size !== lifecycleIds.size || [...browserIds].some((id) => !lifecycleIds.has(id))) return false;
+  return true;
 }
 
 function lifecycleEvidenceIsComplete(lifecycle, isolationVariant, testCount) {
@@ -134,6 +176,13 @@ export function buildReliabilityRecord(input) {
       classifications: [...new Set([...result.classifications.filter((classification) => classification !== "none"), "harness"])],
       exitCode: input.execution.exitCode };
   }
+  if (result.status !== "incomplete"
+      && !resourceEnvironmentIsComplete(input.execution.resourceEnvironment, input.resourceProfile,
+        input.execution.browserLifecycle)) {
+    result = { status: "incomplete",
+      classifications: [...new Set([...result.classifications.filter((classification) => classification !== "none"), "harness"])],
+      exitCode: input.execution.exitCode };
+  }
   return {
     schemaVersion: 1,
     attemptId: input.attemptId,
@@ -167,6 +216,7 @@ export function buildReliabilityRecord(input) {
     testPopulation,
     browserLifecycle: input.execution.browserLifecycle ?? { schemaVersion: 1, processes: [] },
     resourceTimeline: input.execution.resourceTimeline ?? { schemaVersion: 1, intervalMs: 1_000, samples: [] },
+    resourceEnvironment: input.execution.resourceEnvironment ?? { schemaVersion: 1, targets: {} },
     outcome: result
   };
 }
@@ -382,6 +432,16 @@ function resourceTimeline() {
   }
 }
 
+function resourceEnvironment() {
+  const path = resolve(frontend, "test-results", "resource-environment.json");
+  if (!existsSync(path)) return undefined;
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
 function completionOf(child) {
   return new Promise((resolveCompletion) => {
     let completed = false;
@@ -460,6 +520,7 @@ async function runAttempt(options, updateExitCode = true) {
   rmSync(resolve(frontend, "test-results", "browser-gate-outcome.json"), { force: true });
   rmSync(resolve(frontend, "test-results", "browser-lifecycle.json"), { force: true });
   rmSync(resolve(frontend, "test-results", "resource-timeline.json"), { force: true });
+  rmSync(resolve(frontend, "test-results", "resource-environment.json"), { force: true });
   const prerequisites = await environmentPrerequisites(undefined, existsSync(cli));
   const execution = prerequisites.isReady
     ? await runBoundedProcess(process.execPath, [cli, "test", "--project=webkit-core", "--project=webkit-pwa",
@@ -497,7 +558,7 @@ async function runAttempt(options, updateExitCode = true) {
     execution: execution.environmentFailure === true || execution.launchError === true
       ? { exitCode: null, environmentFailure: true }
       : { exitCode: execution.exitCode, timedOut: execution.timedOut, gateOutcome: gateOutcome(),
-        browserLifecycle: browserLifecycle(), resourceTimeline: resourceTimeline() }
+        browserLifecycle: browserLifecycle(), resourceTimeline: resourceTimeline(), resourceEnvironment: resourceEnvironment() }
   });
   validateReliabilityRecord(record);
   const path = retainReliabilityRecord(record, options.output);
@@ -522,6 +583,11 @@ export function validateReliabilityRecord(record) {
   if (record.outcome.status !== "incomplete"
       && !resourceEvidenceIsComplete(record.resourceTimeline, record.matrix.resourceProfile)) {
     throw new Error("A completed reliability run has contradictory resource evidence");
+  }
+  if (record.outcome.status !== "incomplete"
+      && !resourceEnvironmentIsComplete(record.resourceEnvironment, record.matrix.resourceProfile,
+        record.browserLifecycle)) {
+    throw new Error("A completed reliability run has contradictory resource environment evidence");
   }
   const classifications = new Set(record.outcome.classifications);
   const isPassed = record.outcome.status === "passed" && classifications.size === 1

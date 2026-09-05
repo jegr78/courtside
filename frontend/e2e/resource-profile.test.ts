@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   assertDockerResourceCapacity,
+  assertedContainerLimits,
   configureResourceContainer,
   enforceContainerPidLimit,
   selectedResourceProfile
@@ -35,6 +36,18 @@ describe("browser journey resource profiles", () => {
     expect(docker).toHaveBeenCalledWith(["inspect", "--format", "{{.HostConfig.PidsLimit}}", "a".repeat(64)]);
     await expect(enforceContainerPidLimit("a".repeat(64), "normal", "postgres",
       () => Promise.resolve("31"))).rejects.toThrow("expected 32");
+  });
+
+  it("given Docker reports a started container, when retaining its limits, then every selected value must match", () => {
+    // given
+    const observed = { Memory: 134_217_728, NanoCpus: 300_000_000, PidsLimit: 32, ShmSize: 16_777_216 };
+
+    // when / then
+    expect(assertedContainerLimits("normal", "postgres", observed)).toEqual({
+      memoryBytes: 134_217_728, nanoCpus: 300_000_000, pids: 32, sharedMemoryBytes: 16_777_216
+    });
+    expect(() => assertedContainerLimits("normal", "postgres", { ...observed, ShmSize: 67_108_864 }))
+      .toThrow(/postgres.*shared memory/i);
   });
 
   it("given reliability execution, when no or an unknown profile is selected, then it fails closed", () => {

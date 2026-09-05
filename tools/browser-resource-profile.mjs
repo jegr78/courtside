@@ -164,10 +164,16 @@ export function validateResourceTimeline(timeline) {
     const samples = timeline.samples.filter((sample) => sample.target === target);
     if (samples.length < 2) throw new Error(`Resource timeline requires at least two ${target} samples`);
     let previous = 0;
+    let previousTimestamp;
     for (const sample of samples) {
-      if (!Number.isFinite(Date.parse(sample.recordedAt)) || !Number.isInteger(sample.sequence)
+      const recordedAt = Date.parse(sample.recordedAt);
+      if (!Number.isFinite(recordedAt) || !Number.isInteger(sample.sequence)
           || sample.sequence <= previous) throw new Error(`${target} resource sample order is invalid`);
+      if (previousTimestamp !== undefined && recordedAt - previousTimestamp > timeline.intervalMs * 5) {
+        throw new Error(`${target} resource sampling gap exceeds the declared cadence`);
+      }
       previous = sample.sequence;
+      previousTimestamp = recordedAt;
       positiveNumber(sample.cpuPercent === 0 ? 1 : sample.cpuPercent, `${target} CPU`);
       positiveInteger(sample.memoryUsageBytes, `${target} memory`);
       positiveInteger(sample.pids, `${target} pids`);
