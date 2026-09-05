@@ -138,7 +138,9 @@ well, each showing how many people hold it and whether it opens an account on im
 configuration names the rule set that measures a person holding none. A rule set can bar its holders
 from booking a court at all and can require its holders to cancel before a configured deadline. So is the whole
 import: describing a source, linking the people a file cannot match by number, uploading a member
-list, reading what it would change, and running it. The column
+list, reading what it would change, and running it. Where in that a board stands is on screen — a
+source described, a snapshot read, a run ready — derived from what the server has decided rather
+than from a stored checklist, and every stage already reached takes the page back to it. The column
 mapping is offered from the club's own export, read in the browser and never uploaded for that
 purpose. Before a court, a booking card or a day goes out of service, the facility view says which
 bookings sit on it — information beside the control, never a gate in front of it. No administrative
