@@ -365,12 +365,21 @@ enough to need.
   Once the window is held, retain the exact annotated-tag object ID as the ownership token and fetch
   `origin/main` again. Compare it with the base commit recorded by the green verification. If they
   match, push immediately: no build runs while the window is held in this common path. If the base
-  moved, rebase onto it, inspect the intervening commits and resulting diff, and repeat the final
-  verification. Fetch and compare again after every repeated verification; push only when its
-  recorded base still matches `origin/main`. A rebase conflict or failed repeated verification
-  releases the window with the lease-bound deletion below before conflict resolution or diagnosis;
-  after the fix, restart the finalisation sequence instead of keeping another workspace blocked.
-  A failed branch push follows the same release-and-restart rule.
+  moved, rebase onto it and inspect the intervening commits and the resulting diff.
+
+  **A clean rebase does not earn a second local verification.** It leaves the branch's own diff
+  untouched — that content is what the green run verified, and it is still what will be reviewed and
+  squashed. What is unverified is only the combination with the new base, and the pull request's own
+  build tests exactly that combination, in full, before auto-merge can fire. So push, and open or
+  update the pull request with auto-merge armed: no rebased head reaches `main` without a green build
+  of the pairing. Fetch and compare once more after the rebase, and rebase again if the base moved
+  meanwhile.
+
+  A rebase that stops on a conflict is a different case, because resolving it changes the branch's
+  content. It releases the window with the lease-bound deletion below before the resolution, as does
+  a failed verification before its diagnosis; after the fix, restart the finalisation sequence —
+  which begins with a green verification of the resolved content — instead of keeping another
+  workspace blocked. A failed branch push follows the same release-and-restart rule.
 
   After pushing the branch, delete the remote lock with `--force-with-lease` bound to that exact
   object ID, then delete the local tag. A lease mismatch means ownership changed and must leave the
