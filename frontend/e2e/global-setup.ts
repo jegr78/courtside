@@ -489,7 +489,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   };
   let resourceSampleTimer: NodeJS.Timeout | undefined;
   let resourceSamplePending: Promise<void> | undefined;
-  let resourceSampleFailure: unknown;
+  let resourceSampleFailure: Error | undefined;
   const sampleResources = (browser: StartedTestContainer) => {
     if (resourceSamplePending) return;
     resourceSamplePending = retainResourceSample(browser)
