@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -20,6 +21,40 @@ const frontendRequire = createRequire(new URL("../frontend/package.json", import
 const Ajv = frontendRequire("ajv/dist/2020").default;
 const schema = JSON.parse(readFileSync(new URL("../quality/webkit-reliability.schema.json", import.meta.url), "utf8"));
 const validate = new Ajv({ strict: true, allErrors: true, formats: { "date-time": true } }).compile(schema);
+const resourceProfileContents = readFileSync(new URL("../quality/browser-resource-profiles.json", import.meta.url));
+
+function resourceEnvironment() {
+  const container = (target, id) => {
+    const limits = JSON.parse(resourceProfileContents).profiles.normal.targets[target];
+    return { containerId: id.repeat(64), memoryBytes: limits.memoryMegabytes * 1024 * 1024,
+      nanoCpus: Math.ceil(limits.cpu * 1_000_000_000), pids: limits.pids,
+      sharedMemoryBytes: limits.sharedMemoryMegabytes * 1024 * 1024 };
+  };
+  return {
+    schemaVersion: 1,
+    profile: "normal",
+    profileDigest: `sha256:${createHash("sha256").update(resourceProfileContents).digest("hex")}`,
+    docker: { cpuCount: 8, memoryBytes: 16_000_000_000, memoryLimit: true, pidsLimit: true },
+    targets: {
+      application: { processId: 1234, enforcement: "observed-threshold", configuredProcessorCount: 3,
+        jvmMaxRamMegabytes: 1280, jvmMaxRamPercentage: 75 },
+      proxy: container("proxy", "a"),
+      postgres: container("postgres", "b"),
+      browser: [container("browser", "c"), container("browser", "d"), container("browser", "e")]
+    }
+  };
+}
+
+function resourceTimeline() {
+  const containerIds = { proxy: "a", postgres: "b", browser: "c" };
+  return { schemaVersion: 1, intervalMs: 1_000,
+    samples: ["application", "proxy", "postgres", "browser"].flatMap((target) => [1, 2].map((sequence) => ({
+      recordedAt: `2026-08-27T08:00:0${sequence}.000Z`, sequence, target,
+      ...target === "application" ? { processId: 1234 } : { containerId: containerIds[target].repeat(64) },
+      ...target === "browser" ? { processId: 77 } : {},
+      cpuPercent: 1, memoryUsageBytes: 1_000, pids: 1, sharedMemoryUsageBytes: 0
+    }))) };
+}
 
 function record(overrides = {}) {
   return buildReliabilityRecord({
@@ -32,7 +67,7 @@ function record(overrides = {}) {
     browserImage: "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:" + "b".repeat(64),
     projectOrder: "configured",
     isolationVariant: "fresh-project-browser",
-    resourceProfile: "github-hosted-default",
+    resourceProfile: "normal",
     seedFingerprint: `sha256:${"e".repeat(64)}`,
     host: { provider: "github-hosted", platform: "linux", architecture: "x64", cpuCount: 4, totalMemoryBytes: 16_000_000_000 },
     execution: { exitCode: 0, gateOutcome: { schemaVersion: 1, testPopulation: {
@@ -42,27 +77,27 @@ function record(overrides = {}) {
       { id: "webkit-axe-qualification", status: "passed" },
       { id: "browser-harness", status: "passed" }
     ] }, browserLifecycle: { schemaVersion: 1, processes: [{
-      processId: "browser-1", browserName: "webkit", projectName: "webkit-core",
+      processId: "c".repeat(64), browserName: "webkit", projectName: "webkit-core",
       startedAt: "2026-08-27T08:00:00.000Z", finishedAt: "2026-08-27T08:02:00.000Z", durationMs: 120_000,
       samples: [
         { recordedAt: "2026-08-27T08:00:01.000Z", testPosition: 1, phase: "start", memoryUsageBytes: 1000, cpuPercent: 1 },
         { recordedAt: "2026-08-27T08:00:02.000Z", testPosition: 1, phase: "end", memoryUsageBytes: 1100, cpuPercent: 2 }
       ], exitState: { exitCode: 137, oomKilled: false, hasError: false }
     }, {
-      processId: "browser-2", browserName: "webkit", projectName: "webkit-pwa",
+      processId: "d".repeat(64), browserName: "webkit", projectName: "webkit-pwa",
       startedAt: "2026-08-27T08:00:00.000Z", finishedAt: "2026-08-27T08:02:00.000Z", durationMs: 120_000,
       samples: [
         { recordedAt: "2026-08-27T08:00:03.000Z", testPosition: 1, phase: "start", memoryUsageBytes: 1000, cpuPercent: 1 },
         { recordedAt: "2026-08-27T08:00:04.000Z", testPosition: 1, phase: "end", memoryUsageBytes: 1100, cpuPercent: 2 }
       ], exitState: { exitCode: 137, oomKilled: false, hasError: false }
     }, {
-      processId: "browser-3", browserName: "webkit", projectName: "webkit-accessibility",
+      processId: "e".repeat(64), browserName: "webkit", projectName: "webkit-accessibility",
       startedAt: "2026-08-27T08:00:00.000Z", finishedAt: "2026-08-27T08:02:00.000Z", durationMs: 120_000,
       samples: [
         { recordedAt: "2026-08-27T08:00:05.000Z", testPosition: 1, phase: "start", memoryUsageBytes: 1000, cpuPercent: 1 },
         { recordedAt: "2026-08-27T08:00:06.000Z", testPosition: 1, phase: "end", memoryUsageBytes: 1100, cpuPercent: 2 }
       ], exitState: { exitCode: 137, oomKilled: false, hasError: false }
-    }] } },
+    }] }, resourceTimeline: resourceTimeline(), resourceEnvironment: resourceEnvironment() },
     ...overrides
   });
 }
@@ -114,7 +149,8 @@ test("given a product assertion failure, when building its record, then it remai
     { id: "webkit-core-compatibility", status: "failed" },
     { id: "webkit-axe-qualification", status: "passed" },
     { id: "browser-harness", status: "passed" }
-  ], testPopulation: evidence.testPopulation }, browserLifecycle: evidence.browserLifecycle } });
+  ], testPopulation: evidence.testPopulation }, browserLifecycle: evidence.browserLifecycle,
+  resourceTimeline: evidence.resourceTimeline, resourceEnvironment: evidence.resourceEnvironment } });
 
   // then
   assert.deepEqual(result.outcome, { status: "failed", classifications: ["product"], exitCode: 1 });
@@ -252,6 +288,8 @@ test("given both implemented isolation variants, when parsing the run, then they
   // then
   assert.equal(project.isolation, "fresh-project-browser");
   assert.equal(testScoped.isolation, "fresh-test-browser");
+  assert.equal(project.resourceProfile, "normal");
+  assert.equal(reliabilityOptions(["--resource-profile", "stress"]).resourceProfile, "stress");
 });
 
 test("given an isolation experiment, when selecting its output, then completed attempts cannot be cleared by playwright", () => {
@@ -267,7 +305,7 @@ test("given an isolation experiment, when selecting its output, then completed a
 test("given an unknown isolation or resource profile, when parsing the run, then it cannot be claimed", () => {
   // given / when / then
   assert.throws(() => reliabilityOptions(["--isolation", "shared-browser"]), /Unsupported isolation/);
-  assert.throws(() => reliabilityOptions(["--resource-profile", "large-runner"]), /Unsupported option/);
+  assert.throws(() => reliabilityOptions(["--resource-profile", "large-runner"]), /Unsupported resource profile/);
 });
 
 test("given lifecycle evidence does not match the declared isolation, when validating, then it fails closed", () => {
@@ -346,7 +384,9 @@ test("given unsafe or incomplete lifecycle evidence, when the run claims success
       { id: "webkit-axe-qualification", status: "passed" },
       { id: "browser-harness", status: "passed" }
     ] },
-    browserLifecycle: builtEvidence.browserLifecycle
+    browserLifecycle: builtEvidence.browserLifecycle,
+    resourceTimeline: builtEvidence.resourceTimeline,
+    resourceEnvironment: builtEvidence.resourceEnvironment
   } });
 
   // then
@@ -361,6 +401,63 @@ test("given unsafe or incomplete lifecycle evidence, when the run claims success
   assert.throws(() => validateReliabilityRecord(duplicateFreshTestPosition), /contradictory browser lifecycle/);
   assert.throws(() => validateReliabilityRecord(reversedFreshTestProcesses), /contradictory browser lifecycle/);
   assert.throws(() => validateReliabilityRecord(missingFreshTestProjects), /contradictory browser lifecycle/);
+});
+
+test("given claimed resource limits differ from the runtime, when validating, then completion is rejected", () => {
+  // given
+  const missingBrowser = record();
+  missingBrowser.resourceEnvironment.targets.browser.pop();
+  const wrongMemory = record();
+  wrongMemory.resourceEnvironment.targets.postgres.memoryBytes += 1;
+  const staleProfile = record();
+  staleProfile.resourceEnvironment.profileDigest = `sha256:${"f".repeat(64)}`;
+
+  // when / then
+  assert.throws(() => validateReliabilityRecord(missingBrowser), /resource environment/);
+  assert.throws(() => validateReliabilityRecord(wrongMemory), /resource environment/);
+  assert.throws(() => validateReliabilityRecord(staleProfile), /resource environment/);
+});
+
+test("given malformed raw resource evidence, when building the record, then the attempt remains retainable", () => {
+  // given
+  const evidence = record();
+  const invalidEnvironment = structuredClone(evidence.resourceEnvironment);
+  invalidEnvironment.targets.application = null;
+  const partialEnvironment = structuredClone(evidence.resourceEnvironment);
+  partialEnvironment.targets.application = {};
+  const unknownEnvironment = structuredClone(evidence.resourceEnvironment);
+  unknownEnvironment.targets.application.commandLine = "secret";
+  const invalidTimeline = structuredClone(evidence.resourceTimeline);
+  invalidTimeline.samples.push({ ...invalidTimeline.samples[0], target: "mail-sink" });
+  const gateOutcome = { schemaVersion: 1, testPopulation: evidence.testPopulation, claims: [
+    { id: "webkit-core-compatibility", status: "passed" },
+    { id: "webkit-axe-qualification", status: "passed" },
+    { id: "browser-harness", status: "passed" }
+  ] };
+
+  // when
+  const environmentResult = record({ execution: { exitCode: 0, gateOutcome,
+    browserLifecycle: evidence.browserLifecycle, resourceTimeline: evidence.resourceTimeline,
+    resourceEnvironment: invalidEnvironment } });
+  const timelineResult = record({ execution: { exitCode: 0, gateOutcome,
+    browserLifecycle: evidence.browserLifecycle, resourceTimeline: invalidTimeline,
+    resourceEnvironment: evidence.resourceEnvironment } });
+  const partialResult = record({ execution: { exitCode: 0, gateOutcome,
+    browserLifecycle: evidence.browserLifecycle, resourceTimeline: evidence.resourceTimeline,
+    resourceEnvironment: partialEnvironment } });
+  const unknownResult = record({ execution: { exitCode: 0, gateOutcome,
+    browserLifecycle: evidence.browserLifecycle, resourceTimeline: evidence.resourceTimeline,
+    resourceEnvironment: unknownEnvironment } });
+
+  // then
+  assert.equal(environmentResult.outcome.status, "incomplete");
+  assert.equal(timelineResult.outcome.status, "incomplete");
+  assert.equal(validate(environmentResult), true, JSON.stringify(validate.errors));
+  assert.equal(validate(timelineResult), true, JSON.stringify(validate.errors));
+  assert.equal(validate(partialResult), true, JSON.stringify(validate.errors));
+  assert.equal(validate(unknownResult), true, JSON.stringify(validate.errors));
+  assert.deepEqual(partialResult.resourceEnvironment, { schemaVersion: 1, targets: {} });
+  assert.deepEqual(unknownResult.resourceEnvironment, { schemaVersion: 1, targets: {} });
 });
 
 test("given twenty paired attempts per variant, when comparing isolation, then conditions and results stay visible", () => {

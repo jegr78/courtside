@@ -20,7 +20,7 @@ test("given periodic stability evidence, when reading its workflow, then backend
 });
 
 test("given the WebKit reliability matrix, when comparing local and hosted execution, then both use the bounded orchestrator", () => {
-  assert.match(browserOrder, /npm run reliability:webkit -- --order \"\$\{COURTSIDE_PROJECT_ORDER\}\"/);
+  assert.match(browserOrder, /npm run reliability:webkit --\s+--order \"\$\{COURTSIDE_PROJECT_ORDER\}\"\s+--resource-profile \"\$\{COURTSIDE_BROWSER_RESOURCE_PROFILE\}\"/);
   assert.match(browserOrder, /browser-order:[\s\S]*timeout-minutes: 40/);
   assert.match(browserOrder, /Package application\n\s+timeout-minutes: 10/);
   assert.match(browserOrder, /Prove browser isolation under varied project order\n\s+timeout-minutes: 27/);

@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "derivation": {
+    "method": "normal=125%-of-reference-peaks-rounded-up; stress=75%-of-normal",
+    "reference": {
+      "sourceCommit": "7b6cb5891ea052c8eec31be33e6d257f6c35f1dd",
+      "measuredAt": "2026-09-05T03:47:59.020Z",
+      "attemptId": "a6091f88-f7bb-4974-a38f-b58cc3ecfbf0",
+      "peaks": {
+        "application": {
+          "cpuPercent": 228.2,
+          "memoryUsageBytes": 1060061184,
+          "pids": 1,
+          "sharedMemoryUsageBytes": 0
+        },
+        "proxy": {
+          "cpuPercent": 8.44,
+          "memoryUsageBytes": 18140365,
+          "pids": 14,
+          "sharedMemoryUsageBytes": 0
+        },
+        "postgres": {
+          "cpuPercent": 23.63,
+          "memoryUsageBytes": 80541123,
+          "pids": 16,
+          "sharedMemoryUsageBytes": 1077248
+        },
+        "browser": {
+          "cpuPercent": 322.04,
+          "memoryUsageBytes": 1176821039,
+          "pids": 192,
+          "sharedMemoryUsageBytes": 0
+        }
+      }
+    }
+  },
+  "profiles": {
+    "normal": {
+      "targets": {
+        "application": {
+          "cpu": 2.9,
+          "memoryMegabytes": 1280,
+          "pids": 16,
+          "sharedMemoryMegabytes": 16
+        },
+        "proxy": {
+          "cpu": 0.15,
+          "memoryMegabytes": 64,
+          "pids": 32,
+          "sharedMemoryMegabytes": 16
+        },
+        "postgres": {
+          "cpu": 0.3,
+          "memoryMegabytes": 128,
+          "pids": 32,
+          "sharedMemoryMegabytes": 16
+        },
+        "browser": {
+          "cpu": 4.05,
+          "memoryMegabytes": 1408,
+          "pids": 240,
+          "sharedMemoryMegabytes": 16
+        }
+      }
+    },
+    "stress": {
+      "targets": {
+        "application": {
+          "cpu": 2.175,
+          "memoryMegabytes": 960,
+          "pids": 12,
+          "sharedMemoryMegabytes": 12
+        },
+        "proxy": {
+          "cpu": 0.1125,
+          "memoryMegabytes": 48,
+          "pids": 24,
+          "sharedMemoryMegabytes": 12
+        },
+        "postgres": {
+          "cpu": 0.225,
+          "memoryMegabytes": 96,
+          "pids": 24,
+          "sharedMemoryMegabytes": 12
+        },
+        "browser": {
+          "cpu": 3.0375,
+          "memoryMegabytes": 1056,
+          "pids": 180,
+          "sharedMemoryMegabytes": 12
+        }
+      }
+    }
+  }
+}

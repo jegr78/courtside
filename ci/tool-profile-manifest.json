@@ -5,6 +5,8 @@
     { "path": "tools/audit-availability-flags.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/audit-message-keys.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/audit-message-placeholders.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/browser-resource-profile.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/browser-resource-profile.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/courtside.mail-smoke.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/courtside.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/courtside.restore-smoke.mjs", "profiles": ["full"], "test": false },

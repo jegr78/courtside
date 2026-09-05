@@ -1,7 +1,7 @@
 import { execFile, spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
-import { appendFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomUUID, X509Certificate } from "node:crypto";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -23,6 +23,23 @@ import {
 import { startJourneyControl } from "./journey-control";
 import { browserExitState, BrowserLifecycleRecorder, browserResourceUsage } from "./browser-lifecycle";
 import { completeCleanup } from "./resource-cleanup";
+import {
+  applicationResourceCommand,
+  applicationResourceUsage,
+  containerResourceUsage,
+  ResourceTimelineRecorder,
+  sharedMemoryUsage,
+  type ResourceObservation,
+  type ResourceTarget
+} from "./resource-timeline";
+import {
+  applicationResourceLimits,
+  assertDockerResourceCapacity,
+  assertedContainerLimits,
+  configureResourceContainer,
+  enforceContainerPidLimit,
+  selectedResourceProfile
+} from "./resource-profile";
 import {
   browserContainerLabels,
   ObservableGenericContainer,
@@ -422,6 +439,7 @@ async function emptyMailbox(mailboxURL: string): Promise<void> {
 }
 
 export async function startJourneyService(): Promise<StartedJourneyService> {
+  const resourceProfile = selectedResourceProfile(process.env);
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
   // As many lines as a container hands over, so both sides of a failed run read alike.
@@ -431,7 +449,13 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string }>();
   const browserLifecycle = new BrowserLifecycleRecorder();
   const browserLifecyclePath = resolve("test-results", "browser-lifecycle.json");
+  const resourceTimeline = new ResourceTimelineRecorder(1_000);
+  const resourceTimelinePath = resolve("test-results", "resource-timeline.json");
+  const resourceEnvironmentPath = resolve("test-results", "resource-environment.json");
+  mkdirSync(resolve("test-results"), { recursive: true });
   rmSync(browserLifecyclePath, { force: true });
+  rmSync(resourceTimelinePath, { force: true });
+  rmSync(resourceEnvironmentPath, { force: true });
   const retainBrowserLifecycle = () => {
     writeFileSync(browserLifecyclePath, `${JSON.stringify(browserLifecycle.evidence(), null, 2)}\n`, { mode: 0o600 });
   };
@@ -440,11 +464,102 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     return result.stdout;
   };
   const dockerJson = async (args: string[]): Promise<unknown> => JSON.parse(await dockerText(args));
+  const resourceEnvironment: {
+    schemaVersion: 1;
+    profile?: "normal" | "stress";
+    profileDigest?: string;
+    docker?: { cpuCount: number; memoryBytes: number; memoryLimit: boolean; pidsLimit: boolean };
+    targets: Record<string, unknown>;
+  } = { schemaVersion: 1, targets: {} };
+  const retainResourceEnvironment = () => writeFileSync(resourceEnvironmentPath,
+    `${JSON.stringify(resourceEnvironment, null, 2)}\n`, { mode: 0o600 });
+  const retainContainerLimits = async (target: "proxy" | "postgres" | "browser", container: StartedTestContainer) => {
+    if (!resourceProfile || resourceProfile === "reference") return;
+    const observed = await dockerJson(["inspect", "--format", "{{json .HostConfig}}", container.getId()]);
+    const retained = {
+      containerId: container.getId(),
+      ...assertedContainerLimits(resourceProfile, target, observed)
+    };
+    if (target === "browser") {
+      const browsers = resourceEnvironment.targets.browser as unknown[] | undefined;
+      resourceEnvironment.targets.browser = [...browsers ?? [], retained];
+    } else {
+      resourceEnvironment.targets[target] = retained;
+    }
+    retainResourceEnvironment();
+  };
+  const containerObservation = async (target: Exclude<ResourceTarget, "application">,
+    container: StartedTestContainer, includeProcessId = false): Promise<ResourceObservation> => {
+    const [usage, sharedMemory, state] = await Promise.all([
+      dockerJson(["stats", "--no-stream", "--format", "{{json .}}", container.getId()]),
+      container.exec(["sh", "-c", "df -k /dev/shm"]),
+      includeProcessId ? dockerJson(["inspect", "--format", "{{json .State}}", container.getId()]) : undefined
+    ]);
+    if (sharedMemory.exitCode !== 0) throw new Error(`${target} shared memory could not be measured`);
+    const processId = (state as { Pid?: unknown } | undefined)?.Pid;
+    if (includeProcessId && (!Number.isInteger(processId) || (processId as number) < 1)) {
+      throw new Error("Docker reported no browser process ID");
+    }
+    return {
+      target,
+      containerId: container.getId(),
+      ...includeProcessId ? { processId: processId as number } : {},
+      ...containerResourceUsage(usage),
+      sharedMemoryUsageBytes: sharedMemoryUsage(sharedMemory.stdout)
+    };
+  };
+  const retainResourceSample = async (): Promise<void> => {
+    const observations: Array<Promise<ResourceObservation>> = [];
+    if (application?.pid) {
+      const telemetry = applicationResourceCommand(process.platform, application.pid);
+      observations.push(executeFile(telemetry.command, telemetry.args, { timeout: 5_000 })
+        .then(({ stdout }) => ({ target: "application",
+          ...applicationResourceUsage(stdout, application!.pid!, telemetry.memoryUnit) })));
+    }
+    if (clubProxy) observations.push(containerObservation("proxy", clubProxy));
+    if (postgres) observations.push(containerObservation("postgres", postgres));
+    const browser = browserServers.values().next().value?.container;
+    if (browser) observations.push(containerObservation("browser", browser, true));
+    if (observations.length === 0) return;
+    resourceTimeline.append(await Promise.all(observations), new Date().toISOString());
+    writeFileSync(resourceTimelinePath, `${JSON.stringify(resourceTimeline.evidence(), null, 2)}\n`, { mode: 0o600 });
+  };
+  let resourceSampleTimer: NodeJS.Timeout | undefined;
+  let resourceSamplePending: Promise<void> | undefined;
+  let resourceSampleFailure: Error | undefined;
+  let resourceSamplingStopped = false;
+  const sampleResources = () => {
+    if (resourceSamplePending) return;
+    resourceSamplePending = retainResourceSample()
+      .catch((error) => { resourceSampleFailure = error instanceof Error ? error : new Error("Resource sampling failed"); })
+      .finally(() => { resourceSamplePending = undefined; });
+  };
+  const startResourceSampling = async () => {
+    resourceSampleFailure = undefined;
+    resourceSamplingStopped = false;
+    await retainResourceSample();
+    resourceSampleTimer = setInterval(sampleResources, 1_000);
+  };
+  const pauseResourceSampling = async () => {
+    clearInterval(resourceSampleTimer);
+    resourceSampleTimer = undefined;
+    await resourceSamplePending;
+    if (resourceSampleFailure) throw resourceSampleFailure;
+  };
+  const stopResourceSampling = async () => {
+    resourceSamplingStopped = true;
+    await pauseResourceSampling();
+    await retainResourceSample();
+  };
   const stopBrowser = async (browserName: string): Promise<void> => {
     const browser = browserServers.get(browserName);
     if (!browser) return;
     const id = browser.container.getId();
     try {
+      if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true") {
+        await pauseResourceSampling();
+        await retainResourceSample();
+      }
       await completeCleanup([
         async () => {
           await browser.container.stop({ remove: false });
@@ -456,6 +571,9 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       ]);
     } finally {
       browserServers.delete(browserName);
+      if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true" && !resourceSamplingStopped) {
+        resourceSampleTimer = setInterval(sampleResources, 1_000);
+      }
     }
   };
   let clubNetwork: StartedNetwork | undefined;
@@ -474,15 +592,29 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     ]);
   };
   try {
+    if (resourceProfile && resourceProfile !== "reference") {
+      const dockerCapacity = await dockerJson(["info", "--format", "{{json .}}"]);
+      assertDockerResourceCapacity(resourceProfile, dockerCapacity);
+      const capacity = dockerCapacity as { NCPU: number; MemTotal: number; MemoryLimit: boolean; PidsLimit: boolean };
+      resourceEnvironment.profile = resourceProfile;
+      resourceEnvironment.profileDigest = `sha256:${createHash("sha256")
+        .update(readFileSync(resolve("../quality/browser-resource-profiles.json"))).digest("hex")}`;
+      resourceEnvironment.docker = { cpuCount: capacity.NCPU, memoryBytes: capacity.MemTotal,
+        memoryLimit: capacity.MemoryLimit, pidsLimit: capacity.PidsLimit };
+      retainResourceEnvironment();
+    }
     const visualDate = journeyDate;
-    postgres = await new GenericContainer(deployedPostgresImage())
+    postgres = await configureResourceContainer(new GenericContainer(deployedPostgresImage())
       .withEnvironment({
         POSTGRES_DB: "courtside",
         POSTGRES_USER: "courtside",
         POSTGRES_PASSWORD: "courtside"
       })
-      .withExposedPorts(5432)
+      .withExposedPorts(5432), resourceProfile, "postgres")
       .start();
+    await enforceContainerPidLimit(postgres.getId(), resourceProfile, "postgres", dockerText);
+    await retainContainerLimits("postgres", postgres);
+    if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true") await startResourceSampling();
     const relayCertificate = selfSignedRelayCertificate();
     mailSink = await new GenericContainer(deployedMailSinkImage())
       .withEnvironment({
@@ -536,10 +668,22 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       SPRING_WEB_RESOURCES_STATIC_LOCATIONS: `file:${staticDirectory}/,classpath:/static/`
     };
     const startApplication = async () => {
-      application = spawn(java, ["-jar", applicationJar()], {
+      const limits = applicationResourceLimits(resourceProfile);
+      const javaArguments = limits ? [
+        `-XX:ActiveProcessorCount=${Math.max(1, Math.ceil(limits.cpu))}`,
+        `-XX:MaxRAM=${limits.memoryMegabytes}m`,
+        "-XX:MaxRAMPercentage=75.0"
+      ] : [];
+      application = spawn(java, [...javaArguments, "-jar", applicationJar()], {
         env: applicationEnvironment,
         stdio: ["ignore", "pipe", "pipe"]
       });
+      if (limits && application.pid) {
+        resourceEnvironment.targets.application = { processId: application.pid, enforcement: "observed-threshold",
+          configuredProcessorCount: Math.max(1, Math.ceil(limits.cpu)), jvmMaxRamMegabytes: limits.memoryMegabytes,
+          jvmMaxRamPercentage: 75 };
+        retainResourceEnvironment();
+      }
       for (const stream of [application.stdout, application.stderr]) {
         stream?.on("data", (chunk: Buffer) => {
           process.stdout.write(chunk);
@@ -615,7 +759,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     await seedJourneyData(postgres, visualDate);
     const tables = await snapshotJourneyData(postgres);
     clubNetwork = await new Network().start();
-    clubProxy = await new GenericContainer(deployedProxyImage())
+    clubProxy = await configureResourceContainer(new GenericContainer(deployedProxyImage())
       .withNetwork(clubNetwork)
       .withNetworkAliases(CLUB_HOST)
       .withCopyContentToContainer([
@@ -624,8 +768,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       // Reaching the host the way deploy/Caddyfile.dev does. The Testcontainers host tunnel runs
       // inside this process, and its socket errors are uncaught when the application restarts.
       .withExtraHosts([{ host: "host.docker.internal", ipAddress: "host-gateway" }])
-      .withWaitStrategy(Wait.forLogMessage(/serving initial configuration/))
+      .withWaitStrategy(Wait.forLogMessage(/serving initial configuration/)), resourceProfile, "proxy")
       .start();
+    await enforceContainerPidLimit(clubProxy.getId(), resourceProfile, "proxy", dockerText);
+    await retainContainerLimits("proxy", clubProxy);
     const rootCertificate = await readProxyCertificates(clubProxy, CADDY_LOCAL_AUTHORITY);
     const servedKeys = publicKeyFingerprints(
       rootCertificate + await readProxyCertificates(clubProxy, CADDY_ISSUED_CERTIFICATES));
@@ -671,7 +817,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
           }));
       };
       const container = await startOwnedBrowserContainer(
-        async (created) => new ObservableGenericContainer(PINNED_BROWSER_IMAGE, created)
+        async (created) => configureResourceContainer(new ObservableGenericContainer(PINNED_BROWSER_IMAGE, created)
           .withLabels(browserContainerLabels(journeyId, startupId))
           .withNetwork(clubNetwork!)
           .withCopyDirectoriesToContainer([
@@ -688,13 +834,15 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
             + ` && node /opt/courtside/node_modules/playwright/cli.js launch-server --browser ${browserName}`
             + " --config /tmp/launch-options.json"])
           .withExposedPorts(3000)
-          .withWaitStrategy(Wait.forLogMessage(/ws:\/\//))
+          .withWaitStrategy(Wait.forLogMessage(/ws:\/\//)), resourceProfile, "browser")
           .start(),
         () => ownedBrowserContainerIds(journeyId, undefined, dockerText, startupId),
         startupDiagnostics,
         (containerId) => executeFile("docker", ["rm", "-f", containerId], { timeout: 5_000 })
       );
       const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
+      await enforceContainerPidLimit(container.getId(), resourceProfile, "browser", dockerText);
+      await retainContainerLimits("browser", container);
       browserServers.set(browserName, { container, endpoint });
       browserLifecycle.start(browserName, container.getId(), new Date().toISOString());
       retainBrowserLifecycle();
@@ -733,9 +881,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       recordBrowserTest: async (browserName, projectName, testPosition, phase) => {
         const browser = browserServers.get(browserName);
         if (!browser) throw new Error(`No pinned ${browserName} browser exists`);
-        browserLifecycle.sample(browserName, projectName, testPosition, phase,
-          browserResourceUsage(await dockerJson(["stats", "--no-stream", "--format", "{{json .}}",
-            browser.container.getId()])), new Date().toISOString());
+        const usage = await dockerJson(["stats", "--no-stream", "--format", "{{json .}}", browser.container.getId()]);
+        browserLifecycle.sample(browserName, projectName, testPosition, phase, browserResourceUsage(usage), new Date().toISOString());
         retainBrowserLifecycle();
       },
       executeSql,
@@ -770,6 +917,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
             }
             return Promise.resolve();
           },
+          () => process.env.COURTSIDE_WEBKIT_RELIABILITY === "true" ? stopResourceSampling() : Promise.resolve(),
           stopApplication,
           stopContainers,
           () => {
@@ -780,6 +928,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       }
     };
   } catch (error) {
+    clearInterval(resourceSampleTimer);
+    await resourceSamplePending;
     application?.kill();
     try {
       await stopContainers();
