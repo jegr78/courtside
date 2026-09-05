@@ -7,14 +7,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ReferenceDeploymentDocumentationTest {
 
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{(COURTSIDE_[A-Z0-9_]+)");
+
+    private static final Pattern RECORD_KIND = Pattern.compile("\\b(PTR|MX|SPF|DKIM|DMARC)\\b");
 
     @Test
     void whenReadingCompose_thenEveryVariableItReadsIsInTheEnvironmentExample() throws IOException {
@@ -53,6 +58,41 @@ class ReferenceDeploymentDocumentationTest {
                 .as("submission, IMAP and the admin interface belong on no public address, and a "
                         + "port added here reaches the internet the moment somebody restarts the stack")
                 .containsExactly("25:25", "127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT:-8081}:8080");
+    }
+
+    @Test
+    void whenReadingTheMailCheck_thenEveryRecordItVerifiesIsOneTheReferenceTellsAnOperatorToPublish()
+            throws IOException {
+        // given
+        Set<String> verified = recordKindsIn(Files.readString(Path.of("deploy/mail-check.sh")));
+        Set<String> published = recordKindsIn(String.join("\n", dnsTableRecordColumn()));
+
+        // when / then
+        assertThat(published)
+                .as("an operator reads a failing check and looks the record up in the reference, "
+                        + "so the two have to name the same records in the same words")
+                .isEqualTo(verified);
+    }
+
+    private static Set<String> recordKindsIn(String text) {
+        Matcher kinds = RECORD_KIND.matcher(text);
+        return kinds.results().map(match -> match.group(1)).collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    private static List<String> dnsTableRecordColumn() throws IOException {
+        List<String> lines = Files.readAllLines(Path.of("deploy/README.md"));
+        int header = lines.indexOf("| Record | Where | Why |");
+        assertThat(header).as("deploy/README.md holds a table of the records DNS has to publish")
+                .isNotNegative();
+        List<String> column = new ArrayList<>();
+        for (String line : lines.subList(header + 2, lines.size())) {
+            if (!line.startsWith("|")) {
+                break;
+            }
+            column.add(line.split("\\|")[1]);
+        }
+        assertThat(column).as("the table of published records has rows").isNotEmpty();
+        return column;
     }
 
     private static List<String> publishedPortsOf(String service) throws IOException {

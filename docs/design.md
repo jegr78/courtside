@@ -1566,7 +1566,7 @@ whether it is built or designed. **Designed means absent today.**
   a club pointing `COURTSIDE_MAIL_RELAY_HOST` at a provider with a real certificate clears
   `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` and is validated in full again. It closes when the mail
   server has a certificate of its own, which
-  [#342](https://github.com/jegr78/courtside/issues/342) covers. *Built, as described.*
+  [#755](https://github.com/jegr78/courtside/issues/755) decides. *Built, as described.*
 - **Accepted: whoever holds a mailbox can take over every account registered to it.** One address
   serving several people is deliberate — a parent registering for their children — so the same
   inbox receives each of their credentials, and a first credential is enough to set a password and

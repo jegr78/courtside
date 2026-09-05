@@ -122,9 +122,9 @@ running it there.
 docker compose --profile mail up -d
 ```
 
-Nothing starts it otherwise, and until the application can send mail
-([#337](https://github.com/jegr78/courtside/issues/337)) it has no client. Bring it up when you are
-ready to work through the DNS below, not before.
+Nothing starts it otherwise. The application sends every credential and every notification through
+it, so a member's first password waits until this server delivers. Bring it up when you are ready to
+work through the DNS below, not before — a server that starts is not a server whose mail arrives.
 
 ### Setting it up without touching a wizard
 
@@ -156,6 +156,14 @@ commands authenticate with while the server has no accounts yet.
 While it is set the server runs in recovery mode and serves nothing but its admin port: no SMTP, no
 mail. It is a way back in, not a setting to leave on.
 
+Three credentials are in play here and only one of them is temporary:
+
+| Credential | Who it is | How long it lives |
+|---|---|---|
+| `COURTSIDE_MAIL_SETUP_PASSWORD`, through `COURTSIDE_MAIL_RECOVERY_ADMIN` | The built-in `admin`, before any account exists | Setup and recovery only. Clear the variable; keep the password where you keep the others, because recovery needs it again. |
+| `COURTSIDE_MAIL_ADMIN_PASSWORD` | The club's mail administrator | Permanent. This is who signs in to read the DKIM selector or add a relay route. |
+| `COURTSIDE_MAIL_PASSWORD` | The account the instance authenticates as | Permanent, and not an administrator. It may send and nothing else. |
+
 Afterwards the mail administrator signs in at `http://127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT}/` —
 over an SSH tunnel if the host is remote, because the port is bound to the loopback interface and
 belongs on no public address — as `${COURTSIDE_MAIL_ADMIN_USERNAME}@${COURTSIDE_MAIL_DOMAIN}`.
@@ -182,27 +190,51 @@ Two things about the mail container are worth knowing regardless:
   `COURTSIDE_DOMAIN`, not for `COURTSIDE_MAIL_HOSTNAME`, so the mail server serves a self-signed
   certificate on port 25. For inbound STARTTLS that is the ordinary state of affairs between mail
   servers; it becomes a real gap the day you want MTA-STS or DANE.
-  [#342](https://github.com/jegr78/courtside/issues/342) covers the production settings.
+  [#755](https://github.com/jegr78/courtside/issues/755) decides where that certificate comes from.
 
 ### What DNS has to say before anyone believes this server
 
-Six records, all published by you, none of them optional if the mail is to arrive:
+Six records, all published by you, none of them optional if the mail is to arrive. `mail-check`
+below reports each of them by the name in the first column, so a failing line and this table say the
+same word:
 
 | Record | Where | Why |
 |---|---|---|
 | `A` / `AAAA` | `COURTSIDE_MAIL_HOSTNAME` | The address the server sends from. |
-| `PTR` | that address, at your hosting provider | Receivers reject a host whose reverse name disagrees with its forward one. |
+| `PTR` | that address, **at your hosting provider only** | Receivers reject a host whose reverse name disagrees with its forward one. |
 | `MX` | `COURTSIDE_MAIL_DOMAIN` | Where bounces and DMARC reports come back to. |
-| `TXT` `v=spf1` | `COURTSIDE_MAIL_DOMAIN` | Names this host as allowed to send, ending in `-all`. |
-| `TXT` | `<selector>._domainkey.<domain>` | The public half of the key Stalwart signs with. |
-| `TXT` `v=DMARC1` | `_dmarc.<domain>` | What a receiver should do when the first two disagree. |
+| `SPF`, a `TXT` record | `COURTSIDE_MAIL_DOMAIN` | Names this host as allowed to send, ending in `-all`. |
+| `DKIM`, a `TXT` record | `<selector>._domainkey.<domain>` | The public half of the key Stalwart signs with. |
+| `DMARC`, a `TXT` record | `_dmarc.<domain>` | What a receiver should do when the first two disagree. |
+
+Three of them have a catch that costs an evening if nobody says it first:
+
+- **`PTR` is not yours to publish.** It lives in the reverse zone of whoever owns the address, which
+  is your hosting provider — a field in their control panel, or a support request, and some ask why.
+  A missing or generic reverse name is the single most common reason a small machine's mail is
+  refused outright rather than filed as spam, and no amount of SPF and DKIM makes up for it.
+- **`DKIM` names a selector you do not choose.** Stalwart generates its own key and shows the
+  selector in the admin interface; `COURTSIDE_MAIL_DKIM_SELECTOR` follows it rather than setting it.
+  The key lives in the `mail-config` volume, so losing that volume means a new key, a new selector
+  and a new record — see the backup section below.
+- **`DMARC` is a policy, and starting strict punishes you, not a forger.** Publish
+  `v=DMARC1; p=none; rua=mailto:<a mailbox you read>` first, leave it there long enough to read the
+  reports it brings, and tighten to `p=quarantine` and then `p=reject` once they show your own mail
+  passing. `mail-check` accepts any valid record here on purpose: which policy is right is a
+  question about your domain, not about this deployment.
 
 A seventh thing is not DNS and is the one that most often ends the exercise: **most hosting
-providers block outbound port 25** until you ask them to unblock it, and some never will. If yours
-will not, the mail still has somewhere to go: give the server a relay host under
-*MTA → Outbound → Routes* in the web interface — the club's provider, or any server that will accept
-authenticated submission — and point the outbound routing strategy at it. Delivery straight to the
-recipient is what this deployment does by default, not what it requires.
+providers block outbound port 25** until you ask them to unblock it, and some never will. Find out
+before a member depends on it rather than after — `mail-check` below opens a connection to a public
+MX and tells you in one line, and it costs nothing to run on the day the instance is installed.
+
+If the answer is no, the mail still has somewhere to go: give the server a relay host under
+*MTA → Outbound → Routes* in the admin interface — the club's provider, or any server that will
+accept authenticated submission — and point the outbound routing strategy at it. That route is
+configured in the interface and not in `.env`: **no environment variable carries it**, and
+`COURTSIDE_MAIL_RELAY_HOST` is a different hop, the one the application uses to hand a message to
+this server. Delivery straight to the recipient is what this deployment does by default, not what it
+requires.
 
 ### Port 25 is public, and a host firewall will not change that
 
@@ -213,6 +245,13 @@ your provider's security groups or in Stalwart's own configuration.
 
 Inbound port 25 is here so that bounces and DMARC reports arrive at all. What to do with them —
 read them, forward them, act on them — has no answer in this deployment yet.
+
+**Everything else stays off the public interface, and that is deliberate.** Submission, IMAP and
+POP3 have no published port at all: the application reaches submission over the compose network, and
+nobody holds a mailbox here to collect. The admin interface is published on `127.0.0.1` only. Port
+25 is the whole of this server's public surface, and adding a port to `compose.yaml` is what would
+change that — a test in this repository asserts the list, so a slip fails the build rather than the
+club.
 
 ### Checking all of it at once
 
@@ -246,6 +285,26 @@ One thing the run does differently on purpose: it issues itself a throwaway auth
 a certificate for the mail hostname, where your instance serves the self-signed one it generated.
 That is what lets the run validate the handshake instead of accepting whatever it is handed, and it
 is the single point at which the smoke world and your world differ.
+
+### The one test that counts: a message that arrived somewhere else
+
+Everything above happens on your own machine and can pass while the receiving world still refuses
+you. Send one real message to a mailbox you hold at a large provider — the simplest way is to put
+that address on a person in the roster and have the instance issue their credential — then open the
+received message and read its full source. The header to find is `Authentication-Results`, written
+by the receiver and not by you:
+
+```text
+Authentication-Results: mx.example.com;
+       dkim=pass header.i=@courts.example.org;
+       spf=pass smtp.mailfrom=courts.example.org;
+       dmarc=pass header.from=courts.example.org
+```
+
+**Three passes, in one message, at a receiver you do not run.** That is the state a member's first
+password depends on, and nothing short of it proves you are there. If one of them says `fail` or
+`none`, the record it names is the one to go back to; if the message never arrived at all, the
+answer is usually the reverse name or outbound port 25 rather than anything in this file.
 
 ### Back up the mail volumes too
 
@@ -456,14 +515,11 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
   [#27](https://github.com/jegr78/courtside/issues/27)
 - **No collector is included.** Courtside can export metrics and traces over OTLP, but operating,
   securing and retaining telemetry remains the operator's responsibility.
-- **Nothing sends mail yet.** The mail server is here and can be made deliverable, but the
-  application has no client for it until
-  [#337](https://github.com/jegr78/courtside/issues/337) lands. Until then a first password still
-  passes through an administrator's hands.
 - **Inbound mail arrives and nothing reads it.** Port 25 is open so bounces and DMARC reports
-  reach the instance rather than vanishing, but nothing acts on them.
-  [#340](https://github.com/jegr78/courtside/issues/340) tracks the delivery state a roster needs;
-  DMARC reports have no reader at all.
+  reach the instance rather than vanishing, but nothing acts on them. The instance records that it
+  handed a message to this server and learns nothing after that, so a bounce arriving here
+  afterwards is the answer nobody reads — and DMARC reports have no reader either.
 - **The mail server serves a self-signed certificate.** Caddy issues for `COURTSIDE_DOMAIN`, not for
   the mail hostname. Ordinary between mail servers today, and the thing to fix before MTA-STS or
-  DANE.
+  DANE. [#755](https://github.com/jegr78/courtside/issues/755) decides where that certificate comes
+  from.
