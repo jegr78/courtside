@@ -5,6 +5,7 @@ import { Button } from "../../components/Button";
 import { useUnsavedMark } from "../../unsaved/registry";
 import { TextField } from "../../components/TextField";
 import { SuccessFeedback } from "../../components/SuccessFeedback";
+import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../../person-search";
 
 const SEARCH_RESULTS = 10;
 const NUMBER_LENGTH = 120;
@@ -19,6 +20,7 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
   const [cursor, setCursor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<RosterEntry[]>([]);
+  const [searchingFor, setSearchingFor] = useState<string>();
   const [chosen, setChosen] = useState<RosterEntry>();
   const [externalId, setExternalId] = useState("");
   const [pending, setPending] = useState(false);
@@ -38,16 +40,24 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
   // The list has to agree with the field, and the last answer to arrive is not the answer to the
   // last question the board asked.
   useEffect(() => {
-    if (!query.trim()) {
+    const currentQuery = query.trim();
+    if (currentQuery.length < PERSON_SEARCH_MIN_LENGTH) {
       setCandidates([]);
+      setSearchingFor(undefined);
       return;
     }
     let active = true;
-    void api.roster(query, undefined, SEARCH_RESULTS)
-      .then((page) => { if (active) setCandidates(page.entries); })
-      .catch((failure: unknown) => { if (active) reportError(failure); });
+    setCandidates([]);
+    setSearchingFor(currentQuery);
+    const timeout = window.setTimeout(() => {
+      void api.roster(currentQuery, undefined, SEARCH_RESULTS)
+        .then((page) => { if (active) setCandidates(page.entries); })
+        .catch((failure: unknown) => { if (active) reportError(failure); })
+        .finally(() => { if (active) setSearchingFor(undefined); });
+    }, PERSON_SEARCH_DEBOUNCE_MS);
     return () => {
       active = false;
+      window.clearTimeout(timeout);
     };
   }, [query, reportError]);
 
@@ -113,6 +123,8 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
     <div className="grid gap-3 border-t pt-4">
       <h3 className="text-lg font-semibold">{t("admin.import.linkPerson")}</h3>
       <TextField data-testid="reference-person-search" disabled={busy} label={t("admin.import.searchPerson")} value={query} onChange={(event) => setQuery(event.target.value)} />
+      {searchingFor === query.trim()
+        && <p role="status" className="text-sm">{t("admin.import.searchingPerson")}</p>}
       {candidates.length > 0 && <ul className="grid gap-2">
         {candidates.map((entry) => <li key={entry.personId}>
           <Button variant="secondary" data-testid={`reference-person-${entry.personId}`} disabled={busy} type="button" onClick={() => setChosen(entry)}>

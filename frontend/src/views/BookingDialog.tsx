@@ -8,6 +8,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { bookingTimeSlot, formatBookingPeriod, zonedDateTime } from "../time/clubZone";
+import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../person-search";
 
 export interface BookingSelection {
   date: string;
@@ -56,7 +57,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
   useEffect(() => {
     const query = memberQuery.trim();
-    if (query.length < 2) {
+    if (query.length < PERSON_SEARCH_MIN_LENGTH) {
       setMemberMatches([]);
       return;
     }
@@ -66,7 +67,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         if (active) setMemberMatches(matches.filter((match) =>
           !selectedMembers.some((selected) => selected.personId === match.personId)));
       }).catch((failure: unknown) => { if (active) report(failure); });
-    }, 250);
+    }, PERSON_SEARCH_DEBOUNCE_MS);
     return () => {
       active = false;
       window.clearTimeout(timeout);
