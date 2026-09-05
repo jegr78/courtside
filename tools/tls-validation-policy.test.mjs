@@ -12,9 +12,11 @@ const EXTENSIONS = new Set([".mjs", ".js", ".cjs", ".ts", ".tsx"]);
 
 const SETTING = /rejectUnauthorized\s*:\s*([^,\s}]+)/;
 const ENVIRONMENT = /NODE_TLS_REJECT_UNAUTHORIZED/;
+const IDENTITY = /checkServerIdentity/;
 
 const weakened = (line) => SETTING.exec(line)?.[1] !== undefined && SETTING.exec(line)[1] !== "true";
 const wholesale = (line) => ENVIRONMENT.test(line);
+const unnamed = (line) => IDENTITY.test(line);
 
 function sources(directory) {
   let entries;
@@ -54,4 +56,12 @@ test("given the repository's own JavaScript, when it opens TLS, then it never sw
   assert.deepEqual(offenders(wholesale), [],
     "NODE_TLS_REJECT_UNAUTHORIZED disables validation for the whole process, including calls made "
     + "by libraries that never asked for it");
+});
+
+test("given the repository's own JavaScript, when it opens TLS, then it leaves the name to Node", () => {
+  // when / then
+  assert.deepEqual(offenders(unnamed), [],
+    "checkServerIdentity replaces the hostname check, and a replacement that returns undefined "
+    + "accepts every name while rejectUnauthorized still reads true. A chain that proves somebody "
+    + "is not a chain that proves who.");
 });

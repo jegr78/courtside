@@ -214,6 +214,119 @@ Two things about the mail container are worth knowing regardless:
   answers for every container sharing its network, and `mail-check` has to read the public record
   for the same name. MTA-STS and DANE remain out of scope.
 
+### The certificate the mail server serves
+
+Three containers and one certificate. Caddy obtains it for `COURTSIDE_MAIL_HOSTNAME` and renews it,
+`mail-certificate` publishes each new pair into the `mail-tls` volume, and `mail-reload` asks the
+mail server to load what has been published and then reads back which certificate it is serving. No
+container does two of those jobs, which is what keeps a compromise of any one of them from being a
+compromise of the key.
+
+**Where the pair lives, and who can open it.** Caddy's store holds a private key for every name it
+manages and is mounted into `mail-certificate` read-only and into nothing else. The helper writes
+one certificate and one key into `mail-tls` as root with `umask 027`, in the group the mail server
+runs as, so the mail server can read that pair and nothing above it. `mail-reload`, the container
+that asks for the load, runs as a user outside that group: it mounts the same volume read-only and
+still cannot open what it points at. The pair is published under `versions/<digest of the pair>`
+and `current` is a symlink, because two files cannot be renamed at once and a mail server reading
+half a swap would serve a key that does not match its certificate.
+
+**A renewal reaches the listener with nobody present.** Caddy renews at a third of the lifetime
+remaining. `mail-certificate` watches the store and publishes within seconds of a renewal landing;
+`mail-reload` watches `current` and reloads on the swap. It also re-reads what the server holds
+every `COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL` seconds — an hour by default — because a
+certificate nobody renews expires quietly between two swaps, and no swap would ever wake anything.
+An hour is therefore the worst case for noticing a problem that arrives without a swap, and the
+best case for a renewal is seconds.
+
+Both containers write their current state into `/tmp/health`, which is what their healthcheck reads,
+so `docker compose ps` is the live signal and `docker compose logs` is the history. They log a state
+only when it *changes*: a green run says one line and then stays quiet for weeks. The absence of
+recent output is the normal condition, not a stalled container.
+
+```sh
+docker compose --profile mail ps mail-certificate mail-reload
+docker compose --profile mail logs --tail 20 mail-certificate mail-reload
+```
+
+Steady state is `the mail server has the certificate the proxy issued for <hostname>` from
+the helper and `the mail server serves the certificate the proxy issued for <hostname>` from the
+reloader. Both are `ok` lines, and both are what an unhealthy container has stopped saying.
+
+Four things `mail-reload` checks after every load, because a server that accepted a reload has not
+thereby said what it serves: that exactly one certificate is loaded, that it names
+`COURTSIDE_MAIL_HOSTNAME`, that its lifetime is under 400 days — longer than any authority issues
+for, so an outlier is the server's own self-signed fallback rather than the proxy's certificate —
+and that more than a sixth of that lifetime is left. The sixth is
+`COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE`, and it is deliberately later than Caddy's own renewal
+point: by the time it fires, a renewal has had a full window of its own to fail in first.
+
+**Reading what the mail server is actually serving.** The instance hands its mail to the submission
+port over the internal network, and a receiver reaches port 25 from outside. Both listeners present
+the same pair. Substitute your own `COURTSIDE_MAIL_HOSTNAME` for `courts.example.org`:
+
+```sh
+name=courts.example.org
+docker compose --profile mail exec -e NAME="$name" mail sh -c \
+  'openssl s_client -starttls smtp -connect "$NAME:587" -verify_hostname "$NAME" \
+     -verify_return_error </dev/null 2>&1 | grep "^Verify return code"'
+openssl s_client -starttls smtp -connect "$name:25" </dev/null 2>/dev/null \
+  | openssl x509 -noout -subject -issuer -dates
+```
+
+`Verify return code: 0 (ok)` is the answer, and it is the same question the instance asks before it
+hands over a message: chain and name, both, against the system trust store. Anything else names the
+disagreement — `62` is a certificate that does not carry this name, `20` a chain that does not reach
+a known authority, `18` a self-signed one. The second command prints who issued the certificate and
+when it runs out, which is what to compare against a `close to expiry` line in the log.
+
+None of this needs a password, and nothing here prints one. The pair itself is deliberately
+unreadable from the containers you are likely to be in.
+
+### When the certificate stops arriving
+
+Every state below is one a container writes into its health file, so it is what `docker compose ps`
+turns unhealthy and what the log names once, when it starts. Read it there first: the message says
+which of the three jobs stopped, and none of these is repaired by deleting a volume.
+
+Nothing has to be restarted afterwards either. `mail-certificate` reacts to the store and
+`mail-reload` to the swap, so fixing the cause is the whole procedure, and the next line in the log
+is the confirmation.
+
+| What `mail-certificate` says | What it means, and what to do |
+|---|---|
+| `no certificate for <hostname> in the proxy's store yet` | Caddy has not issued for this name. It is the normal state for a minute after the first start, and a lasting one when `COURTSIDE_MAIL_HOSTNAME` does not resolve to this host or port 80 is closed to the authority. Read `docker compose logs proxy`. |
+| `cannot write into <target>, so nothing can be handed over` | The `mail-tls` volume is not writable by the helper. It runs as `0:2000`; a volume restored from a backup with other ownership is the usual cause. |
+| `cannot copy the pair for <hostname> out of the proxy's store` | The store was readable a moment ago and is not now, or the host ran out of disk. |
+| `the pair for <hostname> is incomplete or mismatched, so the published one stays` | Caddy validated nothing usable — a half-written renewal, or a key that does not match its certificate. The published pair is untouched and the mail server keeps serving it, so this is a warning and not an outage. It clears itself when the renewal completes. |
+| `cannot name the new version under <target>` | Same volume, same causes as the write failure above. |
+| `cannot swap <target>/current, so the mail server still reads the pair before this one` | The new pair is on disk but the symlink could not be replaced. The mail server goes on serving the previous one, which is valid until it is not. |
+
+| What `mail-reload` says | What it means, and what to do |
+|---|---|
+| `the certificate helper has published no pair for <hostname> yet` | `mail-reload` started before `mail-certificate` got anywhere. Look at the helper, not at this. |
+| `the mail server answered the reload request with <status>` | The admin endpoint did not answer, or answered with a status. A mail server in recovery mode answers nothing here: check whether `COURTSIDE_MAIL_RECOVERY_ADMIN` is still set. |
+| `the mail server refused the reload: <reason>` | The server read the pair and rejected it, and `validationFailed` is what it says about a certificate it cannot parse. **This is the one state with a consequence beyond the certificate** — see below. |
+| `the mail server answered with <status> when asked what it loaded` | The reload was accepted and the read-back was not. Same causes as the request failure above. |
+| `the mail server holds more than one certificate, so this cannot say which it checked` | Somebody added a second certificate through the admin interface. The reloader refuses to guess which one the listener uses; remove the other. |
+| `the mail server loaded a certificate that does not name <hostname>` | The listener is serving something else entirely. Compare it with the second command above. |
+| `the mail server did not say how long the certificate for <hostname> is valid` | The read-back came back without usable dates, which a Stalwart upgrade that changed the answer's shape would do. |
+| `the mail server serves a certificate it made itself and not the one the proxy issued` | The fallback. The server refused a load at some point and generated its own certificate, valid far beyond any authority's 400 days. Repair the pair and the next reload replaces it. |
+| `the certificate for <hostname> is close to expiry, so the proxy stopped renewing it` | Less than a sixth of the lifetime is left, so Caddy's renewal at a third has already failed once without anybody looking. This is the line that arrives before an outage rather than after it: read `docker compose logs proxy` now, while the certificate is still valid. Weeks of warning on a 90-day certificate, and an hour at worst before the warning appears. |
+
+**The refused reload is the state that reaches members.** Stalwart does not keep the pair it had when
+a load fails: the listener falls back to a certificate it generated itself, the instance refuses to
+authenticate a relay it cannot verify, and every credential and notification settles `FAILED` in the
+admin message list. Repairing the pair does not resend them. The events still outstanding are
+replayed when `app` restarts, and a credential the instance sends again is a new one, because the
+first exists only as a hash. Anything older than that is re-issued from the roster, where sending an
+account new credentials is one action.
+
+Reissuing the certificate itself is the last thing to reach for, not the first. Removing Caddy's
+store makes it obtain a new one, and Let's Encrypt allows five identical certificates per week
+across every attempt, successful or not — a loop that recreates the container a few times exhausts
+that quietly and leaves the name unissuable for days. Exhaust the log first.
+
 ### What DNS has to say before anyone believes this server
 
 Six records, all published by you, none of them optional if the mail is to arrive:
@@ -387,6 +500,8 @@ default.
 | `COURTSIDE_MAIL_RELOAD_PASSWORD` | *required with the mail server* | Password `mail-reload` authenticates with to load a renewed certificate. Written into an account whose only permission is that reload. |
 | `COURTSIDE_MAIL_RELOAD_USERNAME` | `certificate-reload` | Local part of that account's address. |
 | `COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE` | `6` | `mail-reload` reports unhealthy once less than this share of the certificate's own lifetime is left. Relative rather than a number of days, so it means the same for a ninety-day certificate and a twelve-hour one. Caddy renews at a third of the lifetime, so a sixth leaves the renewal a full window of its own to fail in first. |
+| `COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL` | `3600` | Seconds between two read-backs of what the mail server holds. A swap wakes `mail-reload` immediately; this is what notices a certificate that expires with no swap to announce it, so it bounds how long a problem can stay invisible. |
+| `COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME` | `34560000` | Seconds. A loaded certificate valid for longer than this is not one an authority issued — the mail server's own fallback runs to the year 4096 — and `mail-reload` reports unhealthy rather than accepting it. 400 days is the longest any public authority issues for. |
 | `COURTSIDE_MAIL_REPLY_TO` | *required with the mail server* | The club's real mailbox, so a member who answers a message reaches somebody. |
 | `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from and authenticates as, in `COURTSIDE_MAIL_DOMAIN`. |
 | `COURTSIDE_MAIL_RELAY_HOST` | `COURTSIDE_MAIL_HOSTNAME` | Where the instance hands its messages in. The mail server on the compose network by default, reached under the name on its certificate rather than under the service name, because the instance authenticates what answers. Point it at the club's provider instead if this deployment runs without one. |
