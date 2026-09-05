@@ -423,6 +423,10 @@ test("given malformed raw resource evidence, when building the record, then the 
   const evidence = record();
   const invalidEnvironment = structuredClone(evidence.resourceEnvironment);
   invalidEnvironment.targets.application = null;
+  const partialEnvironment = structuredClone(evidence.resourceEnvironment);
+  partialEnvironment.targets.application = {};
+  const unknownEnvironment = structuredClone(evidence.resourceEnvironment);
+  unknownEnvironment.targets.application.commandLine = "secret";
   const invalidTimeline = structuredClone(evidence.resourceTimeline);
   invalidTimeline.samples.push({ ...invalidTimeline.samples[0], target: "mail-sink" });
   const gateOutcome = { schemaVersion: 1, testPopulation: evidence.testPopulation, claims: [
@@ -438,12 +442,22 @@ test("given malformed raw resource evidence, when building the record, then the 
   const timelineResult = record({ execution: { exitCode: 0, gateOutcome,
     browserLifecycle: evidence.browserLifecycle, resourceTimeline: invalidTimeline,
     resourceEnvironment: evidence.resourceEnvironment } });
+  const partialResult = record({ execution: { exitCode: 0, gateOutcome,
+    browserLifecycle: evidence.browserLifecycle, resourceTimeline: evidence.resourceTimeline,
+    resourceEnvironment: partialEnvironment } });
+  const unknownResult = record({ execution: { exitCode: 0, gateOutcome,
+    browserLifecycle: evidence.browserLifecycle, resourceTimeline: evidence.resourceTimeline,
+    resourceEnvironment: unknownEnvironment } });
 
   // then
   assert.equal(environmentResult.outcome.status, "incomplete");
   assert.equal(timelineResult.outcome.status, "incomplete");
   assert.equal(validate(environmentResult), true, JSON.stringify(validate.errors));
   assert.equal(validate(timelineResult), true, JSON.stringify(validate.errors));
+  assert.equal(validate(partialResult), true, JSON.stringify(validate.errors));
+  assert.equal(validate(unknownResult), true, JSON.stringify(validate.errors));
+  assert.deepEqual(partialResult.resourceEnvironment, { schemaVersion: 1, targets: {} });
+  assert.deepEqual(unknownResult.resourceEnvironment, { schemaVersion: 1, targets: {} });
 });
 
 test("given twenty paired attempts per variant, when comparing isolation, then conditions and results stay visible", () => {

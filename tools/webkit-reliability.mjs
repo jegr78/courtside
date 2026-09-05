@@ -28,6 +28,19 @@ function validator() {
   return new Ajv({ strict: true, allErrors: true, formats: { "date-time": true } }).compile(schema);
 }
 
+let validateResourceEnvironmentShape;
+
+function resourceEnvironmentValidator() {
+  if (validateResourceEnvironmentShape) return validateResourceEnvironmentShape;
+  const Ajv = frontendRequire("ajv/dist/2020").default;
+  const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+  validateResourceEnvironmentShape = new Ajv({ strict: true, allErrors: true }).compile({
+    ...schema.properties.resourceEnvironment,
+    $defs: schema.$defs
+  });
+  return validateResourceEnvironmentShape;
+}
+
 function outcome(execution) {
   if (execution.environmentFailure === true) return { status: "incomplete", classifications: ["environment"], exitCode: null };
   const claims = execution.gateOutcome?.claims;
@@ -79,14 +92,7 @@ function resourceTimelineForRecord(timeline) {
 
 function resourceEnvironmentForRecord(environment) {
   const fallback = { schemaVersion: 1, targets: {} };
-  if (environment === undefined || environment === null || typeof environment !== "object"
-      || environment.schemaVersion !== 1 || environment.targets === null
-      || typeof environment.targets !== "object" || Array.isArray(environment.targets)) return fallback;
-  const values = Object.values(environment.targets);
-  if (values.some((value) => value === null || typeof value !== "object")) return fallback;
-  if (environment.targets.browser !== undefined && (!Array.isArray(environment.targets.browser)
-      || environment.targets.browser.some((value) => value === null || typeof value !== "object"))) return fallback;
-  return environment;
+  return environment !== undefined && resourceEnvironmentValidator()(environment) ? environment : fallback;
 }
 
 function resourceEnvironmentIsComplete(environment, profileName, lifecycle) {
