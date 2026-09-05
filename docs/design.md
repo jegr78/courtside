@@ -1567,17 +1567,17 @@ whether it is built or designed. **Designed means absent today.**
   with both cross the hop to the mail server. That hop is required to be encrypted — STARTTLS is
   required and not merely enabled, so a relay that stops offering it fails the handover rather than
   carrying a password in the clear — but the certificate is not authenticated, neither its issuer nor
-  the name on it. Caddy issues for `COURTSIDE_DOMAIN` and not for the mail hostname, and the mail
-  server generates its own for `localhost` alone, which is no name a compose network resolves;
+  the name on it. Caddy issues for the mail hostname now and the mail server serves that certificate,
+  but the instance reaches the relay as `mail` on the compose network, which is on no certificate;
   checking a name on a certificate whose issuer is unchecked would refuse the relay without proving
   anything, because whoever can redirect the connection writes both. An observer needs to be on the
   private compose network *and* able to redirect the application's connection to a server of their
   own. What bounds it: the exception is off by default in the application and switched on in
   `compose.yaml`, where a reader sees it; it names one host, the configured relay and no other; and
   a club pointing `COURTSIDE_MAIL_RELAY_HOST` at a provider with a real certificate clears
-  `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` and is validated in full again. It closes when the mail
-  server has a certificate of its own, and
-  [#755](https://github.com/jegr78/courtside/issues/755) decides where that comes from.
+  `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` and is validated in full again. It closes when the
+  compose network resolves the name the certificate carries, and
+  [#766](https://github.com/jegr78/courtside/issues/766) does that.
   *Built, as described.*
 - **Accepted: whoever holds a mailbox can take over every account registered to it.** One address
   serving several people is deliberate — a parent registering for their children — so the same

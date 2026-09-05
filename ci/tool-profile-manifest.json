@@ -31,6 +31,7 @@
     { "path": "tools/local-check.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/local-check.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/mail-check.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/mail-certificate.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/mail-plan.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/nightly-failure-tracker.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/nightly-failure-tracker.test.mjs", "profiles": ["tooling"], "test": true },
