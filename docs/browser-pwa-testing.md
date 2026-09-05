@@ -2,11 +2,11 @@
 
 Courtside treats Chromium and WebKit as required desktop engines. The merge gate runs Chromium
 core and accessibility projects plus core member, administration and installed-PWA journeys in
-WebKit. Chromium owns the blocking automated WCAG rule scan. The WebKit plus axe combination remains in the
-scheduled reliability and release qualification path until first-attempt evidence qualifies it.
-The scheduled stability workflow adds Firefox, iPhone/Safari emulation and Android/Chrome
-emulation. Emulation exercises layout, touch input and browser-engine behaviour; it is not evidence
-for operating-system integration or a physical device.
+WebKit. Chromium owns the blocking automated WCAG rule scan. The WebKit plus axe combination runs
+in the scheduled reliability path and is not a merge gate. The scheduled stability workflow adds
+Firefox, iPhone/Safari emulation and Android/Chrome emulation. Emulation exercises layout, touch
+input and browser-engine behaviour; it is not evidence for operating-system integration or a
+physical device.
 
 The application shell is available offline after installation. Booking, account and administration
 operations require the network. Workbox uses `NetworkOnly` for every `/api/` request, and the PWA
