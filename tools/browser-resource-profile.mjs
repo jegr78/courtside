@@ -12,6 +12,12 @@ function positiveInteger(value, name) {
   if (!Number.isInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer`);
 }
 
+function nonNegativeNumber(value, name) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(`${name} must be a non-negative number`);
+  }
+}
+
 function roundUp(value, increment) {
   return Math.ceil(value / increment) * increment;
 }
@@ -19,14 +25,15 @@ function roundUp(value, increment) {
 function peak(samples, target, field) {
   const values = samples.filter((sample) => sample.target === target).map((sample) => sample[field]);
   if (values.length === 0) throw new Error(`Reference measurements contain no ${target} samples`);
-  values.forEach((value) => positiveNumber(value === 0 && field === "sharedMemoryUsageBytes" ? 1 : value,
-    `${target} ${field}`));
+  values.forEach((value) => field === "pids" || field === "memoryUsageBytes"
+    ? positiveInteger(value, `${target} ${field}`)
+    : nonNegativeNumber(value, `${target} ${field}`));
   return Math.max(...values);
 }
 
 function derivedTarget(samples, target, factor) {
   return {
-    cpu: roundUp(Math.max(0.25, peak(samples, target, "cpuPercent") / 100 * factor), 0.25),
+    cpu: roundUp(Math.max(0.05, peak(samples, target, "cpuPercent") / 100 * factor), 0.05),
     memoryMegabytes: roundUp(peak(samples, target, "memoryUsageBytes") / mebibyte * factor, 64),
     pids: roundUp(peak(samples, target, "pids") * factor, 16),
     sharedMemoryMegabytes: roundUp(Math.max(1, peak(samples, target, "sharedMemoryUsageBytes") / mebibyte) * factor, 16)
@@ -39,22 +46,28 @@ export function deriveResourceProfiles(reference) {
   if (typeof reference.attemptId !== "string" || reference.attemptId.length === 0) {
     throw new Error("Reference attempt identity is missing");
   }
+  const normalTargets = Object.fromEntries(targets.map((target) => [target, derivedTarget(reference.samples, target, 1.25)]));
   const contract = {
     schemaVersion: 1,
     derivation: {
-      method: "normal=125%-of-reference-peaks; stress=105%-of-reference-peaks; rounded-up",
+      method: "normal=125%-of-reference-peaks-rounded-up; stress=75%-of-normal",
       reference: {
         sourceCommit: reference.sourceCommit,
         measuredAt: reference.measuredAt,
-        attemptId: reference.attemptId
+        attemptId: reference.attemptId,
+        peaks: Object.fromEntries(targets.map((target) => [target, {
+          cpuPercent: peak(reference.samples, target, "cpuPercent"),
+          memoryUsageBytes: peak(reference.samples, target, "memoryUsageBytes"),
+          pids: peak(reference.samples, target, "pids"),
+          sharedMemoryUsageBytes: peak(reference.samples, target, "sharedMemoryUsageBytes")
+        }]))
       }
     },
-    profiles: Object.fromEntries([
-      ["normal", 1.25],
-      ["stress", 1.05]
-    ].map(([name, factor]) => [name, {
-      targets: Object.fromEntries(targets.map((target) => [target, derivedTarget(reference.samples, target, factor)]))
-    }]))
+    profiles: {
+      normal: { targets: normalTargets },
+      stress: { targets: Object.fromEntries(targets.map((target) => [target, Object.fromEntries(
+        Object.entries(normalTargets[target]).map(([field, value]) => [field, Number((value * 0.75).toFixed(4))]))])) }
+    }
   };
   validateResourceProfileContract(contract);
   return contract;
@@ -63,13 +76,23 @@ export function deriveResourceProfiles(reference) {
 export function validateResourceProfileContract(contract) {
   if (contract?.schemaVersion !== 1) throw new Error("Resource profile schema version is unsupported");
   if (contract.derivation?.method
-      !== "normal=125%-of-reference-peaks; stress=105%-of-reference-peaks; rounded-up") {
+      !== "normal=125%-of-reference-peaks-rounded-up; stress=75%-of-normal") {
     throw new Error("Resource profile derivation is unsupported");
   }
   if (!/^[0-9a-f]{40}$/.test(contract.derivation?.reference?.sourceCommit ?? "")
       || !Number.isFinite(Date.parse(contract.derivation?.reference?.measuredAt ?? ""))
       || typeof contract.derivation?.reference?.attemptId !== "string") {
     throw new Error("Resource profile reference provenance is invalid");
+  }
+  if (JSON.stringify(Object.keys(contract.derivation.reference.peaks ?? {})) !== JSON.stringify(targets)) {
+    throw new Error("Resource profile reference peaks are incomplete");
+  }
+  for (const target of targets) {
+    const peaks = contract.derivation.reference.peaks[target];
+    nonNegativeNumber(peaks?.cpuPercent, `${target} reference CPU`);
+    positiveInteger(peaks?.memoryUsageBytes, `${target} reference memory`);
+    positiveInteger(peaks?.pids, `${target} reference PIDs`);
+    nonNegativeNumber(peaks?.sharedMemoryUsageBytes, `${target} reference shared memory`);
   }
   if (JSON.stringify(Object.keys(contract.profiles ?? {})) !== JSON.stringify(profileNames)) {
     throw new Error("Resource profiles must contain only normal and stress in canonical order");
@@ -86,9 +109,9 @@ export function validateResourceProfileContract(contract) {
         throw new Error(`${profileName} ${target} limits are incomplete`);
       }
       positiveNumber(limits.cpu, `${profileName} ${target} CPU`);
-      positiveInteger(limits.memoryMegabytes, `${profileName} ${target} memory`);
-      positiveInteger(limits.pids, `${profileName} ${target} PIDs`);
-      positiveInteger(limits.sharedMemoryMegabytes, `${profileName} ${target} shared memory`);
+      positiveNumber(limits.memoryMegabytes, `${profileName} ${target} memory`);
+      positiveNumber(limits.pids, `${profileName} ${target} PIDs`);
+      positiveNumber(limits.sharedMemoryMegabytes, `${profileName} ${target} shared memory`);
     }
   }
   for (const target of targets) {
@@ -108,7 +131,7 @@ export function resourceLimits(contract, profileName, target) {
   return {
     cpu: limits.cpu,
     memoryBytes: limits.memoryMegabytes * mebibyte,
-    pids: limits.pids,
+    pids: Math.floor(limits.pids),
     sharedMemoryBytes: limits.sharedMemoryMegabytes * mebibyte
   };
 }

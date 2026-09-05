@@ -487,12 +487,35 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     ], new Date().toISOString());
     writeFileSync(resourceTimelinePath, `${JSON.stringify(resourceTimeline.evidence(), null, 2)}\n`, { mode: 0o600 });
   };
+  let resourceSampleTimer: NodeJS.Timeout | undefined;
+  let resourceSamplePending: Promise<void> | undefined;
+  let resourceSampleFailure: unknown;
+  const sampleResources = (browser: StartedTestContainer) => {
+    if (resourceSamplePending) return;
+    resourceSamplePending = retainResourceSample(browser)
+      .catch((error) => { resourceSampleFailure = error instanceof Error ? error : new Error("Resource sampling failed"); })
+      .finally(() => { resourceSamplePending = undefined; });
+  };
+  const startResourceSampling = async (browser: StartedTestContainer) => {
+    resourceSampleFailure = undefined;
+    await retainResourceSample(browser);
+    resourceSampleTimer = setInterval(() => sampleResources(browser), 1_000);
+  };
+  const stopResourceSampling = async (browser: StartedTestContainer) => {
+    clearInterval(resourceSampleTimer);
+    resourceSampleTimer = undefined;
+    await resourceSamplePending;
+    if (resourceSampleFailure) throw resourceSampleFailure;
+    await retainResourceSample(browser);
+  };
   const stopBrowser = async (browserName: string): Promise<void> => {
     const browser = browserServers.get(browserName);
     if (!browser) return;
     const id = browser.container.getId();
     try {
       await completeCleanup([
+        () => process.env.COURTSIDE_WEBKIT_RELIABILITY === "true"
+          ? stopResourceSampling(browser.container) : Promise.resolve(),
         async () => {
           await browser.container.stop({ remove: false });
           browserLifecycle.finish(browserName,
@@ -744,6 +767,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
       browserServers.set(browserName, { container, endpoint });
       browserLifecycle.start(browserName, container.getId(), new Date().toISOString());
+      if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true") await startResourceSampling(container);
       retainBrowserLifecycle();
       return endpoint;
     };
@@ -782,7 +806,6 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         if (!browser) throw new Error(`No pinned ${browserName} browser exists`);
         const usage = await dockerJson(["stats", "--no-stream", "--format", "{{json .}}", browser.container.getId()]);
         browserLifecycle.sample(browserName, projectName, testPosition, phase, browserResourceUsage(usage), new Date().toISOString());
-        if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true") await retainResourceSample(browser.container);
         retainBrowserLifecycle();
       },
       executeSql,

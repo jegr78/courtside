@@ -27,6 +27,9 @@ test("given an unconstrained reference, when deriving profiles, then every limit
   assert.equal(contract.schemaVersion, 1);
   assert.deepEqual(Object.keys(contract.profiles), ["normal", "stress"]);
   assert.equal(contract.derivation.reference.sourceCommit, reference.sourceCommit);
+  assert.deepEqual(contract.derivation.reference.peaks.browser, {
+    cpuPercent: 90, memoryUsageBytes: 600_000_000, pids: 75, sharedMemoryUsageBytes: 40_000_000
+  });
   assert.equal(contract.profiles.normal.targets.browser.memoryMegabytes, 768);
   assert.equal(contract.profiles.normal.targets.browser.sharedMemoryMegabytes, 48);
   assert.ok(contract.profiles.stress.targets.browser.memoryMegabytes
