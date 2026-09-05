@@ -65,11 +65,15 @@ describe("AdminRosterView", () => {
 
     // then
     expect(person).toHaveClass("grid");
-    expect(within(person).getByTestId("roster-label-name")).toHaveTextContent("Name");
-    expect(within(person).getByTestId("roster-label-username")).toHaveTextContent("Username");
-    expect(within(person).getByTestId("roster-label-account")).toHaveTextContent("Account");
-    expect(within(person).getByTestId("roster-label-membership")).toHaveTextContent("Membership type");
-    expect(within(person).getAllByText(/Name|Username|Account|Membership type/).every((label) => label.getAttribute("aria-hidden") === "true")).toBe(true);
+    for (const [testId, label] of [
+      ["roster-label-name", "Name"],
+      ["roster-label-username", "Username"],
+      ["roster-label-account", "Account"],
+      ["roster-label-membership", "Membership type"]
+    ]) {
+      expect(within(person).getByTestId(testId)).toHaveTextContent(label);
+      expect(within(person).getByTestId(testId)).toHaveAttribute("aria-hidden", "true");
+    }
   });
 
   it("given the roster cannot load, when opening the view, then the failure replaces the loading state", async () => {
