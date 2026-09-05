@@ -157,6 +157,7 @@ function render(name, environment) {
         COURTSIDE_MAIL_DOMAIN: "courts.example.org",
         COURTSIDE_MAIL_ADMIN_PASSWORD: "unused",
         COURTSIDE_MAIL_PASSWORD: "unused",
+        COURTSIDE_MAIL_RELOAD_PASSWORD: "unused",
         ...environment
       }
     });
@@ -166,11 +167,12 @@ function render(name, environment) {
   }
 }
 
-function renderedSecret(password) {
-  const rendered = render("base", { COURTSIDE_MAIL_ADMIN_PASSWORD: password });
+function renderedSecret(password, key = "account-administrator",
+  variable = "COURTSIDE_MAIL_ADMIN_PASSWORD") {
+  const rendered = render("base", { [variable]: password });
   const account = rendered.split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line))
-    .find((operation) => operation.value?.["account-administrator"]);
-  return account.value["account-administrator"].credentials["0"].secret;
+    .find((operation) => operation.value?.[key]);
+  return account.value[key].credentials["0"].secret;
 }
 
 test("given the base plan, when the application submits, then it does so as no administrator", () => {
@@ -211,6 +213,37 @@ test("given a password holding JSON and sed metacharacters, when the base plan i
   // then
   assert.equal(secret, password);
 });
+
+test("given a reload password holding metacharacters, when the base plan is rendered, then the "
+  + "account carries it verbatim", () => {
+    // given
+    const password = 'a"b\\c|d&e/f';
+
+    // when
+    const secret = renderedSecret(password, "account-reload", "COURTSIDE_MAIL_RELOAD_PASSWORD");
+
+    // then
+    assert.equal(secret, password,
+      "the reload account is the one credential a club never types again, so a silent difference "
+      + "between .env and the account leaves renewals failing with nothing to look at");
+  });
+
+test("given the base plan, when it creates the reload account, then that account cannot administer "
+  + "the server", () => {
+    // given
+    const accounts = plan("base").filter((operation) => operation.object === "Account")
+      .flatMap((operation) => Object.values(operation.value));
+
+    // when
+    const reloader = accounts.find((account) => account.name === "{{reloaduser}}");
+
+    // then
+    assert.ok(reloader, "the plan creates no account for the reloader, so it would use another");
+    assert.notDeepEqual(reloader.roles, { "@type": "Admin" });
+    assert.equal(reloader.permissions["@type"], "Replace",
+      "Merge keeps whatever the role already grants, and the point is that nothing else is granted");
+    assert.deepEqual(reloader.permissions.disabledPermissions, {});
+  });
 
 test("given a value holding a line break, when a plan is rendered, then rendering refuses it", () => {
   // when / then

@@ -19,6 +19,7 @@ const relayProbeDomain = process.env.COURTSIDE_MAIL_RELAY_PROBE ?? "relay-probe.
 const setupPassword = randomBytes(18).toString("base64url");
 const adminPassword = randomBytes(18).toString("base64url");
 const applicationPassword = randomBytes(18).toString("base64url");
+const reloadPassword = randomBytes(18).toString("base64url");
 const runtime = mkdtempSync(join(tmpdir(), "courtside-mail-smoke-"));
 
 function openssl(args, input) {
@@ -37,12 +38,18 @@ function servedCertificate(port) {
   return found[0];
 }
 
+function serialOf(certificate) {
+  return openssl(["x509", "-noout", "-serial"], certificate).trim();
+}
+
 function namesOn(certificate) {
   const described = openssl(["x509", "-noout", "-subject", "-ext", "subjectAltName"], certificate);
   return [...described.matchAll(/(?:CN\s*=\s*|DNS:|IP Address:)([^,\n]+)/g)].map((match) => match[1]);
 }
 
-function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure = false } = {}) {
+function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure = false,
+  reloadSecret = reloadPassword, remainingShare = "6",
+  maximumLifetime = "34560000" } = {}) {
   const result = spawnSync("docker", ["compose", "-f", composeFile, "-p", project, ...args], {
     encoding: "utf8",
     env: {
@@ -52,7 +59,10 @@ function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure 
       COURTSIDE_MAIL_ADMIN_PASSWORD: adminPassword,
       COURTSIDE_MAIL_PASSWORD: applicationPassword,
       COURTSIDE_MAIL_SETUP_PASSWORD: setupPassword,
-      COURTSIDE_MAIL_RECOVERY_ADMIN: recoveryAdmin
+      COURTSIDE_MAIL_RECOVERY_ADMIN: recoveryAdmin,
+      COURTSIDE_MAIL_RELOAD_PASSWORD: reloadSecret,
+      COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE: remainingShare,
+      COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME: maximumLifetime
     }
   });
   if (result.status !== 0 && !allowFailure) {
@@ -80,7 +90,44 @@ async function until(what, check, attempts = 90) {
 }
 
 function mailIsHealthy() {
-  return compose(["ps", "mail", "--format", "{{.Health}}"]).includes("healthy");
+  return health("mail") === "healthy";
+}
+
+// Compared exactly, because "unhealthy" contains the word a looser check would look for.
+function health(service) {
+  return compose(["ps", service, "--format", "{{.Health}}"], { allowFailure: true }).trim();
+}
+
+// Asked from the one container that already reaches the mail server, so the smoke needs no network
+// of its own onto the project.
+function askMailServer(credential, body) {
+  return compose(["exec", "-T", "mail-reload", "sh", "-c",
+    // base64 wraps at 76 columns, and a credential this long crosses it: a header with a newline
+    // in it is answered with 400 rather than with what the account may do.
+    `wget -q -O - --header="authorization: Basic $(printf '%s' '${credential}' | base64 | tr -d '\n')" `
+    + `--header='content-type: application/json' --post-data='${body}' `
+    + "http://mail:8080/jmap"], { allowFailure: true });
+}
+
+function jmap(credential, body) {
+  const answer = askMailServer(credential, body);
+  try {
+    return JSON.parse(answer);
+  } catch {
+    throw new Error(`the mail server answered something other than JMAP: ${answer}`);
+  }
+}
+
+function grant(id, permissions) {
+  const enabled = Object.fromEntries(permissions.map((permission) => [permission, true]));
+  return '{"using":["urn:ietf:params:jmap:core","urn:stalwart:jmap"],"methodCalls":'
+    + `[["x:Account/set",{"update":{"${id}":{"permissions":{"@type":"Replace","enabledPermissions":`
+    + `${JSON.stringify(enabled)},"disabledPermissions":{}}}}},"c0"]]}`;
+}
+
+function action(variant) {
+  return '{"using":["urn:ietf:params:jmap:core","urn:stalwart:jmap"],"methodCalls":'
+    + `[["x:Action/set",{"create":{"n0":{"@type":"${variant}"}}},"c0"]]}`;
 }
 
 class Smtp {
@@ -169,6 +216,19 @@ async function awaitListener(port, what) {
   });
 }
 
+// The submission listener, offered a credential that belongs somewhere else entirely.
+async function attemptAuthentication(port, from, password, anchor) {
+  const plain = await Smtp.open(port);
+  const session = await plain.startTls(anchor);
+  try {
+    await session.send("EHLO courtside-smoke", "250");
+    const credential = Buffer.from(["", from, password].join("\u0000")).toString("base64");
+    return statusOf(await session.attempt(`AUTH PLAIN ${credential}`));
+  } finally {
+    session.socket.end();
+  }
+}
+
 async function submit(port, from, to, password, anchor) {
   const plain = await Smtp.open(port);
   const session = await plain.startTls(anchor);
@@ -193,6 +253,11 @@ function published() {
   const lines = compose(["logs", "mail-certificate"]).split("\n")
     .filter((line) => line.includes("published the certificate"));
   return lines.length === 0 ? undefined : lines[lines.length - 1].trim().split(" ").pop();
+}
+
+function serialInside(service, path) {
+  return compose(["exec", "-T", service, "sh", "-c",
+    `openssl x509 -in ${path} -noout -serial`], { allowFailure: true }).trim();
 }
 
 function digestInside(service, path) {
@@ -229,6 +294,10 @@ async function main() {
     console.log("Restarting without the recovery credential");
     compose(["up", "-d", "--force-recreate", "mail"], { recoveryAdmin: "" });
     await until("the mail server to report healthy", mailIsHealthy);
+
+    console.log("Starting the reloader, which the plan has just given an account");
+    compose(["up", "-d", "mail-reload"]);
+    await until("the reloader to report healthy", () => health("mail-reload") === "healthy");
 
     const submission = publishedPort("mail", 587);
     const inbound = publishedPort("mail", 25);
@@ -286,6 +355,34 @@ async function main() {
       digestInside("proxy", `/data/caddy/certificates/local/${hostname}/${hostname}.key`),
       "the mail server reads a key the proxy did not issue for its hostname");
 
+    console.log("Reading what the reloader can reach of the pair it loads");
+    const reachable = compose(["exec", "-T", "mail-reload", "sh", "-c",
+      "readlink /tls/current; cat /tls/current/tls.key; ls /tls/versions"], { allowFailure: true });
+    assert.match(reachable, /^versions\/[0-9a-f]{64}$/m,
+      "the reloader cannot name the pair it asks the mail server to load");
+    assert.equal(reachable.match(/Permission denied/g)?.length, 2,
+      "the container that triggers the reload can read the private key it triggers it for");
+
+    console.log("Asking the mail server what the reload account may do");
+    const credential = `certificate-reload@${domain}:${reloadPassword}`;
+    const sibling = askMailServer(credential, action("ReloadSettings"));
+    // A refused action is answered with 200, so the status says nothing and the payload says it all.
+    assert.match(sibling, /"notCreated"/);
+    assert.match(sibling, /"type":"forbidden"/);
+    assert.match(sibling, /Insufficient permissions to perform action of type ReloadSettings/,
+      "the account that loads certificates can also reload the server's settings");
+    const accounts = askMailServer(credential,
+      '{"using":["urn:ietf:params:jmap:core","urn:stalwart:jmap"],'
+      + '"methodCalls":[["x:Account/get",{},"c0"]]}');
+    assert.match(accounts, /"type":"forbidden"/,
+      "the account that loads certificates can also read the club's mail accounts");
+    assert.doesNotMatch(accounts, /"list":/);
+    const rejection = await attemptAuthentication(submission, `certificate-reload@${domain}`,
+      reloadPassword, authority);
+    assert.match(rejection, /^5\d\d/,
+      `the submission listener answered ${rejection} to the reload account, which has no business `
+      + "handing this instance's members mail to anybody");
+
     console.log("Replacing the stored key with one that does not match the certificate");
     const beforeBreak = published();
     compose(["exec", "-T", "proxy", "sh", "-c",
@@ -294,8 +391,11 @@ async function main() {
       compose(["logs", "mail-certificate"]).includes("incomplete or mismatched"));
     assert.equal(published(), beforeBreak,
       "a mismatched pair replaced the published one, and a mail server loading it serves nothing");
+    await until("the helper to report the refused copy", () =>
+      health("mail-certificate") === "unhealthy");
 
     console.log("Letting the proxy issue the mail certificate again");
+    const beforeRotation = serialOf(servedCertificate(submission));
     compose(["exec", "-T", "proxy", "sh", "-c",
       `rm -rf /data/caddy/certificates/local/${hostname}`]);
     compose(["restart", "proxy"]);
@@ -308,6 +408,76 @@ async function main() {
     assert.equal(digestInside("mail", "/etc/stalwart/tls/current/tls.key"),
       digestInside("proxy", `/data/caddy/certificates/local/${hostname}/${hostname}.key`),
       "the mail server still reads the pair from before the reissue, so `current` was not swapped");
+
+    console.log("Waiting for the reissued certificate to reach the listener, with nothing restarted");
+    await until("the listener to serve the reissued certificate",
+      () => serialOf(servedCertificate(submission)) !== beforeRotation);
+    const afterRotation = servedCertificate(submission);
+    assert.ok(namesOn(afterRotation).includes(hostname),
+      "the listener answers with a certificate that is not for the name it was reloaded for");
+    assert.match(serialOf(afterRotation), /^serial=[0-9A-F]+$/);
+    assert.equal(serialInside("mail", "/etc/stalwart/tls/current/tls.crt"), serialOf(afterRotation),
+      "the mail server serves a certificate other than the one the helper published for it");
+    await until("both containers to report healthy after the reissue",
+      () => health("mail-reload") === "healthy" && health("mail-certificate") === "healthy");
+
+    console.log("Taking the reload account away from the reloader");
+    const refused = serialOf(servedCertificate(submission));
+    compose(["up", "-d", "--force-recreate", "mail-reload"], { reloadSecret: "not-the-password" });
+    await until("the reloader to report the credential it was refused with",
+      () => health("mail-reload") === "unhealthy");
+    assert.match(compose(["logs", "mail-reload"]), /answered the reload request with 401/,
+      "a reload the mail server refused was reported as something other than a refusal");
+    assert.equal(serialOf(servedCertificate(submission)), refused,
+      "a refused reload changed what the listener serves, so the pair before it was not kept");
+
+    console.log("Revoking the reload itself and leaving the read-back in place");
+    const administrator = `postmaster@${domain}:${adminPassword}`;
+    const listed = jmap(administrator, '{"using":["urn:ietf:params:jmap:core",'
+      + '"urn:stalwart:jmap"],"methodCalls":[["x:Account/get",{},"c0"]]}');
+    const reloadAccount = listed.methodResponses[0][1].list
+      .find((account) => account.name === "certificate-reload");
+    assert.ok(reloadAccount, "the plan created no account named for the reloader");
+    jmap(administrator, grant(reloadAccount.id, ["authenticate", "sysCertificateGet"]));
+    compose(["up", "-d", "--force-recreate", "mail-reload"]);
+    await until("the reloader to report the refused reload",
+      () => health("mail-reload") === "unhealthy");
+    assert.match(compose(["logs", "mail-reload"]), /refused the reload: forbidden/);
+    // A reload it may not perform leaves the read-back working, and a read-back that reported over
+    // the refusal is what turned this container green five seconds later.
+    const observed = [];
+    for (let poll = 0; poll < 15; poll += 1) {
+      observed.push(health("mail-reload"));
+      await new Promise((wake) => setTimeout(wake, 1000));
+    }
+    assert.ok(!observed.includes("healthy"),
+      "the reloader reported healthy while the reload it owes is one the mail server refuses");
+    assert.equal(serialOf(servedCertificate(submission)), refused,
+      "a reload nobody performed changed what the listener serves");
+
+    jmap(administrator, grant(reloadAccount.id, ["authenticate", "sysActionCreate",
+      "actionReloadTlsCertificates", "sysCertificateGet"]));
+    compose(["up", "-d", "--force-recreate", "mail-reload"]);
+    await until("the reloader to recover once it may reload again",
+      () => health("mail-reload") === "healthy");
+
+    console.log("Telling the reloader the certificate is nearly spent");
+    compose(["up", "-d", "--force-recreate", "mail-reload"], { remainingShare: "1" });
+    await until("the reloader to report the certificate as close to expiry",
+      () => health("mail-reload") === "unhealthy");
+    assert.match(compose(["logs", "mail-reload"]), /close to expiry, so the proxy stopped renewing/,
+      "a certificate with none of its lifetime left was reported as healthy");
+
+    console.log("Telling the reloader that no authority issues for as long as this certificate runs");
+    compose(["up", "-d", "--force-recreate", "mail-reload"], { maximumLifetime: "3600" });
+    await until("the reloader to refuse a certificate the mail server could only have made itself",
+      () => health("mail-reload") === "unhealthy");
+    assert.match(compose(["logs", "mail-reload"]), /a certificate it made itself/,
+      "the fallback the mail server serves after a refused reload runs to the year 4096, and this "
+      + "is the check that tells it from one the proxy obtained");
+
+    compose(["up", "-d", "--force-recreate", "mail-reload"]);
+    await until("the reloader to report healthy again", () => health("mail-reload") === "healthy");
 
     console.log("The shipped mail server, configured only from the shipped plans, delivered a message.");
   } finally {

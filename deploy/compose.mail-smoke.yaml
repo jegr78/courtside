@@ -54,6 +54,38 @@ services:
       - caddy-data:/caddy:ro
       - mail-tls:/tls
     entrypoint: ["sh", "/mail-certificate.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q '^ok' /tmp/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 2
+
+  mail-reload:
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "1500:1500"
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME}
+      COURTSIDE_MAIL_DOMAIN: ${COURTSIDE_MAIL_DOMAIN}
+      COURTSIDE_MAIL_RELOAD_USERNAME: ${COURTSIDE_MAIL_RELOAD_USERNAME:-certificate-reload}
+      COURTSIDE_MAIL_RELOAD_PASSWORD: ${COURTSIDE_MAIL_RELOAD_PASSWORD}
+      COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE: ${COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE:-6}
+      COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME: ${COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME:-34560000}
+    volumes:
+      - ./mail-reload.sh:/mail-reload.sh:ro
+      - mail-tls:/tls:ro
+    entrypoint: ["sh", "/mail-reload.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q '^ok' /tmp/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 2
 
   sink:
     image: axllent/mailpit:v1.31@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
@@ -74,6 +106,8 @@ services:
       COURTSIDE_MAIL_DOMAIN: ${COURTSIDE_MAIL_DOMAIN}
       COURTSIDE_MAIL_ADMIN_PASSWORD: ${COURTSIDE_MAIL_ADMIN_PASSWORD}
       COURTSIDE_MAIL_PASSWORD: ${COURTSIDE_MAIL_PASSWORD}
+      COURTSIDE_MAIL_RELOAD_USERNAME: ${COURTSIDE_MAIL_RELOAD_USERNAME:-certificate-reload}
+      COURTSIDE_MAIL_RELOAD_PASSWORD: ${COURTSIDE_MAIL_RELOAD_PASSWORD}
       COURTSIDE_MAIL_SINK: sink
     volumes:
       - ./mail:/mail:ro

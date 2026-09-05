@@ -24,11 +24,16 @@ adminpassword=$(escape COURTSIDE_MAIL_ADMIN_PASSWORD \
 appuser=$(escape COURTSIDE_MAIL_SENDER_USERNAME "${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}")
 apppassword=$(escape COURTSIDE_MAIL_PASSWORD \
   "${COURTSIDE_MAIL_PASSWORD:?set COURTSIDE_MAIL_PASSWORD in .env}")
+reloaduser=$(escape COURTSIDE_MAIL_RELOAD_USERNAME \
+  "${COURTSIDE_MAIL_RELOAD_USERNAME:-certificate-reload}")
+reloadpassword=$(escape COURTSIDE_MAIL_RELOAD_PASSWORD \
+  "${COURTSIDE_MAIL_RELOAD_PASSWORD:?set COURTSIDE_MAIL_RELOAD_PASSWORD in .env}")
 
 for plan in "$@"; do
   sed -e "s|{{hostname}}|${hostname}|g" -e "s|{{domain}}|${domain}|g" -e "s|{{sink}}|${sink}|g" \
     -e "s|{{adminuser}}|${adminuser}|g" -e "s|{{adminpassword}}|${adminpassword}|g" \
     -e "s|{{appuser}}|${appuser}|g" -e "s|{{apppassword}}|${apppassword}|g" \
+    -e "s|{{reloaduser}}|${reloaduser}|g" -e "s|{{reloadpassword}}|${reloadpassword}|g" \
     "${source_directory}/${plan}.ndjson" > "${target_directory}/${plan}.ndjson"
   printf 'rendered %s for %s\n' "$plan" "$hostname"
 done
