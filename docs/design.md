@@ -1585,12 +1585,15 @@ whether it is built or designed. **Designed means absent today.**
   Stalwart 0.16.20 does not keep the pair it had when that load fails — it drops the certificate and
   falls back to a self-signed one — so a refused reload downgrades the hop rather than leaving it as
   it was. An observer needs to watch container health or the reloader's log, both of which say so:
-  the reloader reports the refusal and turns unhealthy, and the fallback certificate is valid from
-  1975 to 4096, which nothing mistakes for an issued one. It stays open because keeping the previous
-  pair is the mail server's decision and not this deployment's. What bounds it: `current` is swapped
-  only after Caddy has validated the pair behind it, so the reload is asked for a pair that has
-  already been read once; the reloader signs in as an account whose permissions are that one reload;
-  and the instance does not authenticate this certificate anyway, per the entry above.
+  a reload stays owed until one is accepted, so a refused one is named, retried, and reported by a
+  container that stays unhealthy rather than by one a later read-back turns green again. The
+  fallback is refused on its own terms too — it is valid from 1975 to 4096, and the reloader treats
+  a certificate outliving what any authority issues as one the mail server made for itself. It
+  stays open because keeping the previous pair is the mail server's decision and not this
+  deployment's. What bounds it: `current` is swapped only after Caddy has validated the pair behind
+  it, so the reload is asked for a pair that has already been read once; the reloader signs in as an
+  account whose permissions are that one reload; and the instance does not authenticate this
+  certificate anyway, per the entry above.
   *Built, as described.*
 - **Accepted: whoever holds a mailbox can take over every account registered to it.** One address
   serving several people is deliberate — a parent registering for their children — so the same

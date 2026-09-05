@@ -564,9 +564,10 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
 - **A reload the mail server refuses leaves it serving a certificate it generated itself.**
   Stalwart 0.16.20 does not keep the pair it had when a reload fails: it answers `notCreated`, drops
   the certificate, and the listener falls back to a self-signed one valid from 1975 to 4096. Nothing
-  about the fallback is silent here — the reloader reports the refusal and its container turns
-  unhealthy — but nothing undoes it either, short of fixing the pair and reloading again. What
-  bounds it is that `mail-certificate` swaps `current` only after Caddy has validated the pair
-  behind it, so a reload is asked for a pair that has already been read once.
+  about the fallback is silent here — the reload stays owed until one is accepted, so `mail-reload`
+  names the refusal, retries it, and stays unhealthy while it is owed — but nothing undoes it
+  either, short of fixing the pair and reloading again. What bounds it is that `mail-certificate`
+  swaps `current` only after Caddy has validated the pair behind it, so a reload is asked for a pair
+  that has already been read once.
 - **MTA-STS and DANE are not provided.** Neither is published, and neither is planned by this
   work.

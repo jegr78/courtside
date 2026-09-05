@@ -13,6 +13,9 @@ share="${COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE:-6}"
 # A swap can be a renewal period away, and a certificate nobody renews expires in silence between
 # two of them, so what the mail server holds is read back on its own as well.
 interval="${COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL:-3600}"
+# 400 days, the longest any authority issues for. The mail server's own fallback runs to the year
+# 4096, so outliving this is what tells one apart from a certificate the proxy obtained.
+ceiling="${COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME:-34560000}"
 health=/tmp/health
 
 report() {
@@ -100,6 +103,10 @@ verify() {
     failed "the mail server did not say how long the certificate for $hostname is valid"
     return 1
   fi
+  if [ $(( expires - issued )) -gt "$ceiling" ]; then
+    failed "the mail server serves a certificate it made itself and not the one the proxy issued"
+    return 1
+  fi
   if [ $(( (expires - now) * share )) -lt $(( expires - issued )) ]; then
     failed "the certificate for $hostname is close to expiry, so the proxy stopped renewing it"
     return 1
@@ -120,15 +127,14 @@ events=/tmp/events
 exec 3<> "$events"
 report "watching $watched for the certificate the helper publishes"
 
-# A rotation the mail server slept through is loaded on the first round, and a reload is asked for
-# only after a swap: reading back what is loaded needs no second one.
-swapped=yes
-# A retry, not a schedule: the mail server has no reload account until the plan is applied.
+# A rotation the mail server slept through is loaded on the first round. The reload stays owed until
+# one is accepted, so a refused one is retried and no read-back reports over it.
+owed=yes
 delay=5
 while true; do
   inotifyd - "$watched:y" >&3 2>/dev/null &
   watcher=$!
-  if [ "$swapped" = yes ]; then attempt; else verify; fi
+  if [ "$owed" = yes ]; then attempt && owed=no; else verify; fi
   if [ $? -eq 0 ]; then
     waiting="$interval"
     delay=5
@@ -136,7 +142,7 @@ while true; do
     waiting="$delay"
     [ "$delay" -lt 30 ] && delay=$(( delay * 2 ))
   fi
-  if read -t "$waiting" -r _ <&3; then swapped=yes; else swapped=no; fi
+  read -t "$waiting" -r _ <&3 && owed=yes
   kill "$watcher" 2>/dev/null
   wait "$watcher" 2>/dev/null
 done
