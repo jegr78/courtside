@@ -156,11 +156,11 @@ commands authenticate with while the server has no accounts yet.
 While it is set the server runs in recovery mode and serves nothing but its admin port: no SMTP, no
 mail. It is a way back in, not a setting to leave on.
 
-Three credentials are in play here and only one of them is temporary:
+Three credentials are in play here, and which part of which one is temporary is not obvious:
 
 | Credential | Who it is | How long it lives |
 |---|---|---|
-| `COURTSIDE_MAIL_SETUP_PASSWORD`, through `COURTSIDE_MAIL_RECOVERY_ADMIN` | The built-in `admin`, before any account exists | Setup only. Clear the variable afterwards. Recovery later sets it again, to whatever you choose then, so this password is not one to keep. |
+| `COURTSIDE_MAIL_SETUP_PASSWORD`, through `COURTSIDE_MAIL_RECOVERY_ADMIN` | The built-in `admin`, which exists only while the recovery variable is set | The account is temporary, the password is not. `mail-bootstrap` and `mail-configure` authenticate as `admin` with it on every run, so keep it, and set the recovery variable back to `admin:${COURTSIDE_MAIL_SETUP_PASSWORD}` whenever you need to run either again. |
 | `COURTSIDE_MAIL_ADMIN_PASSWORD` | The club's mail administrator | Permanent. This is who signs in to read the DKIM selector or add a relay route. |
 | `COURTSIDE_MAIL_PASSWORD` | The account the instance authenticates as | Permanent, and not an administrator. It may send and nothing else. |
 
@@ -315,8 +315,9 @@ in whatever backs this host up, and treat `mail-config` as a secret when you do.
 
 ### When the mail administrator password is lost
 
-Set `COURTSIDE_MAIL_RECOVERY_ADMIN` to `admin:<password>` and restart the `mail` service, then sign
-in as `admin`. **The server stops accepting and delivering mail while that variable is set** — it
+Set `COURTSIDE_MAIL_RECOVERY_ADMIN` to `admin:${COURTSIDE_MAIL_SETUP_PASSWORD}` and restart the
+`mail` service, then sign in as `admin`. Any password works to sign in, but the setup commands read
+that one variable, so choosing anything else means they can no longer authenticate. **The server stops accepting and delivering mail while that variable is set** — it
 runs in recovery mode and serves only its admin port. Clear it and recreate the container once you
 are back in.
 
