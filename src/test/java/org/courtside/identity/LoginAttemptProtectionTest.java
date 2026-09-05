@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.internal.LoginVerificationCapacity;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,14 +24,16 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = {
+        "courtside.login-protection.verification-concurrency=1",
         "courtside.login-protection.address.max-failures=2",
-        "courtside.login-protection.global.max-failures=20"
+        "courtside.login-protection.global.threshold=20"
 })
 class LoginAttemptProtectionTest extends AbstractIntegrationTest {
 
@@ -48,6 +51,9 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private LoginVerificationCapacity verificationCapacity;
 
     private final ListAppender<ILoggingEvent> recorded = new ListAppender<>();
 
@@ -109,6 +115,33 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:login-rate-limited"))
                 .andExpect(jsonPath("$.violations[0].code")
                         .value("identity.login.rateLimited"));
+    }
+
+    @Test
+    void givenPasswordVerificationCapacityIsOccupied_whenItBecomesFree_thenLoginRecoversImmediately()
+            throws Exception {
+        // given
+        Person person = persons.save(new Person("Ready", "Member", "ready@example.org"));
+        UserAccount account = new UserAccount(
+                person, "ready.member", passwordEncoder.encode("correct-horse"), Set.of(Role.MEMBER), "de");
+        account.enable();
+        accounts.save(account);
+        LoginVerificationCapacity.Permit occupied = verificationCapacity.tryAcquire().orElseThrow();
+
+        // when / then
+        try (occupied) {
+            mockMvc.perform(login("busy", "wrong", "192.0.2.90"))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(header().string("Retry-After", "1"))
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:login-rate-limited"));
+            mockMvc.perform(get("/actuator/health"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("UP"));
+        }
+        mockMvc.perform(login("available", "wrong", "192.0.2.91"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(login("ready.member", "correct-horse", "192.0.2.92"))
+                .andExpect(status().isOk());
     }
 
     @Test

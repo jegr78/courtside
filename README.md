@@ -54,11 +54,12 @@ a restart cannot bring one back, the roster refuses the change that would leave 
 enabled account holding `ADMIN` — an officer may step down once a successor exists, and a board may
 demote a former one.
 
-`POST /api/session` limits attempts by source address and by an instance-wide Argon2 budget before
-another password verification is allowed. The counters live in PostgreSQL, survive restarts and
-apply across application instances. A limited request returns `429` with `Retry-After`; successful
-login clears its address counter. No username can be locked independently, so anonymous failures
-cannot keep a known administrator account in a renewable lockout.
+`POST /api/session` limits attempts by source address and bounds simultaneous Argon2 work in each
+application instance. Address counters live in PostgreSQL, survive restarts and apply across
+application instances; the verification slots are deliberately process-local capacity, not a
+renewable distributed lock. A limited request returns `429` with `Retry-After`; successful login
+clears its address counter. No username or whole instance can be locked independently, so anonymous
+failures cannot keep a known administrator—or every member—in a renewable lockout.
 
 `enabled` defaults to `false` — accounts normally wait for approval. The bootstrap path explicitly
 enables the first administrator because nobody exists to approve it.

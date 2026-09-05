@@ -73,14 +73,14 @@ courtside:
     window: ${COURTSIDE_CREDENTIAL_ISSUE_WINDOW:1h}
     retention: ${COURTSIDE_CREDENTIAL_ISSUE_RETENTION:24h}
   login-protection:
+    verification-concurrency: ${COURTSIDE_LOGIN_VERIFICATION_CONCURRENCY:2}
     address:
       max-failures: ${COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES:20}
       window: ${COURTSIDE_LOGIN_ADDRESS_WINDOW:1m}
       block: ${COURTSIDE_LOGIN_ADDRESS_BLOCK:1m}
     global:
-      max-failures: ${COURTSIDE_LOGIN_GLOBAL_MAX_FAILURES:100}
+      threshold: ${COURTSIDE_LOGIN_GLOBAL_THRESHOLD:100}
       window: ${COURTSIDE_LOGIN_GLOBAL_WINDOW:1m}
-      block: ${COURTSIDE_LOGIN_GLOBAL_BLOCK:1m}
   booking:
     series-horizon-months: 12
     reminder-sweep-interval: 5m

@@ -382,9 +382,9 @@ default.
 | `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` | `20` | Login attempts allowed per source address and window. |
 | `COURTSIDE_LOGIN_ADDRESS_WINDOW` | `1m` | Counting window for a source address. |
 | `COURTSIDE_LOGIN_ADDRESS_BLOCK` | `1m` | Temporary source-address block duration. |
-| `COURTSIDE_LOGIN_GLOBAL_MAX_FAILURES` | `100` | Login attempts allowed across the instance and window. |
-| `COURTSIDE_LOGIN_GLOBAL_WINDOW` | `1m` | Instance-wide counting window. |
-| `COURTSIDE_LOGIN_GLOBAL_BLOCK` | `1m` | Instance-wide login cooldown duration. |
+| `COURTSIDE_LOGIN_VERIFICATION_CONCURRENCY` | `2` | Maximum simultaneous password verifications. Further attempts receive `429` with `Retry-After: 1` and may retry as soon as capacity is free. |
+| `COURTSIDE_LOGIN_GLOBAL_THRESHOLD` | `100` | Observed instance-wide login attempts per window before `courtside.login.distributed.thresholds` is incremented and one privacy-safe warning is written. It does not block sign-in. |
+| `COURTSIDE_LOGIN_GLOBAL_WINDOW` | `1m` | Window for the instance-wide diagnostic threshold. |
 | `COURTSIDE_CREDENTIAL_ISSUE_MAX_PER_WINDOW` | `5` | How often credentials may be requested for one account within the window. It counts requests, not deliveries: a request whose handover fails still spends one. Counted per account, because the account is what a filled mailbox targets; a board sending twice in a row is nowhere near it. |
 | `COURTSIDE_CREDENTIAL_ISSUE_WINDOW` | `1h` | Counting window for one account's credentials. |
 | `COURTSIDE_CREDENTIAL_ISSUE_RETENTION` | `24h` | How long a counting row is kept after its window started, before the hourly cleanup deletes it. |
@@ -403,6 +403,10 @@ default.
 | `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, `DEVELOPMENT` or `PERFORMANCE`. UAT is visibly marked in the frontend. |
 | `COURTSIDE_CLOCK_FIXED_INSTANT` | *unset* | Freezes the clock at an ISO-8601 instant so an automated suite reads the same date on every run. A club never sets this: the instance starts with it only while `COURTSIDE_ENVIRONMENT` names `UAT`, `DEVELOPMENT` or `PERFORMANCE`, so a misspelt designation refuses rather than unlocks. |
 
+`COURTSIDE_LOGIN_GLOBAL_MAX_FAILURES` and `COURTSIDE_LOGIN_GLOBAL_BLOCK` are no longer read. The
+renewable whole-instance cooldown they configured was removed; use the diagnostic threshold and
+verification concurrency settings above instead.
+
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` are set by
 `compose.yaml`. Point them elsewhere if you run PostgreSQL outside Compose; the application needs
 PostgreSQL 17 and will not run on anything else.
@@ -412,7 +416,9 @@ PostgreSQL 17 and will not run on anything else.
 Enable OTLP export only after a collector is reachable. Standard Spring HTTP, JVM and HikariCP
 metrics then identify the affected endpoint and resource pressure. Courtside additionally exports
 the counters `courtside.bookings.created`, `courtside.bookings.rejected` and
-`courtside.bookings.conflicts`; rejected bookings carry only the stable rule code as a tag.
+`courtside.bookings.conflicts`, plus `courtside.login.distributed.thresholds` when the configured
+global login observation threshold is crossed. Rejected bookings carry only the stable rule code as
+a tag; the login counter has no identifying tags.
 
 Hibernate writes queries above `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` to the structured application
 log. The statement retains placeholders instead of bind values, and a sampled request adds its

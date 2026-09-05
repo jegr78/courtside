@@ -18,8 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = {
-        "courtside.login-protection.address.max-failures=20",
-        "courtside.login-protection.global.max-failures=3"
+        "courtside.login-protection.address.max-failures=3",
+        "courtside.login-protection.global.threshold=20"
 })
 class LoginAttemptEncodedPathTest extends AbstractIntegrationTest {
 

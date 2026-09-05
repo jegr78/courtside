@@ -39,6 +39,24 @@ Only `smoke` is suitable for routine automation. Baseline, peak, stress, soak, a
 manual until a dedicated runner provides stable resources. The Funnel profile is always manual and
 requires an operator to supervise `uat share` separately.
 
+### Login verification capacity
+
+The reference application has two password-verification slots. The value is measured against the
+same 2 CPU and 1 GiB application limits declared below, rather than inferred from a developer
+machine. On 2026-09-05 the ordinary two-VU smoke admitted both simultaneous Argon2id logins with no
+technical error; each completed in about 253 ms. The control run with one slot produced an immediate
+typed `429`
+for one of those two logins. Two is therefore the smallest measured value that carries the reference
+smoke without shedding a normal attempt.
+
+Repeat the comparison whenever the Argon2 parameters, application CPU or memory limit, or login path
+changes. Start the ordinary environment with
+`node tools/courtside.mjs perf --skip-verify --no-credential-output`, then run
+`node tools/courtside.mjs perf-run smoke`. Start it again with
+`COURTSIDE_LOGIN_VERIFICATION_CONCURRENCY=1` prefixed to the first command and repeat the smoke as
+the falsification control. The control is expected to record a `429`; it is evidence for the
+boundary, not a passing candidate run.
+
 ## Result semantics
 
 Technical request failures and unexpected server errors determine automated smoke health. An
