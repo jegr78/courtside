@@ -148,8 +148,8 @@ jobs:
           npx playwright test
           --reporter=line,json
           --project=firefox-periodic
-          --project=iphone-periodic
-          --project=android-periodic
+          --project=iphone
+          --project=android
       - name: Upload browser compatibility evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

@@ -33,11 +33,26 @@ test("given supported desktop browsers, when qualifying a pull request, then Chr
   assert.match(supported, /typeof crypto\.randomUUID === "function"\)\)\.toBe\(overTls\)/);
 });
 
+test("given the phone layout journey, when a pull request runs, then a device project covers it unswitched", () => {
+  // given — qualifying a browser is periodic work; whether the product lays out on a phone is a
+  // product check, and the gate that merges a change has to run it
+  const gated = playwright.slice(playwright.indexOf("COURTSIDE_PERIODIC_BROWSERS"),
+    playwright.indexOf("const projectOrder"));
+  const configured = playwright.slice(playwright.indexOf("const configuredProjects"),
+    playwright.indexOf("const projects ="));
+
+  // when / then
+  assert.doesNotMatch(gated, /responsive-mobile/);
+  assert.match(configured, /responsive-mobile/);
+  assert.match(configured, /devices\["iPhone/);
+  assert.match(configured, /devices\["Pixel/);
+});
+
 test("given periodic browser qualification, when the stability workflow runs, then Firefox and mobile devices produce evidence", () => {
   assert.doesNotMatch(stability, /playwright install/);
   assert.match(stability, /--project=firefox-periodic/);
-  assert.match(stability, /--project=iphone-periodic/);
-  assert.match(stability, /--project=android-periodic/);
+  assert.match(stability, /--project=iphone/);
+  assert.match(stability, /--project=android/);
   assert.match(stability, /--reporter=line,json/);
   assert.match(stability, /test-results\/browser-compatibility\.json/);
 });
