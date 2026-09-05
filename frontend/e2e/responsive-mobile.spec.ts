@@ -55,6 +55,14 @@ test("a member reaches every destination from the bottom of a touch viewport", a
   // then
   await expect(page.getByTestId("my-messages-view")).toBeVisible();
   await expectNoHorizontalOverflow(page);
+
+  // when
+  await page.getByTestId("footer-product-identity").scrollIntoViewIfNeeded();
+
+  // then — visible is not reachable, so the footer has to end above where the bar begins
+  const footer = await page.getByTestId("footer-product-identity").boundingBox();
+  const pinned = await page.getByTestId("primary-navigation-bar").boundingBox();
+  expect(Math.round(footer!.y + footer!.height)).toBeLessThanOrEqual(Math.round(pinned!.y));
 });
 
 test("member and administration surfaces remain usable on a touch viewport", async ({ page, journeyService }) => {

@@ -203,12 +203,12 @@ export function App() {
       <Preferences key={String(authenticated)} authenticated={authenticated} supported={club?.supportedLocales} signedOut={signOut} />
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
-    <main className="flex flex-1 items-start justify-center px-4 pt-8 pb-24 sm:pb-8">
+    <main className="flex flex-1 items-start justify-center px-4 py-8">
       {offline ? <div data-testid="offline-status"><Alert>{t("status.offline")}</Alert></div> : session
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} configurationChanged={configurationChanged} clubName={club?.clubName} />
         : <p role="status">{t("status.loading")}</p>}
     </main>
-    <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 py-4 text-sm">
+    <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 pt-4 pb-[max(6rem,calc(4rem+env(safe-area-inset-bottom)))] text-sm sm:pb-4">
       <span data-testid="footer-product-identity" className="flex items-center gap-2 font-semibold">
         <CourtsideMark testId="footer-product-mark" className="h-6 w-6" />
         {t("app.name")}
