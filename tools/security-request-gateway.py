@@ -33,6 +33,10 @@ upstream_outcomes = collections.deque(maxlen=2048)
 class RequestHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
+    def send_response(self, code, message=None):
+        self.send_response_only(code, message)
+        self.send_header("Date", self.date_time_string())
+
     # Every method reaches forward(), where the cap decides. Left to the base class, one it has no
     # do_ handler for would be answered 501 - a server error the assessment reads as the target's.
     def __getattr__(self, name):
