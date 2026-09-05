@@ -170,13 +170,13 @@ export function AdminRosterView() {
                       <span aria-hidden="true" data-testid="roster-label-username" className="font-medium sm:hidden">{t("admin.roster.columnUsername")}</span>
                       <span className="min-w-0 [overflow-wrap:anywhere]">{entry.username ?? "—"}</span>
                     </td>
-                    <td data-testid={`roster-account-${entry.personId}`} className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
+                    <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-account" className="font-medium sm:hidden">{t("admin.roster.columnAccount")}</span>
-                      <span className="min-w-0 break-words">{accountLabel(entry, t)}</span>
+                      <span data-testid={`roster-account-${entry.personId}`} className="min-w-0 break-words">{accountLabel(entry, t)}</span>
                     </td>
-                    <td data-testid={`roster-membership-${entry.personId}`} className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
+                    <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-membership" className="font-medium sm:hidden">{t("admin.roster.columnMembership")}</span>
-                      <span className="min-w-0 break-words">{membershipLabel(entry, typeNames, t)}</span>
+                      <span data-testid={`roster-membership-${entry.personId}`} className="min-w-0 break-words">{membershipLabel(entry, typeNames, t)}</span>
                     </td>
                   </tr>)}
                 </tbody>
