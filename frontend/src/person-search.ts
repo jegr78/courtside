@@ -1,0 +1,2 @@
+export const PERSON_SEARCH_MIN_LENGTH = 2;
+export const PERSON_SEARCH_DEBOUNCE_MS = 250;

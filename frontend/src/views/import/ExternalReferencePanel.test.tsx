@@ -1,6 +1,6 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type ExternalReference, type RosterEntry } from "../../api/client";
 import i18n from "../../i18n";
 import { UnsavedCount } from "../../test/UnsavedCount";
@@ -30,6 +30,8 @@ function show(reportError = vi.fn()) {
 }
 
 describe("ExternalReferencePanel", () => {
+  afterEach(() => vi.useRealTimers());
+
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
@@ -59,6 +61,66 @@ describe("ExternalReferencePanel", () => {
     expect(await screen.findByTestId("no-references")).toHaveTextContent(
       "Members linked to external identifiers appear here. Run an import or link a person below."
     );
+  });
+
+  it("given a burst of eligible search input, when the board pauses, then only the final query is asked", async () => {
+    // given
+    vi.useFakeTimers();
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    const searching = vi.spyOn(api, "roster").mockResolvedValue({ entries: [jane], nextCursor: null });
+    show();
+
+    // when
+    const field = screen.getByTestId("reference-person-search");
+    fireEvent.change(field, { target: { value: "D" } });
+    fireEvent.change(field, { target: { value: "Do" } });
+    fireEvent.change(field, { target: { value: "Doe" } });
+
+    // then
+    expect(searching).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("Searching for people");
+    await act(() => vi.advanceTimersByTimeAsync(249));
+    expect(searching).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(searching).toHaveBeenCalledTimes(1);
+    expect(searching).toHaveBeenCalledWith("Doe", undefined, 10);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("given fewer than two characters, when the board pauses, then no broad roster search starts", async () => {
+    // given
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    const searching = vi.spyOn(api, "roster").mockResolvedValue({ entries: [jane], nextCursor: null });
+    show();
+    await screen.findByTestId("no-references");
+
+    // when
+    await userEvent.type(screen.getByTestId("reference-person-search"), "D");
+
+    // then
+    await new Promise((resolve) => window.setTimeout(resolve, 300));
+    expect(searching).not.toHaveBeenCalled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("given visible matches, when the query changes, then stale people disappear while the new answer is pending", async () => {
+    // given
+    vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
+    vi.spyOn(api, "roster")
+      .mockResolvedValueOnce({ entries: [jane], nextCursor: null })
+      .mockReturnValueOnce(new Promise(() => undefined));
+    show();
+    await screen.findByTestId("no-references");
+    await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
+    expect(await screen.findByTestId("reference-person-person-1")).toBeInTheDocument();
+
+    // when
+    await userEvent.clear(screen.getByTestId("reference-person-search"));
+    await userEvent.type(screen.getByTestId("reference-person-search"), "Major");
+
+    // then
+    expect(screen.queryByTestId("reference-person-person-1")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Searching for people");
   });
 
   it("given a person the file already knows, when they are linked by hand, then the link is written", async () => {
@@ -92,9 +154,11 @@ describe("ExternalReferencePanel", () => {
     show();
     await screen.findByTestId("no-references");
     await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
+    await waitFor(() => expect(api.roster).toHaveBeenCalledTimes(1));
 
-    // when — the board deletes the query, then the answer to it arrives and is committed
+    // when — the board deletes the query, then the answer to it arrives
     await userEvent.clear(screen.getByTestId("reference-person-search"));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     await act(async () => {
       answer({ entries: [jane], nextCursor: null });
       await asked;
@@ -120,8 +184,10 @@ describe("ExternalReferencePanel", () => {
     show();
     await screen.findByTestId("no-references");
     await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
+    await waitFor(() => expect(api.roster).toHaveBeenCalledTimes(1));
     await userEvent.clear(screen.getByTestId("reference-person-search"));
     await userEvent.type(screen.getByTestId("reference-person-search"), "Major");
+    await waitFor(() => expect(api.roster).toHaveBeenCalledTimes(2));
 
     // when — the replaced query answers after the one that replaced it
     await act(async () => {
@@ -149,6 +215,7 @@ describe("ExternalReferencePanel", () => {
     show(reportError);
     await screen.findByTestId("no-references");
     await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
+    await waitFor(() => expect(api.roster).toHaveBeenCalledTimes(1));
 
     // when
     await act(async () => {
@@ -170,6 +237,7 @@ describe("ExternalReferencePanel", () => {
     show(reportError);
     await screen.findByTestId("no-references");
     await userEvent.type(screen.getByTestId("reference-person-search"), "Doe");
+    await waitFor(() => expect(api.roster).toHaveBeenCalledTimes(1));
 
     // when
     await userEvent.clear(screen.getByTestId("reference-person-search"));
