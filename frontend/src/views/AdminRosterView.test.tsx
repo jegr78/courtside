@@ -56,6 +56,22 @@ describe("AdminRosterView", () => {
     expect(api.roster).toHaveBeenCalledWith(undefined, undefined, 50, undefined);
   });
 
+  it("given a person on a phone, when their card is read, then every roster field carries its label", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // when
+    const person = await screen.findByTestId("roster-row-person-1");
+
+    // then
+    expect(person).toHaveClass("grid");
+    expect(within(person).getByTestId("roster-label-name")).toHaveTextContent("Name");
+    expect(within(person).getByTestId("roster-label-username")).toHaveTextContent("Username");
+    expect(within(person).getByTestId("roster-label-account")).toHaveTextContent("Account");
+    expect(within(person).getByTestId("roster-label-membership")).toHaveTextContent("Membership type");
+    expect(within(person).getAllByText(/Name|Username|Account|Membership type/).every((label) => label.getAttribute("aria-hidden") === "true")).toBe(true);
+  });
+
   it("given the roster cannot load, when opening the view, then the failure replaces the loading state", async () => {
     // given
     vi.spyOn(api, "roster").mockRejectedValue(new Error("unavailable"));
