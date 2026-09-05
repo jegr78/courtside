@@ -70,11 +70,14 @@ closed contract defines each profile's CI jobs and local tasks. CI reads it from
 base commit and the local runner from its merge base with `origin/main`, so a branch cannot classify
 itself with rules it brings, and every file that decides a selection is itself classified `full`.
 Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, `tooling`, or an additive
-combination. Backend changes run backend and security verification; frontend changes run frontend
-and security verification, including the complete Chromium and WebKit browser matrix. Documentation
-changes run a bounded documentation job in CI and the same checks locally. It validates Markdown,
-internal references and maintained quality contracts without
-starting Java, Vitest or Playwright. Build, workflow, security, deployment, migration, OpenAPI, and
+combination. Backend changes run backend, tooling and security verification; frontend changes run frontend,
+tooling and security verification, including the complete Chromium and WebKit browser matrix.
+Documentation changes run the bounded documentation job and the tooling job. The tooling job travels
+with all three because the policies under `tools/` read `src/`, `frontend/` and `docs/`, and a rule
+this repository enforces with a test has to run for the change that could break it. The
+documentation check itself validates Markdown, internal references and maintained quality contracts;
+the tool tests beside it install the locked Node toolchain through Maven, so a documentation-only
+check no longer avoids Maven, and it still starts no Java integration test, Vitest or Playwright. Build, workflow, security, deployment, migration, OpenAPI, and
 shared test-infrastructure changes select `full`. Added files follow the same closed path rules as
 modified files. Playwright specifications and their reviewed visual baselines select `frontend`;
 E2E process, container, network and journey orchestration remains `full`. Unknown paths and every
@@ -88,8 +91,10 @@ bounded documentation profile, which checks every tracked Markdown file and the 
 contracts. Deleting, renaming or otherwise changing their structure still selects `full`.
 
 The tooling profile installs the locked Node dependencies and runs every repository tool, policy
-and contract test without Java integration tests, Vitest or Playwright. CI additionally requires
-the security job; hosted CodeQL has no local equivalent. A closed manifest assigns every tracked
+and contract test without Java integration tests, Vitest or Playwright. Selecting it additionally
+requires the security job in CI; hosted CodeQL has no local equivalent. The tooling job itself also
+runs for the documentation, backend and frontend profiles, and a documentation-only change is the
+one selection that runs it without the security job beside it. A closed manifest assigns every tracked
 file below `tools/` explicitly. Reviewed test files select `tooling`, while build, profile,
 security, release, restore, upgrade and other execution-critical runners remain `full`. An
 unlisted new tool, duplicate assignment or stale manifest entry fails closed.

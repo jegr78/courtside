@@ -25,10 +25,24 @@ test("given combined reduced profiles, when resolving coverage, then jobs and ta
   const tasks = localTasksForProfiles(contract, ["backend", "frontend"]);
 
   // then
-  assert.deepEqual(jobs, ["backend", "frontend", "security"]);
+  assert.deepEqual(jobs, ["backend", "frontend", "tooling", "security"]);
   assert.equal(tasks[0].label, "backend");
-  assert.equal(tasks.at(-1).label, "frontend-e2e");
+  assert.equal(tasks.at(-1).label, "tooling-test");
   assert.equal(new Set(tasks.map((task) => task.label)).size, tasks.length);
+});
+
+test("given a tree the tool policies read, when its profile is selected, then the tooling job runs", () => {
+  // given — tests under tools/ read docs/, src/ and frontend/, and a path selects exactly one
+  // reduced profile, so the profile has to carry the job or the policy never runs for the change
+  const contract = loadProfileContract();
+
+  // when / then
+  for (const profile of ["docs", "backend", "frontend"]) {
+    assert.ok(ciJobsForProfiles(contract, [profile]).includes("tooling"),
+      `${profile} does not run the tooling job`);
+    assert.ok(localTasksForProfiles(contract, [profile]).some((task) => task.label === "tooling-test"),
+      `${profile} does not run the tooling tests locally`);
+  }
 });
 
 test("given incomplete full coverage, when validating the contract, then no plan can use it", () => {
