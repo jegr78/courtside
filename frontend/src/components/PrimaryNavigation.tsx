@@ -27,9 +27,11 @@ function isCurrent(destination: Destination, pathname: string): boolean {
   return pathname === destination.to || pathname.startsWith(`${destination.to}/`);
 }
 
-const BAR = "fixed inset-x-0 bottom-0 z-40 flex justify-around border-t px-2 py-2 "
+// Above the breakpoint every declaration here is undone again, so the row stays the row it was and
+// only a phone gets the bar.
+const BAR = "fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t px-2 py-2 "
   + "pb-[max(0.5rem,env(safe-area-inset-bottom))] surface-panel "
-  + "sm:static sm:justify-start sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0";
+  + "sm:static sm:flex-wrap sm:justify-start sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0";
 
 export function PrimaryNavigation({ session }: { session: SessionStatus }) {
   const { t } = useTranslation();
@@ -53,7 +55,7 @@ export function PrimaryNavigation({ session }: { session: SessionStatus }) {
             to={destination.to}
             data-testid={destination.testId}
             aria-current={isCurrent(destination, pathname) ? "page" : undefined}
-            className="flex min-h-11 items-center px-3 font-semibold underline-offset-4 sm:min-h-0 sm:px-0"
+            className="flex min-h-11 items-center px-3 font-semibold underline-offset-4 sm:block sm:min-h-0 sm:px-0"
           >{t(destination.label)}</Link>)}
       </nav>
       {!session.authenticated && pathname !== "/login" && <Link to="/login" data-testid="sign-in-link" className="button-primary rounded-lg px-4 py-3 font-semibold">{t("auth.submit")}</Link>}
