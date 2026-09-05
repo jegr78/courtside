@@ -45,10 +45,11 @@ function resourceEnvironment() {
 }
 
 function resourceTimeline() {
+  const containerIds = { proxy: "a", postgres: "b", browser: "c" };
   return { schemaVersion: 1, intervalMs: 1_000,
     samples: ["application", "proxy", "postgres", "browser"].flatMap((target) => [1, 2].map((sequence) => ({
       recordedAt: `2026-08-27T08:00:0${sequence}.000Z`, sequence, target,
-      ...target === "application" ? { processId: 1234 } : { containerId: String(sequence).repeat(64) },
+      ...target === "application" ? { processId: 1234 } : { containerId: containerIds[target].repeat(64) },
       ...target === "browser" ? { processId: 77 } : {},
       cpuPercent: 1, memoryUsageBytes: 1_000, pids: 1, sharedMemoryUsageBytes: 0
     }))) };

@@ -163,17 +163,10 @@ export function validateResourceTimeline(timeline) {
   for (const target of targets) {
     const samples = timeline.samples.filter((sample) => sample.target === target);
     if (samples.length < 2) throw new Error(`Resource timeline requires at least two ${target} samples`);
-    let previous = 0;
-    let previousTimestamp;
     for (const sample of samples) {
       const recordedAt = Date.parse(sample.recordedAt);
       if (!Number.isFinite(recordedAt) || !Number.isInteger(sample.sequence)
-          || sample.sequence <= previous) throw new Error(`${target} resource sample order is invalid`);
-      if (previousTimestamp !== undefined && recordedAt - previousTimestamp > timeline.intervalMs * 5) {
-        throw new Error(`${target} resource sampling gap exceeds the declared cadence`);
-      }
-      previous = sample.sequence;
-      previousTimestamp = recordedAt;
+          || sample.sequence < 1) throw new Error(`${target} resource sample order is invalid`);
       positiveNumber(sample.cpuPercent === 0 ? 1 : sample.cpuPercent, `${target} CPU`);
       positiveInteger(sample.memoryUsageBytes, `${target} memory`);
       positiveInteger(sample.pids, `${target} pids`);
@@ -188,6 +181,21 @@ export function validateResourceTimeline(timeline) {
       }
       if (target === "browser" && !Number.isInteger(sample.processId)) {
         throw new Error("Browser resource sample requires its process ID");
+      }
+    }
+    const series = Map.groupBy(samples, (sample) => target === "application" ? sample.processId : sample.containerId);
+    for (const observations of series.values()) {
+      if (observations.length < 2) throw new Error(`${target} resource timeline requires two samples per process`);
+      let previousSequence = 0;
+      let previousTimestamp;
+      for (const sample of observations) {
+        const recordedAt = Date.parse(sample.recordedAt);
+        if (sample.sequence <= previousSequence
+            || previousTimestamp !== undefined && recordedAt - previousTimestamp > timeline.intervalMs * 5) {
+          throw new Error(`${target} resource sampling gap or order is invalid`);
+        }
+        previousSequence = sample.sequence;
+        previousTimestamp = recordedAt;
       }
     }
   }

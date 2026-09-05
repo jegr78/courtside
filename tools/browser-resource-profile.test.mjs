@@ -72,7 +72,7 @@ test("given a completed run, when validating its timeline, then all targets and 
     recordedAt: `2026-09-05T08:00:0${sequence}.000Z`,
     sequence,
     target,
-    containerId: target === "application" ? undefined : String(sequence).repeat(64),
+    containerId: target === "application" ? undefined : ({ proxy: "a", postgres: "b", browser: "c" })[target].repeat(64),
     processId: target === "application" ? 1234 : target === "browser" ? 77 : undefined,
     cpuPercent: sequence,
     memoryUsageBytes: sequence * 1000,
