@@ -495,6 +495,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   let resourceSampleTimer: NodeJS.Timeout | undefined;
   let resourceSamplePending: Promise<void> | undefined;
   let resourceSampleFailure: Error | undefined;
+  let resourceSamplingStopped = false;
   const sampleResources = () => {
     if (resourceSamplePending) return;
     resourceSamplePending = retainResourceSample()
@@ -503,14 +504,19 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   };
   const startResourceSampling = async () => {
     resourceSampleFailure = undefined;
+    resourceSamplingStopped = false;
     await retainResourceSample();
     resourceSampleTimer = setInterval(sampleResources, 1_000);
   };
-  const stopResourceSampling = async () => {
+  const pauseResourceSampling = async () => {
     clearInterval(resourceSampleTimer);
     resourceSampleTimer = undefined;
     await resourceSamplePending;
     if (resourceSampleFailure) throw resourceSampleFailure;
+  };
+  const stopResourceSampling = async () => {
+    resourceSamplingStopped = true;
+    await pauseResourceSampling();
     await retainResourceSample();
   };
   const stopBrowser = async (browserName: string): Promise<void> => {
@@ -518,6 +524,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     if (!browser) return;
     const id = browser.container.getId();
     try {
+      if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true") {
+        await pauseResourceSampling();
+        await retainResourceSample();
+      }
       await completeCleanup([
         async () => {
           await browser.container.stop({ remove: false });
@@ -529,6 +539,9 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       ]);
     } finally {
       browserServers.delete(browserName);
+      if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true" && !resourceSamplingStopped) {
+        resourceSampleTimer = setInterval(sampleResources, 1_000);
+      }
     }
   };
   let clubNetwork: StartedNetwork | undefined;
