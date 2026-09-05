@@ -139,7 +139,7 @@ jobs:
           ./mvnw -B package -DskipTests
           cd frontend
           npm ci --ignore-scripts
-      - name: Qualify periodic browser and mobile projects
+      - name: Qualify the periodic Firefox project and repeat the phone layout
         working-directory: frontend
         env:
           COURTSIDE_PERIODIC_BROWSERS: 'true'
