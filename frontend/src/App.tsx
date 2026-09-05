@@ -31,6 +31,7 @@ import { AdminMembershipTypesView } from "./views/AdminMembershipTypesView";
 import { AdminImportView } from "./views/AdminImportView";
 import { AdminPersonView } from "./views/AdminPersonView";
 import { AdminRosterView } from "./views/AdminRosterView";
+import { AdminSetupView } from "./views/AdminSetupView";
 
 interface AppRoutesProps {
   session: SessionStatus;
@@ -59,7 +60,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/" element={<HomeView session={session} clubName={clubName} />} />
     <Route path="/courts" element={<HomeView session={session} clubName={clubName} />} />
     <Route path="/login" element={session.authenticated
-      ? <Navigate to="/" replace />
+      ? <Navigate to={passwordChanged && session.roles.includes("ADMIN") ? "/admin/setup" : "/"} replace />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="/my-bookings" element={session.authenticated
       ? <MyBookingsPage session={session} />
@@ -69,7 +70,8 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <Navigate to="/login" replace />} />
     {/* The role is asked once for the whole surface rather than once per destination. */}
     <Route path="/admin" element={session.roles.includes("ADMIN") ? <AdminShell /> : <Navigate to="/" replace />}>
-      <Route index element={<Navigate to="/admin/configuration" replace />} />
+      <Route index element={<Navigate to="/admin/setup" replace />} />
+      <Route path="setup" element={<AdminSetupView />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={(changed) => configurationChanged?.(changed)} />} />
       <Route path="facility">
         <Route index element={<Navigate to="/admin/facility/courts" replace />} />

@@ -1,6 +1,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import userEvent from "@testing-library/user-event";
 import i18n from "../i18n";
 import { AdminNavigation } from "./AdminNavigation";
 
@@ -25,6 +26,7 @@ describe("AdminNavigation", () => {
 
     // then
     const club = screen.getByTestId("admin-group-club");
+    expect(within(club).getByTestId("admin-setup-link")).toBeInTheDocument();
     expect(within(club).getByTestId("admin-configuration-link")).toBeInTheDocument();
     const facility = screen.getByTestId("admin-group-facility");
     expect(within(facility).getByTestId("admin-courts-link")).toBeInTheDocument();
@@ -56,6 +58,18 @@ describe("AdminNavigation", () => {
     expect(screen.getByTestId("admin-opening-hours-link")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("admin-courts-link")).not.toHaveAttribute("aria-current");
     expect(screen.getByTestId("admin-configuration-link")).not.toHaveAttribute("aria-current");
+  });
+
+  it("given setup is current on a narrow screen, when the navigation is folded, then its control names setup", () => {
+    // given
+    resizeTo(375);
+
+    // when
+    show("/admin/setup");
+
+    // then
+    expect(screen.getByTestId("admin-menu")).toHaveTextContent("Setup");
+    expect(screen.getByTestId("admin-setup-link")).toHaveAttribute("aria-current", "page");
   });
 
   // The four subjects are pages of their own, so a board reaches Sunday without passing the courts.
@@ -119,5 +133,20 @@ describe("AdminNavigation", () => {
 
     // then
     expect(screen.getByTestId("admin-navigation")).toHaveAttribute("open");
+  });
+
+  it("given an open phone navigation, when a destination is chosen, then the destinations fold away", async () => {
+    // given
+    resizeTo(375);
+    show("/admin/setup");
+    await userEvent.click(screen.getByTestId("admin-menu"));
+    expect(screen.getByTestId("admin-configuration-link")).toBeVisible();
+
+    // when
+    await userEvent.click(screen.getByTestId("admin-configuration-link"));
+
+    // then
+    expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
+    expect(screen.getByTestId("admin-menu")).toHaveTextContent("Configuration");
   });
 });

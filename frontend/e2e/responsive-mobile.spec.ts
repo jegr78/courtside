@@ -105,6 +105,14 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   // which one is open rather than leaving that to a marker nobody can see while it is folded
   await expect(page.getByTestId("admin-menu")).toBeVisible();
   await expect(page.getByTestId("admin-courts-link")).not.toBeVisible();
+  await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  // when
+  await page.getByTestId("admin-menu").tap();
+  await page.getByTestId("admin-configuration-link").tap();
+
+  // then
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
   await expect(page.getByTestId("save-club-config")).toBeVisible();
   await expectNoHorizontalOverflow(page);

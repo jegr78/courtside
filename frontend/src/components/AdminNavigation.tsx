@@ -26,6 +26,7 @@ const groups: Group[] = [
     testId: "admin-group-club",
     heading: "nav.adminClub",
     destinations: [
+      { to: "/admin/setup", testId: "admin-setup-link", label: "nav.adminSetup" },
       { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration" }
     ]
   },
@@ -98,6 +99,7 @@ export function AdminNavigation() {
           to={destination.to}
           data-testid={destination.testId}
           aria-current={isCurrent(destination, pathname) ? "page" : undefined}
+          onClick={() => { if (!laidOpen) setUnfolded(false); }}
           className="rounded-lg px-3 py-2 font-semibold aria-[current]:bg-(--cs-raised)"
         >{t(destination.label)}</Link>)}
       </div>)}

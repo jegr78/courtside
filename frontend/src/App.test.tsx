@@ -227,6 +227,7 @@ describe("AppRoutes", () => {
   // sit a level further down than the rest, and a guard that only reached its children would let
   // them through.
   it.each([
+    ["/admin/setup", "admin-setup-view"],
     ["/admin/configuration", "admin-configuration-view"],
     ["/admin/facility/opening-hours", "admin-opening-hours-view"]
   ])("given a member session, when opening %s, then it is not served", (address, view) => {
@@ -257,7 +258,36 @@ describe("AppRoutes", () => {
 
     // then
     expect(screen.getByTestId("primary-navigation")).toBeInTheDocument();
-    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin/configuration");
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin/setup");
+  });
+
+  it.each(["/login", "/admin"])("given an administrator, when opening %s, then setup is the next step", async (address) => {
+    // given
+    vi.spyOn(api, "adminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      logoUrl: null, imprintUrl: null, privacyUrl: null, defaultLocale: "en", supportedLocales: ["de", "en"],
+      slotMinutes: 30, timeZone: "Europe/Berlin", newAccountCredentialHours: 168,
+      passwordResetCredentialHours: 24, bookingReminderHours: 24, logoUploaded: false,
+      logoFallbackUrl: null, noMembershipTypeRuleSetId: null
+    });
+    vi.spyOn(api, "adminCourts").mockResolvedValue([]);
+    vi.spyOn(api, "adminOpeningHours").mockResolvedValue([]);
+    vi.spyOn(api, "membershipTypes").mockResolvedValue([]);
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });
+    vi.spyOn(api, "importSources").mockResolvedValue([]);
+
+    // when
+    render(<RoutedShell initialEntries={[address]}><AppRoutes session={{
+      authenticated: true,
+      username: "admin",
+      displayName: "Example Administrator",
+      roles: ["ADMIN"],
+      passwordChangeRequired: false
+    }} refreshSession={() => Promise.resolve()} passwordChanged={address === "/login"} /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("admin-setup-view")).toBeInTheDocument();
+    expect(screen.getByTestId("setup-progress")).toHaveTextContent("1 von 4");
   });
 
   // The four subjects of the facility are pages of their own, so a link can point at one of them.

@@ -87,7 +87,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
                                 "/my-messages",
-                                "/admin",
+                                "/admin", "/admin/setup",
                                 "/admin/configuration", "/admin/facility",
                                 "/admin/facility/courts", "/admin/facility/opening-hours",
                                 "/admin/facility/booking-cards",
