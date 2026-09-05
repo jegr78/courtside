@@ -12,7 +12,8 @@ CREATE TABLE import_run (
     row_error_count         integer     NOT NULL,
     removals_confirmed      boolean     NOT NULL,
     executed_at             timestamptz NOT NULL,
-    executed_by_account_id  uuid        NOT NULL REFERENCES user_account,
+    -- No foreign key: a run records who ran it, and section 11 lets that person go.
+    executed_by_account_id  uuid        NOT NULL,
     CONSTRAINT import_run_mode_known CHECK (mode IN ('FULL_SNAPSHOT', 'UPDATE_ONLY')),
     CONSTRAINT import_run_file_hash_shape CHECK (file_hash ~ '^[0-9a-f]{64}$'),
     CONSTRAINT import_run_counts_not_negative

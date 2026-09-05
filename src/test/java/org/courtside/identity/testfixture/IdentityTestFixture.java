@@ -107,6 +107,13 @@ public class IdentityTestFixture {
         accounts.saveAndFlush(account);
     }
 
+    // No operation removes an account yet, so what section 11 will one day do is spelled out here
+    // for the modules whose records have to survive it.
+    public void removeAccount(UUID accountId) {
+        accounts.deleteById(accountId);
+        accounts.flush();
+    }
+
     public UUID createPersonWithLeadingIdDigitIn(
             String firstName, String lastName, String email, String allowedDigits) {
         Person person = new Person(firstName, lastName, email);

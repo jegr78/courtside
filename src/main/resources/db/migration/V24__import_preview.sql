@@ -11,7 +11,8 @@ CREATE TABLE import_preview (
     removal_percent       integer     NOT NULL,
     removal_warning_pct   integer     NOT NULL,
     created_at            timestamptz NOT NULL,
-    created_by_account_id uuid        NOT NULL REFERENCES user_account,
+    -- No foreign key: a preview records who took it, and section 11 lets that person go.
+    created_by_account_id uuid        NOT NULL,
     expires_at            timestamptz NOT NULL,
     superseded_at         timestamptz,
     CONSTRAINT import_preview_mode_known CHECK (mode IN ('FULL_SNAPSHOT', 'UPDATE_ONLY')),
