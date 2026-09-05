@@ -5,33 +5,106 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 // The JDK exposes no way to write an X.509 certificate, and adding a library to sign one would be a
-// dependency this repository carries for two tests.
-record TestRelayCertificate(String certificate, String key) {
+// dependency this repository carries for one test class.
+record TestRelayCertificate(String certificate, String key, String authority) {
+
+    private static final String SUBJECT = "/CN=courtside-relay-under-test";
+    private static final DateTimeFormatter MOMENT =
+            DateTimeFormatter.ofPattern("uuuuMMddHHmmss'Z'").withZone(ZoneOffset.UTC);
 
     static TestRelayCertificate issuedFor(String name) throws Exception {
+        Instant now = Instant.now();
+        return issued(name, now.minus(Duration.ofHours(1)), now.plus(Duration.ofDays(1)));
+    }
+
+    static TestRelayCertificate expiredFor(String name) throws Exception {
+        Instant ranOut = Instant.now().minus(Duration.ofDays(30));
+        return issued(name, ranOut.minus(Duration.ofDays(30)), ranOut);
+    }
+
+    // Signed by an authority of its own rather than by itself, because a self-signed certificate
+    // handed to a caller as its own anchor is one PKIX never checks the validity of.
+    private static TestRelayCertificate issued(String name, Instant from, Instant until)
+            throws Exception {
         Path directory = Files.createTempDirectory("courtside-relay-");
-        Path certificate = directory.resolve("cert.pem");
-        Path key = directory.resolve("key.pem");
         try {
-            Process openssl = new ProcessBuilder(executable("openssl").toString(), "req", "-x509",
-                    "-newkey", "rsa:2048", "-nodes", "-days", "1",
-                    "-subj", "/CN=courtside-relay-under-test", "-addext", "subjectAltName=DNS:" + name,
-                    "-keyout", key.toString(), "-out", certificate.toString())
-                    .redirectErrorStream(true).start();
-            String output = new String(openssl.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            if (openssl.waitFor() != 0) {
-                throw new IllegalStateException("Could not issue the relay certificate: " + output);
-            }
-            return new TestRelayCertificate(Files.readString(certificate), Files.readString(key));
+            Files.writeString(directory.resolve("index.txt"), "");
+            Files.writeString(directory.resolve("serial"), "01\n");
+            Files.writeString(directory.resolve("authority.cnf"), authorityConfiguration(name));
+            openssl(directory, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                    "-subj", "/CN=courtside-relay-authority-under-test",
+                    "-keyout", "authority.key", "-out", "authority.pem");
+            openssl(directory, "req", "-new", "-newkey", "rsa:2048", "-nodes", "-subj", SUBJECT,
+                    "-keyout", "key.pem", "-out", "request.pem");
+            // `openssl req -x509` learned to backdate only in OpenSSL 3.5, and the runners this
+            // build uses ship 3.0, where `openssl ca` is the one command that issues into the past.
+            openssl(directory, "ca", "-batch", "-config", "authority.cnf",
+                    "-cert", "authority.pem", "-keyfile", "authority.key",
+                    "-in", "request.pem", "-out", "cert.pem", "-notext", "-extensions", "leaf",
+                    "-startdate", MOMENT.format(from), "-enddate", MOMENT.format(until));
+            return new TestRelayCertificate(read(directory, "cert.pem"), read(directory, "key.pem"),
+                    read(directory, "authority.pem"));
         } finally {
-            Files.deleteIfExists(certificate);
-            Files.deleteIfExists(key);
-            Files.deleteIfExists(directory);
+            discard(directory);
+        }
+    }
+
+    private static String authorityConfiguration(String name) {
+        return """
+                [ca]
+                default_ca = relay
+
+                [relay]
+                database = index.txt
+                serial = serial
+                new_certs_dir = .
+                default_md = sha256
+                policy = anything
+                email_in_dn = no
+                rand_serial = no
+                unique_subject = no
+
+                [anything]
+                commonName = optional
+
+                [leaf]
+                basicConstraints = critical,CA:FALSE
+                subjectAltName = DNS:%s
+                """.formatted(name);
+    }
+
+    private static String read(Path directory, String name) throws IOException {
+        return Files.readString(directory.resolve(name));
+    }
+
+    private static void openssl(Path directory, String... arguments) throws Exception {
+        List<String> command = new ArrayList<>(List.of(executable("openssl").toString()));
+        command.addAll(List.of(arguments));
+        Process openssl = new ProcessBuilder(command)
+                .directory(directory.toFile()).redirectErrorStream(true).start();
+        String output = new String(openssl.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        if (openssl.waitFor() != 0) {
+            throw new IllegalStateException("Could not issue the relay certificate: " + output);
+        }
+    }
+
+    private static void discard(Path directory) throws IOException {
+        try (Stream<Path> written = Files.walk(directory)) {
+            for (Path path : written.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
         }
     }
 
