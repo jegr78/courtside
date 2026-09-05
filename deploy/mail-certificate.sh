@@ -5,6 +5,7 @@ hostname="${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}"
 store="${COURTSIDE_MAIL_CERTIFICATE_STORE:-/caddy/caddy/certificates}"
 target="${COURTSIDE_MAIL_CERTIFICATE_TARGET:-/tls}"
 watched="${COURTSIDE_MAIL_CERTIFICATE_WATCH:-/caddy}"
+health=/tmp/health
 
 # The mail server runs as its own user and reads the pair through the group it shares with this
 # helper, which no default umask would grant it.
@@ -17,9 +18,10 @@ report() {
 # A store Caddy is busy in wakes this helper many times over, and a state that has not changed has
 # nothing to say a second time.
 announce() {
+  printf '%s\n' "$1" > "$health"
   [ "$1" = "$announced" ] && return 0
   announced="$1"
-  report "$1"
+  report "${1#* }"
 }
 
 names() {
@@ -59,43 +61,43 @@ CADDY
 publish() {
   source="$(newest)"
   if [ -z "$source" ]; then
-    announce "no certificate for $hostname in the proxy's store yet"
+    announce "failed no certificate for $hostname in the proxy's store yet"
     return 1
   fi
   issued="$(dirname "$source")"
   version="$(cat "$issued/$hostname.crt" "$issued/$hostname.key" | sha256sum | cut -d' ' -f1)"
   if [ "$version" = "$(readlink "$target/current" 2>/dev/null | sed 's#versions/##')" ]; then
+    announce "ok the mail server has the certificate the proxy issued for $hostname"
     return 1
   fi
 
   staging="$target/versions/.staging"
   rm -rf "$staging"
-  mkdir -p "$staging" || { announce "cannot write into $target, so nothing can be handed over"; return 1; }
+  mkdir -p "$staging" || { announce "failed cannot write into $target, so nothing can be handed over"; return 1; }
   # Copied through a new file rather than with cp, which would carry over the store's own mode and
   # hand the mail server a key its user cannot open.
   if ! cat "$issued/$hostname.crt" > "$staging/tls.crt" \
       || ! cat "$issued/$hostname.key" > "$staging/tls.key"; then
     rm -rf "$staging"
-    announce "cannot copy the pair for $hostname out of the proxy's store"
+    announce "failed cannot copy the pair for $hostname out of the proxy's store"
     return 1
   fi
   if ! usable "$staging"; then
     rm -rf "$staging"
-    announce "the pair for $hostname is incomplete or mismatched, so the published one stays"
+    announce "failed the pair for $hostname is incomplete or mismatched, so the published one stays"
     return 1
   fi
 
   rm -rf "$target/versions/$version"
   mv "$staging" "$target/versions/$version" \
-    || { announce "cannot name the new version under $target"; return 1; }
+    || { announce "failed cannot name the new version under $target"; return 1; }
   # Two files cannot be renamed together, so the pair is swapped by renaming the one link that
   # names both of them.
   if ! ln -sfn "versions/$version" "$target/.next" || ! mv -T "$target/.next" "$target/current"; then
-    announce "cannot swap $target/current, so the mail server still reads the pair before this one"
+    announce "failed cannot swap $target/current, so the mail server still reads the pair before this one"
     return 1
   fi
-  announced=""
-  report "published the certificate for $hostname as $version"
+  announce "ok published the certificate for $hostname as $version"
   discard "$version"
 }
 

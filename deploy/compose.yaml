@@ -132,6 +132,44 @@ services:
       - caddy-data:/caddy:ro
       - mail-tls:/tls
     entrypoint: ["sh", "/mail-certificate.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q '^ok' /tmp/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  mail-reload:
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    profiles: [mail]
+    restart: unless-stopped
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Outside the group the published versions belong to, so the container that tells the mail
+    # server to load the pair is the one container that cannot read it.
+    user: "1500:1500"
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      COURTSIDE_MAIL_DOMAIN: ${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}
+      COURTSIDE_MAIL_RELOAD_USERNAME: ${COURTSIDE_MAIL_RELOAD_USERNAME:-certificate-reload}
+      COURTSIDE_MAIL_RELOAD_PASSWORD: ${COURTSIDE_MAIL_RELOAD_PASSWORD:?set COURTSIDE_MAIL_RELOAD_PASSWORD in .env}
+      COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE: ${COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE:-6}
+    volumes:
+      - ./mail-reload.sh:/mail-reload.sh:ro
+      - mail-tls:/tls:ro
+    entrypoint: ["sh", "/mail-reload.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q '^ok' /tmp/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   mail-plan:
     image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
@@ -149,6 +187,8 @@ services:
       COURTSIDE_MAIL_ADMIN_PASSWORD: ${COURTSIDE_MAIL_ADMIN_PASSWORD:?set COURTSIDE_MAIL_ADMIN_PASSWORD in .env}
       COURTSIDE_MAIL_SENDER_USERNAME: ${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}
       COURTSIDE_MAIL_PASSWORD: ${COURTSIDE_MAIL_PASSWORD:?set COURTSIDE_MAIL_PASSWORD in .env}
+      COURTSIDE_MAIL_RELOAD_USERNAME: ${COURTSIDE_MAIL_RELOAD_USERNAME:-certificate-reload}
+      COURTSIDE_MAIL_RELOAD_PASSWORD: ${COURTSIDE_MAIL_RELOAD_PASSWORD:?set COURTSIDE_MAIL_RELOAD_PASSWORD in .env}
     volumes:
       - ./mail:/mail:ro
       - mail-plan:/plan
