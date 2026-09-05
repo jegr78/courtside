@@ -26,6 +26,37 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.getByTestId("login-submit").click();
 }
 
+test("a member reaches every destination from the bottom of a touch viewport", async ({ page }) => {
+  // given
+  await signIn(page, "doe.jane");
+  await expect(page.getByTestId("court-plan-link")).toBeVisible();
+
+  // when
+  const bar = page.getByTestId("primary-navigation-bar");
+  const box = await bar.boundingBox();
+  const viewport = page.viewportSize();
+
+  // then — pinned to the bottom edge rather than merely present somewhere down the page
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(Math.round(box!.y + box!.height)).toBe(viewport!.height);
+
+  // then — every destination is a target a thumb can hit
+  const links = await bar.locator("a").all();
+  expect(links.length).toBeGreaterThan(1);
+  for (const link of links) {
+    const target = await link.boundingBox();
+    expect(target!.height).toBeGreaterThanOrEqual(44);
+  }
+
+  // when
+  await page.getByTestId("my-messages-link").tap();
+
+  // then
+  await expect(page.getByTestId("my-messages-view")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 test("member and administration surfaces remain usable on a touch viewport", async ({ page, journeyService }) => {
   // given
   await signIn(page, "doe.jane");

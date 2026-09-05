@@ -30,6 +30,34 @@ describe("PrimaryNavigation", () => {
     expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
   });
 
+  it("given more than one destination, when rendered on a phone, then the bar sits where a thumb reaches", () => {
+    // when
+    show(member);
+
+    // then
+    const bar = screen.getByTestId("primary-navigation-bar");
+    expect(bar).toHaveClass("fixed", "inset-x-0", "bottom-0");
+    expect(bar).toHaveClass("sm:static");
+  });
+
+  it("given a visitor with one destination, when rendered, then no bar takes a phone's bottom edge", () => {
+    // when
+    show(anonymous);
+
+    // then — a bar holding the page you are already on is a strip of screen for nothing
+    expect(screen.getByTestId("court-plan-link")).toBeInTheDocument();
+    expect(screen.queryByTestId("primary-navigation-bar")).not.toBeInTheDocument();
+  });
+
+  it("given an administrator, when rendered on a phone, then the bar holds at most four destinations", () => {
+    // when
+    show(administrator);
+
+    // then
+    expect(screen.getByTestId("primary-navigation-bar").querySelectorAll("a").length)
+      .toBeLessThanOrEqual(4);
+  });
+
   it("given a member, when rendered, then nothing offers administration", () => {
     show(member);
     expect(screen.getByTestId("my-bookings-link")).toBeInTheDocument();

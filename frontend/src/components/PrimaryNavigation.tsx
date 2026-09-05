@@ -27,20 +27,33 @@ function isCurrent(destination: Destination, pathname: string): boolean {
   return pathname === destination.to || pathname.startsWith(`${destination.to}/`);
 }
 
+const BAR = "fixed inset-x-0 bottom-0 z-40 flex justify-around border-t px-2 py-2 "
+  + "pb-[max(0.5rem,env(safe-area-inset-bottom))] surface-panel "
+  + "sm:static sm:justify-start sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0";
+
 export function PrimaryNavigation({ session }: { session: SessionStatus }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const open = destinations.filter((destination) => destination.visible(session));
+
+  // A bar holding the one page you are already on takes a phone's bottom edge for nothing, so a
+  // visitor who can reach nowhere else keeps the row the destinations came from.
+  const reachable = open.length > 1;
 
   return <div data-testid="primary-navigation" className="grid w-full max-w-7xl gap-3">
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <nav aria-label={t("nav.primary")} className="flex flex-wrap items-center gap-4">
-        {destinations.filter((destination) => destination.visible(session)).map((destination) =>
+      <nav
+        aria-label={t("nav.primary")}
+        data-testid={reachable ? "primary-navigation-bar" : undefined}
+        className={reachable ? BAR : "flex flex-wrap items-center gap-4"}
+      >
+        {open.map((destination) =>
           <Link
             key={destination.testId}
             to={destination.to}
             data-testid={destination.testId}
             aria-current={isCurrent(destination, pathname) ? "page" : undefined}
-            className="font-semibold underline-offset-4"
+            className="flex min-h-11 items-center px-3 font-semibold underline-offset-4 sm:min-h-0 sm:px-0"
           >{t(destination.label)}</Link>)}
       </nav>
       {!session.authenticated && pathname !== "/login" && <Link to="/login" data-testid="sign-in-link" className="button-primary rounded-lg px-4 py-3 font-semibold">{t("auth.submit")}</Link>}
