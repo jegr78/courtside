@@ -270,6 +270,14 @@ memory limits. Docker enforces memory, CPU, PID and shared-memory limits for Pos
 and every browser container. Startup fails before the journey if the Docker host cannot supply the
 selected total capacity or does not support memory and PID limits.
 
+Requalify the reference only on a clean committed tree. From `frontend`, run
+`COURTSIDE_WEBKIT_RELIABILITY=true COURTSIDE_BROWSER_RESOURCE_PROFILE=reference npx playwright test --project=webkit-core --project=webkit-pwa --project=webkit-accessibility`.
+Then, from the repository root, run
+`node tools/browser-resource-profile.mjs derive frontend/test-results/resource-timeline.json $(git rev-parse HEAD)`.
+Review the measured peaks and replace `quality/browser-resource-profiles.json` with that command's
+output. Contract validation recomputes every normal and stress limit from the retained peaks, so a
+hand-edited limit cannot claim the documented derivation.
+
 | Target | Normal CPU | Normal memory | Normal PIDs | Normal shared memory | Stress CPU | Stress memory | Stress PIDs | Stress shared memory |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Application | 2.9 | 1280 MiB | 16 | 16 MiB | 2.175 | 960 MiB | 12 | 12 MiB |

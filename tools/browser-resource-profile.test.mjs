@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assertHostCapacity,
   deriveResourceProfiles,
+  deriveResourceProfilesFromTimeline,
   resourceLimits,
   validateResourceProfileContract,
   validateResourceTimeline
@@ -64,6 +65,9 @@ test("given the maintained profiles, when loading the contract, then exact enfor
   assert.deepEqual(Object.keys(limits).toSorted(),
     ["cpu", "memoryBytes", "pids", "sharedMemoryBytes"]);
   assert.deepEqual(limits, { cpu: 0.3, memoryBytes: 134_217_728, pids: 32, sharedMemoryBytes: 16_777_216 });
+  const altered = structuredClone(contract);
+  altered.profiles.normal.targets.postgres.cpu += 0.05;
+  assert.throws(() => validateResourceProfileContract(altered), /derivation/);
 });
 
 test("given a completed run, when validating its timeline, then all targets and metrics must be sampled over time", () => {
@@ -89,4 +93,7 @@ test("given a completed run, when validating its timeline, then all targets and 
   assert.throws(() => validateResourceTimeline({ schemaVersion: 1, intervalMs: 1_000,
     samples: samples.map((sample) => sample.target === "browser" && sample.sequence === 2
       ? { ...sample, recordedAt: "2026-09-05T08:00:08.000Z" } : sample) }), /sampling gap/);
+  const derived = deriveResourceProfilesFromTimeline({ schemaVersion: 1, intervalMs: 1_000, samples },
+    "a".repeat(40), "018f47a2-9e4c-7a61-8000-123456789abc");
+  assert.equal(derived.derivation.reference.measuredAt, "2026-09-05T08:00:02.000Z");
 });

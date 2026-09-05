@@ -40,6 +40,15 @@ function derivedTarget(samples, target, factor) {
   };
 }
 
+function derivedPeaksTarget(peaks, target, factor) {
+  return {
+    cpu: roundUp(Math.max(0.05, peaks[target].cpuPercent / 100 * factor), 0.05),
+    memoryMegabytes: roundUp(peaks[target].memoryUsageBytes / mebibyte * factor, 64),
+    pids: roundUp(peaks[target].pids * factor, 16),
+    sharedMemoryMegabytes: roundUp(Math.max(1, peaks[target].sharedMemoryUsageBytes / mebibyte) * factor, 16)
+  };
+}
+
 export function deriveResourceProfiles(reference) {
   if (!/^[0-9a-f]{40}$/.test(reference.sourceCommit ?? "")) throw new Error("Reference source commit is invalid");
   if (!Number.isFinite(Date.parse(reference.measuredAt))) throw new Error("Reference timestamp is invalid");
@@ -81,7 +90,8 @@ export function validateResourceProfileContract(contract) {
   }
   if (!/^[0-9a-f]{40}$/.test(contract.derivation?.reference?.sourceCommit ?? "")
       || !Number.isFinite(Date.parse(contract.derivation?.reference?.measuredAt ?? ""))
-      || typeof contract.derivation?.reference?.attemptId !== "string") {
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+        contract.derivation?.reference?.attemptId ?? "")) {
     throw new Error("Resource profile reference provenance is invalid");
   }
   if (JSON.stringify(Object.keys(contract.derivation.reference.peaks ?? {})) !== JSON.stringify(targets)) {
@@ -110,17 +120,27 @@ export function validateResourceProfileContract(contract) {
       }
       positiveNumber(limits.cpu, `${profileName} ${target} CPU`);
       positiveNumber(limits.memoryMegabytes, `${profileName} ${target} memory`);
-      positiveNumber(limits.pids, `${profileName} ${target} PIDs`);
+      positiveInteger(limits.pids, `${profileName} ${target} PIDs`);
       positiveNumber(limits.sharedMemoryMegabytes, `${profileName} ${target} shared memory`);
     }
   }
   for (const target of targets) {
+    const expectedNormal = derivedPeaksTarget(contract.derivation.reference.peaks, target, 1.25);
     for (const field of ["cpu", "memoryMegabytes", "pids", "sharedMemoryMegabytes"]) {
-      if (contract.profiles.stress.targets[target][field] > contract.profiles.normal.targets[target][field]) {
-        throw new Error(`Stress ${target} ${field} exceeds the normal limit`);
+      const normal = contract.profiles.normal.targets[target][field];
+      const stress = contract.profiles.stress.targets[target][field];
+      if (normal !== expectedNormal[field] || stress !== Number((normal * 0.75).toFixed(4))) {
+        throw new Error(`${target} ${field} does not match the declared resource profile derivation`);
       }
     }
   }
+}
+
+export function deriveResourceProfilesFromTimeline(timeline, sourceCommit, attemptId = randomUUID()) {
+  validateResourceTimeline(timeline);
+  const measuredAt = timeline.samples.reduce((latest, sample) =>
+    Date.parse(sample.recordedAt) > Date.parse(latest) ? sample.recordedAt : latest, timeline.samples[0].recordedAt);
+  return deriveResourceProfiles({ sourceCommit, measuredAt, attemptId, samples: timeline.samples });
 }
 
 export function resourceLimits(contract, profileName, target) {
@@ -202,3 +222,15 @@ export function validateResourceTimeline(timeline) {
 }
 
 export const browserResourceTargets = Object.freeze([...targets]);
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [command, timelinePath, sourceCommit, attemptId] = process.argv.slice(2);
+  if (command !== "derive" || !timelinePath || !sourceCommit) {
+    throw new Error("Usage: node tools/browser-resource-profile.mjs derive <resource-timeline.json> <source-commit> [attempt-id]");
+  }
+  const timeline = JSON.parse(readFileSync(timelinePath, "utf8"));
+  process.stdout.write(`${JSON.stringify(deriveResourceProfilesFromTimeline(timeline, sourceCommit, attemptId), null, 2)}\n`);
+}
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
