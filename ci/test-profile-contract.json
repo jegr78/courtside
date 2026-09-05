@@ -4,22 +4,23 @@
   "ciJobOrder": ["docs", "backend", "frontend", "tooling", "security"],
   "profiles": {
     "docs": {
-      "ciJobs": ["docs"],
-      "localTasks": ["docs-check"]
+      "ciJobs": ["docs", "tooling"],
+      "localTasks": ["frontend-toolchain", "docs-check", "tooling-test"]
     },
     "backend": {
-      "ciJobs": ["backend", "security"],
-      "localTasks": ["backend"]
+      "ciJobs": ["backend", "tooling", "security"],
+      "localTasks": ["frontend-toolchain", "backend", "tooling-test"]
     },
     "frontend": {
-      "ciJobs": ["frontend", "security"],
+      "ciJobs": ["frontend", "tooling", "security"],
       "localTasks": [
         "frontend-toolchain",
         "frontend-lint",
         "frontend-test",
         "frontend-build",
         "frontend-package",
-        "frontend-e2e"
+        "frontend-e2e",
+        "tooling-test"
       ]
     },
     "tooling": {

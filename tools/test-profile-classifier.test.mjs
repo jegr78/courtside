@@ -108,7 +108,7 @@ test("given reviewed GitHub metadata, when classifying, then templates and valid
 
   // when / then
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/ISSUE_TEMPLATE/bug.md" }], []).profiles, ["docs"]);
-  assert.deepEqual(ciJobsForProfiles(contract, ["docs"]), ["docs"]);
+  assert.deepEqual(ciJobsForProfiles(contract, ["docs"]), ["docs", "tooling"]);
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/dependabot.yml" }], []).profiles, ["tooling"]);
   assert.deepEqual(classifyChanges([{ status: "M", path: ".github/workflows/pr-title-lint.yml" }], []).profiles,
     ["tooling"]);
@@ -373,8 +373,9 @@ test("given a profile plan, when binding it to the workflow run, then every iden
   assert.equal(bound.headCommit, "b".repeat(40));
   assert.equal(bound.plannerOutcome, "passed");
   assert.deepEqual(bound.profiles, ["docs"]);
-  assert.deepEqual(bound.ciJobs, ["docs"]);
-  assert.deepEqual(bound.localTasks.map((task) => task.label), ["docs-check"]);
+  assert.deepEqual(bound.ciJobs, ["docs", "tooling"]);
+  assert.deepEqual(bound.localTasks.map((task) => task.label),
+    ["docs-check", "frontend-toolchain", "tooling-test"]);
   assert.equal(bound.isFull, false);
   assert.equal(validatePlan(bound), true, JSON.stringify(validatePlan.errors));
   assert.throws(() => bindPlanToRun(plan, { ...bound, runId: 0 }), /identity/);

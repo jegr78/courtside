@@ -28,7 +28,8 @@ test("given documentation changes, when planning the local check, then the bound
 
   // then
   assert.deepEqual(plan.profiles, ["docs"]);
-  assert.deepEqual(plan.tasks.map((task) => task.label), ["docs-check"]);
+  assert.deepEqual(plan.tasks.map((task) => task.label),
+    ["docs-check", "frontend-toolchain", "tooling-test"]);
 });
 
 test("given backend changes, when planning the local check, then Java verification matches CI", () => {
@@ -40,12 +41,14 @@ test("given backend changes, when planning the local check, then Java verificati
 
   // then
   assert.deepEqual(plan.profiles, ["backend"]);
-  assert.deepEqual(plan.tasks, [{
+  assert.deepEqual(plan.tasks[0], {
     label: "backend",
     workingDirectory: "repository",
     executable: "maven",
     arguments: ["clean", "verify", "-Pjava-only"]
-  }]);
+  });
+  assert.deepEqual(plan.tasks.map((task) => task.label),
+    ["backend", "frontend-toolchain", "tooling-test"]);
 });
 
 test("given frontend changes, when planning the local check, then its tasks match the CI job", () => {
@@ -66,7 +69,8 @@ test("given frontend changes, when planning the local check, then its tasks matc
     ["frontend-test", "npm", ["run", "test:frontend"]],
     ["frontend-build", "npm", ["run", "build"]],
     ["frontend-package", "maven", ["package", "-DskipTests", "-Pjava-only"]],
-    ["frontend-e2e", "npm", ["run", "test:e2e"]]
+    ["frontend-e2e", "npm", ["run", "test:e2e"]],
+    ["tooling-test", "npm", ["run", "test:tools"]]
   ]);
 });
 
@@ -86,7 +90,8 @@ test("given reviewed GitHub metadata changes, when planning locally, then the de
 
   // then
   assert.deepEqual(template.profiles, ["docs"]);
-  assert.deepEqual(template.tasks.map((task) => task.label), ["docs-check"]);
+  assert.deepEqual(template.tasks.map((task) => task.label),
+    ["docs-check", "frontend-toolchain", "tooling-test"]);
   assert.deepEqual(dependabot.profiles, ["tooling"]);
   assert.deepEqual(dependabot.tasks.map((task) => task.label), ["frontend-toolchain", "tooling-test"]);
 });
@@ -104,7 +109,7 @@ test("given backend and frontend changes, when planning the local check, then bo
   // then
   assert.deepEqual(plan.profiles, ["backend", "frontend"]);
   assert.equal(plan.tasks[0].label, "backend");
-  assert.equal(plan.tasks.at(-1).label, "frontend-e2e");
+  assert.equal(plan.tasks.at(-1).label, "tooling-test");
 });
 
 test("given added documentation, when planning the local check, then it uses the bounded docs task", () => {
@@ -113,7 +118,8 @@ test("given added documentation, when planning the local check, then it uses the
 
   // then
   assert.deepEqual(added.profiles, ["docs"]);
-  assert.deepEqual(added.tasks.map((task) => task.label), ["docs-check"]);
+  assert.deepEqual(added.tasks.map((task) => task.label),
+    ["docs-check", "frontend-toolchain", "tooling-test"]);
 });
 
 test("given an added e2e specification, when planning locally, then the complete frontend path runs", () => {
@@ -124,7 +130,7 @@ test("given an added e2e specification, when planning locally, then the complete
   assert.deepEqual(plan.profiles, ["frontend"]);
   assert.deepEqual(plan.tasks.map((task) => task.label), [
     "frontend-toolchain", "frontend-lint", "frontend-test", "frontend-build",
-    "frontend-package", "frontend-e2e"
+    "frontend-package", "frontend-e2e", "tooling-test"
   ]);
   assert.deepEqual(localCheckPlan([
     { status: "A", path: "frontend/e2e/global-setup.ts" }
@@ -390,7 +396,7 @@ test("given a selected check, when every task passes, then the retained result i
     beforeRun: () => events.push("before"),
     createWorktree: () => ({ path: "/pinned", release: () => events.push("release") }),
     execute: (plan) => {
-      assert.equal(plan.workingDirectory, "/pinned");
+      assert.ok(plan.workingDirectory.startsWith("/pinned"), plan.workingDirectory);
       events.push(plan.label);
     },
     writeResult: (candidate) => records.push(structuredClone(candidate))
@@ -398,7 +404,7 @@ test("given a selected check, when every task passes, then the retained result i
 
   // then
   assert.equal(record.outcome, "passed");
-  assert.deepEqual(events, ["before", "backend", "release"]);
+  assert.deepEqual(events, ["before", "backend", "frontend-toolchain", "tooling-test", "release"]);
   assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "passed"]);
 });
 
@@ -551,7 +557,7 @@ test("given the live tree changes after pinning, when finishing, then the verifi
 
   // then
   assert.equal(record.outcome, "passed");
-  assert.deepEqual(events, ["execute", "release"]);
+  assert.deepEqual(events, ["execute", "execute", "execute", "release"]);
   assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "passed"]);
 });
 
