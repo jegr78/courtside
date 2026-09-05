@@ -2204,8 +2204,9 @@ paths:
       description: |
         Courtside is AGPL-3.0. A club that modified it and runs it for its members owes those
         members the source of the modified version, and this is where an instance says which
-        version that is and where to get it. An unmodified deployment reports the upstream
-        repository; a club that forked points `sourceUrl` at its own.
+        version that is and where to get it. The reference deployment requires an explicit
+        `sourceUrl`; an unchanged installation points it at the upstream repository and a club
+        that forked points it at the corresponding source of that fork.
 
         Public and unauthenticated on purpose: the obligation is to the people using the service,
         and requiring an account to see it would defeat it.

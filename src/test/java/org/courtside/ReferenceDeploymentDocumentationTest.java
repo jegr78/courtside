@@ -39,6 +39,21 @@ class ReferenceDeploymentDocumentationTest {
     }
 
     @Test
+    void givenTheReferenceDeployment_whenNoSourceWasChosen_thenComposeRequiresAnExplicitOffer()
+            throws IOException {
+        // given
+        String compose = Files.readString(Path.of("deploy/compose.yaml"));
+        String example = Files.readString(Path.of("deploy/.env.example"));
+
+        // when / then
+        assertThat(compose).contains(
+                "COURTSIDE_SOURCE_URL: ${COURTSIDE_SOURCE_URL:?set COURTSIDE_SOURCE_URL in .env}");
+        assertThat(example)
+                .containsPattern("(?m)^COURTSIDE_SOURCE_URL=$")
+                .doesNotContain("COURTSIDE_SOURCE_URL=https://github.com/jegr78/courtside");
+    }
+
+    @Test
     void whenReadingCompose_thenEveryVariableItReadsIsInTheOperatorDocumentation() throws IOException {
         // given
         List<String> variables = variablesReadByCompose();
