@@ -216,8 +216,9 @@ Three of them have a catch that costs an evening if nobody says it first:
   The key lives in the `mail-config` volume, so losing that volume means a new key, a new selector
   and a new record — see the backup section below.
 - **`DMARC` is a policy, and starting strict punishes you, not a forger.** Publish
-  `v=DMARC1; p=none; rua=mailto:<a mailbox you read>` first, leave it there long enough to read the
-  reports it brings, and tighten to `p=quarantine` and then `p=reject` once they show your own mail
+  `v=DMARC1; p=none; rua=mailto:<a mailbox you read>` first — a mailbox somebody opens, not an
+  address at this instance, which receives reports and has nobody to read them. Leave it there long
+  enough to read what it brings, and tighten to `p=quarantine` and then `p=reject` once they show your own mail
   passing. `mail-check` asks only whether a `v=DMARC1` record is there and never which policy it
   carries, because which policy is right is a question about your domain and not about this
   deployment.
@@ -229,10 +230,9 @@ MX and tells you in one line, and it costs nothing to run on the day the instanc
 
 If the answer is no, the mail still has somewhere to go: give the server a relay host under
 *MTA → Outbound → Routes* in the admin interface — the club's provider, or any server that will
-accept authenticated submission — and point the outbound routing strategy at it. That route is
-configured in the interface and not in `.env`: **no environment variable carries it**, and
-`COURTSIDE_MAIL_RELAY_HOST` is a different hop, the one the application uses to hand a message to
-this server. Delivery straight to the recipient is what this deployment does by default, not what it
+accept authenticated submission — and point the outbound routing strategy at it. That route lives
+in the interface and **no environment variable carries it**. `COURTSIDE_MAIL_RELAY_HOST` is a
+different hop, the one the application uses to hand a message to this server. Delivery straight to the recipient is what this deployment does by default, not what it
 requires.
 
 ### Port 25 is public, and a host firewall will not change that
