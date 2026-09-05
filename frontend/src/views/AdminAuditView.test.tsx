@@ -71,6 +71,7 @@ describe("AdminAuditView", () => {
     expect(within(entry).getByTestId("audit-label-change")).toHaveTextContent("Change");
     expect(within(entry).getByTestId("audit-label-subject")).toHaveTextContent("Subject");
     expect(within(entry).getByTestId("audit-label-actor")).toHaveTextContent("Actor");
+    expect(within(entry).getAllByText(/Occurred|Change|Subject|Actor/).every((label) => label.getAttribute("aria-hidden") === "true")).toBe(true);
   });
 
   it("given an entry with no actor, when it is shown, then the actor names the system", async () => {

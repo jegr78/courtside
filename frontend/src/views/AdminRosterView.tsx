@@ -161,21 +161,21 @@ export function AdminRosterView() {
                 <tbody className="grid gap-3 sm:table-row-group">
                   {entries.map((entry) => <tr key={entry.personId} data-testid={`roster-row-${entry.personId}`} className="grid gap-2 rounded-xl border p-4 sm:table-row sm:rounded-none sm:border-0 sm:p-0">
                     <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
-                      <span data-testid="roster-label-name" className="font-medium sm:hidden">{t("admin.roster.columnName")}</span>
+                      <span aria-hidden="true" data-testid="roster-label-name" className="font-medium sm:hidden">{t("admin.roster.columnName")}</span>
                       <Link data-testid={`person-link-${entry.personId}`} className="min-w-0 break-words font-semibold underline" to={`/admin/roster/${entry.personId}`}>
                         {`${entry.lastName}, ${entry.firstName}`}
                       </Link>
                     </td>
                     <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
-                      <span data-testid="roster-label-username" className="font-medium sm:hidden">{t("admin.roster.columnUsername")}</span>
+                      <span aria-hidden="true" data-testid="roster-label-username" className="font-medium sm:hidden">{t("admin.roster.columnUsername")}</span>
                       <span className="min-w-0 [overflow-wrap:anywhere]">{entry.username ?? "—"}</span>
                     </td>
                     <td data-testid={`roster-account-${entry.personId}`} className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
-                      <span data-testid="roster-label-account" className="font-medium sm:hidden">{t("admin.roster.columnAccount")}</span>
+                      <span aria-hidden="true" data-testid="roster-label-account" className="font-medium sm:hidden">{t("admin.roster.columnAccount")}</span>
                       <span className="min-w-0 break-words">{accountLabel(entry, t)}</span>
                     </td>
                     <td data-testid={`roster-membership-${entry.personId}`} className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
-                      <span data-testid="roster-label-membership" className="font-medium sm:hidden">{t("admin.roster.columnMembership")}</span>
+                      <span aria-hidden="true" data-testid="roster-label-membership" className="font-medium sm:hidden">{t("admin.roster.columnMembership")}</span>
                       <span className="min-w-0 break-words">{membershipLabel(entry, typeNames, t)}</span>
                     </td>
                   </tr>)}
