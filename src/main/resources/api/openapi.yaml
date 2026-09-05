@@ -588,6 +588,11 @@ components:
         allowedRoles:
           type: array
           uniqueItems: true
+          description: |
+            Roles allowed to create a booking with this card. Holding any listed role is
+            sufficient. Empty permits every authenticated member account. Future external
+            accounts may book only when this list explicitly includes `EXTERNAL_BOOKER`.
+            Administrators may always book.
           items: { $ref: "#/components/schemas/Role" }
         managingRoles:
           type: array
@@ -616,6 +621,11 @@ components:
         allowedRoles:
           type: array
           uniqueItems: true
+          description: |
+            Roles allowed to create a booking with this card. Holding any listed role is
+            sufficient. Empty permits every authenticated member account. Future external
+            accounts may book only when this list explicitly includes `EXTERNAL_BOOKER`.
+            Administrators may always book.
           items: { $ref: "#/components/schemas/Role" }
         managingRoles:
           type: array
