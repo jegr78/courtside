@@ -10,7 +10,10 @@ import { SuccessFeedback } from "../components/SuccessFeedback";
 import { ExternalReferencePanel } from "./import/ExternalReferencePanel";
 import { ImportExecutionPanel } from "./import/ImportExecutionPanel";
 import { ImportPreviewPanel } from "./import/ImportPreviewPanel";
+import { ImportProgress } from "./import/ImportProgress";
 import { ImportSourceForm } from "./import/ImportSourceForm";
+import { isExecutable } from "./import/previewState";
+import type { ImportStep } from "./import/steps";
 import { importSourceMark } from "./import/importSourceMark";
 import { useUnsavedChanges } from "../unsaved/registry";
 import { UnsavedChangesQuestion } from "../unsaved/UnsavedChangesQuestion";
@@ -115,64 +118,79 @@ export function AdminImportView() {
   }
 
   const chosen = editing?.source;
+  const holdsPreview = preview !== undefined && isExecutable(preview);
+  const step: ImportStep = !chosen ? "source" : holdsPreview ? "execution" : "preview";
+  const reached: ImportStep[] = !chosen ? [] : holdsPreview ? ["source", "preview"] : ["source"];
+
+  function goTo(part: ImportStep) {
+    document.getElementById(`import-part-${part}`)?.focus();
+  }
 
   return <section data-testid="admin-import-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.import.title")}</h1>
     {(error ?? clubError) && <Alert>{error ?? clubError}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
 
-    {sources && <div className="grid gap-3">
-      <h2 className="text-2xl font-bold">{t("admin.import.sources")}</h2>
-      {sources.length === 0
-        ? <p data-testid="no-sources">{t("admin.import.noSources")}</p>
-        : <ul className="grid gap-2">
-          {sources.map((source) => <li key={source.id}>
-            <Button variant="secondary" data-testid={`source-choice-${source.id}`} disabled={pending} type="button" onClick={() => askBeforeOpening({ source })}>
-              {source.displayName}
-            </Button>
-          </li>)}
-        </ul>}
-      <Button variant="primary" data-testid="new-source" disabled={pending} className="justify-self-start" type="button" onClick={() => askBeforeOpening({ source: undefined })}>
-        {t("admin.import.newSource")}
-      </Button>
+    <ImportProgress current={step} reached={reached} goTo={goTo} />
+
+    <div id="import-part-source" data-testid="import-part-source" tabIndex={-1} className="grid gap-8">
+      {sources && <div className="grid gap-3">
+        <h2 className="text-2xl font-bold">{t("admin.import.sources")}</h2>
+        {sources.length === 0
+          ? <p data-testid="no-sources">{t("admin.import.noSources")}</p>
+          : <ul className="grid gap-2">
+            {sources.map((source) => <li key={source.id}>
+              <Button variant="secondary" data-testid={`source-choice-${source.id}`} disabled={pending} type="button" onClick={() => askBeforeOpening({ source })}>
+                {source.displayName}
+              </Button>
+            </li>)}
+          </ul>}
+        <Button variant="primary" data-testid="new-source" disabled={pending} className="justify-self-start" type="button" onClick={() => askBeforeOpening({ source: undefined })}>
+          {t("admin.import.newSource")}
+        </Button>
+      </div>}
+
+      {pendingChoice && <UnsavedChangesQuestion
+        count={heldHere().length}
+        stay={() => setPendingChoice(undefined)}
+        discard={() => { openSource(pendingChoice.next); setPendingChoice(undefined); }}
+      />}
+
+      {editing && <ImportSourceForm
+        key={chosen?.id ?? "new"}
+        source={chosen}
+        types={types}
+        disabled={pending}
+        save={save}
+      />}
+    </div>
+
+    {chosen && <div id="import-part-preview" data-testid="import-part-preview" tabIndex={-1}>
+      <ImportPreviewPanel
+        key={`preview-${chosen.id}`}
+        sourceId={chosen.id}
+        sourceEncoding={chosen.encoding}
+        preview={preview}
+        disabled={pending}
+        previewed={setPreview}
+        reportError={reportError}
+      />
     </div>}
 
-    {pendingChoice && <UnsavedChangesQuestion
-      count={heldHere().length}
-      stay={() => setPendingChoice(undefined)}
-      discard={() => { openSource(pendingChoice.next); setPendingChoice(undefined); }}
-    />}
-
-    {editing && <ImportSourceForm
-      key={chosen?.id ?? "new"}
-      source={chosen}
-      types={types}
-      disabled={pending}
-      save={save}
-    />}
-
-    {chosen && <ImportPreviewPanel
-      key={`preview-${chosen.id}`}
-      sourceId={chosen.id}
-      sourceEncoding={chosen.encoding}
-      preview={preview}
-      disabled={pending}
-      previewed={setPreview}
-      reportError={reportError}
-    />}
-
-    {chosen && <ImportExecutionPanel
-      key={`execution-${chosen.id}`}
-      sourceId={chosen.id}
-      preview={preview}
-      disabled={pending}
-      timeZone={club?.timeZone}
-      executed={() => {
-        setPreview(undefined);
-        setRunCount((runs) => runs + 1);
-      }}
-      reportError={reportError}
-    />}
+    {chosen && <div id="import-part-execution" data-testid="import-part-execution" tabIndex={-1}>
+      <ImportExecutionPanel
+        key={`execution-${chosen.id}`}
+        sourceId={chosen.id}
+        preview={preview}
+        disabled={pending}
+        timeZone={club?.timeZone}
+        executed={() => {
+          setPreview(undefined);
+          setRunCount((runs) => runs + 1);
+        }}
+        reportError={reportError}
+      />
+    </div>}
 
     {chosen && <ExternalReferencePanel
       key={`references-${chosen.id}-${runCount}`}
