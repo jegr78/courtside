@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { api, type ImportSource, type MembershipType } from "../api/client";
+import { api, type ImportPreview, type ImportSource, type MembershipType } from "../api/client";
 import i18n from "../i18n";
 import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
@@ -21,6 +21,20 @@ const rosterSystem: ImportSource = {
   ownedFields: [],
   removalWarningPercent: 10
 };
+
+const snapshot: ImportPreview = {
+  previewId: "preview-1", sourceId: "source-1", mode: "UPDATE_ONLY", fileName: "members.csv",
+  fileHash: "abc", rowCount: 1, ignoredColumns: [], changes: [], rowErrors: [],
+  possibleDuplicates: [], sharedAddresses: [], removals: { count: 0, currentlyLinked: 0, percent: 0 },
+  needsConfirmation: false, superseded: false,
+  createdAt: "2026-08-21T10:00:00Z", expiresAt: "2126-08-22T10:00:00Z"
+};
+
+async function readSnapshot() {
+  await userEvent.upload(screen.getByTestId("snapshot-file"),
+    new File(["Number;Name\n1;Jane\n"], "members.csv", { type: "text/csv" }));
+  await userEvent.click(screen.getByTestId("upload-snapshot"));
+}
 
 const clubRegistry: ImportSource = { ...rosterSystem, id: "source-2", sourceKey: "club-registry", displayName: "Club registry" };
 
@@ -193,6 +207,94 @@ describe("AdminImportView", () => {
 
     // then — a run links everybody it created, so the panel beside it is stale the moment it ends
     await vi.waitFor(() => expect(reading.mock.calls.length).toBeGreaterThan(before));
+  });
+
+  it("when the import opens, then it names its steps and stands on describing a source", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+
+    // when
+    show();
+
+    // then
+    expect(await screen.findByTestId("import-progress")).toBeInTheDocument();
+    expect(screen.getByTestId("import-step-source")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByTestId("import-step-preview")).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("import-step-execution")).not.toHaveAttribute("aria-current");
+  });
+
+  it("given a described source, when it is opened, then reading a snapshot is the step to be on", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    show();
+
+    // when
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+
+    // then
+    expect(await screen.findByTestId("import-step-preview")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByTestId("import-step-source")).toBeEnabled();
+    expect(screen.getByTestId("import-step-execution")).toBeDisabled();
+  });
+
+  it("given a snapshot has been read, when its preview still holds, then the run is the step to be on", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    vi.spyOn(api, "createImportPreview").mockResolvedValue(snapshot);
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+
+    // when
+    await readSnapshot();
+
+    // then
+    expect(await screen.findByTestId("import-step-execution")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByTestId("import-step-preview")).toBeEnabled();
+  });
+
+  it("given a snapshot the server has superseded, when it comes back, then the import stands on reading one again", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    vi.spyOn(api, "createImportPreview").mockResolvedValue({ ...snapshot, superseded: true });
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+
+    // when
+    await readSnapshot();
+
+    // then — a superseded preview cannot be executed, so the run is not a step anybody is on
+    expect(await screen.findByTestId("import-step-preview")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByTestId("import-step-execution")).toBeDisabled();
+  });
+
+  it("given a snapshot whose preview has expired, when it comes back, then the import stands on reading one again", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    vi.spyOn(api, "createImportPreview")
+      .mockResolvedValue({ ...snapshot, expiresAt: "2020-08-22T10:00:00Z" });
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+
+    // when
+    await readSnapshot();
+
+    // then
+    expect(await screen.findByTestId("import-step-preview")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByTestId("import-step-execution")).toBeDisabled();
+  });
+
+  it("given a later step, when the board chooses an earlier one, then the page goes back to it", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await screen.findByTestId("import-step-preview");
+
+    // when
+    await userEvent.click(screen.getByTestId("import-step-source"));
+
+    // then
+    expect(screen.getByTestId("import-part-source")).toHaveFocus();
   });
 
   it("given the sources cannot be read, when the view opens, then the failure replaces the loading state", async () => {

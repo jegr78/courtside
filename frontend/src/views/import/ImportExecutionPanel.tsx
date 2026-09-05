@@ -5,15 +5,12 @@ import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { SuccessFeedback } from "../../components/SuccessFeedback";
 import { formatDateTime } from "../../time/clubZone";
+import { isExecutable } from "./previewState";
 
 const NUMBERS = [
   "created", "corrected", "membershipsEnded", "accountsCreated", "accountsDisabled",
   "rolesRemoved", "rowErrors"
 ] as const;
-
-function isExecutable(preview: ImportPreview): boolean {
-  return !preview.superseded && Date.parse(preview.expiresAt) > Date.now();
-}
 
 export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, executed, reportError }: {
   sourceId: string;

@@ -4,12 +4,9 @@ import { useTranslation } from "react-i18next";
 import { api, type ImportPersonChange, type ImportPreview, type SnapshotMode } from "../../api/client";
 import { NotUtf8Error, readCsvHeader } from "../../import/read-csv";
 import { Button } from "../../components/Button";
+import { isExpired } from "./previewState";
 
 const MODES: SnapshotMode[] = ["UPDATE_ONLY", "FULL_SNAPSHOT"];
-
-function isExpired(preview: ImportPreview): boolean {
-  return Date.parse(preview.expiresAt) <= Date.now();
-}
 
 function accountsOpenedBy(preview: ImportPreview): number {
   return preview.changes.filter((change) => change.account === "CREATE").length;
