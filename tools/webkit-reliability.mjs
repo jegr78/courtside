@@ -5,10 +5,17 @@ import { arch, cpus, platform, totalmem } from "node:os";
 import { basename, relative, resolve, sep } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import {
+  resourceLimits,
+  validateResourceProfileContract,
+  validateResourceTimeline
+} from "./browser-resource-profile.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const frontend = resolve(root, "frontend");
 const schemaPath = resolve(root, "quality", "webkit-reliability.schema.json");
+const resourceProfileContract = JSON.parse(readFileSync(resolve(root, "quality", "browser-resource-profiles.json"), "utf8"));
+validateResourceProfileContract(resourceProfileContract);
 const frontendRequire = createRequire(resolve(frontend, "package.json"));
 const executionDeadlineMs = 25 * 60 * 1_000;
 const terminationGraceMs = 10_000;
@@ -40,6 +47,21 @@ function outcome(execution) {
     return { status: "passed", classifications: ["none"], exitCode: 0 };
   }
   return { status: "incomplete", classifications: ["harness"], exitCode: execution.exitCode };
+}
+
+function resourceEvidenceIsComplete(timeline, profileName) {
+  try {
+    validateResourceTimeline(timeline);
+  } catch {
+    return false;
+  }
+  return timeline.samples.every((sample) => {
+    const limits = resourceLimits(resourceProfileContract, profileName, sample.target);
+    return sample.cpuPercent <= limits.cpu * 100
+      && sample.memoryUsageBytes <= limits.memoryBytes
+      && sample.pids <= limits.pids
+      && sample.sharedMemoryUsageBytes <= limits.sharedMemoryBytes;
+  });
 }
 
 function lifecycleEvidenceIsComplete(lifecycle, isolationVariant, testCount) {
@@ -106,7 +128,8 @@ export function buildReliabilityRecord(input) {
   };
   let result = outcome(input.execution);
   if (result.status !== "incomplete"
-    && !lifecycleEvidenceIsComplete(input.execution.browserLifecycle, input.isolationVariant, testPopulation.count)) {
+    && (!lifecycleEvidenceIsComplete(input.execution.browserLifecycle, input.isolationVariant, testPopulation.count)
+      || !resourceEvidenceIsComplete(input.execution.resourceTimeline, input.resourceProfile))) {
     result = { status: "incomplete",
       classifications: [...new Set([...result.classifications.filter((classification) => classification !== "none"), "harness"])],
       exitCode: input.execution.exitCode };
@@ -143,6 +166,7 @@ export function buildReliabilityRecord(input) {
     },
     testPopulation,
     browserLifecycle: input.execution.browserLifecycle ?? { schemaVersion: 1, processes: [] },
+    resourceTimeline: input.execution.resourceTimeline ?? { schemaVersion: 1, intervalMs: 1_000, samples: [] },
     outcome: result
   };
 }
@@ -348,6 +372,16 @@ function browserLifecycle() {
   }
 }
 
+function resourceTimeline() {
+  const path = resolve(frontend, "test-results", "resource-timeline.json");
+  if (!existsSync(path)) return undefined;
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
 function completionOf(child) {
   return new Promise((resolveCompletion) => {
     let completed = false;
@@ -425,6 +459,7 @@ async function runAttempt(options, updateExitCode = true) {
   const cli = resolve(frontend, "node_modules", "@playwright", "test", "cli.js");
   rmSync(resolve(frontend, "test-results", "browser-gate-outcome.json"), { force: true });
   rmSync(resolve(frontend, "test-results", "browser-lifecycle.json"), { force: true });
+  rmSync(resolve(frontend, "test-results", "resource-timeline.json"), { force: true });
   const prerequisites = await environmentPrerequisites(undefined, existsSync(cli));
   const execution = prerequisites.isReady
     ? await runBoundedProcess(process.execPath, [cli, "test", "--project=webkit-core", "--project=webkit-pwa",
@@ -432,6 +467,7 @@ async function runAttempt(options, updateExitCode = true) {
       cwd: frontend,
       env: { ...process.env, COURTSIDE_PROJECT_ORDER: options.order, COURTSIDE_WEBKIT_AXE: "true",
         COURTSIDE_WEBKIT_RELIABILITY: "true",
+        COURTSIDE_BROWSER_RESOURCE_PROFILE: options.resourceProfile,
         COURTSIDE_WEBKIT_BROWSER_ISOLATION: options.isolation === "fresh-test-browser" ? "test" : "project" },
       stdio: "inherit"
     })
@@ -447,7 +483,7 @@ async function runAttempt(options, updateExitCode = true) {
     browserImage,
     projectOrder: options.order,
     isolationVariant: options.isolation,
-    resourceProfile: process.env.GITHUB_ACTIONS === "true" ? "github-hosted-default" : "local-default",
+    resourceProfile: options.resourceProfile,
     seedFingerprint: journeySeedFingerprint(),
     experimentId: options.experimentId,
     pairIndex: options.pairIndex,
@@ -461,7 +497,7 @@ async function runAttempt(options, updateExitCode = true) {
     execution: execution.environmentFailure === true || execution.launchError === true
       ? { exitCode: null, environmentFailure: true }
       : { exitCode: execution.exitCode, timedOut: execution.timedOut, gateOutcome: gateOutcome(),
-        browserLifecycle: browserLifecycle() }
+        browserLifecycle: browserLifecycle(), resourceTimeline: resourceTimeline() }
   });
   validateReliabilityRecord(record);
   const path = retainReliabilityRecord(record, options.output);
@@ -483,6 +519,10 @@ export function validateReliabilityRecord(record) {
       record.testPopulation.count)) {
     throw new Error("A completed reliability run has contradictory browser lifecycle evidence");
   }
+  if (record.outcome.status !== "incomplete"
+      && !resourceEvidenceIsComplete(record.resourceTimeline, record.matrix.resourceProfile)) {
+    throw new Error("A completed reliability run has contradictory resource evidence");
+  }
   const classifications = new Set(record.outcome.classifications);
   const isPassed = record.outcome.status === "passed" && classifications.size === 1
     && classifications.has("none") && record.outcome.exitCode === 0;
@@ -495,20 +535,22 @@ export function validateReliabilityRecord(record) {
 
 export function reliabilityOptions(args) {
   const values = { order: "configured", isolation: "fresh-project-browser",
-    output: resolve(frontend, "test-results", "webkit-reliability") };
+    resourceProfile: "normal", output: resolve(frontend, "test-results", "webkit-reliability") };
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
     const value = args[index + 1];
     if (value === undefined) throw new Error(`Missing value for ${name}`);
     if (name === "--order") values.order = value;
     else if (name === "--isolation") values.isolation = value;
-    else if (name === "--output") values.output = resolve(value);
+    else if (name === "--resource-profile") values.resourceProfile = value;
+    else if (name === "--output") values.output = resolve(frontend, value);
     else throw new Error(`Unsupported option: ${name}`);
   }
   if (!new Set(["configured", "reversed"]).has(values.order)) throw new Error("Unsupported project order");
   if (!new Set(["fresh-project-browser", "fresh-test-browser"]).has(values.isolation)) {
     throw new Error("Unsupported isolation variant");
   }
+  if (!new Set(["normal", "stress"]).has(values.resourceProfile)) throw new Error("Unsupported resource profile");
   return values;
 }
 

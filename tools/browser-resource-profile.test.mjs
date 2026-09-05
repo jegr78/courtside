@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   assertHostCapacity,
   deriveResourceProfiles,
+  resourceLimits,
   validateResourceProfileContract,
   validateResourceTimeline
 } from "./browser-resource-profile.mjs";
@@ -48,6 +50,20 @@ test("given a host below the selected profile, when checking capacity, then star
     pids: 50,
     sharedMemoryBytes: 16_000_000
   }), /normal.*CPU.*memory.*PIDs.*shared memory/i);
+});
+
+test("given the maintained profiles, when loading the contract, then exact enforceable limits are available", () => {
+  // given
+  const contract = JSON.parse(readFileSync(new URL("../quality/browser-resource-profiles.json", import.meta.url), "utf8"));
+
+  // when
+  validateResourceProfileContract(contract);
+  const limits = resourceLimits(contract, "normal", "postgres");
+
+  // then
+  assert.deepEqual(Object.keys(limits).toSorted(),
+    ["cpu", "memoryBytes", "pids", "sharedMemoryBytes"]);
+  assert.deepEqual(limits, { cpu: 0.35, memoryBytes: 134_217_728, pids: 32, sharedMemoryBytes: 16_777_216 });
 });
 
 test("given a completed run, when validating its timeline, then all targets and metrics must be sampled over time", () => {

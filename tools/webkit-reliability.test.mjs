@@ -21,6 +21,16 @@ const Ajv = frontendRequire("ajv/dist/2020").default;
 const schema = JSON.parse(readFileSync(new URL("../quality/webkit-reliability.schema.json", import.meta.url), "utf8"));
 const validate = new Ajv({ strict: true, allErrors: true, formats: { "date-time": true } }).compile(schema);
 
+function resourceTimeline() {
+  return { schemaVersion: 1, intervalMs: 1_000,
+    samples: ["application", "proxy", "postgres", "browser"].flatMap((target) => [1, 2].map((sequence) => ({
+      recordedAt: `2026-08-27T08:00:0${sequence}.000Z`, sequence, target,
+      ...target === "application" ? { processId: 1234 } : { containerId: String(sequence).repeat(64) },
+      ...target === "browser" ? { processId: 77 } : {},
+      cpuPercent: 1, memoryUsageBytes: 1_000, pids: 1, sharedMemoryUsageBytes: 0
+    }))) };
+}
+
 function record(overrides = {}) {
   return buildReliabilityRecord({
     attemptId: "018f47a2-9e4c-7a61-8000-123456789abc",
@@ -32,7 +42,7 @@ function record(overrides = {}) {
     browserImage: "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:" + "b".repeat(64),
     projectOrder: "configured",
     isolationVariant: "fresh-project-browser",
-    resourceProfile: "github-hosted-default",
+    resourceProfile: "normal",
     seedFingerprint: `sha256:${"e".repeat(64)}`,
     host: { provider: "github-hosted", platform: "linux", architecture: "x64", cpuCount: 4, totalMemoryBytes: 16_000_000_000 },
     execution: { exitCode: 0, gateOutcome: { schemaVersion: 1, testPopulation: {
@@ -62,7 +72,7 @@ function record(overrides = {}) {
         { recordedAt: "2026-08-27T08:00:05.000Z", testPosition: 1, phase: "start", memoryUsageBytes: 1000, cpuPercent: 1 },
         { recordedAt: "2026-08-27T08:00:06.000Z", testPosition: 1, phase: "end", memoryUsageBytes: 1100, cpuPercent: 2 }
       ], exitState: { exitCode: 137, oomKilled: false, hasError: false }
-    }] } },
+    }] }, resourceTimeline: resourceTimeline() },
     ...overrides
   });
 }
@@ -114,7 +124,8 @@ test("given a product assertion failure, when building its record, then it remai
     { id: "webkit-core-compatibility", status: "failed" },
     { id: "webkit-axe-qualification", status: "passed" },
     { id: "browser-harness", status: "passed" }
-  ], testPopulation: evidence.testPopulation }, browserLifecycle: evidence.browserLifecycle } });
+  ], testPopulation: evidence.testPopulation }, browserLifecycle: evidence.browserLifecycle,
+  resourceTimeline: evidence.resourceTimeline } });
 
   // then
   assert.deepEqual(result.outcome, { status: "failed", classifications: ["product"], exitCode: 1 });
@@ -252,6 +263,8 @@ test("given both implemented isolation variants, when parsing the run, then they
   // then
   assert.equal(project.isolation, "fresh-project-browser");
   assert.equal(testScoped.isolation, "fresh-test-browser");
+  assert.equal(project.resourceProfile, "normal");
+  assert.equal(reliabilityOptions(["--resource-profile", "stress"]).resourceProfile, "stress");
 });
 
 test("given an isolation experiment, when selecting its output, then completed attempts cannot be cleared by playwright", () => {
@@ -267,7 +280,7 @@ test("given an isolation experiment, when selecting its output, then completed a
 test("given an unknown isolation or resource profile, when parsing the run, then it cannot be claimed", () => {
   // given / when / then
   assert.throws(() => reliabilityOptions(["--isolation", "shared-browser"]), /Unsupported isolation/);
-  assert.throws(() => reliabilityOptions(["--resource-profile", "large-runner"]), /Unsupported option/);
+  assert.throws(() => reliabilityOptions(["--resource-profile", "large-runner"]), /Unsupported resource profile/);
 });
 
 test("given lifecycle evidence does not match the declared isolation, when validating, then it fails closed", () => {
@@ -346,7 +359,8 @@ test("given unsafe or incomplete lifecycle evidence, when the run claims success
       { id: "webkit-axe-qualification", status: "passed" },
       { id: "browser-harness", status: "passed" }
     ] },
-    browserLifecycle: builtEvidence.browserLifecycle
+    browserLifecycle: builtEvidence.browserLifecycle,
+    resourceTimeline: builtEvidence.resourceTimeline
   } });
 
   // then

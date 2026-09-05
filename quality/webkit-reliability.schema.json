@@ -4,7 +4,7 @@
   "title": "Courtside WebKit reliability first-attempt record",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "attemptId", "sourceCommit", "sourceTreeState", "startedAt", "finishedAt", "durationMs", "executionDeadlineMs", "terminationGraceMs", "toolchain", "matrix", "host", "testPopulation", "browserLifecycle", "outcome"],
+  "required": ["schemaVersion", "attemptId", "sourceCommit", "sourceTreeState", "startedAt", "finishedAt", "durationMs", "executionDeadlineMs", "terminationGraceMs", "toolchain", "matrix", "host", "testPopulation", "browserLifecycle", "resourceTimeline", "outcome"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "attemptId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
@@ -32,7 +32,7 @@
       "properties": {
         "projectOrder": { "enum": ["configured", "reversed"] },
         "isolationVariant": { "enum": ["fresh-project-browser", "fresh-test-browser"] },
-        "resourceProfile": { "enum": ["local-default", "github-hosted-default"] },
+        "resourceProfile": { "enum": ["normal", "stress"] },
         "seedFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "experimentId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
         "pairIndex": { "type": "integer", "minimum": 1 },
@@ -110,6 +110,34 @@
                   "hasError": { "type": "boolean" }
                 }
               }
+            }
+          }
+        }
+      }
+    },
+    "resourceTimeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "intervalMs", "samples"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "intervalMs": { "type": "integer", "minimum": 1 },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["recordedAt", "sequence", "target", "cpuPercent", "memoryUsageBytes", "pids", "sharedMemoryUsageBytes"],
+            "properties": {
+              "recordedAt": { "type": "string", "format": "date-time" },
+              "sequence": { "type": "integer", "minimum": 1 },
+              "target": { "enum": ["application", "proxy", "postgres", "browser"] },
+              "containerId": { "type": "string", "pattern": "^[a-f0-9]{12,64}$" },
+              "processId": { "type": "integer", "minimum": 1 },
+              "cpuPercent": { "type": "number", "minimum": 0 },
+              "memoryUsageBytes": { "type": "integer", "minimum": 1 },
+              "pids": { "type": "integer", "minimum": 1 },
+              "sharedMemoryUsageBytes": { "type": "integer", "minimum": 0 }
             }
           }
         }

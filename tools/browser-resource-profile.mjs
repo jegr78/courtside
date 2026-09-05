@@ -19,7 +19,7 @@ function nonNegativeNumber(value, name) {
 }
 
 function roundUp(value, increment) {
-  return Math.ceil(value / increment) * increment;
+  return Number((Math.ceil(value / increment) * increment).toFixed(4));
 }
 
 function peak(samples, target, field) {
