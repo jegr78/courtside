@@ -21,6 +21,9 @@ class ReferenceDeploymentDocumentationTest {
 
     private static final Pattern RECORD_KIND = Pattern.compile("\\b(PTR|MX|SPF|DKIM|DMARC)\\b");
 
+    private static final Pattern CHECK_SUBJECT =
+            Pattern.compile("(?m)^\\s*report (?:ok|fail) \"([^\"]*)\"");
+
     @Test
     void whenReadingCompose_thenEveryVariableItReadsIsInTheEnvironmentExample() throws IOException {
         // given
@@ -64,7 +67,7 @@ class ReferenceDeploymentDocumentationTest {
     void whenReadingTheMailCheck_thenEveryRecordItVerifiesIsOneTheReferenceTellsAnOperatorToPublish()
             throws IOException {
         // given
-        Set<String> verified = recordKindsIn(Files.readString(Path.of("deploy/mail-check.sh")));
+        Set<String> verified = recordKindsIn(String.join("\n", checkSubjects()));
         Set<String> published = recordKindsIn(String.join("\n", dnsTableRecordColumn()));
 
         // when / then
@@ -72,6 +75,13 @@ class ReferenceDeploymentDocumentationTest {
                 .as("an operator reads a failing check and looks the record up in the reference, "
                         + "so the two have to name the same records in the same words")
                 .isEqualTo(verified);
+    }
+
+    private static List<String> checkSubjects() throws IOException {
+        Matcher subjects = CHECK_SUBJECT.matcher(Files.readString(Path.of("deploy/mail-check.sh")));
+        List<String> reported = subjects.results().map(match -> match.group(1)).toList();
+        assertThat(reported).as("deploy/mail-check.sh reports what it found").isNotEmpty();
+        return reported;
     }
 
     private static Set<String> recordKindsIn(String text) {
