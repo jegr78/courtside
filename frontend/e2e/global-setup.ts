@@ -24,6 +24,14 @@ import { startJourneyControl } from "./journey-control";
 import { browserExitState, BrowserLifecycleRecorder, browserResourceUsage } from "./browser-lifecycle";
 import { completeCleanup } from "./resource-cleanup";
 import {
+  applicationResourceUsage,
+  containerResourceUsage,
+  ResourceTimelineRecorder,
+  sharedMemoryUsage,
+  type ResourceObservation,
+  type ResourceTarget
+} from "./resource-timeline";
+import {
   browserContainerLabels,
   ObservableGenericContainer,
   ownedBrowserContainerIds,
@@ -431,7 +439,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string }>();
   const browserLifecycle = new BrowserLifecycleRecorder();
   const browserLifecyclePath = resolve("test-results", "browser-lifecycle.json");
+  const resourceTimeline = new ResourceTimelineRecorder(1_000);
+  const resourceTimelinePath = resolve("test-results", "resource-timeline.json");
   rmSync(browserLifecyclePath, { force: true });
+  rmSync(resourceTimelinePath, { force: true });
   const retainBrowserLifecycle = () => {
     writeFileSync(browserLifecyclePath, `${JSON.stringify(browserLifecycle.evidence(), null, 2)}\n`, { mode: 0o600 });
   };
@@ -440,6 +451,42 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     return result.stdout;
   };
   const dockerJson = async (args: string[]): Promise<unknown> => JSON.parse(await dockerText(args));
+  const containerObservation = async (target: Exclude<ResourceTarget, "application">,
+    container: StartedTestContainer, includeProcessId = false): Promise<ResourceObservation> => {
+    const [usage, sharedMemory, state] = await Promise.all([
+      dockerJson(["stats", "--no-stream", "--format", "{{json .}}", container.getId()]),
+      container.exec(["sh", "-c", "df -k /dev/shm"]),
+      includeProcessId ? dockerJson(["inspect", "--format", "{{json .State}}", container.getId()]) : undefined
+    ]);
+    if (sharedMemory.exitCode !== 0) throw new Error(`${target} shared memory could not be measured`);
+    const processId = (state as { Pid?: unknown } | undefined)?.Pid;
+    if (includeProcessId && (!Number.isInteger(processId) || (processId as number) < 1)) {
+      throw new Error("Docker reported no browser process ID");
+    }
+    return {
+      target,
+      containerId: container.getId(),
+      ...includeProcessId ? { processId: processId as number } : {},
+      ...containerResourceUsage(usage),
+      sharedMemoryUsageBytes: sharedMemoryUsage(sharedMemory.stdout)
+    };
+  };
+  const retainResourceSample = async (browser: StartedTestContainer): Promise<void> => {
+    if (!application?.pid || !clubProxy || !postgres) throw new Error("Journey resources are not ready for measurement");
+    const [applicationProcess, proxy, database, browserProcess] = await Promise.all([
+      executeFile("/bin/ps", ["-o", "%cpu=,rss=", "-p", String(application.pid)], { timeout: 5_000 }),
+      containerObservation("proxy", clubProxy),
+      containerObservation("postgres", postgres),
+      containerObservation("browser", browser, true)
+    ]);
+    resourceTimeline.append([
+      { target: "application", ...applicationResourceUsage(applicationProcess.stdout, application.pid) },
+      proxy,
+      database,
+      browserProcess
+    ], new Date().toISOString());
+    writeFileSync(resourceTimelinePath, `${JSON.stringify(resourceTimeline.evidence(), null, 2)}\n`, { mode: 0o600 });
+  };
   const stopBrowser = async (browserName: string): Promise<void> => {
     const browser = browserServers.get(browserName);
     if (!browser) return;
@@ -733,9 +780,9 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       recordBrowserTest: async (browserName, projectName, testPosition, phase) => {
         const browser = browserServers.get(browserName);
         if (!browser) throw new Error(`No pinned ${browserName} browser exists`);
-        browserLifecycle.sample(browserName, projectName, testPosition, phase,
-          browserResourceUsage(await dockerJson(["stats", "--no-stream", "--format", "{{json .}}",
-            browser.container.getId()])), new Date().toISOString());
+        const usage = await dockerJson(["stats", "--no-stream", "--format", "{{json .}}", browser.container.getId()]);
+        browserLifecycle.sample(browserName, projectName, testPosition, phase, browserResourceUsage(usage), new Date().toISOString());
+        if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true") await retainResourceSample(browser.container);
         retainBrowserLifecycle();
       },
       executeSql,
