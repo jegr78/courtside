@@ -11,6 +11,12 @@ services:
       - NET_BIND_SERVICE
     environment:
       STALWART_RECOVERY_ADMIN: ${COURTSIDE_MAIL_RECOVERY_ADMIN:-}
+    networks:
+      default: {}
+      relay:
+        aliases:
+          # As in `compose.yaml`: the name on the certificate this server serves, on its own network.
+          - ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
     volumes:
       - mail-config:/etc/stalwart
       - mail-data:/var/lib/stalwart
@@ -131,6 +137,10 @@ services:
       STALWART_PASSWORD: ${COURTSIDE_MAIL_SETUP_PASSWORD}
     volumes:
       - plan:/plan:ro
+
+networks:
+  default:
+  relay:
 
 volumes:
   mail-config:

@@ -69,16 +69,17 @@ services:
       COURTSIDE_IMPORT_PREVIEW_RETENTION: ${COURTSIDE_IMPORT_PREVIEW_RETENTION:-7d}
       COURTSIDE_IMPORT_SWEEP_INTERVAL: ${COURTSIDE_IMPORT_SWEEP_INTERVAL:-1h}
       COURTSIDE_SLOW_QUERY_THRESHOLD_MS: ${COURTSIDE_SLOW_QUERY_THRESHOLD_MS:-500}
-      COURTSIDE_MAIL_RELAY_HOST: ${COURTSIDE_MAIL_RELAY_HOST:-mail}
+      COURTSIDE_MAIL_RELAY_HOST: ${COURTSIDE_MAIL_RELAY_HOST:-${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}}
       COURTSIDE_MAIL_RELAY_PORT: ${COURTSIDE_MAIL_RELAY_PORT:-587}
       COURTSIDE_MAIL_FROM: ${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}@${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}
       COURTSIDE_MAIL_REPLY_TO: ${COURTSIDE_MAIL_REPLY_TO:?set COURTSIDE_MAIL_REPLY_TO in .env}
       COURTSIDE_MAIL_USERNAME: ${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}@${COURTSIDE_MAIL_DOMAIN}
       COURTSIDE_MAIL_PASSWORD: ${COURTSIDE_MAIL_PASSWORD:?set COURTSIDE_MAIL_PASSWORD in .env}
-      # The mail server serves Caddy's certificate now, but this instance dials it as `mail` on the
-      # compose network, which is a name on no certificate. Clear it when the relay is foreign.
-      COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: ${COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE:-true}
+      COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: ${COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE:-false}
       LOGGING_LEVEL_ORG_COURTSIDE: ${COURTSIDE_LOG_LEVEL:-INFO}
+    networks:
+      - default
+      - relay
     ports:
       - "127.0.0.1:${COURTSIDE_PORT:-8080}:8080"
 
@@ -97,6 +98,13 @@ services:
     environment:
       STALWART_RECOVERY_ADMIN: ${COURTSIDE_MAIL_RECOVERY_ADMIN:-}
       STALWART_RECOVERY_MODE: ${COURTSIDE_MAIL_RECOVERY_MODE:-}
+    networks:
+      default: {}
+      relay:
+        aliases:
+          # The name on the certificate this server serves, on a network of its own: an alias
+          # answers for everyone who shares the network, and `mail-check` reads the public record.
+          - ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
     volumes:
       - mail-config:/etc/stalwart
       - mail-data:/var/lib/stalwart
@@ -282,6 +290,10 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+
+networks:
+  default:
+  relay:
 
 volumes:
   db:
