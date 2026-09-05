@@ -38,7 +38,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const [currentInstant, setCurrentInstant] = useState(referenceInstant);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>();
-  const [selectedCourtId, setSelectedCourtId] = useState<string>();
   const [data, setData] = useState<WeekData>();
   const { message: error, report, clear } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
@@ -48,10 +47,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const [drag, setDrag] = useState<{ courtId: string; anchor: string; head: string }>();
   const [cancellation, setCancellation] = useState<Allocation>();
   const planRef = useRef<HTMLDivElement>(null);
-  const courtSelectorRef = useRef<HTMLDivElement>(null);
   const eligibilityRequest = useRef(0);
   const shownDate = useRef<string>(undefined);
-  const [courtSelectorContinues, setCourtSelectorContinues] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -68,7 +65,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         setSelectedDate((current) => current && days.some((day) => formatDate(day) === current)
           ? current
           : weekOffset === 0 ? formatDate(clubToday) : formatDate(weekStart));
-        setSelectedCourtId((current) => courts.some((court) => court.id === current) ? current : courts[0]?.id);
         setData({ grid, courts, days, allocations: new Map(dailyAllocations) });
       }
     }).catch((failure: unknown) => {
@@ -155,7 +151,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 
   const dragSpan = drag ? bookableSpan(drag.courtId, drag.anchor, drag.head) : [];
   const language = i18n.resolvedLanguage ?? i18n.language;
-  const courtCount = data?.courts.length ?? 0;
   useEffect(() => {
     if (!drag) return;
     const finish = () => {
@@ -211,17 +206,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     return () => window.cancelAnimationFrame(frame);
   }, [currentSlot, isToday]);
 
-  useEffect(() => {
-    const selector = courtSelectorRef.current;
-    if (!selector) return;
-    const update = () => setCourtSelectorContinues(
-      selector.scrollLeft + selector.clientWidth < selector.scrollWidth - 1
-    );
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [courtCount, language]);
-
   // Another day has no current time to scroll to.
   useEffect(() => {
     const changed = shownDate.current !== selectedDate;
@@ -273,30 +257,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       <Button variant="secondary" type="button" data-testid="day-next" className="px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), 1)))} aria-label={t("week.nextDay")}>›</Button>
     </div>}
 
-    {data && data.courts.length > 1 && <div className="mobile-court-selector-frame surface-panel sticky top-0 z-10 mt-3">
-      <div
-        ref={courtSelectorRef}
-        data-testid="court-selector"
-        className="mobile-court-selector flex gap-2 overflow-x-auto py-2"
-        role="group"
-        aria-label={t("week.chooseCourt")}
-        onScroll={() => {
-          const selector = courtSelectorRef.current;
-          if (selector) setCourtSelectorContinues(selector.scrollLeft + selector.clientWidth < selector.scrollWidth - 1);
-        }}
-      >
-        {data.courts.map((court) => <Button
-          variant={selectedCourtId === court.id ? "primary" : "secondary"}
-          key={court.id}
-          type="button"
-          data-testid={`court-selector-${court.number}`}
-          aria-pressed={selectedCourtId === court.id}
-          onClick={() => setSelectedCourtId(court.id)}
-        >{court.name || t("court.number", { number: court.number })}</Button>)}
-      </div>
-      {courtSelectorContinues && <span data-testid="court-selector-continuation" className="mobile-court-selector-continuation" aria-hidden="true" />}
-    </div>}
-
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {eligibilityError && <Alert testId="booking-eligibility-error">{eligibilityError}</Alert>}
@@ -322,17 +282,19 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       <table data-testid="day-plan-table" className={`day-plan-table border-collapse text-sm ${data.courts.length > 4 ? "day-plan-many-courts" : ""}`}>
         <colgroup>
           <col className="day-plan-time-column" />
-          {data.courts.map((court) => <col key={court.id} data-testid={`court-column-${court.number}`} className={`day-plan-court-column ${selectedCourtId === court.id ? "" : "mobile-court-hidden"}`} />)}
+          {data.courts.map((court) => <col key={court.id} data-testid={`court-column-${court.number}`} className="day-plan-court-column" />)}
         </colgroup>
         <thead className="surface-raised">
           <tr>
             <th scope="col" className="border-structural border-b px-4 py-3 text-left">{t("week.time")}</th>
-            {data.courts.map((court) => <th
-              key={court.id}
-              data-testid={`court-heading-${court.number}`}
-              scope="col"
-              className={`border-structural border-b px-4 py-3 text-left ${selectedCourtId === court.id ? "" : "mobile-court-hidden"}`}
-            >{court.name || t("court.number", { number: court.number })}</th>)}
+            {data.courts.map((court) => {
+              const courtName = court.name || t("court.number", { number: court.number });
+              return <th key={court.id} data-testid={`court-heading-${court.number}`} scope="col"
+                aria-label={courtName} className="border-structural border-b px-4 py-3 text-left">
+                <span className="court-heading-full" aria-hidden="true">{courtName}</span>
+                <span className="court-heading-compact" aria-hidden="true">{court.number}</span>
+              </th>;
+            })}
           </tr>
         </thead>
         <tbody>
@@ -352,7 +314,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
               },
               selectedDate ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant) : false,
               bookingAllowed,
-              selectedCourtId === court.id,
               slot === slots[0],
               {
                 selected: drag?.courtId === court.id && dragSpan.includes(slot),
@@ -437,11 +398,10 @@ function renderCell(
   cancel: (allocation: Allocation) => void,
   isPast: boolean,
   canBook: boolean,
-  isSelectedCourt: boolean,
   isFirstVisibleSlot: boolean,
   drag: { selected: boolean; start: (pointerType: string) => void; extend: () => void }
 ) {
-  const cellClass = `border-structural border-b ${isSelectedCourt ? "" : "mobile-court-hidden"}`;
+  const cellClass = "border-structural border-b";
   const visibleSlotStartsAt = date ? Date.parse(zonedDateTime(date, slot, timeZone)) : Number.NaN;
   const allocation = allocations.find((entry) => entry.courtId === court.id
     && (formatTime(entry.startsAt, timeZone) === slot
@@ -471,7 +431,7 @@ function renderCell(
         onClick={() => cancel(allocation)}
         className={className}
         style={style}
-      ><span className="block">{label}</span><span className="block text-xs">{period}</span></button> : <div data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}><span className="block">{label}</span><span className="block text-xs">{period}</span></div>}
+      ><span className="block">{label}</span><span className="block text-xs">{period}</span></button> : <div role="img" aria-label={`${label}, ${period}`} data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}><span className="block">{label}</span><span className="block text-xs">{period}</span></div>}
     </td>;
   }
   const isCovered = isOccupied(allocations, court.id, slot, timeZone);

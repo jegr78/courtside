@@ -223,28 +223,8 @@ input[type="time"] {
 }
 
 .mobile-day-navigation,
-.mobile-court-selector-frame,
-.mobile-court-selector {
+.court-heading-compact {
   display: none;
-}
-
-.mobile-court-selector-continuation {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 3rem;
-  pointer-events: none;
-  background: linear-gradient(to right, transparent, var(--cs-panel) 70%);
-}
-
-.mobile-court-selector-continuation::after {
-  position: absolute;
-  top: 50%;
-  right: 0.35rem;
-  color: var(--cs-text);
-  content: "›";
-  transform: translateY(-50%);
 }
 
 @media (width < 1024px) {
@@ -252,24 +232,12 @@ input[type="time"] {
     display: none;
   }
 
-  .mobile-day-navigation,
-  .mobile-court-selector-frame,
-  .mobile-court-selector {
+  .mobile-day-navigation {
     display: flex;
   }
 
   .mobile-day-navigation {
     display: grid;
-  }
-
-  .mobile-court-selector-frame {
-    position: sticky;
-    display: block;
-  }
-
-  .mobile-court-selector > button {
-    flex: 0 0 auto;
-    min-width: 6rem;
   }
 
   .day-plan {
@@ -281,12 +249,54 @@ input[type="time"] {
     min-width: 100%;
   }
 
-  .day-plan-court-column {
-    width: calc(100% - 5rem);
+  .day-plan-time-column {
+    width: 3.25rem;
   }
 
-  .mobile-court-hidden {
+  .day-plan-court-column {
+    width: calc((100% - 3.25rem) / var(--court-count));
+  }
+
+  .day-plan thead th {
+    padding: 0.5rem 0.125rem;
+    text-align: center;
+  }
+
+  .day-plan tbody th {
+    padding-inline: 0.35rem;
+  }
+
+  .court-heading-full {
     display: none;
+  }
+
+  .court-heading-compact {
+    display: inline;
+  }
+
+  .day-plan td {
+    padding: 0.125rem;
+  }
+
+  .day-plan [data-state] {
+    padding-inline: 0;
+    overflow: hidden;
+    font-size: 0;
+    text-align: center;
+  }
+
+  .day-plan [data-state] span {
+    display: none;
+  }
+
+  .day-plan [data-state="free"]::after {
+    font-size: 0.75rem;
+    content: "✓";
+  }
+
+  .day-plan [data-state="past"]::after {
+    font-size: 0.75rem;
+    content: "—";
   }
 }
 

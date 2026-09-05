@@ -356,18 +356,17 @@ it("given a booking dialog is open, when eligibility cannot be refreshed, then t
   expect(freeSlot(1, "12:30").tagName).toBe("DIV");
 });
 
-it("given multiple courts, when selecting a court, then the mobile plan marks only that court as visible", async () => {
-  // given
+it("given multiple courts, when the plan loads, then every court remains in the small-screen overview", async () => {
+  // when
   render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByTestId("week-grid");
 
-  // when
-  await userEvent.click(screen.getByTestId("court-selector-2"));
-
   // then
-  expect(screen.getByTestId("court-selector-2")).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByTestId("court-column-1")).toHaveClass("mobile-court-hidden");
+  expect(screen.queryByTestId("court-selector")).not.toBeInTheDocument();
+  expect(screen.getByTestId("court-column-1")).not.toHaveClass("mobile-court-hidden");
   expect(screen.getByTestId("court-column-2")).not.toHaveClass("mobile-court-hidden");
+  expect(screen.getByTestId("court-heading-1")).toHaveAccessibleName("Centre Court");
+  expect(screen.getByTestId("court-heading-2")).toHaveAccessibleName("Court 2");
 });
 
 it("given the day plan, when using compact date navigation, then the adjacent day becomes selected", async () => {
