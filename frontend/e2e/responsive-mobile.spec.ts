@@ -26,6 +26,54 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.getByTestId("login-submit").click();
 }
 
+test("a member reaches every destination from the bottom of a touch viewport", async ({ page }) => {
+  // given
+  await signIn(page, "doe.jane");
+  await expect(page.getByTestId("court-plan-link")).toBeVisible();
+
+  // when
+  const bar = page.getByTestId("primary-navigation-bar");
+  const box = await bar.boundingBox();
+  const viewport = page.viewportSize();
+
+  // then — pinned to the bottom edge rather than merely present somewhere down the page
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(Math.round(box!.y + box!.height)).toBe(viewport!.height);
+
+  // then — every destination is a target a thumb can hit
+  const links = await bar.locator("a").all();
+  expect(links.length).toBeGreaterThan(1);
+  for (const link of links) {
+    const target = await link.boundingBox();
+    expect(target!.height).toBeGreaterThanOrEqual(44);
+  }
+
+  // when
+  await page.getByTestId("my-messages-link").tap();
+
+  // then
+  await expect(page.getByTestId("my-messages-view")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  // when
+  const clearance = await page.evaluate(() => {
+    const bar = document.querySelector("[data-testid='primary-navigation-bar']");
+    const footer = document.querySelector("footer");
+    if (bar === null || footer === null) return null;
+    return {
+      bar: bar.getBoundingClientRect().height,
+      reserved: parseFloat(getComputedStyle(footer).paddingBottom)
+    };
+  });
+
+  // then — at the end of the page the bar takes the last band of the viewport, so the space
+  // reserved below the footer's own content has to be at least as tall as the bar
+  expect(clearance).not.toBeNull();
+  expect(clearance!.bar).toBeGreaterThan(0);
+  expect(clearance!.reserved).toBeGreaterThanOrEqual(clearance!.bar);
+});
+
 test("member and administration surfaces remain usable on a touch viewport", async ({ page, journeyService }) => {
   // given
   await signIn(page, "doe.jane");
