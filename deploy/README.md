@@ -141,6 +141,7 @@ docker compose --profile mail-setup run --rm mail-bootstrap
 docker compose --profile mail restart mail
 docker compose --profile mail-setup run --rm mail-configure
 docker compose --profile mail up -d --force-recreate mail
+docker compose --profile mail up -d mail-reload
 ```
 
 The proxy comes first because `mail-configure` writes a certificate that points at two files, and
@@ -151,10 +152,12 @@ certificate for <hostname>` once the pair has arrived, and until then there is n
 Two applies with a restart between them, because the first one answers the questions the wizard
 would have asked — hostname, domain, whether to generate DKIM keys — and the server only leaves
 setup mode on the next start. The second one loads the listeners, the delivery routes, the
-administrator account and the certificate.
+administrator account, the certificate and the account the reloader signs in with — which is why
+`mail-reload` starts last: before that apply there is nothing for it to authenticate as.
 
-Before the first command, `.env` needs four values: `COURTSIDE_MAIL_HOSTNAME`,
-`COURTSIDE_MAIL_DOMAIN`, `COURTSIDE_MAIL_ADMIN_PASSWORD` for the club's mail administrator, and
+Before the first command, `.env` needs five values: `COURTSIDE_MAIL_HOSTNAME`,
+`COURTSIDE_MAIL_DOMAIN`, `COURTSIDE_MAIL_ADMIN_PASSWORD` for the club's mail administrator,
+`COURTSIDE_MAIL_RELOAD_PASSWORD` for the account that loads renewed certificates, and
 `COURTSIDE_MAIL_SETUP_PASSWORD` together with
 `COURTSIDE_MAIL_RECOVERY_ADMIN=admin:$COURTSIDE_MAIL_SETUP_PASSWORD` — the credential the setup
 commands authenticate with while the server has no accounts yet.
@@ -170,8 +173,9 @@ Three credentials are in play here, and which part of which one is temporary is 
 | `COURTSIDE_MAIL_SETUP_PASSWORD`, through `COURTSIDE_MAIL_RECOVERY_ADMIN` | The built-in `admin`, which exists only while the recovery variable is set | The account is temporary, the password is not. `mail-bootstrap` and `mail-configure` authenticate as `admin` with it on every run, so keep it, and set the recovery variable back to `admin:${COURTSIDE_MAIL_SETUP_PASSWORD}` whenever you need to run either again. |
 | `COURTSIDE_MAIL_ADMIN_PASSWORD` | The club's mail administrator | Permanent. This is who signs in to read the DKIM selector or add a relay route. |
 | `COURTSIDE_MAIL_PASSWORD` | The account the instance authenticates as | Permanent, and not an administrator. It is an ordinary account that this deployment gives nothing to read: no IMAP or POP3 listener exists, so submitting is all it can reach. |
+| `COURTSIDE_MAIL_RELOAD_PASSWORD` | The account `mail-reload` authenticates as | Permanent, and narrower than any of the others. Its permissions replace what its role would grant with four: signing in, creating the action, reloading TLS certificates, and reading back which certificate the server loaded. It is refused every other administrative call, a sibling reload included. |
 
-Two of those three grant full control of the mail server and both live in `.env` permanently, so
+Two of those four grant full control of the mail server and both live in `.env` permanently, so
 that file is a secret in its own right: give it to the account that runs Compose and to nobody else
 (`chmod 600`), and keep it out of whatever backs up the rest of this host in the clear.
 
@@ -201,7 +205,9 @@ Two things about the mail container are worth knowing regardless:
   authority, and it now issues for `COURTSIDE_MAIL_HOSTNAME` as well as `COURTSIDE_DOMAIN`. The
   `mail-certificate` helper copies that one certificate and its key into a volume of its own, which
   the mail server mounts read-only. Caddy's store, which holds a private key for every name it
-  manages, is never mounted into the mail server. MTA-STS and DANE remain out of scope.
+  manages, is never mounted into the mail server. A renewal is loaded by `mail-reload`, a third
+  container that reaches the mail server but cannot read the pair it asks it to load, signing in as
+  an account whose permissions are that one reload. MTA-STS and DANE remain out of scope.
 
 ### What DNS has to say before anyone believes this server
 
@@ -373,6 +379,9 @@ default.
 | `COURTSIDE_MAIL_ADMIN_USERNAME` | `postmaster` | Local part of the mail administrator's address. |
 | `COURTSIDE_MAIL_RECOVERY_MODE` | *unset* | Set to `1` to force recovery mode without a recovery credential. Mail stops while it is set. |
 | `COURTSIDE_MAIL_PASSWORD` | *required with the mail server* | Password the instance authenticates with when it hands a message in. Written into its sending account by `mail-configure`; the instance is not an administrator of the mail server. |
+| `COURTSIDE_MAIL_RELOAD_PASSWORD` | *required with the mail server* | Password `mail-reload` authenticates with to load a renewed certificate. Written into an account whose only permission is that reload. |
+| `COURTSIDE_MAIL_RELOAD_USERNAME` | `certificate-reload` | Local part of that account's address. |
+| `COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE` | `6` | `mail-reload` reports unhealthy once less than this share of the certificate's own lifetime is left. Relative rather than a number of days, so it means the same for a ninety-day certificate and a twelve-hour one. Caddy renews at a third of the lifetime, so a sixth leaves the renewal a full window of its own to fail in first. |
 | `COURTSIDE_MAIL_REPLY_TO` | *required with the mail server* | The club's real mailbox, so a member who answers a message reaches somebody. |
 | `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from and authenticates as, in `COURTSIDE_MAIL_DOMAIN`. |
 | `COURTSIDE_MAIL_RELAY_HOST` | `mail` | Where the instance hands its messages in. The mail server on the compose network by default; point it at the club's provider instead if this deployment runs without one. |
@@ -552,9 +561,12 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
   reach the instance rather than vanishing, but nothing acts on them. The instance records that it
   handed a message to this server and learns nothing after that, so a bounce arriving here
   afterwards is the answer nobody reads — and DMARC reports have no reader either.
-- **The mail server serves Caddy's certificate, and reloads it only on a restart.** The helper
-  publishes a renewed pair as soon as Caddy writes it, but nothing tells the running mail server to
-  read the files again, so a renewal reaches the listener at the next restart.
-  [#765](https://github.com/jegr78/courtside/issues/765) closes that.
+- **A reload the mail server refuses leaves it serving a certificate it generated itself.**
+  Stalwart 0.16.20 does not keep the pair it had when a reload fails: it answers `notCreated`, drops
+  the certificate, and the listener falls back to a self-signed one valid from 1975 to 4096. Nothing
+  about the fallback is silent here — the reloader reports the refusal and its container turns
+  unhealthy — but nothing undoes it either, short of fixing the pair and reloading again. What
+  bounds it is that `mail-certificate` swaps `current` only after Caddy has validated the pair
+  behind it, so a reload is asked for a pair that has already been read once.
 - **MTA-STS and DANE are not provided.** Neither is published, and neither is planned by this
   work.

@@ -29,10 +29,12 @@ healthy() { announce "ok $1"; }
 failed() { announce "failed $1"; }
 
 ask() {
-  wget -q -O - -T 20 \
+  answer="$(wget -S -O - -T 20 \
     --header="authorization: Basic $credential" \
     --header="content-type: application/json" \
-    --post-data="$1" "$endpoint" 2>/dev/null
+    --post-data="$1" "$endpoint" 2>"$trace")"
+  status="$(sed -n 's|.*HTTP/1\.[01] \([0-9][0-9]*\).*|\1|p' "$trace" | head -1)"
+  [ -n "$answer" ]
 }
 
 # Every request is answered with 200, including a refused one, so what came back decides and the
@@ -59,17 +61,22 @@ attempt() {
     return 1
   fi
 
-  answer="$(ask "$reload")"
+  if ! ask "$reload"; then
+    failed "the mail server answered the reload request with ${status:-nothing}"
+    return 1
+  fi
   case "$answer" in
-    "") failed "the mail server did not answer the reload request"; return 1 ;;
     *'"created"'*) ;;
     *) failed "the mail server refused the reload: $(refusal "$answer")"; return 1 ;;
   esac
 
-  loaded="$(ask "$inspect")"
+  if ! ask "$inspect"; then
+    failed "the mail server answered with ${status:-nothing} when asked what it loaded"
+    return 1
+  fi
+  loaded="$answer"
   case "$loaded" in
     *"\"$hostname\":true"*) ;;
-    "") failed "the mail server did not say which certificate it loaded"; return 1 ;;
     *) failed "the mail server loaded a certificate that does not name $hostname"; return 1 ;;
   esac
 
@@ -90,6 +97,9 @@ attempt() {
 
 credential="$(printf '%s' "$username@$domain:$password" | base64 | tr -d '\n')"
 announced=""
+answer=""
+status=""
+trace=/tmp/trace
 events=/tmp/events
 [ -p "$events" ] || mkfifo "$events"
 # Held open for both ends, so a swap between arming the watch and reading the link is waiting in the
