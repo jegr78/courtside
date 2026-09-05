@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = {
         "courtside.login-protection.address.max-failures=2",
-        "courtside.login-protection.global.max-failures=20"
+        "courtside.login-protection.global.threshold=20"
 })
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
 class LoginAttemptProtectionConcurrencyTest extends AbstractIntegrationTest {

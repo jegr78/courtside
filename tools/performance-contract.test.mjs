@@ -53,6 +53,12 @@ test("given the performance contract, when reading it, then it carries no image 
   assert.equal(JSON.stringify(contract).includes("sha256:"), false);
 });
 
+test("given the reference application, when measuring login capacity, then the candidate is configurable", () => {
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
+  assert.match(compose,
+    /COURTSIDE_LOGIN_VERIFICATION_CONCURRENCY: \$\{COURTSIDE_LOGIN_VERIFICATION_CONCURRENCY:-2\}/);
+});
+
 test("given supported performance profiles, when reading their execution limits, then every run is bounded", () => {
   // given
   const contract = readJson(contractPath);

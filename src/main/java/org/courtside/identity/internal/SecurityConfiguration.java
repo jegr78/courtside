@@ -56,6 +56,7 @@ public class SecurityConfiguration {
             ProblemDetailAccessDeniedHandler accessDeniedHandler,
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
             LoginAttemptProtection loginAttemptProtection,
+            LoginVerificationCapacity loginVerificationCapacity,
             LoginRateLimitHandler loginRateLimitHandler,
             UserAccountRepository accounts,
             @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
@@ -128,7 +129,8 @@ public class SecurityConfiguration {
                         })
                         .failureHandler(authenticationEntryPoint::commence))
                 .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), loginAttemptProtection,
-                        loginRateLimitHandler), UsernamePasswordAuthenticationFilter.class)
+                        loginVerificationCapacity, loginRateLimitHandler),
+                        UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new SecurityEpochFilter(accounts, authenticationEntryPoint),
                         SecurityContextHolderFilter.class)
                 .logout(logout -> logout

@@ -1,21 +1,21 @@
 package org.courtside.identity.internal;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
-import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -26,33 +26,29 @@ class LoginAttemptProtection {
     private final JdbcClient jdbc;
     private final LoginProtectionProperties properties;
     private final Clock clock;
+    private final MeterRegistry meters;
 
     @Transactional
     Optional<LoginBlock> registerAttempt(String address) {
         String normalizedAddress = normalizeAddress(address);
         lock(Scope.ADDRESS, hash(normalizedAddress));
-        lock(Scope.GLOBAL, hash("all"));
 
         Optional<LoginBlock> retryAfter = retryAfter(normalizedAddress);
         if (retryAfter.isPresent()) {
             return retryAfter;
         }
 
+        lock(Scope.GLOBAL, hash("all"));
         recordAttempt(Scope.ADDRESS, normalizedAddress, properties.address());
-        recordAttempt(Scope.GLOBAL, "all", properties.global());
+        observeGlobalAttempt();
         return Optional.empty();
     }
 
     private Optional<LoginBlock> retryAfter(String address) {
         Instant now = clock.instant();
-        return java.util.stream.Stream.of(
-                        blockedUntil(Scope.ADDRESS, address).map(until -> Map.entry(Scope.ADDRESS, until)),
-                        blockedUntil(Scope.GLOBAL, "all").map(until -> Map.entry(Scope.GLOBAL, until)))
-                .flatMap(Optional::stream)
-                .filter(blocked -> blocked.getValue().isAfter(now))
-                .max(Map.Entry.comparingByValue())
-                .map(blocked -> new LoginBlock(blocked.getKey().name(),
-                        Duration.between(now, blocked.getValue())));
+        return blockedUntil(Scope.ADDRESS, address)
+                .filter(until -> until.isAfter(now))
+                .map(until -> new LoginBlock(Scope.ADDRESS.name(), Duration.between(now, until)));
     }
 
     @Transactional
@@ -87,19 +83,7 @@ class LoginAttemptProtection {
     private void recordAttempt(Scope scope, String subject, LoginProtectionProperties.Limit limit) {
         String subjectHash = hash(subject);
         Instant now = clock.instant();
-        Attempt current = jdbc.sql("""
-                        SELECT attempt_count, window_started_at, blocked_until
-                        FROM login_attempt_limit
-                        WHERE scope = :scope AND subject_hash = :subjectHash
-                        """)
-                .param("scope", scope.name())
-                .param("subjectHash", subjectHash)
-                .query((rs, row) -> new Attempt(
-                        rs.getInt("attempt_count"),
-                        rs.getObject("window_started_at", OffsetDateTime.class).toInstant(),
-                        toInstant(rs.getObject("blocked_until", OffsetDateTime.class))))
-                .optional()
-                .orElse(null);
+        Attempt current = currentAttempt(scope, subject).orElse(null);
 
         boolean windowExpired = current == null
                 || !current.windowStartedAt().plus(limit.window()).isAfter(now);
@@ -128,6 +112,51 @@ class LoginAttemptProtection {
                 .param("blockedUntil", blockedUntil == null
                         ? null : blockedUntil.atOffset(ZoneOffset.UTC))
                 .update();
+    }
+
+    private void observeGlobalAttempt() {
+        LoginProtectionProperties.Observation observation = properties.global();
+        Instant now = clock.instant();
+        Attempt current = currentAttempt(Scope.GLOBAL, "all").orElse(null);
+        boolean windowExpired = current == null
+                || !current.windowStartedAt().plus(observation.window()).isAfter(now);
+        int attempts = windowExpired ? 1 : current.attemptCount() + 1;
+        Instant windowStartedAt = windowExpired ? now : current.windowStartedAt();
+
+        if (attempts == observation.threshold()) {
+            meters.counter("courtside.login.distributed.thresholds").increment();
+            log.warn("The distributed sign-in observation threshold of {} attempts in {} seconds was crossed",
+                    observation.threshold(), observation.window().toSeconds());
+        }
+
+        jdbc.sql("""
+                        INSERT INTO login_attempt_limit
+                            (scope, subject_hash, attempt_count, window_started_at, blocked_until)
+                        VALUES ('GLOBAL', :subjectHash, :attempts, :windowStartedAt, NULL)
+                        ON CONFLICT (scope, subject_hash) DO UPDATE
+                        SET attempt_count = EXCLUDED.attempt_count,
+                            window_started_at = EXCLUDED.window_started_at,
+                            blocked_until = NULL
+                        """)
+                .param("subjectHash", hash("all"))
+                .param("attempts", attempts)
+                .param("windowStartedAt", windowStartedAt.atOffset(ZoneOffset.UTC))
+                .update();
+    }
+
+    private Optional<Attempt> currentAttempt(Scope scope, String subject) {
+        return jdbc.sql("""
+                        SELECT attempt_count, window_started_at, blocked_until
+                        FROM login_attempt_limit
+                        WHERE scope = :scope AND subject_hash = :subjectHash
+                        """)
+                .param("scope", scope.name())
+                .param("subjectHash", hash(subject))
+                .query((rs, row) -> new Attempt(
+                        rs.getInt("attempt_count"),
+                        rs.getObject("window_started_at", OffsetDateTime.class).toInstant(),
+                        toInstant(rs.getObject("blocked_until", OffsetDateTime.class))))
+                .optional();
     }
 
     private Instant toInstant(OffsetDateTime value) {

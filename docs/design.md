@@ -1472,14 +1472,20 @@ whether it is built or designed. **Designed means absent today.**
   Ending one single session while leaving the account's rights untouched still has no surface.
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* Source-address counters
-  absorb concentrated attacks and an instance-wide Argon2 budget bounds distributed attempts;
-  both are stored in PostgreSQL. There is deliberately no username lockout: an anonymous attacker
-  could renew it against a known administrator indefinitely. Success clears its address counter,
-  while `Retry-After` tells a client when an address or instance cooldown ends. A refused sign-in is
-  logged with what refused it — the credential, a deactivated account, or which of the two limits
-  holds — carrying the account id where one exists and never the username, the address or a name, so
-  an operator can tell an attack from a member who mistypes without the log itself becoming a list of
-  who tried to sign in.
+  absorb concentrated attacks, while a two-per-instance concurrency guard bounds simultaneous
+  Argon2 work on the reference deployment's two CPUs and 1 GiB application container. Capacity is
+  released as soon as a verification ends; an attempt arriving while both slots are occupied gets
+  the typed `429` with `Retry-After: 1`, not a renewable cooldown. The default is configurable and
+  invalid values fail startup. There is deliberately no username or instance-wide lockout: an
+  anonymous attacker could renew either one indefinitely. Success clears its address counter,
+  while `Retry-After` tells a client when its address cooldown ends. A credential or account-status
+  refusal is logged with the account id where one exists, and an address limit writes one line when
+  it closes; neither contains the username, the address or a name. PostgreSQL also counts admitted
+  attempts in a global one-minute observation
+  window. At 100 attempts it increments `courtside.login.distributed.thresholds` and writes one
+  privacy-safe warning, but changes neither login decisions nor health. A repeated distributed
+  attacker can still keep both verification slots busy; operators should investigate the metric and
+  restrict abusive sources at the reverse proxy or network edge.
 - **Credential issuing:** limited per account over a configurable window, counted in PostgreSQL.
   *Built.* The account is the unit because the account is what the abuse targets: somebody holding a
   board member's session filling one member's mailbox with credentials that each invalidate the
