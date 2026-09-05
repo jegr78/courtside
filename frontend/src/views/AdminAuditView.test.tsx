@@ -57,6 +57,22 @@ describe("AdminAuditView", () => {
     expect(within(entryRow).getByTestId("audit-actor")).toHaveTextContent("doe.jane");
   });
 
+  it("given an entry on a phone, when its card is read, then every audit field carries its label", async () => {
+    // given
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+
+    // when
+    show();
+    const entry = await screen.findByTestId("audit-row");
+
+    // then
+    expect(entry).toHaveClass("grid");
+    expect(within(entry).getByTestId("audit-label-occurred-at")).toHaveTextContent("Occurred");
+    expect(within(entry).getByTestId("audit-label-change")).toHaveTextContent("Change");
+    expect(within(entry).getByTestId("audit-label-subject")).toHaveTextContent("Subject");
+    expect(within(entry).getByTestId("audit-label-actor")).toHaveTextContent("Actor");
+  });
+
   it("given an entry with no actor, when it is shown, then the actor names the system", async () => {
     // given
     const entry: AuditEntry = { ...courtAdded, actorAccountId: null, actorUsername: null };

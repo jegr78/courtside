@@ -86,7 +86,11 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await page.goto("/admin/roster");
 
   // then
-  await expect(page.locator('[data-testid^="roster-row-"]').first()).toBeVisible();
+  const rosterRow = page.locator('[data-testid^="roster-row-"]').first();
+  await expect(rosterRow).toBeVisible();
+  expect(await rosterRow.evaluate((element) => getComputedStyle(element).display)).toBe("grid");
+  await expect(rosterRow.getByTestId("roster-label-membership")).toBeVisible();
+  expect(await rosterRow.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await expectNoHorizontalOverflow(page);
 
   // when
@@ -107,7 +111,11 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await page.goto("/admin/audit");
 
   // then
-  await expect(page.getByTestId("audit-row").first()).toBeVisible();
+  const auditRow = page.getByTestId("audit-row").first();
+  await expect(auditRow).toBeVisible();
+  expect(await auditRow.evaluate((element) => getComputedStyle(element).display)).toBe("grid");
+  await expect(auditRow.getByTestId("audit-label-actor")).toBeVisible();
+  expect(await auditRow.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await expectNoHorizontalOverflow(page);
 });
 
