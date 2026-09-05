@@ -30,10 +30,17 @@ test("given concurrent local builds, when Vitest schedules files, then its worke
   assert.match(vite, /maxWorkers: 2/);
 });
 
-test("given a pull request, when coverage is collected, then changed critical decisions receive context without a percentage gate", () => {
+test("given measured coverage baselines, when verification runs, then coverage cannot fall below its recorded floors", () => {
   assert.match(build, /tools\/coverage-diff\.mjs/);
-  assert.doesNotMatch(pom, /<minimum>/);
-  assert.doesNotMatch(vite, /thresholds:/);
+  assert.match(pom, /<goal>check<\/goal>/);
+  assert.match(pom, /<counter>LINE<\/counter>[\s\S]*?<minimum>0\.96<\/minimum>/);
+  assert.match(pom, /<counter>BRANCH<\/counter>[\s\S]*?<minimum>0\.83<\/minimum>/);
+  assert.match(vite, /thresholds:\s*\{[\s\S]*?statements:\s*89[\s\S]*?branches:\s*85[\s\S]*?functions:\s*86[\s\S]*?lines:\s*92/);
+  assert.match(pom, /<mutationThreshold>74<\/mutationThreshold>/);
+  assert.match(build, /target\/site\/jacoco/);
+  assert.match(mutation, /target\/pit-reports/);
+  assert.match(readFileSync(new URL("../docs/quality-strategy.md", import.meta.url), "utf8"),
+    /263d9ff3275dc072669c9978f7a62ede35ae8b59[\s\S]*96\.18% line[\s\S]*83\.52% branch[\s\S]*89\.79% statement[\s\S]*85\.94% branch[\s\S]*86\.79% function[\s\S]*92\.03% line[\s\S]*Darwin arm64[\s\S]*75% mutation/);
 });
 
 test("given booking authorization and idempotency decisions, when classifying changed coverage, then internal decisions are critical", () => {
