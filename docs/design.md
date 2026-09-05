@@ -1491,8 +1491,10 @@ whether it is built or designed. **Designed means absent today.**
   Booking and participant cards carry no shared credentials; account roles decide which cards the
   actor may use. Anonymous access is read-only. *Built.*
 - **Source offer:** `GET /api/source` reports the running version, the commit it was built from
-  and where its source can be obtained, unauthenticated. *Built.* An operator who forked sets
-  `COURTSIDE_SOURCE_URL`; unset, it names this repository.
+  and where its source can be obtained, unauthenticated. *Built.* The reference deployment requires
+  an explicit absolute HTTP or HTTPS `COURTSIDE_SOURCE_URL` without embedded credentials, so a fork
+  cannot silently offer the upstream source instead of the code it runs or expose a source-host
+  credential through this public response.
 - **Unsupported HTTP methods** are rejected without a server error, and which layer rejects them is
   fixed. The reference proxy answers `TRACE`, `CONNECT` and `TRACK` itself with 405 and forwards
   nothing else it does not relay. Every other method reaches the application, which answers 405 with

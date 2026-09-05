@@ -399,7 +399,7 @@ default.
 | `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` | `500` | Logs Hibernate queries slower than this threshold in milliseconds. Bind values are not logged. |
 | `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's own loggers. `DEBUG` adds an `Answering` line for every error one of its exception handlers answers; sign-in and authorisation failures are not among them. |
 | `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |
-| `COURTSIDE_SOURCE_URL` | this repository | Where `GET /api/source` points. **If you modified Courtside and let others use it, the AGPL requires this to point at your source, not at ours.** |
+| `COURTSIDE_SOURCE_URL` | required | The absolute HTTP or HTTPS address without embedded credentials returned by `GET /api/source`. Point an unchanged installation here and a modified fork at the corresponding source for that fork. Compose refuses to start without this choice. |
 | `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, `DEVELOPMENT` or `PERFORMANCE`. UAT is visibly marked in the frontend. |
 | `COURTSIDE_CLOCK_FIXED_INSTANT` | *unset* | Freezes the clock at an ISO-8601 instant so an automated suite reads the same date on every run. A club never sets this: the instance starts with it only while `COURTSIDE_ENVIRONMENT` names `UAT`, `DEVELOPMENT` or `PERFORMANCE`, so a misspelt designation refuses rather than unlocks. |
 

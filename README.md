@@ -146,9 +146,10 @@ here: a club's members should be able to see what handles their bookings.
 
 Every instance answers `GET /api/source` with the version it is running, the commit it was built
 from and where that source can be obtained. It needs no login, because the obligation runs to the
-people using the service. An unmodified deployment reports this repository; a club that forked
-sets `COURTSIDE_SOURCE_URL` to its own and has thereby discharged section 13.
+people using the service. The reference deployment requires `COURTSIDE_SOURCE_URL` explicitly, so
+an unchanged installation points it here and a fork points it at that fork's corresponding source.
 
 That address must be one the members can actually open. An internal `https://git.intern.example/…`
 discharges nothing — the offer is to them — and publishes an internal hostname to anyone who asks.
-Courtside refuses to start on anything that is not an absolute `http` or `https` address.
+Courtside refuses to start on anything that is not an absolute `http` or `https` address without
+embedded credentials.

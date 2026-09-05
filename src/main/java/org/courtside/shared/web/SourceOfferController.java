@@ -59,11 +59,12 @@ class SourceOfferController implements SourceApi {
     private static URI requireAnOfferAMemberCanFollow(URI sourceUrl) {
         if (sourceUrl.getScheme() == null
                 || !SCHEMES_A_MEMBER_CAN_FOLLOW.contains(sourceUrl.getScheme().toLowerCase())
-                || sourceUrl.getHost() == null) {
+                || sourceUrl.getHost() == null
+                || sourceUrl.getUserInfo() != null) {
             throw new IllegalStateException(
-                    "courtside.source-url must be an http or https address a member can open, "
-                            + "because it is the offer of source AGPL section 13 asks for. Got: "
-                            + sourceUrl);
+                    "courtside.source-url must be an http or https address without credentials "
+                            + "that a member can open, "
+                            + "because it is the offer of source AGPL section 13 asks for");
         }
         return sourceUrl;
     }

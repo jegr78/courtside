@@ -17,7 +17,8 @@ class SourceOfferUrlTest {
         // given
         for (String notAnOffer : new String[] {
                 "javascript:alert(1)", "data:text/html,x", "file:///etc/passwd",
-                "//evil.example/x", "", "ftp://example.org/courtside"}) {
+                "//evil.example/x", "", "ftp://example.org/courtside",
+                "https://user:secret@example.org/courtside"}) {
 
             // when / then
             assertThatThrownBy(() -> controllerWith(notAnOffer))
@@ -25,6 +26,16 @@ class SourceOfferUrlTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("courtside.source-url");
         }
+    }
+
+    @Test
+    void givenCredentialsInTheAddress_whenStarting_thenTheFailureDoesNotDiscloseThem() {
+        // when / then
+        assertThatThrownBy(() -> controllerWith("https://user:secret@example.org/courtside"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("courtside.source-url")
+                .hasMessageNotContaining("user")
+                .hasMessageNotContaining("secret");
     }
 
     @Test
