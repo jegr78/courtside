@@ -77,6 +77,9 @@ services:
       COURTSIDE_MAIL_PASSWORD: ${COURTSIDE_MAIL_PASSWORD:?set COURTSIDE_MAIL_PASSWORD in .env}
       COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: ${COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE:-false}
       LOGGING_LEVEL_ORG_COURTSIDE: ${COURTSIDE_LOG_LEVEL:-INFO}
+    networks:
+      - default
+      - relay
     ports:
       - "127.0.0.1:${COURTSIDE_PORT:-8080}:8080"
 
@@ -96,10 +99,11 @@ services:
       STALWART_RECOVERY_ADMIN: ${COURTSIDE_MAIL_RECOVERY_ADMIN:-}
       STALWART_RECOVERY_MODE: ${COURTSIDE_MAIL_RECOVERY_MODE:-}
     networks:
-      default:
+      default: {}
+      relay:
         aliases:
-          # The name on the certificate the mail server serves. Without it the instance would reach
-          # the relay as `mail`, which is on no certificate any authority issues.
+          # The name on the certificate this server serves, on a network of its own: an alias
+          # answers for everyone who shares the network, and `mail-check` reads the public record.
           - ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
     volumes:
       - mail-config:/etc/stalwart
@@ -286,6 +290,10 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+
+networks:
+  default:
+  relay:
 
 volumes:
   db:

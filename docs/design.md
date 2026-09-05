@@ -1574,9 +1574,9 @@ whether it is built or designed. **Designed means absent today.**
   merely enabled, so a relay that stops offering it fails the handover rather than carrying a
   password in the clear — and the certificate is checked, both the chain up to an authority the
   runtime already holds and the name on it. The reference deployment reaches the relay under
-  `COURTSIDE_MAIL_HOSTNAME`, which the compose network answers for as a second name of the mail
-  service and which is the name Caddy issued the certificate for, so nothing there needs an
-  exception. `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` still exists and still switches both checks
+  `COURTSIDE_MAIL_HOSTNAME`, the name Caddy issued the certificate for, which the mail server
+  answers to as a second name on a network shared with the instance and nothing else, so nothing
+  there needs an exception. `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` still exists and still switches both checks
   off for a club whose relay serves a certificate this container cannot follow; it defaults to
   false everywhere now, and what it costs when it is set is that whoever can redirect the connection
   reads the mail. The failure direction is closed rather than open: a relay serving the wrong name,

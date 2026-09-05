@@ -151,8 +151,11 @@ test("given the shipped plan, when it creates the reload identity, then that ide
 test("given the mail server, when the instance dials it, then it dials the name on its certificate",
   () => {
     // given / when / then
-    assert.match(service("mail"), /aliases:\n(?: +#[^\n]*\n)* +- \$\{COURTSIDE_MAIL_HOSTNAME:\?/,
+    assert.match(service("mail"),
+      /relay:\n +aliases:\n(?: +#[^\n]*\n)* +- \$\{COURTSIDE_MAIL_HOSTNAME:\?/,
       "the compose network answers for `mail` alone, a name no authority issues a certificate for");
+    assert.match(service("app"), /networks:\n(?: +- \w+\n)* +- relay\n/,
+      "the instance is not on the network the name answers on, so it reaches nothing under it");
     assert.match(compose,
       /COURTSIDE_MAIL_RELAY_HOST: \$\{COURTSIDE_MAIL_RELAY_HOST:-\$\{COURTSIDE_MAIL_HOSTNAME:\?/,
       "an instance that keeps dialling `mail` cannot authenticate what answers");
@@ -172,4 +175,12 @@ test("given the mail smoke, when it verifies a certificate, then nothing in it t
         "openssl reports a verification failure and carries on unless it is told not to, so this "
         + "check reads the same whether the certificate verified or not");
     }
+  });
+
+test("given the setup check, when it reads the mail hostname's public record, then no alias answers "
+  + "for it", () => {
+    // given / when / then
+    assert.doesNotMatch(service("mail-check"), /\n +(?:- relay\b|relay:)/,
+      "an alias answers for every container sharing its network, so this check would read the mail "
+      + "container's address as the host's A record and report its reverse name as missing");
   });

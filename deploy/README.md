@@ -208,9 +208,11 @@ Two things about the mail container are worth knowing regardless:
   manages, is never mounted into the mail server. A renewal is loaded by `mail-reload`, a third
   container that reaches the mail server but cannot read the pair it asks it to load, signing in as
   an account whose permissions are that one reload. The instance hands its mail in under
-  `COURTSIDE_MAIL_HOSTNAME`, which the compose network answers for as a second name of the `mail`
-  service, and it verifies the chain and that name like any other client — so a relay serving the
-  wrong certificate stops the mail rather than receiving it. MTA-STS and DANE remain out of scope.
+  `COURTSIDE_MAIL_HOSTNAME` and verifies the chain and that name like any other client, so a relay
+  serving the wrong certificate stops the mail rather than receiving it. That name answers on a
+  network of its own, joined by the instance and the mail server and by nothing else: an alias
+  answers for every container sharing its network, and `mail-check` has to read the public record
+  for the same name. MTA-STS and DANE remain out of scope.
 
 ### What DNS has to say before anyone believes this server
 
