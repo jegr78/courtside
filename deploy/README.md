@@ -162,7 +162,11 @@ Three credentials are in play here, and which part of which one is temporary is 
 |---|---|---|
 | `COURTSIDE_MAIL_SETUP_PASSWORD`, through `COURTSIDE_MAIL_RECOVERY_ADMIN` | The built-in `admin`, which exists only while the recovery variable is set | The account is temporary, the password is not. `mail-bootstrap` and `mail-configure` authenticate as `admin` with it on every run, so keep it, and set the recovery variable back to `admin:${COURTSIDE_MAIL_SETUP_PASSWORD}` whenever you need to run either again. |
 | `COURTSIDE_MAIL_ADMIN_PASSWORD` | The club's mail administrator | Permanent. This is who signs in to read the DKIM selector or add a relay route. |
-| `COURTSIDE_MAIL_PASSWORD` | The account the instance authenticates as | Permanent, and not an administrator. It may send and nothing else. |
+| `COURTSIDE_MAIL_PASSWORD` | The account the instance authenticates as | Permanent, and not an administrator. It is an ordinary account that this deployment gives nothing to read: no IMAP or POP3 listener exists, so submitting is all it can reach. |
+
+Two of those three grant full control of the mail server and both live in `.env` permanently, so
+that file is a secret in its own right: give it to the account that runs Compose and to nobody else
+(`chmod 600`), and keep it out of whatever backs up the rest of this host in the clear.
 
 Afterwards the mail administrator signs in at `http://127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT}/` —
 over an SSH tunnel if the host is remote, because the port is bound to the loopback interface and
@@ -201,7 +205,7 @@ Six records, all published by you, none of them optional if the mail is to arriv
 | `A` / `AAAA` | `COURTSIDE_MAIL_HOSTNAME` | The address the server sends from. |
 | `PTR` | that address, **at your hosting provider only** | Receivers reject a host whose reverse name disagrees with its forward one. |
 | `MX` | `COURTSIDE_MAIL_DOMAIN` | Where bounces and DMARC reports come back to. |
-| `SPF`, a `TXT` record | `COURTSIDE_MAIL_DOMAIN` | Names this host as allowed to send, ending in `-all`. |
+| `SPF`, a `TXT` record | `COURTSIDE_MAIL_DOMAIN` | Names this host as allowed to send, ending in `-all`. `mail-check` reads the sender mechanisms and never the `all` at the end, so `+all` — which authorises the whole internet to send as your domain — passes it. |
 | `DKIM`, a `TXT` record | `<selector>._domainkey.<domain>` | The public half of the key Stalwart signs with. |
 | `DMARC`, a `TXT` record | `_dmarc.<domain>` | What a receiver should do when the first two disagree. |
 
@@ -213,15 +217,19 @@ Three of them have a catch that costs an evening if nobody says it first:
   refused outright rather than filed as spam, and no amount of SPF and DKIM makes up for it.
 - **`DKIM` names a selector you do not choose.** Stalwart generates its own key and shows the
   selector in the admin interface; `COURTSIDE_MAIL_DKIM_SELECTOR` follows it rather than setting it.
-  The key lives in the `mail-config` volume, so losing that volume means a new key, a new selector
-  and a new record — see the backup section below.
+  The key lives in the `mail-data` volume with everything else the server stores, so losing that
+  volume means a new key, a new selector and a new record — see the backup section below. The
+  selector also changes on its own every 90 days, and this deployment publishes DNS by hand:
+  after a rotation the server signs with a new selector while `.env` and DNS still describe the
+  retired one, and `mail-check` reports `ok` for a record nothing signs with any more. Read the
+  selector out of the admin interface, not out of the last green check.
 - **`DMARC` is a policy, and starting strict punishes you, not a forger.** Publish
   `v=DMARC1; p=none; rua=mailto:<a mailbox you read>` first — a mailbox somebody opens, not an
   address at this instance, which receives reports and has nobody to read them. Leave it there long
-  enough to read what it brings, and tighten to `p=quarantine` and then `p=reject` once they show your own mail
-  passing. `mail-check` asks only whether a `v=DMARC1` record is there and never which policy it
-  carries, because which policy is right is a question about your domain and not about this
-  deployment.
+  enough to read what it brings, and tighten to `p=quarantine` and then `p=reject` once they show
+  your own mail passing. `mail-check` asks only whether a `v=DMARC1` record is there and never
+  which policy it carries, because which policy is right is a question about your domain and not
+  about this deployment.
 
 A seventh thing is not DNS and is the one that most often ends the exercise: **most hosting
 providers block outbound port 25** until you ask them to unblock it, and some never will. Find out
@@ -232,8 +240,8 @@ If the answer is no, the mail still has somewhere to go: give the server a relay
 *MTA → Outbound → Routes* in the admin interface — the club's provider, or any server that will
 accept authenticated submission — and point the outbound routing strategy at it. That route lives
 in the interface and **no environment variable carries it**. `COURTSIDE_MAIL_RELAY_HOST` is a
-different hop, the one the application uses to hand a message to this server. Delivery straight to the recipient is what this deployment does by default, not what it
-requires.
+different hop, the one the application uses to hand a message to this server. Delivery straight to
+the recipient is what this deployment does by default, not what it requires.
 
 ### Port 25 is public, and a host firewall will not change that
 
@@ -290,10 +298,18 @@ is the single point at which the smoke world and your world differ.
 ### The test that counts is a message that arrived somewhere else
 
 Everything above happens on your own machine and can pass while the receiving world still refuses
-you. Send one real message to a mailbox you hold at a large provider — put that address on your own
-administrator account and have the instance issue a credential to it — then open the received
-message and read its full source. The header to find is `Authentication-Results`, written
-by the receiver and not by you:
+you. Send one real message to a mailbox you hold at a large provider. Add a person to the roster
+with that address, give them an account, issue their credential, and deactivate the account once
+the message has been read.
+
+**Not your own administrator account.** Issuing a credential replaces that account's password
+immediately and ends its sessions, and the instance can only see that it handed the message to this
+server — which is the very thing under test. If it is then refused out there, the password is gone,
+and an instance whose only administrator is locked out has no way back that does not go through the
+database.
+
+Open the received message and read its full source. The header to find is
+`Authentication-Results`, written by the receiver and not by you:
 
 ```text
 Authentication-Results: mx.example.com;
@@ -309,10 +325,11 @@ answer is usually the reverse name or outbound port 25 rather than anything in t
 
 ### Back up the mail volumes too
 
-The backup below covers PostgreSQL. `mail-config` holds the private DKIM key and the mail server's
-credentials, and it is not in it. Losing it means generating a new key and publishing a new selector;
-leaking it means somebody can sign mail as your domain until you notice. Include both mail volumes
-in whatever backs this host up, and treat `mail-config` as a secret when you do.
+The backup below covers PostgreSQL. Neither mail volume is in it, and the two are not alike:
+`mail-config` holds one small file naming where the store lives, and **`mail-data` is the store** —
+the private DKIM key, every account and its credentials. Losing it means generating a new key and
+publishing a new selector; leaking it means somebody can sign mail as your domain until you notice.
+Include both volumes in whatever backs this host up, and treat `mail-data` as a secret when you do.
 
 ### When the mail administrator password is lost
 
