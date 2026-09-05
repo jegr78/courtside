@@ -3,31 +3,31 @@
   "derivation": {
     "method": "normal=125%-of-reference-peaks-rounded-up; stress=75%-of-normal",
     "reference": {
-      "sourceCommit": "c278b4430c8cd000d6ec94a18b2aa920f1a7c2d8",
-      "measuredAt": "2026-09-05T03:30:47.968Z",
-      "attemptId": "a1d31933-ebd7-40b6-b634-7b1a8faf0402",
+      "sourceCommit": "7b6cb5891ea052c8eec31be33e6d257f6c35f1dd",
+      "measuredAt": "2026-09-05T03:47:59.020Z",
+      "attemptId": "a6091f88-f7bb-4974-a38f-b58cc3ecfbf0",
       "peaks": {
         "application": {
-          "cpuPercent": 140.1,
-          "memoryUsageBytes": 497123328,
+          "cpuPercent": 228.2,
+          "memoryUsageBytes": 1060061184,
           "pids": 1,
           "sharedMemoryUsageBytes": 0
         },
         "proxy": {
-          "cpuPercent": 10.3,
-          "memoryUsageBytes": 18329108,
-          "pids": 13,
+          "cpuPercent": 8.44,
+          "memoryUsageBytes": 18140365,
+          "pids": 14,
           "sharedMemoryUsageBytes": 0
         },
         "postgres": {
-          "cpuPercent": 26.78,
+          "cpuPercent": 23.63,
           "memoryUsageBytes": 80541123,
-          "pids": 17,
+          "pids": 16,
           "sharedMemoryUsageBytes": 1077248
         },
         "browser": {
-          "cpuPercent": 294.52,
-          "memoryUsageBytes": 1181116006,
+          "cpuPercent": 322.04,
+          "memoryUsageBytes": 1176821039,
           "pids": 192,
           "sharedMemoryUsageBytes": 0
         }
@@ -38,8 +38,8 @@
     "normal": {
       "targets": {
         "application": {
-          "cpu": 1.8,
-          "memoryMegabytes": 640,
+          "cpu": 2.9,
+          "memoryMegabytes": 1280,
           "pids": 16,
           "sharedMemoryMegabytes": 16
         },
@@ -50,13 +50,13 @@
           "sharedMemoryMegabytes": 16
         },
         "postgres": {
-          "cpu": 0.35,
+          "cpu": 0.3,
           "memoryMegabytes": 128,
           "pids": 32,
           "sharedMemoryMegabytes": 16
         },
         "browser": {
-          "cpu": 3.7,
+          "cpu": 4.05,
           "memoryMegabytes": 1408,
           "pids": 240,
           "sharedMemoryMegabytes": 16
@@ -66,8 +66,8 @@
     "stress": {
       "targets": {
         "application": {
-          "cpu": 1.35,
-          "memoryMegabytes": 480,
+          "cpu": 2.175,
+          "memoryMegabytes": 960,
           "pids": 12,
           "sharedMemoryMegabytes": 12
         },
@@ -78,13 +78,13 @@
           "sharedMemoryMegabytes": 12
         },
         "postgres": {
-          "cpu": 0.2625,
+          "cpu": 0.225,
           "memoryMegabytes": 96,
           "pids": 24,
           "sharedMemoryMegabytes": 12
         },
         "browser": {
-          "cpu": 2.775,
+          "cpu": 3.0375,
           "memoryMegabytes": 1056,
           "pids": 180,
           "sharedMemoryMegabytes": 12

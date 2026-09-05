@@ -19,7 +19,6 @@ interface ResourceProfileContract {
 interface ConfigurableContainer {
   withResourcesQuota(quota: { cpu: number; memory: number }): this;
   withSharedMemorySize(bytes: number): this;
-  withUlimits(ulimits: { nproc: { soft: number; hard: number } }): this;
 }
 
 interface DockerCapacity {
@@ -51,8 +50,16 @@ export function configureResourceContainer<T extends ConfigurableContainer>(cont
   const limits = contract.profiles[profile].targets[target];
   return container
     .withResourcesQuota({ cpu: limits.cpu, memory: limits.memoryMegabytes / mebibytesPerGibibyte })
-    .withSharedMemorySize(limits.sharedMemoryMegabytes * bytesPerMebibyte)
-    .withUlimits({ nproc: { soft: limits.pids, hard: limits.pids } });
+    .withSharedMemorySize(limits.sharedMemoryMegabytes * bytesPerMebibyte);
+}
+
+export async function enforceContainerPidLimit(containerId: string, profile: ResourceExecutionMode | undefined,
+  target: ContainerResourceTarget, docker: (args: string[]) => Promise<string>): Promise<void> {
+  if (!profile || profile === "reference") return;
+  const pids = contract.profiles[profile].targets[target].pids;
+  await docker(["update", "--pids-limit", String(pids), containerId]);
+  const observed = Number(await docker(["inspect", "--format", "{{.HostConfig.PidsLimit}}", containerId]));
+  if (observed !== pids) throw new Error(`${target} PID limit is ${observed}, expected ${pids}`);
 }
 
 export function assertDockerResourceCapacity(profile: ResourceProfileName, observed: unknown): void {

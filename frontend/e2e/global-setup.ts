@@ -35,6 +35,7 @@ import {
   applicationResourceLimits,
   assertDockerResourceCapacity,
   configureResourceContainer,
+  enforceContainerPidLimit,
   selectedResourceProfile
 } from "./resource-profile";
 import {
@@ -572,6 +573,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       })
       .withExposedPorts(5432), resourceProfile, "postgres")
       .start();
+    await enforceContainerPidLimit(postgres.getId(), resourceProfile, "postgres", dockerText);
     if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true") await startResourceSampling();
     const relayCertificate = selfSignedRelayCertificate();
     mailSink = await new GenericContainer(deployedMailSinkImage())
@@ -722,6 +724,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       .withExtraHosts([{ host: "host.docker.internal", ipAddress: "host-gateway" }])
       .withWaitStrategy(Wait.forLogMessage(/serving initial configuration/)), resourceProfile, "proxy")
       .start();
+    await enforceContainerPidLimit(clubProxy.getId(), resourceProfile, "proxy", dockerText);
     const rootCertificate = await readProxyCertificates(clubProxy, CADDY_LOCAL_AUTHORITY);
     const servedKeys = publicKeyFingerprints(
       rootCertificate + await readProxyCertificates(clubProxy, CADDY_ISSUED_CERTIFICATES));
@@ -791,6 +794,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         (containerId) => executeFile("docker", ["rm", "-f", containerId], { timeout: 5_000 })
       );
       const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
+      await enforceContainerPidLimit(container.getId(), resourceProfile, "browser", dockerText);
       browserServers.set(browserName, { container, endpoint });
       browserLifecycle.start(browserName, container.getId(), new Date().toISOString());
       retainBrowserLifecycle();

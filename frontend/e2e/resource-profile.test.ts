@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assertDockerResourceCapacity,
   configureResourceContainer,
+  enforceContainerPidLimit,
   selectedResourceProfile
 } from "./resource-profile";
 
@@ -10,8 +11,7 @@ describe("browser journey resource profiles", () => {
     // given
     const container = {
       withResourcesQuota: vi.fn().mockReturnThis(),
-      withSharedMemorySize: vi.fn().mockReturnThis(),
-      withUlimits: vi.fn().mockReturnThis()
+      withSharedMemorySize: vi.fn().mockReturnThis()
     };
 
     // when
@@ -19,9 +19,22 @@ describe("browser journey resource profiles", () => {
 
     // then
     expect(configured).toBe(container);
-    expect(container.withResourcesQuota).toHaveBeenCalledWith({ cpu: 0.35, memory: 0.125 });
+    expect(container.withResourcesQuota).toHaveBeenCalledWith({ cpu: 0.3, memory: 0.125 });
     expect(container.withSharedMemorySize).toHaveBeenCalledWith(16_777_216);
-    expect(container.withUlimits).toHaveBeenCalledWith({ nproc: { soft: 32, hard: 32 } });
+  });
+
+  it("given a selected profile, when enforcing process capacity, then the cgroup limit must match", async () => {
+    // given
+    const docker = vi.fn((args: string[]) => Promise.resolve(args[0] === "inspect" ? "32\n" : ""));
+
+    // when
+    await enforceContainerPidLimit("a".repeat(64), "normal", "postgres", docker);
+
+    // then
+    expect(docker).toHaveBeenCalledWith(["update", "--pids-limit", "32", "a".repeat(64)]);
+    expect(docker).toHaveBeenCalledWith(["inspect", "--format", "{{.HostConfig.PidsLimit}}", "a".repeat(64)]);
+    await expect(enforceContainerPidLimit("a".repeat(64), "normal", "postgres",
+      () => Promise.resolve("31"))).rejects.toThrow("expected 32");
   });
 
   it("given reliability execution, when no or an unknown profile is selected, then it fails closed", () => {

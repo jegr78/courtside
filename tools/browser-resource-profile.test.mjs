@@ -63,7 +63,7 @@ test("given the maintained profiles, when loading the contract, then exact enfor
   // then
   assert.deepEqual(Object.keys(limits).toSorted(),
     ["cpu", "memoryBytes", "pids", "sharedMemoryBytes"]);
-  assert.deepEqual(limits, { cpu: 0.35, memoryBytes: 134_217_728, pids: 32, sharedMemoryBytes: 16_777_216 });
+  assert.deepEqual(limits, { cpu: 0.3, memoryBytes: 134_217_728, pids: 32, sharedMemoryBytes: 16_777_216 });
 });
 
 test("given a completed run, when validating its timeline, then all targets and metrics must be sampled over time", () => {
