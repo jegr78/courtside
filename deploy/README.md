@@ -218,8 +218,9 @@ Three of them have a catch that costs an evening if nobody says it first:
 - **`DMARC` is a policy, and starting strict punishes you, not a forger.** Publish
   `v=DMARC1; p=none; rua=mailto:<a mailbox you read>` first, leave it there long enough to read the
   reports it brings, and tighten to `p=quarantine` and then `p=reject` once they show your own mail
-  passing. `mail-check` accepts any valid record here on purpose: which policy is right is a
-  question about your domain, not about this deployment.
+  passing. `mail-check` asks only whether a `v=DMARC1` record is there and never which policy it
+  carries, because which policy is right is a question about your domain and not about this
+  deployment.
 
 A seventh thing is not DNS and is the one that most often ends the exercise: **most hosting
 providers block outbound port 25** until you ask them to unblock it, and some never will. Find out
