@@ -14,8 +14,7 @@ services:
     networks:
       default:
         aliases:
-          # The name on the certificate the mail server serves. Without it the instance would reach
-          # the relay as `mail`, which is on no certificate any authority issues.
+          # As in `compose.yaml`: the name on the certificate this server serves.
           - ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
     volumes:
       - mail-config:/etc/stalwart

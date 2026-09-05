@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { connect as connectTls } from "node:tls";
 import { createConnection } from "node:net";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +38,43 @@ function servedCertificate(port) {
   return found[0];
 }
 
+// The chain up to an authority already held and the name that was asked for. Without
+// `-verify_return_error` openssl reports a failed verification and carries the connection on anyway.
+function verificationOf(port, name, anchors) {
+  const held = join(runtime, `anchors-${createHash("sha256").update(anchors).digest("hex")}.pem`);
+  writeFileSync(held, anchors);
+  const attempt = spawnSync("openssl", ["s_client", "-starttls", "smtp",
+    "-connect", `127.0.0.1:${port}`, "-CAfile", held, "-verify_hostname", name,
+    "-verify_return_error"], { cwd: runtime, encoding: "utf8", input: "" });
+  const reported = /^Verify return code: (\d+)/m.exec(`${attempt.stdout}${attempt.stderr}`);
+  assert.ok(reported, `openssl said nothing about verifying ${name} on ${port}: ${attempt.stderr}`);
+  return Number(reported[1]);
+}
+
+function chainLength(port) {
+  const shown = openssl(["s_client", "-showcerts", "-starttls", "smtp",
+    "-connect", `127.0.0.1:${port}`], "");
+  return (shown.match(/-----BEGIN CERTIFICATE-----/g) ?? []).length;
+}
+
+// The application's own path, which reaches the relay by name and checks both the chain and that
+// name. A refusal is reported by its code, so each of these cases names why it was refused.
+async function handshake(port, name, anchor) {
+  const session = await Smtp.open(port);
+  // Torn down on purpose below, and a socket reporting that teardown to nobody ends the run with an
+  // unhandled error rather than with the answer this was opened for.
+  session.socket.on("error", () => {});
+  try {
+    const secure = await session.startTls(anchor, name);
+    secure.socket.on("error", () => {});
+    return "accepted";
+  } catch (refusal) {
+    return refusal.code ?? refusal.message;
+  } finally {
+    session.socket.destroy();
+  }
+}
+
 function serialOf(certificate) {
   return openssl(["x509", "-noout", "-serial"], certificate).trim();
 }
@@ -48,10 +85,11 @@ function namesOn(certificate) {
 }
 
 function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure = false,
-  reloadSecret = reloadPassword, remainingShare = "6",
+  reloadSecret = reloadPassword, remainingShare = "6", input = undefined,
   maximumLifetime = "34560000" } = {}) {
   const result = spawnSync("docker", ["compose", "-f", composeFile, "-p", project, ...args], {
     encoding: "utf8",
+    input,
     env: {
       ...process.env,
       COURTSIDE_MAIL_HOSTNAME: hostname,
@@ -176,14 +214,12 @@ class Smtp {
     return this.reply();
   }
 
-  // Against the authority that issued it, not against what the server itself presented: the chain is
-  // checked, and only the name is not, which is exactly what the exception the instance runs with means.
-  async startTls(anchor) {
+  // Chain and name both, against the authority that issued it. The name is the one the instance
+  // dials, not the address this run reaches the published port at: that is what a relay is asked.
+  async startTls(anchor, name = hostname) {
     await this.send("EHLO courtside-smoke", "250");
     await this.send("STARTTLS", "220");
-    const secure = connectTls({
-      socket: this.socket, ca: [anchor], checkServerIdentity: () => undefined
-    });
+    const secure = connectTls({ socket: this.socket, ca: [anchor], servername: name });
     await new Promise((ready, fail) => secure.once("secureConnect", ready).once("error", fail));
     return new Smtp(secure);
   }
@@ -316,10 +352,6 @@ async function main() {
     assert.ok(names.includes(hostname),
       `the mail server serves a certificate for ${names.join(", ")} and not for ${hostname}, `
       + "so the proxy's certificate never reached the listener a receiver connects to");
-    // The instance reaches the relay as `mail` on the compose network, which is not a name any
-    // certificate carries, so the exception this deployment sets is still what the hop rests on.
-    assert.ok(!names.includes("mail"),
-      "the relay now answers to the name the instance dials, so the trust exception can go");
 
     console.log("Offering the shipped mail server somebody else's mail on the published port");
     await awaitListener(inbound, "the inbound listener to accept connections");
@@ -342,6 +374,33 @@ async function main() {
       const { messages } = await response.json();
       return messages.some((message) => message.To.some((address) => address.Address === recipient));
     });
+
+    console.log("Verifying the mail server the way a receiver and the instance itself do");
+    assert.equal(verificationOf(submission, hostname, authority), 0,
+      "the submission listener the instance hands its mail to serves a certificate that does not "
+      + `verify as ${hostname} against the authority that issued it`);
+    assert.equal(verificationOf(inbound, hostname, authority), 0,
+      "a receiving mail server offered STARTTLS on port 25 cannot verify this instance");
+    assert.equal(chainLength(submission), 2,
+      "the listener hands out the leaf alone, so only a client that already holds the issuing "
+      + "authority can verify it");
+    assert.equal(verificationOf(submission, "mail", authority), 62,
+      "the name this instance used to dial its relay before now verifies, so a certificate for the "
+      + "wrong host would pass here too");
+    assert.equal(await handshake(submission, "mail", authority), "ERR_TLS_CERT_ALTNAME_INVALID",
+      "the application path accepts a name the certificate does not carry");
+
+    console.log("Reaching the mail server by the name on its certificate, from inside the network");
+    compose(["exec", "-T", "mail", "sh", "-c", "cat > /tmp/authority.pem"], { input: authority });
+    const byName = compose(["exec", "-T", "mail", "sh", "-c",
+      `openssl s_client -starttls smtp -connect ${hostname}:587 -CAfile /tmp/authority.pem `
+      + `-verify_hostname ${hostname} -verify_return_error < /dev/null 2>&1 `
+      + "| grep '^Verify return code'"], { allowFailure: true });
+    // One measurement for two claims: the compose network answers for the hostname at all, and
+    // what answers there is the certificate that names it.
+    assert.match(byName, /^Verify return code: 0 /m,
+      `nothing on the compose network verifies as ${hostname}, so an instance that dials its relay `
+      + `by that name reaches either nothing or something it cannot authenticate: ${byName}`);
 
     console.log("Reading what the mail server can reach of the proxy's store");
     const foreignKey = `/data/caddy/certificates/local/${domain}/${domain}.key`;
@@ -478,6 +537,53 @@ async function main() {
 
     compose(["up", "-d", "--force-recreate", "mail-reload"]);
     await until("the reloader to report healthy again", () => health("mail-reload") === "healthy");
+
+    console.log("Leaving the mail server a pair it cannot read, the way a cut-short copy does");
+    const store = `/caddy/caddy/certificates/local/${hostname}/${hostname}`;
+    const standing = published();
+    // Cut short rather than mismatched: a certificate whose key does not fit it is accepted by the
+    // reload and quietly kept out of use, and only a PEM the server cannot parse reaches this state.
+    compose(["exec", "-T", "mail-certificate", "sh", "-c",
+      "umask 027; mkdir -p /tls/versions/unreadable; "
+      + `head -c 400 ${store}.crt > /tls/versions/unreadable/tls.crt; `
+      + `cat ${store}.key > /tls/versions/unreadable/tls.key; `
+      + "ln -sfn versions/unreadable /tls/.next && mv -T /tls/.next /tls/current"]);
+    await until("the listener to fall back to the certificate the mail server made for itself",
+      () => verificationOf(submission, hostname, authority) === 18);
+    assert.equal(await handshake(submission, hostname, authority), "DEPTH_ZERO_SELF_SIGNED_CERT",
+      "the application hands its members' mail to a relay that signed its own certificate");
+    await until("the reloader to report the pair the mail server would not read",
+      () => health("mail-reload") === "unhealthy");
+    assert.match(compose(["logs", "mail-reload"]), /refused the reload: validationFailed/,
+      "the deployment falls back to a certificate of the mail server's own and says nothing");
+
+    console.log("Publishing the certificate without the authority that signed it");
+    const intermediate = compose(["exec", "-T", "proxy", "cat",
+      "/data/caddy/pki/authorities/local/intermediate.crt"]);
+    compose(["exec", "-T", "mail-certificate", "sh", "-c",
+      "umask 027; mkdir -p /tls/versions/unchained; "
+      + `awk '/BEGIN CERTIFICATE/{seen++} seen==1' ${store}.crt > /tls/versions/unchained/tls.crt; `
+      + `cat ${store}.key > /tls/versions/unchained/tls.key; `
+      + "ln -sfn versions/unchained /tls/.next && mv -T /tls/.next /tls/current"]);
+    // Waited for by what only the proxy's leaf satisfies. A count of one would also be true of the
+    // certificate the mail server made for itself, which is what the listener served a moment ago.
+    await until("the listener to serve the leaf the proxy issued and nothing above it",
+      () => verificationOf(submission, hostname, `${authority}${intermediate}`) === 0);
+    assert.equal(chainLength(submission), 1,
+      "the listener still sends the authority that signed the leaf, so nothing is missing here");
+    assert.equal(verificationOf(submission, hostname, authority), 20,
+      "the leaf verified against the root alone, so the link the listener stopped sending was "
+      + "never needed and this case proves nothing");
+    assert.equal(await handshake(submission, hostname, authority), "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+      "the application path accepts a chain it cannot follow to an authority it holds");
+
+    console.log("Handing the mail server back the pair the proxy issued");
+    compose(["exec", "-T", "mail-certificate", "sh", "-c",
+      `ln -sfn versions/${standing} /tls/.next && mv -T /tls/.next /tls/current`]);
+    await until("the listener to serve the proxy's certificate again",
+      () => verificationOf(submission, hostname, authority) === 0);
+    await until("both containers to report healthy after the pair came back",
+      () => health("mail-reload") === "healthy" && health("mail-certificate") === "healthy");
 
     console.log("The shipped mail server, configured only from the shipped plans, delivered a message.");
   } finally {
