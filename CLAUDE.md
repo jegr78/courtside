@@ -390,6 +390,38 @@ enough to need.
 * **A branch gets a whole-branch review before its final verification and push.** Every batch of
   work so far has had its most serious findings surface there rather than in the per-task reviews.
 
+## The tracker
+
+The project board [Courtside](https://github.com/users/jegr78/projects/2) is the overview. Every
+open issue that is *work* is on it, in `Todo`, `In Progress` or `Done`. A piece of work that is not
+on the board is a bug in the tracker, not a gap in the board.
+
+* **Status lives in two places and no third.** The board says what is moving. A parent issue's
+  sub-issue panel says how far its children have got. The parent's *body* says the problem, the
+  scope and what "done" means, and it never repeats the panel: no `- [ ] #nnn` checklist, no
+  "Delivered" or "Open" section.
+
+  A hand-maintained copy beside a real link is the copy that rots, and it rots silently because
+  nothing verifies it. This tracker has already carried a parent claiming that delivered work was
+  open, that a resolved question still needed a decision, and that a shipped navigation bar did not
+  exist. Every one of those sentences was true on the day it was written.
+
+* **Scope a parent records is scope somebody tracks.** When a parent body settles a shape for four
+  subjects and only three of them become sub-issues, the fourth is a decision nobody holds: it does
+  not appear in the panel, so the parent reads as complete while part of what it agreed is
+  unbuilt. Either the fourth gets a child issue or the body stops claiming it.
+
+* **A closed sub-issue is not a closed parent.** Before closing a parent, read its own "Done when"
+  against the code rather than the count in the panel.
+
+* **Not every open issue is work.** `.github/ISSUE_TEMPLATE` carries the kinds. A `bug` behaves
+  differently from what the documentation or the UI promises, `debt` is a shortcoming with no
+  decision behind it, and an `operations` requirement binds whoever deploys and runs an instance.
+  `decision` and `known-limit` are *records*: they stay open so they are not re-litigated, they are
+  not on the board, and they are not backlog. Read them with `is:open label:decision,known-limit`.
+  The scheduled-run tracker owns the `nightly` issues and closes them itself after seven consecutive
+  green first attempts and a human confirmation.
+
 ## The design specification
 
 `docs/design.md` is the design specification: what the product is, why the architecture is shaped
