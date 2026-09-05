@@ -317,9 +317,10 @@ in whatever backs this host up, and treat `mail-config` as a secret when you do.
 
 Set `COURTSIDE_MAIL_RECOVERY_ADMIN` to `admin:${COURTSIDE_MAIL_SETUP_PASSWORD}` and restart the
 `mail` service, then sign in as `admin`. Any password works to sign in, but the setup commands read
-that one variable, so choosing anything else means they can no longer authenticate. **The server stops accepting and delivering mail while that variable is set** — it
-runs in recovery mode and serves only its admin port. Clear it and recreate the container once you
-are back in.
+that one variable, so choosing anything else means they can no longer authenticate.
+
+**The server stops accepting and delivering mail while that variable is set** — it runs in recovery
+mode and serves only its admin port. Clear it and recreate the container once you are back in.
 
 To change the administrator password instead, edit `COURTSIDE_MAIL_ADMIN_PASSWORD` and run
 `mail-configure` again: the plan upserts the account, so it reconciles rather than duplicates.
