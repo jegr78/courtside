@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError } from "../api/client";
@@ -41,6 +41,21 @@ it("given preferences chosen once, when the header is shown, then they stay insi
   // then
   expect(document.getElementById("locale-preference")).toBeVisible();
   expect(document.getElementById("theme-preference")).toBeVisible();
+});
+
+it("given React owns the menu state, when its summary is activated, then the native toggle cannot race it", () => {
+  // given
+  render(<Preferences authenticated signedOut={() => undefined} />);
+  const menu = screen.getByTestId("preferences-menu");
+  const details = screen.getByTestId("preferences-menu").closest("details")!;
+
+  // when
+  const nativeDefaultRan = fireEvent.click(menu);
+
+  // then
+  expect(nativeDefaultRan).toBe(false);
+  expect(details).toHaveAttribute("open");
+  expect(screen.getByTestId("logout")).toBeVisible();
 });
 
 it("when no theme was selected, then dark mode is the default", () => {

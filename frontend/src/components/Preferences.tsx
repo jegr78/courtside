@@ -58,8 +58,13 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
 
   return <div className="grid justify-items-end gap-2">
     {failure && <Alert testId="preferences-failure">{failure}</Alert>}
-    <details className="relative" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary data-testid="preferences-menu" className="form-control cursor-pointer list-none rounded-lg border px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+    <details className="relative" open={open}>
+      <summary data-testid="preferences-menu"
+        onClick={(event) => {
+          event.preventDefault();
+          setOpen((current) => !current);
+        }}
+        className="form-control cursor-pointer list-none rounded-lg border px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
         {t(authenticated ? "preferences.accountMenu" : "preferences.menu")}
       </summary>
       <div className="surface-panel absolute right-0 z-30 mt-2 grid w-64 max-w-[calc(100vw-2rem)] gap-4 rounded-xl border p-4 shadow-[0_20px_50px_var(--cs-shadow)]">
