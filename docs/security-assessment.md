@@ -2,7 +2,13 @@
 
 Courtside maintains a repeatable internal security assessment based on OWASP guidance. It gives a maintainer a bounded, auditable way to exercise known attack classes and prepares evidence for an external tester. It does not replace an independent penetration test and a successful run does not prove that the application has no vulnerabilities.
 
-The risk-level source remains [`docs/quality-strategy.md`](quality-strategy.md). The machine-readable [`security/assessment-catalog.json`](../security/assessment-catalog.json) maps concrete assessment work to those risk IDs; it does not copy or redefine their impact, ownership or product invariants. Its shape is closed and versioned by [`security/assessment-catalog.schema.json`](../security/assessment-catalog.schema.json).
+The machine-readable [`quality/risk-register.json`](../quality/risk-register.json) and its
+[`closed schema`](../quality/risk-register.schema.json) own risk levels, review dates, evidence
+types, ownership and product invariants. The register renders the maintained tables in
+[`docs/quality-strategy.md`](quality-strategy.md). The machine-readable
+[`security/assessment-catalog.json`](../security/assessment-catalog.json) maps concrete assessment
+work to those risk IDs without copying their meaning. The catalog also has a closed, versioned
+schema.
 
 ## Standards and versioning
 

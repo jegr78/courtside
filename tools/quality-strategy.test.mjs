@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { checkRiskRegister } from "./risk-register.mjs";
 
 const strategy = readFileSync(new URL("../docs/quality-strategy.md", import.meta.url), "utf8");
 const pullRequestTemplate = readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
 
-test("given the quality strategy, when reviewing product risks, then every maintained risk area is present", () => {
+test("given the quality strategy, when reviewing product risks, then the generated register is current", () => {
   // when / then
+  assert.equal(checkRiskRegister().riskCount, 18);
   for (const area of [
     "Identity and security",
     "Booking",
@@ -19,7 +21,7 @@ test("given the quality strategy, when reviewing product risks, then every maint
   }
   for (const field of [
     "Impact", "Likelihood", "Invariant", "Positive boundaries", "Negative boundaries", "Level", "Frequency",
-    "Environment", "Synthetic data", "Evidence", "Owner", "Residual risk"
+    "Environment", "Synthetic data", "Evidence", "Owner", "Open gap", "Last review", "Next review"
   ]) {
     assert.match(strategy, new RegExp(`\\| ${field} `));
   }
@@ -30,6 +32,7 @@ test("given a pull request, when declaring quality evidence, then the maintained
   // when / then
   assert.equal(pullRequestTemplate.includes(
     "https://github.com/jegr78/courtside/blob/main/docs/quality-strategy.md"), true);
+  assert.match(pullRequestTemplate, /quality\/risk-register\.json/);
   assert.match(pullRequestTemplate, /Affected risk IDs/);
   assert.match(pullRequestTemplate, /Evidence/);
   assert.match(pullRequestTemplate, /Residual risk/);
@@ -37,7 +40,7 @@ test("given a pull request, when declaring quality evidence, then the maintained
 
 test("given tracked residual test risks, when reading the strategy, then their existing issues remain authoritative", () => {
   // when / then
-  for (const issue of [45]) {
+  for (const issue of [41]) {
     assert.match(strategy, new RegExp(`github\\.com/jegr78/courtside/issues/${issue}`));
   }
 });

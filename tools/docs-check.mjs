@@ -2,12 +2,14 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkRiskRegister } from "./risk-register.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const documentationTests = [
   "tools/docs-check.test.mjs",
   "tools/github-template-metadata.test.mjs",
   "tools/quality-strategy.test.mjs",
+  "tools/risk-register.test.mjs",
   "tools/post-merge-policy.test.mjs",
   "tools/test-profile-contract.test.mjs"
 ];
@@ -92,6 +94,7 @@ function headingAnchors(source) {
 function main() {
   if (process.argv.includes("--check")) {
     checkDocumentation(repository);
+    checkRiskRegister(repository);
     execFileSync(process.execPath, ["--test", ...documentationTests],
       { cwd: repository, shell: false, stdio: "inherit" });
   }
