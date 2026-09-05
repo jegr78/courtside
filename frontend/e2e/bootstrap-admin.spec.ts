@@ -49,7 +49,7 @@ test("the application shell identifies the exact running build", async ({ page }
   }
 });
 
-test("the bootstrap admin can replace the initial password and maintain a session", async ({ page }) => {
+test("the bootstrap admin can replace the initial password and continue with setup", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("bootstrap-admin");
@@ -65,9 +65,12 @@ test("the bootstrap admin can replace the initial password and maintain a sessio
   await page.getByTestId("username").fill("bootstrap-admin");
   await page.getByTestId("password").fill("permanent-password");
   await page.getByTestId("login-submit").click();
-  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+  await expect(page.getByTestId("setup-progress")).toBeVisible();
 
   await page.reload();
+  await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+  await page.getByTestId("court-plan-link").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
   await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();

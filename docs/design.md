@@ -14,6 +14,12 @@
 
 ## 0. What is built today
 
+After replacing an initial password, an administrator's next sign-in opens the setup overview.
+The administration navigation also opens it, so the board can return later. It derives progress
+from the current configuration, active courts and opening hours, active membership types and
+current roster memberships. An import source is optional. The overview stores no completion flags
+and presents no partial progress if a state request fails.
+
 Fifteen modules exist: `api`, `audit`, `booking`, `card`, `config`, `dataexchange`, `demo`,
 `facility`, `identity`, `member`, `notification`, `performance`, `rules`, `securityassessment`,
 `shared`. `api` holds the OpenAPI-generated request, response and controller-interface types and

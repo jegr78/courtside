@@ -87,14 +87,21 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
-  test(`${locale} administration configuration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+  test(`${locale} setup and administration configuration meet automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
     await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "configuration-admin");
 
     // when
-    await page.goto("/admin/configuration");
+    await page.goto("/admin/setup");
+    await expect(page.getByTestId("setup-progress")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+
+    // when
+    await page.getByTestId("admin-configuration-link").click();
     await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
     await expect(page.getByTestId("save-club-config")).toBeVisible();
 

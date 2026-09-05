@@ -17,7 +17,7 @@ const destinations: Destination[] = [
   { to: "/", testId: "court-plan-link", label: "nav.courts", visible: () => true },
   { to: "/my-bookings", testId: "my-bookings-link", label: "nav.myBookings", visible: (session) => session.authenticated },
   { to: "/my-messages", testId: "my-messages-link", label: "nav.myMessages", visible: (session) => session.authenticated },
-  { to: "/admin/configuration", testId: "administration-link", label: "nav.administration", visible: isAdmin }
+  { to: "/admin/setup", testId: "administration-link", label: "nav.administration", visible: isAdmin }
 ];
 
 // NavLink decides aria-current itself, and its to="/" matches every path, so the court plan would
