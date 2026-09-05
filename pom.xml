@@ -45,7 +45,7 @@
         <npm.version>11.17.0</npm.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <jacoco.version>0.8.15</jacoco.version>
-        <pitest.version>1.25.9</pitest.version>
+        <pitest.version>1.30.0</pitest.version>
         <pitest-junit5.version>1.2.3</pitest-junit5.version>
         <quicktheories.version>0.26</quicktheories.version>
         <jgit.version>7.7.1.202607240634-r</jgit.version>
