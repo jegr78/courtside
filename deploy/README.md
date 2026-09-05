@@ -207,7 +207,10 @@ Two things about the mail container are worth knowing regardless:
   the mail server mounts read-only. Caddy's store, which holds a private key for every name it
   manages, is never mounted into the mail server. A renewal is loaded by `mail-reload`, a third
   container that reaches the mail server but cannot read the pair it asks it to load, signing in as
-  an account whose permissions are that one reload. MTA-STS and DANE remain out of scope.
+  an account whose permissions are that one reload. The instance hands its mail in under
+  `COURTSIDE_MAIL_HOSTNAME`, which the compose network answers for as a second name of the `mail`
+  service, and it verifies the chain and that name like any other client — so a relay serving the
+  wrong certificate stops the mail rather than receiving it. MTA-STS and DANE remain out of scope.
 
 ### What DNS has to say before anyone believes this server
 
@@ -384,9 +387,9 @@ default.
 | `COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE` | `6` | `mail-reload` reports unhealthy once less than this share of the certificate's own lifetime is left. Relative rather than a number of days, so it means the same for a ninety-day certificate and a twelve-hour one. Caddy renews at a third of the lifetime, so a sixth leaves the renewal a full window of its own to fail in first. |
 | `COURTSIDE_MAIL_REPLY_TO` | *required with the mail server* | The club's real mailbox, so a member who answers a message reaches somebody. |
 | `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from and authenticates as, in `COURTSIDE_MAIL_DOMAIN`. |
-| `COURTSIDE_MAIL_RELAY_HOST` | `mail` | Where the instance hands its messages in. The mail server on the compose network by default; point it at the club's provider instead if this deployment runs without one. |
+| `COURTSIDE_MAIL_RELAY_HOST` | `COURTSIDE_MAIL_HOSTNAME` | Where the instance hands its messages in. The mail server on the compose network by default, reached under the name on its certificate rather than under the service name, because the instance authenticates what answers. Point it at the club's provider instead if this deployment runs without one. |
 | `COURTSIDE_MAIL_RELAY_PORT` | `587` | Submission port on that host. |
-| `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `true` in this deployment, `false` in the application | Accept the certificate the relay presents without authenticating it — neither its issuer nor the name on it. The mail server now serves Caddy's certificate for `COURTSIDE_MAIL_HOSTNAME`, but the instance dials it as `mail` on the compose network, which is on no certificate. Clear it when you point `COURTSIDE_MAIL_RELAY_HOST` at a name that is. |
+| `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `false` | Accept the certificate the relay presents without authenticating it — neither its issuer nor the name on it. Nothing here needs it: the mail server serves Caddy's certificate for `COURTSIDE_MAIL_HOSTNAME` and the instance dials exactly that name. Set it only for a relay whose certificate the instance cannot check, such as one issued by a private authority the container does not hold, and know that whoever can redirect the connection then reads the mail. |
 | `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
 | `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`. Needed for the initial setup, and a way back in afterwards. **The server serves no mail while it is set.** |
 | `COURTSIDE_MAIL_OUTBOUND_PROBE` | `gmail-smtp-in.l.google.com` | The host `mail-check` opens port 25 to when testing whether outbound mail leaves at all. A third party by default; point it at a server of your own if you would rather not tell one. |
@@ -565,9 +568,11 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
   Stalwart 0.16.20 does not keep the pair it had when a reload fails: it answers `notCreated`, drops
   the certificate, and the listener falls back to a self-signed one valid from 1975 to 4096. Nothing
   about the fallback is silent here — the reload stays owed until one is accepted, so `mail-reload`
-  names the refusal, retries it, and stays unhealthy while it is owed — but nothing undoes it
-  either, short of fixing the pair and reloading again. What bounds it is that `mail-certificate`
-  swaps `current` only after Caddy has validated the pair behind it, so a reload is asked for a pair
-  that has already been read once.
+  names the refusal, retries it, and stays unhealthy while it is owed — and the instance stops
+  handing messages over rather than handing them to something it cannot authenticate, which shows
+  as an outbox that stops draining. Nothing undoes the fallback, though, short of fixing the pair
+  and reloading again. What bounds it is that `mail-certificate` swaps `current` only after Caddy
+  has validated the pair behind it, so a reload is asked for a pair that has already been read
+  once.
 - **MTA-STS and DANE are not provided.** Neither is published, and neither is planned by this
   work.

@@ -1568,23 +1568,20 @@ whether it is built or designed. **Designed means absent today.**
   vendoring an interface this product does not maintain. What bounds it: the admin port is bound
   to the loopback interface, nothing else in the deployment reads that interface, and it is
   reached only during setup and recovery. *Built, as described.*
-- **Accepted: the instance does not validate the bundled mail server's certificate.** Everything
-  that grants access travels by mail, so the credential and the password the instance authenticates
-  with both cross the hop to the mail server. That hop is required to be encrypted — STARTTLS is
-  required and not merely enabled, so a relay that stops offering it fails the handover rather than
-  carrying a password in the clear — but the certificate is not authenticated, neither its issuer nor
-  the name on it. Caddy issues for the mail hostname now and the mail server serves that certificate,
-  but the instance reaches the relay as `mail` on the compose network, which is on no certificate;
-  checking a name on a certificate whose issuer is unchecked would refuse the relay without proving
-  anything, because whoever can redirect the connection writes both. An observer needs to be on the
-  private compose network *and* able to redirect the application's connection to a server of their
-  own. What bounds it: the exception is off by default in the application and switched on in
-  `compose.yaml`, where a reader sees it; it names one host, the configured relay and no other; and
-  a club pointing `COURTSIDE_MAIL_RELAY_HOST` at a provider with a real certificate clears
-  `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` and is validated in full again. It closes when the
-  compose network resolves the name the certificate carries, and
-  [#766](https://github.com/jegr78/courtside/issues/766) does that.
-  *Built, as described.*
+- **Mail hop authentication:** everything that grants access travels by mail, so the credential and
+  the password the instance authenticates with both cross the hop to the mail server, and that hop
+  is authenticated in both halves. It is required to be encrypted — STARTTLS is required and not
+  merely enabled, so a relay that stops offering it fails the handover rather than carrying a
+  password in the clear — and the certificate is checked, both the chain up to an authority the
+  runtime already holds and the name on it. The reference deployment reaches the relay under
+  `COURTSIDE_MAIL_HOSTNAME`, which the compose network answers for as a second name of the mail
+  service and which is the name Caddy issued the certificate for, so nothing there needs an
+  exception. `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` still exists and still switches both checks
+  off for a club whose relay serves a certificate this container cannot follow; it defaults to
+  false everywhere now, and what it costs when it is set is that whoever can redirect the connection
+  reads the mail. The failure direction is closed rather than open: a relay serving the wrong name,
+  an unknown issuer, an expired certificate or a chain that stops short of its issuer stops the
+  handover, and the mail waits instead of leaving. *Built.*
 - **Accepted: a reload the mail server refuses leaves it serving a certificate it made itself.**
   A renewed certificate reaches the running listener without a restart: the helper publishes the
   pair, a reloader asks the mail server to load it, and the listener answers with the new one.
@@ -1598,8 +1595,9 @@ whether it is built or designed. **Designed means absent today.**
   stays open because keeping the previous pair is the mail server's decision and not this
   deployment's. What bounds it: `current` is swapped only after Caddy has validated the pair behind
   it, so the reload is asked for a pair that has already been read once; the reloader signs in as an
-  account whose permissions are that one reload; and the instance does not authenticate this
-  certificate anyway, per the entry above.
+  account whose permissions are that one reload; and the instance refuses the fallback rather than
+  handing it anything, per the entry above, so a downgraded hop stops the mail instead of carrying
+  it in reach of whoever caused the fallback.
   *Built, as described.*
 - **Accepted: whoever holds a mailbox can take over every account registered to it.** One address
   serving several people is deliberate — a parent registering for their children — so the same
