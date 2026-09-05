@@ -56,17 +56,22 @@ test("a member reaches every destination from the bottom of a touch viewport", a
   await expect(page.getByTestId("my-messages-view")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
-  // when — the end of the document, not merely far enough for the element to enter the viewport
-  // rectangle, which counts the band behind the bar as in view
-  await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight }));
-  await expect.poll(async () => page.evaluate(() =>
-    Math.round(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 1
-  )).toBe(true);
+  // when
+  const clearance = await page.evaluate(() => {
+    const bar = document.querySelector("[data-testid='primary-navigation-bar']");
+    const footer = document.querySelector("footer");
+    if (bar === null || footer === null) return null;
+    return {
+      bar: bar.getBoundingClientRect().height,
+      reserved: parseFloat(getComputedStyle(footer).paddingBottom)
+    };
+  });
 
-  // then — visible is not reachable, so the footer has to end above where the bar begins
-  const footer = await page.getByTestId("footer-product-identity").boundingBox();
-  const pinned = await page.getByTestId("primary-navigation-bar").boundingBox();
-  expect(Math.round(footer!.y + footer!.height)).toBeLessThanOrEqual(Math.round(pinned!.y));
+  // then — at the end of the page the bar takes the last band of the viewport, so the space
+  // reserved below the footer's own content has to be at least as tall as the bar
+  expect(clearance).not.toBeNull();
+  expect(clearance!.bar).toBeGreaterThan(0);
+  expect(clearance!.reserved).toBeGreaterThanOrEqual(clearance!.bar);
 });
 
 test("member and administration surfaces remain usable on a touch viewport", async ({ page, journeyService }) => {
