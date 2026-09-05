@@ -160,7 +160,7 @@ Three credentials are in play here and only one of them is temporary:
 
 | Credential | Who it is | How long it lives |
 |---|---|---|
-| `COURTSIDE_MAIL_SETUP_PASSWORD`, through `COURTSIDE_MAIL_RECOVERY_ADMIN` | The built-in `admin`, before any account exists | Setup and recovery only. Clear the variable; keep the password where you keep the others, because recovery needs it again. |
+| `COURTSIDE_MAIL_SETUP_PASSWORD`, through `COURTSIDE_MAIL_RECOVERY_ADMIN` | The built-in `admin`, before any account exists | Setup only. Clear the variable afterwards. Recovery later sets it again, to whatever you choose then, so this password is not one to keep. |
 | `COURTSIDE_MAIL_ADMIN_PASSWORD` | The club's mail administrator | Permanent. This is who signs in to read the DKIM selector or add a relay route. |
 | `COURTSIDE_MAIL_PASSWORD` | The account the instance authenticates as | Permanent, and not an administrator. It may send and nothing else. |
 
@@ -194,9 +194,7 @@ Two things about the mail container are worth knowing regardless:
 
 ### What DNS has to say before anyone believes this server
 
-Six records, all published by you, none of them optional if the mail is to arrive. `mail-check`
-below reports each of them by the name in the first column, so a failing line and this table say the
-same word:
+Six records, all published by you, none of them optional if the mail is to arrive:
 
 | Record | Where | Why |
 |---|---|---|
@@ -249,15 +247,17 @@ read them, forward them, act on them — has no answer in this deployment yet.
 **Everything else stays off the public interface, and that is deliberate.** Submission, IMAP and
 POP3 have no published port at all: the application reaches submission over the compose network, and
 nobody holds a mailbox here to collect. The admin interface is published on `127.0.0.1` only. Port
-25 is the whole of this server's public surface, and adding a port to `compose.yaml` is what would
-change that — a test in this repository asserts the list, so a slip fails the build rather than the
-club.
+25 is this server's entire public surface, and the only thing that changes that is a port added to
+`compose.yaml`.
 
 ### Checking all of it at once
 
 ```sh
 docker compose --profile mail-check run --rm mail-check
 ```
+
+Every record it names — `PTR`, `MX`, `SPF`, `DKIM` and `DMARC` — is a row in the table above, in
+the same word, so a failing line says which row to go back to.
 
 That resolves every record above, compares each address's reverse name against the forward one,
 opens a connection to a public MX to see whether outbound 25 leaves the host, and asks the mail
@@ -286,12 +286,12 @@ a certificate for the mail hostname, where your instance serves the self-signed 
 That is what lets the run validate the handshake instead of accepting whatever it is handed, and it
 is the single point at which the smoke world and your world differ.
 
-### The one test that counts: a message that arrived somewhere else
+### The test that counts is a message that arrived somewhere else
 
 Everything above happens on your own machine and can pass while the receiving world still refuses
-you. Send one real message to a mailbox you hold at a large provider — the simplest way is to put
-that address on a person in the roster and have the instance issue their credential — then open the
-received message and read its full source. The header to find is `Authentication-Results`, written
+you. Send one real message to a mailbox you hold at a large provider — put that address on your own
+administrator account and have the instance issue a credential to it — then open the received
+message and read its full source. The header to find is `Authentication-Results`, written
 by the receiver and not by you:
 
 ```text
