@@ -1,7 +1,7 @@
 import { execFile, spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
-import { appendFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomUUID, X509Certificate } from "node:crypto";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -448,6 +448,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const browserLifecyclePath = resolve("test-results", "browser-lifecycle.json");
   const resourceTimeline = new ResourceTimelineRecorder(1_000);
   const resourceTimelinePath = resolve("test-results", "resource-timeline.json");
+  mkdirSync(resolve("test-results"), { recursive: true });
   rmSync(browserLifecyclePath, { force: true });
   rmSync(resourceTimelinePath, { force: true });
   const retainBrowserLifecycle = () => {
