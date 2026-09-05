@@ -100,7 +100,9 @@ function health(service) {
 // of its own onto the project.
 function askMailServer(credential, body) {
   return compose(["exec", "-T", "mail-reload", "sh", "-c",
-    `wget -q -O - --header="authorization: Basic $(printf '%s' '${credential}' | base64)" `
+    // base64 wraps at 76 columns, and a credential this long crosses it: a header with a newline
+    // in it is answered with 400 rather than with what the account may do.
+    `wget -q -O - --header="authorization: Basic $(printf '%s' '${credential}' | base64 | tr -d '\n')" `
     + `--header='content-type: application/json' --post-data='${body}' `
     + "http://mail:8080/jmap"], { allowFailure: true });
 }
@@ -380,9 +382,8 @@ async function main() {
     assert.match(serialOf(afterRotation), /^serial=[0-9A-F]+$/);
     assert.equal(serialInside("mail", "/etc/stalwart/tls/current/tls.crt"), serialOf(afterRotation),
       "the mail server serves a certificate other than the one the helper published for it");
-    assert.equal(health("mail-reload"), "healthy");
-    assert.equal(health("mail-certificate"), "healthy",
-      "the helper published the reissued pair, so the copy it refused before is behind it");
+    await until("both containers to report healthy after the reissue",
+      () => health("mail-reload") === "healthy" && health("mail-certificate") === "healthy");
 
     console.log("Taking the reload account away from the reloader");
     const refused = serialOf(servedCertificate(submission));

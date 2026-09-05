@@ -10,6 +10,9 @@ watched="${COURTSIDE_MAIL_CERTIFICATE_TARGET:-/tls}"
 # A certificate is stale once less than this share of its own lifetime is left. Caddy renews at a
 # third, so a sixth means the renewal had a full window of its own to fail in first.
 share="${COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE:-6}"
+# A swap can be a renewal period away, and a certificate nobody renews expires in silence between
+# two of them, so what the mail server holds is read back on its own as well.
+interval="${COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL:-3600}"
 health=/tmp/health
 
 report() {
@@ -70,11 +73,21 @@ attempt() {
     *) failed "the mail server refused the reload: $(refusal "$answer")"; return 1 ;;
   esac
 
+  verify
+}
+
+verify() {
   if ! ask "$inspect"; then
     failed "the mail server answered with ${status:-nothing} when asked what it loaded"
     return 1
   fi
   loaded="$answer"
+  # Read without an id, so the answer holds every certificate and the fields below would be taken
+  # from whichever came last.
+  if [ "$(printf '%s' "$loaded" | grep -o '"notValidAfter"' | wc -l)" -ne 1 ]; then
+    failed "the mail server holds more than one certificate, so this cannot say which it checked"
+    return 1
+  fi
   case "$loaded" in
     *"\"$hostname\":true"*) ;;
     *) failed "the mail server loaded a certificate that does not name $hostname"; return 1 ;;
@@ -107,19 +120,23 @@ events=/tmp/events
 exec 3<> "$events"
 report "watching $watched for the certificate the helper publishes"
 
-# A retry, not a schedule: the mail server may not have the reload account yet, and the next swap
-# can be a renewal period away.
+# A rotation the mail server slept through is loaded on the first round, and a reload is asked for
+# only after a swap: reading back what is loaded needs no second one.
+swapped=yes
+# A retry, not a schedule: the mail server has no reload account until the plan is applied.
 delay=5
 while true; do
   inotifyd - "$watched:y" >&3 2>/dev/null &
   watcher=$!
-  if attempt; then
-    read -r _ <&3
+  if [ "$swapped" = yes ]; then attempt; else verify; fi
+  if [ $? -eq 0 ]; then
+    waiting="$interval"
     delay=5
   else
-    read -t "$delay" -r _ <&3
+    waiting="$delay"
     [ "$delay" -lt 30 ] && delay=$(( delay * 2 ))
   fi
+  if read -t "$waiting" -r _ <&3; then swapped=yes; else swapped=no; fi
   kill "$watcher" 2>/dev/null
   wait "$watcher" 2>/dev/null
 done
