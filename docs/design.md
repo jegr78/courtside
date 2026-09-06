@@ -73,7 +73,9 @@ alone and with its one-time password mailed to that member rather than shown to 
 preview names per row whether an account would be opened and, where it would not, why, and it
 reports every row whose mailbox more than one person reads. A board can also answer, from a
 person's page, what the instance holds about that one person — the file described in section 11 —
-while the CSV export of the admin list views is still missing. `/actuator/health` is exposed. The
+and take the roster and a period's confirmed bookings out as CSV, in the separator and character
+set its own spreadsheet reads. The change log and the message log have no export yet.
+`/actuator/health` is exposed. The
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
@@ -205,9 +207,11 @@ later is additive rather than invasive.
 | Access control: transponders, door and light automation | `AccessControlPort` |
 | Bidirectional sync with an external membership system | `MemberSyncPort` |
 
-CSV **import** is in Release 1; export is not. A club adopting Courtside has to bring its members
-in before it needs to take anything out, so the import is what Release 1 builds and the export
-follows in the release after it. The live, bidirectional sync stays deferred to its own project.
+CSV **import** is in Release 1, and so is the export of the two lists a club is most likely to
+need outside the instance: the roster and a period's confirmed bookings. The lists that remain are
+records rather than data a club works with elsewhere — the change log and the message log — and
+their export follows in the release after it. The live, bidirectional sync stays deferred to its
+own project.
 
 The one export with a date attached to it is the per-member one that answers a subject access
 request. It is not a convenience, and it is built ahead of the rest for that reason: a club owes
@@ -1346,8 +1350,12 @@ Import and export:
   system knows — creating one that never existed is the separate thing described above, and the two
   must not be confused. None can disable the club's own administration either: an account holding
   `ADMIN` keeps that role and stays enabled. An import cannot lock a club out of its instance.
-- **CSV export** for every list view in the admin backend, matching what existing booking
-  systems offer today. *Designed.*
+- **CSV export** of the roster and of a period's confirmed bookings, in the separator and
+  character set the club's own import source records, so the file a spreadsheet opens is the file
+  the import reads back. *Built.* The bookings file names courts, slots and cards and never who
+  booked: `Allocation.bookedByName` is designed and unbuilt, and an export is the wrong place for
+  this product to resolve a member's name for the first time. The change log and the message log
+  have no export. *Designed.*
 - **Per-member JSON export** for subject access requests (section 11). *Built.* This one was
   never deferred by preference: a club is the controller, and a controller that cannot answer what
   it holds about somebody is not compliant because its supplier ran out of release.
