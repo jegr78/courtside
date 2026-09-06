@@ -464,5 +464,7 @@ test("given the passive baseline acceptance, when reading its public proof, then
   assert.deepEqual(baselineSummary.counts, { candidates: 16, findings: 1, regressions: 0 });
   assert.equal(acceptedFindings.length, 1);
   assert.equal(acceptedFindings[0].fingerprint, acceptance.fingerprint);
+  assert.match(acceptance.rationale, /same-origin upload/i);
+  assert.doesNotMatch(acceptance.rationale, /no same-origin asset upload exists/i);
   assert.match(baselineDocumentation, new RegExp(summaryDigest));
 });
