@@ -7,6 +7,12 @@ password="${COURTSIDE_MAIL_RELOAD_PASSWORD:?set COURTSIDE_MAIL_RELOAD_PASSWORD i
 domain="${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}"
 endpoint="${COURTSIDE_MAIL_RELOAD_ENDPOINT:-http://mail:8080/jmap}"
 watched="${COURTSIDE_MAIL_CERTIFICATE_TARGET:-/tls}"
+# Docker's internal service name reaches the listener on the reloader's existing network. TLS still
+# authenticates the public hostname below; using `mail` as the server name would accept the wrong
+# certificate.
+listener="${COURTSIDE_MAIL_RELOAD_TLS_HOST:-mail}"
+listener_port="${COURTSIDE_MAIL_RELOAD_TLS_PORT:-587}"
+authority="${COURTSIDE_MAIL_RELOAD_CA_FILE:-}"
 # A certificate is stale once less than this share of its own lifetime is left. Caddy renews at a
 # third, so a sixth means the renewal had a full window of its own to fail in first.
 share="${COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE:-6}"
@@ -112,7 +118,26 @@ verify() {
     return 1
   fi
 
+  version="$(readlink "$watched/current" 2>/dev/null | sed 's#versions/##')"
+  if ! printf '%s\n' "$version" | grep -q '^[a-f0-9]\{64\}$'; then
+    failed "the certificate helper published an invalid version name"
+    return 1
+  fi
+  expected="$(cat "$watched/fingerprints/$version" 2>/dev/null)"
+  if ! served="$(served_certificate 2>&1)"; then
+    failed "$served"
+    return 1
+  fi
+
   healthy "the mail server serves the certificate the proxy issued for $hostname"
+}
+
+served_certificate() {
+  if [ -z "$authority" ]; then
+    node /mail-certificate-peer.mjs "$hostname" "$listener" "$listener_port" "$expected"
+  else
+    node /mail-certificate-peer.mjs "$hostname" "$listener" "$listener_port" "$expected" "$authority"
+  fi
 }
 
 credential="$(printf '%s' "$username@$domain:$password" | base64 | tr -d '\n')"
@@ -134,14 +159,21 @@ delay=5
 while true; do
   inotifyd - "$watched:y" >&3 2>/dev/null &
   watcher=$!
-  if [ "$owed" = yes ]; then attempt && owed=no; else verify; fi
-  if [ $? -eq 0 ]; then
+  succeeded=no
+  if [ "$owed" = yes ]; then
+    if attempt; then owed=no; succeeded=yes; fi
+  elif verify; then
+    succeeded=yes
+  fi
+  if [ "$succeeded" = yes ]; then
     waiting="$interval"
     delay=5
   else
     waiting="$delay"
     [ "$delay" -lt 30 ] && delay=$(( delay * 2 ))
   fi
+  # BusyBox ash supports a timed read; this script intentionally targets the pinned Alpine image.
+  # shellcheck disable=SC3045
   read -t "$waiting" -r _ <&3 && owed=yes
   kill "$watcher" 2>/dev/null
   wait "$watcher" 2>/dev/null

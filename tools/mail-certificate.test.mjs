@@ -13,6 +13,8 @@ const smoke = readFileSync(fileURLToPath(new URL("courtside.mail-smoke.mjs", imp
 const caddyfile = deploymentFile("Caddyfile");
 const helper = deploymentFile("mail-certificate.sh");
 const reloadScript = deploymentFile("mail-reload.sh");
+const mailWorkflow = readFileSync(fileURLToPath(new URL("../.github/workflows/mail-smoke.yml",
+  import.meta.url)), "utf8");
 
 function service(name) {
   const start = compose.indexOf(`\n  ${name}:\n`);
@@ -93,7 +95,7 @@ test("given the reloader, when it is configured, then it can reach the mail serv
     const reloader = service("mail-reload");
 
     // when / then
-    assert.match(reloader, /image: alpine:3@sha256:[a-f0-9]{64}$/m);
+    assert.match(reloader, /image: node:26-alpine@sha256:[a-f0-9]{64}$/m);
     assert.match(reloader, /no-new-privileges:true/);
     assert.match(reloader, /cap_drop:\n {6}- ALL/);
     assert.match(reloader, /read_only: true/);
@@ -112,6 +114,41 @@ test("given the reloader, when it runs, then it cannot read the pair it announce
     + "outside that group is denied the private key it triggers a reload for");
   assert.doesNotMatch(reloader, /user: "\d+:2000"/);
 });
+
+test("given a validated certificate, when the helper publishes it, then it retains a public leaf "
+  + "fingerprint without exposing the pair", () => {
+  // given / when / then
+  assert.match(helper, /fingerprints/,
+    "the published version has no non-secret identity the reloader can compare with the listener");
+  assert.match(helper, /base64 -d[\s\S]*sha256sum/,
+    "hashing the PEM text would not match the listener's DER certificate fingerprint");
+  assert.match(helper, /chmod 0644/,
+    "the reloader is deliberately outside the group that can traverse the certificate versions");
+  assert.doesNotMatch(service("mail-reload"), /user: "\d+:2000"/,
+    "public fingerprint metadata does not justify granting access to the private-key group");
+});
+
+test("given an accepted reload, when health is decided, then the served leaf must match the "
+  + "published fingerprint", () => {
+  // given / when / then
+  assert.match(reloadScript, /mail-certificate-peer\.mjs/,
+    "Stalwart can accept a mismatched pair while retaining its old certificate");
+  assert.match(reloadScript, /grep -q '\^\[a-f0-9\]\\\{64\\\}\$'/,
+    "a crafted current symlink must not select arbitrary metadata paths");
+  assert.match(reloadScript, /listener="\$\{COURTSIDE_MAIL_RELOAD_TLS_HOST:-mail}"/,
+    "the public hostname is an alias on a network the least-privileged reloader does not join");
+  assert.match(service("mail-reload"), /node:26-alpine@sha256:[a-f0-9]{64}$/m,
+    "the Alpine base has no client that can both validate SMTP STARTTLS and read its peer leaf");
+  assert.match(service("mail-reload"),
+    /- \.\/mail-certificate-peer\.mjs:\/mail-certificate-peer\.mjs:ro$/m);
+});
+
+test("given the listener verifier changes, when GitHub selects checks, then the real mail stack runs",
+  () => {
+    // given / when / then
+    assert.match(mailWorkflow, /- 'deploy\/mail-certificate-peer\.mjs'/,
+      "an isolated verifier change would otherwise skip its only real Stalwart execution");
+  });
 
 test("given a reload, when the mail server answers, then the reloader reads the answer and not the "
   + "status", () => {

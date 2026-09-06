@@ -148,7 +148,7 @@ services:
       start_period: 60s
 
   mail-reload:
-    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    image: node:26-alpine@sha256:2d984a15c9b54fd0aeb608b8e0d0d83529eb34d2966db27a1fb4f1edc3d298a3
     profiles: [mail]
     restart: unless-stopped
     logging: *logging
@@ -171,6 +171,7 @@ services:
       COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL: ${COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL:-3600}
       COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME: ${COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME:-34560000}
     volumes:
+      - ./mail-certificate-peer.mjs:/mail-certificate-peer.mjs:ro
       - ./mail-reload.sh:/mail-reload.sh:ro
       - mail-tls:/tls:ro
     entrypoint: ["sh", "/mail-reload.sh"]

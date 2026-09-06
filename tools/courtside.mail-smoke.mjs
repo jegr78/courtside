@@ -21,6 +21,8 @@ const adminPassword = randomBytes(18).toString("base64url");
 const applicationPassword = randomBytes(18).toString("base64url");
 const reloadPassword = randomBytes(18).toString("base64url");
 const runtime = mkdtempSync(join(tmpdir(), "courtside-mail-smoke-"));
+const reloadAuthority = join(runtime, "reload-authority.crt");
+writeFileSync(reloadAuthority, "");
 
 function openssl(args, input) {
   const result = spawnSync("openssl", args, { cwd: runtime, encoding: "utf8", input });
@@ -108,6 +110,7 @@ function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure 
       COURTSIDE_MAIL_SETUP_PASSWORD: setupPassword,
       COURTSIDE_MAIL_RECOVERY_ADMIN: recoveryAdmin,
       COURTSIDE_MAIL_RELOAD_PASSWORD: reloadSecret,
+      COURTSIDE_MAIL_RELOAD_CA_SOURCE: reloadAuthority,
       COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE: remainingShare,
       COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME: maximumLifetime
     }
@@ -328,6 +331,26 @@ async function main() {
 
     console.log("Waiting for the proxy's certificate to reach the mail server's volume");
     await until("the helper to publish a certificate", () => published() !== undefined);
+    const initialPublishedVersion = published();
+    assert.match(initialPublishedVersion ?? "", /^[0-9a-f]{64}$/,
+      "the first published pair has no immutable version name");
+    const authority = compose(["exec", "-T", "proxy", "cat",
+      "/data/caddy/pki/authorities/local/root.crt"]);
+    assert.match(authority, /-----BEGIN CERTIFICATE-----/,
+      "without the proxy's own root the reloader cannot check the smoke deployment's local chain");
+    writeFileSync(reloadAuthority, authority);
+
+    console.log("Backfilling public fingerprint metadata on an existing certificate volume");
+    compose(["exec", "-T", "mail-certificate", "rm",
+      `/tls/fingerprints/${initialPublishedVersion}`]);
+    compose(["restart", "mail-certificate"]);
+    await until("the helper to restore the missing public fingerprint", () => {
+      const fingerprint = compose(["exec", "-T", "mail-certificate", "cat",
+        `/tls/fingerprints/${initialPublishedVersion}`], { allowFailure: true }).trim();
+      return /^[0-9a-f]{64}$/.test(fingerprint);
+    });
+    await until("the helper to report healthy after the metadata backfill",
+      () => health("mail-certificate") === "healthy");
 
     console.log("Rendering and applying the shipped plans");
     compose(["run", "--rm", "plan"]);
@@ -373,10 +396,6 @@ async function main() {
       + "and an open relay is the one state in which this instance harms people who are not its members");
 
     console.log("Submitting as the instance, with the account the shipped plan gave it");
-    const authority = compose(["exec", "-T", "proxy", "cat",
-      "/data/caddy/pki/authorities/local/root.crt"]);
-    assert.match(authority, /-----BEGIN CERTIFICATE-----/,
-      "without the proxy's own root there is nothing to check the mail server's chain against");
     await submit(submission, sender, recipient, applicationPassword, authority);
 
     await until("the message to arrive in the sink", async () => {
@@ -504,6 +523,43 @@ async function main() {
       "the mail server serves a certificate other than the one the helper published for it");
     await until("both containers to report healthy after the reissue",
       () => health("mail-reload") === "healthy" && health("mail-certificate") === "healthy");
+
+    console.log("Giving Stalwart its valid pair with an incorrect published fingerprint");
+    const beforeFailedHandover = serialOf(afterRotation);
+    const beforeFailedVersion = published();
+    assert.notEqual(beforeFailedVersion, initialPublishedVersion,
+      "the rotation produced no second fingerprint for the mismatch check");
+    compose(["stop", "mail-certificate"]);
+    const failedVersion = "f".repeat(64);
+    const failedPair = `/tls/versions/${failedVersion}`;
+    const failedFingerprint = `/tls/fingerprints/${failedVersion}`;
+    compose(["run", "--rm", "--no-deps", "--entrypoint", "sh", "mail-certificate", "-c",
+      `set -eu; umask 027; mkdir -p ${failedPair} /tls/fingerprints; `
+      + `cat /tls/versions/${beforeFailedVersion}/tls.crt > ${failedPair}/tls.crt; `
+      + `cat /tls/versions/${beforeFailedVersion}/tls.key > ${failedPair}/tls.key; `
+      + `cat /tls/fingerprints/${initialPublishedVersion} > ${failedFingerprint}.next; `
+      + `chmod 0644 ${failedFingerprint}.next; `
+      + `mv ${failedFingerprint}.next ${failedFingerprint}; `
+      + `ln -sfn versions/${failedVersion} /tls/.next; mv -T /tls/.next /tls/current`]);
+    await until("the reloader to identify the accepted but ineffective handover", () =>
+      compose(["logs", "mail-reload"])
+        .includes("served leaf fingerprint does not match the published certificate"));
+    await until("Docker health to reflect the fingerprint mismatch",
+      () => health("mail-reload") === "unhealthy");
+    assert.equal((await verified(submission, hostname, authority)).code, 0,
+      "the valid pair failed trust validation, so this did not isolate the fingerprint check");
+    assert.equal(serialOf(servedCertificate(submission)), beforeFailedHandover,
+      "the deliberately mismatched pair changed the valid certificate the listener serves");
+
+    console.log("Letting the publisher replace the rejected pair with the valid one");
+    compose(["up", "-d", "mail-certificate"]);
+    await until("both containers to recover after the rejected pair",
+      () => health("mail-reload") === "healthy" && health("mail-certificate") === "healthy");
+    assert.notEqual(compose(["exec", "-T", "mail", "readlink", "/etc/stalwart/tls/current"]).trim(),
+      `versions/${failedVersion}`,
+      "the publisher reported healthy without replacing the deliberately mismatched version");
+    assert.equal(serialOf(servedCertificate(submission)), beforeFailedHandover,
+      "restoring the correctly identified pair changed the listener certificate");
 
     console.log("Taking the reload account away from the reloader");
     const refused = serialOf(servedCertificate(submission));
