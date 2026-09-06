@@ -129,6 +129,11 @@
             "kind": { "const": "protocol" },
             "disagreement": { "enum": ["missing-required-header", "unsupported-method-status",
               "missing-allow-header", "allow-header-mismatch"] }
+          } },
+        { "type": "object", "additionalProperties": false,
+          "required": ["kind", "scenarioStatus"], "properties": {
+            "kind": { "const": "scenario" },
+            "scenarioStatus": { "enum": ["error", "failure", "interrupted", "skip", "timeout", "unknown"] }
           } }
       ]
     },

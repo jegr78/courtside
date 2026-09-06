@@ -451,3 +451,59 @@ test("given a contract chosen for the run, when the fuzzer loads, then it is the
   // then
   assert.equal(printed, `sha256:${createHash("sha256").update(readFileSync(chosen)).digest("hex")}`);
 });
+
+test("given a scenario that ended without succeeding, when nothing failed a check, then the operation still says what happened", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "listRoster")];
+  const events = [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: {
+      status: "error",
+      recorder: {
+        label: "GET /api/admin/roster",
+        cases: { one: { value: { method: "GET", query: { cursor: "boundary" },
+          meta: { generation: { mode: "positive" } } } } },
+        checks: {}
+      }
+    } }
+  ];
+
+  // when
+  const normalized = normalizeSchemathesisEvents(events, inventory, "positive");
+
+  // then
+  assert.equal(normalized.operationResults[0].outcome, "incomplete");
+  assert.equal(normalized.counterexamples.length, 1);
+  assert.equal(normalized.counterexamples[0].check, "scenario-completion");
+  assert.equal(normalized.counterexamples[0].operationId, "listRoster");
+  assert.deepEqual(normalized.counterexamples[0].reason,
+    { kind: "scenario", scenarioStatus: "error" });
+  assert.match(normalized.counterexamples[0].reproductionDigest, /^sha256:[a-f0-9]{64}$/);
+});
+
+// The status is the one field of this counterexample that comes from the scanner rather than from us.
+test("given an unfinished scenario reporting a status nobody defined, when it is retained, then the status is not carried through", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "listRoster")];
+  const events = [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: {
+      status: "something-the-scanner-invented",
+      recorder: {
+        label: "GET /api/admin/roster",
+        cases: { one: { value: { method: "GET", meta: { generation: { mode: "positive" } } } } },
+        checks: {}
+      }
+    } }
+  ];
+
+  // when
+  const normalized = normalizeSchemathesisEvents(events, inventory, "positive");
+
+  // then
+  assert.equal(normalized.operationResults[0].outcome, "incomplete");
+  assert.deepEqual(normalized.counterexamples[0].reason,
+    { kind: "scenario", scenarioStatus: "unknown" });
+});

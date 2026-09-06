@@ -15,6 +15,7 @@ const api = yaml.load(specification.toString("utf8"));
 const operationResponses = collectOperationResponses(api);
 const publicPropertyNames = collectPropertyNames(api.components?.schemas ?? {});
 const publicMediaTypes = collectMediaTypes(api);
+const scenarioStatuses = new Set(["error", "failure", "interrupted", "skip", "timeout", "unknown"]);
 const evidenceSchema = JSON.parse(readFileSync(
   new URL("../security/openapi-fuzz-evidence.schema.json", import.meta.url), "utf8"));
 const lifecycleSchema = JSON.parse(readFileSync(
@@ -119,7 +120,10 @@ export function normalizeSchemathesisEvents(events, inventory, mode, contractOpe
           }
         }
       }
-      if (scenario.status !== "success" && !recordedFailure) failed = true;
+      if (scenario.status !== "success" && !recordedFailure) {
+        counterexamples.push(unfinishedScenarioCounterexample(entry, mode, ++sequence, scenario, caseIds));
+        failed = true;
+      }
     }
     const outcome = failed ? "incomplete" : "passed";
     return { operationId: entry.operationId, mode, outcome,
@@ -170,7 +174,8 @@ export async function runOpenApiFuzzAssessment(plan, context) {
   const observedAt = (context.now?.() ?? new Date()).toISOString();
   const candidates = mergeCandidates([
     ...counterexamples.map((counterexample) => counterexampleCandidate(counterexample, plan, context, observedAt)),
-    ...undocumentedRoutes.map((route) => undocumentedRouteCandidate(route, plan, context, observedAt))
+    ...undocumentedRoutes.map((route) => undocumentedRouteCandidate(route, plan, context, observedAt)),
+    ...incompleteCaseCandidates(scanner, plan, context, observedAt)
   ]);
   const stateChanged = scanner.stateBefore !== scanner.stateAfter;
   const incomplete = counterexamples.length > 0 || undocumentedRoutes.length > 0
@@ -561,6 +566,43 @@ function reproductionDigestFor(counterexample) {
     .digest("hex")}`;
 }
 
+function incompleteCaseCandidates(scanner, plan, context, observedAt) {
+  const incomplete = ({ outcome }) => outcome === "incomplete";
+  return [
+    ...scanner.inputCases.filter(incomplete)
+      .map((entry) => incompleteCaseCandidate("input", entry.id, entry, plan, context, observedAt)),
+    ...scanner.importCases.filter(incomplete)
+      .map((entry) => incompleteCaseCandidate("import", entry.id, entry, plan, context, observedAt)),
+    ...scanner.mutationCases.filter(incomplete)
+      .map((entry) => incompleteCaseCandidate("mutation", `${entry.method} ${entry.path}`, entry,
+        plan, context, observedAt))
+  ];
+}
+
+function incompleteCaseCandidate(kind, surface, entry, plan, context, observedAt) {
+  const identity = JSON.stringify({ kind, surface, observation: entry.observation,
+    status: entry.status ?? null, problemType: entry.problemType ?? null,
+    transportError: entry.transportError ?? null });
+  const digest = createHash("sha256").update(identity).digest("hex");
+  return createCandidate({
+    scanner: "schemathesis",
+    ruleId: `${kind}-case-incomplete`,
+    normalizedSurface: surface,
+    parameter: `case-${digest.slice(0, 16)}`,
+    attackClass: "contract-boundary",
+    provenance: {
+      tool: "schemathesis", version: openApiFuzzVersion, runId: plan.runId, attempt: context.attempt,
+      targetFingerprint: plan.targetFingerprint, observedAt
+    },
+    evidence: [{
+      id: `schemathesis-case-${digest.slice(0, 12)}`,
+      status: "retained", classification: "protected",
+      digest: `sha256:${digest}`,
+      expiresOn: new Date(new Date(observedAt).getTime() + 30 * 86_400_000).toISOString().slice(0, 10)
+    }]
+  });
+}
+
 function undocumentedRouteCandidate(route, plan, context, observedAt) {
   return createCandidate({
     scanner: "schemathesis",
@@ -637,8 +679,16 @@ function safeCounterexample(operation, mode, sequence, check, generatedCase) {
   return counterexample;
 }
 
+function unfinishedScenarioCounterexample(operation, mode, sequence, scenario, caseIds) {
+  const status = scenarioStatuses.has(scenario.status) ? scenario.status : "unknown";
+  return safeCounterexample(operation, mode, sequence,
+    { name: "scenario_completion", failure_info: { reason: { kind: "scenario", scenarioStatus: status } } },
+    scenario.recorder.cases[caseIds[0]].value);
+}
+
 function failureReasonProjection(check, reason) {
   const allowedKinds = {
+    "scenario-completion": ["scenario"],
     "not-a-server-error": ["status"],
     "status-code-conformance": ["status"],
     "negative-data-rejection": ["status"],
@@ -690,6 +740,8 @@ function failureReasonProjection(check, reason) {
       && new Set(reason.missingProperties).size === reason.missingProperties.length
       && (reason.validationKeyword === "required" ? reason.missingProperties.length > 0
         : reason.missingProperties.length === 0);
+  } else if (reason?.kind === "scenario") {
+    valid &&= exactKeys(["kind", "scenarioStatus"]) && scenarioStatuses.has(reason.scenarioStatus);
   } else if (reason?.kind === "protocol") {
     valid &&= exactKeys(["kind", "disagreement"])
       && ["missing-required-header", "unsupported-method-status", "missing-allow-header",
