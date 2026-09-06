@@ -52,9 +52,12 @@ test("given a repository that never released, when it bootstraps, then it starts
       + " compare against whatever commit the clone happens to start at and pass on the wrong one");
     const first = git("rev-list", "--max-parents=0", "HEAD").split("\n").at(-1);
 
-    // when / then
-    assert.deepEqual(manifest, { ".": "0.0.0" },
-      "a manifest naming a version nobody can pull would claim a release that never happened");
+    // when / then — the value is release-please's from the first release onwards, and the release
+    // pull request is where it changes, so only the shape of this file is ours to hold.
+    assert.deepEqual(Object.keys(manifest), ["."],
+      "one package, and it is the repository root — a component key would prefix every tag it"
+      + " writes and the release workflow answers `v*`");
+    assert.match(manifest["."], /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
     assert.equal(config["bootstrap-sha"], first,
       "the first changelog covers everything the repository has done, so it stops at the root commit");
     assert.equal(config["last-release-sha"], undefined,
