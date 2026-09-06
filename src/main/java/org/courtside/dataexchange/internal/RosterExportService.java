@@ -23,6 +23,7 @@ import java.util.function.Function;
 public class RosterExportService {
 
     static final int PAGE_SIZE = 200;
+    private static final String SEPARATORS = ",;|\t";
 
     private final RosterService roster;
     private final MemberService memberships;
@@ -31,7 +32,8 @@ public class RosterExportService {
 
     public byte[] roster(String query, UUID membershipTypeId, UUID sourceId, char separator,
                          String encoding) {
-        Charset charset = SupportedEncodings.resolve(encoding);
+        Charset charset = SupportedEncodings.forWriting(encoding);
+        requireUsableSeparator(separator);
         Map<UUID, String> memberNumbers = memberNumbersOf(sourceId);
         return RosterCsv.write(rowsOf(query, membershipTypeId, memberNumbers, new HashMap<>()),
                 separator, charset);
@@ -68,6 +70,14 @@ public class RosterExportService {
     private String nameOf(UUID membershipTypeId, Map<UUID, String> typeNames) {
         return typeNames.computeIfAbsent(membershipTypeId,
                 id -> memberships.membershipTypeNameOf(id).orElse(""));
+    }
+
+    // The document names the characters and the web layer rejects the others, so a separator that
+    // reaches here is a caller that skipped it rather than a club that typed something odd.
+    static void requireUsableSeparator(char separator) {
+        if (SEPARATORS.indexOf(separator) < 0) {
+            throw new IllegalStateException("A separator the contract does not allow reached the export");
+        }
     }
 
     private Map<UUID, String> memberNumbersOf(UUID sourceId) {

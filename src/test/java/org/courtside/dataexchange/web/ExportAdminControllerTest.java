@@ -39,7 +39,7 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-        roster.addPerson("Jörg", "Müller", "jorg.muller@example.org");
+        roster.addPerson("Renée", "Major", "renee.major@example.org");
     }
 
     @Test
@@ -53,7 +53,7 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
                         "attachment; filename=\"roster-2026-05-12.csv\""))
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(written).contains("memberNumber,firstName,lastName").contains("Jörg,Müller");
+        assertThat(written).contains("memberNumber,firstName,lastName").contains("Renée,Major");
     }
 
     @Test
@@ -67,7 +67,7 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsByteArray();
 
         // then
-        assertThat(new String(written, WINDOWS_1252)).contains(";Jörg;Müller;");
+        assertThat(new String(written, WINDOWS_1252)).contains(";Renée;Major;");
     }
 
     @Test
@@ -80,6 +80,29 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:snapshot-encoding-unsupported"))
                 .andExpect(jsonPath("$.violations[0].code")
                         .value("import.snapshot.encodingUnsupported"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void givenAnEncodingThatOnlyReads_whenItExports_thenItIsRefusedRatherThanFailingToWrite()
+            throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/export/roster")
+                        .param("encoding", "x-JISAutoDetect").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code")
+                        .value("import.snapshot.encodingUnsupported"))
+                .andExpect(jsonPath("$.violations[0].params.encoding").value("x-JISAutoDetect"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void givenASeparatorTheDocumentDoesNotAllow_whenItExports_thenTheFieldIsNamedBack()
+            throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/export/roster").param("separator", "\"").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("separator"));
     }
 
     @Test

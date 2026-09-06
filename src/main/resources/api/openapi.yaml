@@ -5366,7 +5366,7 @@ paths:
         whose tooling expects `windows-1252` gets mangled names from anything else, and the import
         source this club configured already records both — the administrative surface offers them
         from there. UTF-8 is written with a byte order mark, because a spreadsheet that is given
-        none guesses, and guesses wrong on the first name with an umlaut in it.
+        none guesses, and guesses wrong on the first name that leaves ASCII.
 
         `POST` rather than `GET`, for one of the two reasons
         `/api/admin/export/person/{personId}` is a `POST`: the file discloses what the club holds
@@ -5403,13 +5403,15 @@ paths:
           description: |
             The single character between two cells. A club whose spreadsheet reads semicolons says
             so here; the default is a comma.
-          schema: { type: string, minLength: 1, maxLength: 1, default: "," }
+          schema: { type: string, pattern: '^[,;|\t]$', minLength: 1, maxLength: 1, default: "," }
         - name: encoding
           in: query
           required: false
           description: |
-            One of the names `/api/admin/import/encodings` lists. An unusable one is answered
-            `400`, because it names a club's tooling and not a caller's bug.
+            One of the names `/api/admin/import/encodings` lists. That list answers the import,
+            so a few of its names decode only and cannot write a file; asking one of them for an
+            export is answered `400` for the same reason an unusable name is — it names a club's
+            tooling and not a caller's bug.
           schema: { type: string, maxLength: 40, default: "UTF-8" }
       responses:
         "200":
@@ -5471,11 +5473,13 @@ paths:
           in: query
           required: false
           description: The single character between two cells.
-          schema: { type: string, minLength: 1, maxLength: 1, default: "," }
+          schema: { type: string, pattern: '^[,;|\t]$', minLength: 1, maxLength: 1, default: "," }
         - name: encoding
           in: query
           required: false
-          description: One of the names `/api/admin/import/encodings` lists.
+          description: |
+            One of the names `/api/admin/import/encodings` lists that can write a file; a
+            decode-only one is answered `400`.
           schema: { type: string, maxLength: 40, default: "UTF-8" }
       responses:
         "200":

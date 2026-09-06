@@ -19,10 +19,11 @@ public class BookingExportService {
     private final BookingLedger ledger;
 
     public byte[] bookings(LocalDate from, LocalDate to, char separator, String encoding) {
+        RosterExportService.requireUsableSeparator(separator);
         List<List<String>> rows = ledger.confirmedBetween(from, to).stream()
                 .map(BookingExportService::cells)
                 .toList();
-        return ExportCsv.write(HEADER, rows, separator, SupportedEncodings.resolve(encoding));
+        return ExportCsv.write(HEADER, rows, separator, SupportedEncodings.forWriting(encoding));
     }
 
     private static List<String> cells(BookingLedger.Occupancy occupancy) {

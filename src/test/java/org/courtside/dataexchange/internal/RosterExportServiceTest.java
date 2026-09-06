@@ -114,13 +114,13 @@ class RosterExportServiceTest extends AbstractIntegrationTest {
     @Test
     void givenAClubWhoseSpreadsheetReadsWindows1252_whenTheRosterIsExported_thenTheNamesSurvive() {
         // given
-        roster.addPerson("Jörg", "Müller", "");
+        roster.addPerson("Renée", "Major", "");
 
         // when
         byte[] written = exports.roster(null, null, null, ';', "windows-1252");
 
         // then
-        assertThat(new String(written, WINDOWS_1252)).contains(";Jörg;Müller;");
+        assertThat(new String(written, WINDOWS_1252)).contains(";Renée;Major;");
     }
 
     @Test

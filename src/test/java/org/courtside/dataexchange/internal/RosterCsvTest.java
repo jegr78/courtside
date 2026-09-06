@@ -51,15 +51,15 @@ class RosterCsvTest {
     }
 
     @Test
-    void givenANameWithAnUmlaut_whenWindows1252IsChosen_thenTheBytesCarryThatNameAndNotAQuestionMark() {
+    void givenANameOutsideAscii_whenWindows1252IsChosen_thenTheBytesCarryItAndNotAQuestionMark() {
         // given
-        RosterCsv.Row umlaut = new RosterCsv.Row("11", "Jörg", "Müller", "", "Adult", null, null);
+        RosterCsv.Row accented = new RosterCsv.Row("11", "Renée", "Major", "", "Adult", null, null);
 
         // when
-        byte[] written = RosterCsv.write(List.of(umlaut), ';', WINDOWS_1252);
+        byte[] written = RosterCsv.write(List.of(accented), ';', WINDOWS_1252);
 
         // then
-        assertThat(new String(written, WINDOWS_1252)).contains("Jörg;Müller");
+        assertThat(new String(written, WINDOWS_1252)).contains("Renée;Major");
         assertThat(new String(written, WINDOWS_1252)).doesNotContain("?");
     }
 
@@ -81,6 +81,27 @@ class RosterCsvTest {
                 .containsEntry(CanonicalField.FIRST_NAME, "Mary \"Major\"")
                 .containsEntry(CanonicalField.LAST_NAME, "Roe, the elder")
                 .containsEntry(CanonicalField.MEMBERSHIP_TYPE, "Youth\nand student");
+    }
+
+    @Test
+    void givenACellOpeningLikeAFormula_whenTheFileIsWritten_thenTheSpreadsheetShowsItInsteadOfRunningIt() {
+        // given
+        RosterCsv.Row injected = new RosterCsv.Row("=HYPERLINK(\"http://example.org\")", "Mary",
+                "Major", "+15551234", "@Adult", null, null);
+
+        // when
+        byte[] written = RosterCsv.write(List.of(injected), ';', StandardCharsets.UTF_8);
+        String text = new String(written, StandardCharsets.UTF_8);
+
+        // then
+        assertThat(text).contains("'=HYPERLINK").contains("'+15551234").contains("'@Adult");
+
+        // and the club gets its own values back when the file is read again
+        CsvSnapshot read = SnapshotParser.parse(written, COLUMNS, StandardCharsets.UTF_8, ';');
+        assertThat(read.rows().getFirst().externalId()).isEqualTo("=HYPERLINK(\"http://example.org\")");
+        assertThat(read.rows().getFirst().values())
+                .containsEntry(CanonicalField.EMAIL, "+15551234")
+                .containsEntry(CanonicalField.MEMBERSHIP_TYPE, "@Adult");
     }
 
     @Test

@@ -32,7 +32,7 @@ class ExportAdminController implements AdminExportApi {
                                                  String separator, String encoding) {
         byte[] file = rosterExports.roster(query, membershipTypeId, sourceId,
                 separator.charAt(0), encoding);
-        return offered("roster-%s".formatted(today()), file, SupportedEncodings.resolve(encoding));
+        return offered("roster-%s".formatted(today()), file, SupportedEncodings.forWriting(encoding));
     }
 
     @Override
@@ -40,7 +40,7 @@ class ExportAdminController implements AdminExportApi {
                                                    String encoding) {
         byte[] file = bookingExports.bookings(from, to, separator.charAt(0), encoding);
         return offered("bookings-%s-%s".formatted(from, to), file,
-                SupportedEncodings.resolve(encoding));
+                SupportedEncodings.forWriting(encoding));
     }
 
     private LocalDate today() {

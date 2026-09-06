@@ -23,12 +23,21 @@ public final class ExportCsv {
         StringWriter text = new StringWriter();
         try (CSVPrinter printer = format(header, separator).print(text)) {
             for (List<String> row : rows) {
-                printer.printRecord(row.stream().map(cell -> cell == null ? "" : cell).toList());
+                printer.printRecord(row.stream().map(ExportCsv::cell).toList());
             }
         } catch (IOException e) {
             throw new UncheckedIOException("A file written into memory cannot fail on IO", e);
         }
         return encoded(text.toString(), charset);
+    }
+
+    // A spreadsheet reads a cell opening with one of these as a formula, quoted or not, and the
+    // value reaching here came from whoever fills the club's membership system.
+    private static String cell(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        return FormulaCharacters.opensAFormula(value) ? "'" + value : value;
     }
 
     // The same dialect the import parses, so a club that exports and re-imports is read by the
@@ -42,7 +51,7 @@ public final class ExportCsv {
     }
 
     // A spreadsheet handed UTF-8 without a mark guesses the encoding, and guesses wrong on the
-    // first name with an umlaut in it.
+    // first name that leaves ASCII.
     private static byte[] encoded(String text, Charset charset) {
         ByteBuffer written = charset.encode(text);
         byte[] content = new byte[written.remaining()];

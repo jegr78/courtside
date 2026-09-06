@@ -1899,6 +1899,18 @@ deliver the implementation.
 
   Answering is itself a processing activity: it writes `dataexchange.subjectAccess.answered` to
   the change log, naming the person and nothing that was in the answer. **Built.**
+- **Accepted: a roster export leaves no trace in the change log.** The file it produces carries
+  every member's name and address, and no entry records that somebody asked for it. What bounds it
+  is that only an administrator can, that the columns are the ones the roster list already shows on
+  screen, and that the file names no account and no booking. What it costs is that a club cannot
+  answer, from its own instance, who took the member list out and when.
+
+  The reason is not preference. Every entry in the change log names the entity it changed —
+  `subject_id` is required — and an export changes nothing and names no entity; the subject access
+  answer is recorded because the law attaches that activity to *one person*, which is a reason
+  about the person and not about producing a file. Recording a bulk export needs a subject the log
+  does not have yet, and inventing one to satisfy the column would put an export under whichever
+  entity was closest to hand. It stays open until the log has a shape for an instance-wide event.
 - **Documentation templates in the repository**: a pre-filled record of processing
   activities, a TOM list, and a privacy policy template for the application. For German
   clubs this is a genuine adoption argument and costs only writing.
