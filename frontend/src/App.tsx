@@ -195,8 +195,6 @@ export function App() {
     void navigate("/login");
   }
 
-  // The session the account menu belongs to. Keying the menu by it drops a message about the
-  // session that ended rather than carrying it into the one that signs in next.
   const authenticated = session?.authenticated ?? false;
 
   return <div className="flex min-h-screen flex-col bg-(--cs-page) text-(--cs-text)">
@@ -206,7 +204,7 @@ export function App() {
         {club?.logoUrl ? <img src={club.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
         <span data-testid="club-brand-name" className="text-xl font-bold">{club?.clubName ?? t("app.name")}</span>
       </div>
-      <Preferences key={String(authenticated)} authenticated={authenticated} supported={club?.supportedLocales} signedOut={signOut} />
+      <Preferences authenticated={authenticated} supported={club?.supportedLocales} signedOut={signOut} />
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">

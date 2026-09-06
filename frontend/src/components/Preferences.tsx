@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "../api/client";
 import { problemMessage } from "../api/problem-message";
@@ -19,18 +19,31 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
   const [theme, updateTheme] = useState<Theme>(initialTheme);
   const [open, setOpen] = useState(false);
   const [failure, setFailure] = useState<string>();
+  const session = useRef(0);
   const locale = supportedLocale(i18n.resolvedLanguage) ?? i18n.resolvedLanguage ?? "";
+
+  // A message belongs to the session that raised it: the next one starts without it, and a request
+  // answering after the change no longer writes onto it.
+  useLayoutEffect(() => {
+    session.current += 1;
+    setFailure(undefined);
+  }, [authenticated]);
+
+  function report(raisedDuring: number, message?: string) {
+    if (session.current === raisedDuring) setFailure(message);
+  }
 
   // Stored on the account rather than in the browser, so the next message the instance sends
   // arrives in the language the member reads.
   async function changeLocale(value: SupportedLocale) {
     await setLocale(value);
     if (!authenticated) return;
+    const raisedDuring = session.current;
     try {
       await api.changeOwnLocale(value);
-      setFailure(undefined);
+      report(raisedDuring);
     } catch (rejected) {
-      setFailure(problemMessage(rejected, t));
+      report(raisedDuring, problemMessage(rejected, t));
     }
   }
 
@@ -38,12 +51,13 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
   // every page as the largest and most colourful control on it.
   async function logout() {
     setFailure(undefined);
+    const raisedDuring = session.current;
     try {
       await api.logout();
     } catch (rejected) {
       // A session the instance has already ended refuses the request that would have ended it.
       if (!(rejected instanceof ApiError) || rejected.status !== 401) {
-        setFailure(problemMessage(rejected, t));
+        report(raisedDuring, problemMessage(rejected, t));
         return;
       }
     }
