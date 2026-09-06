@@ -527,13 +527,19 @@ test("given a mutation probe that was not answered as documented, when the run i
     }))
   ];
   const fingerprint = `sha256:${"a".repeat(64)}`;
-  const inputCases = openApiFuzzPolicy.inputClasses.map((id) => ({ id, status: 400,
-    problemType: "urn:courtside:error:validation-failed", observation: "typed-input-rejection",
-    outcome: "passed" }));
-  const importCases = ["invalid-utf8", "duplicate-columns"].map((id) => ({ id, status: 400,
-    problemType: "urn:courtside:error:import-snapshot-unreadable", observation: "typed-upload-rejection",
-    outcome: "passed" })).concat(["oversized-cell", "conflicting-reference"].map((id) => ({ id, status: 201,
-    observation: "row-level-rejection", outcome: "passed" })));
+  const [firstInputClass] = openApiFuzzPolicy.inputClasses;
+  const inputCases = openApiFuzzPolicy.inputClasses.map((id) => ({ id,
+    ...(id === firstInputClass ? { status: 200 }
+      : { status: 400, problemType: "urn:courtside:error:validation-failed" }),
+    observation: "typed-input-rejection",
+    outcome: id === firstInputClass ? "incomplete" : "passed" }));
+  const importCases = ["invalid-utf8", "duplicate-columns"].map((id) => ({ id,
+    ...(id === "invalid-utf8" ? { status: 200 }
+      : { status: 400, problemType: "urn:courtside:error:import-snapshot-unreadable" }),
+    observation: "typed-upload-rejection",
+    outcome: id === "invalid-utf8" ? "incomplete" : "passed" }))
+    .concat(["oversized-cell", "conflicting-reference"].map((id) => ({ id, status: 201,
+      observation: "row-level-rejection", outcome: "passed" })));
   const mutations = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
   const mutationCases = mutations.map(({ operationId, method, path }) => ({ operationId, method, path,
     status: operationId === "exportRoster" ? 200 : 400,
@@ -560,8 +566,11 @@ test("given a mutation probe that was not answered as documented, when the run i
   // then
   assert.equal(evidence.outcome, "incomplete");
   assert.deepEqual(evidence.counterexamples, []);
-  assert.equal(evidence.candidates.length, 1);
-  assert.equal(evidence.candidates[0].ruleId, "mutation-case-incomplete");
-  assert.equal(evidence.candidates[0].normalizedSurface, "post /api/admin/export/roster");
+  assert.deepEqual(evidence.candidates.map(({ ruleId }) => ruleId).toSorted(),
+    ["import-case-incomplete", "input-case-incomplete", "mutation-case-incomplete"]);
+  assert.equal(evidence.candidates.find(({ ruleId }) => ruleId === "mutation-case-incomplete")
+    .normalizedSurface, "post /api/admin/export/roster");
+  assert.equal(evidence.candidates.find(({ ruleId }) => ruleId === "import-case-incomplete")
+    .normalizedSurface, "invalid-utf8");
   assert.doesNotThrow(() => validateOpenApiFuzzEvidence(evidence));
 });
