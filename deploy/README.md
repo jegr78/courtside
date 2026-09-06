@@ -271,14 +271,16 @@ docker compose --profile mail exec -e NAME="$name" mail sh -c \
   'openssl s_client -starttls smtp -connect "$NAME:587" -verify_hostname "$NAME" \
      -verify_return_error </dev/null 2>&1 | grep "^Verify return code"'
 openssl s_client -starttls smtp -connect "$name:25" </dev/null 2>/dev/null \
-  | openssl x509 -noout -subject -issuer -dates
+  | openssl x509 -noout -issuer -dates -ext subjectAltName
 ```
 
 `Verify return code: 0 (ok)` is the answer, and it is the question the instance asks before it
 hands over a message: chain and name, both, against a public trust store. Anything else names the
 disagreement — `62` is a certificate that does not carry this name, `20` a chain that does not reach
-a known authority, `18` a self-signed one. The second command prints who issued the certificate and
-when it runs out, which is what to compare against a `close to expiry` line in the log.
+a known authority, `18` a self-signed one. The second command prints who issued the certificate,
+which names it carries and when it runs out, which is what to compare against a `close to expiry`
+line in the log. Ask it for the names and not for the subject: Caddy leaves the subject empty and
+puts the name in the certificate's `subjectAltName`, so `-subject` prints an empty line.
 
 None of this needs a password and none of it prints one. Reading what the server serves is not
 reading the key it serves it with, and no command in this file does the second.

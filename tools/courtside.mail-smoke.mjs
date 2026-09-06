@@ -411,14 +411,14 @@ async function main() {
 
     console.log("Reading the issuer and the dates the way the documentation tells an operator to");
     await paced();
-    const described = openssl(["x509", "-noout", "-subject", "-issuer", "-dates"],
+    const described = openssl(["x509", "-noout", "-issuer", "-dates", "-ext", "subjectAltName"],
       servedCertificate(inbound));
-    const subject = /^subject=(.*)$/m.exec(described)?.[1];
     const issuer = /^issuer=(.*)$/m.exec(described)?.[1];
     const runsOut = /^notAfter=(.*)$/m.exec(described)?.[1];
-    assert.ok(subject && issuer && issuer !== subject,
-      `the documented command reports no issuer separate from the subject, so it cannot tell a `
-      + `certificate an authority issued from one the mail server made for itself: ${described}`);
+    assert.ok(issuer && !issuer.includes(hostname) && described.includes(`DNS:${hostname}`),
+      `the documented command does not report both the name the certificate carries and an issuer `
+      + `other than itself, so it cannot tell one an authority issued from the mail server's own: `
+      + `${described}`);
     assert.ok(runsOut && Date.parse(runsOut) > Date.now(),
       `the documented command reports no expiry an operator could act before: ${described}`);
 
