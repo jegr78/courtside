@@ -351,6 +351,14 @@ export async function runOpenApiInputCases(plan, fixture, context) {
   return { cases: results, requestCount: cases.length, generatedBytes };
 }
 
+// A schema that only says "string" accepts "invalid", so corrupting such a parameter would assert a
+// rejection the contract never promised.
+function constrainedQueryParameter(parameters) {
+  return parameters.find(({ in: location, schema }) => location === "query" && schema !== undefined
+    && (schema.format !== undefined || schema.pattern !== undefined || schema.enum !== undefined
+      || schema.type !== "string"))?.name;
+}
+
 export async function runOpenApiMutationCases(plan, fixture, context) {
   const operations = buildOpenApiFuzzInventory(api)
     .filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
@@ -368,10 +376,10 @@ export async function runOpenApiMutationCases(plan, fixture, context) {
     const path = operation.path.replaceAll(/\{[^}]+\}/g, "invalid");
     const contentTypes = Object.keys(definition.requestBody?.content ?? {});
     const contentType = contentTypes[0];
+    const requiredHeaders = parameters
+      .filter(({ in: location, required }) => location === "header" && required);
     const probe = { method: operation.method, path, headers: {} };
-    for (const parameter of parameters.filter(({ in: location, required }) => location === "header" && required)) {
-      probe.headers[parameter.name] = "security-invalid";
-    }
+    for (const parameter of requiredHeaders) probe.headers[parameter.name] = "security-invalid";
     if (contentType === "application/json") {
       probe.headers["content-type"] = contentType;
       probe.body = "{";
@@ -382,7 +390,11 @@ export async function runOpenApiMutationCases(plan, fixture, context) {
       probe.headers["content-type"] = "multipart/form-data; boundary=courtside-invalid";
       probe.body = "--courtside-invalid--\r\n";
     }
-    generatedBytes += Buffer.byteLength(path) + Buffer.byteLength(probe.body ?? "");
+    if (path === operation.path && requiredHeaders.length === 0 && probe.body === undefined) {
+      const constrained = constrainedQueryParameter(parameters);
+      if (constrained !== undefined) probe.path = `${path}?${constrained}=invalid`;
+    }
+    generatedBytes += Buffer.byteLength(probe.path) + Buffer.byteLength(probe.body ?? "");
     const response = await send(probe);
     const passed = response.status >= 400 && response.status < 500
       && /^urn:courtside:error:[a-z0-9-]+$/.test(response.problemType ?? "");

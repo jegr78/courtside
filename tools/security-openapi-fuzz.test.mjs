@@ -597,3 +597,53 @@ test("given a mutation probe that was not answered as documented, when the run i
     .filter(({ ruleId }) => ruleId !== "mutation-case-incomplete");
   assert.throws(() => validateOpenApiFuzzEvidence(withoutCandidate), /omits a lifecycle candidate/);
 });
+
+// An operation with no body, no path parameter and no required header leaves the probe nothing to
+// corrupt, so it used to send a valid request and then report the correct answer as a violation.
+test("given an operation with only optional query parameters, when the probe is built, then it corrupts one of them", async () => {
+  // given
+  const probes = new Map();
+  const fixture = { client: {} };
+
+  // when
+  await runOpenApiMutationCases({ target: "https://127.0.0.1:9443" }, fixture, {
+    ca: "certificate", timeoutMilliseconds: 1_000,
+    request: async (probe) => {
+      probes.set(probe.path.split("?")[0], probe);
+      return { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    }
+  });
+
+  // then
+  const roster = probes.get("/api/admin/export/roster");
+  assert.ok(roster, "the roster export is no longer probed at all");
+  assert.match(roster.path, /[?&]membershipTypeId=invalid\b/,
+    "a uuid query parameter is what this operation offers to make invalid");
+  assert.equal(roster.body, undefined, "the operation declares no request body");
+});
+
+// A probe that could not corrupt anything sends a valid request and then reports the correct answer
+// as a violation, which is how the roster export held the paired comparison red.
+test("given every state-changing operation, when its probe is built, then the request was actually made invalid", async () => {
+  // given
+  const probes = [];
+  const fixture = { client: {} };
+
+  // when
+  const result = await runOpenApiMutationCases({ target: "https://127.0.0.1:9443" }, fixture, {
+    ca: "certificate", timeoutMilliseconds: 1_000,
+    request: async (probe) => {
+      probes.push(probe);
+      return { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    }
+  });
+
+  // then
+  const untouched = result.cases
+    .map((entry, index) => ({ entry, probe: probes[index] }))
+    .filter(({ entry, probe }) => probe.path === entry.path
+      && Object.keys(probe.headers).length === 0 && probe.body === undefined)
+    .map(({ entry }) => `${entry.method} ${entry.path}`);
+  assert.deepEqual(untouched, [],
+    "these operations are probed with a request the contract permits, so their answer says nothing");
+});
