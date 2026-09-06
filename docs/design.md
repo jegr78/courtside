@@ -1594,7 +1594,8 @@ whether it is built or designed. **Designed means absent today.**
   downgrades the hop rather than leaving it as it was. An observer needs to watch container health
   or the reloader's log, both of which say so:
   a reload stays owed until one is accepted, so a refused one is named, retried, and reported by a
-  container that stays unhealthy rather than by one a later read-back turns green again. The
+  container that stays unhealthy rather than by one a later read-back turns green again, and
+  `deploy/README.md` names every state either container reports and what to do about it. The
   fallback is refused on its own terms too — it is valid from 1975 to 4096, and the reloader treats
   a certificate outliving what any authority issues as one the mail server made for itself. It
   stays open because keeping the previous pair is the mail server's decision and not this

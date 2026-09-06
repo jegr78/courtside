@@ -409,6 +409,24 @@ async function main() {
       `nothing on the compose network verifies as ${hostname}, so an instance that dials its relay `
       + `by that name reaches either nothing or something it cannot authenticate: ${byName}`);
 
+    console.log("Reading the issuer and the dates the way the documentation tells an operator to");
+    await paced();
+    const described = openssl(["x509", "-noout", "-issuer", "-dates", "-ext", "subjectAltName"],
+      servedCertificate(inbound));
+    const issuer = /^issuer=(.*)$/m.exec(described)?.[1];
+    const runsOut = Date.parse(/^notAfter=(.*)$/m.exec(described)?.[1] ?? "");
+    const from = Date.parse(/^notBefore=(.*)$/m.exec(described)?.[1] ?? "");
+    assert.ok(issuer && described.includes(`DNS:${hostname}`),
+      `the documented command reports no issuer, or not the name the certificate carries, so an `
+      + `operator reading it cannot tell which certificate the listener holds: ${described}`);
+    // The property the reloader itself decides on: the fallback the mail server generates runs to
+    // the year 4096, and no authority issues for longer than 400 days.
+    assert.ok(runsOut - from < 400 * 86400 * 1000,
+      `the documented command reports a lifetime no authority issues, so what it read is the mail `
+      + `server's own certificate and not the proxy's: ${described}`);
+    assert.ok(runsOut > Date.now(),
+      `the documented command reports no expiry an operator could act before: ${described}`);
+
     console.log("Reading what the mail server can reach of the proxy's store");
     const foreignKey = `/data/caddy/certificates/local/${domain}/${domain}.key`;
     const foreignDigest = digestInside("proxy", foreignKey);

@@ -163,11 +163,9 @@ test("given the mail server, when the instance dials it, then it dials the name 
       "this deployment still accepts whatever certificate the relay presents");
   });
 
-test("given the mail smoke, when it verifies a certificate, then nothing in it turns verification "
-  + "off", () => {
+test("given the mail smoke, when it verifies a certificate, then openssl reports a failure as one",
+  () => {
     // given / when / then
-    assert.doesNotMatch(smoke, /checkServerIdentity|rejectUnauthorized/,
-      "a run that switches the name check off proves the deployment nothing about names");
     const verifying = smoke.split("s_client").filter((call) => call.includes("-CAfile"));
     assert.ok(verifying.length > 0, "the smoke hands openssl no authority to verify against");
     for (const call of verifying) {
