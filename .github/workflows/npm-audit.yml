@@ -17,9 +17,14 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
+      - name: Install the documentation site
+        run: npm --prefix site ci
       - name: Capture npm audit evidence
         working-directory: frontend
         run: npm run audit:security -- --output ../build/security/npm.json
+      - name: Capture npm audit evidence for the documentation site
+        working-directory: frontend
+        run: npm run audit:security -- --output ../build/security/npm-site.json --directory ../site
       - name: Enforce npm vulnerability policy
         run: >
           node tools/security-findings.mjs
@@ -30,19 +35,31 @@ jobs:
           --scope scheduled-npm-audit
           --subject ${{ github.sha }}
           --output build/security/npm-audit-summary.json
-      - name: Require a completed scheduled audit
+      - name: Enforce npm vulnerability policy for the documentation site
         run: >
-          jq -e '.evidenceSources[] |
-          select(.scanner == "npm") |
-          .status == "completed"'
-          build/security/npm-audit-summary.json
-      - name: Remove raw npm audit report
+          node tools/security-findings.mjs
+          --npm build/security/npm-site.json
+          --npm-version "$(npm --version)"
+          --exceptions security/exceptions.json
+          --assessment-policy not-applicable
+          --scope scheduled-npm-audit-site
+          --subject ${{ github.sha }}
+          --output build/security/npm-audit-site-summary.json
+      - name: Require a completed scheduled audit
+        run: |
+          jq -e '.evidenceSources[] | select(.scanner == "npm") | .status == "completed"' \
+            build/security/npm-audit-summary.json
+          jq -e '.evidenceSources[] | select(.scanner == "npm") | .status == "completed"' \
+            build/security/npm-audit-site-summary.json
+      - name: Remove raw npm audit reports
         if: always()
-        run: rm -f build/security/npm.json
+        run: rm -f build/security/npm.json build/security/npm-site.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: npm-audit-evidence-${{ github.run_id }}
-          path: build/security/npm-audit-summary.json
+          path: |
+            build/security/npm-audit-summary.json
+            build/security/npm-audit-site-summary.json
           retention-days: 14
           if-no-files-found: error

@@ -50,8 +50,9 @@ function skipped(reason) {
   return { status: "skipped", report: { schemaVersion: 1, status: "skipped", reason } };
 }
 
-export function runAudit({ output }, execute = executeNpmAudit) {
-  const result = classifyAuditAttempt(execute());
+export function runAudit({ output, directory }, execute) {
+  const audit = execute ?? (() => executeNpmAudit(spawnSync, process.env, resolve(directory ?? ".")));
+  const result = classifyAuditAttempt(audit());
   const target = resolve(output);
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, `${JSON.stringify(result.report, null, 2)}\n`, { mode: 0o600 });
@@ -69,10 +70,12 @@ export function executeNpmAudit(execute = spawnSync, env = process.env, workingD
 }
 
 function parseArguments(args) {
-  if (args.length !== 2 || args[0] !== "--output" || !args[1]) {
-    throw new Error("Usage: npm run audit:security -- --output <path>");
+  const output = args[0] === "--output" ? args[1] : undefined;
+  const directory = args[2] === "--directory" ? args[3] : undefined;
+  if (!output || (args.length !== 2 && (args.length !== 4 || !directory))) {
+    throw new Error("Usage: npm run audit:security -- --output <path> [--directory <path>]");
   }
-  return { output: args[1] };
+  return { output, directory };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

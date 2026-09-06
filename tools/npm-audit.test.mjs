@@ -134,3 +134,20 @@ test("given an unavailable service, when the audit runner writes evidence, then 
     rmSync(directory, { recursive: true });
   }
 });
+
+// The site is a second npm package, and an audit that only ever reads the directory it was started
+// in would report the frontend twice and the site never.
+test("given a second package directory, when the audit is asked for it, then that is where npm runs", () => {
+  // given
+  const calls = [];
+  const execute = (command, args, options) => {
+    calls.push(options.cwd);
+    return { status: 0, stdout: cleanReport, stderr: "" };
+  };
+
+  // when
+  executeNpmAudit(execute, { npm_execpath: "/opt/npm-cli.js" }, "/repo/site");
+
+  // then
+  assert.deepEqual(calls, ["/repo/site"]);
+});

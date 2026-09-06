@@ -34,6 +34,11 @@ updates:
           - "@eslint/*"
           - "typescript-eslint"
 
+  - package-ecosystem: npm
+    directory: "/site"
+    schedule:
+      interval: weekly
+
   - package-ecosystem: docker
     directory: "/"
     schedule:

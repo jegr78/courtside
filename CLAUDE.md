@@ -10,6 +10,9 @@ AGPL-3.0, distributed as a container image plus a reference deployment.
 * **Communication:** German
 * **Documentation, Code, Comments, Commit Messages, Identifiers:** English
 * **UI texts and email templates:** i18n message bundles, German is the default locale
+* **The documentation site in `site/`:** German is the default and English sits beside it. The site
+  addresses members and boards, not contributors, so it follows the product's locale rule rather
+  than the English-documentation rule above — which still governs everything in `docs/`.
 
 ## Technology Stack
 
@@ -471,3 +474,4 @@ carries per item and section 9 carries per metric.
 * What the schema holds, table by table: `docs/data-model.md`
 * Reference deployment and its environment: `deploy/README.md`
 * Cutting a release, and what the release refuses: `docs/releasing.md`
+* The published documentation site: `site/`, deployed by `.github/workflows/pages.yml`
