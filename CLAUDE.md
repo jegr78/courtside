@@ -452,3 +452,4 @@ carries per item and section 9 carries per metric.
 
 * Design spec: `docs/design.md`
 * Reference deployment and its environment: `deploy/README.md`
+* Cutting a release, and what the release refuses: `docs/releasing.md`

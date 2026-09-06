@@ -124,6 +124,7 @@ handling is the database's job and is tested as such.
 ## Documentation
 
 - Design spec: `docs/design.md`
+- How a release is cut: `docs/releasing.md`
 - Known deviations and follow-ups: the issue tracker, labeled `decision`, `known-limit`,
   `operations` or `debt`
 - Conventions for contributors: `CLAUDE.md`. Courtside is developed with AI assistance, and

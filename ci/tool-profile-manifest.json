@@ -52,6 +52,7 @@
     { "path": "tools/risk-register.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/risk-register.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/regression-evidence-policy.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/release-documentation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/role-inventory.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-api-document.mjs", "profiles": ["full"], "test": false },
