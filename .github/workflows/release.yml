@@ -155,7 +155,10 @@ jobs:
 
       - name: Collect the upgrade notes
         run: |
-          previous=$(git describe --tags --abbrev=0 --match 'v*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          # A candidate sits between two releases; anchoring on it would drop every breaking
+          # change before it from the notes a club upgrading from the last release reads.
+          previous=$(git describe --tags --abbrev=0 --match 'v*' --exclude 'v*-*' \
+            "$GITHUB_REF_NAME^" 2>/dev/null || true)
           range=${previous:+$previous..}$GITHUB_REF_NAME
           breaking=$(git log --no-merges --format='%s%n%b' "$range" \
             | grep -E '^BREAKING CHANGE:|^[a-z]+(\(.+\))?!:' || true)

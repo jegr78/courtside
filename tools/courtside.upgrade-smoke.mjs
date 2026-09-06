@@ -9,8 +9,15 @@ import { localRequest, newBootstrapPassword } from "./courtside.mjs";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const composeFile = join(root, "deploy", "compose.upgrade.yaml");
 
+// Semantic versioning: no numeric part carries a leading zero, so the same version cannot arrive
+// twice written two ways.
+const NUMBER = String.raw`(?:0|[1-9]\d*)`;
+const IDENTIFIER = String.raw`(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`;
+const VERSION = new RegExp(
+  `^v(${NUMBER})\\.(${NUMBER})\\.(${NUMBER})(?:-(${IDENTIFIER}(?:\\.${IDENTIFIER})*))?$`);
+
 function parseVersion(tag) {
-  const match = /^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(tag);
+  const match = VERSION.exec(tag);
   return match && {
     tag, major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]),
     prerelease: match[4] ?? null

@@ -92,6 +92,18 @@ test("given a candidate tag, when the release resolves upgrade origins, then the
       "the flag decides how a candidate is published and is reachable now");
   });
 
+// A candidate sits between two releases, so a range anchored on the nearest tag would drop every
+// breaking change before it from the notes a club reads.
+test("given a candidate between two releases, when the upgrade notes are collected, then the range skips it",
+  () => {
+    // given
+    const collect = workflow.jobs.build.steps.find((step) => step.name === "Collect the upgrade notes");
+
+    // when / then
+    assert.match(collect.run, /git describe [^\n]*--exclude 'v\*-\*'/,
+      "the range is anchored on the last release, never on a candidate");
+  });
+
 test("given the tags a release publishes, when the document names them, then it names every one", () => {
   // given
   const meta = workflow.jobs.publish.steps

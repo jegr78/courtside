@@ -95,6 +95,15 @@ test("given several patches in the current line, when selecting origins, then pa
   assert.deepEqual(origins, ["v0.3.1", "v0.2.1"]);
 });
 
+// Semantic versioning forbids a leading zero, and accepting one would offer the same version twice
+// as two origins that only differ in how they were written.
+test("given a version written with a leading zero, when selecting upgrade origins, then it is not one", () => {
+  // when / then
+  assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.3.0-rc.01", "v0.3.0-rc.1"]), ["v0.3.0-rc.1"]);
+  assert.throws(() => selectUpgradeOrigins("v01.2.3", []), /not a semantic version/);
+  assert.throws(() => selectUpgradeOrigins("v0.3.0-rc.01", []), /not a semantic version/);
+});
+
 test("given no published origin, when selecting upgrade origins, then the pre-release fixture is used", () => {
   // when / then
   assert.deepEqual(selectUpgradeOrigins("v0.1.0", []), ["pre-release-v17"]);
