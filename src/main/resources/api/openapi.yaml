@@ -5354,6 +5354,10 @@ paths:
         `email` and `membershipType` are the import's canonical fields, and
         `membershipStartedOn` and `membershipEndedOn` follow them.
 
+        `memberNumber` names one source, because a person may be linked in several and no rule for
+        picking between them would be right for every club. `sourceId` says which; without it the
+        column is empty for everybody, which is what a club that never imported anything gets.
+
         `query` and `membershipTypeId` mean exactly what they mean on `/api/admin/roster`, and the
         file holds every matching person rather than a page. The order is the same: last name,
         first name, person id.
@@ -5364,9 +5368,14 @@ paths:
         from there. UTF-8 is written with a byte order mark, because a spreadsheet that is given
         none guesses, and guesses wrong on the first name with an umlaut in it.
 
-        `POST` for the reason `/api/admin/export/person/{personId}` is a `POST`: producing the file
-        is itself a processing activity, it is written to the change log, and it is not a request a
-        browser may make on its own.
+        `POST` rather than `GET`, for one of the two reasons
+        `/api/admin/export/person/{personId}` is a `POST`: the file discloses what the club holds
+        about every one of its members at once, and that is not a request a browser may make on its
+        own from a link somebody sent. It is not written to the change log, though — that log
+        records what changed about a configuration entity, and an export changes nothing and names
+        no entity. The subject access answer is recorded because answering *that* request is a
+        processing activity the law attaches to one person, which is a reason about the person and
+        not about the file.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -5380,6 +5389,13 @@ paths:
           in: query
           required: false
           description: Only the people who hold this membership type right now.
+          schema: { type: string, format: uuid }
+        - name: sourceId
+          in: query
+          required: false
+          description: |
+            The import source whose member numbers fill `memberNumber`. An unknown one is answered
+            `404`, as it is everywhere else it names a source.
           schema: { type: string, format: uuid }
         - name: separator
           in: query
@@ -5413,6 +5429,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/admin/export/person/{personId}:
     post:
