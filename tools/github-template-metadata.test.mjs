@@ -50,3 +50,24 @@ test("given issue frontmatter is missing malformed duplicated or open, when vali
   // when / then
   for (const candidate of cases) assert.throws(() => validateIssueTemplate(candidate));
 });
+
+test("given a choice is still pending, when selecting a template, then it remains separate from completed records", () => {
+  // given
+  const decision = readFileSync(new URL("../.github/ISSUE_TEMPLATE/decision.md", import.meta.url), "utf8");
+  const knownLimit = readFileSync(new URL("../.github/ISSUE_TEMPLATE/known-limit.md", import.meta.url), "utf8");
+  const question = readFileSync(new URL("../.github/ISSUE_TEMPLATE/question.md", import.meta.url), "utf8");
+
+  // when / then
+  assert.match(decision, /^about: A completed design decision,/mu);
+  assert.match(decision, /^labels: decision$/mu);
+  assert.match(decision, /Close the issue after recording the decision\./u);
+  assert.match(knownLimit, /^about: A completed, accepted product limitation/mu);
+  assert.match(knownLimit, /^labels: known-limit$/mu);
+  assert.match(knownLimit, /^## What would reopen it$/mu);
+  assert.match(knownLimit, /Close the issue after recording the limitation\./u);
+  assert.match(question, /^about: An open choice that blocks or shapes planned work$/mu);
+  assert.match(question, /^labels: question$/mu);
+  assert.match(question, /^## Recommended choice$/mu);
+  assert.match(question, /^## Alternatives considered$/mu);
+  assert.match(question, /^## What this blocks$/mu);
+});

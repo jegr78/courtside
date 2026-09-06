@@ -426,13 +426,18 @@ on the board is a bug in the tracker, not a gap in the board.
 * **A closed sub-issue is not a closed parent.** Before closing a parent, read its own "Done when"
   against the code rather than the count in the panel.
 
-* **Not every open issue is work.** `.github/ISSUE_TEMPLATE` carries the kinds. A `bug` behaves
+* **Not every tracker entry is work.** `.github/ISSUE_TEMPLATE` carries the kinds. A `bug` behaves
   differently from what the documentation or the UI promises, `debt` is a shortcoming with no
   decision behind it, and an `operations` requirement binds whoever deploys and runs an instance.
-  `decision` and `known-limit` are *records*: they stay open so they are not re-litigated, they are
-  not on the board, and they are not backlog. Read them with `is:open label:decision,known-limit`.
-  The scheduled-run tracker owns the `nightly` issues and closes them itself after seven consecutive
-  green first attempts and a human confirmation.
+  A `decision` records a completed choice; a `known-limit` records a consciously accepted product
+  limitation. Both close once their reasoning and reopen condition are written down, retain their
+  record label and stay off the board. Read them with `is:closed label:decision` and
+  `is:closed label:known-limit`. A choice that still needs a maintainer answer uses `question`,
+  remains open on the board, and includes a concrete recommendation, alternatives and the work it
+  blocks. A limitation planned for remediation is work: replace `known-limit` with the appropriate
+  work label and put it on the board and in its target milestone. The scheduled-run tracker owns the
+  `nightly` issues and closes them itself after seven consecutive green first attempts and a human
+  confirmation.
 
 ## The design specification
 

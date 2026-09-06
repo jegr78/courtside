@@ -1,8 +1,11 @@
 ---
 name: Decision
-about: A deliberate design decision, recorded so it is not argued again
+about: A completed design decision, recorded so it is not argued again
 labels: decision
 ---
+
+<!-- This template records a choice that has already been made. Use the Decision needed template
+     while a maintainer answer is still pending. Close the issue after recording the decision. -->
 
 ## What was decided
 
