@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import {
+  boundedAssessmentFailureReason,
   authorizeSecurityProfile, buildSecurityPlan, executeSecurityPlan, fingerprintSecurityTarget, recoverSecurityRun,
   redactSecurityText, securityRunContract, securityRunPaths, validateSecurityRedirect,
   validateSecurityTarget
@@ -25,6 +26,19 @@ test("given the same target identity in a different property order, when fingerp
 const digest = `sha256:${"a".repeat(64)}`;
 const seedFingerprint = `sha256:${"b".repeat(64)}`;
 const instanceFingerprint = `sha256:${"d".repeat(64)}`;
+
+test("given an oversized adapter failure, when retaining its reason, then the manifest schema remains usable", () => {
+  // given
+  const failure = `adapter failed: ${"diagnostic ".repeat(100)}`;
+
+  // when
+  const reason = boundedAssessmentFailureReason(failure);
+
+  // then
+  assert.equal(reason.length <= 500, true);
+  assert.match(reason, /truncated; sha256:[a-f0-9]{64}/);
+});
+
 const targetFingerprint = `sha256:${"c".repeat(64)}`;
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const Ajv = require("ajv/dist/2020").default;

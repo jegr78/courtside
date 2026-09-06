@@ -210,12 +210,19 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   } catch (failure) {
     manifest.status = "finished";
     manifest.outcome = failure.assessmentOutcome ?? "incomplete";
-    manifest.reason = redactSecurityText(failure.message);
+    manifest.reason = boundedAssessmentFailureReason(failure.message);
   }
   manifest.finishedAt = now().toISOString();
   manifest.usage ??= { requests: 0, generatedDataMegabytes: 0, evidenceBytes: directoryBytes(paths.evidence) };
   writeManifest(paths.manifest, manifest);
   return manifest;
+}
+
+export function boundedAssessmentFailureReason(message) {
+  const redacted = redactSecurityText(String(message)).trim();
+  if (redacted.length <= 500) return redacted || "Assessment failed without a diagnostic reason";
+  const digest = createHash("sha256").update(redacted).digest("hex");
+  return `${redacted.slice(0, 410)}... [truncated; sha256:${digest}]`;
 }
 
 async function missingLoginAttemptReset() {

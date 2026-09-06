@@ -205,8 +205,12 @@ export async function startSecurityEnvironment(runId, image) {
   }
   const identity = verifySecurityEnvironment(runId);
   writeIdentity(runId, identity);
-  process.stdout.write(`Security environment ${runId} is ready\n`);
-  process.stdout.write(`Shared synthetic credential: ${environment.COURTSIDE_SECURITY_SHARED_PASSWORD}\n`);
+  process.stdout.write(`${securityEnvironmentReadyMessage(runId)}\n`);
+}
+
+export function securityEnvironmentReadyMessage(runId) {
+  securityProject(runId);
+  return `Security environment ${runId} is ready; synthetic credentials remain in private run state`;
 }
 
 export function verifySecurityEnvironment(runId) {
@@ -917,11 +921,17 @@ async function recoverAfterResourceAbuse(runId, stateBefore, stateAfter, command
 export function authenticatedZapDiagnostic(output, sessionCookies) {
   let safe = String(output);
   for (const cookie of sessionCookies) safe = safe.replaceAll(cookie, "[REDACTED]");
-  return safe.replace(/http:\/\/scanner-gateway:8090\S*/g, "[SCANNER_ROUTE]")
+  safe = safe.replace(/http:\/\/scanner-gateway:8090\S*/g, "[SCANNER_ROUTE]")
     .replace(/(cookie|authorization|password|token)\s*[:=][^\r\n]+/gi, "$1=[REDACTED]")
-    .replace(/SESSION=[^;\s]+/gi, "SESSION=[REDACTED]")
-    .slice(-8192)
-    .trim();
+    .replace(/SESSION=[^;\s]+/gi, "SESSION=[REDACTED]");
+  const mismatch = /Difference in response code values[\s\S]*?Expected\s*:\s*(\d+)\s+Received\s*:\s*(\d+)/i.exec(safe);
+  const classification = mismatch
+    ? `response-code-mismatch expected=${mismatch[1]} received=${mismatch[2]}`
+    : /Automation plan warnings:/i.test(safe)
+      ? "automation-plan-warning"
+      : "non-zero-process-exit";
+  const digest = createHash("sha256").update(safe).digest("hex");
+  return `${classification}; redacted-output-digest=sha256:${digest}`;
 }
 
 function scannerRuntimeHardened(container, expected) {

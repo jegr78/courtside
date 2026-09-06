@@ -37,6 +37,8 @@ test("given the pinned authenticated policy, when rendering role plans, then act
   assert.match(member, /defaultThreshold: "Off"/);
   assert.match(renderAuthenticatedZapCanaryRetestPlan(), /action: passIfAbsent/);
   assert.match(renderAuthenticatedZapCanaryRetestPlan(), /scanner-canary-remediation-retest/);
+  assert.match(renderAuthenticatedZapCanaryRetestPlan(),
+    /scanner-canary-remediation-retest\n\s+method: GET\n\s+responseCode: 401/);
   assert.equal(authenticatedZapCanaryRetestDetected({ site: [] }), false);
   assert.throws(() => authenticatedZapCanaryRetestDetected({ site: [{ alerts: [{
     pluginid: "10037", instances: [{ uri: "http://foreign.example/__security/zap-canary" }]

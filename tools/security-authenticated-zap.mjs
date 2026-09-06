@@ -61,7 +61,7 @@ jobs:
       - url: http://scanner-gateway:8090${authenticatedZapPolicy.canary.path}
         name: scanner-canary-remediation-retest
         method: GET
-        responseCode: 404
+        responseCode: 401
   - type: passiveScan-wait
     parameters:
       maxDuration: 1

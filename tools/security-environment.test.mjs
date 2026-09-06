@@ -13,6 +13,7 @@ import {
   prometheusMetric,
   remainingScannerRequestBudget,
   relayableMethods,
+  securityEnvironmentReadyMessage,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
@@ -89,6 +90,21 @@ test("given a security run, when deriving its identity, then secrets and seed id
   assert.equal(environment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES, "5");
   assert.match(environment.COURTSIDE_SECURITY_SEED_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
   assert.match(environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
+});
+
+test("given a ready security environment, when reporting startup, then its credential remains private", () => {
+  // given
+  const credential = "synthetic-password-value";
+  const source = readFileSync(fileURLToPath(new URL("./security-environment.mjs", import.meta.url)), "utf8");
+
+  // when
+  const message = securityEnvironmentReadyMessage("run-0001");
+
+  // then
+  assert.match(message, /private run state/);
+  assert.doesNotMatch(message, new RegExp(credential));
+  assert.doesNotMatch(message, /credential:/i);
+  assert.doesNotMatch(source, /Shared synthetic credential/);
 });
 
 test("given a mismatched target, when verifying identity, then active use is rejected", () => {
@@ -363,7 +379,18 @@ test("given scanner diagnostics, when reporting a failed run, then session mater
 
   // then
   assert.doesNotMatch(diagnostic, /opaque-session|opaque-csrf|opaque-token|opaque-password|opaque-path|opaque-query/);
-  assert.match(diagnostic, /\[REDACTED]/);
+  assert.match(diagnostic, /^non-zero-process-exit; redacted-output-digest=sha256:[a-f0-9]{64}$/);
+  assert.ok(diagnostic.length < 500);
+});
+
+test("given a scanner response assertion, when reporting it, then the closed reason retains both statuses", () => {
+  // when
+  const diagnostic = authenticatedZapDiagnostic(
+    "Difference in response code values Expected : 404 Received : 401", []);
+
+  // then
+  assert.match(diagnostic, /^response-code-mismatch expected=404 received=401;/);
+  assert.ok(diagnostic.length < 500);
 });
 
 // A JSON schema and a run contract cannot read the deployment, so nothing would carry a scanner
