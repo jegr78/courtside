@@ -5,8 +5,11 @@
   "include-v-in-tag": true,
   "bootstrap-sha": "76fe6d22733eda1b2b251747acc7e862a7a543b7",
   "bump-minor-pre-major": true,
+  "commit-search-depth": 2000,
   "versioning": "prerelease",
   "prerelease": false,
+  "draft": true,
+  "force-tag-creation": true,
   "changelog-sections": [
     {
       "type": "feat",
@@ -26,10 +29,6 @@
     },
     {
       "type": "build",
-      "section": "Build and dependencies"
-    },
-    {
-      "type": "deps",
       "section": "Build and dependencies"
     },
     {

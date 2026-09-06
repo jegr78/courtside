@@ -23,11 +23,19 @@ would write. Merge it when a nightly has verified the commit it sits on, and the
 A second pull request follows each release and moves `pom.xml` on to the next `-SNAPSHOT`. It
 carries no release and no tag; merge it and forget it.
 
-**Where the version lives.** `pom.xml` is the source of truth: release-please writes it, Maven
+**What the merge writes.** Merging the release pull request writes the tag and a *draft* GitHub
+release. A draft is visible to whoever may write to this repository and to nobody else, and `publish`
+is what turns it into the release a club sees — after every gate above it has passed. A run that
+stops earlier leaves the draft standing, which is why a failed release is invisible from the outside
+rather than merely unsigned.
+
+**Where the version lives.** `pom.xml` carries it between releases: release-please writes it, Maven
 writes `build-info.properties` from it, and `GET /api/source` reports that to the browser — so the
 version a member reads in the footer is the one that was released, and between releases it is the
 `-SNAPSHOT` that says which release it follows. `frontend/package.json` is kept in step by the same
-pull request, so nothing there can drift.
+pull request, so nothing there can drift. The release build itself does not trust any of that: it
+takes the version from the tag and stamps it in with `versions:set`, so what is published is what
+the tag says even if the pom were to disagree.
 
 ## Cutting a candidate
 
@@ -35,8 +43,11 @@ Candidates are opened and closed with one line of configuration, not with a hand
 
 1. Set `"prerelease": true` in `release-please-config.json` and merge that. The next release pull
    request proposes `v0.3.0-rc.1`, and every merge after it raises `rc.2`, `rc.3`.
-2. To open an `alpha` line instead, land a commit carrying `Release-As: 0.3.0-alpha.1`; the strategy
-   counts that suffix onwards by itself.
+2. To open an `alpha` line instead, land a commit carrying a `Release-As:` footer naming
+   `0.3.0-alpha.1`; the strategy counts that suffix onwards by itself. That footer names the version
+   outright and overrides everything else, `bump-minor-pre-major` included — it is the one way to
+   reach 1.0 without a decision, so read the version in the release pull request's own title before
+   merging it.
 3. Set `"prerelease": false` again to graduate. The suffix is stripped and the next release pull
    request proposes `v0.3.0`.
 
@@ -87,9 +98,10 @@ publication, so the digest a club pulls is the digest that was brought up twice.
 
 ## When a release fails
 
-It stops at the job that refused, and nothing is published under a version tag. What stays behind is
-the `release-candidate-<sha>` image, unsigned and unqualified, in a public registry — nothing
-removes those, and no version tag resolves to one.
+It stops at the job that refused, and nothing is published under a version tag: the release the
+merge created is still a draft and stays one. What stays behind is the `release-candidate-<sha>`
+image, unsigned and unqualified, in a public registry — nothing removes those, and no version tag
+resolves to one.
 
 **The tag stays where it is.** A tag that once named a commit and later names another is the one
 thing a consumer cannot detect, and by the time a run has started, the tag has been observed. Fix
@@ -104,8 +116,8 @@ a misspelling that keeps the leading `v` still starts a run.
 A failed tag costs the next release nothing. Both things the release reads from its history — the
 supported upgrade origins and the range the upgrade notes cover — come from the releases this
 repository has **published**, not from the tags that exist. A tag whose run stopped before `publish`
-therefore names no release, is no origin, and shortens no range. It stays where it is, and nothing
-has to be deleted to move on.
+therefore names a draft and no published release, is no origin, and shortens no range. It stays
+where it is, and nothing has to be deleted to move on.
 
 ## When the change is breaking
 

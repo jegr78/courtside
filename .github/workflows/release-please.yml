@@ -10,10 +10,8 @@ concurrency:
   group: release-please
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+# The action authenticates with the PAT for every call it makes, so the run needs nothing of its own.
+permissions: {}
 
 jobs:
   release-please:
@@ -29,7 +27,7 @@ jobs:
         run: |
           echo "::error::RELEASE_PLEASE_TOKEN is not set. release-please would open a release" \
             "pull request whose checks never run, and merging it would push a tag that starts" \
-            "no release pipeline. Add the fine-grained PAT described at the top of this file."
+            "no release pipeline. Add the fine-grained PAT that section 10 of docs/design.md scopes."
           exit 1
 
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
