@@ -73,7 +73,8 @@ test("given a repository that never released, when it bootstraps, then it starts
     // `initial-version` is consulted only while this file still reads 0.0.0: release-please treats
     // any other value as a release to bump from, and the first version would come from there again.
     if (manifest["."] !== "0.0.0") {
-      assert.match(read("CHANGELOG.md"), new RegExp(`^#{1,3} .*${manifest["."].replace(/\./g, "\\.")}`, "m"),
+      const headings = read("CHANGELOG.md").split("\n").filter((line) => /^#{1,3}\s/.test(line));
+      assert.ok(headings.some((heading) => heading.includes(manifest["."])),
         "a manifest naming a version the changelog does not is a version nobody released");
     }
     assert.equal(config["bootstrap-sha"], first,
