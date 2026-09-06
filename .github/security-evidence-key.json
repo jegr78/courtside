@@ -1,6 +1,8 @@
 {
   "version": 1,
   "custodianRole": "repository-maintainer",
+  "contentEncryptionAlgorithm": "AES-256-GCM",
+  "keyEncryptionAlgorithm": "RSA-OAEP-SHA-256",
   "canaryVerifiedOn": "2026-08-24",
   "canaryValidThrough": "2026-11-24"
 }

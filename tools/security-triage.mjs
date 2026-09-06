@@ -191,7 +191,10 @@ export function assessmentOutcome(lifecycle, today = new Date().toISOString().sl
   }
   const unresolved = lifecycle.findings.filter((finding) =>
     ["validated", "remediation-in-progress"].includes(finding.state));
-  if (unresolved.length) return { outcome: "failed", reason: `${unresolved.length} validated finding remains unresolved` };
+  if (unresolved.length) return {
+    outcome: "failed",
+    reason: `${unresolved.length} validated finding${unresolved.length === 1 ? "" : "s"} remain${unresolved.length === 1 ? "s" : ""} unresolved`
+  };
   const awaitingRetest = lifecycle.findings.filter((finding) => finding.state === "fixed");
   if (awaitingRetest.length) return { outcome: "incomplete", reason: `${awaitingRetest.length} fix awaits retest` };
   return { outcome: "passed", reason: null };
@@ -247,6 +250,23 @@ function replayFindingState(finding) {
   if (state !== finding.state) throw new Error(`Finding ${finding.fingerprint} has inconsistent current state`);
 }
 
+export function validateFindingTimeline(finding, recordedAt) {
+  const timestamps = [finding.validation.reproducedAt,
+    ...finding.retests.map((retest) => retest.testedAt),
+    ...finding.transitions.map((transition) => transition.changedAt)];
+  if (!validTimestamp(recordedAt) || timestamps.some((timestamp) => !validTimestamp(timestamp))) {
+    throw new Error(`Finding ${finding.fingerprint} has invalid lifecycle timestamp`);
+  }
+  const ordered = [finding.provenance.observedAt,
+    ...finding.transitions.map((transition) => transition.changedAt)];
+  if (!validTimestamp(finding.provenance.observedAt)
+      || ordered.some((timestamp, index) => index > 0 && timestamp < ordered[index - 1])
+      || ordered.at(-1) > recordedAt) {
+    throw new Error(`Finding ${finding.fingerprint} has inconsistent lifecycle chronology`);
+  }
+  replayFindingState(finding);
+}
+
 function validateLifecycleSemantics(lifecycle, today) {
   if (!validTimestamp(lifecycle.run.recordedAt)) throw new Error("Security lifecycle has invalid run timestamp");
   const entries = [...lifecycle.candidates, ...lifecycle.findings];
@@ -270,19 +290,7 @@ function validateLifecycleSemantics(lifecycle, today) {
     }
   }
   for (const finding of lifecycle.findings) {
-    const timestamps = [finding.validation.reproducedAt,
-      ...finding.retests.map((retest) => retest.testedAt),
-      ...finding.transitions.map((transition) => transition.changedAt)];
-    if (timestamps.some((timestamp) => !validTimestamp(timestamp))) {
-      throw new Error(`Finding ${finding.fingerprint} has invalid lifecycle timestamp`);
-    }
-    const ordered = [finding.provenance.observedAt,
-      ...finding.transitions.map((transition) => transition.changedAt)];
-    if (ordered.some((timestamp, index) => index > 0 && timestamp < ordered[index - 1])
-      || ordered.at(-1) > lifecycle.run.recordedAt) {
-      throw new Error(`Finding ${finding.fingerprint} has inconsistent lifecycle chronology`);
-    }
-    replayFindingState(finding);
+    validateFindingTimeline(finding, lifecycle.run.recordedAt);
     if (finding.state === "accepted-risk") {
       const acceptance = lifecycle.riskAcceptances.find((entry) => entry.fingerprint === finding.fingerprint);
       const transition = finding.transitions.at(-1);

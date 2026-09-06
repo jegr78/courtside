@@ -11,10 +11,20 @@ import {
   isMissingDockerResource,
   mergeSecurityProcessEnvironment,
   prometheusMetric,
+  remainingScannerRequestBudget,
   relayableMethods,
+  securityEnvironmentReadyMessage,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
+
+test("given scanner traffic, when reserving the canary retest, then only the remaining budget is available", () => {
+  // when / then
+  assert.equal(remainingScannerRequestBudget(8000, 7999), 1);
+  assert.throws(() => remainingScannerRequestBudget(8000, 0), /no request budget/);
+  assert.throws(() => remainingScannerRequestBudget(8000, 8000), /no request budget/);
+  assert.throws(() => remainingScannerRequestBudget(8000, 8001), /no request budget/);
+});
 
 test("given Hikari metrics, when sampling pool pressure, then active and pending connections remain distinct", () => {
   // given
@@ -80,6 +90,21 @@ test("given a security run, when deriving its identity, then secrets and seed id
   assert.equal(environment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES, "5");
   assert.match(environment.COURTSIDE_SECURITY_SEED_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
   assert.match(environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
+});
+
+test("given a ready security environment, when reporting startup, then its credential remains private", () => {
+  // given
+  const credential = "synthetic-password-value";
+  const source = readFileSync(fileURLToPath(new URL("./security-environment.mjs", import.meta.url)), "utf8");
+
+  // when
+  const message = securityEnvironmentReadyMessage("run-0001");
+
+  // then
+  assert.match(message, /private run state/);
+  assert.doesNotMatch(message, new RegExp(credential));
+  assert.doesNotMatch(message, /credential:/i);
+  assert.doesNotMatch(source, /Shared synthetic credential/);
 });
 
 test("given a mismatched target, when verifying identity, then active use is rejected", () => {
@@ -293,6 +318,9 @@ test("given an active scanner boundary, when checking targets, then methods path
   const gateway = fileURLToPath(new URL("./security-request-gateway.py", import.meta.url));
   const script = `
 import importlib.util
+import http.client
+import http.server
+import threading
 import urllib.parse
 spec = importlib.util.spec_from_file_location("gateway", ${JSON.stringify(gateway)})
 gateway = importlib.util.module_from_spec(spec)
@@ -307,6 +335,20 @@ assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards/../admin"), 
 assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards/%2e%2e/admin"), "GET")
 assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards/%252e%252e/admin"), "GET")
 assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards\\..\\admin"), "GET")
+server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), gateway.RequestHandler)
+thread = threading.Thread(target=server.serve_forever, daemon=True)
+thread.start()
+connection = http.client.HTTPConnection("127.0.0.1", server.server_port)
+connection.request("GET", "/__security/zap-canary")
+response = connection.getresponse()
+assert response.status == 200
+assert response.getheader("X-Powered-By") == "Courtside-ZAP-Canary/1.0"
+assert response.getheader("Server") is None
+response.read()
+connection.close()
+server.shutdown()
+server.server_close()
+thread.join()
 `;
 
   // when
@@ -315,7 +357,8 @@ assert not gateway.target_allowed(urllib.parse.urlsplit("/api/cards\\..\\admin")
     COURTSIDE_SECURITY_MAX_REQUESTS: "100",
     COURTSIDE_SECURITY_MAX_CONCURRENCY: "1",
     COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD",
-    COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api/cards",
+    COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api/cards,/__security/zap-canary",
+    COURTSIDE_SECURITY_CANARY_ENABLED: "true",
     COURTSIDE_SECURITY_MAX_TARGET_BYTES: "1024",
     COURTSIDE_SECURITY_MAX_GENERATED_BYTES: "1048576",
     PYTHONDONTWRITEBYTECODE: "1"
@@ -336,7 +379,18 @@ test("given scanner diagnostics, when reporting a failed run, then session mater
 
   // then
   assert.doesNotMatch(diagnostic, /opaque-session|opaque-csrf|opaque-token|opaque-password|opaque-path|opaque-query/);
-  assert.match(diagnostic, /\[REDACTED]/);
+  assert.match(diagnostic, /^non-zero-process-exit; redacted-output-digest=sha256:[a-f0-9]{64}$/);
+  assert.ok(diagnostic.length < 500);
+});
+
+test("given a scanner response assertion, when reporting it, then the closed reason retains both statuses", () => {
+  // when
+  const diagnostic = authenticatedZapDiagnostic(
+    "Difference in response code values Expected : 404 Received : 401", []);
+
+  // then
+  assert.match(diagnostic, /^response-code-mismatch expected=404 received=401;/);
+  assert.ok(diagnostic.length < 500);
 });
 
 // A JSON schema and a run contract cannot read the deployment, so nothing would carry a scanner

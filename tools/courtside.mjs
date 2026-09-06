@@ -637,6 +637,7 @@ async function execute(options) {
     // other command of this tool has to start on a checkout where nothing has been installed yet.
     const {
       runPassiveDeploymentAssessment, runAuthorizationAssessment, renderAuthenticatedZapPlan,
+      renderAuthenticatedZapCanaryRetestPlan,
       runAuthenticatedZapAssessment, prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment,
       runOpenApiImportCases, runOpenApiInputCases, runOpenApiMutationCases, runResourceAbuseAssessment
     } = await securityAssessments();
@@ -671,7 +672,7 @@ async function execute(options) {
         ca,
         sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
         runZap: (candidate, limits) => runAuthenticatedZap(candidate, context.stopFile, limits,
-          renderAuthenticatedZapPlan)
+          renderAuthenticatedZapPlan, renderAuthenticatedZapCanaryRetestPlan)
       }),
       runOpenApiFuzzAssessment: async (selectedPlan, context) => runOpenApiFuzzAssessment(selectedPlan, {
         ...context,

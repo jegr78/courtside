@@ -21,6 +21,9 @@ const documentation = readFileSync(new URL("../docs/security-findings.md", impor
 const baselineDocumentation = readFileSync(new URL("../docs/security-baseline.md", import.meta.url), "utf8");
 const baselineSummaryBytes = readFileSync(new URL("../security/passive-baseline-finding-summary.json", import.meta.url));
 const baselineSummary = JSON.parse(baselineSummaryBytes);
+const manualBaselineSummaryBytes = readFileSync(
+  new URL("../security/manual-baseline-finding-summary.json", import.meta.url));
+const manualBaselineSummary = JSON.parse(manualBaselineSummaryBytes);
 const digest = `sha256:${"a".repeat(64)}`;
 
 function lifecycle(overrides = {}) {
@@ -142,6 +145,15 @@ test("given an unvalidated scanner candidate, when calculating the assessment ou
 
   // then
   assert.deepEqual(result, { outcome: "incomplete", reason: "1 candidate awaits reproducible validation" });
+});
+
+test("given several validated findings, when reporting the failed assessment, then the reason names the real count", () => {
+  // when
+  const result = assessmentOutcome({ candidates: [], findings: [finding(), finding()], riskAcceptances: [] },
+    "2026-08-20");
+
+  // then
+  assert.deepEqual(result, { outcome: "failed", reason: "2 validated findings remain unresolved" });
 });
 
 test("given a scanner candidate, when promoting it without reproducible validation, then promotion is rejected", () => {
@@ -459,10 +471,49 @@ test("given the passive baseline acceptance, when reading its public proof, then
   const summaryDigest = `sha256:${createHash("sha256").update(baselineSummaryBytes).digest("hex")}`;
 
   // when / then
-  assert.equal(baselineSummary.run.runId, "issue471-closed");
-  assert.equal(baselineSummary.outcome.outcome, "incomplete");
-  assert.deepEqual(baselineSummary.counts, { candidates: 16, findings: 1, regressions: 0 });
+  assert.equal(baselineSummary.run.runId, "assessment-34004691464-1");
+  assert.equal(baselineSummary.run.subject,
+    "commit:63bcd3ed81fdd7bc5e931d7a06ee3a57c04ffd69");
+  assert.equal(baselineSummary.run.catalogVersion, "1.3.0");
+  assert.equal(baselineSummary.outcome.outcome, "passed");
+  assert.deepEqual(baselineSummary.counts, { candidates: 11, findings: 1, regressions: 0 });
+  assert.ok(baselineSummary.candidates.every((candidate) => candidate.state === "false-positive"));
   assert.equal(acceptedFindings.length, 1);
   assert.equal(acceptedFindings[0].fingerprint, acceptance.fingerprint);
+  assert.match(acceptance.rationale, /same-origin upload/i);
+  assert.doesNotMatch(acceptance.rationale, /no same-origin asset upload exists/i);
   assert.match(baselineDocumentation, new RegExp(summaryDigest));
+  assert.match(baselineDocumentation, /316 unique selected controls/);
+  assert.match(baselineDocumentation, /ten unique unresolved findings/);
+  assert.match(baselineDocumentation, /146 are explicitly blocked under #804/);
+  assert.doesNotMatch(baselineDocumentation, /\| pass \| (?!0 \|)/);
+  assert.match(baselineDocumentation, /does not replace an independent penetration test/);
+  assert.match(baselineDocumentation,
+    /Paired run: `assessment-34004691464-1` \(safe attempt 1, active attempt 2\)/);
+  assert.doesNotMatch(baselineDocumentation, /assessment-34004691464-2/);
+  for (let issue = 792; issue <= 800; issue += 1) {
+    assert.match(baselineDocumentation, new RegExp(`#${issue}\\b`));
+  }
+  assert.match(baselineDocumentation, /#803 dependency remediation deadlines/);
+});
+
+test("given the corrected manual baseline, when reading its public proof, then no generic pass is implied", () => {
+  // given
+  const summaryDigest = `sha256:${createHash("sha256").update(manualBaselineSummaryBytes).digest("hex")}`;
+  const states = manualBaselineSummary.findings.map(({ state }) => state);
+
+  // when / then
+  assert.equal(manualBaselineSummary.run.runId, "manual-baseline-20260906");
+  assert.equal(manualBaselineSummary.run.subject,
+    "commit:63bcd3ed81fdd7bc5e931d7a06ee3a57c04ffd69");
+  assert.equal(manualBaselineSummary.outcome.outcome, "failed");
+  assert.equal(manualBaselineSummary.outcome.reason, "10 validated findings remain unresolved");
+  assert.deepEqual(manualBaselineSummary.counts, { candidates: 0, findings: 11, regressions: 0 });
+  assert.equal(states.filter((state) => state === "validated").length, 10);
+  assert.equal(states.filter((state) => state === "accepted-risk").length, 1);
+  assert.ok(manualBaselineSummary.findings.every(({ priority }) => ["P2", "P3"].includes(priority)));
+  assert.doesNotMatch(JSON.stringify(manualBaselineSummary), /location|impact|reachability|validation/);
+  assert.match(baselineDocumentation, new RegExp(summaryDigest));
+  assert.match(baselineDocumentation, /\| pass \| 0 \|/);
+  assert.match(baselineDocumentation, /\| blocked pending control-specific evidence \| 146 \|/);
 });

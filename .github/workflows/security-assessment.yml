@@ -132,7 +132,8 @@ jobs:
             tar -czf - -C "build/security/$RUN_ID/assessment/attempt-1" evidence
           fi | openssl cms -encrypt -binary -aes-256-gcm -outform DER \
               -out build/security-gate/protected-evidence.cms \
-              .github/security-evidence-recipient.pem
+              -recip .github/security-evidence-recipient.pem \
+              -keyopt rsa_padding_mode:oaep -keyopt rsa_oaep_md:sha256
           openssl dgst -sha256 -r build/security-gate/protected-evidence.cms \
             | awk '{print $1}' > build/security-gate/protected-evidence.sha256
           echo "sealed=true" >> "$GITHUB_OUTPUT"

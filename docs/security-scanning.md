@@ -28,8 +28,8 @@ state. The closed schema rejects fields that could become an informal evidence s
 The current acceptance covers only the CSP observation caused by administrator-selected HTTPS
 club logos. It expires on 30 November 2026. The image request may disclose a visitor's IP address
 and the Courtside origin to that host; executable resources and application connections remain
-same-origin, and clubs can avoid the disclosure with a root-relative logo. The acceptance must be
-removed when same-origin asset hosting replaces the external-image requirement.
+same-origin, and clubs can avoid the disclosure with a root-relative URL or an uploaded logo. The
+acceptance must be removed when compatibility no longer requires external logo URLs.
 
 The project currently has a single maintainer. That maintainer may set `independentReview` to `false` to stay operational, but the missing peer review remains visible in the record. This is intentionally not an approval requirement until another regular maintainer exists.
 

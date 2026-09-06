@@ -6,8 +6,8 @@
       "id": "remote-https-club-logo-2026",
       "fingerprint": "sha256:971c33107d4bf2efa1ba8cf7eccee04bc287bea807d095b46f782e87e37ca6e2",
       "owner": "maintainer",
-      "rationale": "Club branding currently supports an administrator-selected HTTPS logo while no same-origin asset upload exists.",
-      "compensatingControl": "The policy grants only image loading over HTTPS; scripts, styles, connections, frames and forms remain same-origin, active URL schemes are rejected, and the referrer policy limits cross-origin disclosure to the Courtside origin.",
+      "rationale": "Club branding deliberately keeps administrator-selected HTTPS logo URLs as a fallback for existing configurations. A same-origin upload is available and lets a club avoid the third-party request, but removing URL support would break those configurations.",
+      "compensatingControl": "The policy grants only image loading over HTTPS; scripts, styles, connections, frames and forms remain same-origin, active URL schemes are rejected, the referrer policy limits cross-origin disclosure to the Courtside origin, and the administration surface offers a same-origin upload.",
       "expiresOn": "2026-11-30",
       "acceptedAt": "2026-08-25T16:10:00.000Z",
       "independentReview": false

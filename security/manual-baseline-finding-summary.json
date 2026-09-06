@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "run": {
+    "runId": "manual-baseline-20260906",
+    "attempt": 2,
+    "subject": "commit:63bcd3ed81fdd7bc5e931d7a06ee3a57c04ffd69",
+    "profile": "active",
+    "outcome": "failed",
+    "targetFingerprint": "sha256:849b0aa130dd720847194fe6c5325f5ebbcc7704cd904f80078dc2b1c613d47b",
+    "catalogVersion": "1.3.0",
+    "recordedAt": "2026-09-06T02:21:58Z"
+  },
+  "outcome": {
+    "outcome": "failed",
+    "reason": "10 validated findings remain unresolved"
+  },
+  "counts": {
+    "candidates": 0,
+    "findings": 11,
+    "regressions": 0
+  },
+  "candidates": [],
+  "findings": [
+    {
+      "fingerprint": "sha256:040118e1729855d1c80c0ab11701f29d80a4ebd5eab346172dfc9826b31a2a75",
+      "state": "validated",
+      "priority": "P2",
+      "mappings": {
+        "cwe": [
+          "CWE-521"
+        ],
+        "wstg": [
+          "WSTG-v4.2-ATHN-07",
+          "WSTG-v4.2-ATHN-09"
+        ],
+        "asvs": [
+          "v5.0.0-6.1.2",
+          "v5.0.0-6.2.2",
+          "v5.0.0-6.2.3",
+          "v5.0.0-6.2.4",
+          "v5.0.0-6.2.11",
+          "v5.0.0-6.2.12",
+          "v5.0.0-6.4.3",
+          "v5.0.0-7.5.1"
+        ],
+        "apiTop10": [
+          "API2:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:889ce369b8dc00ccc93566407f485e713f0ca0bf3aea65f4d3e3f3ff7a5eb42b",
+      "state": "validated",
+      "priority": "P2",
+      "mappings": {
+        "cwe": [
+          "CWE-613"
+        ],
+        "wstg": [
+          "WSTG-v4.2-SESS-06",
+          "WSTG-v4.2-SESS-07",
+          "WSTG-v4.2-SESS-09"
+        ],
+        "asvs": [
+          "v5.0.0-7.1.1",
+          "v5.0.0-7.1.2",
+          "v5.0.0-7.3.1",
+          "v5.0.0-7.3.2",
+          "v5.0.0-7.4.5",
+          "v5.0.0-7.5.2"
+        ],
+        "apiTop10": [
+          "API2:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:18c2c9bbd3344d74636825a5429df0796c16b55027e6c528377844a609f36b77",
+      "state": "validated",
+      "priority": "P3",
+      "mappings": {
+        "cwe": [
+          "CWE-693"
+        ],
+        "wstg": [
+          "WSTG-v4.2-SESS-02",
+          "WSTG-v4.2-CLNT-09"
+        ],
+        "asvs": [
+          "v5.0.0-3.3.1",
+          "v5.0.0-3.3.3",
+          "v5.0.0-3.4.3"
+        ],
+        "apiTop10": [
+          "API8:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:51be99887351a66cf99835fb2582204c77b1ed6e29371daa9d9072cf9cae0225",
+      "state": "validated",
+      "priority": "P2",
+      "mappings": {
+        "cwe": [
+          "CWE-319"
+        ],
+        "wstg": [
+          "WSTG-v4.2-CRYP-01",
+          "WSTG-v4.2-CRYP-03"
+        ],
+        "asvs": [
+          "v5.0.0-12.3.1",
+          "v5.0.0-12.3.3",
+          "v5.0.0-12.3.4"
+        ],
+        "apiTop10": [
+          "API8:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:8afb0e7db15f5faec178d354319c60d005534712bded119b72eab4dae5e96a9a",
+      "state": "validated",
+      "priority": "P2",
+      "mappings": {
+        "cwe": [
+          "CWE-522",
+          "CWE-250"
+        ],
+        "wstg": [
+          "WSTG-v4.2-CONF-01"
+        ],
+        "asvs": [
+          "v5.0.0-13.2.1",
+          "v5.0.0-13.2.2",
+          "v5.0.0-13.3.1",
+          "v5.0.0-13.3.2"
+        ],
+        "apiTop10": [
+          "API8:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:95ad9048e3247838111f935c9c8f93f45a4645339c536c6104a594a13147b363",
+      "state": "validated",
+      "priority": "P2",
+      "mappings": {
+        "cwe": [
+          "CWE-778"
+        ],
+        "wstg": [
+          "WSTG-v4.2-ERRH-01"
+        ],
+        "asvs": [
+          "v5.0.0-16.1.1",
+          "v5.0.0-16.3.1",
+          "v5.0.0-16.3.2",
+          "v5.0.0-16.3.3",
+          "v5.0.0-16.2.3",
+          "v5.0.0-16.2.4",
+          "v5.0.0-16.4.2",
+          "v5.0.0-16.4.3"
+        ],
+        "apiTop10": [
+          "API8:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:0a6740c25832761271e4ad1d834b1f5324e78edb8f3666904fde2bf4fd13d1ca",
+      "state": "validated",
+      "priority": "P3",
+      "mappings": {
+        "cwe": [
+          "CWE-320"
+        ],
+        "wstg": [
+          "WSTG-v4.2-CRYP-04"
+        ],
+        "asvs": [
+          "v5.0.0-11.1.1",
+          "v5.0.0-11.1.2",
+          "v5.0.0-11.2.2"
+        ],
+        "apiTop10": [
+          "API8:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:e15bf99a1c62790132caa6caa65acd03efc7846cd7a33da53d86e2a4fe3f3365",
+      "state": "validated",
+      "priority": "P3",
+      "mappings": {
+        "cwe": [
+          "CWE-434"
+        ],
+        "wstg": [
+          "WSTG-v4.2-BUSL-08",
+          "WSTG-v4.2-BUSL-09"
+        ],
+        "asvs": [
+          "v5.0.0-5.1.1",
+          "v5.0.0-5.2.2",
+          "v5.0.0-5.4.3"
+        ],
+        "apiTop10": [
+          "API8:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:2338d38486107051a1febe59e26e494cb0e7634486c1a1b3160df26dfc7fcf66",
+      "state": "validated",
+      "priority": "P3",
+      "mappings": {
+        "cwe": [
+          "CWE-1104"
+        ],
+        "wstg": [
+          "WSTG-v4.2-INFO-08"
+        ],
+        "asvs": [
+          "v5.0.0-15.1.1",
+          "v5.0.0-15.2.1"
+        ],
+        "apiTop10": [
+          "API9:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:fe8de435e2bfe81370306e9cadbe4b4e5b0abe7b6115c072e54c872fb8961a96",
+      "state": "validated",
+      "priority": "P2",
+      "mappings": {
+        "cwe": [
+          "CWE-319"
+        ],
+        "wstg": [
+          "WSTG-v4.2-ATHN-01",
+          "WSTG-v4.2-CRYP-03"
+        ],
+        "asvs": [
+          "v5.0.0-4.1.2"
+        ],
+        "apiTop10": [
+          "API8:2023"
+        ]
+      },
+      "regression": false
+    },
+    {
+      "fingerprint": "sha256:971c33107d4bf2efa1ba8cf7eccee04bc287bea807d095b46f782e87e37ca6e2",
+      "state": "accepted-risk",
+      "priority": "P3",
+      "mappings": {
+        "cwe": [
+          "CWE-693"
+        ],
+        "wstg": [
+          "WSTG-v4.2-CONF-02"
+        ],
+        "asvs": [
+          "v5.0.0-3.4.3",
+          "v5.0.0-14.2.3"
+        ],
+        "apiTop10": [
+          "API8:2023"
+        ]
+      },
+      "regression": false
+    }
+  ]
+}

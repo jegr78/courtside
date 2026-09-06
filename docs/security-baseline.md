@@ -1,143 +1,135 @@
 # Internal security assessment baseline
 
-Status: incomplete as of 2026-08-24.
+Status: baseline execution completed; manual evidence remains incomplete as of 6 September 2026.
 
-This record is the redacted result of the first complete execution of the automated safe and active
-assessment boundary. It does not declare the application secure, and it does not replace an
-independent penetration test.
+This is the redacted record of an internal OWASP-oriented assessment. It does not declare the
+application secure and does not replace an independent penetration test.
 
-## Candidate identity
+## Candidate and evidence identity
 
-- Source commit: `92e766610e8c3940ea409158b1c3073b9be14ad1`
-- Application image: `sha256:beac6ddca2c1546cdf2912e1a0ae4ae62d9e137489f404dff433caada2c1cf71`
-- Catalog: `1.2.0`
-- Run: `baseline-20260824`
-- Environment: disposable `SECURITY`
-- Target fingerprint: `sha256:a89f08ba255dc0f66c6728bdd8c83a7b52aa4dcaa328c7a6ea942208ee54be03`
+- Source commit: `63bcd3ed81fdd7bc5e931d7a06ee3a57c04ffd69`
+- Application image: `sha256:7dcf2f8034fe9951fe8ce3837dbd237f64d4a44ea1bcd4fbed06f2746242105e`
+- Target fingerprint: `sha256:849b0aa130dd720847194fe6c5325f5ebbcc7704cd904f80078dc2b1c613d47b`
+- Catalog: `1.3.0`
+- Hosted workflow: [run 34004691464](https://github.com/jegr78/courtside/actions/runs/34004691464)
+- Paired run: `assessment-34004691464-1` (safe attempt 1, active attempt 2)
+- Manual record: `manual-baseline-20260906`
+- Sealed paired-evidence digest:
+  `sha256:c7cc5c839298629bcb6913fd4752eb0b98ecc67548c2cc3ba36ada8e2b2beb09`
 
-The UAT qualification bound the deployment, authentication, booking-persistence and runtime-
-hardening checks to that image. Safe attempt 1 and active attempt 2 used the same running instance,
-seed fingerprint and instance fingerprint. No image rebuild or retry occurred between them.
+The workflow qualified one immutable image, started one fresh `SECURITY` environment and bound both
+attempts to the same commit, image, target origin, target fingerprint and seed. The encrypted
+evidence envelope uses the repository's RSA-OAEP recipient. Its GitHub artifact attestation was
+verified before local decryption. Protected evidence is mode `0600`, is not committed, and expires
+on 6 October 2026.
 
-## Executed evidence
+## Automated execution
 
-The candidate passed the full build before assessment: 1,422 backend tests, 384 frontend tests, 416
-tool contract tests and 108 packaged browser journeys. That evidence covers the implemented session,
-booking, privacy, administration, member, PWA, supply-chain and operations catalog entries without
-repeating those journeys inside a scanner.
-
-| Attempt | Profile | Duration | Requests | Generated data | Evidence | Result |
+| Attempt | Profile | Duration | Requests | Generated data | Evidence | Runner result |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
-| 1 | safe | 55.355 s | 30 | 0 MiB | 13,074 bytes | incomplete |
-| 2 | active | 240.236 s | 1,651 | 4.015 MiB | 456,906 bytes | incomplete |
+| 1 | safe | 50.009 s | 30 | 0 MiB | 12,403 bytes | incomplete before triage |
+| 2 | active | 203.567 s | 2,124 | 5.972 MiB | 397,693 bytes | passed |
 
-All 28 native deployment checks passed or were explicitly not applicable. The authorization matrix
-and authenticated active scan passed. The OpenAPI suite preserved the same domain-state fingerprint
-before and after rejected mutations. The authenticated scanner canary was detected and classified
-as a reproducible false positive. Both attempts stayed within their declared request, concurrency,
-duration, data and evidence budgets.
+The workflow spent 26 minutes 49 seconds building and testing the candidate, 3 minutes 10 seconds
+qualifying it, and 5 minutes 18 seconds preparing and executing the isolated assessment. The target
+identity, authenticated ZAP plan, OpenAPI fuzzer and authorization matrix all passed. Every active
+check remained inside its request, concurrency, duration, generated-data and evidence budgets.
+Cleanup removed the run-owned containers, network and volumes.
 
-Cleanup removed every run-owned container, network and volume through the ownership-checked path.
-Protected evidence remains local until its recorded 2026-09-23 expiry; it is not part of this
-repository or an ordinary CI artifact.
-
-## Candidate triage
-
-The safe attempt retained 22 route-specific observations. The readable CSRF cookie explains five
-missing-`HttpOnly` observations; it is not the session cookie and is required by the double-submit
-design. Modern-application and session-response detection are informational classifications. The
-remaining observations led to explicit work rather than scanner suppression:
-
-- explicit cookie isolation: #470;
-- CSP and proxy capability disclosure: #471;
-- reproducible passive-alert evidence: #472.
-
-### Passive-alert evidence retest
-
-The final #472 retest reused the qualified #471 image and its deployment qualification, so only the
-evidence adapter changed. Attempt 1 of run `issue472-evidence-v2` completed all 28 native checks and
-30 bounded requests. Its protected passive record has digest
-`sha256:01181917cdb95172213faa218f85bc3b7b334a62a9391af3e43c56f039b9c714` and remains local until
-8 September 2026.
-
-Every alert now carries closed rule-specific evidence. The suspicious-comment candidate retains
-`comment-query`, resource digest
-`sha256:bb96b04aa0cac7748510cfc97e78f1bcdf38de3993c8a5f0bb91e3a344b62ea1` and location digest
-`sha256:8ff01140999a6ee57840fa0d39d7381ecd2a8fe3f1a737efd26e2ed7f693d449`, without the resource path,
-matched comment or scanner prose. The earlier `SELECT` observation shares the stable route-level
-finding fingerprint but does not match the current rule evidence and therefore is not silently
-confirmed. The attempt remains `incomplete` because the retained candidates still require lifecycle
-dispositions, not because their scanner evidence is missing.
-
-### Browser and proxy disclosure retest
-
-The #471 retest used commit `918011b8c863e27e9e4a1c2fd17f4fbc6127e172` and qualified image
-`sha256:2c0b5af51fc09f1aecfaf20bc4263f7ec58538f5fefc2b8b32ebe61e338e56ee`.
-UAT verified the response through Caddy before safe attempt 1 of run `issue471-closed` reused that
-exact image. All 28 native deployment checks passed or were not applicable. Each of the five
-public response checks observed the narrowed image policy and no `Server` or `Via` header.
-
-ZAP still reported rule `10055` once for `GET /`. Its stable fingerprint
-`sha256:971c33107d4bf2efa1ba8cf7eccee04bc287bea807d095b46f782e87e37ca6e2` matches the
-time-bounded acceptance in `security/exceptions.json`: arbitrary HTTPS images remain necessary for
-administrator-selected club branding until same-origin asset hosting exists. No scanner rule was
-disabled. The provenance-bound lifecycle validates it as a P3 finding and transitions it to
-`accepted-risk` with that acceptance as its reference. Its protected record has digest
-`sha256:337874e6daaf6b696e3ad97b4f977ac8d4dc5155c79b85a0bbe7c8b268571247` and remains
-local until 24 September 2026. The redacted
+The safe runner correctly stopped at `incomplete` because it cannot decide whether scanner alerts
+are findings. Reproducible lifecycle triage classified all 12 observations: eleven are false
+positives and one is the existing P3 acceptance for administrator-selected remote HTTPS logos. No
+scanner rule was suppressed. The resulting safe lifecycle passes with no untriaged candidate and no
+regression. Its redacted
 [`passive-baseline-finding-summary.json`](../security/passive-baseline-finding-summary.json) has
-digest `sha256:b959f93623401bbe18c13ee1715050e2bd70c9dad4296c50b1963015ea6d6ac3`.
-The attempt remains `incomplete` because 16 other passive candidates still require lifecycle
-dispositions. Their rule-specific evidence is now available through the #472 evidence format.
+digest `sha256:62e07b38ecc6e1b998abad9abe2b66197b3c97e849f84410d81be0179bf40790`.
 
-The active attempt retained 66 OpenAPI candidates. They reduce to three attributable classes:
+The harmless authenticated-scanner canary completed the full lifecycle in the isolated target:
+detected, validated, remediation in progress, fixed, and independently retested without the seeded
+header. The retest used a separate closed ZAP plan and required the protected route's actual `401`
+response, rather than weakening application behavior to manufacture a `404`. The retained proof
+binds each transition to its actual event time and binds the separate retest request count and
+report digest without publishing the report. Supplemental local run `issue253-canary-evidence-v4`
+reproduced the complete active profile against qualified immutable image
+`sha256:ac5474ecd824d7d68fc973538533db17177d856f11bea48ce8faf9fda82ac836` in 162.410 seconds. Its
+authenticated ZAP evidence records 129 requests, one retest request, strictly increasing phase
+times and protected retest-report digest
+`sha256:aa4d3286770df2985eed45c47175775da70d29a8ff14d6e7f7b5934f1935a64a`.
 
-- a nullable audit payload makes the administrative log fail with a server error: #467;
-- actual responses and the published formats disagree for problem instances and local times: #468;
-- proxy and documented validation outcomes are not represented correctly by the fuzzer policy:
-  #469.
+## Manual WSTG and ASVS review
 
-The baseline remains incomplete until those classes are fixed or receive reproducible lifecycle
-dispositions and the same seed is retested. The records do not treat a scanner observation as a
-validated vulnerability. No critical or high vulnerability was validated in these attempts.
+The manual record covers 316 unique selected controls from OWASP WSTG 4.2 and ASVS 5.0.0 Level 2:
 
-## Coverage gaps
+| Outcome | Controls |
+| --- | ---: |
+| pass | 0 |
+| not applicable, with rationale | 111 |
+| fail, linked to a validated or accepted finding | 59 |
+| blocked pending control-specific evidence | 146 |
 
-The catalog contains 15 implemented entries: 12 automated and three hybrid. One additional entry is
-explicitly blocked. Administrative multi-factor authentication remains blocked by #69; it was not
-silently counted as executed. Destructive resource-abuse testing is outside this safe-and-active
-baseline and remains manual-only.
+The first review had assigned 158 pass outcomes from chapter-level file inventories. Independent
+review showed that those records were not control-specific and contradicted ten known gaps. None of
+those generated outcomes remains a pass: 12 map to a validated or accepted finding and the other
+146 are explicitly blocked under #804 until a named production path and a falsifying check exist.
 
-The control-specific manual WSTG 4.2 and ASVS 5.0.0 Level 2 record is not complete. In particular,
-physical-device client review, operational evidence review and the independent-assessment intake
-cannot be inferred from automated results. The baseline cannot pass until every applicable manual
-control has a recorded outcome and every blocked or not-applicable control has a precise owner and
-rationale.
+The 59 failed controls reduce to ten unique unresolved findings and the existing accepted risk.
+There are no untriaged candidates, regressions, P0 findings or P1 findings. The ten remediation
+items are:
 
-The harmless scanner canary proves candidate creation and false-positive disposition, but not the
-required remediation-to-successful-retest path. That proof must accompany the candidate retest and
-may not be replaced by a unit test of the lifecycle helper.
+- #792 permanent-password lifecycle (P2)
+- #793 complete session lifecycle (P2)
+- #794 host-bound authentication cookies (P3)
+- #795 encrypted internal reference-deployment traffic (P2)
+- #796 bounded backend-service identities (P2)
+- #797 actionable authentication and authorization log retention (P2)
+- #798 cryptographic inventory and key lifecycle (P3)
+- #799 documented upload type boundary (P3)
+- #800 refusal of plaintext API requests before redirect (P2)
+- #803 dependency remediation deadlines (P3)
+
+They are ordered under parent #801. The redacted
+[`manual-baseline-finding-summary.json`](../security/manual-baseline-finding-summary.json) has digest
+`sha256:1b6b90e83009d299d43b627e5148f4485f00a03e228e351b5a9f1b947fe2d03e`.
+It contains eleven findings: ten `validated`, one `accepted-risk`, zero candidates and zero
+regressions. The overall assessment fails on those findings and remains
+incomplete on the 146 blocked controls. A completed execution is not a passing baseline.
+
+Administrative multi-factor authentication remains explicitly blocked by #69. Destructive
+resource-abuse tests, physical-device checks and independent external testing were not inferred
+from automated evidence. They remain separately owned release activities.
+
+## Failed attempt and reproducibility
+
+The first hosted attempt, [run 34002456549](https://github.com/jegr78/courtside/actions/runs/34002456549),
+was retained rather than retried as a flake. Safe attempt 1 ran for 46.084 seconds and produced the
+same 30 bounded requests and 12,403 evidence bytes. Active attempt 2 stopped after 134.271 seconds
+because the canary retest expected `404` from an authenticated route that correctly returned `401`.
+The failure was deterministic. The implementation was corrected to assert `401`, redact and bound
+diagnostics, and keep synthetic credentials out of startup logs. A fresh isolated local active run
+then passed all 2,124 requests before the second hosted run reproduced that result. After the
+evidence contract was tightened, local run `issue253-canary-evidence-v4` repeated all 2,124 requests
+and proved the retained timestamp and report-digest binding.
 
 ## Gate recommendation
 
-- Pull requests keep the existing build, static findings, contract tests and packaged browser
-  journeys. Network assessment is too slow and stateful for every pull request.
-- The bounded safe profile remains scheduled weekly. Any incomplete attempt is investigated; it is
-  not retried over or called flaky.
-- The active profile remains manually dispatched for ordinary assessments. The release workflow
-  also runs it against the qualified immutable candidate and blocks publication when that automated
-  assessment gate does not pass.
-- Destructive resource-abuse, manual procedures and independent penetration testing remain explicit
-  release activities, never scheduled against a production instance.
-- That automated release gate does not complete this broader baseline. Release readiness remains
-  incomplete while candidates, manual controls or the successful lifecycle retest remain open.
+- Pull requests retain the build, static analysis, contract tests and packaged browser journeys.
+  The network assessment is too stateful and expensive for every PR.
+- The bounded safe profile runs weekly. An incomplete run requires lifecycle triage; it is never
+  silently treated as passed or retried as a presumed flake.
+- The active profile remains manually dispatchable and runs against an immutable release candidate.
+  It blocks release when its automated gate fails.
+- The control-specific manual checklist, destructive procedures and independent assessment remain
+  explicit release activities. Active tests never target production.
+- Release gating must not pass with an untriaged observation or an unresolved P0/P1 finding.
+  It also cannot use the manual baseline as positive evidence while #804 controls remain blocked.
+  Accepted risks require a rationale, compensating control and expiry.
 
 ## Reproduction
 
 Follow the qualification and environment sequence in
-[`security-environment.md`](security-environment.md), then execute the safe and active commands in
-[`security-assessment.md`](security-assessment.md) with one resolved image digest. The manual
-`baseline` workflow dispatch performs that sequence as safe attempt 1 and active attempt 2. Preserve
-both manifests, use the exact active authorization string, classify observations through
-[`security-findings.md`](security-findings.md), and finish with the ownership-checked cleanup. A new
-run uses a new run identifier; it never overwrites this baseline's evidence.
+[`security-environment.md`](security-environment.md), then run the paired `baseline` workflow from
+[`security-assessment.md`](security-assessment.md) against one resolved image digest. Verify the
+artifact attestation and OAEP envelope before decrypting protected evidence. Classify every retained
+observation through [`security-findings.md`](security-findings.md), execute the manual procedures in
+[`security-manual-assessment.md`](security-manual-assessment.md), and finish with ownership-checked
+cleanup. Each rerun gets a new run identifier and preserves the prior record.

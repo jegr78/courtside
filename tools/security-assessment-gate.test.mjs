@@ -19,7 +19,7 @@ function manifest(overrides = {}) {
     targetFingerprint: digest,
     seedFingerprint: digest,
     instanceFingerprint: digest,
-    catalogVersion: "1.2.0",
+    catalogVersion: "1.3.0",
     tools: [
       { id: "target-identity", version: "1.0.0", testIds: [] },
       { id: "passive-deployment", version: "1.3.0", testIds: ["CSA-DEPLOY-001"] }
