@@ -9,23 +9,89 @@ import { localRequest, newBootstrapPassword } from "./courtside.mjs";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const composeFile = join(root, "deploy", "compose.upgrade.yaml");
 
+// Semantic versioning: no numeric part carries a leading zero, so the same version cannot arrive
+// twice written two ways.
+const NUMBER = String.raw`(?:0|[1-9]\d*)`;
+const IDENTIFIER = String.raw`(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`;
+const VERSION = new RegExp(
+  `^v(${NUMBER})\\.(${NUMBER})\\.(${NUMBER})(?:-(${IDENTIFIER}(?:\\.${IDENTIFIER})*))?$`);
+
 function parseVersion(tag) {
-  const match = /^v(\d+)\.(\d+)\.(\d+)$/.exec(tag);
-  return match && { tag, major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) };
+  const match = VERSION.exec(tag);
+  return match && {
+    tag, major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]),
+    prerelease: match[4] ?? null
+  };
+}
+
+// Semantic versioning §11: a candidate precedes the release it is a candidate for, a numeric
+// identifier is compared as a number, and a shorter set of identifiers precedes a longer one.
+function precedence(left, right) {
+  if (left.major !== right.major) return left.major - right.major;
+  if (left.minor !== right.minor) return left.minor - right.minor;
+  if (left.patch !== right.patch) return left.patch - right.patch;
+  if (left.prerelease === right.prerelease) return 0;
+  if (left.prerelease === null) return 1;
+  if (right.prerelease === null) return -1;
+  return comparePrerelease(left.prerelease.split("."), right.prerelease.split("."));
+}
+
+function comparePrerelease(left, right) {
+  for (let index = 0; index < Math.min(left.length, right.length); index++) {
+    const order = compareIdentifier(left[index], right[index]);
+    if (order !== 0) return order;
+  }
+  return left.length - right.length;
+}
+
+function compareIdentifier(left, right) {
+  const numeric = /^\d+$/;
+  if (numeric.test(left) && numeric.test(right)) return Number(left) - Number(right);
+  if (numeric.test(left)) return -1;
+  if (numeric.test(right)) return 1;
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function sameRelease(version, candidate) {
+  return version.major === candidate.major && version.minor === candidate.minor
+    && version.patch === candidate.patch;
 }
 
 export function selectUpgradeOrigins(candidateTag, tags) {
   const candidate = parseVersion(candidateTag);
-  if (!candidate) throw new Error(`Candidate tag is not stable semantic version: ${candidateTag}`);
-  const versions = tags.map(parseVersion).filter(Boolean)
+  if (!candidate) throw new Error(`Candidate tag is not a semantic version: ${candidateTag}`);
+  const earlier = tags.map(parseVersion).filter(Boolean)
     .filter((version) => version.major === candidate.major)
-    .filter((version) => version.minor < candidate.minor
-      || (version.minor === candidate.minor && version.patch < candidate.patch))
-    .sort((left, right) => right.minor - left.minor || right.patch - left.patch);
-  if (versions.length === 0) return ["pre-release-v17"];
-  const patch = versions.find((version) => version.minor === candidate.minor);
-  const minor = versions.find((version) => version.minor < candidate.minor);
-  return [...new Set([patch?.tag, minor?.tag].filter(Boolean))];
+    .filter((version) => precedence(version, candidate) < 0);
+  const released = earlier.filter((version) => version.prerelease === null)
+    .sort((left, right) => precedence(right, left));
+  const patch = released.find((version) => version.minor === candidate.minor);
+  const minor = released.find((version) => version.minor < candidate.minor);
+  // A club that ran a candidate has migrated its database, so every candidate for this release is
+  // an origin — a club is not asked which of them it happened to stop on.
+  const candidates = earlier.filter((version) => sameRelease(version, candidate))
+    .sort(precedence).map((version) => version.tag);
+  const released_ = [patch?.tag, minor?.tag].filter(Boolean);
+  // Until a release exists, the pre-release schema is the only database a club can hold, and a
+  // candidate preceding the first release does not make that upgrade any less real.
+  const from = released_.length === 0 ? ["pre-release-v17", ...candidates] : [...released_, ...candidates];
+  return [...new Set(from)];
+}
+
+// A tag whose run never reached publish names no image; resolving an origin from it would pull
+// something that does not exist and block every release of that line.
+export function publishedTags(releases) {
+  return releases.filter((release) => release.draft === false).map((release) => release.tag_name);
+}
+
+export function previousReleaseTag(candidateTag, tags) {
+  const candidate = parseVersion(candidateTag);
+  if (!candidate) throw new Error(`Candidate tag is not a semantic version: ${candidateTag}`);
+  const released = tags.map(parseVersion).filter(Boolean)
+    .filter((version) => version.prerelease === null)
+    .filter((version) => precedence(version, candidate) < 0)
+    .sort((left, right) => precedence(right, left));
+  return released[0]?.tag ?? null;
 }
 
 export function selectRepositoryDigest(repository, originTag, repoDigests) {
@@ -325,8 +391,12 @@ async function executeUpgrade() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv[2] === "--origins") {
-    const tags = run("git", ["tag", "--list", "v*"]).stdout.trim().split("\n").filter(Boolean);
+    const tags = JSON.parse(process.argv[4]);
     process.stdout.write(`${JSON.stringify(selectUpgradeOrigins(process.argv[3], tags))}\n`);
+  } else if (process.argv[2] === "--published-tags") {
+    process.stdout.write(`${JSON.stringify(publishedTags(JSON.parse(process.argv[3])))}\n`);
+  } else if (process.argv[2] === "--previous-release") {
+    process.stdout.write(`${previousReleaseTag(process.argv[3], JSON.parse(process.argv[4])) ?? ""}\n`);
   } else {
     await executeUpgrade();
   }

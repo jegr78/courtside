@@ -1570,6 +1570,14 @@ whether it is built or designed. **Designed means absent today.**
   cosign and attaches an SBOM attestation. Trivy scans the application's extracted layers and the
   source tree on every pull request and every release; the container image's own base layers are
   not, so that half is designed and not built.*
+- **A release candidate carries what a release carries.** *Built.* A tag with a prerelease suffix —
+  `v0.3.0-alpha.1`, `v0.3.0-rc.1` — travels the same pipeline: the same nightly verification of a
+  commit it builds on, the same qualification of the exact manifest that is published, the same
+  keyless cosign signature and SBOM attestation. A candidate exists so that a club can run it, and
+  proving it less than a release would make the same signature mean two different things. What
+  differs is reach, not proof: a candidate is published under its own version only, no floating tag
+  follows it, and its GitHub release is marked a prerelease, so a club that pinned `latest` or a
+  major line never receives one without asking for it by exact version.
 - **Security assessment evidence:** hosted assessments upload normalized public records and a CMS
   envelope encrypted to the tracked recipient certificate. The expected certificate fingerprint
   lives in a GitHub repository variable, outside commit history, so changing the certificate and a

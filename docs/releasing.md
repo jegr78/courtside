@@ -81,20 +81,11 @@ failed is followed by `v0.2.1`.
 Only a tag no run ever saw is free to move, and under a `v*` trigger that is rarer than it sounds —
 a misspelling that keeps the leading `v` still starts a run.
 
-**A retained failed tag has two consequences, and both bite the next release**, because the
-workflow reads its history from local git tags rather than from what was published:
-
-- `upgrade` resolves its origins from `git tag --list 'v*'`, so the failed `v0.2.0` becomes an
-  upgrade origin for `v0.2.1` — and the job then tries to pull an image that was never published.
-  Every release of that minor line fails there until somebody intervenes.
-- The upgrade notes are collected backwards with `git describe --tags`, so the range starts at the
-  failed tag. Every `BREAKING CHANGE:` footer between the last *published* release and it falls out
-  of the release body, and a club reading that body is told nothing changed.
-
-Until [#808](https://github.com/jegr78/courtside/issues/808) is resolved, a failed tag has to be
-deleted before the next release of the same minor line — the mutation this section otherwise
-forbids, which is exactly why that issue exists. Delete it from the remote and locally, and say so
-in the pull request carrying the fix.
+A failed tag costs the next release nothing. Both things the release reads from its history — the
+supported upgrade origins and the range the upgrade notes cover — come from the releases this
+repository has **published**, not from the tags that exist. A tag whose run stopped before `publish`
+therefore names no release, is no origin, and shortens no range. It stays where it is, and nothing
+has to be deleted to move on.
 
 ## When the change is breaking
 
@@ -113,19 +104,41 @@ nobody at 22:00.
 What no automation covers is the upgrade path itself. `upgrade` executes the origins it resolved
 from the tag history, so a release that breaks one of those is refused — but only those.
 
-## Prereleases do not work today
+## Candidates
 
-`v0.3.0-rc1` reaches *Resolve supported database upgrade origins*, which refuses any tag that is not
-`v<major>.<minor>.<patch>`, and `build` fails there. The `prerelease` flag further down the workflow
-is unreachable. Do not cut one expecting a candidate release;
-[#808](https://github.com/jegr78/courtside/issues/808) covers this too.
+A tag may carry a prerelease suffix — `v0.3.0-alpha.1`, `v0.3.0-rc.1` — and it travels the same
+pipeline as any other release: the same nightly verification, the same qualification, the same
+signature. A candidate exists so that a club can *run* it, and a candidate proved less than a
+release would be an image whose signature means less than the same signature on a release.
+
+Two stages are used, and each says what it promises. `alpha` is for the first club that agreed to
+run one; `rc` says no known defect is open against it. Nothing else is used, because a third stage
+nobody can describe in one sentence is a stage that means nothing.
+
+**A published candidate is an upgrade origin.** A club that ran one has migrated its database, so
+the release it is a candidate for upgrades from it, and so does every later candidate for that same
+release. Candidates of another line are not origins: a club is expected to reach a candidate's
+release before following the next one. A candidate whose run never reached `publish` is not an
+origin either — it named no image, and the release reads its history from what was published rather
+than from the tags that happen to exist.
+
+A version is read as semantic versioning defines it. Build metadata (`v0.3.0+build.1`) is refused
+rather than interpreted, because nothing here has a use for it and a release that guessed would be
+worse than one that stops.
+
+Ordering follows semantic versioning, so `v0.3.0-rc` precedes `v0.3.0-rc.2`, which precedes
+`v0.3.0-rc.10`, and all of them precede `v0.3.0`.
 
 ## After the release
 
-The image is at `ghcr.io/jegr78/courtside`, signed, under four tags: `<version>`,
-`<major>.<minor>`, `<major>` and `latest`. A club pinning `0.2.0` stays where it is; one pinning
-`0.2`, `0` or `latest` moves with every matching release — worth knowing before recommending a tag
-to anybody.
+The image is at `ghcr.io/jegr78/courtside`, signed. A release is published under four tags:
+`<version>`, `<major>.<minor>`, `<major>` and `latest`. A club pinning `0.2.0` stays where it is;
+one pinning `0.2`, `0` or `latest` moves with every matching release — worth knowing before
+recommending a tag to anybody.
+
+**A candidate is published under its own version and nothing else.** No floating tag follows it, and
+the GitHub release is marked as a prerelease, so a club that pinned `latest` or `0.2` never receives
+one by accident. Reaching a candidate is a deliberate act: pinning its exact version.
 
 The GitHub release carries two files: the `openapi.yaml` this version answers to, and
 `security-record.json`. That record is an ordinary release asset — neither signed nor attested,

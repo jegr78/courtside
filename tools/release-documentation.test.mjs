@@ -76,21 +76,61 @@ test("given the release body, when the document promises what it carries, then t
     }
   });
 
-// The document says prereleases do not work and names the reason. When somebody makes them work,
-// this goes red and the document has to stop saying it — which is the point of writing it down.
-test("given a prerelease tag, when the release resolves upgrade origins, then the document's warning still holds",
+test("given a candidate tag, when the release resolves upgrade origins, then the document describes what happens",
   () => {
     // given
     const publish = workflow.jobs.publish.steps
       .find((step) => (step.uses ?? "").startsWith("softprops/action-gh-release"));
 
     // when / then
-    assert.throws(() => selectUpgradeOrigins("v0.3.0-rc1", ["v0.2.0", "v0.3.0-rc1"]),
-      /not stable semantic version/);
-    assert.match(document, /## Prereleases do not work today/);
+    assert.deepEqual(selectUpgradeOrigins("v0.3.0-rc.2", ["v0.2.0", "v0.3.0-rc.1"]),
+      ["v0.2.0", "v0.3.0-rc.1"]);
+    assert.doesNotMatch(document, /Prereleases do not work/,
+      "candidates reach publish now, so the document may no longer say they cannot");
+    assert.match(document, /^## Candidates$/m);
     assert.match(String(publish.with.prerelease), /contains\(github\.ref_name, '-'\)/,
-      "the document explains an unreachable flag; if the flag is gone the passage has to go too");
+      "the flag decides how a candidate is published and is reachable now");
   });
+
+// A tag that failed before publish stays where it is, so reading the history from local tags let a
+// failed release shorten the next one's notes and offer an image that was never pushed.
+test("given a tag that never published, when the release reads its history, then it reads releases instead",
+  () => {
+    // given
+    const published = workflow.jobs.build.steps
+      .find((step) => step.name === "Read the releases this repository has published");
+    const collect = workflow.jobs.build.steps.find((step) => step.name === "Collect the upgrade notes");
+    const origins = workflow.jobs.build.steps
+      .find((step) => step.name === "Resolve supported database upgrade origins");
+
+    // when / then
+    assert.match(published.run, /gh api --paginate "repos\/\$\{GITHUB_REPOSITORY\}\/releases"/);
+    assert.match(published.run, /--published-tags/);
+    assert.doesNotMatch(collect.run, /git describe/,
+      "the notes anchor comes from what was published, not from the tags that happen to exist");
+    for (const step of [collect, origins]) {
+      assert.equal(step.env.PUBLISHED_TAGS, "${{ steps.published.outputs.tags }}");
+      assert.match(step.run, /"\$PUBLISHED_TAGS"/,
+        "the tag list travels through the environment rather than into the script");
+    }
+  });
+
+// The action rewrites the tag pattern and clears `latest` for a prerelease, so a candidate never
+// moves a tag a club may have pinned.
+test("given a candidate, when the image is tagged, then no floating tag follows it", () => {
+  // given
+  const meta = workflow.jobs.publish.steps
+    .find((step) => (step.uses ?? "").startsWith("docker/metadata-action"));
+  const release = workflow.jobs.publish.steps
+    .find((step) => (step.uses ?? "").startsWith("softprops/action-gh-release"));
+
+  // when / then
+  assert.equal(meta.with.flavor, undefined,
+    "a flavor input would override the default that holds latest back for a candidate");
+  assert.match(String(release.with.prerelease), /contains\(github\.ref_name, '-'\)/,
+    "and the GitHub release is marked so its own latest never resolves to a candidate");
+  assert.match(document, /a candidate is published under its own version and nothing else/i);
+});
 
 test("given the tags a release publishes, when the document names them, then it names every one", () => {
   // given
@@ -103,19 +143,19 @@ test("given the tags a release publishes, when the document names them, then it 
   // when / then
   assert.deepEqual(patterns, ["{{version}}", "{{major}}.{{minor}}", "{{major}}"]);
   assert.equal(meta.with.flavor, undefined,
-    "the action's default moves `latest` with every release, and the document says so");
+    "the action's default holds `latest` back for a candidate and moves it for a release, and the document says so");
   assert.match(document, /`latest`/,
     "a club pinning latest moves with every release and the document has to name that tag");
   assert.match(document, /`<major>\.<minor>`/);
 });
 
-// The warning about a retained failed tag rests on where the notes range starts. If that stops
-// being the local tag history, the warning is stale rather than merely unnecessary.
-test("given the upgrade notes, when the document warns about their range, then the workflow still reads git",
+// The document now says a failed tag costs the next release nothing. That rests entirely on both
+// reads coming from published releases; if either goes back to the tag history, the promise is false.
+test("given a failed tag, when the document says it costs nothing, then neither read touches the tag history",
   () => {
     // when / then
-    assert.match(source, /previous=\$\(git describe --tags --abbrev=0 --match 'v\*'/);
-    assert.match(source, /git tag --list 'v\*'|--origins "\$GITHUB_REF_NAME"/);
-    assert.match(document, /git describe --tags/,
-      "the document warns about a range it no longer describes");
+    assert.doesNotMatch(source, /git describe/);
+    assert.doesNotMatch(source, /git tag --list/);
+    assert.match(document, /come from the releases this\nrepository has \*\*published\*\*/,
+      "the document explains where the two reads look, and the workflow has to keep looking there");
   });

@@ -4,6 +4,8 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   selectRepositoryDigest,
+  publishedTags,
+  previousReleaseTag,
   selectUpgradeOrigins,
   unexplainedChanges
 } from "./courtside.upgrade-smoke.mjs";
@@ -27,13 +29,61 @@ const upgradeRunner = readFileSync(
 
 test("given patch and minor releases, when selecting upgrade origins, then the latest of each is retained", () => {
   // given
-  const tags = ["v0.1.0", "v0.1.1", "v0.2.0", "v0.2.1", "v0.3.0-rc.1"];
+  const tags = ["v0.1.0", "v0.1.1", "v0.2.0", "v0.2.1"];
 
   // when
   const origins = selectUpgradeOrigins("v0.3.0", tags);
 
   // then
   assert.deepEqual(origins, ["v0.2.1"]);
+});
+
+// A club that ran a candidate has migrated its database, so the release it is a candidate for has
+// to upgrade from it.
+test("given candidates for this release, when selecting upgrade origins, then every one of them is an origin",
+  () => {
+    // given
+    const tags = ["v0.2.1", "v0.3.0-alpha.1", "v0.3.0-rc.1", "v0.3.0-rc.2"];
+
+    // when
+    const origins = selectUpgradeOrigins("v0.3.0", tags);
+
+    // then
+    assert.deepEqual(origins, ["v0.2.1", "v0.3.0-alpha.1", "v0.3.0-rc.1", "v0.3.0-rc.2"]);
+  });
+
+test("given a candidate as the release, when selecting upgrade origins, then only what precedes it counts",
+  () => {
+    // given
+    const tags = ["v0.2.1", "v0.3.0-rc.1", "v0.3.0-rc.2", "v0.3.0"];
+
+    // when
+    const origins = selectUpgradeOrigins("v0.3.0-rc.2", tags);
+
+    // then
+    assert.deepEqual(origins, ["v0.2.1", "v0.3.0-rc.1"]);
+  });
+
+test("given candidates of another line, when selecting upgrade origins, then they are not origins", () => {
+  // given
+  const tags = ["v0.2.1", "v0.2.2-rc.1", "v0.4.0-rc.1"];
+
+  // when
+  const origins = selectUpgradeOrigins("v0.3.0", tags);
+
+  // then
+  assert.deepEqual(origins, ["v0.2.1"]);
+});
+
+test("given candidates numbered past nine, when ordering them, then ten follows nine rather than one", () => {
+  // given
+  const tags = ["v0.3.0-rc.2", "v0.3.0-rc.10", "v0.3.0-rc"];
+
+  // when
+  const origins = selectUpgradeOrigins("v0.3.0", tags);
+
+  // then
+  assert.deepEqual(origins, ["pre-release-v17", "v0.3.0-rc", "v0.3.0-rc.2", "v0.3.0-rc.10"]);
 });
 
 test("given several patches in the current line, when selecting origins, then patch and previous minor differ", () => {
@@ -47,10 +97,60 @@ test("given several patches in the current line, when selecting origins, then pa
   assert.deepEqual(origins, ["v0.3.1", "v0.2.1"]);
 });
 
+// Semantic versioning forbids a leading zero, and accepting one would offer the same version twice
+// as two origins that only differ in how they were written.
+test("given a version written with a leading zero, when selecting upgrade origins, then it is not one", () => {
+  // when / then
+  assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.3.0-rc.01", "v0.3.0-rc.1"]),
+    ["pre-release-v17", "v0.3.0-rc.1"]);
+  assert.throws(() => selectUpgradeOrigins("v01.2.3", []), /not a semantic version/);
+  assert.throws(() => selectUpgradeOrigins("v0.3.0-rc.01", []), /not a semantic version/);
+});
+
 test("given no published origin, when selecting upgrade origins, then the pre-release fixture is used", () => {
   // when / then
   assert.deepEqual(selectUpgradeOrigins("v0.1.0", []), ["pre-release-v17"]);
 });
+
+// Before the first release the pre-release schema is the only database a club can hold, and a
+// candidate preceding it does not make that upgrade any less real.
+test("given only candidates before the first release, when selecting origins, then the pre-release schema stays one",
+  () => {
+    // when / then
+    assert.deepEqual(selectUpgradeOrigins("v0.1.0", ["v0.1.0-rc.1"]),
+      ["pre-release-v17", "v0.1.0-rc.1"]);
+    assert.deepEqual(selectUpgradeOrigins("v0.1.0", []), ["pre-release-v17"]);
+  });
+
+test("given only a candidate of another line, when selecting origins, then the pre-release schema is the origin",
+  () => {
+    // when / then
+    assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.2.2-rc.1"]), ["pre-release-v17"]);
+  });
+
+// A tag whose run never reached publish names no image, so an origin resolved from it would pull
+// something that does not exist and block the whole line.
+test("given a release that was drafted or never published, when reading the tags, then it is not one", () => {
+  // given
+  const releases = [
+    { tag_name: "v0.2.0", draft: false },
+    { tag_name: "v0.3.0-rc.1", draft: false },
+    { tag_name: "v0.3.0", draft: true }
+  ];
+
+  // when / then
+  assert.deepEqual(publishedTags(releases), ["v0.2.0", "v0.3.0-rc.1"]);
+  assert.deepEqual(publishedTags([]), []);
+});
+
+test("given the published releases, when anchoring the upgrade notes, then a candidate is never the anchor",
+  () => {
+    // when / then
+    assert.equal(previousReleaseTag("v0.3.0", ["v0.2.0", "v0.2.1", "v0.3.0-rc.2"]), "v0.2.1");
+    assert.equal(previousReleaseTag("v0.3.0-rc.2", ["v0.2.1", "v0.3.0-rc.1"]), "v0.2.1");
+    assert.equal(previousReleaseTag("v0.1.0", ["v0.1.0-rc.1"]), null);
+    assert.equal(previousReleaseTag("v0.1.0", []), null);
+  });
 
 test("given repository digests, when resolving an origin, then only the expected repository is accepted", () => {
   // given
