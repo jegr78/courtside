@@ -195,8 +195,7 @@ already in the database. Nothing outside the mechanism they protect reads either
 
 ## What a fresh instance holds
 
-A database that has just been migrated is not empty. Flyway seeds enough that an instance can be
-signed into and configured:
+A database that has just been migrated is not empty. Flyway seeds a facility a club can start from:
 
 - one `court`, number 1, and opening hours of 08:00–22:00 on all seven days
 - four booking cards: **Member booking** (two or four players, guests allowed, counts against
@@ -204,11 +203,16 @@ signed into and configured:
 - two participant cards: **Ball machine**, which fills one slot, and **Looking for a partner**,
   which fills one without capacity
 - two rule sets, **Standard** and **Youth**, each with an advance window and a limit on open
-  bookings, and the membership types **Active** and Youth that point at them
+  bookings, and two membership types — **Active** and a youth one — pointing at them
 - one `club_config` row named Courtside, in German, in `Europe/Berlin`
 
-Every one of those is a row a board can change in the admin surface. None of them is a fixture the
-product depends on.
+What it does not seed is an account. The first one is created at startup from the
+`courtside.bootstrap-admin` configuration, which is why an instance has an administrator before
+anybody has signed in — see `deploy/README.md` for the variables that carry it.
+
+Everything else in that list is a row a board changes in the admin surface: courts, opening hours,
+booking cards, participant cards, rule sets, membership types and the club configuration all have
+one.
 
 ## Reading this against the code
 
