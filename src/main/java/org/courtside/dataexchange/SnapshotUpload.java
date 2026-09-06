@@ -7,9 +7,9 @@ import java.util.Map;
 
 public record SnapshotUpload(String fileName, String declaredMediaType, byte[] content) {
 
-    static final int MAX_FILE_NAME_LENGTH = 200;
-    static final List<String> EXTENSIONS = List.of(".csv", ".txt");
-    static final List<String> MEDIA_TYPES = List.of("text/csv", "text/plain",
+    private static final int MAX_FILE_NAME_LENGTH = 200;
+    private static final List<String> EXTENSIONS = List.of(".csv", ".txt");
+    private static final List<String> MEDIA_TYPES = List.of("text/csv", "text/plain",
             "application/vnd.ms-excel", "application/octet-stream");
 
     // A file whose first bytes are a container, an image or an executable is not a member list,
