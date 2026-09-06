@@ -109,8 +109,7 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
     }
 
     private UUID takePreview() {
-        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
-                TWO_ROWS.getBytes(StandardCharsets.UTF_8), account).previewId();
+        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", new SnapshotUpload("roster.csv", "text/csv", TWO_ROWS.getBytes(StandardCharsets.UTF_8)), account).previewId();
     }
 
     private ImportPreview expiredCopyOf(ImportPreview preview) {

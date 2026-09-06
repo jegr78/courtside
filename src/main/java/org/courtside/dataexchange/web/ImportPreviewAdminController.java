@@ -15,6 +15,7 @@ import org.courtside.dataexchange.PreviewService;
 import org.courtside.dataexchange.PreviewSummary;
 import org.courtside.dataexchange.ResolvedChangeSet;
 import org.courtside.dataexchange.SnapshotMode;
+import org.courtside.dataexchange.SnapshotUpload;
 import org.courtside.identity.CurrentUser;
 import org.courtside.shared.WireTypes;
 import org.springframework.http.ResponseEntity;
@@ -39,9 +40,10 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
     public ResponseEntity<ApiImportPreview> createImportPreview(UUID sourceId, MultipartFile file,
                                                                 ApiSnapshotMode mode,
                                                                 String encoding) {
+        SnapshotUpload upload = new SnapshotUpload(file.getOriginalFilename(),
+                file.getContentType(), bytesOf(file));
         PreviewSummary summary = previews.create(sourceId, SnapshotMode.valueOf(mode.getValue()),
-                encoding, file.getOriginalFilename(), bytesOf(file),
-                currentUser.requireAccount().getId());
+                encoding, upload, currentUser.requireAccount().getId());
         return ResponseEntity
                 .created(java.net.URI.create("/api/admin/import/previews/" + summary.previewId()))
                 .body(toResponse(summary));

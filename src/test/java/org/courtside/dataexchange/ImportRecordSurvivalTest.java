@@ -68,8 +68,7 @@ class ImportRecordSurvivalTest extends AbstractIntegrationTest {
     @Test
     void givenAnImportSomebodyRan_whenTheirAccountIsRemoved_thenTheRunAndItsPreviewRemain() {
         // given
-        UUID previewId = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
-                TWO_ROWS.getBytes(StandardCharsets.UTF_8), account).previewId();
+        UUID previewId = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", new SnapshotUpload("roster.csv", "text/csv", TWO_ROWS.getBytes(StandardCharsets.UTF_8)), account).previewId();
         UUID runId = executions.execute(previewId, false, account).runId();
 
         // when

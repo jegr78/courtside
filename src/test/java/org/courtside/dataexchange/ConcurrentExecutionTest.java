@@ -150,8 +150,7 @@ class ConcurrentExecutionTest extends AbstractIntegrationTest {
     }
 
     private UUID preview(String content) {
-        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
-                content.getBytes(StandardCharsets.UTF_8), actor).previewId();
+        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", new SnapshotUpload("roster.csv", "text/csv", content.getBytes(StandardCharsets.UTF_8)), actor).previewId();
     }
 
     private static void await(CountDownLatch latch) {

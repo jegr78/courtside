@@ -4,6 +4,7 @@ import org.courtside.dataexchange.internal.CsvSnapshot;
 import org.courtside.dataexchange.internal.MemberNumber;
 import org.courtside.dataexchange.internal.SnapshotHeaderInvalidException;
 import org.courtside.dataexchange.internal.SnapshotParser;
+import org.courtside.dataexchange.SnapshotUploadUnsupportedException;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -445,6 +446,33 @@ class SnapshotParserTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Test
+    void givenBytesThatAreNotTextUnderTheClubsEncoding_whenParsing_thenTheyAreRefusedRatherThanRead() {
+        // given — ISO-8859-1 maps every byte, so a binary file decodes into control characters
+        byte[] binary = {0x4e, 0x72, 0x0a, 0x00, 0x01, 0x02, 0x31, 0x0a};
+
+        // when / then
+        assertThatThrownBy(() -> SnapshotParser.parse(binary, COLUMNS,
+                StandardCharsets.ISO_8859_1, ','))
+                .isInstanceOf(SnapshotUploadUnsupportedException.class)
+                .extracting("code").isEqualTo("import.snapshot.notText");
+    }
+
+    // A club configured ISO-8859-1 whose export is really Windows-1252 decodes its typographic
+    // quotes into C1, and refusing those would cost that club its import.
+    @Test
+    void givenAnExportWhoseEncodingIsOffByOneCodePage_whenParsing_thenItStillReadsIt() {
+        // given
+        byte[] content = ("Member number,First name,Last name\n4711,Jane,\u0093Doe\u0094\n")
+                .getBytes(StandardCharsets.ISO_8859_1);
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(content, COLUMNS, StandardCharsets.ISO_8859_1, ',');
+
+        // then
+        assertThat(snapshot.rows()).hasSize(1);
     }
 
     private static CsvSnapshot parse(String content) {

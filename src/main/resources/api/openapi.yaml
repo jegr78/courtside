@@ -4535,7 +4535,12 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: The club's export as CSV. A byte order mark is honoured.
+                  description: |
+                    The club's export as CSV, named `.csv` or `.txt`. A byte order mark is honoured.
+                    The declared part type is checked for contradiction against the types a browser
+                    sends for such a file, and the content decides: a container, image, workbook or
+                    executable signature is refused, and so is anything that decodes into control
+                    characters.
                 mode: { $ref: "#/components/schemas/SnapshotMode" }
                 encoding:
                   type: string
@@ -4551,6 +4556,11 @@ paths:
                     a property of the platform the instance runs on, not a decision this product
                     gets to freeze into a release: a club whose export tool writes a seventh one
                     must not have to wait for a new image to import its own members.
+            encoding:
+              file:
+                # The same export leaves a club's browser as a different type depending on the
+                # system that sends it, so it is checked for contradiction and never trusted.
+                contentType: text/csv, text/plain, application/vnd.ms-excel, application/octet-stream
       responses:
         "201":
           description: The preview.
@@ -4944,7 +4954,10 @@ paths:
       tags: [admin-config]
       operationId: uploadClubLogo
       summary: Replace the logo stored by this Courtside instance.
-      description: Accepts PNG or JPEG up to 1 MiB and 2048 by 2048 pixels.
+      description: |
+        Accepts PNG or JPEG up to 1 MiB and 2048 by 2048 pixels. The bytes decide: the file is read
+        as an image and stored re-encoded, so what a browser later receives is what this instance
+        wrote rather than what arrived.
       security:
         - sessionCookie: []
           csrfToken: []
