@@ -7,9 +7,14 @@ function deploymentFile(name) {
   return readFileSync(fileURLToPath(new URL(`../deploy/${name}`, import.meta.url)), "utf8");
 }
 
+function repositoryFile(path) {
+  return readFileSync(fileURLToPath(new URL(`../${path}`, import.meta.url)), "utf8");
+}
+
 const compose = deploymentFile("compose.yaml");
 const readme = deploymentFile("README.md");
 const example = deploymentFile(".env.example");
+const properties = repositoryFile("src/main/resources/application.yaml");
 // A README wraps its lines, so a message quoted in a table may be split anywhere a space is.
 const reflowed = readme.replace(/\s+/g, " ");
 const scripts = {
@@ -60,6 +65,17 @@ test("given the reference deployment, when a variable is read, then it is docume
       assert.ok(interpolated.has(variable),
         `.env.example offers ${variable} and compose.yaml reads it nowhere, so setting it does `
         + "nothing");
+    }
+    // The README says in one sentence which variables it still names after they stopped being read,
+    // so the exemption is the documentation's own and not a list kept beside it.
+    const retirement = readme.split("\n\n")
+      .find((paragraph) => paragraph.includes("no longer read")) ?? "";
+    const retired = named(retirement, /`(COURTSIDE_[A-Z0-9_]+)`/g);
+    const read = named(properties, /\$\{(COURTSIDE_[A-Z0-9_]+)/g);
+    for (const variable of documented) {
+      assert.ok(interpolated.has(variable) || read.has(variable) || retired.has(variable),
+        `README.md names ${variable} and neither compose.yaml nor application.yaml reads it, so it `
+        + "documents a variable that does nothing");
     }
   });
 

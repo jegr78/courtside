@@ -409,6 +409,19 @@ async function main() {
       `nothing on the compose network verifies as ${hostname}, so an instance that dials its relay `
       + `by that name reaches either nothing or something it cannot authenticate: ${byName}`);
 
+    console.log("Reading the issuer and the dates the way the documentation tells an operator to");
+    await paced();
+    const described = openssl(["x509", "-noout", "-subject", "-issuer", "-dates"],
+      servedCertificate(inbound));
+    const subject = /^subject=(.*)$/m.exec(described)?.[1];
+    const issuer = /^issuer=(.*)$/m.exec(described)?.[1];
+    const runsOut = /^notAfter=(.*)$/m.exec(described)?.[1];
+    assert.ok(subject && issuer && issuer !== subject,
+      `the documented command reports no issuer separate from the subject, so it cannot tell a `
+      + `certificate an authority issued from one the mail server made for itself: ${described}`);
+    assert.ok(runsOut && Date.parse(runsOut) > Date.now(),
+      `the documented command reports no expiry an operator could act before: ${described}`);
+
     console.log("Reading what the mail server can reach of the proxy's store");
     const foreignKey = `/data/caddy/certificates/local/${domain}/${domain}.key`;
     const foreignDigest = digestInside("proxy", foreignKey);

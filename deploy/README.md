@@ -225,7 +225,7 @@ compromise of the key.
 **Where the pair lives, and who can open it.** Caddy's store holds a private key for every name it
 manages and is mounted into `mail-certificate` read-only and into nothing else. The helper writes
 one certificate and one key into `mail-tls` as root with `umask 027`, in the group the mail server
-runs as, so the mail server can read that pair and nothing above it. `mail-reload`, the container
+runs as, so the mail server can read that pair and nothing in the store it came from. `mail-reload`, the container
 that asks for the load, runs as a user outside that group: it mounts the same volume read-only and
 still cannot open what it points at. The pair is published under `versions/<digest of the pair>`
 and `current` is a symlink, because two files cannot be renamed at once and a mail server reading
@@ -274,14 +274,14 @@ openssl s_client -starttls smtp -connect "$name:25" </dev/null 2>/dev/null \
   | openssl x509 -noout -subject -issuer -dates
 ```
 
-`Verify return code: 0 (ok)` is the answer, and it is the same question the instance asks before it
-hands over a message: chain and name, both, against the system trust store. Anything else names the
+`Verify return code: 0 (ok)` is the answer, and it is the question the instance asks before it
+hands over a message: chain and name, both, against a public trust store. Anything else names the
 disagreement — `62` is a certificate that does not carry this name, `20` a chain that does not reach
 a known authority, `18` a self-signed one. The second command prints who issued the certificate and
 when it runs out, which is what to compare against a `close to expiry` line in the log.
 
-None of this needs a password, and nothing here prints one. The pair itself is deliberately
-unreadable from the containers you are likely to be in.
+None of this needs a password and none of it prints one. Reading what the server serves is not
+reading the key it serves it with, and no command in this file does the second.
 
 ### When the certificate stops arriving
 
@@ -305,8 +305,8 @@ is the confirmation.
 | What `mail-reload` says | What it means, and what to do |
 |---|---|
 | `the certificate helper has published no pair for <hostname> yet` | `mail-reload` started before `mail-certificate` got anywhere. Look at the helper, not at this. |
-| `the mail server answered the reload request with <status>` | The admin endpoint did not answer, or answered with a status. A mail server in recovery mode answers nothing here: check whether `COURTSIDE_MAIL_RECOVERY_ADMIN` is still set. |
-| `the mail server refused the reload: <reason>` | The server read the pair and rejected it, and `validationFailed` is what it says about a certificate it cannot parse. **This is the one state with a consequence beyond the certificate** — see below. |
+| `the mail server answered the reload request with <status>` | `401` is a credential the server does not accept: `COURTSIDE_MAIL_RELOAD_PASSWORD` was changed in `.env` without `mail-configure` being run again, or the server was left in recovery mode, where that account does not exist. No status at all is an admin port that did not answer. |
+| `the mail server refused the reload: <reason>` | `forbidden` is the reload account missing the permission to reload, which leaves the listener serving the pair it already had. `validationFailed` is a pair the server read and could not parse, and **it is the one state with a consequence beyond the certificate** — see below. |
 | `the mail server answered with <status> when asked what it loaded` | The reload was accepted and the read-back was not. Same causes as the request failure above. |
 | `the mail server holds more than one certificate, so this cannot say which it checked` | Somebody added a second certificate through the admin interface. The reloader refuses to guess which one the listener uses; remove the other. |
 | `the mail server loaded a certificate that does not name <hostname>` | The listener is serving something else entirely. Compare it with the second command above. |
@@ -323,9 +323,10 @@ first exists only as a hash. Anything older than that is re-issued from the rost
 account new credentials is one action.
 
 Reissuing the certificate itself is the last thing to reach for, not the first. Removing Caddy's
-store makes it obtain a new one, and Let's Encrypt allows five identical certificates per week
-across every attempt, successful or not — a loop that recreates the container a few times exhausts
-that quietly and leaves the name unissuable for days. Exhaust the log first.
+store makes it obtain a new one, and Let's Encrypt issues at most five certificates for the same
+name per week and refuses a name whose validation has failed five times in an hour. A loop that
+keeps recreating the container spends both quietly and leaves the name unissuable for days, which
+is a longer outage than the one it was trying to fix. Read the log to the end first.
 
 ### What DNS has to say before anyone believes this server
 
