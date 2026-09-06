@@ -8,9 +8,15 @@ function repositoryFile(path) {
 }
 
 const MIGRATIONS = "src/main/resources/db/migration";
+// A repeatable migration is named R__*.sql and carries no version, so ordering reads the version
+// where there is one and leaves the rest behind the numbered ones.
+function version(name) {
+  return Number(/^V(\d+)/.exec(name)?.[1] ?? Number.MAX_SAFE_INTEGER);
+}
+
 const migrations = readdirSync(fileURLToPath(new URL(`../${MIGRATIONS}`, import.meta.url)))
   .filter((name) => name.endsWith(".sql"))
-  .sort((left, right) => Number(/^V(\d+)/.exec(left)[1]) - Number(/^V(\d+)/.exec(right)[1]));
+  .sort((left, right) => version(left) - version(right));
 const schema = migrations.map((name) => repositoryFile(`${MIGRATIONS}/${name}`)).join("\n");
 const document = repositoryFile("docs/data-model.md");
 
