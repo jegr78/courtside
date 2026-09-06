@@ -151,8 +151,9 @@ directories share one encrypted envelope. The schedule always selects `safe`; ac
 never introduced by changing a default or cron expression.
 
 The public certificate in [`.github/security-evidence-recipient.pem`](../.github/security-evidence-recipient.pem)
-encrypts that envelope with AES-256-GCM through OpenSSL CMS. Its security evidence private key is
-kept outside the repository. The workflow compares the certificate fingerprint with the
+encrypts that envelope with AES-256-GCM through OpenSSL CMS. RSA-OAEP with SHA-256 wraps the
+content-encryption key; PKCS#1 v1.5 key transport is not permitted. Its security evidence private
+key is kept outside the repository. The workflow compares the certificate fingerprint with the
 `COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256` GitHub repository variable. The expected value
 therefore cannot move in the same commit as the certificate. A missing or stale variable blocks
 evidence sealing. Configure it from the checked certificate and verify the stored value:

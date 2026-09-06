@@ -88,11 +88,12 @@ test("given protected active evidence, when the hosted run finishes, then only i
   assert.doesNotMatch(scheduled, /EXPECTED_FINGERPRINT=.*security-evidence-key\.json/);
   assert.match(scheduled, /canaryVerifiedOn <= \$today and \$today <= \.canaryValidThrough/);
   assert.match(scheduled, /set -o pipefail[\s\S]+tar -czf - -C[\s\S]+assessment\/attempt-1" evidence[\s\S]+\| openssl cms -encrypt -binary -aes-256-gcm/);
-  assert.match(scheduled, /openssl cms -encrypt -binary -aes-256-gcm[\s\S]+\.github\/security-evidence-recipient\.pem/);
+  assert.match(scheduled, /openssl cms -encrypt -binary -aes-256-gcm[\s\S]+-recip \.github\/security-evidence-recipient\.pem[\s\S]+-keyopt rsa_padding_mode:oaep -keyopt rsa_oaep_md:sha256/);
+  assert.doesNotMatch(scheduled, /openssl cms -encrypt[\s\S]+\n\s+\.github\/security-evidence-recipient\.pem/);
   assert.match(scheduled, /build\/security-gate\/protected-evidence\.cms/);
   assert.doesNotMatch(scheduled, /build\/security-gate\/protected-evidence\.tar\.gz/);
   assert.doesNotMatch(scheduled, /path:[\s\S]+assessment\/attempt-1\/evidence/);
-  assert.match(assessment, /security evidence private key/);
+  assert.match(assessment, /security evidence private\s+key/);
   assert.match(assessment, /COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256/);
   assert.match(assessment, /openssl cms -decrypt/);
   assert.match(assessment, /gh attestation verify protected-evidence\.cms/);
