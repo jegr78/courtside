@@ -90,6 +90,10 @@ plan. Classifier failures also select `full` and cannot make the required aggreg
 skipping a quality job. The selector executes the classifier from the immutable pull-request base
 commit, so a classifier or rule change cannot reduce the verification required for itself.
 
+The reference deployment guide is documentation even though it lives below `deploy/`. A modified
+`deploy/README.md` selects `docs`; deleting or renaming it remains a structural change and selects
+`full`. Executable deployment files and environment examples stay in the full profile.
+
 `CLAUDE.md` and its `AGENTS.md` indirection are documentation inputs. Modifying either selects the
 bounded documentation profile, which checks every tracked Markdown file and the maintained quality
 contracts. Deleting, renaming or otherwise changing their structure still selects `full`.
@@ -101,7 +105,12 @@ runs for the documentation, backend and frontend profiles, and a documentation-o
 one selection that runs it without the security job beside it. A closed manifest assigns every tracked
 file below `tools/` explicitly. Reviewed test files select `tooling`, while build, profile,
 security, release, restore, upgrade and other execution-critical runners remain `full`. An
-unlisted new tool, duplicate assignment or stale manifest entry fails closed.
+unlisted new tool, duplicate assignment or stale manifest entry fails closed. The classifier reads
+both committed versions of the manifest when a pull request only adds entries for newly added tool
+tests. If the old inventory remains unchanged and the head inventory is complete, those tests
+select their declared profiles. Adding a runner or helper, removing an entry, changing an existing
+assignment, registering a file that was not added in the same change, or adding an invalid inventory
+still selects `full`.
 Three local first attempts of the declared tooling tasks completed in 14, 11 and 11 seconds, for an
 11-second median. Each attempt reinstalled the locked dependencies and passed the complete tool suite.
 

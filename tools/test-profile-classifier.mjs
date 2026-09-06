@@ -9,6 +9,7 @@ const repository = fileURLToPath(new URL("..", import.meta.url));
 const rulesUrl = new URL("../ci/test-profiles.json", import.meta.url);
 const toolManifestUrl = new URL("../ci/tool-profile-manifest.json", import.meta.url);
 const githubManifestUrl = new URL("../ci/github-profile-manifest.json", import.meta.url);
+const toolManifestPath = "ci/tool-profile-manifest.json";
 const rules = JSON.parse(readFileSync(rulesUrl, "utf8"));
 const toolManifest = JSON.parse(readFileSync(toolManifestUrl, "utf8"));
 const githubManifest = JSON.parse(readFileSync(githubManifestUrl, "utf8"));
@@ -151,6 +152,48 @@ export function classifyPath(path) {
   return null;
 }
 
+function readJsonAtCommit(git, commit, path) {
+  return JSON.parse(git(["show", `${commit}:${path}`]));
+}
+
+function additiveToolManifestOverrides(changes, commits) {
+  const manifestChange = changes.find((change) => change.path === toolManifestPath);
+  if (manifestChange === undefined || manifestChange.status !== "M") return new Map();
+  if (!/^[a-f0-9]{40}$/.test(commits.baseCommit) || !/^[a-f0-9]{40}$/.test(commits.headCommit)
+      || typeof commits.git !== "function") return new Map();
+  try {
+    const base = readJsonAtCommit(commits.git, commits.baseCommit, toolManifestPath);
+    const head = readJsonAtCommit(commits.git, commits.headCommit, toolManifestPath);
+    const trackedHeadTools = commits.git([
+      "ls-tree", "-r", "-z", "--name-only", commits.headCommit, "--", "tools"
+    ]).split("\0").filter(Boolean);
+    validateToolManifest(base);
+    validateToolManifest(head, trackedHeadTools);
+    if (JSON.stringify(base) !== JSON.stringify(toolManifest)) return new Map();
+    const headEntries = new Map(head.entries.map((entry) => [entry.path, entry]));
+    if (base.entries.some((entry) => JSON.stringify(headEntries.get(entry.path)) !== JSON.stringify(entry))) {
+      return new Map();
+    }
+    const basePaths = new Set(base.entries.map((entry) => entry.path));
+    const added = head.entries.filter((entry) => !basePaths.has(entry.path));
+    const changedPaths = new Map(changes.map((change) => [change.path, change.status]));
+    if (added.length < 1 || added.some((entry) => !entry.test
+        || changedPaths.get(entry.path) !== "A")) return new Map();
+    const profiles = added.some((entry) => entry.profiles.includes("full")) ? ["full"]
+      : reducedProfiles.filter((profile) => added.some((entry) => entry.profiles.includes(profile)));
+    return new Map([
+      [toolManifestPath, { profiles, rule: `additive-manifest:${toolManifestPath}` }],
+      ...added.map((entry) => [entry.path, { profiles: entry.profiles, rule: `manifest:${entry.path}` }])
+    ]);
+  } catch {
+    return new Map();
+  }
+}
+
+export function classifyChangesAtCommits(changes, labels, commits) {
+  return classifyChanges(changes, labels, additiveToolManifestOverrides(changes, commits));
+}
+
 export function parseNameStatus(value) {
   if (typeof value !== "string" || !value.endsWith("\0")) throw new Error("Git change evidence is malformed");
   const fields = value.slice(0, -1).split("\0");
@@ -169,9 +212,11 @@ export function parseNameStatus(value) {
   return changes;
 }
 
-export function classifyChanges(changes, labels) {
+export function classifyChanges(changes, labels, overrides = new Map()) {
   if (!Array.isArray(changes) || changes.length < 1 || !Array.isArray(labels)
-      || labels.some((label) => typeof label !== "string")) throw new Error("Classification input is invalid");
+      || labels.some((label) => typeof label !== "string") || !(overrides instanceof Map)) {
+    throw new Error("Classification input is invalid");
+  }
   const reasons = [];
   let requiresFull = labels.includes("ci:full");
   if (requiresFull) reasons.push({ code: "manual-full", path: null, profile: "full", status: null });
@@ -185,7 +230,7 @@ export function classifyChanges(changes, labels) {
       throw new Error("Changed path status is invalid");
     }
     const structural = change.status !== "M" && change.status !== "A";
-    const classification = classifyPath(change.path);
+    const classification = overrides.get(change.path) ?? classifyPath(change.path);
     const classifiedProfiles = structural || classification === null ? ["full"] : classification.profiles;
     if (classifiedProfiles.includes("full")) requiresFull = true;
     for (const profile of classifiedProfiles) if (profile !== "full") selected.add(profile);
@@ -249,6 +294,12 @@ function argument(name) {
   return process.argv[index + 1];
 }
 
+function runGit(arguments_) {
+  return execFileSync("git", arguments_, {
+    cwd: repository, encoding: "utf8", maxBuffer: 10 * 1024 * 1024
+  });
+}
+
 export function profileSummary(plan) {
   const safe = (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;").replaceAll("|", "&#124;").replaceAll("@", "&#64;")
@@ -268,7 +319,7 @@ export function profileSummary(plan) {
     "",
     "| Status | Path | Profile | Reason |",
     "| --- | --- | --- | --- |",
-    ...plan.reasons.map((reason) => `| ${safe(reason.status ?? "label")} | ${inertCode(reason.path ?? "ci:full")} | ${safe(reason.profile)} | ${safe(reason.code)} |`),
+    ...plan.reasons.map((reason) => `| ${safe(reason.status ?? "label")} | ${inertCode(reason.path ?? "ci:full")} | ${safe(reason.profile)} | ${inertCode(reason.code)} |`),
     ""
   ].join("\n");
 }
@@ -289,10 +340,11 @@ function main() {
   mkdirSync(dirname(summaryOutput), { recursive: true });
   try {
     const labels = JSON.parse(argument("--labels"));
-    const evidence = execFileSync("git", ["diff", "--name-status", "-z", "--find-renames", base, head, "--"], {
-      cwd: repository, encoding: "utf8", maxBuffer: 10 * 1024 * 1024
-    });
-    const plan = bindPlanToRun(classifyChanges(parseNameStatus(evidence), labels), identity);
+    const evidence = runGit(["diff", "--name-status", "-z", "--find-renames", base, head, "--"]);
+    const changes = parseNameStatus(evidence);
+    const plan = bindPlanToRun(classifyChangesAtCommits(changes, labels, {
+      baseCommit: base, headCommit: head, git: runGit
+    }), identity);
     writeFileSync(output, `${JSON.stringify(plan, null, 2)}\n`, { mode: 0o600 });
     writeFileSync(summaryOutput, profileSummary(plan), { mode: 0o600 });
   } catch (error) {

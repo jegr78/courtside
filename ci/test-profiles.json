@@ -46,7 +46,7 @@
       ]
     },
     "docs": {
-      "exact": ["AGENTS.md", "CLAUDE.md", "LICENSE", "NOTICE", "README.md"],
+      "exact": ["AGENTS.md", "CLAUDE.md", "LICENSE", "NOTICE", "README.md", "deploy/README.md"],
       "prefixes": ["bruno/", "docs/"]
     },
     "backend": {
