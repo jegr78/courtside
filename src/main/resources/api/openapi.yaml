@@ -5329,6 +5329,91 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/admin/export/roster:
+    post:
+      tags: [admin-export]
+      operationId: exportRoster
+      summary: The roster as a CSV file.
+      description: |
+        The club's own data, in a form its spreadsheet opens. A board that wants its member list
+        for a general meeting, or a club that leaves, has no other way out than the API one request
+        at a time.
+
+        It is the club's member list and not its account list: the member number an import linked,
+        the name, the address the club holds, and the membership with the dates it runs between.
+        No username, no role, no booking, no change log. Every one of those is on screen for an
+        administrator who needs it, and a file that travels by mail and lands in a shared drive is
+        the wrong carrier for the half of the roster that describes how somebody signs in.
+
+        Nor is it a subject access answer. The bulk form section 11 refuses is that shape — which
+        holds everything one instance knows about one person — and a list every administrator
+        already reads on screen does not become it by being downloadable.
+
+        The columns are the ones the import understands, so a club that exports and re-imports gets
+        its own people back rather than duplicates: `memberNumber`, `firstName`, `lastName`,
+        `email` and `membershipType` are the import's canonical fields, and
+        `membershipStartedOn` and `membershipEndedOn` follow them.
+
+        `query` and `membershipTypeId` mean exactly what they mean on `/api/admin/roster`, and the
+        file holds every matching person rather than a page. The order is the same: last name,
+        first name, person id.
+
+        `separator` and `encoding` decide what the receiving spreadsheet makes of the file. A club
+        whose tooling expects `windows-1252` gets mangled names from anything else, and the import
+        source this club configured already records both — the administrative surface offers them
+        from there. UTF-8 is written with a byte order mark, because a spreadsheet that is given
+        none guesses, and guesses wrong on the first name with an umlaut in it.
+
+        `POST` for the reason `/api/admin/export/person/{personId}` is a `POST`: producing the file
+        is itself a processing activity, it is written to the change log, and it is not a request a
+        browser may make on its own.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: query
+          in: query
+          required: false
+          description: Matches against the person's full name, case-insensitively.
+          schema: { type: string, maxLength: 60 }
+        - name: membershipTypeId
+          in: query
+          required: false
+          description: Only the people who hold this membership type right now.
+          schema: { type: string, format: uuid }
+        - name: separator
+          in: query
+          required: false
+          description: |
+            The single character between two cells. A club whose spreadsheet reads semicolons says
+            so here; the default is a comma.
+          schema: { type: string, minLength: 1, maxLength: 1, default: "," }
+        - name: encoding
+          in: query
+          required: false
+          description: |
+            One of the names `/api/admin/import/encodings` lists. An unusable one is answered
+            `400`, because it names a club's tooling and not a caller's bug.
+          schema: { type: string, maxLength: 40, default: "UTF-8" }
+      responses:
+        "200":
+          description: The roster, one row per person.
+          headers:
+            Content-Disposition:
+              description: |
+                `attachment` with a fixed ASCII file name carrying the date the file was produced.
+                No value a club entered reaches this header.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/admin/export/person/{personId}:
     post:
       tags: [admin-subject-access]
