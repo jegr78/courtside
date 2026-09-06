@@ -468,12 +468,25 @@ test("given the passive baseline acceptance, when reading its public proof, then
   const summaryDigest = `sha256:${createHash("sha256").update(baselineSummaryBytes).digest("hex")}`;
 
   // when / then
-  assert.equal(baselineSummary.run.runId, "issue471-closed");
-  assert.equal(baselineSummary.outcome.outcome, "incomplete");
-  assert.deepEqual(baselineSummary.counts, { candidates: 16, findings: 1, regressions: 0 });
+  assert.equal(baselineSummary.run.runId, "assessment-34004691464-1");
+  assert.equal(baselineSummary.run.subject,
+    "commit:63bcd3ed81fdd7bc5e931d7a06ee3a57c04ffd69");
+  assert.equal(baselineSummary.run.catalogVersion, "1.3.0");
+  assert.equal(baselineSummary.outcome.outcome, "passed");
+  assert.deepEqual(baselineSummary.counts, { candidates: 11, findings: 1, regressions: 0 });
+  assert.ok(baselineSummary.candidates.every((candidate) => candidate.state === "false-positive"));
   assert.equal(acceptedFindings.length, 1);
   assert.equal(acceptedFindings[0].fingerprint, acceptance.fingerprint);
   assert.match(acceptance.rationale, /same-origin upload/i);
   assert.doesNotMatch(acceptance.rationale, /no same-origin asset upload exists/i);
   assert.match(baselineDocumentation, new RegExp(summaryDigest));
+  assert.match(baselineDocumentation, /316 unique selected controls/);
+  assert.match(baselineDocumentation, /nine unique unresolved findings/);
+  assert.match(baselineDocumentation, /does not replace an independent penetration test/);
+  assert.match(baselineDocumentation,
+    /Paired run: `assessment-34004691464-1` \(safe attempt 1, active attempt 2\)/);
+  assert.doesNotMatch(baselineDocumentation, /assessment-34004691464-2/);
+  for (let issue = 792; issue <= 800; issue += 1) {
+    assert.match(baselineDocumentation, new RegExp(`#${issue}\\b`));
+  }
 });
