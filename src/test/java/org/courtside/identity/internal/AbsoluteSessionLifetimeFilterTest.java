@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -23,14 +22,12 @@ class AbsoluteSessionLifetimeFilterTest {
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
     private static final Duration LIFETIME = Duration.ofHours(24);
 
-    private final ProblemDetailAuthenticationEntryPoint entryPoint =
-            mock(ProblemDetailAuthenticationEntryPoint.class);
     private final HttpServletRequest request = mock(HttpServletRequest.class);
     private final HttpServletResponse response = mock(HttpServletResponse.class);
     private final FilterChain chain = mock(FilterChain.class);
 
     private final AbsoluteSessionLifetimeFilter filter = new AbsoluteSessionLifetimeFilter(
-            Clock.fixed(NOW, ZoneOffset.UTC), LIFETIME, entryPoint);
+            Clock.fixed(NOW, ZoneOffset.UTC), LIFETIME);
 
     @Test
     void givenASessionOlderThanTheLifetime_whenARequestArrives_thenItIsEndedAndRefused() throws Exception {
@@ -42,8 +39,9 @@ class AbsoluteSessionLifetimeFilterTest {
 
         // then
         verify(session).invalidate();
-        verify(entryPoint).commence(any(), any(), isNull());
-        verify(chain, never()).doFilter(any(), any());
+        // The request carries on without authority: what needs it answers 401 the ordinary way, and
+        // signing in again is a request an aged session must not stand in the way of.
+        verify(chain).doFilter(request, response);
     }
 
     @Test
@@ -56,7 +54,7 @@ class AbsoluteSessionLifetimeFilterTest {
 
         // then — the lifetime is how long a session may live, so reaching it ends it
         verify(session).invalidate();
-        verify(chain, never()).doFilter(any(), any());
+        verify(chain).doFilter(request, response);
     }
 
     @Test
@@ -82,7 +80,6 @@ class AbsoluteSessionLifetimeFilterTest {
 
         // then
         verify(chain).doFilter(request, response);
-        verify(entryPoint, never()).commence(any(), any(), any());
     }
 
     private HttpSession sessionCreated(Duration ago) {

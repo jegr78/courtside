@@ -19,7 +19,6 @@ class AbsoluteSessionLifetimeFilter extends OncePerRequestFilter {
 
     private final Clock clock;
     private final Duration lifetime;
-    private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -31,9 +30,10 @@ class AbsoluteSessionLifetimeFilter extends OncePerRequestFilter {
                 && !Instant.ofEpochMilli(session.getCreationTime()).plus(lifetime).isAfter(clock.instant())) {
             session.invalidate();
             SecurityContextHolder.clearContext();
-            authenticationEntryPoint.commence(request, response, null);
-            return;
         }
+        // Ending it is enough: what needs authority now answers 401 through the entry point that
+        // answers every other unauthenticated request, and signing in again is one of the things
+        // this request may legitimately be.
         filterChain.doFilter(request, response);
     }
 }

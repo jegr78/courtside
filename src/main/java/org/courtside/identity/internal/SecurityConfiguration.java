@@ -139,7 +139,7 @@ public class SecurityConfiguration {
                 .addFilterAfter(new SecurityEpochFilter(accounts, authenticationEntryPoint),
                         SecurityContextHolderFilter.class)
                 .addFilterAfter(new AbsoluteSessionLifetimeFilter(clock,
-                                sessionLifetime.absoluteLifetime(), authenticationEntryPoint),
+                                sessionLifetime.absoluteLifetime()),
                         SecurityContextHolderFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
