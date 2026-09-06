@@ -56,8 +56,6 @@ class RosterExportServiceTest extends AbstractIntegrationTest {
         String written = exported(null, null, null);
 
         // then
-        // A leading empty cell is written as a quoted empty one, which is how the CSV dialect
-        // tells it apart from a missing value, and how the import reads it back.
         assertThat(written.lines().skip(1)).containsExactly(
                 "\"\",Jane,Doe,jane.doe@example.org,Adult,2026-01-01,",
                 "\"\",John,Roe,john.roe@example.org,,,");
