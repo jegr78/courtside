@@ -456,7 +456,7 @@ const resources = {
     "week.time": "Zeit",
     "week.bookingCount_one": "{{count}} Belegung",
     "week.bookingCount_other": "{{count}} Belegungen",
-    "week.noCourtOpen": "Der Club hat zurzeit keinen Platz zum Buchen freigegeben.",
+    "week.noCourtOpen": "Der Verein hat zurzeit keinen Platz zum Buchen freigegeben.",
     "week.closed": "An diesem Tag ist die Anlage geschlossen.",
     "week.available": "Frei",
     "week.past": "Vergangen",
