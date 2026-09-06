@@ -61,17 +61,21 @@ export function selectUpgradeOrigins(candidateTag, tags) {
   const candidate = parseVersion(candidateTag);
   if (!candidate) throw new Error(`Candidate tag is not a semantic version: ${candidateTag}`);
   const earlier = tags.map(parseVersion).filter(Boolean)
-    .filter((version) => version.major === candidate.major)
     .filter((version) => precedence(version, candidate) < 0);
-  const released = earlier.filter((version) => version.prerelease === null)
+  const released = earlier
+    .filter((version) => version.major === candidate.major && version.prerelease === null)
     .sort((left, right) => precedence(right, left));
   const patch = released.find((version) => version.minor === candidate.minor);
   const minor = released.find((version) => version.minor < candidate.minor);
+  const precedingMajor = earlier
+    .filter((version) => version.major < candidate.major && version.prerelease === null)
+    .sort((left, right) => precedence(right, left))[0];
   // A club that ran a candidate has migrated its database, so every candidate for this release is
   // an origin — a club is not asked which of them it happened to stop on.
   const candidates = earlier.filter((version) => sameRelease(version, candidate))
     .sort(precedence).map((version) => version.tag);
-  const released_ = [patch?.tag, minor?.tag].filter(Boolean);
+  const released_ = [patch?.tag, minor?.tag, released.length === 0 ? precedingMajor?.tag : null]
+    .filter(Boolean);
   // Until a release exists, the pre-release schema is the only database a club can hold, and a
   // candidate preceding the first release does not make that upgrade any less real.
   const from = released_.length === 0 ? ["pre-release-v17", ...candidates] : [...released_, ...candidates];

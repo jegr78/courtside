@@ -128,6 +128,18 @@ test("given only a candidate of another line, when selecting origins, then the p
     assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.2.2-rc.1"]), ["pre-release-v17"]);
   });
 
+test("given the first release of a major, when selecting origins, then the preceding major remains covered",
+  () => {
+    // given
+    const tags = ["v0.8.0", "v0.9.1", "v0.10.0-rc.1", "v1.0.0-rc.1"];
+
+    // when
+    const origins = selectUpgradeOrigins("v1.0.0", tags);
+
+    // then
+    assert.deepEqual(origins, ["v0.9.1", "v1.0.0-rc.1"]);
+  });
+
 // A tag whose run never reached publish names no image, so an origin resolved from it would pull
 // something that does not exist and block the whole line.
 test("given a release that was drafted or never published, when reading the tags, then it is not one", () => {

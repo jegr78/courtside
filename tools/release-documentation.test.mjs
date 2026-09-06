@@ -140,7 +140,7 @@ test("given the tags a release publishes, when the document names them, then it 
   const meta = workflow.jobs.publish.steps
     .find((step) => (step.uses ?? "").startsWith("docker/metadata-action"));
   const patterns = meta.with.tags.trim().split("\n")
-    .map((line) => /pattern=(.+)$/.exec(line.trim())?.[1])
+    .map((line) => /pattern=([^,]+)(?:,|$)/.exec(line.trim())?.[1])
     .filter(Boolean);
 
   // when / then
@@ -150,6 +150,19 @@ test("given the tags a release publishes, when the document names them, then it 
   assert.match(document, /`latest`/,
     "a club pinning latest moves with every release and the document has to name that tag");
   assert.match(document, /`<major>\.<minor>`/);
+});
+
+test("given a pre-one release, when image tags are generated, then the floating zero tag is disabled", () => {
+  // given
+  const meta = workflow.jobs.publish.steps
+    .find((step) => (step.uses ?? "").startsWith("docker/metadata-action"));
+  const major = meta.with.tags.trim().split("\n")
+    .find((line) => /pattern=\{\{major\}\}(?:,|$)/.test(line));
+
+  // when / then
+  assert.equal(major.trim(),
+    "type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}");
+  assert.match(document, /A `0\.x` release does not publish the floating\s+`0` tag/);
 });
 
 // The document now says a failed tag costs the next release nothing. That rests entirely on both
