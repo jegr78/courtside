@@ -286,6 +286,14 @@ away.
 * **Default branch:** `main`. Feature work on `feat/<short-description>`.
 * **Commits:** English Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`,
   `refactor:`). Commit frequently; push only after manual verification.
+* **A commit message has to be one release-please can parse.** Its parser reads every message that
+  reaches `main` and drops the ones it rejects, silently — two commits are missing from this
+  repository's first changelog, and the only trace was one line in a workflow log. What trips it is
+  narrower than unbalanced brackets and not worth learning by eye: a line *beginning* with a quoted
+  `logAnswered(,` fell over, the same text mid-sentence parses, and three unbalanced brackets in
+  another message did not trip it at all.
+  `tools/commit-message-parser.test.mjs` runs that same parser over the branch's own commits, so a
+  message that would be dropped fails the build instead of disappearing.
 * **Test data carries English placeholder identities only** — Jane Doe, John Roe, Mary Major,
   Richard Miles, Example Tennis Club, `@example.org`. Never a real person, club or address, and
   nothing German: not in tests, seeds, plans, specs or commit messages. This is an AGPL

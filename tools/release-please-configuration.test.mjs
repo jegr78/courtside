@@ -34,6 +34,18 @@ test("given a version below one, when a change is breaking, then it raises the m
   assert.equal(config["bump-minor-pre-major"], true);
 });
 
+// The guard above governs every release except the one that matters most here. Read in the bundle
+// the pinned action ships: with no release to bump from, `buildReleasePullRequest` never asks the
+// versioning strategy at all — it returns `initialReleaseVersion()`, which is `1.0.0` unless this
+// key says otherwise. The manifest, the breaking changes and the strategy are all bypassed.
+test("given no release to bump from, when the first one is proposed, then this names it", () => {
+  // when / then
+  assert.equal(config["initial-version"], "0.1.0",
+    "the first release pull request proposed 1.0.0 without this, and neither bump-minor-pre-major"
+    + " nor the 0.0.0 in the manifest had any say in it; 1.0 is declared by a decision, and this"
+    + " repository has not made one");
+});
+
 test("given a candidate is wanted, when the strategy is read, then it can be turned on and graduated",
   () => {
     // when / then
@@ -58,6 +70,13 @@ test("given a repository that never released, when it bootstraps, then it starts
       "one package, and it is the repository root — a component key would prefix every tag it"
       + " writes and the release workflow answers `v*`");
     assert.match(manifest["."], /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
+    // `initial-version` is consulted only while this file still reads 0.0.0: release-please treats
+    // any other value as a release to bump from, and the first version would come from there again.
+    if (manifest["."] !== "0.0.0") {
+      const headings = read("CHANGELOG.md").split("\n").filter((line) => /^#{1,3}\s/.test(line));
+      assert.ok(headings.some((heading) => heading.includes(manifest["."])),
+        "a manifest naming a version the changelog does not is a version nobody released");
+    }
     assert.equal(config["bootstrap-sha"], first,
       "the first changelog covers everything the repository has done, so it stops at the root commit");
     assert.equal(config["last-release-sha"], undefined,

@@ -46,6 +46,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
+    "@conventional-commits/parser": "0.4.1",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.3",
