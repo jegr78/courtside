@@ -76,20 +76,20 @@ test("given the release body, when the document promises what it carries, then t
     }
   });
 
-// The document says prereleases do not work and names the reason. When somebody makes them work,
-// this goes red and the document has to stop saying it — which is the point of writing it down.
-test("given a prerelease tag, when the release resolves upgrade origins, then the document's warning still holds",
+test("given a candidate tag, when the release resolves upgrade origins, then the document describes what happens",
   () => {
     // given
     const publish = workflow.jobs.publish.steps
       .find((step) => (step.uses ?? "").startsWith("softprops/action-gh-release"));
 
     // when / then
-    assert.throws(() => selectUpgradeOrigins("v0.3.0-rc1", ["v0.2.0", "v0.3.0-rc1"]),
-      /not stable semantic version/);
-    assert.match(document, /## Prereleases do not work today/);
+    assert.deepEqual(selectUpgradeOrigins("v0.3.0-rc.2", ["v0.2.0", "v0.3.0-rc.1"]),
+      ["v0.2.0", "v0.3.0-rc.1"]);
+    assert.doesNotMatch(document, /Prereleases do not work/,
+      "candidates reach publish now, so the document may no longer say they cannot");
+    assert.match(document, /^## Candidates$/m);
     assert.match(String(publish.with.prerelease), /contains\(github\.ref_name, '-'\)/,
-      "the document explains an unreachable flag; if the flag is gone the passage has to go too");
+      "the flag decides how a candidate is published and is reachable now");
   });
 
 test("given the tags a release publishes, when the document names them, then it names every one", () => {

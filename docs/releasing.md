@@ -113,12 +113,24 @@ nobody at 22:00.
 What no automation covers is the upgrade path itself. `upgrade` executes the origins it resolved
 from the tag history, so a release that breaks one of those is refused — but only those.
 
-## Prereleases do not work today
+## Candidates
 
-`v0.3.0-rc1` reaches *Resolve supported database upgrade origins*, which refuses any tag that is not
-`v<major>.<minor>.<patch>`, and `build` fails there. The `prerelease` flag further down the workflow
-is unreachable. Do not cut one expecting a candidate release;
-[#808](https://github.com/jegr78/courtside/issues/808) covers this too.
+A tag may carry a prerelease suffix — `v0.3.0-alpha.1`, `v0.3.0-rc.1` — and it travels the same
+pipeline as any other release: the same nightly verification, the same qualification, the same
+signature. A candidate exists so that a club can *run* it, and a candidate proved less than a
+release would be an image whose signature means less than the same signature on a release.
+
+Two stages are used, and each says what it promises. `alpha` is for the first club that agreed to
+run one; `rc` says no known defect is open against it. Nothing else is used, because a third stage
+nobody can describe in one sentence is a stage that means nothing.
+
+**A candidate is an upgrade origin.** A club that ran one has migrated its database, so the release
+it is a candidate for upgrades from it, and so does every later candidate for that same release.
+Candidates of another line are not origins: a club is expected to reach a candidate's release before
+following the next one.
+
+Ordering follows semantic versioning, so `v0.3.0-rc` precedes `v0.3.0-rc.2`, which precedes
+`v0.3.0-rc.10`, and all of them precede `v0.3.0`.
 
 ## After the release
 

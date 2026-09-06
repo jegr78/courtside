@@ -27,13 +27,61 @@ const upgradeRunner = readFileSync(
 
 test("given patch and minor releases, when selecting upgrade origins, then the latest of each is retained", () => {
   // given
-  const tags = ["v0.1.0", "v0.1.1", "v0.2.0", "v0.2.1", "v0.3.0-rc.1"];
+  const tags = ["v0.1.0", "v0.1.1", "v0.2.0", "v0.2.1"];
 
   // when
   const origins = selectUpgradeOrigins("v0.3.0", tags);
 
   // then
   assert.deepEqual(origins, ["v0.2.1"]);
+});
+
+// A club that ran a candidate has migrated its database, so the release it is a candidate for has
+// to upgrade from it.
+test("given candidates for this release, when selecting upgrade origins, then every one of them is an origin",
+  () => {
+    // given
+    const tags = ["v0.2.1", "v0.3.0-alpha.1", "v0.3.0-rc.1", "v0.3.0-rc.2"];
+
+    // when
+    const origins = selectUpgradeOrigins("v0.3.0", tags);
+
+    // then
+    assert.deepEqual(origins, ["v0.2.1", "v0.3.0-alpha.1", "v0.3.0-rc.1", "v0.3.0-rc.2"]);
+  });
+
+test("given a candidate as the release, when selecting upgrade origins, then only what precedes it counts",
+  () => {
+    // given
+    const tags = ["v0.2.1", "v0.3.0-rc.1", "v0.3.0-rc.2", "v0.3.0"];
+
+    // when
+    const origins = selectUpgradeOrigins("v0.3.0-rc.2", tags);
+
+    // then
+    assert.deepEqual(origins, ["v0.2.1", "v0.3.0-rc.1"]);
+  });
+
+test("given candidates of another line, when selecting upgrade origins, then they are not origins", () => {
+  // given
+  const tags = ["v0.2.1", "v0.2.2-rc.1", "v0.4.0-rc.1"];
+
+  // when
+  const origins = selectUpgradeOrigins("v0.3.0", tags);
+
+  // then
+  assert.deepEqual(origins, ["v0.2.1"]);
+});
+
+test("given candidates numbered past nine, when ordering them, then ten follows nine rather than one", () => {
+  // given
+  const tags = ["v0.3.0-rc.2", "v0.3.0-rc.10", "v0.3.0-rc"];
+
+  // when
+  const origins = selectUpgradeOrigins("v0.3.0", tags);
+
+  // then
+  assert.deepEqual(origins, ["v0.3.0-rc", "v0.3.0-rc.2", "v0.3.0-rc.10"]);
 });
 
 test("given several patches in the current line, when selecting origins, then patch and previous minor differ", () => {
