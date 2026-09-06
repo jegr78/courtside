@@ -125,7 +125,7 @@ public final class SnapshotParser {
             }
             if (!claimed.add(field)) {
                 throw new SnapshotHeaderInvalidException("import.snapshot.header.duplicateColumn",
-                        Map.of("column", name.strip()));
+                        Map.of("column", ReportedValue.printable(name.strip())));
             }
             header.put(name, field);
         }

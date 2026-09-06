@@ -71,7 +71,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
 
     <div className="grid gap-2">
       <label className="font-semibold" htmlFor="snapshot-file">{t("admin.import.snapshotFile")}</label>
-      <input data-testid="snapshot-file" id="snapshot-file" type="file" accept=".csv,text/csv" disabled={busy} onChange={(event) => void chooseFile(event)} />
+      <input data-testid="snapshot-file" id="snapshot-file" type="file" accept=".csv,.txt,text/csv,text/plain" disabled={busy} onChange={(event) => void chooseFile(event)} />
     </div>
 
     {asksEncoding && <div className="grid gap-2">

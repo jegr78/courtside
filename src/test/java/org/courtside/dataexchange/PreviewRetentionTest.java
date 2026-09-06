@@ -108,8 +108,34 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
         assertThat(fingerprints).doesNotContain(untouched.toString());
     }
 
+    // Section 10 of the design specification promises this application persists nothing of an
+    // uploaded file but its name, its digest and the change set parsed from it.
+    @Test
+    void givenAColumnThisSourceIgnores_whenAPreviewIsStored_thenNothingItCarriedSurvivesInTheRow() {
+        // given
+        String withAnIgnoredColumn = """
+                Member number,First name,Last name,Email,Bank account
+                4711,Janet,Doe,jane.doe@example.org,SECRET-ACCOUNT-VALUE
+                """;
+
+        // when
+        UUID previewId = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                new SnapshotUpload("roster.csv", "text/csv",
+                        withAnIgnoredColumn.getBytes(StandardCharsets.UTF_8)),
+                account).previewId();
+
+        // then
+        ImportPreview preview = stored.findById(previewId).orElseThrow();
+        assertThat(preview.getChangeSet()).doesNotContain("SECRET-ACCOUNT-VALUE");
+        assertThat(preview.getFingerprints()).doesNotContain("SECRET-ACCOUNT-VALUE");
+        assertThat(preview.getFileName()).isEqualTo("roster.csv");
+        assertThat(preview.getFileHash()).hasSize(64);
+    }
+
     private UUID takePreview() {
-        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", new SnapshotUpload("roster.csv", "text/csv", TWO_ROWS.getBytes(StandardCharsets.UTF_8)), account).previewId();
+        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                new SnapshotUpload("roster.csv", "text/csv",
+                        TWO_ROWS.getBytes(StandardCharsets.UTF_8)), account).previewId();
     }
 
     private ImportPreview expiredCopyOf(ImportPreview preview) {

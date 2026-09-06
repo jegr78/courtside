@@ -9,7 +9,7 @@ public record SnapshotUpload(String fileName, String declaredMediaType, byte[] c
 
     private static final int MAX_FILE_NAME_LENGTH = 200;
     private static final List<String> EXTENSIONS = List.of(".csv", ".txt");
-    private static final List<String> MEDIA_TYPES = List.of("text/csv", "text/plain",
+    static final List<String> MEDIA_TYPES = List.of("text/csv", "text/plain",
             "application/vnd.ms-excel", "application/octet-stream");
 
     // A file whose first bytes are a container, an image or an executable is not a member list,
@@ -27,8 +27,8 @@ public record SnapshotUpload(String fileName, String declaredMediaType, byte[] c
         fileName = usableName(fileName);
         requireReadableExtension(fileName);
         requireUsableMediaType(declaredMediaType);
+        content = content == null ? null : content.clone();
         requireTextContent(content);
-        content = content.clone();
     }
 
     @Override

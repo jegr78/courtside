@@ -4538,9 +4538,11 @@ paths:
                   description: |
                     The club's export as CSV, named `.csv` or `.txt`. A byte order mark is honoured.
                     The declared part type is checked for contradiction against the types a browser
-                    sends for such a file, and the content decides: a container, image, workbook or
-                    executable signature is refused, and so is anything that decodes into control
-                    characters.
+                    sends for such a file, listed under `encoding` below; a part that declares no
+                    type at all is accepted, because some clients send none. The content decides: a
+                    container, image, workbook or executable signature is refused, and so is
+                    anything that decodes into a C0 control character other than tab, carriage
+                    return or line feed.
                 mode: { $ref: "#/components/schemas/SnapshotMode" }
                 encoding:
                   type: string
