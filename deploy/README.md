@@ -225,11 +225,11 @@ compromise of the key.
 **Where the pair lives, and who can open it.** Caddy's store holds a private key for every name it
 manages and is mounted into `mail-certificate` read-only and into nothing else. The helper writes
 one certificate and one key into `mail-tls` as root with `umask 027`, in the group the mail server
-runs as, so the mail server can read that pair and nothing in the store it came from. `mail-reload`, the container
-that asks for the load, runs as a user outside that group: it mounts the same volume read-only and
-still cannot open what it points at. The pair is published under `versions/<digest of the pair>`
-and `current` is a symlink, because two files cannot be renamed at once and a mail server reading
-half a swap would serve a key that does not match its certificate.
+runs as, so the mail server can read that pair and nothing in the store it came from.
+`mail-reload`, the container that asks for the load, runs as a user outside that group: it mounts
+the same volume read-only and still cannot open what it points at. The pair is published under
+`versions/<digest of the pair>` and `current` is a symlink, because two files cannot be renamed at
+once and a mail server reading half a swap would serve a key that does not match its certificate.
 
 **A renewal reaches the listener with nobody present.** Caddy renews at a third of the lifetime
 remaining. `mail-certificate` watches the store and publishes within seconds of a renewal landing;
@@ -300,7 +300,7 @@ is the confirmation.
 | `no certificate for <hostname> in the proxy's store yet` | Caddy has not issued for this name. It is the normal state for a minute after the first start, and a lasting one when `COURTSIDE_MAIL_HOSTNAME` does not resolve to this host or port 80 is closed to the authority. Read `docker compose logs proxy`. |
 | `cannot write into <target>, so nothing can be handed over` | The `mail-tls` volume is not writable by the helper. It runs as `0:2000`; a volume restored from a backup with other ownership is the usual cause. |
 | `cannot copy the pair for <hostname> out of the proxy's store` | The store was readable a moment ago and is not now, or the host ran out of disk. |
-| `the pair for <hostname> is incomplete or mismatched, so the published one stays` | Caddy validated nothing usable — a half-written renewal, or a key that does not match its certificate. The published pair is untouched and the mail server keeps serving it, so this is a warning and not an outage. It clears itself when the renewal completes. |
+| `the pair for <hostname> is incomplete or mismatched, so the published one stays` | Caddy could not validate the pair: a half-written renewal, or a key that does not match its certificate. The published pair is untouched and the mail server keeps serving it, so this is a warning and not an outage. It clears itself when the renewal completes. |
 | `cannot name the new version under <target>` | Same volume, same causes as the write failure above. |
 | `cannot swap <target>/current, so the mail server still reads the pair before this one` | The new pair is on disk but the symlink could not be replaced. The mail server goes on serving the previous one, which is valid until it is not. |
 
@@ -316,10 +316,10 @@ is the confirmation.
 | `the mail server serves a certificate it made itself and not the one the proxy issued` | The fallback. The server refused a load at some point and generated its own certificate, valid far beyond any authority's 400 days. Repair the pair and the next reload replaces it. |
 | `the certificate for <hostname> is close to expiry, so the proxy stopped renewing it` | Less than a sixth of the lifetime is left, so Caddy's renewal at a third has already failed once without anybody looking. This is the line that arrives before an outage rather than after it: read `docker compose logs proxy` now, while the certificate is still valid. Weeks of warning on a 90-day certificate, and an hour at worst before the warning appears. |
 
-**The refused reload is the state that reaches members.** Stalwart does not keep the pair it had when
-a load fails: the listener falls back to a certificate it generated itself, the instance refuses to
-authenticate a relay it cannot verify, and every credential and notification settles `FAILED` in the
-admin message list. Repairing the pair does not resend them. The events still outstanding are
+**A pair the mail server cannot parse is the state that reaches members.** Stalwart does not keep
+the pair it had when it refuses a load: the listener falls back to a certificate it generated
+itself, the instance refuses to authenticate a relay it cannot verify, and every credential and
+notification settles `FAILED` in the admin message list. Repairing the pair does not resend them. The events still outstanding are
 replayed when `app` restarts, and a credential the instance sends again is a new one, because the
 first exists only as a hash. Anything older than that is re-issued from the roster, where sending an
 account new credentials is one action.
