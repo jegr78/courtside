@@ -136,20 +136,21 @@ failed, so it leaves no row in `message_record` and the log says it was not sent
 the message log cannot tell a board that somebody declined, and is not meant to: what a member
 chose is the member's, not the board's.
 
-The web client is built and covered by tests too: the court plan as the public landing page,
-personal booking management, managed appointments for officers — including creating a recurring
-series, which is previewed before anything is written and reports what it had to skip — and the
-browser admin surface for configuration, facilities and the club's people — adding somebody,
-correcting their name or address, giving them an account, changing its roles, correcting its
-username, sending it new credentials and disabling it. Membership types are administered there as
-well, each showing how many people hold it and whether it opens an account on import, and the
-configuration names the rule set that measures a person holding none. A rule set can bar its holders
-from booking a court at all and can require its holders to cancel before a configured deadline. So is the whole
-import: describing a source, linking the people a file cannot match by number, uploading a member
-list, reading what it would change, and running it. Where in that a board stands is on screen — a
-source described, a snapshot read, a run ready — read from the source and the preview in hand
-rather than from a stored checklist, and every stage already reached takes the page back to it.
-Whether a preview may still run is decided by the instance and not by the page that says so. The column
+The web client is built and covered by tests too: the court plan as the public landing page, which
+names a club with no court open instead of drawing an empty grid, personal booking management,
+managed appointments for officers — including creating a recurring series, which is previewed
+before anything is written and reports what it had to skip — and the browser admin surface for
+configuration, facilities and the club's people — adding somebody, correcting their name or
+address, giving them an account, changing its roles, correcting its username, sending it new
+credentials and disabling it. Membership types are administered there as well, each showing how
+many people hold it and whether it opens an account on import, and the configuration names the rule
+set that measures a person holding none. A rule set can bar its holders from booking a court at all
+and can require its holders to cancel before a configured deadline. So is the whole import:
+describing a source, linking the people a file cannot match by number, uploading a member list,
+reading what it would change, and running it. Where in that a board stands is on screen — a source
+described, a snapshot read, a run ready — read from the source and the preview in hand rather than
+from a stored checklist, and every stage already reached takes the page back to it. Whether a
+preview may still run is decided by the instance and not by the page that says so. The column
 mapping is offered from the club's own export, read in the browser and never uploaded for that
 purpose. Before a court, a booking card or a day goes out of service, the facility view says which
 bookings sit on it — information beside the control, never a gate in front of it. No administrative
@@ -159,8 +160,7 @@ application or by closing the tab, and equally the editor on it when another rul
 import source is opened in its place. A change that answers for one attribute leaves the rest of
 the row as it was typed, and a refused creation leaves the form as the board left it. What a board
 still cannot reach from a browser is listed with the endpoints that have no surface, in
-`tools/surfaceless-endpoints.json`; every entry left in it now names a
-decision rather than a gap.
+`tools/surfaceless-endpoints.json`; every entry left in it now names a decision rather than a gap.
 
 A booking now writes to the people it concerns: the member who made it gets a confirmation carrying
 the day, the period, every court it holds and the kind of booking, in the account's own language; a
