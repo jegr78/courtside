@@ -617,12 +617,16 @@ chose it.
 
 ### Remaining core entities
 
-```
-person ────< member >──── membership_type ──── rule_set ──< rule
-   │                                                        (type + params jsonb)
-   └──< user_account (username UNIQUE, email NOT UNIQUE) >──< role
+The complete table-by-table map, including everything this section does not argue about, is
+`docs/data-model.md`.
 
-court ──< opening_hours       booking ──< booking_participant
+```
+person ──── member >──── membership_type ──── rule_set ──< rule_definition
+   │  (email, not unique)                                    (type + params jsonb)
+   └──< user_account (username UNIQUE) >──< user_account_role
+
+opening_hours (per weekday,   booking ──< court_allocation >──── court
+   facility-wide)                  └──< booking_participant
                                              └─ person_id OR guest_name
 ```
 
@@ -637,7 +641,7 @@ Deliberate decisions:
 - **`booking_participant`** references either a `person` (member) or carries a free-text
   `guest_name`. Guest bookings are prepared in the model without Release 1 having to do
   billing.
-- **`rule` stores parameters as `jsonb`** rather than one column per rule type. A new rule
+- **`rule_definition` stores parameters as `jsonb`** rather than one column per rule type. A new rule
   kind is a validator class plus a row, not a schema migration.
 - **`membership_type` → `rule_set`** is what makes "juniors only until 18:00" possible
   without a special case in code.
