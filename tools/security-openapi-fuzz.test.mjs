@@ -46,8 +46,8 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   const inventory = buildOpenApiFuzzInventory(api);
 
   // then
-  assert.equal(inventory.length, 99);
-  assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 99);
+  assert.equal(inventory.length, 101);
+  assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 101);
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "getBookingEligibility"), {
     operationId: "getBookingEligibility",
     method: "GET",

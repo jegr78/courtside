@@ -102,7 +102,8 @@ public final class SnapshotParser {
     private static Map<CanonicalField, String> valuesOf(CSVRecord record,
                                                         Map<String, CanonicalField> header) {
         Map<CanonicalField, String> values = new EnumMap<>(CanonicalField.class);
-        header.forEach((column, field) -> values.put(field, record.get(column).strip()));
+        header.forEach((column, field) ->
+                values.put(field, FormulaCharacters.withoutTheEscape(record.get(column).strip())));
         return values;
     }
 

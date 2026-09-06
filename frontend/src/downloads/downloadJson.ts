@@ -1,9 +1,11 @@
 const REVOKE_AFTER_MS = 60_000;
 
 export function downloadJson(fileName: string, content: unknown): void {
-  const url = URL.createObjectURL(
-    new Blob([JSON.stringify(content, null, 2)], { type: "application/json" })
-  );
+  downloadBlob(fileName, new Blob([JSON.stringify(content, null, 2)], { type: "application/json" }));
+}
+
+export function downloadBlob(fileName: string, content: Blob): void {
+  const url = URL.createObjectURL(content);
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;

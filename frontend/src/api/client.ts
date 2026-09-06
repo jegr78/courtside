@@ -76,6 +76,21 @@ export type MoveRequest = components["schemas"]["MoveRequest"];
 export type MovePreview = components["schemas"]["MovePreview"];
 export type MoveExecuted = components["schemas"]["MoveExecuted"];
 
+export interface BookingExportParameters extends Record<string, string> {
+  from: string;
+  to: string;
+  separator: string;
+  encoding: string;
+}
+
+export interface RosterExportParameters extends Record<string, string> {
+  query: string;
+  membershipTypeId: string;
+  sourceId: string;
+  separator: string;
+  encoding: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -87,7 +102,7 @@ export class ApiError extends Error {
 
 const ACCESS_DENIED = "urn:courtside:error:access-denied";
 
-async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true): Promise<T> {
+async function send(path: string, init: RequestInit, notifyUnauthorized: boolean): Promise<Response> {
   const write = Boolean(init.method) && init.method !== "GET" && init.method !== "HEAD";
   const sent = write ? await usableCsrfToken() : undefined;
   let response = await fetch(path, carrying(init, sent));
@@ -104,11 +119,33 @@ async function request<T>(path: string, init: RequestInit = {}, notifyUnauthoriz
     }
     throw new ApiError(response.status, problem);
   }
+  return response;
+}
+
+async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true): Promise<T> {
+  const response = await send(path, init, notifyUnauthorized);
   if (response.status === 204 || response.headers.get("Content-Length") === "0") {
     return undefined as T;
   }
   const body = await response.text();
   return body ? JSON.parse(body) as T : undefined as T;
+}
+
+export interface OfferedFile {
+  fileName: string;
+  content: Blob;
+}
+
+async function requestFile(path: string, init: RequestInit): Promise<OfferedFile> {
+  const response = await send(path, init, true);
+  return { fileName: fileNameIn(response.headers.get("Content-Disposition")), content: await response.blob() };
+}
+
+// The instance names the file and the name is ASCII by construction, so anything else in that
+// header is a header this client did not ask for and does not follow.
+function fileNameIn(disposition: string | null): string {
+  const quoted = /filename="([A-Za-z0-9._-]+)"/.exec(disposition ?? "");
+  return quoted ? quoted[1] : "courtside-export.csv";
 }
 
 async function problemIn(response: Response): Promise<Problem | undefined> {
@@ -334,6 +371,12 @@ export const api = {
   ),
   // No Content-Type: only the browser knows the boundary it is about to write.
   supportedEncodings: () => request<string[]>("/api/admin/import/encodings"),
+  exportBookings: (parameters: BookingExportParameters) => requestFile(
+    `/api/admin/export/bookings?${new URLSearchParams(parameters).toString()}`, { method: "POST" }),
+  exportRoster: (parameters: RosterExportParameters) => requestFile(
+    `/api/admin/export/roster?${new URLSearchParams(
+      Object.entries(parameters).filter(([, value]) => value)
+    ).toString()}`, { method: "POST" }),
   createImportPreview: (sourceId: string, file: File, mode: SnapshotMode, encoding: string) => {
     const form = new FormData();
     form.append("file", file);
