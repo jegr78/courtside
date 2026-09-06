@@ -19,6 +19,8 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
+
+import java.time.Clock;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -28,7 +30,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
-        LoginProtectionProperties.class})
+        LoginProtectionProperties.class, SessionLifetimeProperties.class})
 public class SecurityConfiguration {
 
     // OWASP's Argon2id minimum; the login filter limits how often a caller can incur this cost.
@@ -59,6 +61,8 @@ public class SecurityConfiguration {
             LoginVerificationCapacity loginVerificationCapacity,
             LoginRateLimitHandler loginRateLimitHandler,
             UserAccountRepository accounts,
+            SessionLifetimeProperties sessionLifetime,
+            Clock clock,
             @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
@@ -133,6 +137,9 @@ public class SecurityConfiguration {
                         loginVerificationCapacity, loginRateLimitHandler),
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new SecurityEpochFilter(accounts, authenticationEntryPoint),
+                        SecurityContextHolderFilter.class)
+                .addFilterAfter(new AbsoluteSessionLifetimeFilter(clock,
+                                sessionLifetime.absoluteLifetime(), authenticationEntryPoint),
                         SecurityContextHolderFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")

@@ -1465,7 +1465,14 @@ whether it is built or designed. **Designed means absent today.**
   limiting (below) counts every attempt before the password is checked, instance-wide as well as per
   address. The population shrinks on its own, since each sign-in removes one account from it.
 - **Sessions:** server-side via Spring Session in the database, delivered as an
-  `HttpOnly` / `Secure` / `SameSite=Lax` cookie. **No JWT** — the PWA and API share an
+  `HttpOnly` / `Secure` / `SameSite=Lax` cookie. Two expiries bound one, and they are different
+  promises: an inactivity window of 30 minutes that every request restarts, and an absolute lifetime
+  of 24 hours counted from when the session began, which activity does not extend. Both are the
+  deployment's to set, both are stated rather than inherited from a framework default that can move,
+  and an absolute lifetime shorter than the inactivity window is refused at startup because the
+  window could then never be reached. The absolute one is counted from the creation time stored with
+  the session, so restarting the application does not hand a live session a fresh lifetime. *Built.*
+  **No JWT** — the PWA and API share an
   origin, so no token gymnastics are needed, and an admin can terminate a session
   immediately, which JWT cannot do. A role, membership or account-status change must terminate
   that account's active sessions in the same operation — a role or an account status because
