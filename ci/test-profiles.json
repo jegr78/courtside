@@ -5,6 +5,7 @@
       "exact": [
         ".dockerignore",
         ".gitignore",
+        ".release-please-manifest.json",
         "Dockerfile",
         "SECURITY.md",
         "frontend/.npmrc",
@@ -17,13 +18,14 @@
         "frontend/tsconfig.json",
         "frontend/tsconfig.node.json",
         "frontend/vite.config.ts",
+        "mvnw",
+        "mvnw.cmd",
+        "pom.xml",
+        "release-please-config.json",
         "site/.npmrc",
         "site/.vitepress/config.mts",
         "site/package-lock.json",
         "site/package.json",
-        "mvnw",
-        "mvnw.cmd",
-        "pom.xml",
         "src/main/resources/META-INF/spring.factories",
         "src/main/resources/application-demo.yaml",
         "src/main/resources/application-perf.yaml",
@@ -50,22 +52,53 @@
       ]
     },
     "docs": {
-      "exact": ["AGENTS.md", "CLAUDE.md", "LICENSE", "NOTICE", "README.md", "deploy/README.md"],
-      "prefixes": ["bruno/", "docs/", "site/"]
+      "exact": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "LICENSE",
+        "NOTICE",
+        "README.md",
+        "deploy/README.md"
+      ],
+      "prefixes": [
+        "bruno/",
+        "docs/",
+        "site/"
+      ]
     },
     "backend": {
       "exact": [],
-      "prefixes": ["src/"]
+      "prefixes": [
+        "src/"
+      ]
     },
     "frontend": {
       "exact": [],
-      "prefixes": ["frontend/"],
+      "prefixes": [
+        "frontend/"
+      ],
       "patterns": [
-        { "prefix": "frontend/e2e/", "suffix": ".spec.ts" },
-        { "prefix": "frontend/e2e/", "contains": ".spec.ts-snapshots/", "suffix": ".png" },
-        { "prefix": "frontend/e2e/static-fixtures/", "suffix": ".json" },
-        { "prefix": "frontend/e2e/static-fixtures/", "suffix": ".csv" },
-        { "prefix": "frontend/e2e/static-fixtures/", "suffix": ".txt" }
+        {
+          "prefix": "frontend/e2e/",
+          "suffix": ".spec.ts"
+        },
+        {
+          "prefix": "frontend/e2e/",
+          "contains": ".spec.ts-snapshots/",
+          "suffix": ".png"
+        },
+        {
+          "prefix": "frontend/e2e/static-fixtures/",
+          "suffix": ".json"
+        },
+        {
+          "prefix": "frontend/e2e/static-fixtures/",
+          "suffix": ".csv"
+        },
+        {
+          "prefix": "frontend/e2e/static-fixtures/",
+          "suffix": ".txt"
+        }
       ]
     },
     "tooling": {

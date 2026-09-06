@@ -1,0 +1,78 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "maven",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "bootstrap-sha": "76fe6d22733eda1b2b251747acc7e862a7a543b7",
+  "bump-minor-pre-major": true,
+  "versioning": "prerelease",
+  "prerelease": false,
+  "changelog-sections": [
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Bug fixes"
+    },
+    {
+      "type": "perf",
+      "section": "Performance"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "build",
+      "section": "Build and dependencies"
+    },
+    {
+      "type": "deps",
+      "section": "Build and dependencies"
+    },
+    {
+      "type": "test",
+      "hidden": true,
+      "section": "Tests"
+    },
+    {
+      "type": "ci",
+      "hidden": true,
+      "section": "Continuous integration"
+    },
+    {
+      "type": "refactor",
+      "hidden": true,
+      "section": "Refactoring"
+    },
+    {
+      "type": "chore",
+      "hidden": true,
+      "section": "Chores"
+    },
+    {
+      "type": "style",
+      "hidden": true,
+      "section": "Style"
+    },
+    {
+      "type": "revert",
+      "hidden": true,
+      "section": "Reverts"
+    }
+  ],
+  "packages": {
+    ".": {
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "frontend/package.json",
+          "jsonpath": "$.version"
+        }
+      ],
+      "prerelease-type": "rc"
+    }
+  }
+}

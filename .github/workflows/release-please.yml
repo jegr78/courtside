@@ -1,0 +1,46 @@
+name: release-please
+
+# RELEASE_PLEASE_TOKEN is a long-lived PAT. This workflow is push-triggered on main only, so no
+# pull request's code reaches it. Scope a fine-grained PAT to this repository and nothing else:
+#   Contents: read and write        (push the release branch and the tag)
+#   Pull requests: read and write   (open and update the release pull request)
+#   Issues: read and write          (the autorelease labels use the issues API)
+#   Metadata: read-only             (mandatory for any fine-grained PAT)
+# Deliberately not granted: Actions. Nothing here dispatches a workflow.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+    steps:
+      # A tag pushed with GITHUB_TOKEN triggers no workflow, so a release cut without the PAT
+      # would carry no image, no signature and no qualification. Refusing is the honest answer:
+      # release.yml has no dispatch trigger to recover it, and the tag cannot be moved afterwards.
+      - name: Refuse to cut a release without the token that starts its pipeline
+        if: env.RELEASE_PLEASE_TOKEN == ''
+        run: |
+          echo "::error::RELEASE_PLEASE_TOKEN is not set. release-please would open a release" \
+            "pull request whose checks never run, and merging it would push a tag that starts" \
+            "no release pipeline. Add the fine-grained PAT described at the top of this file."
+          exit 1
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

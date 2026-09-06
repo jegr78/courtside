@@ -17,18 +17,21 @@ const document = repositoryFile("docs/releasing.md");
 const workflow = yaml.load(repositoryFile(".github/workflows/release.yml"));
 const source = repositoryFile(".github/workflows/release.yml");
 
-// The tag pattern is what a reader copies, so the document has to name the one the workflow reacts
-// to rather than one that was true when it was written.
-test("given the release trigger, when the document names a tag, then it is the tag the workflow answers",
+// Nobody types the tag any more, so the thing to hold is that what writes it and what answers it
+// still agree on its shape — a tag without the leading v would start nothing at all.
+test("given the release trigger, when release-please writes a tag, then the workflow answers that shape",
   () => {
     // given
     const triggers = workflow.on ?? workflow[true];
+    const config = JSON.parse(repositoryFile("release-please-config.json"));
 
     // when / then
     assert.deepEqual(triggers.push.tags, ["v*"]);
-    assert.match(document, /```sh\n[\s\S]*git tag -a v\d+\.\d+\.\d+/,
-      "the recipe has to cut a tag the release workflow reacts to");
-    assert.match(document, /git push origin v\d+\.\d+\.\d+/);
+    assert.equal(config["include-v-in-tag"], true);
+    assert.equal(config["include-component-in-tag"], false,
+      "a component prefix would put something before the v and the trigger would miss it");
+    assert.match(document, /release pull request/i,
+      "the document has to say what produces the tag now that nobody pushes one");
   });
 
 test("given the jobs a release runs, when the document explains them, then it names every one", () => {

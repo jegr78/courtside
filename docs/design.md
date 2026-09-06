@@ -1570,6 +1570,16 @@ whether it is built or designed. **Designed means absent today.**
   cosign and attaches an SBOM attestation. Trivy scans the application's extracted layers and the
   source tree on every pull request and every release; the container image's own base layers are
   not, so that half is designed and not built.*
+- **Accepted: a long-lived token can publish under this project's name.** release-please cuts every
+  release, and it holds a fine-grained personal access token scoped to this repository alone —
+  contents, pull requests and issues, nothing else, and no permission over workflows. It exists
+  because a tag pushed with the workflow's own token starts no pipeline, so a release cut without it
+  would carry no image, no qualification and no signature; the workflow refuses to run rather than
+  produce one. What the token can do is what merging the release pull request can do: write a tag,
+  and with it start a run that signs an image as this project. What bounds it is that the workflow
+  is triggered by a push to `main` only, so no pull request's code ever runs beside it, and that
+  every gate before `publish` still has to pass. Rotating it is a maintainer's task; nothing in the
+  repository can observe that it has gone stale, only that it is absent.
 - **A release candidate carries what a release carries.** *Built.* A tag with a prerelease suffix —
   `v0.3.0-alpha.1`, `v0.3.0-rc.1` — travels the same pipeline: the same nightly verification of a
   commit it builds on, the same qualification of the exact manifest that is published, the same
