@@ -118,15 +118,103 @@ test("given a job the allowlist does not name, when it fails, then the failure i
   assert.equal(failures[0].job, "backend (postgres 18)");
 });
 
-test("given a summoned run of the same workflow, when it is classified, then it is tracked like a nightly", () => {
+test("given a summoned run of the same workflow, when it is classified, then it is rejected as non-nightly", () => {
+  // when / then
+  assert.throws(() => classifyNightlyFailures(
+    { ...run, run_attempt: 1, event: "workflow_dispatch" }, jobs, workflowId), /workflow is invalid/);
+  assert.throws(() => classifyNightlyFailures({ ...run, run_attempt: 1, event: "push" }, jobs, workflowId),
+    /workflow is invalid/);
+});
+
+test("given several failed steps in one job, when classified, then only the first failure owns an issue", () => {
+  // given
+  const cascade = [{ name: "backend", conclusion: "failure", steps: [
+    { name: "Verify backend", conclusion: "failure" },
+    { name: "Capture evidence", conclusion: "failure" },
+    { name: "Remove test target", conclusion: "failure" }
+  ] }];
+
   // when
-  const failures = classifyNightlyFailures(
-    { ...run, run_attempt: 1, event: "workflow_dispatch" }, jobs, workflowId);
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, cascade, workflowId);
+  const [planned] = planFailureUpdates(failures, []);
 
   // then
   assert.equal(failures.length, 1);
-  assert.throws(() => classifyNightlyFailures({ ...run, run_attempt: 1, event: "push" }, jobs, workflowId),
-    /workflow is invalid/);
+  assert.equal(failures[0].step, "Verify backend");
+  assert.deepEqual(failures[0].secondaryFailures, [
+    { step: "Capture evidence", failureClass: "failure" },
+    { step: "Remove test target", failureClass: "failure" }
+  ]);
+  assert.match(planned.body, /Additional failed steps: `Capture evidence` \(failure\), `Remove test target` \(failure\)/);
+});
+
+test("given untrusted secondary step names, when an occurrence is written, then its context stays bounded and safe", () => {
+  // given
+  const unsafe = [{ name: "backend", conclusion: "failure", steps: [
+    { name: "Verify backend", conclusion: "failure" },
+    { name: "@team `capture` <evidence>", conclusion: "failure" }
+  ] }];
+
+  // when
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, unsafe, workflowId);
+  const [planned] = planFailureUpdates(failures, []);
+
+  // then
+  assert.doesNotMatch(planned.body, /@team|`capture`|<evidence>/);
+  assert.throws(() => classifyNightlyFailures({ ...run, run_attempt: 1 }, [{
+    name: "backend", conclusion: "failure", steps: [
+      { name: "Verify backend", conclusion: "failure" },
+      { name: "x".repeat(121), conclusion: "failure" }
+    ]
+  }], workflowId), /step is invalid/);
+});
+
+test("given a cancelled job with failed follow-up steps, when classified, then cancellation remains one job issue", () => {
+  // given
+  const cancelled = [{ name: "backend", conclusion: "cancelled", steps: [
+    { name: "Build candidate", conclusion: "cancelled" },
+    { name: "Capture evidence", conclusion: "failure" },
+    { name: "Remove test target", conclusion: "failure" }
+  ] }];
+
+  // when
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, cancelled, workflowId);
+
+  // then
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].step, "job");
+  assert.equal(failures[0].failureClass, "cancelled");
+  assert.equal(failures[0].secondaryFailures.length, 3);
+});
+
+test("given cleanup is the only failed step, when classified, then it remains the primary failure", () => {
+  // given
+  const cleanup = [{ name: "backend", conclusion: "failure", steps: [
+    { name: "Verify backend", conclusion: "success" },
+    { name: "Remove test target", conclusion: "failure" }
+  ] }];
+
+  // when
+  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, cleanup, workflowId);
+
+  // then
+  assert.equal(failure.step, "Remove test target");
+  assert.deepEqual(failure.secondaryFailures, []);
+});
+
+test("given two failed jobs with cascades, when classified, then each job owns exactly one issue", () => {
+  // given
+  const independent = ["backend", "frontend"].map((name) => ({ name, conclusion: "failure", steps: [
+    { name: `Verify ${name}`, conclusion: "failure" },
+    { name: `Capture ${name} evidence`, conclusion: "failure" }
+  ] }));
+
+  // when
+  const failures = classifyNightlyFailures({ ...run, run_attempt: 1 }, independent, workflowId);
+
+  // then
+  assert.deepEqual(failures.map((failure) => failure.job), ["backend", "frontend"]);
+  assert.deepEqual(failures.map((failure) => failure.secondaryFailures.length), [1, 1]);
 });
 
 test("given a summoned run, when counting consecutive green nights, then only scheduled ones count", () => {

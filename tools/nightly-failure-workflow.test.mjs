@@ -31,7 +31,8 @@ test("given a workflow that runs on a schedule, when tracking is wired, then it 
 
 test("given a completed run, when tracking it, then only scheduled first-attempt evidence is fetched", () => {
   assert.match(workflow, /types: \[completed\]/);
-  assert.match(workflow, /fromJSON\('\["schedule", "workflow_dispatch"\]'\), github\.event\.workflow_run\.event/);
+  assert.match(workflow, /github\.event\.workflow_run\.event == 'schedule'/);
+  assert.doesNotMatch(workflow, /workflow_dispatch/);
   assert.match(workflow, /attempts\/1\/jobs/);
 });
 
@@ -43,8 +44,8 @@ test("given evidence of a workflow other than the build, when it is read, then i
 });
 
 test("given a second job added to the tracker, when a fork run completes, then it refuses the event too", () => {
-  // given — the fork path is closed by a condition, and a job added without it would open it again
-  const refusesForeignEvents = /fromJSON\('\["schedule", "workflow_dispatch"\]'\), github\.event\.workflow_run\.event/;
+  // given — the non-schedule path is closed by a condition, and a job added without it would open it again
+  const refusesForeignEvents = /github\.event\.workflow_run\.event == 'schedule'/;
   const jobs = Object.entries(tracker.jobs);
 
   // then

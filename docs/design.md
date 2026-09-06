@@ -1677,11 +1677,12 @@ whether it is built or designed. **Designed means absent today.**
   scheduled run whose cost nobody has weighed yet. *Built, as described.*
 - **Accepted: a red scheduled gate names itself in a public issue.** The failure tracker watches
   every workflow that runs on a schedule, so a red `security assessment` opens an issue in this
-  repository — which is public — naming the workflow, the job, the step that failed, the commit
-  range it covers and, where that workflow carries the required check, that the failure blocks every
-  open pull request. The issue is assigned to the repository owner, whose account already owns the
-  repository publicly. What an observer needs: nothing, an issue list is readable by anybody. What it
-  does not say: the finding, its severity and the code it concerns stay in the run's retained
+  repository — which is public — naming the workflow, the job, its primary failed step, the commit
+  range and any later failed steps from that job. A manually dispatched diagnostic run never opens
+  or reopens one. Where the workflow carries the required check, the issue says that the failure
+  blocks every open pull request. The issue is assigned to the repository owner, whose account
+  already owns the repository publicly. What an observer needs: nothing, an issue list is readable
+  by anybody. What it does not say: the finding, its severity and the code it concerns stay in the run's retained
   evidence. On a public repository that evidence is not privileged — any GitHub account can read the
   run and download its artefacts, not only somebody with access to this repository — and of the four
   files the assessment retains, only `protected-evidence.cms` is encrypted to a recipient

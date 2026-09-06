@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const allowedJobs = new Set(["backend", "frontend", "tooling", "security", "build", "tool-update-comparison"]);
-// A run that can be summoned is a path that can be proven; only a scheduled one counts
-// towards the consecutive green nights that make an issue ready for closure.
-const trackedEvents = new Set(["schedule", "workflow_dispatch"]);
+const trackedEvents = new Set(["schedule"]);
+const failureConclusions = new Set(["failure", "cancelled", "timed_out"]);
+const primaryFailureConclusions = new Set(["failure", "timed_out"]);
 export const trackerLabel = "nightly";
 const readyMarker = "<!-- courtside-nightly-ready-for-review -->";
 
@@ -40,29 +40,34 @@ function validateRun(run, workflowId) {
 export function classifyNightlyFailures(run, jobs, workflowId) {
   validateRun(run, workflowId);
   if (!Array.isArray(jobs) || jobs.length > 100) throw new Error("jobs are invalid");
-  return jobs.filter((job) => ["failure", "cancelled", "timed_out"].includes(job?.conclusion)).flatMap((job) => {
-    const failedSteps = (job.steps ?? []).filter((step) =>
-      ["failure", "cancelled", "timed_out"].includes(step?.conclusion));
-    const classes = failedSteps.length > 0 ? failedSteps : [{ name: "job", conclusion: job.conclusion }];
-    return classes.map((failedStep) => {
-      const rawStep = boundedText(failedStep.name, "step");
-      const step = safeText(rawStep);
-      const failureClass = failedStep.conclusion;
-      const jobName = allowedJobs.has(job.name) ? job.name : safeText(boundedText(job.name, "job"));
-      const identity = JSON.stringify({ schemaVersion: 1, workflow: run.name, job: jobName,
-        step: rawStep, failureClass });
-      return {
-        fingerprint: createHash("sha256").update(identity).digest("hex"),
-        workflow: safeText(run.name),
-        job: jobName,
-        step,
-        failureClass,
-        runId: run.id,
-        attempt: 1,
-        commit: run.head_sha,
-        runUrl: run.html_url
-      };
-    });
+  return jobs.filter((job) => failureConclusions.has(job?.conclusion)).map((job) => {
+    if (!Array.isArray(job.steps) || job.steps.length > 100) throw new Error("steps are invalid");
+    const failedSteps = job.steps.filter((step) => failureConclusions.has(step?.conclusion));
+    const primary = job.conclusion === "cancelled"
+      ? { name: "job", conclusion: "cancelled" }
+      : failedSteps.find((step) => primaryFailureConclusions.has(step.conclusion))
+        ?? { name: "job", conclusion: job.conclusion };
+    const rawStep = boundedText(primary.name, "step");
+    const step = safeText(rawStep);
+    const failureClass = primary.conclusion;
+    const jobName = allowedJobs.has(job.name) ? job.name : safeText(boundedText(job.name, "job"));
+    const secondaryFailures = failedSteps.filter((failedStep) => failedStep !== primary).map((failedStep) => ({
+      step: safeText(boundedText(failedStep.name, "step")), failureClass: failedStep.conclusion
+    }));
+    const identity = JSON.stringify({ schemaVersion: 1, workflow: run.name, job: jobName,
+      step: rawStep, failureClass });
+    return {
+      fingerprint: createHash("sha256").update(identity).digest("hex"),
+      workflow: safeText(run.name),
+      job: jobName,
+      step,
+      failureClass,
+      secondaryFailures,
+      runId: run.id,
+      attempt: 1,
+      commit: run.head_sha,
+      runUrl: run.html_url
+    };
   });
 }
 
@@ -93,7 +98,10 @@ function blocked(failure, blockingWorkflow) {
 
 function occurrence(failure) {
   const range = failure.baseCommit ? `${failure.baseCommit}..${failure.commit}` : failure.commit;
-  return `${occurrenceMarker(failure)}\n- First-attempt commit range \`${range}\`: ${failure.runUrl}`;
+  const secondary = failure.secondaryFailures.length === 0 ? "" :
+    `\n- Additional failed steps: ${failure.secondaryFailures.map((item) =>
+      `\`${item.step}\` (${item.failureClass})`).join(", ")}`;
+  return `${occurrenceMarker(failure)}\n- First-attempt commit range \`${range}\`: ${failure.runUrl}${secondary}`;
 }
 
 export function bindCommitRange(failures, recentRuns) {

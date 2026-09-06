@@ -129,8 +129,9 @@ tagged one builds on, and unless that run's retained verification record says th
 Open nightly failure issues are refused as well, but only as a complement: a tracker that threw, a
 schedule GitHub disabled after sixty quiet days and a label somebody removed all look identical
 from the release job, and every one of them would leave the absence check green. The nightly build
-also answers to `workflow_dispatch`, so the whole chain — verification record, failure tracker,
-issue — can be summoned and watched rather than waited for.
+also answers to `workflow_dispatch`, so the checks and their verification record can be summoned for
+diagnosis rather than waited for. A summoned run cannot create or reopen a nightly issue and does
+not count as release evidence; only a scheduled first attempt enters that bookkeeping.
 
 Every workflow that runs on a schedule feeds that tracker, not the nightly build alone. The tracker
 names them, but the set is not maintained by hand: a test reads every workflow file, collects the
@@ -142,7 +143,9 @@ label rather than the one product defects use, and it is assigned to the reposit
 owner is a user account, so a red gate reaches somebody instead of waiting in a list to be found. An
 organisation cannot be an assignee, so an instance owned by one is told by the label alone. Where the failing workflow is the one
 behind the required check, the issue says so, because every open pull request inherits that failure
-until it is fixed.
+until it is fixed. Each failed job owns at most one issue. Its first failed or timed-out step is the
+primary class, and later failures remain context on the same occurrence. A cancelled job is one
+job-level occurrence rather than one issue per cancelled or cleanup step.
 
 ### Release checklist
 
