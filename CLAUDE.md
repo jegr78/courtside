@@ -451,5 +451,6 @@ carries per item and section 9 carries per metric.
 ## References
 
 * Design spec: `docs/design.md`
+* What the schema holds, table by table: `docs/data-model.md`
 * Reference deployment and its environment: `deploy/README.md`
 * Cutting a release, and what the release refuses: `docs/releasing.md`

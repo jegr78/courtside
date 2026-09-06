@@ -617,6 +617,9 @@ chose it.
 
 ### Remaining core entities
 
+The complete table-by-table map, including everything this section does not argue about, is
+`docs/data-model.md`.
+
 ```
 person ────< member >──── membership_type ──── rule_set ──< rule
    │                                                        (type + params jsonb)

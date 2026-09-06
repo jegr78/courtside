@@ -15,6 +15,7 @@
     { "path": "tools/courtside.upgrade-smoke.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/coverage-diff.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/coverage-diff.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/data-model-documentation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/database-restore.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/database-upgrade.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/dependency-snapshot.mjs", "profiles": ["full"], "test": false },
