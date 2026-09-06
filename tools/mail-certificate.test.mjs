@@ -150,6 +150,22 @@ test("given the listener verifier changes, when GitHub selects checks, then the 
       "an isolated verifier change would otherwise skip its only real Stalwart execution");
   });
 
+test("given the temporary bootstrap credential, when the smoke tests legacy metadata, then setup "
+  + "keeps its established critical path", () => {
+  // given
+  const bootstrap = smoke.indexOf("/plan/bootstrap.ndjson");
+  const recoveryRemoved = smoke.indexOf("Restarting without the recovery credential");
+  const backfill = smoke.indexOf("Backfilling public fingerprint metadata");
+
+  // when / then
+  assert.ok(bootstrap >= 0 && recoveryRemoved > bootstrap && backfill > recoveryRemoved,
+    "certificate metadata exercises must not delay or perturb first-use administrator setup");
+  assert.match(smoke, /bootstrap\.status !== 0[\s\S]*bootstrap-transition-complete/,
+    "a lost bootstrap response may proceed only after the persistent registry proves the update won");
+  assert.match(smoke, /bootstrap\.output\.includes\("authentication failed \(HTTP 401\)"\)/,
+    "an unrelated bootstrap failure must remain fatal even when it happened after a transition");
+});
+
 test("given a reload, when the mail server answers, then the reloader reads the answer and not the "
   + "status", () => {
     // given / when / then

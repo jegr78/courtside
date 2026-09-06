@@ -97,7 +97,7 @@ function namesOn(certificate) {
 
 function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure = false,
   reloadSecret = reloadPassword, remainingShare = "6", input = undefined,
-  maximumLifetime = "34560000" } = {}) {
+  maximumLifetime = "34560000", includeStatus = false } = {}) {
   const result = spawnSync("docker", ["compose", "-f", composeFile, "-p", project, ...args], {
     encoding: "utf8",
     input,
@@ -118,7 +118,8 @@ function compose(args, { recoveryAdmin = `admin:${setupPassword}`, allowFailure 
   if (result.status !== 0 && !allowFailure) {
     throw new Error(`docker compose ${args.join(" ")} failed:\n${result.stdout}\n${result.stderr}`);
   }
-  return `${result.stdout}${result.stderr}`;
+  const output = `${result.stdout}${result.stderr}`;
+  return includeStatus ? { output, status: result.status } : output;
 }
 
 function publishedPort(service, container) {
@@ -334,11 +335,39 @@ async function main() {
     const initialPublishedVersion = published();
     assert.match(initialPublishedVersion ?? "", /^[0-9a-f]{64}$/,
       "the first published pair has no immutable version name");
+
+    console.log("Rendering and applying the shipped plans");
+    compose(["run", "--rm", "plan"]);
+    const bootstrap = compose(
+      ["run", "--rm", "apply", "apply", "--file", "/plan/bootstrap.ndjson"],
+      { allowFailure: true, includeStatus: true }
+    );
+    if (bootstrap.status !== 0) {
+      const transitioned = compose(["exec", "-T", "mail", "sh", "-c",
+        "test -s /etc/stalwart/config.json && printf bootstrap-transition-complete"],
+      { allowFailure: true }).includes("bootstrap-transition-complete");
+      assert.ok(bootstrap.output.includes("authentication failed (HTTP 401)") && transitioned,
+        `the bootstrap plan failed before Stalwart completed its registry transition:\n${bootstrap.output}`);
+      console.log("Stalwart completed bootstrap while its CLI connection lost the old identity");
+    }
+    compose(["restart", "mail"]);
+    await until("the mail server to report healthy", mailIsHealthy);
+    compose(["run", "--rm", "apply", "apply", "--file", "/plan/base.ndjson"]);
+    compose(["run", "--rm", "apply", "apply", "--file", "/plan/journey.ndjson"]);
+
+    console.log("Restarting without the recovery credential");
+    compose(["up", "-d", "--force-recreate", "mail"], { recoveryAdmin: "" });
+    await until("the mail server to report healthy", mailIsHealthy);
+
     const authority = compose(["exec", "-T", "proxy", "cat",
       "/data/caddy/pki/authorities/local/root.crt"]);
     assert.match(authority, /-----BEGIN CERTIFICATE-----/,
       "without the proxy's own root the reloader cannot check the smoke deployment's local chain");
     writeFileSync(reloadAuthority, authority);
+
+    console.log("Starting the reloader, which the plan has just given an account");
+    compose(["up", "-d", "mail-reload"]);
+    await until("the reloader to report healthy", () => health("mail-reload") === "healthy");
 
     console.log("Backfilling public fingerprint metadata on an existing certificate volume");
     compose(["exec", "-T", "mail-certificate", "rm",
@@ -349,24 +378,8 @@ async function main() {
         `/tls/fingerprints/${initialPublishedVersion}`], { allowFailure: true }).trim();
       return /^[0-9a-f]{64}$/.test(fingerprint);
     });
-    await until("the helper to report healthy after the metadata backfill",
-      () => health("mail-certificate") === "healthy");
-
-    console.log("Rendering and applying the shipped plans");
-    compose(["run", "--rm", "plan"]);
-    compose(["run", "--rm", "apply", "apply", "--file", "/plan/bootstrap.ndjson"]);
-    compose(["restart", "mail"]);
-    await until("the mail server to report healthy", mailIsHealthy);
-    compose(["run", "--rm", "apply", "apply", "--file", "/plan/base.ndjson"]);
-    compose(["run", "--rm", "apply", "apply", "--file", "/plan/journey.ndjson"]);
-
-    console.log("Restarting without the recovery credential");
-    compose(["up", "-d", "--force-recreate", "mail"], { recoveryAdmin: "" });
-    await until("the mail server to report healthy", mailIsHealthy);
-
-    console.log("Starting the reloader, which the plan has just given an account");
-    compose(["up", "-d", "mail-reload"]);
-    await until("the reloader to report healthy", () => health("mail-reload") === "healthy");
+    await until("both helpers to report healthy after the metadata backfill",
+      () => health("mail-certificate") === "healthy" && health("mail-reload") === "healthy");
 
     const submission = publishedPort("mail", 587);
     const inbound = publishedPort("mail", 25);
