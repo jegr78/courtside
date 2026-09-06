@@ -58,6 +58,31 @@ CADDY
   caddy validate --adapter caddyfile --config /tmp/pair.caddy > /dev/null 2>&1
 }
 
+leaf_fingerprint() {
+  encoded=/tmp/leaf-certificate.base64
+  der=/tmp/leaf-certificate.der
+  if ! awk '/BEGIN CERTIFICATE/{inside=1; next} /END CERTIFICATE/{exit} inside{print}' "$1" \
+      > "$encoded" || ! base64 -d "$encoded" > "$der" || [ ! -s "$der" ]; then
+    rm -f "$encoded" "$der"
+    return 1
+  fi
+  sha256sum "$der" | cut -d' ' -f1
+  rm -f "$encoded" "$der"
+}
+
+retain_fingerprint() {
+  version="$1"
+  certificate="$2"
+  fingerprint="$(leaf_fingerprint "$certificate")"
+  if ! printf '%s\n' "$fingerprint" | grep -q '^[a-f0-9]\{64\}$'; then
+    return 1
+  fi
+  temporary="$target/fingerprints/.$version"
+  printf '%s\n' "$fingerprint" > "$temporary" || return 1
+  chmod 0644 "$temporary" || return 1
+  mv "$temporary" "$target/fingerprints/$version"
+}
+
 publish() {
   source="$(newest)"
   if [ -z "$source" ]; then
@@ -67,6 +92,15 @@ publish() {
   issued="$(dirname "$source")"
   version="$(cat "$issued/$hostname.crt" "$issued/$hostname.key" | sha256sum | cut -d' ' -f1)"
   if [ "$version" = "$(readlink "$target/current" 2>/dev/null | sed 's#versions/##')" ]; then
+    if [ ! -f "$target/fingerprints/$version" ]; then
+      current="$(cat "$target/current/tls.crt" "$target/current/tls.key" 2>/dev/null \
+        | sha256sum | cut -d' ' -f1)"
+      if [ "$current" != "$version" ] || ! usable "$target/current" \
+          || ! retain_fingerprint "$version" "$target/current/tls.crt"; then
+        announce "failed the published version for $hostname no longer matches its contents"
+        return 1
+      fi
+    fi
     announce "ok the mail server has the certificate the proxy issued for $hostname"
     return 1
   fi
@@ -91,6 +125,11 @@ publish() {
   rm -rf "$target/versions/$version"
   mv "$staging" "$target/versions/$version" \
     || { announce "failed cannot name the new version under $target"; return 1; }
+  if ! retain_fingerprint "$version" "$target/versions/$version/tls.crt"; then
+    rm -rf "$target/versions/$version"
+    announce "failed cannot retain the public fingerprint for $hostname"
+    return 1
+  fi
   # Two files cannot be renamed together, so the pair is swapped by renaming the one link that
   # names both of them.
   if ! ln -sfn "versions/$version" "$target/.next" || ! mv -T "$target/.next" "$target/current"; then
@@ -109,6 +148,7 @@ discard() {
     case "$(basename "$version")" in
       "$1" | "$previous" | .staging) continue ;;
     esac
+    rm -f "$target/fingerprints/$(basename "$version")"
     rm -rf "$version"
   done
   previous="$1"
@@ -118,7 +158,8 @@ discard() {
 # may still have open.
 previous="$(readlink "$target/current" 2>/dev/null | sed 's#versions/##')"
 announced=""
-mkdir -p "$target/versions" || report "cannot create $target/versions"
+mkdir -p "$target/versions" "$target/fingerprints" || report "cannot create directories under $target"
+chmod 0755 "$target/fingerprints" || report "cannot make fingerprint metadata readable"
 events=/tmp/events
 [ -p "$events" ] || mkfifo "$events"
 # Held open for both ends, so the watch is registered before the pass that follows it reads the
@@ -136,6 +177,8 @@ while true; do
   # Re-armed each round because an issuer's directory appears only with the first order it fills,
   # and inotify watches the directories that existed when it started.
   armed="$(watches)"
+  # Each newline-delimited path and event mask is one inotifyd argument.
+  # shellcheck disable=SC2086
   inotifyd - $armed >&3 2>/dev/null &
   watcher=$!
   publish

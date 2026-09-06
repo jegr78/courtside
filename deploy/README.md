@@ -218,7 +218,8 @@ Two things about the mail container are worth knowing regardless:
 
 Three containers and one certificate. Caddy obtains it for `COURTSIDE_MAIL_HOSTNAME` and renews it,
 `mail-certificate` publishes each new pair into the `mail-tls` volume, and `mail-reload` asks the
-mail server to load what has been published and then reads back which certificate it is serving. No
+mail server to load what has been published. The reloader then connects to the submission listener
+and verifies what it actually serves. No
 container does two of those jobs, which is what keeps a compromise of any one of them from being a
 compromise of the key.
 
@@ -230,6 +231,10 @@ runs as, so the mail server can read that pair and nothing in the store it came 
 the same volume read-only and still cannot open what it points at. The pair is published under
 `versions/<digest of the pair>` and `current` is a symlink, because two files cannot be renamed at
 once and a mail server reading half a swap would serve a key that does not match its certificate.
+The volume also holds a world-readable SHA-256 fingerprint of the public leaf certificate for each
+retained version. It never makes the certificate or key readable to `mail-reload`. The reloader
+uses this metadata to distinguish a successful handover from a reload that Stalwart accepted
+without changing its listener.
 
 **A renewal reaches the listener with nobody present.** Caddy renews at a third of the lifetime
 remaining. `mail-certificate` watches the store and publishes within seconds of a renewal landing;
@@ -253,11 +258,11 @@ Steady state is `the mail server has the certificate the proxy issued for <hostn
 the helper and `the mail server serves the certificate the proxy issued for <hostname>` from the
 reloader. Both are `ok` lines, and both are what an unhealthy container has stopped saying.
 
-Four things `mail-reload` checks after every load, because a server that accepted a reload has not
-thereby said what it serves: that exactly one certificate is loaded, that it names
-`COURTSIDE_MAIL_HOSTNAME`, that its lifetime is under 400 days — longer than any authority issues
-for, so an outlier is the server's own self-signed fallback rather than the proxy's certificate —
-and that more than a sixth of that lifetime is left. The sixth is
+The JMAP read-back first checks that exactly one certificate is loaded, that it names
+`COURTSIDE_MAIL_HOSTNAME`, that its lifetime is under 400 days and that more than a sixth of that
+lifetime is left. The reloader then performs SMTP STARTTLS with normal chain and hostname
+validation and compares the served leaf with the publisher's fingerprint. A server accepting the
+reload request is therefore not enough to become healthy. The sixth is
 `COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE`, and it is deliberately later than Caddy's own renewal
 point: by the time it fires, a renewal has had a full window of its own to fail in first.
 
@@ -302,6 +307,8 @@ is the confirmation.
 | `cannot copy the pair for <hostname> out of the proxy's store` | The store was readable a moment ago and is not now, or the host ran out of disk. |
 | `the pair for <hostname> is incomplete or mismatched, so the published one stays` | Caddy could not validate the pair: a half-written renewal, or a key that does not match its certificate. The published pair is untouched and the mail server keeps serving it, so this is a warning and not an outage. It clears itself when the renewal completes. |
 | `cannot name the new version under <target>` | Same volume, same causes as the write failure above. |
+| `cannot retain the public fingerprint for <hostname>` | The pair was valid, but the helper could not write its non-secret fingerprint. It removes the new version instead of publishing something the reloader cannot identify. |
+| `the published version for <hostname> no longer matches its contents` | An existing volume names a pair by a digest that no longer matches its files. Restore the volume from a consistent backup or let Caddy publish a new pair. The helper will not create trusted metadata for altered contents. |
 | `cannot swap <target>/current, so the mail server still reads the pair before this one` | The new pair is on disk but the symlink could not be replaced. The mail server goes on serving the previous one, which is valid until it is not. |
 
 | What `mail-reload` says | What it means, and what to do |
@@ -315,6 +322,10 @@ is the confirmation.
 | `the mail server did not say how long the certificate for <hostname> is valid` | The read-back came back without usable dates, which a Stalwart upgrade that changed the answer's shape would do. |
 | `the mail server serves a certificate it made itself and not the one the proxy issued` | The fallback. The server refused a load at some point and generated its own certificate, valid far beyond any authority's 400 days. Repair the pair and the next reload replaces it. |
 | `the certificate for <hostname> is close to expiry, so the proxy stopped renewing it` | Less than a sixth of the lifetime is left, so Caddy's renewal at a third has already failed once without anybody looking. This is the line that arrives before an outage rather than after it, and on a ninety-day certificate it arrives about a fortnight ahead: read `docker compose logs proxy` while the certificate is still valid. The renewal fails for the reasons the first issuance would have: `COURTSIDE_MAIL_HOSTNAME` no longer resolves to this host, something closed port 80 or 443 in front of the proxy, or the authority is refusing the name. Caddy keeps retrying on its own, so the fix is the cause and never a restart. |
+| `the certificate helper published an invalid version name` | `current` no longer points to the 64-character digest created by the helper. Treat the volume as inconsistent and restore it from a known-good backup. The reloader refuses the name before using it as a metadata path. |
+| `the mail listener did not present a certificate trusted for <hostname>` | The submission listener's chain or hostname validation failed. Read the listener with the command above. A reload response cannot override this failure. |
+| `the configured mail listener did not offer STARTTLS` | Port 587 answered as another protocol or Stalwart no longer offers transport security there. Check the listener plan before changing the reloader. |
+| `the served leaf fingerprint does not match the published certificate` | Stalwart accepted the reload but kept or served another certificate. The helper has already published a valid pair. Read the mail server logs and compare `current` with the listener before attempting another issuance. |
 
 **A pair the mail server cannot parse is the state that reaches members.** Stalwart does not keep
 the pair it had when it refuses a load: the listener falls back to a certificate it generated
