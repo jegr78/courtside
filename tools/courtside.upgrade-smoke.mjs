@@ -71,8 +71,27 @@ export function selectUpgradeOrigins(candidateTag, tags) {
   // an origin — a club is not asked which of them it happened to stop on.
   const candidates = earlier.filter((version) => sameRelease(version, candidate))
     .sort(precedence).map((version) => version.tag);
-  const origins = [...new Set([patch?.tag, minor?.tag, ...candidates].filter(Boolean))];
-  return origins.length === 0 ? ["pre-release-v17"] : origins;
+  const released_ = [patch?.tag, minor?.tag].filter(Boolean);
+  // Until a release exists, the pre-release schema is the only database a club can hold, and a
+  // candidate preceding the first release does not make that upgrade any less real.
+  const from = released_.length === 0 ? ["pre-release-v17", ...candidates] : [...released_, ...candidates];
+  return [...new Set(from)];
+}
+
+// A tag whose run never reached publish names no image; resolving an origin from it would pull
+// something that does not exist and block every release of that line.
+export function publishedTags(releases) {
+  return releases.filter((release) => release.draft === false).map((release) => release.tag_name);
+}
+
+export function previousReleaseTag(candidateTag, tags) {
+  const candidate = parseVersion(candidateTag);
+  if (!candidate) throw new Error(`Candidate tag is not a semantic version: ${candidateTag}`);
+  const released = tags.map(parseVersion).filter(Boolean)
+    .filter((version) => version.prerelease === null)
+    .filter((version) => precedence(version, candidate) < 0)
+    .sort((left, right) => precedence(right, left));
+  return released[0]?.tag ?? null;
 }
 
 export function selectRepositoryDigest(repository, originTag, repoDigests) {
@@ -372,8 +391,12 @@ async function executeUpgrade() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv[2] === "--origins") {
-    const tags = run("git", ["tag", "--list", "v*"]).stdout.trim().split("\n").filter(Boolean);
+    const tags = JSON.parse(process.argv[4]);
     process.stdout.write(`${JSON.stringify(selectUpgradeOrigins(process.argv[3], tags))}\n`);
+  } else if (process.argv[2] === "--published-tags") {
+    process.stdout.write(`${JSON.stringify(publishedTags(JSON.parse(process.argv[3])))}\n`);
+  } else if (process.argv[2] === "--previous-release") {
+    process.stdout.write(`${previousReleaseTag(process.argv[3], JSON.parse(process.argv[4])) ?? ""}\n`);
   } else {
     await executeUpgrade();
   }

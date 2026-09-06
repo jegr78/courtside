@@ -153,12 +153,24 @@ jobs:
         if: always()
         run: rm -rf build/security/npm.json build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql
 
-      - name: Collect the upgrade notes
+      - name: Read the releases this repository has published
+        id: published
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # A candidate sits between two releases; anchoring on it would drop every breaking
-          # change before it from the notes a club upgrading from the last release reads.
-          previous=$(git describe --tags --abbrev=0 --match 'v*' --exclude 'v*-*' \
-            "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          releases=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" --slurp \
+            --jq 'map(.[]) | map({tag_name, draft})')
+          tags=$(node tools/courtside.upgrade-smoke.mjs --published-tags "$releases")
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+      - name: Collect the upgrade notes
+        env:
+          PUBLISHED_TAGS: ${{ steps.published.outputs.tags }}
+        run: |
+          # A tag that never published names no release, and a candidate is not what a club
+          # upgrading from the last release needs the notes to start at.
+          previous=$(node tools/courtside.upgrade-smoke.mjs --previous-release \
+            "$GITHUB_REF_NAME" "$PUBLISHED_TAGS")
           range=${previous:+$previous..}$GITHUB_REF_NAME
           breaking=$(git log --no-merges --format='%s%n%b' "$range" \
             | grep -E '^BREAKING CHANGE:|^[a-z]+(\(.+\))?!:' || true)
@@ -172,8 +184,11 @@ jobs:
 
       - name: Resolve supported database upgrade origins
         id: upgrade-origins
+        env:
+          PUBLISHED_TAGS: ${{ steps.published.outputs.tags }}
         run: |
-          origins=$(node tools/courtside.upgrade-smoke.mjs --origins "$GITHUB_REF_NAME")
+          origins=$(node tools/courtside.upgrade-smoke.mjs --origins "$GITHUB_REF_NAME" \
+            "$PUBLISHED_TAGS")
           echo "origins=$origins" >> "$GITHUB_OUTPUT"
           printf '\n## Supported database upgrade origins\n\n' >> build/release-body.md
           node -e 'for (const origin of JSON.parse(process.argv[1])) console.log("- " + origin)' "$origins" \
