@@ -29,7 +29,7 @@ test("given documentation changes, when planning the local check, then the bound
   // then
   assert.deepEqual(plan.profiles, ["docs"]);
   assert.deepEqual(plan.tasks.map((task) => task.label),
-    ["docs-check", "frontend-toolchain", "tooling-test"]);
+    ["docs-check", "frontend-toolchain", "site-install", "site-build", "tooling-test"]);
 });
 
 test("given backend changes, when planning the local check, then Java verification matches CI", () => {
@@ -91,7 +91,7 @@ test("given reviewed GitHub metadata changes, when planning locally, then the de
   // then
   assert.deepEqual(template.profiles, ["docs"]);
   assert.deepEqual(template.tasks.map((task) => task.label),
-    ["docs-check", "frontend-toolchain", "tooling-test"]);
+    ["docs-check", "frontend-toolchain", "site-install", "site-build", "tooling-test"]);
   assert.deepEqual(dependabot.profiles, ["tooling"]);
   assert.deepEqual(dependabot.tasks.map((task) => task.label), ["frontend-toolchain", "tooling-test"]);
 });
@@ -119,7 +119,7 @@ test("given added documentation, when planning the local check, then it uses the
   // then
   assert.deepEqual(added.profiles, ["docs"]);
   assert.deepEqual(added.tasks.map((task) => task.label),
-    ["docs-check", "frontend-toolchain", "tooling-test"]);
+    ["docs-check", "frontend-toolchain", "site-install", "site-build", "tooling-test"]);
 });
 
 test("given an added e2e specification, when planning locally, then the complete frontend path runs", () => {

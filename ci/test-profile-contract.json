@@ -5,7 +5,7 @@
   "profiles": {
     "docs": {
       "ciJobs": ["docs", "tooling"],
-      "localTasks": ["frontend-toolchain", "docs-check", "tooling-test"]
+      "localTasks": ["frontend-toolchain", "docs-check", "site-install", "site-build", "tooling-test"]
     },
     "backend": {
       "ciJobs": ["backend", "tooling", "security"],
@@ -76,6 +76,16 @@
       "executable": "npm",
       "arguments": ["run", "test:e2e"]
     },
+    "site-install": {
+      "workingDirectory": "repository",
+      "executable": "npm",
+      "arguments": ["--prefix", "site", "ci"]
+    },
+    "site-build": {
+      "workingDirectory": "repository",
+      "executable": "npm",
+      "arguments": ["--prefix", "site", "run", "build"]
+    },
     "tooling-test": {
       "workingDirectory": "frontend",
       "executable": "npm",
@@ -97,6 +107,11 @@
       "scope": "tooling",
       "ci": "Repository tool tests; the security job runs beside them for every profile except documentation",
       "local": "Repository tool tests; hosted CodeQL, dependency review and container scanning unavailable"
+    },
+    {
+      "scope": "site",
+      "ci": "The documentation job installs and builds the documentation site whenever it runs",
+      "local": "Built by the documentation profile; Maven's full verification does not build the site"
     }
   ]
 }

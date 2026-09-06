@@ -496,7 +496,7 @@ test("given a profile plan, when binding it to the workflow run, then every iden
   assert.deepEqual(bound.profiles, ["docs"]);
   assert.deepEqual(bound.ciJobs, ["docs", "tooling"]);
   assert.deepEqual(bound.localTasks.map((task) => task.label),
-    ["docs-check", "frontend-toolchain", "tooling-test"]);
+    ["docs-check", "frontend-toolchain", "site-install", "site-build", "tooling-test"]);
   assert.equal(bound.isFull, false);
   assert.equal(validatePlan(bound), true, JSON.stringify(validatePlan.errors));
   assert.throws(() => bindPlanToRun(plan, { ...bound, runId: 0 }), /identity/);
