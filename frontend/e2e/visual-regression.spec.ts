@@ -151,6 +151,13 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   // then
   await stableScreenshot(page.getByTestId("admin-import-view"), "admin-import.png");
 
+  // when
+  await page.goto("/admin/export");
+  await expect(page.getByTestId("bookings-export-download")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-export-view"), "admin-export.png");
+
   // when — the journey world is reset between tests, so the empty log is the one state this
   // surface reaches deterministically; a populated one would be masked down to its own chrome
   await page.goto("/admin/audit");
