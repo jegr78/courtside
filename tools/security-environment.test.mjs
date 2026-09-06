@@ -11,10 +11,19 @@ import {
   isMissingDockerResource,
   mergeSecurityProcessEnvironment,
   prometheusMetric,
+  remainingScannerRequestBudget,
   relayableMethods,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
+
+test("given scanner traffic, when reserving the canary retest, then only the remaining budget is available", () => {
+  // when / then
+  assert.equal(remainingScannerRequestBudget(8000, 7999), 1);
+  assert.throws(() => remainingScannerRequestBudget(8000, 0), /no request budget/);
+  assert.throws(() => remainingScannerRequestBudget(8000, 8000), /no request budget/);
+  assert.throws(() => remainingScannerRequestBudget(8000, 8001), /no request budget/);
+});
 
 test("given Hikari metrics, when sampling pool pressure, then active and pending connections remain distinct", () => {
   // given

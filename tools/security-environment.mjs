@@ -416,6 +416,14 @@ export async function runPassiveZap(plan, stopFile, limits) {
   }
 }
 
+export function remainingScannerRequestBudget(limit, consumed) {
+  if (!Number.isSafeInteger(limit) || limit < 1
+      || !Number.isSafeInteger(consumed) || consumed < 1 || consumed >= limit) {
+    throw new Error("The canary remediation retest has no request budget remaining");
+  }
+  return limit - consumed;
+}
+
 export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, renderRetestPlan) {
   const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
     COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests),
@@ -481,8 +489,10 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
       networks: [`${securityProject(plan.runId)}_scanner-client`, `${securityProject(plan.runId)}_scanner-upstream`]
     });
     const primaryRequestCount = await zapRequestCount(gateway, command);
+    const retestRequestBudget = remainingScannerRequestBudget(limits.maxRequests, primaryRequestCount);
     await command(["rm", "-f", gateway]);
     environment.COURTSIDE_SECURITY_CANARY_ENABLED = "false";
+    environment.COURTSIDE_SECURITY_MAX_REQUESTS = String(retestRequestBudget);
     await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "up", "-d", "--wait",
       "scanner-gateway"]);
     const retestName = `courtside-security-zap-${plan.runId}-${limits.attempt}-canary-retest`;
@@ -519,9 +529,8 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     });
     const retestRequestCount = await zapRequestCount(gateway, command);
     const requestCount = primaryRequestCount + retestRequestCount;
-    if (!Number.isSafeInteger(primaryRequestCount) || primaryRequestCount < 1
-        || !Number.isSafeInteger(retestRequestCount) || retestRequestCount < 1
-        || requestCount > limits.maxRequests) {
+    if (!Number.isSafeInteger(retestRequestCount) || retestRequestCount < 1
+        || retestRequestCount > retestRequestBudget || requestCount > limits.maxRequests) {
       throw new Error("Authenticated ZAP exceeded its request budget");
     }
     const runtimeHardened = gatewayHardened && retestScannerHardened && retestGatewayHardened;
