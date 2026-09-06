@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "../api/client";
 import { problemMessage } from "../api/problem-message";
@@ -20,6 +20,9 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
   const [open, setOpen] = useState(false);
   const [failure, setFailure] = useState<string>();
   const locale = supportedLocale(i18n.resolvedLanguage) ?? i18n.resolvedLanguage ?? "";
+
+  // A message about the session that ended must not be carried into the one that signs in next.
+  useEffect(() => setFailure(undefined), [authenticated]);
 
   // Stored on the account rather than in the browser, so the next message the instance sends
   // arrives in the language the member reads.

@@ -385,6 +385,24 @@ describe("App build identity", () => {
     expect(screen.queryByTestId("preferences-failure")).not.toBeInTheDocument();
   });
 
+  it("given the account menu opened before the session arrives, when it arrives, then the menu stays open under the hand that opened it", async () => {
+    // given — the header paints before the session is known, so the menu can be opened ahead of it
+    let publishSession: (status: SessionStatus) => void = () => undefined;
+    vi.spyOn(api, "session").mockReturnValue(new Promise<SessionStatus>((resolve) => { publishSession = resolve; }));
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingHours: [] });
+    vi.spyOn(api, "courts").mockResolvedValue([]);
+    render(<RoutedShell><App /></RoutedShell>);
+    await userEvent.click(await screen.findByTestId("preferences-menu"));
+
+    // when
+    publishSession({ authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false, displayName: "Jane Doe" });
+
+    // then
+    expect(await screen.findByTestId("logout")).toBeVisible();
+  });
+
   it("given an account that reads another language, when it signs in, then the navigation never appears in the language it is about to leave", async () => {
     // given — the shell starts in the club's default language and the account reads English
     await i18n.changeLanguage("de");
