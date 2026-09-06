@@ -4,6 +4,8 @@ import { createRequire } from "node:module";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { selectUpgradeOrigins } from "./courtside.upgrade-smoke.mjs";
+
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
 
@@ -72,6 +74,48 @@ test("given the release body, when the document promises what it carries, then t
       assert.ok(document.includes(name.replace(/\.[a-z]+$/, "")) || document.includes(name),
         `the release attaches ${name} and docs/releasing.md does not mention it`);
     }
-    assert.match(document, /prerelease/i,
-      "a hyphenated tag is published as a prerelease and a reader has to know that");
+  });
+
+// The document says prereleases do not work and names the reason. When somebody makes them work,
+// this goes red and the document has to stop saying it — which is the point of writing it down.
+test("given a prerelease tag, when the release resolves upgrade origins, then the document's warning still holds",
+  () => {
+    // given
+    const publish = workflow.jobs.publish.steps
+      .find((step) => (step.uses ?? "").startsWith("softprops/action-gh-release"));
+
+    // when / then
+    assert.throws(() => selectUpgradeOrigins("v0.3.0-rc1", ["v0.2.0", "v0.3.0-rc1"]),
+      /not stable semantic version/);
+    assert.match(document, /## Prereleases do not work today/);
+    assert.match(String(publish.with.prerelease), /contains\(github\.ref_name, '-'\)/,
+      "the document explains an unreachable flag; if the flag is gone the passage has to go too");
+  });
+
+test("given the tags a release publishes, when the document names them, then it names every one", () => {
+  // given
+  const meta = workflow.jobs.publish.steps
+    .find((step) => (step.uses ?? "").startsWith("docker/metadata-action"));
+  const patterns = meta.with.tags.trim().split("\n")
+    .map((line) => /pattern=(.+)$/.exec(line.trim())?.[1])
+    .filter(Boolean);
+
+  // when / then
+  assert.deepEqual(patterns, ["{{version}}", "{{major}}.{{minor}}", "{{major}}"]);
+  assert.equal(meta.with.flavor, undefined,
+    "the action's default moves `latest` with every release, and the document says so");
+  assert.match(document, /`latest`/,
+    "a club pinning latest moves with every release and the document has to name that tag");
+  assert.match(document, /`<major>\.<minor>`/);
+});
+
+// The warning about a retained failed tag rests on where the notes range starts. If that stops
+// being the local tag history, the warning is stale rather than merely unnecessary.
+test("given the upgrade notes, when the document warns about their range, then the workflow still reads git",
+  () => {
+    // when / then
+    assert.match(source, /previous=\$\(git describe --tags --abbrev=0 --match 'v\*'/);
+    assert.match(source, /git tag --list 'v\*'|--origins "\$GITHUB_REF_NAME"/);
+    assert.match(document, /git describe --tags/,
+      "the document warns about a range it no longer describes");
   });

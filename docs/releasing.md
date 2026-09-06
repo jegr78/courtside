@@ -1,11 +1,17 @@
 # Cutting a release
 
-A release is an annotated tag `v<version>` on `main`. Everything after that is automatic, and
+A release is a tag `v<version>` pushed to this repository. Everything after that is automatic, and
 almost everything the automation does is a refusal — it would rather not publish than publish
 something nobody verified.
 
-This document says what to do in what order. `CLAUDE.md` remains the policy for branches, commits
-and pull requests; this is the part that happens after the last one is merged.
+This document says what to do in what order, and what the release does *not* guarantee, which is the
+half a workflow file cannot tell you. `CLAUDE.md` remains the policy for branches, commits and pull
+requests; this is the part that happens after the last one is merged.
+
+**Pushing a tag is signing a release.** `publish` signs the image with cosign under this
+repository's own identity, keyless, and attests its provenance and SBOM. No human approves anything
+in between, and the workflow checks neither that the tag is annotated nor that it is signed. Whoever
+may push a `v*` tag may publish under this project's name.
 
 ## The short version
 
@@ -15,43 +21,47 @@ git tag -a v0.2.0 -m "Courtside 0.2.0"
 git push origin v0.2.0
 ```
 
-The version is the tag without its leading `v`, and the workflow stamps that into the build. There
-is no other place a version is written: the `pom.xml` carries a `-SNAPSHOT` between releases and is
-never edited to cut one.
+The version is the tag without its leading `v`, and the workflow stamps that into the build. The
+`pom.xml` carries a `-SNAPSHOT` between releases and is never edited to cut one. The version in
+`frontend/package.json` is written by hand, read by nothing and updated by nobody; ignore it.
 
 ## What the release refuses before it builds anything
 
-Three checks run before a single compilation, and each of them fails the run rather than warns.
+Three checks run before a single compilation, and each fails the run rather than warning.
 
-**The tag has to sit on `main`.** A tag on a branch, or on a commit that never landed, is refused
-by name. Move the tag rather than arguing with the check: delete it, merge what is missing, tag
-again.
+**The tag has to sit on `main`.** A tag on a branch, or on a commit that never landed, is refused by
+name. The tag is spent at that point — *When a release fails* below applies to this refusal like any
+other.
 
-**A nightly must already have verified this commit.** The release looks for a scheduled `build`
-run that succeeded on its *first* attempt, whose head commit is an ancestor of the tag, and whose
-recorded evidence says `releaseReadiness: complete`. A re-run that went green on the second attempt
-does not count, and neither does a nightly that verified something later than the tag. If the check
-refuses, the answer is usually to wait for tonight's run rather than to tag again.
+**A nightly must already have verified an ancestor of this commit.** The release looks for a
+scheduled `build` run that succeeded on its *first* attempt, whose head commit is an ancestor of
+the tag, and whose recorded evidence says `releaseReadiness: complete`. A run that went green on its
+second attempt does not count. Note what this does and does not establish: some ancestor was
+verified in full, not the tagged commit. What verifies the tagged commit is the release's own
+`build` job.
 
-**No `nightly` failure issue may be open.** The scheduled-run tracker opens one issue per failing
-gate and closes it after seven consecutive green first attempts. While one is open the release
-stops — except for `npm audit`, which is excluded by name because its findings arrive from outside
-the repository and are tracked on their own.
+**No tracker-written `nightly` failure issue may be open.** The check counts open issues carrying
+the `nightly` label whose title starts with `[nightly] ` and whose body holds the tracker's
+fingerprint — the issues the scheduled-run tracker wrote. An issue a human opened about a failing
+night does not stop a release. Issues reporting `npm audit` are excluded by name, because those
+findings arrive from outside the repository and are tracked on their own.
 
-Together these mean a release is never the first time the full suite runs against the code being
-released.
+**The tracker never closes one of those issues itself.** After seven consecutive green first
+attempts it comments that the issue is ready for closure review and says, in as many words, that it
+remains open. Somebody has to close it. A release that seems blocked for no reason is usually
+waiting on exactly that.
 
 ## What runs, and what each part proves
 
 | Job | What it establishes |
 |---|---|
-| `build` | The version is stamped, the full suite passes, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
+| `build` | The version is stamped, the full suite passes on the tagged commit, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
 | `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
 | `qualify` | That exact digest is brought up through the reference deployment on `amd64` and `arm64`, and its vulnerabilities are checked against the candidate-image policy |
-| `active-security` | The running candidate is exercised by the authenticated scanner |
-| `upgrade` | The database upgrade path from every supported origin is executed against the candidate |
+| `active-security` | The running candidate is exercised by the scanners of the `active` profile. The `destructive` profile — resource abuse — does not run here |
+| `upgrade` | The database upgrade path from each resolved origin is executed against the candidate |
 | `restore` | A backup taken from the candidate is restored into it |
-| `security-record` | The evidence from the passes above is sealed |
+| `security-record` | The build, image, qualify and active-security evidence is collected into one file. `upgrade` and `restore` are not in it |
 | `publish` | The qualified manifest is tagged, signed with cosign, given an SBOM and a provenance attestation, and the GitHub release is written |
 
 `publish` retags the manifest that `qualify` proved. Nothing is rebuilt between qualification and
@@ -59,17 +69,32 @@ publication, so the digest a club pulls is the digest that was brought up twice.
 
 ## When a release fails
 
-It stops at the job that refused, and nothing is published. What exists afterwards is the
-`release-candidate-<sha>` image in the registry — a candidate, not a release, and no club will
-resolve a version tag to it.
+It stops at the job that refused, and nothing is published under a version tag. What stays behind is
+the `release-candidate-<sha>` image, unsigned and unqualified, in a public registry — nothing
+removes those, and no version tag resolves to one.
 
-**The tag stays where it is.** Do not delete and re-push a tag to retry: a tag that once named a
-commit and later names another is the one thing consumers cannot detect. Fix the cause on `main`
-through the usual pull request, then cut the next patch version. A `v0.2.0` that failed is followed
-by `v0.2.1`, not by a second `v0.2.0`.
+**The tag stays where it is.** A tag that once named a commit and later names another is the one
+thing a consumer cannot detect, and by the time a run has started, the tag has been observed. Fix
+the cause on `main` through the usual pull request and cut the next patch version: a `v0.2.0` that
+failed is followed by `v0.2.1`.
 
-The exception is a tag that never started a run at all — a typo in the name, a push that raced a
-branch protection — where nothing observed it and re-tagging costs nobody anything.
+Only a tag no run ever saw is free to move, and under a `v*` trigger that is rarer than it sounds —
+a misspelling that keeps the leading `v` still starts a run.
+
+**A retained failed tag has two consequences, and both bite the next release**, because the
+workflow reads its history from local git tags rather than from what was published:
+
+- `upgrade` resolves its origins from `git tag --list 'v*'`, so the failed `v0.2.0` becomes an
+  upgrade origin for `v0.2.1` — and the job then tries to pull an image that was never published.
+  Every release of that minor line fails there until somebody intervenes.
+- The upgrade notes are collected backwards with `git describe --tags`, so the range starts at the
+  failed tag. Every `BREAKING CHANGE:` footer between the last *published* release and it falls out
+  of the release body, and a club reading that body is told nothing changed.
+
+Until [#808](https://github.com/jegr78/courtside/issues/808) is resolved, a failed tag has to be
+deleted before the next release of the same minor line — the mutation this section otherwise
+forbids, which is exactly why that issue exists. Delete it from the remote and locally, and say so
+in the pull request carrying the fix.
 
 ## When the change is breaking
 
@@ -78,24 +103,33 @@ variables a club sets are the published surface, and a change in the shape of ei
 pull request that makes one carries `!` in its Conventional Commit title or a `BREAKING CHANGE:`
 footer, which is what the title lint reads and what the version bump follows.
 
-**The upgrade note writes itself from your commit messages.** `build` collects every
-`BREAKING CHANGE:` footer and every `!:` subject between the previous tag and this one and puts them
-verbatim into the release body under *Upgrade notes*; with none it says that no published surface
-changed and a club may raise `COURTSIDE_VERSION` and restart. So the footer is not paperwork — it is
-the text a club reads before pulling the image, and "BREAKING CHANGE: renamed a variable" is a
-sentence that helps nobody at 22:00.
+**The upgrade note is your commit message.** `build` collects every `BREAKING CHANGE:` footer and
+every `!:` subject between the previous tag and this one and puts them verbatim into the release
+body under *Upgrade notes*; with none it writes that no published surface changed and a club may
+raise `COURTSIDE_VERSION` and restart. The footer is not paperwork, then — it is the text a club
+reads before pulling the image, and `BREAKING CHANGE: renamed a variable` is a sentence that helps
+nobody at 22:00.
 
-What no automation covers is the upgrade path: a supported origin has to still reach the new schema.
-The `upgrade` job executes every origin the repository declares, so a release that breaks one is
-refused, but only for the origins that are on the list.
+What no automation covers is the upgrade path itself. `upgrade` executes the origins it resolved
+from the tag history, so a release that breaks one of those is refused — but only those.
+
+## Prereleases do not work today
+
+`v0.3.0-rc1` reaches *Resolve supported database upgrade origins*, which refuses any tag that is not
+`v<major>.<minor>.<patch>`, and `build` fails there. The `prerelease` flag further down the workflow
+is unreachable. Do not cut one expecting a candidate release;
+[#808](https://github.com/jegr78/courtside/issues/808) covers this too.
 
 ## After the release
 
-The image is at `ghcr.io/jegr78/courtside:<version>`, signed, and the GitHub release carries two
-files: the `openapi.yaml` this version answers to, and `security-record.json`, the sealed evidence
-of the passes above. A tag with a hyphen in it —
-`v0.3.0-rc1` — is published as a prerelease, which is how a candidate reaches a club that wants to
-try it without being offered to everyone.
+The image is at `ghcr.io/jegr78/courtside`, signed, under four tags: `<version>`,
+`<major>.<minor>`, `<major>` and `latest`. A club pinning `0.2.0` stays where it is; one pinning
+`0.2`, `0` or `latest` moves with every matching release — worth knowing before recommending a tag
+to anybody.
+
+The GitHub release carries two files: the `openapi.yaml` this version answers to, and
+`security-record.json`. That record is an ordinary release asset — neither signed nor attested,
+unlike the image itself — so it reports what the passes found rather than proving it.
 
 `deploy/.env.example` names `COURTSIDE_VERSION`, and a club moves by editing that one line and
 recreating the container — the deployment reference in `deploy/README.md` is what they follow, not
