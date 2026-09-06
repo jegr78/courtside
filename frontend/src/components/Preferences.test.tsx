@@ -257,3 +257,20 @@ it("given nobody is signed in, when the menu is opened, then it offers nothing t
   // then
   expect(screen.queryByTestId("logout")).not.toBeInTheDocument();
 });
+
+it("given a request still in flight, when the session it belongs to ends first, then its failure does not reach the next one", async () => {
+  // given
+  let refuse: (rejected: Error) => void = () => undefined;
+  vi.spyOn(api, "changeOwnLocale").mockReturnValue(new Promise((_, reject) => { refuse = reject; }));
+  const { rerender } = render(<Preferences authenticated signedOut={() => undefined} />);
+  await openPreferences();
+  await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
+
+  // when — another request sees the session end first, so the flip is spent before the refusal lands
+  rerender(<Preferences authenticated={false} signedOut={() => undefined} />);
+  refuse(new Error("network"));
+
+  // then
+  await waitFor(() => expect(api.changeOwnLocale).toHaveBeenCalled());
+  expect(screen.queryByTestId("preferences-failure")).not.toBeInTheDocument();
+});
