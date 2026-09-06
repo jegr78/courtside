@@ -25,8 +25,11 @@ booking_card ──< booking ──< court_allocation >── court
 | `court_allocation` | One row per court the booking occupies, with its own start, end and status |
 | `booking_participant` | One row per player slot |
 
-A booking holds one card and one or more allocations. A club that wants a new kind of occupancy —
-a tournament, a school session — inserts a `booking_card` row; it does not deploy anything.
+A booking holds exactly one card and one `court_allocation` row per court it takes. Nothing in the
+schema insists it takes any: a booking series gets a trigger for that, a booking does not, and the
+API's own contract is what refuses an empty list of courts. A club that wants a new kind of
+occupancy — a tournament, a school session — inserts a `booking_card` row; it does not deploy
+anything.
 
 **`court_allocation` is where the product's central guarantee lives.** Two confirmed allocations
 can never overlap on the same court, and that is not application logic:
