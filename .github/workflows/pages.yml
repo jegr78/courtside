@@ -46,6 +46,8 @@ jobs:
 
   deploy:
     needs: build
+    # workflow_dispatch can start this run from any branch; only main publishes.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

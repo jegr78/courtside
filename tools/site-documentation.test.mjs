@@ -71,6 +71,11 @@ test("given the deployment, when the workflow runs, then only main publishes and
 
     // when / then
     assert.deepEqual(triggers.push.branches, ["main"]);
+    assert.equal(triggers.pull_request_target, undefined,
+      "that trigger would run this workflow with the repository's own token on a fork's branch");
+    assert.equal(triggers.pull_request, undefined);
+    assert.match(workflow.jobs.deploy.if, /github\.ref == 'refs\/heads\/main'/,
+      "workflow_dispatch can start this run from any branch, so the deploy job says which one publishes");
     assert.equal(workflow.permissions.contents, "read");
     assert.equal(workflow.permissions["id-token"], undefined,
       "the token that proves the deployment belongs to the job that deploys, not to the workflow");
@@ -99,6 +104,12 @@ test("given a change to the site, when the profile is classified, then the docum
     // when / then
     assert.ok(profiles.docs.prefixes.includes("site/"),
       "site/ classifies as an unknown path, which fails closed to the full profile");
+    for (const base of ["site/package.json", "site/package-lock.json", "site/.npmrc",
+      "site/.vitepress/config.mts"]) {
+      assert.ok(profiles.full.exact.includes(base),
+        `${base} decides what the site depends on, and a change to it selects the cheap `
+        + "documentation profile — the frontend's equivalents are listed here for that reason");
+    }
     assert.ok(contract.profiles.docs.localTasks.includes("site-build"),
       "the documentation profile selects site/ and then never builds it");
     assert.deepEqual(contract.localTaskDefinitions["site-build"].arguments,
