@@ -411,8 +411,8 @@ The project board [Courtside](https://github.com/users/jegr78/projects/2) is the
 open issue that is *work* is on it, in `Todo`, `In Progress` or `Done`. A piece of work that is not
 on the board is a bug in the tracker, not a gap in the board.
 
-* **Status lives in two places and no third.** The board says what is moving. A parent issue's
-  sub-issue panel says how far its children have got. The parent's *body* says the problem, the
+* **Status lives in two places and no hand-maintained third copy.** The board says what is moving.
+  A parent issue's sub-issue panel says how far its children have got. The parent's *body* says the problem, the
   scope and what "done" means, and it never repeats the panel: no `- [ ] #nnn` checklist, no
   "Delivered" or "Open" section.
 
@@ -420,6 +420,16 @@ on the board is a bug in the tracker, not a gap in the board.
   nothing verifies it. This tracker has already carried a parent claiming that delivered work was
   open, that a resolved question still needed a decision, and that a shipped navigation bar did not
   exist. Every one of those sentences was true on the day it was written.
+
+  The 0.1.0 release parent is the one deliberate exception: its marked status comment is generated
+  from the native sub-issue relationships, milestone and published release rather than edited by a
+  person or agent. `tools/release-plan-sync.mjs` verifies its editable contract against those
+  relationships, updates only that comment after relevant issue changes and on a daily safety run,
+  and reopens the parent if somebody closes it before its work and release are complete. A plan
+  relationship or contract change is not finished until that sync succeeds locally or through its
+  dispatch workflow. Locally, pass a current token only to that process with
+  `GH_TOKEN="$(gh auth token)" node tools/release-plan-sync.mjs --repository jegr78/courtside
+  --issue 826`. Never edit the generated comment.
 
 * **Scope a parent records is scope somebody tracks.** When a parent body settles a shape for four
   subjects and only three of them become sub-issues, the fourth is a decision nobody holds: it does

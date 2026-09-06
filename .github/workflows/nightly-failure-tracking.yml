@@ -9,6 +9,7 @@ on:
       - mutation testing
       - npm audit
       - performance smoke
+      - release plan sync
       - security assessment
       - test stability
     types: [completed]
