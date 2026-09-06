@@ -174,10 +174,13 @@ the category procedure is incomplete.
 
 ### MAN-CLIENT-001 Browser, accessibility and physical-device review
 
-- Prerequisites: supported desktop browsers, at least one physical mobile device and test assistive technology.
+- Prerequisites: supported desktop browsers and test assistive technology. A release that claims
+  real-device evidence additionally requires the physical iOS and Android smoke defined by #217;
+  browser emulation must not be reported as that evidence.
 - Steps: inspect focus, announcements, clipboard, autofill, browser storage, back/forward cache,
   service-worker update and offline states around login and sensitive mutations; repeat critical
-  journeys with keyboard and screen reader; review installed-PWA behavior after logout and upgrade.
+  journeys with keyboard and screen reader; review installed-PWA behavior after logout and upgrade;
+  perform the physical-device smoke when the assessed release claims that evidence.
 - Expected secure outcome: browser and assistive paths neither conceal security decisions nor retain
   authenticated or personal data beyond the documented session.
 
