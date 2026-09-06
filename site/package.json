@@ -1,0 +1,25 @@
+{
+  "name": "courtside-site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "overrides": {
+    "vite": "8.2.2"
+  },
+  "allowScripts": {
+    "esbuild": true,
+    "fsevents": true
+  },
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "vitepress": "1.6.4"
+  }
+}

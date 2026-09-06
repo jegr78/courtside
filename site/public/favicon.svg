@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Courtside">
+  <title>Courtside</title>
+  <rect x="0" y="0" width="64" height="64" rx="10" ry="10" fill="#B85C38"/>
+  <rect x="8" y="8" width="12" height="48" fill="#D7E24B"/>
+  <g fill="none" stroke="#FCFBF9" stroke-width="4" stroke-linecap="square">
+    <line x1="20" y1="8" x2="20" y2="56"/>
+    <line x1="20" y1="32" x2="56" y2="32"/>
+  </g>
+</svg>
