@@ -142,7 +142,8 @@ reads before pulling the image, and `BREAKING CHANGE: renamed a variable` is a s
 nobody at 22:00.
 
 What no automation covers is the upgrade path itself. `upgrade` executes the origins it resolved
-from the tag history, so a release that breaks one of those is refused — but only those.
+from the published release history, so a release that breaks one of those is refused — but only
+those.
 
 ## Candidates
 
@@ -171,10 +172,11 @@ Ordering follows semantic versioning, so `v0.3.0-rc` precedes `v0.3.0-rc.2`, whi
 
 ## After the release
 
-The image is at `ghcr.io/jegr78/courtside`, signed. A release is published under four tags:
-`<version>`, `<major>.<minor>`, `<major>` and `latest`. A club pinning `0.2.0` stays where it is;
-one pinning `0.2`, `0` or `latest` moves with every matching release — worth knowing before
-recommending a tag to anybody.
+The image is at `ghcr.io/jegr78/courtside`, signed. A release is published under up to four tags:
+`<version>`, `<major>.<minor>`, `<major>` and `latest`. A `0.x` release does not publish the floating
+`0` tag because every minor may break compatibility before 1.0. A club pinning `0.2.0` stays where
+it is; one pinning `0.2` or `latest` moves with every matching release. From 1.0 onwards, the
+floating major tag moves with every matching release as well.
 
 **A candidate is published under its own version and nothing else.** No floating tag follows it, and
 the GitHub release is marked as a prerelease, so a club that pinned `latest` or `0.2` never receives
