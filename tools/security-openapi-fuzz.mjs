@@ -17,6 +17,8 @@ const publicPropertyNames = collectPropertyNames(api.components?.schemas ?? {});
 const publicMediaTypes = collectMediaTypes(api);
 const evidenceSchema = JSON.parse(readFileSync(
   new URL("../security/openapi-fuzz-evidence.schema.json", import.meta.url), "utf8"));
+const scenarioStatuses = new Set(evidenceSchema.$defs.failureReason.oneOf
+  .find((branch) => branch.properties.kind.const === "scenario").properties.scenarioStatus.enum);
 const lifecycleSchema = JSON.parse(readFileSync(
   new URL("../security/finding-lifecycle.schema.json", import.meta.url), "utf8"));
 const ajv = new Ajv({ strict: true, allErrors: true });
@@ -119,7 +121,10 @@ export function normalizeSchemathesisEvents(events, inventory, mode, contractOpe
           }
         }
       }
-      if (scenario.status !== "success" && !recordedFailure) failed = true;
+      if (scenario.status !== "success" && !recordedFailure) {
+        counterexamples.push(unfinishedScenarioCounterexample(entry, mode, ++sequence, scenario, caseIds));
+        failed = true;
+      }
     }
     const outcome = failed ? "incomplete" : "passed";
     return { operationId: entry.operationId, mode, outcome,
@@ -170,7 +175,8 @@ export async function runOpenApiFuzzAssessment(plan, context) {
   const observedAt = (context.now?.() ?? new Date()).toISOString();
   const candidates = mergeCandidates([
     ...counterexamples.map((counterexample) => counterexampleCandidate(counterexample, plan, context, observedAt)),
-    ...undocumentedRoutes.map((route) => undocumentedRouteCandidate(route, plan, context, observedAt))
+    ...undocumentedRoutes.map((route) => undocumentedRouteCandidate(route, plan, context, observedAt)),
+    ...incompleteCaseCandidates(scanner, plan, context, observedAt)
   ]);
   const stateChanged = scanner.stateBefore !== scanner.stateAfter;
   const incomplete = counterexamples.length > 0 || undocumentedRoutes.length > 0
@@ -345,6 +351,14 @@ export async function runOpenApiInputCases(plan, fixture, context) {
   return { cases: results, requestCount: cases.length, generatedBytes };
 }
 
+// A schema that only says "string" accepts "invalid", so corrupting such a parameter would assert a
+// rejection the contract never promised.
+function constrainedQueryParameter(parameters) {
+  return parameters.find(({ in: location, schema }) => location === "query" && schema !== undefined
+    && (schema.format !== undefined || schema.pattern !== undefined || schema.enum !== undefined
+      || schema.type !== "string"))?.name;
+}
+
 export async function runOpenApiMutationCases(plan, fixture, context) {
   const operations = buildOpenApiFuzzInventory(api)
     .filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
@@ -362,10 +376,10 @@ export async function runOpenApiMutationCases(plan, fixture, context) {
     const path = operation.path.replaceAll(/\{[^}]+\}/g, "invalid");
     const contentTypes = Object.keys(definition.requestBody?.content ?? {});
     const contentType = contentTypes[0];
+    const requiredHeaders = parameters
+      .filter(({ in: location, required }) => location === "header" && required);
     const probe = { method: operation.method, path, headers: {} };
-    for (const parameter of parameters.filter(({ in: location, required }) => location === "header" && required)) {
-      probe.headers[parameter.name] = "security-invalid";
-    }
+    for (const parameter of requiredHeaders) probe.headers[parameter.name] = "security-invalid";
     if (contentType === "application/json") {
       probe.headers["content-type"] = contentType;
       probe.body = "{";
@@ -376,7 +390,11 @@ export async function runOpenApiMutationCases(plan, fixture, context) {
       probe.headers["content-type"] = "multipart/form-data; boundary=courtside-invalid";
       probe.body = "--courtside-invalid--\r\n";
     }
-    generatedBytes += Buffer.byteLength(path) + Buffer.byteLength(probe.body ?? "");
+    if (path === operation.path && requiredHeaders.length === 0 && probe.body === undefined) {
+      const constrained = constrainedQueryParameter(parameters);
+      if (constrained !== undefined) probe.path = `${path}?${constrained}=invalid`;
+    }
+    generatedBytes += Buffer.byteLength(probe.path) + Buffer.byteLength(probe.body ?? "");
     const response = await send(probe);
     const passed = response.status >= 400 && response.status < 500
       && /^urn:courtside:error:[a-z0-9-]+$/.test(response.problemType ?? "");
@@ -426,6 +444,16 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
   if (evidence.dispositions.some(({ reproductionDigest }) => actionableDigests.has(reproductionDigest))) {
     throw new Error("OpenAPI fuzz evidence classifies one observation twice");
   }
+  // An incomplete result is comparable only when its incompleteness comes from retained candidates,
+  // so every operation that reports one has to name what a reader would triage.
+  if (evidence.operations.some((operation) => operation.outcomes.some(({ mode, outcome }) =>
+    outcome === "incomplete"
+      && !evidence.counterexamples.some((counterexample) =>
+        counterexample.operationId === operation.operationId && counterexample.mode === mode)
+      && !evidence.mutationCases.some((entry) =>
+        entry.operationId === operation.operationId && entry.outcome === "incomplete")))) {
+    throw new Error("OpenAPI fuzz evidence reports an incomplete operation that retained nothing");
+  }
   const candidateFingerprints = evidence.candidates.map(({ fingerprint }) => fingerprint);
   if (evidence.inputCases.some((entry) => (entry.status === undefined) === (entry.transportError === undefined))) {
     throw new Error("OpenAPI input evidence must contain exactly one transport outcome");
@@ -439,7 +467,10 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
       "2000-01-01T00:00:00.000Z")),
     ...evidence.undocumentedRoutes.map((route) => undocumentedRouteCandidate(route,
       { runId: "validation", targetFingerprint: evidence.targetFingerprint }, { attempt: 1 },
-      "2000-01-01T00:00:00.000Z"))
+      "2000-01-01T00:00:00.000Z")),
+    ...incompleteCaseCandidates(evidence,
+      { runId: "validation", targetFingerprint: evidence.targetFingerprint }, { attempt: 1 },
+      "2000-01-01T00:00:00.000Z")
   ]);
   const expectedFingerprints = new Set(expectedCandidates.map(({ fingerprint }) => fingerprint));
   if (expectedFingerprints.size !== candidateFingerprints.length
@@ -561,6 +592,45 @@ function reproductionDigestFor(counterexample) {
     .digest("hex")}`;
 }
 
+function incompleteCaseCandidates(cases, plan, context, observedAt) {
+  const incomplete = ({ outcome }) => outcome === "incomplete";
+  return [
+    ...cases.inputCases.filter(incomplete)
+      .map((entry) => incompleteCaseCandidate("input", `input-class ${entry.id}`, entry,
+        plan, context, observedAt)),
+    ...cases.importCases.filter(incomplete)
+      .map((entry) => incompleteCaseCandidate("import", `import-class ${entry.id}`, entry,
+        plan, context, observedAt)),
+    ...cases.mutationCases.filter(incomplete)
+      .map((entry) => incompleteCaseCandidate("mutation", `${entry.method} ${entry.path}`, entry,
+        plan, context, observedAt))
+  ];
+}
+
+// The identity names which case is unfinished, not how it answered this time: a probe that responds
+// 502 on one run and 500 on the next would otherwise mint two findings for one unresolved case.
+function incompleteCaseCandidate(kind, surface, entry, plan, context, observedAt) {
+  const identity = JSON.stringify({ kind, surface, observation: entry.observation });
+  const digest = createHash("sha256").update(identity).digest("hex");
+  return createCandidate({
+    scanner: "schemathesis",
+    ruleId: `${kind}-case-incomplete`,
+    normalizedSurface: surface,
+    parameter: `case-${digest.slice(0, 16)}`,
+    attackClass: "contract-boundary",
+    provenance: {
+      tool: "schemathesis", version: openApiFuzzVersion, runId: plan.runId, attempt: context.attempt,
+      targetFingerprint: plan.targetFingerprint, observedAt
+    },
+    evidence: [{
+      id: `schemathesis-case-${digest.slice(0, 12)}`,
+      status: "retained", classification: "protected",
+      digest: `sha256:${digest}`,
+      expiresOn: new Date(new Date(observedAt).getTime() + 30 * 86_400_000).toISOString().slice(0, 10)
+    }]
+  });
+}
+
 function undocumentedRouteCandidate(route, plan, context, observedAt) {
   return createCandidate({
     scanner: "schemathesis",
@@ -637,8 +707,16 @@ function safeCounterexample(operation, mode, sequence, check, generatedCase) {
   return counterexample;
 }
 
+function unfinishedScenarioCounterexample(operation, mode, sequence, scenario, caseIds) {
+  const status = scenarioStatuses.has(scenario.status) ? scenario.status : "unknown";
+  return safeCounterexample(operation, mode, sequence,
+    { name: "scenario_completion", failure_info: { reason: { kind: "scenario", scenarioStatus: status } } },
+    scenario.recorder.cases[caseIds[0]].value);
+}
+
 function failureReasonProjection(check, reason) {
   const allowedKinds = {
+    "scenario-completion": ["scenario"],
     "not-a-server-error": ["status"],
     "status-code-conformance": ["status"],
     "negative-data-rejection": ["status"],
@@ -690,6 +768,8 @@ function failureReasonProjection(check, reason) {
       && new Set(reason.missingProperties).size === reason.missingProperties.length
       && (reason.validationKeyword === "required" ? reason.missingProperties.length > 0
         : reason.missingProperties.length === 0);
+  } else if (reason?.kind === "scenario") {
+    valid &&= exactKeys(["kind", "scenarioStatus"]) && scenarioStatuses.has(reason.scenarioStatus);
   } else if (reason?.kind === "protocol") {
     valid &&= exactKeys(["kind", "disagreement"])
       && ["missing-required-header", "unsupported-method-status", "missing-allow-header",

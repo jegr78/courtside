@@ -129,6 +129,11 @@
             "kind": { "const": "protocol" },
             "disagreement": { "enum": ["missing-required-header", "unsupported-method-status",
               "missing-allow-header", "allow-header-mismatch"] }
+          } },
+        { "type": "object", "additionalProperties": false,
+          "required": ["kind", "scenarioStatus"], "properties": {
+            "kind": { "const": "scenario" },
+            "scenarioStatus": { "enum": ["error", "failure", "interrupted", "skip", "timeout", "unknown"] }
           } }
       ]
     },
@@ -144,7 +149,7 @@
         "id": { "enum": ["missing-fields", "duplicate-fields", "unknown-fields", "unicode-normalization", "control-characters", "deep-json", "oversized-body", "numeric-boundary", "cursor-boundary", "date-time-boundary", "malformed-idempotency-key"] },
         "status": { "type": "integer", "minimum": 100, "maximum": 599 },
         "transportError": { "enum": ["connection-reset"] },
-        "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$" },
+        "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$", "maxLength": 100 },
         "observation": { "enum": ["typed-input-rejection", "proxy-size-rejection"] },
         "outcome": { "$ref": "#/$defs/outcome" }
       }
@@ -156,7 +161,7 @@
       "properties": {
         "id": { "enum": ["invalid-utf8", "duplicate-columns", "oversized-cell", "conflicting-reference"] },
         "status": { "type": "integer", "minimum": 100, "maximum": 599 },
-        "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$" },
+        "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$", "maxLength": 100 },
         "observation": { "enum": ["typed-upload-rejection", "row-level-rejection"] },
         "outcome": { "$ref": "#/$defs/outcome" }
       }
@@ -170,7 +175,7 @@
         "method": { "enum": ["POST", "PUT", "PATCH", "DELETE"] },
         "path": { "type": "string", "pattern": "^/", "maxLength": 200 },
         "status": { "type": "integer", "minimum": 100, "maximum": 599 },
-        "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$" },
+        "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$", "maxLength": 100 },
         "observation": { "const": "invalid-mutation-rejected" },
         "outcome": { "$ref": "#/$defs/outcome" }
       }

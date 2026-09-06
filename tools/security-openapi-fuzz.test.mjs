@@ -451,3 +451,199 @@ test("given a contract chosen for the run, when the fuzzer loads, then it is the
   // then
   assert.equal(printed, `sha256:${createHash("sha256").update(readFileSync(chosen)).digest("hex")}`);
 });
+
+test("given a scenario that ended without succeeding, when nothing failed a check, then the operation still says what happened", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "listRoster")];
+  const events = [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: {
+      status: "error",
+      recorder: {
+        label: "GET /api/admin/roster",
+        cases: { one: { value: { method: "GET", query: { cursor: "boundary" },
+          meta: { generation: { mode: "positive" } } } } },
+        checks: {}
+      }
+    } }
+  ];
+
+  // when
+  const normalized = normalizeSchemathesisEvents(events, inventory, "positive");
+
+  // then
+  assert.equal(normalized.operationResults[0].outcome, "incomplete");
+  assert.equal(normalized.counterexamples.length, 1);
+  assert.equal(normalized.counterexamples[0].check, "scenario-completion");
+  assert.equal(normalized.counterexamples[0].operationId, "listRoster");
+  assert.deepEqual(normalized.counterexamples[0].reason,
+    { kind: "scenario", scenarioStatus: "error" });
+  assert.match(normalized.counterexamples[0].reproductionDigest, /^sha256:[a-f0-9]{64}$/);
+});
+
+// The status is the one field of this counterexample that comes from the scanner rather than from us.
+test("given an unfinished scenario reporting a status nobody defined, when it is retained, then the status is not carried through", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "listRoster")];
+  const events = [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: {
+      status: "something-the-scanner-invented",
+      recorder: {
+        label: "GET /api/admin/roster",
+        cases: { one: { value: { method: "GET", meta: { generation: { mode: "positive" } } } } },
+        checks: {}
+      }
+    } }
+  ];
+
+  // when
+  const normalized = normalizeSchemathesisEvents(events, inventory, "positive");
+
+  // then
+  assert.equal(normalized.operationResults[0].outcome, "incomplete");
+  assert.deepEqual(normalized.counterexamples[0].reason,
+    { kind: "scenario", scenarioStatus: "unknown" });
+});
+
+// The paired comparison refuses a candidate run that is incomplete while it retained nothing, and a
+// mutation probe is one of the routes that used to reach that shape.
+test("given a mutation probe that was not answered as documented, when the run is retained, then it says which one", async () => {
+  // given
+  const inventory = buildOpenApiFuzzInventory(api);
+  const generatedInventory = inventory.filter(({ method }) => method === "GET");
+  const events = (mode) => [
+    { LoadingFinished: { statistic: { operations: { total: inventory.length,
+      selected: generatedInventory.filter(({ modes }) => modes.includes(mode)).length } } } },
+    ...generatedInventory.filter(({ modes }) => modes.includes(mode)).map((entry) => ({
+      ScenarioFinished: { status: entry.operationId === "listRoster" ? "timeout" : "success", recorder: {
+        label: `${entry.method} ${entry.path}`,
+        cases: { one: { value: { method: entry.method, path: entry.path,
+          query: { case: "0" }, meta: { generation: { mode } } } } },
+        checks: {}
+      } }
+    }))
+  ];
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  const [firstInputClass] = openApiFuzzPolicy.inputClasses;
+  const inputCases = openApiFuzzPolicy.inputClasses.map((id) => ({ id,
+    ...(id === firstInputClass ? { status: 200 }
+      : { status: 400, problemType: "urn:courtside:error:validation-failed" }),
+    observation: "typed-input-rejection",
+    outcome: id === firstInputClass ? "incomplete" : "passed" }));
+  const importCases = ["invalid-utf8", "duplicate-columns"].map((id) => ({ id,
+    ...(id === "invalid-utf8" ? { status: 200 }
+      : { status: 400, problemType: "urn:courtside:error:import-snapshot-unreadable" }),
+    observation: "typed-upload-rejection",
+    outcome: id === "invalid-utf8" ? "incomplete" : "passed" }))
+    .concat(["oversized-cell", "conflicting-reference"].map((id) => ({ id, status: 201,
+      observation: "row-level-rejection", outcome: "passed" })));
+  const mutations = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
+  const mutationCases = (unfinishedStatus) => mutations.map(({ operationId, method, path }) => ({
+    operationId, method, path,
+    status: operationId === "exportRoster" ? unfinishedStatus : 400,
+    ...(operationId === "exportRoster" ? {}
+      : { problemType: "urn:courtside:error:validation-failed" }),
+    observation: "invalid-mutation-rejected",
+    outcome: operationId === "exportRoster" ? "incomplete" : "passed" }));
+
+  const retained = (unfinishedStatus) => runOpenApiFuzzAssessment({ profile: "active",
+    environment: "SECURITY",
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001", "CSA-API-001", "CSA-IMPORT-001"],
+    runId: "run-0002", targetFingerprint: fingerprint }, {
+    maxRequests: 2000, attempt: 1, deadline: new Date(Date.now() + 60_000),
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-fuzz-evidence-")),
+    now: () => new Date("2026-08-21T12:00:00Z"),
+    runFuzzer: async () => ({ runtimeHardened: true, requestCount: 100,
+      specificationDigest: openApiSpecificationDigest(),
+      events: { positive: events("positive"), negative: events("negative") }, inputCases, importCases,
+      mutationCases: mutationCases(unfinishedStatus),
+      observedRoutes: inventory.map(({ method, path }) => ({ method, pathTemplate: path })),
+      stateBefore: fingerprint, stateAfter: fingerprint, generatedDataMegabytes: 1 })
+  });
+
+  // when
+  const evidence = await retained(200);
+  const flaky = await retained(500);
+
+  // then
+  assert.equal(evidence.outcome, "incomplete");
+  assert.deepEqual(evidence.candidates.map(({ ruleId }) => ruleId).toSorted(),
+    ["import-case-incomplete", "input-case-incomplete", "mutation-case-incomplete",
+      "scenario-completion"]);
+  assert.equal(evidence.candidates.find(({ ruleId }) => ruleId === "mutation-case-incomplete")
+    .normalizedSurface, "post /api/admin/export/roster");
+  assert.equal(evidence.candidates.find(({ ruleId }) => ruleId === "import-case-incomplete")
+    .normalizedSurface, "import-class invalid-utf8");
+  assert.equal(evidence.counterexamples.filter(({ check }) => check === "scenario-completion").length,
+    2, "the unfinished GET scenario is retained in both generation modes");
+  assert.doesNotThrow(() => validateOpenApiFuzzEvidence(evidence));
+
+  // The acknowledgement gate is a fingerprint difference, so a probe answering 500 on one run and
+  // 200 on the next must not mint a second finding for one unresolved case.
+  assert.deepEqual(flaky.candidates.map(({ fingerprint: value }) => value).toSorted(),
+    evidence.candidates.map(({ fingerprint: value }) => value).toSorted());
+
+  const unattributed = structuredClone(evidence);
+  const untouched = unattributed.operations.find(({ operationId }) => operationId === "getCourt");
+  untouched.outcomes[0].outcome = "incomplete";
+  untouched.outcomes[0].observation = "candidate-requires-triage";
+  assert.throws(() => validateOpenApiFuzzEvidence(unattributed), /retained nothing/);
+
+  const withoutCandidate = structuredClone(evidence);
+  withoutCandidate.candidates = withoutCandidate.candidates
+    .filter(({ ruleId }) => ruleId !== "mutation-case-incomplete");
+  assert.throws(() => validateOpenApiFuzzEvidence(withoutCandidate), /omits a lifecycle candidate/);
+});
+
+// An operation with no body, no path parameter and no required header leaves the probe nothing to
+// corrupt, so it used to send a valid request and then report the correct answer as a violation.
+test("given an operation with only optional query parameters, when the probe is built, then it corrupts one of them", async () => {
+  // given
+  const probes = new Map();
+  const fixture = { client: {} };
+
+  // when
+  await runOpenApiMutationCases({ target: "https://127.0.0.1:9443" }, fixture, {
+    ca: "certificate", timeoutMilliseconds: 1_000,
+    request: async (probe) => {
+      probes.set(probe.path.split("?")[0], probe);
+      return { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    }
+  });
+
+  // then
+  const roster = probes.get("/api/admin/export/roster");
+  assert.ok(roster, "the roster export is no longer probed at all");
+  assert.match(roster.path, /[?&]membershipTypeId=invalid\b/,
+    "a uuid query parameter is what this operation offers to make invalid");
+  assert.equal(roster.body, undefined, "the operation declares no request body");
+});
+
+// A probe that could not corrupt anything sends a valid request and then reports the correct answer
+// as a violation, which is how the roster export held the paired comparison red.
+test("given every state-changing operation, when its probe is built, then the request was actually made invalid", async () => {
+  // given
+  const probes = [];
+  const fixture = { client: {} };
+
+  // when
+  const result = await runOpenApiMutationCases({ target: "https://127.0.0.1:9443" }, fixture, {
+    ca: "certificate", timeoutMilliseconds: 1_000,
+    request: async (probe) => {
+      probes.push(probe);
+      return { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    }
+  });
+
+  // then
+  const untouched = result.cases
+    .map((entry, index) => ({ entry, probe: probes[index] }))
+    .filter(({ entry, probe }) => probe.path === entry.path
+      && Object.keys(probe.headers).length === 0 && probe.body === undefined)
+    .map(({ entry }) => `${entry.method} ${entry.path}`);
+  assert.deepEqual(untouched, [],
+    "these operations are probed with a request the contract permits, so their answer says nothing");
+});
