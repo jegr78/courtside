@@ -13,7 +13,12 @@ const git = (...arguments_) =>
 
 function branchCommits() {
   const base = git("rev-parse", "--verify", "origin/main");
-  return git("rev-list", "--no-merges", `${base}..HEAD`).split("\n").filter(Boolean);
+  const commits = git("rev-list", "--no-merges", `${base}..HEAD`).split("\n").filter(Boolean);
+  // Nothing to check and nothing checked look the same from outside, so the one state that
+  // legitimately has none — HEAD already sitting on the base — is the only one allowed to report it.
+  assert.ok(commits.length > 0 || git("rev-parse", "HEAD") === base,
+    "this branch adds commits and none of them were read, so the guard compared nothing");
+  return commits;
 }
 
 // release-please reads every commit message on main through this parser and silently drops the ones
