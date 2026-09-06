@@ -7,6 +7,7 @@ import org.springframework.boot.session.autoconfigure.SessionProperties;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.session.Session;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -15,8 +16,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Named as the deployment names them, so this holds that the documented variables reach the
-// behaviour rather than describing rows nothing reads.
+// Named as the deployment names them, and set to a value no framework defaults to, so a binding
+// that never happened cannot look like one that did.
+@TestPropertySource(properties = "COURTSIDE_SESSION_INACTIVITY_TIMEOUT=17m")
 class SessionLifetimeTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -34,7 +36,7 @@ class SessionLifetimeTest extends AbstractIntegrationTest {
         assertThat(inactivity.getTimeout())
                 .as("COURTSIDE_SESSION_INACTIVITY_TIMEOUT is what a deployment sets; unset, the"
                         + " window would be whatever Spring defaults to and could change under it")
-                .isEqualTo(Duration.ofMinutes(30));
+                .isEqualTo(Duration.ofMinutes(17));
     }
 
     @Test
@@ -43,7 +45,7 @@ class SessionLifetimeTest extends AbstractIntegrationTest {
         Session session = sessions.createSession();
 
         // when / then
-        assertThat(session.getMaxInactiveInterval()).isEqualTo(Duration.ofMinutes(30));
+        assertThat(session.getMaxInactiveInterval()).isEqualTo(Duration.ofMinutes(17));
     }
 
     @Test
@@ -78,7 +80,7 @@ class SessionLifetimeTest extends AbstractIntegrationTest {
                 .param("id", id)
                 .param("creation", created.toEpochMilli())
                 .param("accessed", reference.toEpochMilli())
-                .param("expiry", reference.plus(Duration.ofMinutes(30)).toEpochMilli())
+                .param("expiry", reference.plus(Duration.ofMinutes(17)).toEpochMilli())
                 .update();
         return id;
     }

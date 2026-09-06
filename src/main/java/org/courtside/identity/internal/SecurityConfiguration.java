@@ -20,7 +20,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 
-import java.time.Clock;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -62,7 +61,6 @@ public class SecurityConfiguration {
             LoginRateLimitHandler loginRateLimitHandler,
             UserAccountRepository accounts,
             SessionLifetimeProperties sessionLifetime,
-            Clock clock,
             @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
@@ -138,9 +136,10 @@ public class SecurityConfiguration {
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new SecurityEpochFilter(accounts, authenticationEntryPoint),
                         SecurityContextHolderFilter.class)
-                .addFilterAfter(new AbsoluteSessionLifetimeFilter(clock,
-                                sessionLifetime.absoluteLifetime()),
-                        SecurityContextHolderFilter.class)
+                // Anchored behind the epoch filter rather than beside it: two filters sharing one
+                // anchor are ordered by nothing but the order they were added here.
+                .addFilterAfter(new AbsoluteSessionLifetimeFilter(sessionLifetime.absoluteLifetime()),
+                        SecurityEpochFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
                         .logoutSuccessHandler((request, response, authentication) ->

@@ -1472,9 +1472,10 @@ whether it is built or designed. **Designed means absent today.**
   and an absolute lifetime shorter than the inactivity window is refused at startup because the
   window could then never be reached. The absolute one is counted from the creation time stored with
   the session, so restarting the application does not hand a live session a fresh lifetime. Reaching
-  either bound ends the session and nothing more: the request carries on without authority, so what
-  needed it is refused the same way every unauthenticated request is, and signing in again is not
-  something an expired session stands in the way of. *Built.*
+  the absolute bound ends the session and nothing more — the request carries on without authority,
+  so what needed it is refused the way every unauthenticated request is, and signing in again is not
+  something an expired session stands in the way of; past the inactivity bound there is nothing left
+  to end, because the store no longer returns the session at all. *Built.*
   **No JWT** — the PWA and API share an
   origin, so no token gymnastics are needed, and an admin can terminate a session
   immediately, which JWT cannot do. A role, membership or account-status change must terminate

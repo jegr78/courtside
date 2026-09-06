@@ -5,7 +5,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -14,11 +13,21 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
-@RequiredArgsConstructor
 class AbsoluteSessionLifetimeFilter extends OncePerRequestFilter {
 
     private final Clock clock;
     private final Duration lifetime;
+
+    // Not the application's clock: Spring Session writes the creation time from the system clock, and
+    // a fixed instant on one side of that comparison would make the bound meaningless rather than testable.
+    AbsoluteSessionLifetimeFilter(Duration lifetime) {
+        this(Clock.systemUTC(), lifetime);
+    }
+
+    AbsoluteSessionLifetimeFilter(Clock clock, Duration lifetime) {
+        this.clock = clock;
+        this.lifetime = lifetime;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -31,9 +40,8 @@ class AbsoluteSessionLifetimeFilter extends OncePerRequestFilter {
             session.invalidate();
             SecurityContextHolder.clearContext();
         }
-        // Ending it is enough: what needs authority now answers 401 through the entry point that
-        // answers every other unauthenticated request, and signing in again is one of the things
-        // this request may legitimately be.
+        // Signing in again is one of the things this request may legitimately be, and what needs
+        // authority is refused the way every unauthenticated request is.
         filterChain.doFilter(request, response);
     }
 }
