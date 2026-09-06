@@ -1232,3 +1232,40 @@ it("given an occupied court leaves no period, when the dialog opens, then it say
   expect(screen.queryByTestId("booking-no-duration")).not.toBeInTheDocument();
   expect(screen.getByTestId("booking-submit")).toBeEnabled();
 });
+
+it("given a club with no active court, when the plan loads, then it says so instead of showing an empty grid", async () => {
+  // given
+  vi.mocked(api.courts).mockResolvedValue([]);
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  expect(await screen.findByTestId("court-plan-empty"))
+    .toHaveTextContent("The club has no court open for booking at the moment.");
+  expect(screen.queryByTestId("day-plan-table")).toBeNull();
+  expect(screen.queryByTestId("week-grid")).toBeNull();
+});
+
+it("given a club with active courts, when the plan loads, then it does not claim the club has none", async () => {
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  await findFreeSlot(1, "12:30");
+  expect(screen.queryByTestId("court-plan-empty")).toBeNull();
+});
+
+// A read that failed says nothing about how many courts the club has, and answering it with
+// "no court is open" would be an invention the member cannot act on.
+it("given the courts cannot be read, when the plan fails, then the failure is shown and no absence is claimed", async () => {
+  // given
+  vi.mocked(api.courts).mockRejectedValue(new Error("unavailable"));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
+  expect(screen.queryByTestId("court-plan-empty")).toBeNull();
+});
