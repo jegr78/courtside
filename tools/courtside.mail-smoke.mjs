@@ -414,12 +414,17 @@ async function main() {
     const described = openssl(["x509", "-noout", "-issuer", "-dates", "-ext", "subjectAltName"],
       servedCertificate(inbound));
     const issuer = /^issuer=(.*)$/m.exec(described)?.[1];
-    const runsOut = /^notAfter=(.*)$/m.exec(described)?.[1];
-    assert.ok(issuer && !issuer.includes(hostname) && described.includes(`DNS:${hostname}`),
-      `the documented command does not report both the name the certificate carries and an issuer `
-      + `other than itself, so it cannot tell one an authority issued from the mail server's own: `
-      + `${described}`);
-    assert.ok(runsOut && Date.parse(runsOut) > Date.now(),
+    const runsOut = Date.parse(/^notAfter=(.*)$/m.exec(described)?.[1] ?? "");
+    const from = Date.parse(/^notBefore=(.*)$/m.exec(described)?.[1] ?? "");
+    assert.ok(issuer && described.includes(`DNS:${hostname}`),
+      `the documented command reports no issuer, or not the name the certificate carries, so an `
+      + `operator reading it cannot tell which certificate the listener holds: ${described}`);
+    // The property the reloader itself decides on: the fallback the mail server generates runs to
+    // the year 4096, and no authority issues for longer than 400 days.
+    assert.ok(runsOut - from < 400 * 86400 * 1000,
+      `the documented command reports a lifetime no authority issues, so what it read is the mail `
+      + `server's own certificate and not the proxy's: ${described}`);
+    assert.ok(runsOut > Date.now(),
       `the documented command reports no expiry an operator could act before: ${described}`);
 
     console.log("Reading what the mail server can reach of the proxy's store");

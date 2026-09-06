@@ -36,10 +36,15 @@ function sources(directory) {
 // This file names both patterns in order to search for them.
 const SELF = relative(repository, fileURLToPath(import.meta.url));
 
+// A setting wrapped after its name reads as two harmless lines, so each file is offered whole as
+// well and reported without a line when only that pass sees it.
 function offenders(offends) {
   return SEARCHED.flatMap(sources).filter((file) => file !== SELF).flatMap((file) => {
-    const lines = readFileSync(join(repository, file), "utf8").split("\n");
-    return lines.flatMap((line, index) => (offends(line) ? [`${file}:${index + 1}`] : []));
+    const content = readFileSync(join(repository, file), "utf8");
+    const found = content.split("\n")
+      .flatMap((line, index) => (offends(line) ? [`${file}:${index + 1}`] : []));
+    if (found.length > 0) return found;
+    return offends(content.replace(/\s+/g, " ")) ? [file] : [];
   });
 }
 
