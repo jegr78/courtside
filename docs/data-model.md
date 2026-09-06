@@ -51,9 +51,9 @@ a check the application ran first.
 | `court` | A court: its number, an optional name, whether it is active | — |
 | `opening_hours` | When the facility opens and closes, one row per weekday | — |
 
-`court.number` is unique and positive. `opening_hours` carries one row per `day_of_week` (1–7,
-Monday first), with `closes_at` after `opens_at`. A club with no active court is a state the court
-plan names rather than a state the API refuses.
+`court.number` is unique and positive, and `active` is what takes a court out of service without
+losing it. `opening_hours` carries one row per `day_of_week`, numbered the way `java.time.DayOfWeek`
+numbers them — 1 is Monday — with `closes_at` after `opens_at`.
 
 ## Cards
 
@@ -185,11 +185,13 @@ that was not running, and Courtside neither reads nor migrates it by hand.
 
 | Table | Holds |
 |---|---|
-| `login_attempt_limit` | Failed sign-in counts per hashed subject, and how long that subject stays blocked |
+| `login_attempt_limit` | Failed sign-in counts per scope and hashed subject, and how long that subject stays blocked |
 | `credential_issue_limit` | How often a credential was issued for an account inside the current window |
 
-Both are rate-limit bookkeeping, keyed by a hash rather than by an address or a name, and both are
-expired by their `window_started_at`. Nothing outside the mechanism they protect reads them.
+Both are rate-limit bookkeeping and both are expired by their `window_started_at`. They are keyed
+differently on purpose: a sign-in attempt is counted against a *hash* of its subject, because the
+subject is an address somebody typed, while a credential is issued for an `account_id` that is
+already in the database. Nothing outside the mechanism they protect reads either table.
 
 ## What a fresh instance holds
 
