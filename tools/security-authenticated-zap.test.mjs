@@ -52,7 +52,7 @@ test("given the pinned authenticated policy, when rendering role plans, then act
   assert.match(member, /authenticated-session-retention-proof\n\s+method: GET\n\s+responseCode: 200/);
 });
 
-test("given ZAP output, when normalizing alerts, then the canary is proven and findings become candidates", () => {
+test("given ZAP output, when normalizing alerts, then the canary is promoted separately from product candidates", () => {
   // given
   const report = { site: [{ alerts: [
     { pluginid: "10037", name: "Server header", instances: [{
@@ -68,11 +68,11 @@ test("given ZAP output, when normalizing alerts, then the canary is proven and f
 
   // then
   assert.equal(normalized.canaryDetected, true);
-  assert.equal(normalized.candidates.length, 2);
-  assert.equal(normalized.candidates[0].state, "false-positive");
-  assert.equal(normalized.candidates[1].state, "candidate");
-  assert.equal(normalized.candidates[1].scanner, "owasp-zap");
-  assert.equal(normalized.candidates[1].normalizedSurface, "/api/bookings");
+  assert.equal(normalized.candidates.length, 1);
+  assert.equal(normalized.candidates[0].state, "candidate");
+  assert.equal(normalized.candidates[0].scanner, "owasp-zap");
+  assert.equal(normalized.candidates[0].normalizedSurface, "/api/bookings");
+  assert.equal(normalized.lifecycleSeed.normalizedSurface, "/__security/zap-canary");
   assert.doesNotMatch(JSON.stringify(normalized), /\?date=|scanner-gateway/);
 });
 
@@ -121,13 +121,19 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
   // then
   assert.equal(evidence.outcome, "passed");
   assert.equal(evidence.requestCount, 91);
-  assert.equal(evidence.candidates[0].state, "false-positive");
+  assert.deepEqual(evidence.candidates, []);
   assert.equal(evidence.lifecycleProof.state, "retest-passed");
   assert.deepEqual(evidence.lifecycleProof.transitions.map(({ state }) => state),
     ["validated", "remediation-in-progress", "fixed", "retest-passed"]);
   const mismatchedProof = structuredClone(evidence);
   mismatchedProof.lifecycleProof.fingerprint = `sha256:${"f".repeat(64)}`;
   assert.throws(() => validateAuthenticatedZapEvidence(mismatchedProof), /lifecycle proof/);
+  const forgedTimeline = structuredClone(evidence);
+  forgedTimeline.lifecycleProof.transitions.at(-1).reference = "unrelated-retest";
+  assert.throws(() => validateAuthenticatedZapEvidence(forgedTimeline), /transition history/);
+  const forgedRemediation = structuredClone(evidence);
+  forgedRemediation.lifecycleProof.transitions[1].actor = "unrelated-actor";
+  assert.throws(() => validateAuthenticatedZapEvidence(forgedRemediation), /lifecycle proof/);
   assert.doesNotMatch(readFileSync(join(evidenceDirectory, "authenticated-zap.json"), "utf8"), /secret-/);
 });
 

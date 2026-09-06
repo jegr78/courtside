@@ -36,7 +36,6 @@
     "canaryDetected": { "const": true },
     "candidates": {
       "type": "array",
-      "minItems": 1,
       "items": { "$ref": "urn:courtside:security:finding-lifecycle:v1#/$defs/candidate" }
     },
     "lifecycleProof": { "$ref": "urn:courtside:security:finding-lifecycle:v1#/$defs/finding" },

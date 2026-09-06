@@ -114,9 +114,10 @@ cannot be inferred from automated results. The baseline cannot pass until every 
 control has a recorded outcome and every blocked or not-applicable control has a precise owner and
 rationale.
 
-The harmless scanner canary proves candidate creation and false-positive disposition, but not the
-required remediation-to-successful-retest path. That proof must accompany the candidate retest and
-may not be replaced by a unit test of the lifecycle helper.
+The harmless scanner canary now proves the complete remediation lifecycle. The scanner first
+detects the seeded header. The runner then recreates the isolated gateway without it and a separate,
+closed ZAP plan proves that the same rule no longer reports the exact canary path. Retained evidence
+records validation, remediation, fix and successful retest separately from product candidates.
 
 ## Gate recommendation
 

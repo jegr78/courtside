@@ -15,7 +15,8 @@ const ajv = new Ajv({ strict: true, allErrors: true });
 ajv.addSchema(lifecycleSchema);
 const validateEvidenceSchema = ajv.compile(evidenceSchema);
 import {
-  classifyCandidate, createCandidate, createFinding, recordRetest, transitionFinding
+  createCandidate, createFinding, fingerprintFinding, recordRetest, transitionFinding,
+  validateFindingTimeline
 } from "./security-triage.mjs";
 
 export const authenticatedZapPolicy = Object.freeze(JSON.parse(readFileSync(
@@ -240,8 +241,6 @@ export function normalizeAuthenticatedZapAlerts(reports, run) {
           canaryDetected = true;
           const seed = zapCandidate(alert, instance, run);
           lifecycleSeed ??= seed;
-          const candidate = classifyZapCanary(seed, run);
-          candidates.set(candidate.fingerprint, candidate);
           continue;
         }
         if (!authenticatedZapPolicy.active.ruleIds.includes(Number(ruleId))) {
@@ -310,16 +309,6 @@ export function createCanaryLifecycleProof(candidate, run) {
   });
 }
 
-export function classifyZapCanary(candidate, run) {
-  return classifyCandidate(candidate, {
-    state: "false-positive",
-    rationale: "The alert belongs to the isolated scanner canary and cannot reach the application image.",
-    actor: run.actor,
-    classifiedAt: run.observedAt,
-    reference: "security/zap-authenticated-policy.json"
-  });
-}
-
 export function retainAuthenticatedZapEvidence(directory, evidence) {
   const serialized = `${JSON.stringify(evidence, null, 2)}\n`;
   mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -343,11 +332,28 @@ export function validateAuthenticatedZapEvidence(evidence) {
   }
   const derived = evidence.candidates.some(({ state }) => state === "candidate") ? "incomplete" : "passed";
   if (evidence.outcome !== derived) throw new Error("Authenticated ZAP evidence outcome is inconsistent");
-  const canary = evidence.candidates.find((candidate) => candidate.ruleId === "10037"
-    && candidate.normalizedSurface === authenticatedZapPolicy.canary.path);
   const expectedTransitions = ["validated", "remediation-in-progress", "fixed", "retest-passed"];
-  if (!canary || evidence.lifecycleProof.fingerprint !== canary.fingerprint
+  const reference = "authenticated-zap.json#scanner-canary";
+  const retestReference = "authenticated-zap.json#scanner-canary-remediation-retest";
+  const expectedFingerprint = fingerprintFinding(String(authenticatedZapPolicy.canary.passiveRuleId),
+    authenticatedZapPolicy.canary.path, "response", "scanner-canary-server-header");
+  const proof = evidence.lifecycleProof;
+  validateFindingTimeline(proof, proof.provenance.observedAt);
+  const expectedTransitionReferences = [reference, reference, retestReference, retestReference];
+  if (evidence.lifecycleProof.fingerprint !== expectedFingerprint
+      || evidence.lifecycleProof.ruleId !== String(authenticatedZapPolicy.canary.passiveRuleId)
+      || evidence.lifecycleProof.normalizedSurface !== authenticatedZapPolicy.canary.path
+      || evidence.lifecycleProof.provenance.targetFingerprint !== evidence.targetFingerprint
       || evidence.lifecycleProof.state !== "retest-passed"
+      || evidence.lifecycleProof.validation.method !== "regression-test"
+      || evidence.lifecycleProof.validation.reference !== reference
+      || evidence.lifecycleProof.retests.length !== 1
+      || evidence.lifecycleProof.retests[0].outcome !== "passed"
+      || evidence.lifecycleProof.retests[0].reference !== retestReference
+      || evidence.lifecycleProof.transitions.some((transition, index) =>
+        transition.actor !== "local-maintainer"
+        || transition.changedAt !== proof.provenance.observedAt
+        || transition.reference !== expectedTransitionReferences[index])
       || JSON.stringify(evidence.lifecycleProof.transitions.map(({ state }) => state))
         !== JSON.stringify(expectedTransitions)) {
     throw new Error("Authenticated ZAP evidence has no matching remediation lifecycle proof");
