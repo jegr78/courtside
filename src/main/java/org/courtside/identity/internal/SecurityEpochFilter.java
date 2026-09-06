@@ -16,7 +16,6 @@ import java.io.IOException;
 class SecurityEpochFilter extends OncePerRequestFilter {
 
     private final UserAccountRepository accounts;
-    private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -30,9 +29,9 @@ class SecurityEpochFilter extends OncePerRequestFilter {
                 request.getSession(false).invalidate();
             }
             SecurityContextHolder.clearContext();
-            authenticationEntryPoint.commence(request, response, null);
-            return;
         }
+        // Ending it is enough. Answering from here refused the sign-in that would have replaced the
+        // session, and wrote a response the header writer downstream never got to see.
         filterChain.doFilter(request, response);
     }
 }

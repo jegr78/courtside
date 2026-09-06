@@ -1483,7 +1483,11 @@ whether it is built or designed. **Designed means absent today.**
   cached authorities must not outlive the change, a membership because what its holder may book
   changes with it and neither direction of that change is harmless. Every path that ends an
   account's sessions deletes the stored rows and raises a persisted account security epoch, and the
-  epoch is what carries the guarantee where the deletion cannot reach: a request already in flight
+  epoch is what ends a session the deletion could not reach. Ending it is all that happens: the
+  request then carries no authority and is answered by whatever handles it without one, so the
+  status endpoint reports nobody signed in, a sign-out is already done, and the sign-in that would
+  replace the session is not the thing that gets refused. The guarantee reaches where the deletion
+  cannot: a request already in flight
   saves its session again afterwards, and a store that refuses the deletion must not fail the
   operation that revoked the session. A session created before the change fails closed either way.
   *Built.* The roster is the admin surface for it:

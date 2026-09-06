@@ -134,7 +134,7 @@ public class SecurityConfiguration {
                 .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), loginAttemptProtection,
                         loginVerificationCapacity, loginRateLimitHandler),
                         UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(new SecurityEpochFilter(accounts, authenticationEntryPoint),
+                .addFilterAfter(new SecurityEpochFilter(accounts),
                         SecurityContextHolderFilter.class)
                 // Anchored behind the epoch filter rather than beside it: two filters sharing one
                 // anchor are ordered by nothing but the order they were added here.

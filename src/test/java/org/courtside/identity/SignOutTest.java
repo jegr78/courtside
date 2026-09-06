@@ -78,18 +78,17 @@ class SignOutTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenARevokedSession_whenItSignsOut_thenTheRefusalNamesUnauthenticated() throws Exception {
+    void givenARevokedSession_whenItSignsOut_thenSigningOutIsAlreadyDone() throws Exception {
         // given
         UserAccount jane = enabledAccount("Jane", "Doe", "doe.jane");
         MockHttpSession session = signIn("doe.jane");
         jane.disable();
         accounts.saveAndFlush(jane);
 
-        // when / then
+        // when / then — the session was ended before the request reached the logout, and the only
+        // answer the document declares for this endpoint is the one that says it is over
         mockMvc.perform(post("/api/session/logout").session(session).with(csrf()))
-                .andExpect(status().isUnauthorized())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.type").value(UNAUTHENTICATED));
+                .andExpect(status().isNoContent());
     }
 
     private UserAccount enabledAccount(String firstName, String lastName, String username) {
