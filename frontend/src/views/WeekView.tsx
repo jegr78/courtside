@@ -112,6 +112,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     if (eligibilityError || eligibility?.violations.length) setBookingSelection(undefined);
   }, [eligibility, eligibilityError]);
 
+  const hasCourts = (data?.courts.length ?? 0) > 0;
   const days = data?.days ?? [];
   const selectedDay = days.find((day) => formatDate(day) === selectedDate);
   const selectedAllocations = selectedDate ? data?.allocations.get(selectedDate) ?? [] : [];
@@ -218,19 +219,19 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 id="occupancy-heading" data-testid="occupancy-heading" className="text-2xl font-bold">{t("week.title")}</h2>
-        {days.length > 0 && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
+        {days.length > 0 && hasCourts && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
       </div>
-      <div className="flex gap-2">
+      {(!data || hasCourts) && <div className="flex gap-2">
         <Button variant="secondary" type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
           {t("week.previousShort")}
         </Button>
         <Button variant="secondary" type="button" data-testid="week-next" onClick={() => setWeekOffset((offset) => offset + 1)} aria-label={t("week.next")}>
           {t("week.nextShort")}
         </Button>
-      </div>
+      </div>}
     </div>
 
-    {data && <div className="desktop-day-navigation mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+    {data && hasCourts && <div className="desktop-day-navigation mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
       {days.map((day) => {
         const date = formatDate(day);
         const count = data.allocations.get(date)?.length ?? 0;
@@ -250,7 +251,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       })}
     </div>}
 
-    {data && <div className="mobile-day-navigation sticky top-0 z-10 mt-5 grid grid-cols-[auto_1fr_auto_auto] gap-2 surface-panel py-2">
+    {data && hasCourts && <div className="mobile-day-navigation sticky top-0 z-10 mt-5 grid grid-cols-[auto_1fr_auto_auto] gap-2 surface-panel py-2">
       <Button variant="secondary" type="button" data-testid="day-previous" className="px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), -1)))} aria-label={t("week.previousDay")}>‹</Button>
       <input data-testid="selected-date" type="date" value={selectedDate ?? ""} onChange={(event) => selectDate(event.target.value)} aria-label={t("week.chooseDate")} className="form-control min-w-0 rounded-lg border px-2" />
       <Button variant="secondary" type="button" data-testid="day-today" className="px-3" onClick={() => selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.today")}</Button>
@@ -268,10 +269,11 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       </ul>
     </Alert>}
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
-    {data && <div className="mt-4 flex justify-end">
+    {data && !hasCourts && <p data-testid="court-plan-empty" className="text-muted mt-6">{t("week.noCourtOpen")}</p>}
+    {data && hasCourts && <div className="mt-4 flex justify-end">
       {isToday && <Button variant="secondary" type="button" data-testid="current-time" onClick={() => scrollToSlot(planRef.current, currentSlot)}>{t("week.now")}</Button>}
     </div>}
-    {data && <div
+    {data && hasCourts && <div
       ref={planRef}
       data-testid="week-grid"
       data-week-offset={weekOffset}
@@ -335,7 +337,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       />}
       {slots.length === 0 && <p className="text-muted px-4 py-6 text-center">{t("week.closed")}</p>}
     </div>}
-    {data && <ul data-testid="court-plan-legend" className="text-muted mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t("week.legend")}>
+    {data && hasCourts && <ul data-testid="court-plan-legend" className="text-muted mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t("week.legend")}>
       <li><span className="day-plan-legend free" aria-hidden="true" />{t("week.available")}</li>
       <li><span className="day-plan-legend occupied" aria-hidden="true" />{t("week.occupied")}</li>
       <li><span className="day-plan-legend own" aria-hidden="true" />{t("week.own")}</li>
