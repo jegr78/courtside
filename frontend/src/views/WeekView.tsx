@@ -219,16 +219,16 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 id="occupancy-heading" data-testid="occupancy-heading" className="text-2xl font-bold">{t("week.title")}</h2>
-        {days.length > 0 && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
+        {days.length > 0 && hasCourts && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
       </div>
-      <div className="flex gap-2">
+      {(!data || hasCourts) && <div className="flex gap-2">
         <Button variant="secondary" type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
           {t("week.previousShort")}
         </Button>
         <Button variant="secondary" type="button" data-testid="week-next" onClick={() => setWeekOffset((offset) => offset + 1)} aria-label={t("week.next")}>
           {t("week.nextShort")}
         </Button>
-      </div>
+      </div>}
     </div>
 
     {data && hasCourts && <div className="desktop-day-navigation mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">

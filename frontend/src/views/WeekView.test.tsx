@@ -1245,6 +1245,8 @@ it("given a club with no active court, when the plan loads, then it says so inst
     .toHaveTextContent("The club has no court open for booking at the moment.");
   expect(screen.queryByTestId("day-plan-table")).toBeNull();
   expect(screen.queryByTestId("week-grid")).toBeNull();
+  expect(screen.queryByTestId("week-next")).toBeNull();
+  expect(screen.queryByTestId("court-plan-legend")).toBeNull();
 });
 
 it("given a club with active courts, when the plan loads, then it does not claim the club has none", async () => {
