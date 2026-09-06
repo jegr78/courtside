@@ -173,8 +173,8 @@ no message per occurrence. Of section 6's table, the booking confirmation is the
 the rest are designed.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
-container image scanning, reports and exports, and the self-service password reset of section 4 — a
-board member has the instance send new credentials through the roster instead.
+container image scanning, the reports beyond court utilisation, and the self-service password reset
+of section 4 — a board member has the instance send new credentials through the roster instead.
 
 ---
 
@@ -1186,7 +1186,13 @@ admin sees the diagnosis themselves.
 ### Reporting and data exchange
 
 Reports read from `domain_event` and the booking tables, and every one of them is also
-available as CSV. *Designed.*
+available as CSV. *Designed*, except the first row.
+
+The **court utilisation** report is *built*: a board picks an inclusive period in the club time
+zone, at most 366 days, and reads confirmed occupancy by court — the bookings, the occupied time,
+and each court's share of the busiest one. Courts nobody booked are rows rather than omissions,
+because a board weighing a second court is asking about the quiet one. The same period, in the same
+shape, is what the bookings CSV export takes.
 
 | Report | Purpose |
 |---|---|
