@@ -51,6 +51,13 @@ Candidates are opened and closed with one line of configuration, not with a hand
 3. Set `"prerelease": false` again to graduate. The suffix is stripped and the next release pull
    request proposes `v0.3.0`.
 
+None of that applies to the very first release, because there is nothing to bump from: with no
+release in the history release-please never asks the versioning strategy at all and takes
+`initial-version` verbatim — which is `1.0.0` unless the configuration says otherwise, whatever the
+manifest holds and however many breaking changes the history carries. A candidate for the first
+release is therefore opened by writing it there, as `0.1.0-rc.1`; the three steps above take over
+from the second release onwards.
+
 Nothing else changes: a candidate travels the same pipeline, and section 10 of `docs/design.md` says
 what that means.
 

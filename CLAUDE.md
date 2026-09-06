@@ -286,6 +286,11 @@ away.
 * **Default branch:** `main`. Feature work on `feat/<short-description>`.
 * **Commits:** English Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`,
   `refactor:`). Commit frequently; push only after manual verification.
+* **A commit body keeps its parentheses balanced.** release-please parses the whole message, and a
+  single unmatched `(` makes it drop that commit — the change is missing from the changelog with
+  nothing but a line in a workflow log to say so. Two commits are absent from this repository's
+  first changelog for exactly that reason, both of them quoting code that opened a bracket it never
+  closed. Quote such a fragment with its closing bracket, or reword around it.
 * **Test data carries English placeholder identities only** — Jane Doe, John Roe, Mary Major,
   Richard Miles, Example Tennis Club, `@example.org`. Never a real person, club or address, and
   nothing German: not in tests, seeds, plans, specs or commit messages. This is an AGPL

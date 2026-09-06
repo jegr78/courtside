@@ -5,6 +5,7 @@
   "include-v-in-tag": true,
   "bootstrap-sha": "76fe6d22733eda1b2b251747acc7e862a7a543b7",
   "bump-minor-pre-major": true,
+  "initial-version": "0.1.0",
   "commit-search-depth": 2000,
   "versioning": "prerelease",
   "prerelease": false,
