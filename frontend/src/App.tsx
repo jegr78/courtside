@@ -29,6 +29,7 @@ import { AdminOpeningHoursView } from "./views/facility/AdminOpeningHoursView";
 import { AdminSlotFillersView } from "./views/facility/AdminSlotFillersView";
 import { AdminMembershipTypesView } from "./views/AdminMembershipTypesView";
 import { AdminExportView } from "./views/AdminExportView";
+import { AdminFacilityUtilisationView } from "./views/AdminFacilityUtilisationView";
 import { AdminImportView } from "./views/AdminImportView";
 import { AdminPersonView } from "./views/AdminPersonView";
 import { AdminRosterView } from "./views/AdminRosterView";
@@ -87,6 +88,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       <Route path="membership-types" element={<AdminMembershipTypesView />} />
       <Route path="import" element={<AdminImportView />} />
       <Route path="export" element={<AdminExportView />} />
+      <Route path="utilisation" element={<AdminFacilityUtilisationView />} />
       <Route path="audit" element={<AdminAuditView />} />
       <Route path="messages" element={<AdminMessagesView />} />
       <Route path="*" element={<Navigate to="/" replace />} />

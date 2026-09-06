@@ -93,6 +93,14 @@ describe("AdminNavigation", () => {
     expect(screen.getByTestId("admin-roster-link")).toHaveAttribute("aria-current", "page");
   });
 
+  it("given the utilisation page, when the navigation is read, then it is the current destination", () => {
+    // when
+    show("/admin/utilisation");
+
+    // then
+    expect(screen.getByTestId("admin-utilisation-link")).toHaveAttribute("aria-current", "page");
+  });
+
   it("given the export page, when the navigation is read, then it is the current destination", () => {
     // when
     show("/admin/export");
