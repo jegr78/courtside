@@ -409,8 +409,8 @@ test("an initial password change ends every active session for the account", asy
   await Promise.all([first.close(), second.close()]);
 });
 
-// Whichever request arrives first consumes the revocation, so the epoch moves while the sign-out is
-// in flight rather than before it, where the week view's next refresh would take the refusal instead.
+// The epoch moves while the sign-out is in flight rather than before it, where the week view's next
+// refresh would consume the revocation first and this journey would prove nothing about signing out.
 test("a session the instance revoked signs out onto sign-in without an error", async ({ pinnedBrowser, journeyService }) => {
   // given
   const context = await memberContext(pinnedBrowser, journeyService, "doe.jane");
@@ -422,12 +422,13 @@ test("a session the instance revoked signs out onto sign-in without an error", a
   });
 
   // when
-  const refused = page.waitForResponse((response) => response.url().endsWith("/api/session/logout"));
+  const signOut = page.waitForResponse((response) => response.url().endsWith("/api/session/logout"));
   await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
 
-  // then
-  expect((await refused).status()).toBe(401);
+  // then — the revocation ends the session before the sign-out reaches it, and ending a session
+  // that is already over is what the sign-out was asked to do
+  expect((await signOut).status()).toBe(204);
   await expect(page.getByTestId("login-view")).toBeVisible();
   await expect(page.getByTestId("preferences-failure")).toHaveCount(0);
   await context.close();
