@@ -381,6 +381,18 @@ enough to need.
   which begins with a green verification of the resolved content — instead of keeping another
   workspace blocked. A failed branch push follows the same release-and-restart rule.
 
+  **Scale that verification to what the resolution did.** A conflict where both sides added to the
+  same list, table or section, and the resolution is exactly the union of what each added, changes
+  no behaviour: nothing survives that neither side wrote. Prove that instead of rebuilding
+  everything — run the check that reads the merged result and show it carries both intents, then
+  push. The pull request's own build still tests the pairing in full, which is what makes the
+  shorter proof safe rather than merely cheaper.
+
+  The full run stays the answer for every other resolution: a choice between the two sides, a
+  reworded line, a merge that had to be reasoned about, or any result containing something neither
+  side wrote. If you cannot state in one sentence which executed check covers the resolution, it is
+  one of those. The distinction is the resolution's effect, never its size.
+
   After pushing the branch, delete the remote lock with `--force-with-lease` bound to that exact
   object ID, then delete the local tag. A lease mismatch means ownership changed and must leave the
   remote tag untouched. Never overwrite or delete another workspace's lock. Only the maintainer may
