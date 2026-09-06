@@ -444,7 +444,10 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
       "2000-01-01T00:00:00.000Z")),
     ...evidence.undocumentedRoutes.map((route) => undocumentedRouteCandidate(route,
       { runId: "validation", targetFingerprint: evidence.targetFingerprint }, { attempt: 1 },
-      "2000-01-01T00:00:00.000Z"))
+      "2000-01-01T00:00:00.000Z")),
+    ...incompleteCaseCandidates(evidence,
+      { runId: "validation", targetFingerprint: evidence.targetFingerprint }, { attempt: 1 },
+      "2000-01-01T00:00:00.000Z")
   ]);
   const expectedFingerprints = new Set(expectedCandidates.map(({ fingerprint }) => fingerprint));
   if (expectedFingerprints.size !== candidateFingerprints.length

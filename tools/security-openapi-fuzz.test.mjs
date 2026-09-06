@@ -507,3 +507,61 @@ test("given an unfinished scenario reporting a status nobody defined, when it is
   assert.deepEqual(normalized.counterexamples[0].reason,
     { kind: "scenario", scenarioStatus: "unknown" });
 });
+
+// The paired comparison refuses a candidate run that is incomplete while it retained nothing, and a
+// mutation probe is one of the routes that used to reach that shape.
+test("given a mutation probe that was not answered as documented, when the run is retained, then it says which one", async () => {
+  // given
+  const inventory = buildOpenApiFuzzInventory(api);
+  const generatedInventory = inventory.filter(({ method }) => method === "GET");
+  const events = (mode) => [
+    { LoadingFinished: { statistic: { operations: { total: inventory.length,
+      selected: generatedInventory.filter(({ modes }) => modes.includes(mode)).length } } } },
+    ...generatedInventory.filter(({ modes }) => modes.includes(mode)).map((entry) => ({
+      ScenarioFinished: { status: "success", recorder: {
+        label: `${entry.method} ${entry.path}`,
+        cases: { one: { value: { method: entry.method, path: entry.path,
+          query: { case: "0" }, meta: { generation: { mode } } } } },
+        checks: {}
+      } }
+    }))
+  ];
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  const inputCases = openApiFuzzPolicy.inputClasses.map((id) => ({ id, status: 400,
+    problemType: "urn:courtside:error:validation-failed", observation: "typed-input-rejection",
+    outcome: "passed" }));
+  const importCases = ["invalid-utf8", "duplicate-columns"].map((id) => ({ id, status: 400,
+    problemType: "urn:courtside:error:import-snapshot-unreadable", observation: "typed-upload-rejection",
+    outcome: "passed" })).concat(["oversized-cell", "conflicting-reference"].map((id) => ({ id, status: 201,
+    observation: "row-level-rejection", outcome: "passed" })));
+  const mutations = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
+  const mutationCases = mutations.map(({ operationId, method, path }) => ({ operationId, method, path,
+    status: operationId === "exportRoster" ? 200 : 400,
+    ...(operationId === "exportRoster" ? {}
+      : { problemType: "urn:courtside:error:validation-failed" }),
+    observation: "invalid-mutation-rejected",
+    outcome: operationId === "exportRoster" ? "incomplete" : "passed" }));
+
+  // when
+  const evidence = await runOpenApiFuzzAssessment({ profile: "active", environment: "SECURITY",
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001", "CSA-API-001", "CSA-IMPORT-001"],
+    runId: "run-0002", targetFingerprint: fingerprint }, {
+    maxRequests: 2000, attempt: 1, deadline: new Date(Date.now() + 60_000),
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-fuzz-evidence-")),
+    now: () => new Date("2026-08-21T12:00:00Z"),
+    runFuzzer: async () => ({ runtimeHardened: true, requestCount: 100,
+      specificationDigest: openApiSpecificationDigest(),
+      events: { positive: events("positive"), negative: events("negative") }, inputCases, importCases,
+      mutationCases,
+      observedRoutes: inventory.map(({ method, path }) => ({ method, pathTemplate: path })),
+      stateBefore: fingerprint, stateAfter: fingerprint, generatedDataMegabytes: 1 })
+  });
+
+  // then
+  assert.equal(evidence.outcome, "incomplete");
+  assert.deepEqual(evidence.counterexamples, []);
+  assert.equal(evidence.candidates.length, 1);
+  assert.equal(evidence.candidates[0].ruleId, "mutation-case-incomplete");
+  assert.equal(evidence.candidates[0].normalizedSurface, "post /api/admin/export/roster");
+  assert.doesNotThrow(() => validateOpenApiFuzzEvidence(evidence));
+});
