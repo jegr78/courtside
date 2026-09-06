@@ -24,6 +24,13 @@ const run = {
   expiresOn: "2026-09-20",
   actor: "local-maintainer"
 };
+const canaryRetestChronology = {
+  detectedAt: "2026-08-21T08:00:00.000Z",
+  remediationStartedAt: "2026-08-21T08:00:01.000Z",
+  fixedAt: "2026-08-21T08:00:02.000Z",
+  retestStartedAt: "2026-08-21T08:00:03.000Z",
+  retestFinishedAt: "2026-08-21T08:00:04.000Z"
+};
 
 test("given the pinned authenticated policy, when rendering role plans, then active rules stay curated", () => {
   // when
@@ -116,7 +123,7 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
       reports: [report], requestCount: 70, runtimeHardened: true,
       roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
       planDigest: authenticatedZapPlanDigest(),
-      canaryRetest: { report: { site: [] }, requestCount: 1 }
+      canaryRetest: { report: { site: [] }, requestCount: 1, ...canaryRetestChronology }
     })
   });
 
@@ -127,6 +134,12 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
   assert.equal(evidence.lifecycleProof.state, "retest-passed");
   assert.deepEqual(evidence.lifecycleProof.transitions.map(({ state }) => state),
     ["validated", "remediation-in-progress", "fixed", "retest-passed"]);
+  assert.deepEqual(evidence.lifecycleProof.transitions.map(({ changedAt }) => changedAt),
+    [canaryRetestChronology.detectedAt, canaryRetestChronology.remediationStartedAt,
+      canaryRetestChronology.fixedAt, canaryRetestChronology.retestFinishedAt]);
+  assert.equal(evidence.canaryRetest.requestCount, 1);
+  assert.match(evidence.canaryRetest.reportDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(evidence.lifecycleProof.evidence.at(-1).digest, evidence.canaryRetest.reportDigest);
   const mismatchedProof = structuredClone(evidence);
   mismatchedProof.lifecycleProof.fingerprint = `sha256:${"f".repeat(64)}`;
   assert.throws(() => validateAuthenticatedZapEvidence(mismatchedProof), /lifecycle proof/);
@@ -136,6 +149,15 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
   const forgedRemediation = structuredClone(evidence);
   forgedRemediation.lifecycleProof.transitions[1].actor = "unrelated-actor";
   assert.throws(() => validateAuthenticatedZapEvidence(forgedRemediation), /lifecycle proof/);
+  const forgedRetestDigest = structuredClone(evidence);
+  forgedRetestDigest.canaryRetest.reportDigest = `sha256:${"f".repeat(64)}`;
+  assert.throws(() => validateAuthenticatedZapEvidence(forgedRetestDigest), /lifecycle proof/);
+  const forgedRetestCount = structuredClone(evidence);
+  forgedRetestCount.canaryRetest.requestCount = 128;
+  assert.throws(() => validateAuthenticatedZapEvidence(forgedRetestCount), /evidence is invalid/);
+  const forgedRetestChronology = structuredClone(evidence);
+  forgedRetestChronology.canaryRetest.fixedAt = "2026-08-21T07:59:59.000Z";
+  assert.throws(() => validateAuthenticatedZapEvidence(forgedRetestChronology), /lifecycle proof/);
   assert.doesNotMatch(readFileSync(join(evidenceDirectory, "authenticated-zap.json"), "utf8"), /secret-/);
 });
 
@@ -163,7 +185,7 @@ test("given the seeded canary remains after remediation, when assessing, then th
       reports: [report], requestCount: 70, runtimeHardened: true,
       roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
       planDigest: authenticatedZapPlanDigest(),
-      canaryRetest: { report, requestCount: 1 }
+      canaryRetest: { report, requestCount: 1, ...canaryRetestChronology }
     })
   }), /canary remediation retest/);
 });
@@ -188,7 +210,7 @@ test("given a changed executed plan, when assessing, then the evidence fails clo
       reports: [], requestCount: 70, runtimeHardened: true,
       roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
       planDigest: `sha256:${"b".repeat(64)}`,
-      canaryRetest: { detected: false, requestCount: 1 }
+      canaryRetest: { detected: false, report: { site: [] }, requestCount: 1, ...canaryRetestChronology }
     })
   }), /plan digest/);
 });

@@ -1,6 +1,6 @@
 # Internal security assessment baseline
 
-Status: completed with unresolved findings as of 6 September 2026.
+Status: baseline execution completed; manual evidence remains incomplete as of 6 September 2026.
 
 This is the redacted record of an internal OWASP-oriented assessment. It does not declare the
 application secure and does not replace an independent penetration test.
@@ -47,7 +47,14 @@ digest `sha256:62e07b38ecc6e1b998abad9abe2b66197b3c97e849f84410d81be0179bf40790`
 The harmless authenticated-scanner canary completed the full lifecycle in the isolated target:
 detected, validated, remediation in progress, fixed, and independently retested without the seeded
 header. The retest used a separate closed ZAP plan and required the protected route's actual `401`
-response, rather than weakening application behavior to manufacture a `404`.
+response, rather than weakening application behavior to manufacture a `404`. The retained proof
+binds each transition to its actual event time and binds the separate retest request count and
+report digest without publishing the report. Supplemental local run `issue253-canary-evidence-v4`
+reproduced the complete active profile against qualified immutable image
+`sha256:ac5474ecd824d7d68fc973538533db17177d856f11bea48ce8faf9fda82ac836` in 162.410 seconds. Its
+authenticated ZAP evidence records 129 requests, one retest request, strictly increasing phase
+times and protected retest-report digest
+`sha256:aa4d3286770df2985eed45c47175775da70d29a8ff14d6e7f7b5934f1935a64a`.
 
 ## Manual WSTG and ASVS review
 
@@ -55,12 +62,19 @@ The manual record covers 316 unique selected controls from OWASP WSTG 4.2 and AS
 
 | Outcome | Controls |
 | --- | ---: |
-| pass | 158 |
+| pass | 0 |
 | not applicable, with rationale | 111 |
-| fail, linked to a validated finding | 47 |
+| fail, linked to a validated or accepted finding | 59 |
+| blocked pending control-specific evidence | 146 |
 
-All failures reduce to nine unique unresolved findings and the existing accepted risk. There are no
-untriaged candidates, regressions, P0 findings or P1 findings. The nine remediation items are:
+The first review had assigned 158 pass outcomes from chapter-level file inventories. Independent
+review showed that those records were not control-specific and contradicted ten known gaps. None of
+those generated outcomes remains a pass: 12 map to a validated or accepted finding and the other
+146 are explicitly blocked under #804 until a named production path and a falsifying check exist.
+
+The 59 failed controls reduce to ten unique unresolved findings and the existing accepted risk.
+There are no untriaged candidates, regressions, P0 findings or P1 findings. The ten remediation
+items are:
 
 - #792 permanent-password lifecycle (P2)
 - #793 complete session lifecycle (P2)
@@ -71,13 +85,14 @@ untriaged candidates, regressions, P0 findings or P1 findings. The nine remediat
 - #798 cryptographic inventory and key lifecycle (P3)
 - #799 documented upload type boundary (P3)
 - #800 refusal of plaintext API requests before redirect (P2)
+- #803 dependency remediation deadlines (P3)
 
-They are ordered under parent #801. The manual lifecycle contains ten findings in total: nine
-`validated`, one `accepted-risk`, zero candidates and zero regressions. Its protected redacted
-finding summary has digest
-`sha256:d9cc3e7af47aa5d3085c584c275e47020f18c3b3c6aa54f9f693bd119715caf5`.
-The overall assessment therefore fails until the nine validated findings are remediated and
-retested; a completed assessment is not the same as a passing assessment.
+They are ordered under parent #801. The redacted
+[`manual-baseline-finding-summary.json`](../security/manual-baseline-finding-summary.json) has digest
+`sha256:1b6b90e83009d299d43b627e5148f4485f00a03e228e351b5a9f1b947fe2d03e`.
+It contains eleven findings: ten `validated`, one `accepted-risk`, zero candidates and zero
+regressions. The overall assessment fails on those findings and remains
+incomplete on the 146 blocked controls. A completed execution is not a passing baseline.
 
 Administrative multi-factor authentication remains explicitly blocked by #69. Destructive
 resource-abuse tests, physical-device checks and independent external testing were not inferred
@@ -91,7 +106,9 @@ same 30 bounded requests and 12,403 evidence bytes. Active attempt 2 stopped aft
 because the canary retest expected `404` from an authenticated route that correctly returned `401`.
 The failure was deterministic. The implementation was corrected to assert `401`, redact and bound
 diagnostics, and keep synthetic credentials out of startup logs. A fresh isolated local active run
-then passed all 2,124 requests before the second hosted run reproduced that result.
+then passed all 2,124 requests before the second hosted run reproduced that result. After the
+evidence contract was tightened, local run `issue253-canary-evidence-v4` repeated all 2,124 requests
+and proved the retained timestamp and report-digest binding.
 
 ## Gate recommendation
 
@@ -104,6 +121,7 @@ then passed all 2,124 requests before the second hosted run reproduced that resu
 - The control-specific manual checklist, destructive procedures and independent assessment remain
   explicit release activities. Active tests never target production.
 - Release gating must not pass with an untriaged observation or an unresolved P0/P1 finding.
+  It also cannot use the manual baseline as positive evidence while #804 controls remain blocked.
   Accepted risks require a rationale, compensating control and expiry.
 
 ## Reproduction

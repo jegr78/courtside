@@ -487,6 +487,7 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
       await command(["rm", "-f", name]);
       containers.pop();
     }
+    const detectedAt = new Date().toISOString();
     const gatewayRuntime = JSON.parse((await command(["inspect", gateway, "--format", "{{json .}}"])).stdout);
     const gatewayHardened = scannerRuntimeHardened(gatewayRuntime, {
       memory: 128 * 1024 * 1024, nanoCpus: 500_000_000, pids: 64,
@@ -494,11 +495,13 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     });
     const primaryRequestCount = await zapRequestCount(gateway, command);
     const retestRequestBudget = remainingScannerRequestBudget(limits.maxRequests, primaryRequestCount);
+    const remediationStartedAt = new Date().toISOString();
     await command(["rm", "-f", gateway]);
     environment.COURTSIDE_SECURITY_CANARY_ENABLED = "false";
     environment.COURTSIDE_SECURITY_MAX_REQUESTS = String(retestRequestBudget);
     await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "up", "-d", "--wait",
       "scanner-gateway"]);
+    const fixedAt = new Date().toISOString();
     const retestName = `courtside-security-zap-${plan.runId}-${limits.attempt}-canary-retest`;
     containers.push(retestName);
     await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "-d", "--no-deps",
@@ -513,6 +516,7 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     await command(["exec", "-i", retestName, "sh", "-c", "umask 077; cat > /tmp/courtside-plan.yaml"], {
       input: retestPlan
     });
+    const retestStartedAt = new Date().toISOString();
     const retestZap = await command(["exec", retestName, "zap.sh", "-cmd", "-autorun", "/tmp/courtside-plan.yaml"], {
       acceptedExitCodes: [0, 2], outputLimitBytes: 4 * 1024 * 1024
     });
@@ -523,6 +527,7 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     const retestReportText = (await command(["exec", retestName, "cat", "/zap/wrk/report-canary-retest.json"], {
       outputLimitBytes: 10 * 1024 * 1024
     })).stdout;
+    const retestFinishedAt = new Date().toISOString();
     generatedBytes += Buffer.byteLength(retestReportText);
     await command(["rm", "-f", retestName]);
     containers.pop();
@@ -542,7 +547,10 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     if (planDigest !== limits.planDigest) throw new Error("Authenticated ZAP plan digest changed during execution");
     return { reports, requestCount, runtimeHardened, roles: Object.keys(limits.sessions), planDigest,
       generatedDataMegabytes: generatedBytes / (1024 * 1024),
-      canaryRetest: { report: JSON.parse(retestReportText), requestCount: retestRequestCount } };
+      canaryRetest: {
+        report: JSON.parse(retestReportText), requestCount: retestRequestCount,
+        detectedAt, remediationStartedAt, fixedAt, retestStartedAt, retestFinishedAt
+      } };
   } finally {
     const cleanupFailures = [];
     for (const resource of [...containers, gateway, reservation]) {

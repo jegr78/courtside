@@ -278,6 +278,11 @@ export function authenticatedZapCanaryRetestDetected(report) {
   return detected;
 }
 
+export function authenticatedZapCanaryRetestDigest(report) {
+  if (!report || !Array.isArray(report.site)) throw new Error("ZAP canary retest produced no valid report");
+  return `sha256:${createHash("sha256").update(JSON.stringify(report)).digest("hex")}`;
+}
+
 export function createCanaryLifecycleProof(candidate, run) {
   const reference = "authenticated-zap.json#scanner-canary";
   const retestReference = "authenticated-zap.json#scanner-canary-remediation-retest";
@@ -295,17 +300,24 @@ export function createCanaryLifecycleProof(candidate, run) {
       reachability: "Only scanner containers on the private assessment network can reach it."
     },
     validation: {
-      method: "regression-test", reference, reproducedAt: run.observedAt, actor: run.actor
+      method: "regression-test", reference, reproducedAt: run.detectedAt, actor: run.actor
     }
   });
+  finding = { ...finding, evidence: [...finding.evidence, {
+    id: `zap-canary-retest-${run.reportDigest.slice(7, 19)}`,
+    status: "retained",
+    classification: "protected",
+    digest: run.reportDigest,
+    expiresOn: run.expiresOn
+  }] };
   finding = transitionFinding(finding, {
-    state: "remediation-in-progress", actor: run.actor, changedAt: run.observedAt, reference
+    state: "remediation-in-progress", actor: run.actor, changedAt: run.remediationStartedAt, reference
   });
   finding = transitionFinding(finding, {
-    state: "fixed", actor: run.actor, changedAt: run.observedAt, reference: retestReference
+    state: "fixed", actor: run.actor, changedAt: run.fixedAt, reference: retestReference
   });
   return recordRetest(finding, {
-    outcome: "passed", testedAt: run.observedAt, actor: run.actor, reference: retestReference
+    outcome: "passed", testedAt: run.retestFinishedAt, actor: run.actor, reference: retestReference
   });
 }
 
@@ -338,8 +350,12 @@ export function validateAuthenticatedZapEvidence(evidence) {
   const expectedFingerprint = fingerprintFinding(String(authenticatedZapPolicy.canary.passiveRuleId),
     authenticatedZapPolicy.canary.path, "response", "scanner-canary-server-header");
   const proof = evidence.lifecycleProof;
-  validateFindingTimeline(proof, proof.provenance.observedAt);
+  const retest = evidence.canaryRetest;
+  validateFindingTimeline(proof, retest.retestFinishedAt);
   const expectedTransitionReferences = [reference, reference, retestReference, retestReference];
+  const expectedTransitionTimes = [retest.detectedAt, retest.remediationStartedAt,
+    retest.fixedAt, retest.retestFinishedAt];
+  const retestEvidence = proof.evidence.find(({ id }) => id.startsWith("zap-canary-retest-"));
   if (evidence.lifecycleProof.fingerprint !== expectedFingerprint
       || evidence.lifecycleProof.ruleId !== String(authenticatedZapPolicy.canary.passiveRuleId)
       || evidence.lifecycleProof.normalizedSurface !== authenticatedZapPolicy.canary.path
@@ -347,12 +363,20 @@ export function validateAuthenticatedZapEvidence(evidence) {
       || evidence.lifecycleProof.state !== "retest-passed"
       || evidence.lifecycleProof.validation.method !== "regression-test"
       || evidence.lifecycleProof.validation.reference !== reference
+      || evidence.lifecycleProof.validation.reproducedAt !== retest.detectedAt
+      || evidence.lifecycleProof.provenance.observedAt !== retest.detectedAt
       || evidence.lifecycleProof.retests.length !== 1
       || evidence.lifecycleProof.retests[0].outcome !== "passed"
       || evidence.lifecycleProof.retests[0].reference !== retestReference
+      || evidence.lifecycleProof.retests[0].testedAt !== retest.retestFinishedAt
+      || !retestEvidence || retestEvidence.digest !== retest.reportDigest
+      || retest.requestCount !== 1 || retest.requestCount >= evidence.requestCount
+      || [retest.detectedAt, retest.remediationStartedAt, retest.fixedAt,
+        retest.retestStartedAt, retest.retestFinishedAt]
+        .some((timestamp, index, timestamps) => index > 0 && timestamp <= timestamps[index - 1])
       || evidence.lifecycleProof.transitions.some((transition, index) =>
         transition.actor !== "local-maintainer"
-        || transition.changedAt !== proof.provenance.observedAt
+        || transition.changedAt !== expectedTransitionTimes[index]
         || transition.reference !== expectedTransitionReferences[index])
       || JSON.stringify(evidence.lifecycleProof.transitions.map(({ state }) => state))
         !== JSON.stringify(expectedTransitions)) {
@@ -403,7 +427,15 @@ export async function runAuthenticatedZapAssessment(plan, context) {
         ? "Authenticated ZAP plan digest does not match the executed plans"
         : "Authenticated ZAP coverage or runtime controls are incomplete");
     }
-    const observedAt = (context.now?.() ?? new Date()).toISOString();
+    const retestMetadata = scanner.canaryRetest;
+    const retestTimestamps = retestMetadata && [retestMetadata.detectedAt,
+      retestMetadata.remediationStartedAt, retestMetadata.fixedAt,
+      retestMetadata.retestStartedAt, retestMetadata.retestFinishedAt];
+    if (!retestTimestamps || retestTimestamps.some((timestamp) =>
+      typeof timestamp !== "string" || Number.isNaN(Date.parse(timestamp)))) {
+      throw new Error("Authenticated ZAP canary remediation retest has no event chronology");
+    }
+    const observedAt = retestMetadata.detectedAt;
     const normalized = normalizeAuthenticatedZapAlerts(scanner.reports, {
       runId: plan.runId,
       attempt: context.attempt,
@@ -412,20 +444,31 @@ export async function runAuthenticatedZapAssessment(plan, context) {
       expiresOn: new Date(new Date(observedAt).getTime() + 30 * 86_400_000).toISOString().slice(0, 10),
       actor: "local-maintainer"
     });
-    const canaryRetestDetected = scanner.canaryRetest?.detected
-      ?? authenticatedZapCanaryRetestDetected(scanner.canaryRetest?.report);
+    const canaryRetestDetected = retestMetadata?.detected
+      ?? authenticatedZapCanaryRetestDetected(retestMetadata?.report);
     if (canaryRetestDetected !== false
-        || !Number.isSafeInteger(scanner.canaryRetest.requestCount)
-        || scanner.canaryRetest.requestCount < 1) {
+        || !Number.isSafeInteger(retestMetadata.requestCount)
+        || retestMetadata.requestCount < 1) {
       throw new Error("Authenticated ZAP canary remediation retest did not pass");
     }
+    const reportDigest = authenticatedZapCanaryRetestDigest(retestMetadata.report);
+    const canaryRetest = {
+      detectedAt: retestMetadata.detectedAt,
+      remediationStartedAt: retestMetadata.remediationStartedAt,
+      fixedAt: retestMetadata.fixedAt,
+      retestStartedAt: retestMetadata.retestStartedAt,
+      retestFinishedAt: retestMetadata.retestFinishedAt,
+      reportDigest,
+      requestCount: retestMetadata.requestCount,
+      outcome: "passed"
+    };
     const lifecycleProof = createCanaryLifecycleProof(normalized.lifecycleSeed, {
-      observedAt,
-      actor: "local-maintainer"
+      ...canaryRetest, expiresOn: new Date(new Date(observedAt).getTime() + 30 * 86_400_000)
+        .toISOString().slice(0, 10), actor: "local-maintainer"
     });
     const unresolved = normalized.candidates.some(({ state }) => state === "candidate");
     const evidence = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       testId: "CSA-DAST-001",
       targetFingerprint: plan.targetFingerprint,
       image: authenticatedZapPolicy.image,
@@ -436,6 +479,7 @@ export async function runAuthenticatedZapAssessment(plan, context) {
       passiveEvidence: "separate-csa-deploy-001",
       canaryDetected: normalized.canaryDetected,
       candidates: normalized.candidates,
+      canaryRetest,
       lifecycleProof,
       requestCount,
       generatedDataMegabytes: scanner.generatedDataMegabytes ?? 0,

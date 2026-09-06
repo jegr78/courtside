@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:security:authenticated-zap-evidence:v2",
+  "$id": "urn:courtside:security:authenticated-zap-evidence:v3",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "testId", "targetFingerprint", "image", "policyDigest", "planDigest", "roles", "activeRuleIds", "passiveEvidence", "canaryDetected", "candidates", "lifecycleProof", "requestCount", "generatedDataMegabytes", "outcome"],
+  "required": ["schemaVersion", "testId", "targetFingerprint", "image", "policyDigest", "planDigest", "roles", "activeRuleIds", "passiveEvidence", "canaryDetected", "candidates", "canaryRetest", "lifecycleProof", "requestCount", "generatedDataMegabytes", "outcome"],
   "properties": {
-    "schemaVersion": { "const": 2 },
+    "schemaVersion": { "const": 3 },
     "testId": { "const": "CSA-DAST-001" },
     "targetFingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "image": { "type": "string", "pattern": "^zaproxy/zap-stable:[\\w.]+@sha256:[a-f0-9]{64}$" },
@@ -37,6 +37,21 @@
     "candidates": {
       "type": "array",
       "items": { "$ref": "urn:courtside:security:finding-lifecycle:v1#/$defs/candidate" }
+    },
+    "canaryRetest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detectedAt", "remediationStartedAt", "fixedAt", "retestStartedAt", "retestFinishedAt", "reportDigest", "requestCount", "outcome"],
+      "properties": {
+        "detectedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" },
+        "remediationStartedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" },
+        "fixedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" },
+        "retestStartedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" },
+        "retestFinishedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" },
+        "reportDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "requestCount": { "const": 1 },
+        "outcome": { "const": "passed" }
+      }
     },
     "lifecycleProof": { "$ref": "urn:courtside:security:finding-lifecycle:v1#/$defs/finding" },
     "requestCount": { "type": "integer", "minimum": 1 },
