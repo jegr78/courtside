@@ -43,7 +43,7 @@ export function validateDependabot(candidate) {
     }
     return `${update["package-ecosystem"]}:${update.directory}`;
   });
-  assert.deepEqual(locations.sort(), ["docker-compose:/deploy", "docker:/", "github-actions:/", "maven:/", "npm:/frontend"]);
+  assert.deepEqual(locations.sort(), ["docker-compose:/deploy", "docker:/", "github-actions:/", "maven:/", "npm:/frontend", "npm:/site"]);
 }
 
 export function validatePullRequestTitleWorkflow(candidate) {
