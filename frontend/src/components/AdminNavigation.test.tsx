@@ -93,6 +93,14 @@ describe("AdminNavigation", () => {
     expect(screen.getByTestId("admin-roster-link")).toHaveAttribute("aria-current", "page");
   });
 
+  it("given the export page, when the navigation is read, then it is the current destination", () => {
+    // when
+    show("/admin/export");
+
+    // then
+    expect(screen.getByTestId("admin-export-link")).toHaveAttribute("aria-current", "page");
+  });
+
   // Folded away, the current destination is invisible, so the control that opens the list says it.
   it("given the destinations are folded away, when the control is read, then it names the current one", () => {
     // when

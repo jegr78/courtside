@@ -76,6 +76,13 @@ export type MoveRequest = components["schemas"]["MoveRequest"];
 export type MovePreview = components["schemas"]["MovePreview"];
 export type MoveExecuted = components["schemas"]["MoveExecuted"];
 
+export interface BookingExportParameters extends Record<string, string> {
+  from: string;
+  to: string;
+  separator: string;
+  encoding: string;
+}
+
 export interface RosterExportParameters extends Record<string, string> {
   query: string;
   membershipTypeId: string;
@@ -364,6 +371,8 @@ export const api = {
   ),
   // No Content-Type: only the browser knows the boundary it is about to write.
   supportedEncodings: () => request<string[]>("/api/admin/import/encodings"),
+  exportBookings: (parameters: BookingExportParameters) => requestFile(
+    `/api/admin/export/bookings?${new URLSearchParams(parameters).toString()}`, { method: "POST" }),
   exportRoster: (parameters: RosterExportParameters) => requestFile(
     `/api/admin/export/roster?${new URLSearchParams(
       Object.entries(parameters).filter(([, value]) => value)

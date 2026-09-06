@@ -8,7 +8,6 @@ import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
-import { RosterExport } from "./RosterExport";
 
 const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
@@ -145,7 +144,6 @@ export function AdminRosterView() {
             </select>
           </label>
         </div>
-        <RosterExport query={query} membershipTypeId={membershipTypeId} disabled={pending} onFailure={reportError} />
         <section className="grid gap-4">
           <h2 className="text-2xl font-bold">{t("admin.roster.people")}</h2>
           {entries.length === 0

@@ -53,6 +53,7 @@ const groups: Group[] = [
     testId: "admin-group-records",
     heading: "nav.adminRecords",
     destinations: [
+      { to: "/admin/export", testId: "admin-export-link", label: "nav.adminExport" },
       { to: "/admin/audit", testId: "admin-audit-link", label: "nav.adminAudit" },
       { to: "/admin/messages", testId: "admin-messages-link", label: "nav.adminMessages" }
     ]
