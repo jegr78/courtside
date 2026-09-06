@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { bindPlanToRun, classifyChanges, classifyPath, fallbackPlanToRun, parseNameStatus,
+import { bindPlanToRun, classifyChanges, classifyChangesAtCommits, classifyPath, fallbackPlanToRun, parseNameStatus,
   executedTests, profileSummary, validateGitHubManifest, validateRules,
   validateToolManifest } from "./test-profile-classifier.mjs";
 import { ciJobsForProfiles, loadProfileContract } from "./test-profile-contract.mjs";
@@ -206,6 +206,85 @@ test("given reviewed tool assignments, when classifying changes, then tests redu
   ], []).profiles, ["full"]);
 });
 
+test("given an added tool test and an additive manifest entry, when classifying commits, "
+  + "then tooling is enough", () => {
+  // given
+  const addedPath = "tools/new-policy.test.mjs";
+  const headManifest = structuredClone(toolManifest);
+  headManifest.entries.push({ path: addedPath, profiles: ["tooling"], test: true });
+  const changes = [
+    { status: "M", path: "ci/tool-profile-manifest.json" },
+    { status: "A", path: addedPath }
+  ];
+
+  // when
+  const plan = classifyChangesAtCommits(changes, [], commitInventory(headManifest));
+
+  // then
+  assert.deepEqual(plan.profiles, ["tooling"]);
+  assert.equal(plan.isFull, false);
+  assert.deepEqual(plan.reasons.map(({ path, profile }) => ({ path, profile })), [
+    { path: "ci/tool-profile-manifest.json", profile: "tooling" },
+    { path: addedPath, profile: "tooling" }
+  ]);
+});
+
+test("given an additive full runner, when classifying commits, then it still selects full", () => {
+  // given
+  const addedPath = "tools/new-runner.mjs";
+  const headManifest = structuredClone(toolManifest);
+  headManifest.entries.push({ path: addedPath, profiles: ["full"], test: false });
+  const changes = [
+    { status: "M", path: "ci/tool-profile-manifest.json" },
+    { status: "A", path: addedPath }
+  ];
+
+  // when
+  const plan = classifyChangesAtCommits(changes, [], commitInventory(headManifest));
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"]);
+});
+
+test("given a narrowed or stale tool manifest, when classifying commits, then it fails closed to full", () => {
+  // given
+  const removed = structuredClone(toolManifest);
+  removed.entries = removed.entries.filter((entry) => entry.path !== "tools/mail-check.test.mjs");
+  const moved = structuredClone(toolManifest);
+  moved.entries.find((entry) => entry.path === "tools/courtside.mjs").profiles = ["tooling"];
+  const nonexistent = structuredClone(toolManifest);
+  nonexistent.entries.push({ path: "tools/missing.test.mjs", profiles: ["tooling"], test: true });
+  const unrelatedBase = structuredClone(toolManifest);
+  unrelatedBase.entries.reverse();
+  const additive = structuredClone(toolManifest);
+  additive.entries.push({ path: "tools/new-policy.test.mjs", profiles: ["tooling"], test: true });
+  const manifestChange = [{ status: "M", path: "ci/tool-profile-manifest.json" }];
+
+  // when / then
+  assert.deepEqual(classifyChangesAtCommits(manifestChange, [], commitInventory(removed)).profiles, ["full"]);
+  assert.deepEqual(classifyChangesAtCommits(manifestChange, [], commitInventory(moved)).profiles, ["full"]);
+  assert.deepEqual(classifyChangesAtCommits([
+    ...manifestChange, { status: "A", path: "tools/missing.test.mjs" }
+  ], [], commitInventory(nonexistent, { omit: ["tools/missing.test.mjs"] })).profiles, ["full"]);
+  assert.deepEqual(classifyChangesAtCommits(manifestChange, [], commitInventory(
+    toolManifest, { baseManifest: unrelatedBase }
+  )).profiles, ["full"]);
+  assert.deepEqual(classifyChangesAtCommits([
+    ...manifestChange,
+    { status: "A", path: "tools/new-policy.test.mjs" },
+    { status: "A", path: "tools/unlisted-helper.mjs" }
+  ], [], commitInventory(additive, { extra: ["tools/unlisted-helper.mjs"] })).profiles, ["full"]);
+});
+
+test("given the deployment guide changes, when classifying it, then only modifications use documentation checks", () => {
+  // when / then
+  assert.deepEqual(classifyChanges([{ status: "M", path: "deploy/README.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(classifyChanges([{ status: "D", path: "deploy/README.md" }], []).profiles, ["full"]);
+  assert.deepEqual(classifyChanges([{
+    status: "R100", previousPath: "deploy/README.md", path: "deploy/OPERATIONS.md"
+  }], []).profiles, ["full"]);
+});
+
 test("given duplicate or stale tool assignments, when validating the manifest, then it fails closed", () => {
   // given
   const duplicate = { schemaVersion: 1, entries: [
@@ -400,3 +479,29 @@ test("given the classifier fails, when binding fallback evidence, then the plan 
   assert.equal(validatePlan(fallback), true, JSON.stringify(validatePlan.errors));
   assert.doesNotMatch(JSON.stringify(fallback), /message|stack|error.*error/i);
 });
+
+function commitInventory(headManifest, { baseManifest = toolManifest, omit = [], extra = [] } = {}) {
+  const baseCommit = "a".repeat(40);
+  const headCommit = "b".repeat(40);
+  const tracked = [
+    ...headManifest.entries.filter((entry) => !omit.includes(entry.path)).map((entry) => entry.path),
+    ...extra
+  ].join("\0");
+  return {
+    baseCommit,
+    headCommit,
+    git: (arguments_) => {
+      if (arguments_[0] === "show" && arguments_[1] === `${baseCommit}:ci/tool-profile-manifest.json`) {
+        return JSON.stringify(baseManifest);
+      }
+      if (arguments_[0] === "show" && arguments_[1] === `${headCommit}:ci/tool-profile-manifest.json`) {
+        return JSON.stringify(headManifest);
+      }
+      if (arguments_[0] === "ls-tree") {
+        assert.deepEqual(arguments_, ["ls-tree", "-r", "-z", "--name-only", headCommit, "--", "tools"]);
+        return `${tracked}\0`;
+      }
+      throw new Error(`Unexpected git call: ${arguments_.join(" ")}`);
+    }
+  };
+}

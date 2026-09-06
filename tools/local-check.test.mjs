@@ -448,7 +448,10 @@ test("given a protected base, when classifying, then its classifier runs from an
         calls.push(["parse", value]);
         return [{ status: "M", path: "docs/quality-strategy.md" }];
       },
-      classifyChanges: (changes, labels) => localCheckPlan(changes, { forceFull: labels.includes("ci:full") })
+      classifyChangesAtCommits: (changes, labels, commits) => {
+        calls.push(["classify", commits.baseCommit, commits.headCommit, commits.git]);
+        return localCheckPlan(changes, { forceFull: labels.includes("ci:full") });
+      }
     };
   };
 
@@ -462,9 +465,11 @@ test("given a protected base, when classifying, then its classifier runs from an
   assert.equal(calls[1][0], "load");
   assert.match(calls[1][1], /tools\/test-profile-classifier\.mjs\?base=a{40}$/);
   assert.deepEqual(calls[2], ["parse", evidence.changeEvidence]);
-  assert.equal(calls[3][0], "load");
-  assert.match(calls[3][1], /tools\/local-check\.mjs\?base=a{40}$/);
-  assert.deepEqual(calls[4].slice(0, 3), ["worktree", "remove", "--force"]);
+  assert.deepEqual(calls[3].slice(0, 3), ["classify", "a".repeat(40), "b".repeat(40)]);
+  assert.equal(calls[3][3], git);
+  assert.equal(calls[4][0], "load");
+  assert.match(calls[4][1], /tools\/local-check\.mjs\?base=a{40}$/);
+  assert.deepEqual(calls[5].slice(0, 3), ["worktree", "remove", "--force"]);
 });
 
 test("given a planned local check, when rendering it, then the profiles tasks and evidence are all named", () => {
@@ -505,7 +510,7 @@ test("given a protected base classifier, when classifying locally, then its answ
     ? await import("./local-check.mjs")
     : {
       parseNameStatus: () => [{ status: "M", path: "docs/quality-strategy.md" }],
-      classifyChanges: () => ({ schemaVersion: 1, profiles: ["tooling"], isFull: false, reasons: [] })
+      classifyChangesAtCommits: () => ({ schemaVersion: 1, profiles: ["tooling"], isFull: false, reasons: [] })
     };
 
   // when

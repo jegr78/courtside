@@ -329,7 +329,11 @@ export async function classifyProtectedChanges(evidence, forceFull, git = runGit
     const classifierUrl = pathToFileURL(join(worktree, "tools", "test-profile-classifier.mjs"));
     const protectedClassifier = await loadClassifier(`${classifierUrl.href}?base=${evidence.baseCommit}`);
     const changes = protectedClassifier.parseNameStatus(evidence.changeEvidence);
-    const classified = protectedClassifier.classifyChanges(changes, forceFull ? ["ci:full"] : []);
+    const classified = protectedClassifier.classifyChangesAtCommits(
+      changes,
+      forceFull ? ["ci:full"] : [],
+      { baseCommit: evidence.baseCommit, headCommit: evidence.headCommit, git }
+    );
     const protectedLocalCheckUrl = pathToFileURL(join(worktree, "tools", "local-check.mjs"));
     const protectedLocalCheck = await loadClassifier(
       `${protectedLocalCheckUrl.href}?base=${evidence.baseCommit}`);
