@@ -174,6 +174,26 @@ test("given non-automated controls, when maintaining the catalog, then each link
   }
 });
 
+test("given the ASVS 5 inventory, when assigning manual controls, then each chapter uses its matching procedure", () => {
+  // given
+  const procedureByChapter = new Map([
+    ["1", "MAN-INPUT-001"], ["2", "MAN-BUSINESS-001"], ["3", "MAN-CLIENT-001"],
+    ["4", "MAN-INPUT-001"], ["5", "MAN-INPUT-001"], ["6", "MAN-IDENTITY-001"],
+    ["7", "MAN-SESSION-001"], ["8", "MAN-AUTHZ-001"], ["9", "MAN-SESSION-001"],
+    ["10", "MAN-IDENTITY-001"], ["11", "MAN-CRYPTO-001"], ["12", "MAN-COMMS-001"],
+    ["13", "MAN-OPS-001"], ["14", "MAN-DATA-001"], ["15", "MAN-ARCH-001"],
+    ["16", "MAN-OPS-001"], ["17", "MAN-COMMS-001"]
+  ]);
+  const controls = catalog.controlCoverage.flatMap(({ controls: entries }) => entries)
+    .filter(({ id, manualProcedureId }) => id.startsWith("v5.0.0-") && manualProcedureId);
+
+  // when / then
+  for (const control of controls) {
+    const chapter = control.id.slice("v5.0.0-".length).split(".")[0];
+    assert.equal(control.manualProcedureId, procedureByChapter.get(chapter), control.id);
+  }
+});
+
 test("given the manual runbook, when an assessment is recorded, then method evidence and outcomes are closed", () => {
   // when / then
   for (const field of ["Prerequisites", "Steps", "Expected secure outcome", "Observed result",
@@ -199,14 +219,14 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
   };
   const control = {
     controlId: "v5.0.0-1.1.1",
-    stepsPerformed: ["Reviewed the boundary"],
-    expectedSecureOutcome: "No undocumented boundary exists.",
-    observedResult: "The documented and deployed boundaries agree.",
+    stepsPerformed: ["Reviewed canonical input decoding"],
+    expectedSecureOutcome: "Each encoded input is decoded once before validation.",
+    observedResult: "The typed parsers decode each accepted representation once.",
     redactedEvidenceReferences: [evidenceReference],
     outcome: "pass"
   };
   const procedure = {
-    procedureId: "MAN-ARCH-001",
+    procedureId: "MAN-INPUT-001",
     prerequisites: ["Qualified target"],
     controls: [control],
     tester: "Maintainer",
@@ -224,14 +244,14 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
     targetFingerprint: digest,
     targetOrigin: "https://127.0.0.1:8443",
     environment: "SECURITY",
-    profile: "safe",
+    profile: "active",
     authorization: {
       id: "protected-record-1",
       origin: "https://127.0.0.1:8443",
       targetFingerprint: digest,
       targetImageDigest: digest,
-      profile: "safe",
-      procedureIds: ["MAN-ARCH-001"],
+      profile: "active",
+      procedureIds: ["MAN-INPUT-001"],
       expiresAt: "2026-09-21T20:00:00Z"
     },
     selectedControlIds: ["v5.0.0-1.1.1"],
@@ -331,16 +351,16 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
   const digest = `sha256:${"a".repeat(64)}`;
   const control = {
     controlId: "v5.0.0-1.1.1",
-    stepsPerformed: ["Compared the deployed trust boundary with the pinned requirement"],
-    expectedSecureOutcome: "The boundary is explicit.",
-    observedResult: "The boundary agrees with the documented model.",
+    stepsPerformed: ["Compared canonical decoding with the pinned requirement"],
+    expectedSecureOutcome: "Encoded input has one canonical representation.",
+    observedResult: "The parser decodes before validation without a second decoding path.",
     redactedEvidenceReferences: [{
       id: "evidence-001", digest, classification: "restricted-security-evidence", expiresOn: "2026-09-21"
     }],
     outcome: "pass"
   };
   const procedure = {
-    procedureId: "MAN-ARCH-001",
+    procedureId: "MAN-INPUT-001",
     prerequisites: ["Qualified target"],
     controls: [control],
     tester: "Maintainer",
@@ -358,14 +378,14 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
     targetFingerprint: digest,
     targetOrigin: "https://127.0.0.1:8443",
     environment: "SECURITY",
-    profile: "safe",
+    profile: "active",
     authorization: {
       id: "protected-record-1",
       origin: "https://127.0.0.1:8443",
       targetFingerprint: digest,
       targetImageDigest: digest,
-      profile: "safe",
-      procedureIds: ["MAN-ARCH-001"],
+      profile: "active",
+      procedureIds: ["MAN-INPUT-001"],
       expiresAt: "2026-09-21T20:00:00Z"
     },
     selectedControlIds: ["v5.0.0-1.1.1"],
