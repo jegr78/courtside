@@ -15,9 +15,10 @@ const api = yaml.load(specification.toString("utf8"));
 const operationResponses = collectOperationResponses(api);
 const publicPropertyNames = collectPropertyNames(api.components?.schemas ?? {});
 const publicMediaTypes = collectMediaTypes(api);
-const scenarioStatuses = new Set(["error", "failure", "interrupted", "skip", "timeout", "unknown"]);
 const evidenceSchema = JSON.parse(readFileSync(
   new URL("../security/openapi-fuzz-evidence.schema.json", import.meta.url), "utf8"));
+const scenarioStatuses = new Set(evidenceSchema.$defs.failureReason.oneOf
+  .find((branch) => branch.properties.kind.const === "scenario").properties.scenarioStatus.enum);
 const lifecycleSchema = JSON.parse(readFileSync(
   new URL("../security/finding-lifecycle.schema.json", import.meta.url), "utf8"));
 const ajv = new Ajv({ strict: true, allErrors: true });
@@ -431,6 +432,16 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
   if (evidence.dispositions.some(({ reproductionDigest }) => actionableDigests.has(reproductionDigest))) {
     throw new Error("OpenAPI fuzz evidence classifies one observation twice");
   }
+  // An incomplete result is comparable only when its incompleteness comes from retained candidates,
+  // so every operation that reports one has to name what a reader would triage.
+  if (evidence.operations.some((operation) => operation.outcomes.some(({ mode, outcome }) =>
+    outcome === "incomplete"
+      && !evidence.counterexamples.some((counterexample) =>
+        counterexample.operationId === operation.operationId && counterexample.mode === mode)
+      && !evidence.mutationCases.some((entry) =>
+        entry.operationId === operation.operationId && entry.outcome === "incomplete")))) {
+    throw new Error("OpenAPI fuzz evidence reports an incomplete operation that retained nothing");
+  }
   const candidateFingerprints = evidence.candidates.map(({ fingerprint }) => fingerprint);
   if (evidence.inputCases.some((entry) => (entry.status === undefined) === (entry.transportError === undefined))) {
     throw new Error("OpenAPI input evidence must contain exactly one transport outcome");
@@ -569,23 +580,25 @@ function reproductionDigestFor(counterexample) {
     .digest("hex")}`;
 }
 
-function incompleteCaseCandidates(scanner, plan, context, observedAt) {
+function incompleteCaseCandidates(cases, plan, context, observedAt) {
   const incomplete = ({ outcome }) => outcome === "incomplete";
   return [
-    ...scanner.inputCases.filter(incomplete)
-      .map((entry) => incompleteCaseCandidate("input", entry.id, entry, plan, context, observedAt)),
-    ...scanner.importCases.filter(incomplete)
-      .map((entry) => incompleteCaseCandidate("import", entry.id, entry, plan, context, observedAt)),
-    ...scanner.mutationCases.filter(incomplete)
+    ...cases.inputCases.filter(incomplete)
+      .map((entry) => incompleteCaseCandidate("input", `input-class ${entry.id}`, entry,
+        plan, context, observedAt)),
+    ...cases.importCases.filter(incomplete)
+      .map((entry) => incompleteCaseCandidate("import", `import-class ${entry.id}`, entry,
+        plan, context, observedAt)),
+    ...cases.mutationCases.filter(incomplete)
       .map((entry) => incompleteCaseCandidate("mutation", `${entry.method} ${entry.path}`, entry,
         plan, context, observedAt))
   ];
 }
 
+// The identity names which case is unfinished, not how it answered this time: a probe that responds
+// 502 on one run and 500 on the next would otherwise mint two findings for one unresolved case.
 function incompleteCaseCandidate(kind, surface, entry, plan, context, observedAt) {
-  const identity = JSON.stringify({ kind, surface, observation: entry.observation,
-    status: entry.status ?? null, problemType: entry.problemType ?? null,
-    transportError: entry.transportError ?? null });
+  const identity = JSON.stringify({ kind, surface, observation: entry.observation });
   const digest = createHash("sha256").update(identity).digest("hex");
   return createCandidate({
     scanner: "schemathesis",

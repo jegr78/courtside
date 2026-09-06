@@ -96,6 +96,8 @@ The active suite writes `authorization-matrix.json`, `authenticated-zap.json` an
 
 To replay an OpenAPI candidate, keep its protected `openapi-fuzz.json`, start a fresh environment with the recorded application image, and run the recorded active profile against the unchanged image, policy, OpenAPI digest and seed. Locate the new counterexample by operation, mode, check, case ID and request locations, then compare its structural `reason`. The reproduction digest matches only when those structural inputs match. Concrete query, path and body values are deliberately not retained; replay regenerates them from the pinned scanner and seed. The same exact status disagreement, public instance pointer and missing public properties, or media-type classification validates the structural defect. Never copy a discarded raw Schemathesis report into retained evidence.
 
+Two kinds of candidate are not replayed that way. A `scenario-completion` counterexample records that a scenario ended without succeeding and without failing a check; its `reason` carries the scenario status, and a run that ended in a timeout, an error or an interruption is not reproducible from the seed. An `input-case-incomplete`, `import-case-incomplete` or `mutation-case-incomplete` candidate has no counterexample at all: it names a probe of the pinned policy whose response was not the documented one, and the retained input, import or mutation case beside it carries the status and problem type that were observed. Both kinds are read from the retained evidence rather than regenerated, and both keep a run incomplete until somebody triages them.
+
 Inspect the latest or a specific attempt with:
 
 ```bash

@@ -87,8 +87,8 @@ function expectedPlan(contractPath, catalogPath, profile) {
   return { catalogVersion: catalog.catalogVersion, budgets: contract.profiles[profile], selectedTests, tools };
 }
 
-// A tool ends incomplete for six reasons and only two of them mint a candidate, so a refusal that
-// names the missing candidates alone leaves its reader with nothing to look at.
+// A refusal that names only the missing candidate leaves its reader looking for which of the six
+// routes to an incomplete result actually produced it.
 function incompleteCases(evidence) {
   const incomplete = ({ outcome }) => outcome === "incomplete";
   const cases = [

@@ -518,7 +518,7 @@ test("given a mutation probe that was not answered as documented, when the run i
     { LoadingFinished: { statistic: { operations: { total: inventory.length,
       selected: generatedInventory.filter(({ modes }) => modes.includes(mode)).length } } } },
     ...generatedInventory.filter(({ modes }) => modes.includes(mode)).map((entry) => ({
-      ScenarioFinished: { status: "success", recorder: {
+      ScenarioFinished: { status: entry.operationId === "listRoster" ? "timeout" : "success", recorder: {
         label: `${entry.method} ${entry.path}`,
         cases: { one: { value: { method: entry.method, path: entry.path,
           query: { case: "0" }, meta: { generation: { mode } } } } },
@@ -541,15 +541,16 @@ test("given a mutation probe that was not answered as documented, when the run i
     .concat(["oversized-cell", "conflicting-reference"].map((id) => ({ id, status: 201,
       observation: "row-level-rejection", outcome: "passed" })));
   const mutations = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
-  const mutationCases = mutations.map(({ operationId, method, path }) => ({ operationId, method, path,
-    status: operationId === "exportRoster" ? 200 : 400,
+  const mutationCases = (unfinishedStatus) => mutations.map(({ operationId, method, path }) => ({
+    operationId, method, path,
+    status: operationId === "exportRoster" ? unfinishedStatus : 400,
     ...(operationId === "exportRoster" ? {}
       : { problemType: "urn:courtside:error:validation-failed" }),
     observation: "invalid-mutation-rejected",
     outcome: operationId === "exportRoster" ? "incomplete" : "passed" }));
 
-  // when
-  const evidence = await runOpenApiFuzzAssessment({ profile: "active", environment: "SECURITY",
+  const retained = (unfinishedStatus) => runOpenApiFuzzAssessment({ profile: "active",
+    environment: "SECURITY",
     selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001", "CSA-API-001", "CSA-IMPORT-001"],
     runId: "run-0002", targetFingerprint: fingerprint }, {
     maxRequests: 2000, attempt: 1, deadline: new Date(Date.now() + 60_000),
@@ -558,19 +559,41 @@ test("given a mutation probe that was not answered as documented, when the run i
     runFuzzer: async () => ({ runtimeHardened: true, requestCount: 100,
       specificationDigest: openApiSpecificationDigest(),
       events: { positive: events("positive"), negative: events("negative") }, inputCases, importCases,
-      mutationCases,
+      mutationCases: mutationCases(unfinishedStatus),
       observedRoutes: inventory.map(({ method, path }) => ({ method, pathTemplate: path })),
       stateBefore: fingerprint, stateAfter: fingerprint, generatedDataMegabytes: 1 })
   });
 
+  // when
+  const evidence = await retained(200);
+  const flaky = await retained(500);
+
   // then
   assert.equal(evidence.outcome, "incomplete");
-  assert.deepEqual(evidence.counterexamples, []);
   assert.deepEqual(evidence.candidates.map(({ ruleId }) => ruleId).toSorted(),
-    ["import-case-incomplete", "input-case-incomplete", "mutation-case-incomplete"]);
+    ["import-case-incomplete", "input-case-incomplete", "mutation-case-incomplete",
+      "scenario-completion"]);
   assert.equal(evidence.candidates.find(({ ruleId }) => ruleId === "mutation-case-incomplete")
     .normalizedSurface, "post /api/admin/export/roster");
   assert.equal(evidence.candidates.find(({ ruleId }) => ruleId === "import-case-incomplete")
-    .normalizedSurface, "invalid-utf8");
+    .normalizedSurface, "import-class invalid-utf8");
+  assert.equal(evidence.counterexamples.filter(({ check }) => check === "scenario-completion").length,
+    2, "the unfinished GET scenario is retained in both generation modes");
   assert.doesNotThrow(() => validateOpenApiFuzzEvidence(evidence));
+
+  // The acknowledgement gate is a fingerprint difference, so a probe answering 500 on one run and
+  // 200 on the next must not mint a second finding for one unresolved case.
+  assert.deepEqual(flaky.candidates.map(({ fingerprint: value }) => value).toSorted(),
+    evidence.candidates.map(({ fingerprint: value }) => value).toSorted());
+
+  const unattributed = structuredClone(evidence);
+  const untouched = unattributed.operations.find(({ operationId }) => operationId === "getCourt");
+  untouched.outcomes[0].outcome = "incomplete";
+  untouched.outcomes[0].observation = "candidate-requires-triage";
+  assert.throws(() => validateOpenApiFuzzEvidence(unattributed), /retained nothing/);
+
+  const withoutCandidate = structuredClone(evidence);
+  withoutCandidate.candidates = withoutCandidate.candidates
+    .filter(({ ruleId }) => ruleId !== "mutation-case-incomplete");
+  assert.throws(() => validateOpenApiFuzzEvidence(withoutCandidate), /omits a lifecycle candidate/);
 });
