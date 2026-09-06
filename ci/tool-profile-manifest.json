@@ -13,6 +13,7 @@
     { "path": "tools/courtside.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/courtside.uat-smoke.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/courtside.upgrade-smoke.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/commit-message-parser.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/coverage-diff.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/coverage-diff.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/data-model-documentation.test.mjs", "profiles": ["tooling"], "test": true },

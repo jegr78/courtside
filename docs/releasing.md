@@ -42,7 +42,7 @@ the tag says even if the pom were to disagree.
 Candidates are opened and closed with one line of configuration, not with a hand-typed version.
 
 1. Set `"prerelease": true` in `release-please-config.json` and merge that. The next release pull
-   request proposes `v0.3.0-rc.1`, and every merge after it raises `rc.2`, `rc.3`.
+   request proposes `v0.3.0-rc`, and every merge after it raises `rc.1`, `rc.2`.
 2. To open an `alpha` line instead, land a commit carrying a `Release-As:` footer naming
    `0.3.0-alpha.1`; the strategy counts that suffix onwards by itself. That footer names the version
    outright and overrides everything else, `bump-minor-pre-major` included — it is the one way to
@@ -55,8 +55,9 @@ None of that applies to the very first release, because there is nothing to bump
 release in the history release-please never asks the versioning strategy at all and takes
 `initial-version` verbatim — which is `1.0.0` unless the configuration says otherwise, whatever the
 manifest holds and however many breaking changes the history carries. A candidate for the first
-release is therefore opened by writing it there, as `0.1.0-rc.1`; the three steps above take over
-from the second release onwards.
+release is therefore opened by writing it there, as `0.1.0-rc.1`, and `"prerelease": true` belongs
+in the same change: without it the release after that candidate strips the suffix and graduates.
+The three steps above take over from the second release onwards.
 
 Nothing else changes: a candidate travels the same pipeline, and section 10 of `docs/design.md` says
 what that means.

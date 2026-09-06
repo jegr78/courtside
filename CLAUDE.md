@@ -286,11 +286,13 @@ away.
 * **Default branch:** `main`. Feature work on `feat/<short-description>`.
 * **Commits:** English Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`,
   `refactor:`). Commit frequently; push only after manual verification.
-* **A commit body keeps its parentheses balanced.** release-please parses the whole message, and a
-  single unmatched `(` makes it drop that commit — the change is missing from the changelog with
-  nothing but a line in a workflow log to say so. Two commits are absent from this repository's
-  first changelog for exactly that reason, both of them quoting code that opened a bracket it never
-  closed. Quote such a fragment with its closing bracket, or reword around it.
+* **A commit message has to be one release-please can parse.** Its parser reads every message that
+  reaches `main` and drops the ones it rejects, silently — two commits are missing from this
+  repository's first changelog, and the only trace was one line in a workflow log. What trips it is
+  narrower than unbalanced brackets and not worth learning by eye: a quoted `logAnswered(,` fell
+  over, while three unbalanced brackets in another message did not.
+  `tools/commit-message-parser.test.mjs` runs that same parser over the branch's own commits, so a
+  message that would be dropped fails the build instead of disappearing.
 * **Test data carries English placeholder identities only** — Jane Doe, John Roe, Mary Major,
   Richard Miles, Example Tennis Club, `@example.org`. Never a real person, club or address, and
   nothing German: not in tests, seeds, plans, specs or commit messages. This is an AGPL
