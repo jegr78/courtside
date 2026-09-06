@@ -46,6 +46,8 @@ export type ExternalReferencePage = components["schemas"]["ExternalReferencePage
 export type ExternalReferenceRequest = components["schemas"]["ExternalReferenceRequest"];
 export type AccountRequest = components["schemas"]["AccountRequest"];
 export type SubjectAccessExport = components["schemas"]["SubjectAccessExport"];
+export type FacilityUtilisation = components["schemas"]["FacilityUtilisation"];
+export type CourtUtilisation = components["schemas"]["CourtUtilisation"];
 export type SourceOffer = components["schemas"]["SourceOffer"];
 export type Problem = components["schemas"]["Problem"];
 export type PublicCourt = components["schemas"]["PublicCourt"];
@@ -371,6 +373,8 @@ export const api = {
   ),
   // No Content-Type: only the browser knows the boundary it is about to write.
   supportedEncodings: () => request<string[]>("/api/admin/import/encodings"),
+  facilityUtilisation: (from: string, to: string) => request<FacilityUtilisation>(
+    `/api/admin/reports/facility-utilisation?${new URLSearchParams({ from, to }).toString()}`),
   exportBookings: (parameters: BookingExportParameters) => requestFile(
     `/api/admin/export/bookings?${new URLSearchParams(parameters).toString()}`, { method: "POST" }),
   exportRoster: (parameters: RosterExportParameters) => requestFile(

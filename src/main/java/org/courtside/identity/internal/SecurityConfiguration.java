@@ -95,7 +95,7 @@ public class SecurityConfiguration {
                                 "/admin/facility/slot-fillers",
                                 "/admin/roster",
                                 "/admin/roster/{personId}", "/admin/membership-types", "/admin/import",
-                                "/admin/export",
+                                "/admin/export", "/admin/utilisation",
                                 "/admin/audit",
                                 "/admin/messages",
                                 "/index.html",
