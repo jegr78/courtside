@@ -126,8 +126,10 @@ handling is the database's job and is tested as such.
 - Design spec: `docs/design.md`
 - The data model: `docs/data-model.md`
 - How a release is cut: `docs/releasing.md`
-- Known deviations and follow-ups: the issue tracker, labeled `decision`, `known-limit`,
-  `operations` or `debt`
+- Recorded decisions, known deviations and follow-ups: the issue tracker, labeled `decision`,
+  `known-limit`, `operations` or `debt`. Completed decisions and accepted known limits are closed;
+  pending choices use `question` and planned remediation uses a work label so both remain visible
+  work.
 - Conventions for contributors: `CLAUDE.md`. Courtside is developed with AI assistance, and
   that file is the ruleset it works under — architecture principles, migration policy, test
   discipline. It is written for a contributor of either kind.
