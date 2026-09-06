@@ -350,6 +350,100 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
     }
 
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnImageCarryingACsvNameAndType_whenPreviewing_thenTheContentDecidesAndNothingIsStored()
+            throws Exception {
+        // given — every name agrees with the policy and only the bytes disagree
+        byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13};
+
+        // when / then
+        mockMvc.perform(multipart("/api/admin/import/sources/{sourceId}/previews", source)
+                        .file(new MockMultipartFile("file", "roster.csv", "text/csv", png))
+                        .param("mode", "FULL_SNAPSHOT").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:import-snapshot-upload-unsupported"))
+                .andExpect(jsonPath("$.violations[0].code").value("import.snapshot.notText"));
+        assertThatTheRosterIsUntouched();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAWorkbookNamedAsAnExport_whenPreviewing_thenTheExtensionItReadsIsNamed() throws Exception {
+        // when / then
+        mockMvc.perform(multipart("/api/admin/import/sources/{sourceId}/previews", source)
+                        .file(new MockMultipartFile("file", "roster.xlsx", "text/csv",
+                                THREE_ROWS.getBytes(StandardCharsets.UTF_8)))
+                        .param("mode", "FULL_SNAPSHOT").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code").value("import.snapshot.extensionUnsupported"))
+                .andExpect(jsonPath("$.violations[0].params.extensions").value(org.hamcrest.Matchers.contains(".csv", ".txt")));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenATypeThatIsNoMemberList_whenPreviewing_thenItIsRefusedBeforeAnythingIsRead()
+            throws Exception {
+        // when / then
+        mockMvc.perform(multipart("/api/admin/import/sources/{sourceId}/previews", source)
+                        .file(new MockMultipartFile("file", "roster.csv", "image/png",
+                                THREE_ROWS.getBytes(StandardCharsets.UTF_8)))
+                        .param("mode", "FULL_SNAPSHOT").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code").value("import.snapshot.mediaTypeUnsupported"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnEarlierPreview_whenTheParserRefusesTheNextFile_thenThatPreviewIsStillTheCurrentOne()
+            throws Exception {
+        // given — this refusal is raised inside the transaction, after the source has been locked,
+        // which is the only path on which an earlier preview could still be superseded
+        String first = mockMvc.perform(upload(THREE_ROWS, "FULL_SNAPSHOT"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        byte[] withAControlCharacter =
+                "Member number,First name,Last name,Email\n4713,Jane,\u0001,jane@example.org\n"
+                        .getBytes(StandardCharsets.UTF_8);
+
+        // when
+        mockMvc.perform(multipart("/api/admin/import/sources/{sourceId}/previews", source)
+                        .file(new MockMultipartFile("file", "roster.csv", "text/csv",
+                                withAControlCharacter))
+                        .param("mode", "FULL_SNAPSHOT").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code").value("import.snapshot.notText"));
+
+        // then — a refusal creates no preview state and supersedes none
+        mockMvc.perform(get("/api/admin/import/previews/{id}", JsonPath.<String>read(first, "$.previewId")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.superseded").value(false));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAContainerTheSignatureListDoesNotName_whenPreviewing_thenTheContentStillRefusesIt()
+            throws Exception {
+        // given — the signature list is a fast filter; what the boundary rests on is the text check
+        var refused = Map.of(
+                new byte[] {0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0}, "import.snapshot.notText",
+                new byte[] {(byte) 0xef, (byte) 0xbb, (byte) 0xbf, 0x50, 0x4b, 0x03, 0x04, 0x14, 0, 0},
+                "import.snapshot.notText",
+                // Not valid UTF-8 either, so this source refuses it one step earlier than the rest.
+                new byte[] {0x1f, (byte) 0x8b, 0x08, 0x00, 0, 0, 0, 0}, "import.snapshot.notEncoding");
+
+        // when / then
+        for (var candidate : refused.entrySet()) {
+            mockMvc.perform(multipart("/api/admin/import/sources/{sourceId}/previews", source)
+                            .file(new MockMultipartFile("file", "roster.csv", "text/csv",
+                                    candidate.getKey()))
+                            .param("mode", "FULL_SNAPSHOT").with(csrf()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.violations[0].code").value(candidate.getValue()));
+        }
+        assertThatTheRosterIsUntouched();
+    }
+
     private RequestBuilder upload(String content, String mode) {
         return multipart("/api/admin/import/sources/{sourceId}/previews", source)
                 .file(new MockMultipartFile("file", "roster.csv", "text/csv",

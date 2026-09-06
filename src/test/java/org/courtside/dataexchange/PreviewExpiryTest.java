@@ -125,8 +125,9 @@ class PreviewExpiryTest extends AbstractIntegrationTest {
         expiry.sweep(clock.instant().plus(Duration.ofDays(9)));
 
         // when
-        previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
-                ONE_MEMBER.getBytes(StandardCharsets.UTF_8), actor);
+        previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                new SnapshotUpload("roster.csv", "text/csv",
+                        ONE_MEMBER.getBytes(StandardCharsets.UTF_8)), actor);
 
         // then
         assertThat(stored.findById(previewId).orElseThrow().getChangeSet()).isNull();
@@ -157,7 +158,8 @@ class PreviewExpiryTest extends AbstractIntegrationTest {
     }
 
     private UUID preview() {
-        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
-                ONE_MEMBER.getBytes(StandardCharsets.UTF_8), actor).previewId();
+        return previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                new SnapshotUpload("roster.csv", "text/csv",
+                        ONE_MEMBER.getBytes(StandardCharsets.UTF_8)), actor).previewId();
     }
 }

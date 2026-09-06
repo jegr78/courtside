@@ -83,3 +83,22 @@ it("given a problem with a trace reference, when resolving it, then the member c
     reference: `${traceId}/${spanId}`
   });
 });
+
+it("given a refused upload, when resolving it, then the board reads which formats are read rather than the generic message", async () => {
+  // given
+  const i18n = (await import("../i18n")).default;
+  await i18n.changeLanguage("de");
+  const error = new ApiError(400, {
+    type: "urn:courtside:error:import-snapshot-upload-unsupported",
+    title: "Snapshot upload unsupported",
+    status: 400,
+    violations: [{ code: "import.snapshot.extensionUnsupported", params: { extensions: [".csv", ".txt"] } }]
+  });
+
+  // when
+  const message = problemMessage(error, i18n.t);
+
+  // then
+  expect(message).not.toEqual(i18n.t("error.generic"));
+  expect(message).toContain(".csv");
+});

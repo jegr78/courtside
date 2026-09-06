@@ -1532,6 +1532,23 @@ whether it is built or designed. **Designed means absent today.**
   firewall does not recognise it at all — as it does for a request target the HTTP grammar does not
   allow, which the connector refuses before any dispatch. All of those answers are RFC 9457, so a
   club running without the reference proxy loses nothing: the application is what answers. *Built.*
+- **Uploads carry a documented type boundary, and the content is what decides it.** *Built.* Two
+  endpoints accept a file. A roster snapshot is read as CSV: the name must end in `.csv` or `.txt`,
+  the declared part type must be one a browser actually sends for such a file — `text/csv`,
+  `text/plain`, `application/vnd.ms-excel`, `application/octet-stream`, or none at all — and the
+  bytes must be text. A container, image, workbook or executable signature is refused, and so is
+  anything that decodes into a C0 control character other than tab, carriage return or line feed,
+  because `ISO-8859-1` maps every byte and would otherwise read a binary as a roster. C1
+  (U+0080–U+009F) is deliberately not refused: a club configured `ISO-8859-1` whose export is
+  really Windows-1252 decodes its typographic quotes into that range. The refusal happens before
+  any preview exists, so a rejected file supersedes nothing and this application persists nothing
+  of it — what a preview keeps is the file's name, its SHA-256 digest and the change set parsed
+  from it, never the uploaded bytes. The servlet container still buffers the part it received to
+  its own temporary directory before the application sees it, and removes it with the request. A club logo is refused unless
+  its own bytes are PNG or JPEG within 1 MiB and 2048 pixels, and what is stored is the re-encode
+  through `ImageIO` rather than what arrived. Neither is scanned for malware, and neither needs to
+  be: the logo that reaches a browser is bytes this instance wrote, and a snapshot becomes rows in
+  a change set and is never served back as a file.
 - **Security headers and TLS:** the application sets `Content-Security-Policy`,
   `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and
   `Referrer-Policy: strict-origin-when-cross-origin` on its own responses. For a request it

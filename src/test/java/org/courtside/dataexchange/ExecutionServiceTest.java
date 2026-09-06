@@ -233,11 +233,12 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
                         "Email", CanonicalField.EMAIL,
                         "Category", CanonicalField.MEMBERSHIP_TYPE),
                 Map.of("A", ACTIVE_TYPE), ACTIVE_TYPE, Set.of(CanonicalField.MEMBERSHIP_TYPE), 10).sourceId();
-        UUID previewId = previews.create(typed, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv", """
+        UUID previewId = previews.create(typed, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                new SnapshotUpload("roster.csv", "text/csv", """
                 Member number,First name,Last name,Email,Category
                 4711,Jane,Doe,jane.doe@example.org,A
                 4712,John,Roe,john.roe@example.org,A
-                """.getBytes(StandardCharsets.UTF_8), actor).previewId();
+                """.getBytes(StandardCharsets.UTF_8)), actor).previewId();
         long peopleBefore = persons.count();
         memberFixture.deactivateMembershipType(ACTIVE_TYPE);
 
@@ -267,12 +268,12 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     @Test
     void givenARowWhoseOwnedNameCellIsEmpty_whenPreviewing_thenItFailsThatRowRatherThanTheRun() {
         // when
-        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
-                """
+        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                new SnapshotUpload("roster.csv", "text/csv", """
                 Member number,First name,Last name,Email
                 4711,,Doe,jane.doe@example.org
                 4712,John,Roe,john.roe@example.org
-                """.getBytes(StandardCharsets.UTF_8), actor);
+                """.getBytes(StandardCharsets.UTF_8)), actor);
 
         // then
         assertThat(summary.changeSet().errors()).singleElement().satisfies(error -> {
@@ -285,11 +286,11 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     @Test
     void givenARowWhoseAddressIsNotOne_whenPreviewing_thenItFailsThatRow() {
         // when
-        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
-                """
+        PreviewSummary summary = previews.create(source, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                new SnapshotUpload("roster.csv", "text/csv", """
                 Member number,First name,Last name,Email
                 4711,Jane,Doe,not-an-address
-                """.getBytes(StandardCharsets.UTF_8), actor);
+                """.getBytes(StandardCharsets.UTF_8)), actor);
 
         // then
         assertThat(summary.changeSet().errors()).singleElement()
@@ -331,7 +332,8 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         UUID granting = memberFixture.membershipTypeGrantingAnAccount("Contributing");
         UUID grantingSource = sourceWithDefaultType(granting);
         PreviewSummary summary = previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
-                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor);
+                new SnapshotUpload("roster.csv", "text/csv",
+                        TWO_MEMBERS.getBytes(StandardCharsets.UTF_8)), actor);
 
         // when
         RunOutcome outcome = executions.execute(summary.previewId(), false, actor);
@@ -356,7 +358,8 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         UUID granting = memberFixture.membershipTypeGrantingAnAccount("Contributing");
         UUID grantingSource = sourceWithDefaultType(granting);
         PreviewSummary summary = previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
-                "roster.csv", ONE_MEMBER_WITHOUT_AN_ADDRESS.getBytes(StandardCharsets.UTF_8), actor);
+                new SnapshotUpload("roster.csv", "text/csv",
+                        ONE_MEMBER_WITHOUT_AN_ADDRESS.getBytes(StandardCharsets.UTF_8)), actor);
 
         // when
         RunOutcome outcome = executions.execute(summary.previewId(), false, actor);
@@ -377,15 +380,17 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         UUID granting = memberFixture.membershipTypeGrantingAnAccount("Contributing");
         UUID grantingSource = sourceWithDefaultType(granting);
         executions.execute(previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
-                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(),
+                new SnapshotUpload("roster.csv", "text/csv",
+                        TWO_MEMBERS.getBytes(StandardCharsets.UTF_8)), actor).previewId(),
                 false, actor);
         UUID jane = personIdsOf(grantingSource).get("4711");
         memberFixture.correctAccountUsername(jane, "jane");
 
         // when
         RunOutcome outcome = executions.execute(previews.create(grantingSource,
-                SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
-                TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(), false, actor);
+                SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                        new SnapshotUpload("roster.csv", "text/csv",
+                                TWO_MEMBERS.getBytes(StandardCharsets.UTF_8)), actor).previewId(), false, actor);
 
         // then — a second run must not reissue a password or rename a login somebody is using
         assertThat(outcome.accountsCreated()).isZero();
@@ -400,14 +405,16 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         UUID type = memberFixture.createMembershipType("Contributing");
         UUID typedSource = sourceWithDefaultType(type);
         executions.execute(previews.create(typedSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
-                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(),
+                new SnapshotUpload("roster.csv", "text/csv",
+                        TWO_MEMBERS.getBytes(StandardCharsets.UTF_8)), actor).previewId(),
                 false, actor);
         memberFixture.letMembershipTypeGrantAnAccount(type, "Contributing");
 
         // when
         RunOutcome outcome = executions.execute(previews.create(typedSource,
-                SnapshotMode.FULL_SNAPSHOT, "UTF-8", "roster.csv",
-                TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(), false, actor);
+                SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                        new SnapshotUpload("roster.csv", "text/csv",
+                                TWO_MEMBERS.getBytes(StandardCharsets.UTF_8)), actor).previewId(), false, actor);
 
         // then — a run log that says somebody was corrected when nothing about them was is a
         // false statement in a record a board reads and cannot amend
@@ -421,12 +428,14 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         UUID type = memberFixture.createMembershipType("Contributing");
         UUID typedSource = sourceWithDefaultType(type);
         executions.execute(previews.create(typedSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
-                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId(),
+                new SnapshotUpload("roster.csv", "text/csv",
+                        TWO_MEMBERS.getBytes(StandardCharsets.UTF_8)), actor).previewId(),
                 false, actor);
         memberFixture.letMembershipTypeGrantAnAccount(type, "Contributing");
         UUID jane = personIdsOf(typedSource).get("4711");
         UUID previewId = previews.create(typedSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
-                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor).previewId();
+                new SnapshotUpload("roster.csv", "text/csv",
+                        TWO_MEMBERS.getBytes(StandardCharsets.UTF_8)), actor).previewId();
         memberFixture.giveAccount(jane, "jane", Set.of(Role.MEMBER));
 
         // when / then — whether somebody signs in is part of what a preview described, so a board
@@ -444,7 +453,8 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
 
         // when
         PreviewSummary summary = previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
-                "roster.csv", TWO_MEMBERS_ON_ONE_ADDRESS.getBytes(StandardCharsets.UTF_8), actor);
+                new SnapshotUpload("roster.csv", "text/csv",
+                        TWO_MEMBERS_ON_ONE_ADDRESS.getBytes(StandardCharsets.UTF_8)), actor);
 
         // then — a shared mailbox is deliberate, so both accounts are still opened; what the
         // board must not be denied is the count before the run sends anything
@@ -466,7 +476,8 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
 
         // when
         PreviewSummary summary = previews.create(grantingSource, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
-                "roster.csv", TWO_MEMBERS.getBytes(StandardCharsets.UTF_8), actor);
+                new SnapshotUpload("roster.csv", "text/csv",
+                        TWO_MEMBERS.getBytes(StandardCharsets.UTF_8)), actor);
 
         // then — the count is asked of the roster, not only of the file
         assertThat(summary.changeSet().sharedAddresses())
@@ -486,8 +497,9 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     }
 
     private UUID preview(String content, SnapshotMode mode) {
-        return previews.create(source, mode, "UTF-8", "roster.csv",
-                content.getBytes(StandardCharsets.UTF_8), actor).previewId();
+        return previews.create(source, mode, "UTF-8",
+                new SnapshotUpload("roster.csv", "text/csv",
+                        content.getBytes(StandardCharsets.UTF_8)), actor).previewId();
     }
 
     private Map<String, UUID> personIdsOf(UUID sourceId) {

@@ -40,8 +40,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class PreviewService {
 
-    private static final int MAX_FILE_NAME_LENGTH = 200;
-
     private final ImportPreviewRepository previews;
     private final ImportSourceService sources;
     private final ExternalReferenceRepository references;
@@ -55,10 +53,11 @@ public class PreviewService {
 
     @Transactional
     public PreviewSummary create(UUID sourceId, SnapshotMode mode, String encoding,
-                                 String fileName, byte[] content, UUID accountId) {
+                                 SnapshotUpload upload, UUID accountId) {
+        byte[] content = requiredUpload(upload).content();
         SourceConfiguration configuration = sources.configurationForUpdate(sourceId);
         SnapshotMode requested = requiredMode(mode);
-        CsvSnapshot snapshot = SnapshotParser.parse(requiredContent(content), configuration.columns(),
+        CsvSnapshot snapshot = SnapshotParser.parse(content, configuration.columns(),
                 SupportedEncodings.resolve(encodingInForce(encoding, configuration)),
                 configuration.separator());
         CurrentRoster roster = currentRosterFor(sourceId, snapshot);
@@ -66,7 +65,7 @@ public class PreviewService {
         Instant now = clock.instant();
         supersedeEarlierPreviewsOf(sourceId, now);
         ImportPreview preview = previews.save(new ImportPreview(sourceId, requested,
-                requiredFileName(fileName), PersonFingerprint.sha256(content), snapshot.rows().size(),
+                upload.fileName(), PersonFingerprint.sha256(content), snapshot.rows().size(),
                 write(new PreviewContent(resolved, snapshot.ignoredColumns())),
                 write(fingerprintsOf(resolved, roster)), resolved.removals().count(),
                 resolved.removals().percent(), configuration.removalWarningPercent(), now,
@@ -222,20 +221,11 @@ public class PreviewService {
         return mode;
     }
 
-    private static byte[] requiredContent(byte[] content) {
-        if (content == null) {
+    private static SnapshotUpload requiredUpload(SnapshotUpload upload) {
+        if (upload == null) {
             throw new IllegalStateException("A snapshot is uploaded with the file it stands for");
         }
-        return content;
-    }
-
-    private static String requiredFileName(String fileName) {
-        String stripped = fileName == null ? "" : fileName.strip();
-        if (stripped.isEmpty() || stripped.length() > MAX_FILE_NAME_LENGTH) {
-            throw new SnapshotFileNameInvalidException("import.snapshot.fileNameUnusable",
-                    Map.of("maxLength", MAX_FILE_NAME_LENGTH));
-        }
-        return stripped;
+        return upload;
     }
 
     private static UUID requiredAccountId(UUID accountId) {

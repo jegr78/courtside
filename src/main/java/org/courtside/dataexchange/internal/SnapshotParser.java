@@ -5,6 +5,7 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.csv.DuplicateHeaderMode;
 import org.courtside.dataexchange.CanonicalField;
+import org.courtside.dataexchange.SnapshotUploadUnsupportedException;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -124,7 +125,7 @@ public final class SnapshotParser {
             }
             if (!claimed.add(field)) {
                 throw new SnapshotHeaderInvalidException("import.snapshot.header.duplicateColumn",
-                        Map.of("column", name.strip()));
+                        Map.of("column", ReportedValue.printable(name.strip())));
             }
             header.put(name, field);
         }
@@ -150,6 +151,22 @@ public final class SnapshotParser {
     // A byte order mark and valid UTF-8 are facts about the bytes and outrank the caller's choice.
     // Which 8-bit encoding a file uses is not knowable from its content, so that one is chosen.
     private static String decoded(byte[] content, Charset chosen) {
+        return text(decodedWith(content, chosen));
+    }
+
+    // ISO-8859-1 maps every byte, so a file that is not text decodes without complaint into control
+    // characters no export writes — that is the only signal left that the bytes are not a roster.
+    private static String text(String decoded) {
+        for (int index = 0; index < decoded.length(); index++) {
+            char character = decoded.charAt(index);
+            if (character < 0x20 && character != '\t' && character != '\r' && character != '\n') {
+                throw new SnapshotUploadUnsupportedException("import.snapshot.notText", Map.of());
+            }
+        }
+        return decoded;
+    }
+
+    private static String decodedWith(byte[] content, Charset chosen) {
         if (startsWith(content, UTF_8_MARK)) {
             return new String(content, UTF_8_MARK.length, content.length - UTF_8_MARK.length,
                     StandardCharsets.UTF_8);
