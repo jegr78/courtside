@@ -33,8 +33,8 @@ test("given the commits this branch adds, when release-please parses them, then 
 
     // when / then
     assert.deepEqual(unreadable, [],
-      "a commit the parser rejects never reaches the changelog; quoting code with an unclosed"
-      + " bracket is what did it the two times it happened here");
+      "a commit the parser rejects never reaches the changelog; both times it happened here a line"
+      + " began with quoted code holding an unclosed bracket, and the same text mid-sentence parses");
   });
 
 // A merge commit is skipped above because it carries no conventional type and nothing of it would
