@@ -319,10 +319,10 @@ is the confirmation.
 **A pair the mail server cannot parse is the state that reaches members.** Stalwart does not keep
 the pair it had when it refuses a load: the listener falls back to a certificate it generated
 itself, the instance refuses to authenticate a relay it cannot verify, and every credential and
-notification settles `FAILED` in the admin message list. Repairing the pair does not resend them. The events still outstanding are
-replayed when `app` restarts, and a credential the instance sends again is a new one, because the
-first exists only as a hash. Anything older than that is re-issued from the roster, where sending an
-account new credentials is one action.
+notification settles `FAILED` in the admin message list. Repairing the pair does not resend them.
+The events still outstanding are replayed when `app` restarts, and a credential the instance sends
+again is a new one, because the first exists only as a hash. Anything older than that is re-issued
+from the roster, where sending an account new credentials is one action.
 
 Reissuing the certificate itself is the last thing to reach for, not the first. Removing Caddy's
 store makes it obtain a new one, and Let's Encrypt issues at most five certificates for the same
@@ -694,8 +694,8 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
   settles `FAILED` with its reason in the admin message list. Repairing the pair resends none of
   them; the events still outstanding are replayed when `app` restarts, and a replayed credential is
   a new one, because the first exists only as a hash. Nothing undoes the fallback either, short of
-  fixing the pair and reloading again. What bounds it is that `mail-certificate` swaps `current` only after Caddy
-  has validated the pair behind it, so a reload is asked for a pair that has already been read
-  once.
+  fixing the pair and reloading again. What bounds it is that `mail-certificate` swaps `current`
+  only after Caddy has validated the pair behind it, so a reload is asked for a pair that has
+  already been read once.
 - **MTA-STS and DANE are not provided.** Neither is published, and neither is planned by this
   work.
