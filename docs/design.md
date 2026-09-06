@@ -1572,7 +1572,9 @@ whether it is built or designed. **Designed means absent today.**
   not, so that half is designed and not built.*
 - **Accepted: a long-lived token can publish under this project's name.** release-please cuts every
   release, and it holds a fine-grained personal access token scoped to this repository alone —
-  contents, pull requests and issues, nothing else, and no permission over workflows. It exists
+  contents (push the release branch and the tag), pull requests (open and update the release pull
+  request), issues (the autorelease labels use that API) and the metadata every fine-grained token
+  needs — nothing else, and no permission over workflows or actions. It exists
   because a tag pushed with the workflow's own token starts no pipeline, so a release cut without it
   would carry no image, no qualification and no signature; the workflow refuses to run rather than
   produce one. What the token can do is what merging the release pull request can do: write a tag,

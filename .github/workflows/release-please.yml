@@ -1,12 +1,6 @@
 name: release-please
 
-# RELEASE_PLEASE_TOKEN is a long-lived PAT. This workflow is push-triggered on main only, so no
-# pull request's code reaches it. Scope a fine-grained PAT to this repository and nothing else:
-#   Contents: read and write        (push the release branch and the tag)
-#   Pull requests: read and write   (open and update the release pull request)
-#   Issues: read and write          (the autorelease labels use the issues API)
-#   Metadata: read-only             (mandatory for any fine-grained PAT)
-# Deliberately not granted: Actions. Nothing here dispatches a workflow.
+# What RELEASE_PLEASE_TOKEN may do, and what bounds it, is section 10 of docs/design.md.
 
 on:
   push:
@@ -29,8 +23,7 @@ jobs:
       RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
     steps:
       # A tag pushed with GITHUB_TOKEN triggers no workflow, so a release cut without the PAT
-      # would carry no image, no signature and no qualification. Refusing is the honest answer:
-      # release.yml has no dispatch trigger to recover it, and the tag cannot be moved afterwards.
+      # would carry no image, no signature and no qualification.
       - name: Refuse to cut a release without the token that starts its pipeline
         if: env.RELEASE_PLEASE_TOKEN == ''
         run: |
