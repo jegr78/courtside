@@ -5432,6 +5432,69 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /api/admin/export/bookings:
+    post:
+      tags: [admin-export]
+      operationId: exportBookings
+      summary: The confirmed bookings of a period as a CSV file.
+      description: |
+        What stood on the courts between two dates, one row per court and slot, so a board can put
+        a season into a spreadsheet without reading a calendar day by day.
+
+        `from` and `to` are inclusive dates in the club time zone and the period may span at most
+        366 days, exactly as `/api/admin/reports/facility-utilisation` defines a period. Confirmed
+        occupancy only, for the same reason that report counts it: a cancelled booking occupied
+        nothing.
+
+        **It does not name who booked.** The columns are the ones the day grid already shows every
+        member — the court, the slot and the card the court was held under — and nothing else. The
+        contract's `Allocation.bookedByName` is designed and unbuilt, and an export is the wrong
+        place for a product to resolve a member's name for the first time: what a board needs about
+        one person is `/api/admin/export/person/{personId}`, which answers for that person alone
+        and is recorded when it does.
+
+        `separator` and `encoding` decide what the receiving spreadsheet makes of the file, as they
+        do for the roster.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: separator
+          in: query
+          required: false
+          description: The single character between two cells.
+          schema: { type: string, minLength: 1, maxLength: 1, default: "," }
+        - name: encoding
+          in: query
+          required: false
+          description: One of the names `/api/admin/import/encodings` lists.
+          schema: { type: string, maxLength: 40, default: "UTF-8" }
+      responses:
+        "200":
+          description: The period's confirmed bookings, one row per court and slot.
+          headers:
+            Content-Disposition:
+              description: |
+                `attachment` with a fixed ASCII file name carrying the period it covers.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/admin/export/person/{personId}:
     post:
       tags: [admin-subject-access]
