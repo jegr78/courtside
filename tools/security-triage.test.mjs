@@ -144,6 +144,15 @@ test("given an unvalidated scanner candidate, when calculating the assessment ou
   assert.deepEqual(result, { outcome: "incomplete", reason: "1 candidate awaits reproducible validation" });
 });
 
+test("given several validated findings, when reporting the failed assessment, then the reason names the real count", () => {
+  // when
+  const result = assessmentOutcome({ candidates: [], findings: [finding(), finding()], riskAcceptances: [] },
+    "2026-08-20");
+
+  // then
+  assert.deepEqual(result, { outcome: "failed", reason: "2 validated findings remain unresolved" });
+});
+
 test("given a scanner candidate, when promoting it without reproducible validation, then promotion is rejected", () => {
   // when / then
   assert.throws(() => createFinding(candidate(), { priority: "P1" }), /reproducible validation/);

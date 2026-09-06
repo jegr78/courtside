@@ -191,7 +191,10 @@ export function assessmentOutcome(lifecycle, today = new Date().toISOString().sl
   }
   const unresolved = lifecycle.findings.filter((finding) =>
     ["validated", "remediation-in-progress"].includes(finding.state));
-  if (unresolved.length) return { outcome: "failed", reason: `${unresolved.length} validated finding remains unresolved` };
+  if (unresolved.length) return {
+    outcome: "failed",
+    reason: `${unresolved.length} validated finding${unresolved.length === 1 ? "" : "s"} remain${unresolved.length === 1 ? "s" : ""} unresolved`
+  };
   const awaitingRetest = lifecycle.findings.filter((finding) => finding.state === "fixed");
   if (awaitingRetest.length) return { outcome: "incomplete", reason: `${awaitingRetest.length} fix awaits retest` };
   return { outcome: "passed", reason: null };
