@@ -246,6 +246,23 @@ test("given an additive full runner, when classifying commits, then it still sel
   assert.deepEqual(plan.profiles, ["full"]);
 });
 
+test("given an additive non-test claims a reduced profile, when classifying commits, then it selects full", () => {
+  // given
+  const addedPath = "tools/new-runner.mjs";
+  const headManifest = structuredClone(toolManifest);
+  headManifest.entries.push({ path: addedPath, profiles: ["docs"], test: false });
+  const changes = [
+    { status: "M", path: "ci/tool-profile-manifest.json" },
+    { status: "A", path: addedPath }
+  ];
+
+  // when
+  const plan = classifyChangesAtCommits(changes, [], commitInventory(headManifest));
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"]);
+});
+
 test("given a narrowed or stale tool manifest, when classifying commits, then it fails closed to full", () => {
   // given
   const removed = structuredClone(toolManifest);
@@ -430,6 +447,31 @@ test("given a repository path contains markdown, when rendering reasons, then it
     (_entity, point) => String.fromCodePoint(Number.parseInt(point, 16)));
   assert.match(visible, /\\u\{202e\}\\u\{200f\}/);
   assert.doesNotMatch(rendered, /<b>|@team|\[open\]|\u202e|\u200f|\nreversed/);
+});
+
+test("given an additive manifest reason contains markdown, when rendering it, then it remains inert", () => {
+  // given
+  const addedPath = "tools/![open](x)\u202e.test.mjs";
+  const headManifest = structuredClone(toolManifest);
+  headManifest.entries.push({ path: addedPath, profiles: ["tooling"], test: true });
+  const plan = classifyChangesAtCommits([
+    { status: "M", path: "ci/tool-profile-manifest.json" },
+    { status: "A", path: addedPath }
+  ], [], commitInventory(headManifest));
+
+  // when
+  const rendered = profileSummary(bindPlanToRun(plan, {
+    runId: 101,
+    attempt: 1,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40)
+  }));
+
+  // then
+  assert.doesNotMatch(rendered, /\[open\]|\u202e/);
+  const visibleCodes = [...rendered.matchAll(/<code>([^<]*)<\/code>/g)].map((match) => match[1]
+    .replace(/&#x([0-9a-f]+);/g, (_entity, point) => String.fromCodePoint(Number.parseInt(point, 16))));
+  assert.ok(visibleCodes.some((code) => code.includes("\\u{202e}")));
 });
 
 test("given a profile plan, when binding it to the workflow run, then every identity is retained", () => {

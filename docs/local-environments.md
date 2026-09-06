@@ -66,9 +66,9 @@ merge base, requires a clean committed HEAD, and classifies its changes with
 need only clean change evidence. Backend changes run the Java profile; frontend changes run lint,
 unit tests, build, audit, application packaging and browser journeys. A mixed change runs both
 profiles. Added tool tests use the tooling profile when the same change only appends their complete
-manifest entries. The reference deployment guide uses the documentation profile. Build, workflow,
-security, executable deployment, database, OpenAPI, shared test-infrastructure, unknown and
-structural changes run the complete Maven verification.
+manifest entries; runners and helpers remain full. The reference deployment guide uses the
+documentation profile. Build, workflow, security, executable deployment, database, OpenAPI, shared
+test-infrastructure, unknown and structural changes run the complete Maven verification.
 
 The command writes `build/local-check/result.json` with the base and head commits, a content
 fingerprint, selected profiles, reasons, tasks and outcome. It checks out the recorded head in a

@@ -177,7 +177,8 @@ function additiveToolManifestOverrides(changes, commits) {
     const basePaths = new Set(base.entries.map((entry) => entry.path));
     const added = head.entries.filter((entry) => !basePaths.has(entry.path));
     const changedPaths = new Map(changes.map((change) => [change.path, change.status]));
-    if (added.length < 1 || added.some((entry) => changedPaths.get(entry.path) !== "A")) return new Map();
+    if (added.length < 1 || added.some((entry) => !entry.test
+        || changedPaths.get(entry.path) !== "A")) return new Map();
     const profiles = added.some((entry) => entry.profiles.includes("full")) ? ["full"]
       : reducedProfiles.filter((profile) => added.some((entry) => entry.profiles.includes(profile)));
     return new Map([
@@ -318,7 +319,7 @@ export function profileSummary(plan) {
     "",
     "| Status | Path | Profile | Reason |",
     "| --- | --- | --- | --- |",
-    ...plan.reasons.map((reason) => `| ${safe(reason.status ?? "label")} | ${inertCode(reason.path ?? "ci:full")} | ${safe(reason.profile)} | ${safe(reason.code)} |`),
+    ...plan.reasons.map((reason) => `| ${safe(reason.status ?? "label")} | ${inertCode(reason.path ?? "ci:full")} | ${safe(reason.profile)} | ${inertCode(reason.code)} |`),
     ""
   ].join("\n");
 }

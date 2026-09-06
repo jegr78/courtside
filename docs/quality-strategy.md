@@ -107,9 +107,10 @@ file below `tools/` explicitly. Reviewed test files select `tooling`, while buil
 security, release, restore, upgrade and other execution-critical runners remain `full`. An
 unlisted new tool, duplicate assignment or stale manifest entry fails closed. The classifier reads
 both committed versions of the manifest when a pull request only adds entries for newly added tool
-files. If the old inventory remains unchanged and the head inventory is complete, those entries
-select their declared profiles. Removing an entry, changing an existing assignment, registering a
-file that was not added in the same change, or adding an invalid inventory still selects `full`.
+tests. If the old inventory remains unchanged and the head inventory is complete, those tests
+select their declared profiles. Adding a runner or helper, removing an entry, changing an existing
+assignment, registering a file that was not added in the same change, or adding an invalid inventory
+still selects `full`.
 Three local first attempts of the declared tooling tasks completed in 14, 11 and 11 seconds, for an
 11-second median. Each attempt reinstalled the locked dependencies and passed the complete tool suite.
 
