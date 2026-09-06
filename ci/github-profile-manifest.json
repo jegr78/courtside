@@ -25,6 +25,7 @@
     { "path": ".github/workflows/pr-title-lint.yml", "profiles": ["tooling"], "validators": ["tools/github-metadata.test.mjs", "tools/workflow-action-pinning.test.mjs"] },
     { "path": ".github/workflows/release.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/release-plan-sync.yml", "profiles": ["tooling"], "validators": ["tools/release-plan-sync.test.mjs", "tools/workflow-action-pinning.test.mjs"] },
+    { "path": ".github/workflows/release-please.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/security-assessment.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/test-stability.yml", "profiles": ["full"], "validators": [] }
   ]

@@ -17,18 +17,21 @@ const document = repositoryFile("docs/releasing.md");
 const workflow = yaml.load(repositoryFile(".github/workflows/release.yml"));
 const source = repositoryFile(".github/workflows/release.yml");
 
-// The tag pattern is what a reader copies, so the document has to name the one the workflow reacts
-// to rather than one that was true when it was written.
-test("given the release trigger, when the document names a tag, then it is the tag the workflow answers",
+// Nobody types the tag any more, so the thing to hold is that what writes it and what answers it
+// still agree on its shape — a tag without the leading v would start nothing at all.
+test("given the release trigger, when release-please writes a tag, then the workflow answers that shape",
   () => {
     // given
     const triggers = workflow.on ?? workflow[true];
+    const config = JSON.parse(repositoryFile("release-please-config.json"));
 
     // when / then
     assert.deepEqual(triggers.push.tags, ["v*"]);
-    assert.match(document, /```sh\n[\s\S]*git tag -a v\d+\.\d+\.\d+/,
-      "the recipe has to cut a tag the release workflow reacts to");
-    assert.match(document, /git push origin v\d+\.\d+\.\d+/);
+    assert.equal(config["include-v-in-tag"], true);
+    assert.equal(config["include-component-in-tag"], false,
+      "a component prefix would put something before the v and the trigger would miss it");
+    assert.match(document, /`chore\(main\): release <version>`/,
+      "the document has to name the pull request that produces the tag now that nobody pushes one");
   });
 
 test("given the jobs a release runs, when the document explains them, then it names every one", () => {
@@ -158,4 +161,22 @@ test("given a failed tag, when the document says it costs nothing, then neither 
     assert.doesNotMatch(source, /git tag --list/);
     assert.match(document, /come from the releases this\nrepository has \*\*published\*\*/,
       "the document explains where the two reads look, and the workflow has to keep looking there");
+  });
+
+// release-please creates the release as a draft so that nothing claims to be released before the
+// gates run. Exactly one step turns it into a release a club can see, and it does so by omission:
+// action-gh-release publishes an existing draft unless it is told to keep it.
+test("given a draft the pipeline has to publish, when the release is written, then nothing keeps it draft",
+  () => {
+    // given
+    const publish = workflow.jobs.publish.steps
+      .find((step) => (step.uses ?? "").startsWith("softprops/action-gh-release"));
+
+    // when / then
+    assert.ok(publish, "nothing writes the GitHub release, so the draft would stand for ever");
+    assert.equal(publish.with.draft, undefined,
+      "setting it at all keeps the release a draft; omitting it is what publishes the one"
+      + " release-please created");
+    assert.equal(publish.with.prerelease, "${{ contains(github.ref_name, '-') }}",
+      "a candidate is marked here rather than by release-please, which knows only the strategy");
   });

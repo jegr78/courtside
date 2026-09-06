@@ -1,0 +1,37 @@
+name: release-please
+
+# What RELEASE_PLEASE_TOKEN may do, and what bounds it, is section 10 of docs/design.md.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+# The action authenticates with the PAT for every call it makes, so the run needs nothing of its own.
+permissions: {}
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+    steps:
+      # A tag pushed with GITHUB_TOKEN triggers no workflow, so a release cut without the PAT
+      # would carry no image, no signature and no qualification.
+      - name: Refuse to cut a release without the token that starts its pipeline
+        if: env.RELEASE_PLEASE_TOKEN == ''
+        run: |
+          echo "::error::RELEASE_PLEASE_TOKEN is not set. release-please would open a release" \
+            "pull request whose checks never run, and merging it would push a tag that starts" \
+            "no release pipeline. Add the fine-grained PAT that section 10 of docs/design.md scopes."
+          exit 1
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

@@ -5,8 +5,10 @@
       "exact": [
         ".dockerignore",
         ".gitignore",
+        ".release-please-manifest.json",
         "Dockerfile",
         "SECURITY.md",
+        "release-please-config.json",
         "frontend/.npmrc",
         "frontend/eslint.config.js",
         "frontend/package-lock.json",
@@ -50,7 +52,7 @@
       ]
     },
     "docs": {
-      "exact": ["AGENTS.md", "CLAUDE.md", "LICENSE", "NOTICE", "README.md", "deploy/README.md"],
+      "exact": ["AGENTS.md", "CHANGELOG.md", "CLAUDE.md", "LICENSE", "NOTICE", "README.md", "deploy/README.md"],
       "prefixes": ["bruno/", "docs/", "site/"]
     },
     "backend": {

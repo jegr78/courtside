@@ -146,6 +146,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          # The release configuration is checked against the history it claims to cover.
+          fetch-depth: 0
       - uses: ./.github/actions/tool-dependencies
       - name: Verify repository tooling
         working-directory: frontend

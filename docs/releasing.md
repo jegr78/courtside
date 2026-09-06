@@ -1,29 +1,58 @@
 # Cutting a release
 
-A release is a tag `v<version>` pushed to this repository. Everything after that is automatic, and
-almost everything the automation does is a refusal — it would rather not publish than publish
-something nobody verified.
+A release is a tag `v<version>` on this repository. Nobody types it: release-please keeps a release
+pull request open, and merging it writes the version, the changelog and the tag. Everything after
+that is automatic, and almost everything the automation does is a refusal — it would rather not
+publish than publish something nobody verified.
 
 This document says what to do in what order, and what the release does *not* guarantee, which is the
 half a workflow file cannot tell you. `CLAUDE.md` remains the policy for branches, commits and pull
 requests; this is the part that happens after the last one is merged.
 
-**Pushing a tag is signing a release.** `publish` signs the image with cosign under this
-repository's own identity, keyless, and attests its provenance and SBOM. No human approves anything
-in between, and the workflow checks neither that the tag is annotated nor that it is signed. Whoever
-may push a `v*` tag may publish under this project's name.
+**Merging the release pull request is signing a release.** `publish` signs the image with cosign
+under this repository's own identity, keyless, and attests its provenance and SBOM. No human
+approves anything in between. Whoever may merge that pull request — or push a `v*` tag by hand —
+may publish under this project's name.
 
 ## The short version
 
-```sh
-git switch main && git pull --ff-only
-git tag -a v0.2.0 -m "Courtside 0.2.0"
-git push origin v0.2.0
-```
+There is nothing to type. A release pull request titled `chore(main): release <version>` stands
+open on `main` and grows with every merge; it shows the version it would cut and the changelog it
+would write. Merge it when a nightly has verified the commit it sits on, and the rest happens.
 
-The version is the tag without its leading `v`, and the workflow stamps that into the build. The
-`pom.xml` carries a `-SNAPSHOT` between releases and is never edited to cut one. The version in
-`frontend/package.json` is written by hand, read by nothing and updated by nobody; ignore it.
+A second pull request follows each release and moves `pom.xml` on to the next `-SNAPSHOT`. It
+carries no release and no tag; merge it and forget it.
+
+**What the merge writes.** Merging the release pull request writes the tag and a *draft* GitHub
+release. A draft is visible to whoever may write to this repository and to nobody else, and `publish`
+is what turns it into the release a club sees — after every gate above it has passed. A run that
+stops earlier leaves the draft standing, which is why a failed release is invisible from the outside
+rather than merely unsigned.
+
+**Where the version lives.** `pom.xml` carries it between releases: release-please writes it, Maven
+writes `build-info.properties` from it, and `GET /api/source` reports that to the browser — so the
+version a member reads in the footer is the one that was released, and between releases it is the
+`-SNAPSHOT` that says which release it follows. `frontend/package.json` is kept in step by the same
+pull request, so nothing there can drift. The release build itself does not trust any of that: it
+takes the version from the tag and stamps it in with `versions:set`, so what is published is what
+the tag says even if the pom were to disagree.
+
+## Cutting a candidate
+
+Candidates are opened and closed with one line of configuration, not with a hand-typed version.
+
+1. Set `"prerelease": true` in `release-please-config.json` and merge that. The next release pull
+   request proposes `v0.3.0-rc.1`, and every merge after it raises `rc.2`, `rc.3`.
+2. To open an `alpha` line instead, land a commit carrying a `Release-As:` footer naming
+   `0.3.0-alpha.1`; the strategy counts that suffix onwards by itself. That footer names the version
+   outright and overrides everything else, `bump-minor-pre-major` included — it is the one way to
+   reach 1.0 without a decision, so read the version in the release pull request's own title before
+   merging it.
+3. Set `"prerelease": false` again to graduate. The suffix is stripped and the next release pull
+   request proposes `v0.3.0`.
+
+Nothing else changes: a candidate travels the same pipeline, and section 10 of `docs/design.md` says
+what that means.
 
 ## What the release refuses before it builds anything
 
@@ -69,14 +98,17 @@ publication, so the digest a club pulls is the digest that was brought up twice.
 
 ## When a release fails
 
-It stops at the job that refused, and nothing is published under a version tag. What stays behind is
-the `release-candidate-<sha>` image, unsigned and unqualified, in a public registry — nothing
-removes those, and no version tag resolves to one.
+It stops at the job that refused, and nothing is published under a version tag: the release the
+merge created is still a draft and stays one. What stays behind is the `release-candidate-<sha>`
+image, unsigned and unqualified, in a public registry — nothing removes those, and no version tag
+resolves to one.
 
 **The tag stays where it is.** A tag that once named a commit and later names another is the one
 thing a consumer cannot detect, and by the time a run has started, the tag has been observed. Fix
-the cause on `main` through the usual pull request and cut the next patch version: a `v0.2.0` that
-failed is followed by `v0.2.1`.
+the cause on `main` through the usual pull request; the next release pull request then proposes the
+patch after it, so a `v0.2.0` that failed is followed by `v0.2.1`. The version that failed is
+skipped rather than retried, and the manifest already names it — worth knowing before somebody
+looks for a `v0.2.0` that never appeared.
 
 Only a tag no run ever saw is free to move, and under a `v*` trigger that is rarer than it sounds —
 a misspelling that keeps the leading `v` still starts a run.
@@ -84,8 +116,8 @@ a misspelling that keeps the leading `v` still starts a run.
 A failed tag costs the next release nothing. Both things the release reads from its history — the
 supported upgrade origins and the range the upgrade notes cover — come from the releases this
 repository has **published**, not from the tags that exist. A tag whose run stopped before `publish`
-therefore names no release, is no origin, and shortens no range. It stays where it is, and nothing
-has to be deleted to move on.
+therefore names a draft and no published release, is no origin, and shortens no range. It stays
+where it is, and nothing has to be deleted to move on.
 
 ## When the change is breaking
 

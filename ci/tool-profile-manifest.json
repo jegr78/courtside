@@ -56,6 +56,7 @@
     { "path": "tools/release-plan-sync.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/release-plan-sync.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-documentation.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/release-please-configuration.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/role-inventory.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-api-document.mjs", "profiles": ["full"], "test": false },
