@@ -5,6 +5,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.SecurityEventLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,6 +29,7 @@ class BootstrapAdminInitializerTest {
     @Mock private PersonRepository persons;
     @Mock private UserAccountRepository accounts;
     @Mock private PasswordEncoder encoder;
+    @Mock private SecurityEventLog securityEvents;
 
     @Test
     void givenAnEmptyAccountTable_whenInitializing_thenOneEnabledLocalAdminIsCreated() {
@@ -55,6 +57,10 @@ class BootstrapAdminInitializerTest {
         // a correction elsewhere cannot withdraw it and lock a club out of its own instance.
         assertThat(account.getPasswordHash()).isEqualTo("encoded");
         assertThat(account.getCredentialsExpireAt()).isNull();
+        verify(securityEvents).administrativeActionAfterCommit(account.getId(), null,
+                SecurityEventLog.AdministrativeAction.ACCOUNT_CREATED);
+        verify(securityEvents).credentialChangedAfterCommit(account.getId(), null,
+                SecurityEventLog.CredentialChange.TEMPORARY_CREDENTIAL_ISSUED);
     }
 
     @Test
@@ -105,7 +111,8 @@ class BootstrapAdminInitializerTest {
     }
 
     private BootstrapAdminInitializer initializer(BootstrapAdminProperties properties) {
-        return new BootstrapAdminInitializer(lock, persons, accounts, encoder, properties, GERMAN_CLUB);
+        return new BootstrapAdminInitializer(
+                lock, persons, accounts, encoder, properties, GERMAN_CLUB, securityEvents);
     }
 
     private static final org.courtside.config.ClubIdentity GERMAN_CLUB = new org.courtside.config.ClubIdentity() {

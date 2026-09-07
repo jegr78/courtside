@@ -142,13 +142,14 @@ public class UserAccount {
 
     // An address correction cannot reach a message already sent, so what was sent stops working. A
     // credential with no deadline came from the environment and is not this instance's to withdraw.
-    public void withdrawUnusedCredential() {
+    public boolean withdrawUnusedCredential() {
         if (credentialsExpireAt == null || !passwordChangeRequired) {
-            return;
+            return false;
         }
         this.passwordHash = null;
         this.credentialsExpireAt = null;
         revokeSessions();
+        return true;
     }
 
     void revokeSessions() {

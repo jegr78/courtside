@@ -102,10 +102,16 @@ class ConcurrentSessionLimitTest extends AbstractIntegrationTest {
                         + " cascade from it do not outlive the session they belonged to")
                 .isZero();
         assertThat(recorded.list)
-                .extracting(ILoggingEvent::getFormattedMessage)
-                .anySatisfy(message -> assertThat(message)
-                        .contains("displaced").contains(accountId.toString())
-                        .doesNotContain("doe.jane").doesNotContain(displaced));
+                .anySatisfy(event -> {
+                    var fields = event.getKeyValuePairs().stream()
+                            .collect(java.util.stream.Collectors.toMap(pair -> pair.key, pair -> pair.value));
+                    assertThat(fields)
+                            .containsEntry("event.code", "courtside.session.terminated")
+                            .containsEntry("event.reason", "CONCURRENT_LIMIT")
+                            .containsEntry("account.id", accountId.toString())
+                            .containsEntry("actor.account.id", accountId.toString());
+                    assertThat(event.toString()).doesNotContain("doe.jane", displaced);
+                });
         mockMvc.perform(get("/api/admin/config").cookie(held.getFirst()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"))
@@ -186,8 +192,7 @@ class ConcurrentSessionLimitTest extends AbstractIntegrationTest {
     }
 
     private static Logger displacementLog() {
-        return (Logger) LoggerFactory.getLogger(
-                "org.courtside.identity.internal.DisplacingSessionRegistry");
+        return (Logger) LoggerFactory.getLogger("org.courtside.security.events");
     }
 
     @Test

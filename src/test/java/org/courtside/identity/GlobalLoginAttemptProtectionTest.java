@@ -1,6 +1,5 @@
 package org.courtside.identity;
 
-import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -18,7 +17,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -69,11 +67,18 @@ class GlobalLoginAttemptProtectionTest extends AbstractIntegrationTest {
 
         assertThat(meters.counter("courtside.login.distributed.thresholds").count())
                 .isEqualTo(observationsBefore + 1);
-        assertThat(recorded.list).filteredOn(event -> event.getLevel() == Level.WARN)
+        assertThat(recorded.list).filteredOn(event -> event.getKeyValuePairs().stream()
+                        .anyMatch(pair -> pair.key.equals("event.reason")
+                                && pair.value.equals("DISTRIBUTED_LOGIN_THRESHOLD")))
                 .singleElement()
-                .extracting(ILoggingEvent::getFormattedMessage)
-                .asInstanceOf(STRING)
-                .doesNotContain("third-private-username", "192.0.2.63");
+                .satisfies(event -> {
+                    assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                        assertThat(pair.key).isEqualTo("event.code");
+                        assertThat(pair.value).isEqualTo("courtside.control.triggered");
+                    });
+                    assertThat(event.toString())
+                            .doesNotContain("third-private-username", "192.0.2.63");
+                });
     }
 
     @Test
@@ -90,8 +95,7 @@ class GlobalLoginAttemptProtectionTest extends AbstractIntegrationTest {
     }
 
     private static Logger observationLog() {
-        return (Logger) LoggerFactory.getLogger(
-                "org.courtside.identity.internal.LoginAttemptProtection");
+        return (Logger) LoggerFactory.getLogger("org.courtside.security.events");
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder login(

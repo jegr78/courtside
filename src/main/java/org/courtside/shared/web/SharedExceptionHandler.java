@@ -6,6 +6,7 @@ import jakarta.persistence.PessimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.DuplicateItemException;
+import org.courtside.shared.SecurityEventLog;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import org.springframework.core.Ordered;
@@ -56,6 +57,7 @@ import java.util.regex.Pattern;
 class SharedExceptionHandler {
 
     private final ProblemTraceReference traceReference;
+    private final SecurityEventLog securityEvents;
 
     // An allowlist: anything else a constraint carries must not reach a client.
     private static final Map<String, Set<String>> ALLOWED_PARAMS_BY_CONSTRAINT = Map.of(
@@ -96,6 +98,7 @@ class SharedExceptionHandler {
     // Only for a violation nothing upstream recognised.
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleRejectedByTheDatabase(DataIntegrityViolationException exception) {
+        refusedByValidation();
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "The request conflicts with a database constraint");
         problem.setType(URI.create("urn:courtside:error:constraint-violation"));
@@ -119,6 +122,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleValidationFailure(MethodArgumentNotValidException exception) {
+        refusedByValidation();
         List<Map<String, Object>> fieldErrors = exception.getBindingResult().getFieldErrors().stream()
                 .map(SharedExceptionHandler::toMap)
                 .toList();
@@ -129,6 +133,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail handleMethodValidationFailure(ConstraintViolationException exception) {
+        refusedByValidation();
         List<Map<String, Object>> fieldErrors = exception.getConstraintViolations().stream()
                 .map(violation -> toMap(lastPathNode(violation), violation))
                 .toList();
@@ -148,6 +153,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ProblemDetail handleParameterTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        refusedByValidation();
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "One of the request's parameters is not valid");
         problem.setType(URI.create("urn:courtside:error:parameter-type-mismatch"));
@@ -162,6 +168,7 @@ class SharedExceptionHandler {
     // Jackson records the property path as a mismatch unwinds.
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail handleUnreadableBody(HttpMessageNotReadableException exception) {
+        refusedByValidation();
         String field = mismatchedField(exception);
         if (field == null) {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -257,6 +264,9 @@ class SharedExceptionHandler {
         HttpStatus status = exception instanceof ErrorResponse response
                 ? ContainerErrorController.resolve(response.getStatusCode().value())
                 : HttpStatus.INTERNAL_SERVER_ERROR;
+        if (status == HttpStatus.BAD_REQUEST) {
+            refusedByValidation();
+        }
         ProblemDetail problem = ContainerErrorController.problemFor(status);
         logAnswered(problem);
         return ResponseEntity.status(status).body(problem);
@@ -264,6 +274,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MissingServletRequestPartException.class)
     ProblemDetail handleMissingPart(MissingServletRequestPartException exception) {
+        refusedByValidation();
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "The request does not carry the part this endpoint reads");
         problem.setType(URI.create("urn:courtside:error:missing-request-part"));
@@ -277,6 +288,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ProblemDetail handleOversizedUpload(MaxUploadSizeExceededException exception) {
+        refusedByValidation();
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.PAYLOAD_TOO_LARGE, "The upload is larger than this instance accepts");
         problem.setType(URI.create("urn:courtside:error:payload-too-large"));
@@ -291,6 +303,7 @@ class SharedExceptionHandler {
     // getHeaders() carries Accept, as it carries Allow above.
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     ResponseEntity<ProblemDetail> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
+        refusedByValidation();
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.UNSUPPORTED_MEDIA_TYPE, "This endpoint does not accept the request's content type");
         problem.setType(URI.create("urn:courtside:error:unsupported-media-type"));
@@ -313,6 +326,7 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     ProblemDetail handleMissingParameter(MissingServletRequestParameterException exception) {
+        refusedByValidation();
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "A required request parameter is missing");
         problem.setType(URI.create("urn:courtside:error:missing-parameter"));
@@ -383,5 +397,9 @@ class SharedExceptionHandler {
 
     private static List<String> fieldsOf(List<Map<String, Object>> fieldErrors) {
         return fieldErrors.stream().map(error -> (String) error.get("field")).toList();
+    }
+
+    private void refusedByValidation() {
+        securityEvents.controlRefusedForCurrentAccount(SecurityEventLog.ControlRefusal.REQUEST_VALIDATION);
     }
 }

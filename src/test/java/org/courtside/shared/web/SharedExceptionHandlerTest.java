@@ -1,5 +1,6 @@
 package org.courtside.shared.web;
 
+import org.courtside.shared.SecurityEventLog;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.UncategorizedSQLException;
@@ -16,13 +17,14 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class SharedExceptionHandlerTest {
 
     @Test
     void whenPostgresRefusesAContendedLock_thenTheProblemIsAnActionableTemporaryFailure() {
         // given
-        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
+        SharedExceptionHandler handler = handler();
 
         // when
         ProblemDetail problem = handler.handleUncategorizedDatabaseFailure(
@@ -38,7 +40,7 @@ class SharedExceptionHandlerTest {
     @Test
     void whenAnUncategorisedDatabaseFailureIsNotLockContention_thenItRemainsAnInternalFailure() {
         // given
-        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
+        SharedExceptionHandler handler = handler();
         UncategorizedSQLException failure = new UncategorizedSQLException(
                 "query", "select something", new SQLException("broken", "XX000"));
 
@@ -54,7 +56,9 @@ class SharedExceptionHandlerTest {
     @Test
     void whenHandlingAnUntranslatedConstraintViolation_thenTheProblemDetailNamesItsOwnType() {
         // given
-        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
+        SecurityEventLog securityEvents = mock(SecurityEventLog.class);
+        SharedExceptionHandler handler = new SharedExceptionHandler(
+                mock(ProblemTraceReference.class), securityEvents);
 
         // when
         ProblemDetail problem = handler.handleRejectedByTheDatabase(
@@ -63,13 +67,15 @@ class SharedExceptionHandlerTest {
         // then
         assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
         assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:constraint-violation");
+        verify(securityEvents).controlRefusedForCurrentAccount(
+                SecurityEventLog.ControlRefusal.REQUEST_VALIDATION);
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void givenAFieldErrorThatIsNotABeanValidationViolation_whenHandlingIt_thenAProblemDetailStillNamesTheField() {
         // given
-        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
+        SharedExceptionHandler handler = handler();
         MethodArgumentNotValidException exception = FieldRejections.rejectionOf("page", null);
 
         // when
@@ -87,7 +93,9 @@ class SharedExceptionHandlerTest {
     @Test
     void givenARejectionSpringRaisesInsideTheDispatcher_whenAnsweringIt_thenItCarriesTheStatusAndAType() {
         // given
-        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class));
+        SecurityEventLog securityEvents = mock(SecurityEventLog.class);
+        SharedExceptionHandler handler = new SharedExceptionHandler(
+                mock(ProblemTraceReference.class), securityEvents);
 
         // when
         ResponseEntity<ProblemDetail> refused = handler.handleFrameworkRejection(
@@ -103,5 +111,12 @@ class SharedExceptionHandlerTest {
                 .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
         assertThat(unwritable.getBody().getType().toString())
                 .isEqualTo("urn:courtside:error:internal-error");
+        verify(securityEvents).controlRefusedForCurrentAccount(
+                SecurityEventLog.ControlRefusal.REQUEST_VALIDATION);
+    }
+
+    private static SharedExceptionHandler handler() {
+        return new SharedExceptionHandler(mock(ProblemTraceReference.class),
+                mock(org.courtside.shared.SecurityEventLog.class));
     }
 }

@@ -1,6 +1,5 @@
 package org.courtside.identity;
 
-import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -19,6 +18,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -78,9 +78,9 @@ class SignInFailureLogTest extends AbstractIntegrationTest {
         attempt(USERNAME, "battery-staple");
 
         // then
-        assertThat(messages()).anySatisfy(message -> assertThat(message)
-                .contains("BAD_CREDENTIALS")
-                .contains(accountId.toString()));
+        assertThat(securityEventFields()).anySatisfy(fields -> assertThat(fields)
+                .containsEntry("event.reason", "BAD_CREDENTIALS")
+                .containsEntry("account.id", accountId.toString()));
     }
 
     @Test
@@ -90,9 +90,9 @@ class SignInFailureLogTest extends AbstractIntegrationTest {
         attempt("nobody.here", "battery-staple");
 
         // then
-        assertThat(messages()).anySatisfy(message -> assertThat(message)
-                .contains("BAD_CREDENTIALS")
-                .doesNotContain("account "));
+        assertThat(securityEventFields()).anySatisfy(fields -> assertThat(fields)
+                .containsEntry("event.reason", "BAD_CREDENTIALS")
+                .doesNotContainKey("account.id"));
     }
 
     @Test
@@ -107,9 +107,9 @@ class SignInFailureLogTest extends AbstractIntegrationTest {
         attempt(USERNAME, PASSWORD);
 
         // then
-        assertThat(messages()).anySatisfy(message -> assertThat(message)
-                .contains("DISABLED")
-                .contains(accountId.toString()));
+        assertThat(securityEventFields()).anySatisfy(fields -> assertThat(fields)
+                .containsEntry("event.reason", "DISABLED")
+                .containsEntry("account.id", accountId.toString()));
     }
 
     @Test
@@ -130,7 +130,7 @@ class SignInFailureLogTest extends AbstractIntegrationTest {
         attempt(USERNAME, "battery-staple");
 
         // then
-        assertThat(messages()).isNotEmpty().allSatisfy(message -> assertThat(message)
+        assertThat(recorded.list).isNotEmpty().allSatisfy(event -> assertThat(event.toString())
                 .doesNotContain(USERNAME)
                 .doesNotContain(EMAIL)
                 .doesNotContain("Jane")
@@ -144,14 +144,15 @@ class SignInFailureLogTest extends AbstractIntegrationTest {
                 .with(csrf()));
     }
 
-    private List<String> messages() {
+    private List<Map<String, Object>> securityEventFields() {
         return recorded.list.stream()
-                .filter(event -> event.getLevel().isGreaterOrEqual(Level.INFO))
-                .map(ILoggingEvent::getFormattedMessage)
+                .map(event -> event.getKeyValuePairs().stream()
+                        .collect(java.util.stream.Collectors.toMap(pair -> pair.key, pair -> pair.value)))
+                .filter(fields -> "courtside.authentication.failed".equals(fields.get("event.code")))
                 .toList();
     }
 
     private static Logger signInLog() {
-        return (Logger) LoggerFactory.getLogger("org.courtside.identity.internal.SignInFailureLog");
+        return (Logger) LoggerFactory.getLogger("org.courtside.security.events");
     }
 }

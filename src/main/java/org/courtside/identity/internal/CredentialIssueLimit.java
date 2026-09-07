@@ -1,6 +1,7 @@
 package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.shared.SecurityEventLog;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ class CredentialIssueLimit implements CredentialIssuing {
     private final JdbcClient jdbc;
     private final CredentialIssueProperties properties;
     private final Clock clock;
+    private final SecurityEventLog securityEvents;
 
     @Override
     @Transactional
@@ -30,6 +32,8 @@ class CredentialIssueLimit implements CredentialIssuing {
         boolean windowExpired = current == null
                 || !current.startedAt().plus(properties.window()).isAfter(now);
         if (!windowExpired && current.issuedCount() >= properties.maxPerWindow()) {
+            securityEvents.controlRefused(accountId,
+                    SecurityEventLog.ControlRefusal.CREDENTIAL_ISSUE_LIMIT);
             throw new CredentialIssueRateLimitedException(properties.maxPerWindow());
         }
         record(accountId, windowExpired ? 1 : current.issuedCount() + 1,

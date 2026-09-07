@@ -2,6 +2,7 @@ package org.courtside.identity.internal;
 
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.SecurityEventLog;
 
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
@@ -70,6 +71,7 @@ public class SecurityConfiguration {
             LoginAttemptProtection loginAttemptProtection,
             LoginVerificationCapacity loginVerificationCapacity,
             LoginRateLimitHandler loginRateLimitHandler,
+            SecurityEventLog securityEvents,
             UserAccountRepository accounts,
             CourtsideSessionProperties sessionPolicy,
             SessionRegistry sessionRegistry,
@@ -136,6 +138,9 @@ public class SecurityConfiguration {
                         .loginProcessingUrl(LOGIN_PROCESSING_URL)
                         .successHandler((request, response, authentication) -> {
                             loginAttemptProtection.clear(request.getRemoteAddr());
+                            if (authentication.getPrincipal() instanceof CourtsideUserDetails user) {
+                                securityEvents.authenticationSucceeded(user.accountId());
+                            }
                             if (authentication.getAuthorities().stream().anyMatch(authority ->
                                     authority.getAuthority().equals(
                                             CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED))) {
@@ -145,7 +150,7 @@ public class SecurityConfiguration {
                         })
                         .failureHandler(authenticationEntryPoint::commence))
                 .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), loginAttemptProtection,
-                        loginVerificationCapacity, loginRateLimitHandler),
+                        loginVerificationCapacity, loginRateLimitHandler, securityEvents),
                         UsernamePasswordAuthenticationFilter.class)
                 // The default only changes the session id, which keeps the creation time the absolute
                 // lifetime counts from, so a second member on a shared browser inherits the first's.
@@ -156,18 +161,24 @@ public class SecurityConfiguration {
                         // The oldest inactive session goes rather than the sign-in being refused: a
                         // member who cannot reach a device is not helped by being locked out of it.
                         .maxSessionsPreventsLogin(false))
-                .addFilterAfter(new SecurityEpochFilter(accounts),
+                .addFilterAfter(new SecurityEpochFilter(accounts, securityEvents),
                         SecurityContextHolderFilter.class)
                 // Anchored behind the epoch filter: two filters sharing one anchor are ordered by
                 // nothing but the order they were added here.
-                .addFilterAfter(new AbsoluteSessionLifetimeFilter(sessionPolicy.absoluteLifetime()),
+                .addFilterAfter(new AbsoluteSessionLifetimeFilter(sessionPolicy.absoluteLifetime(), securityEvents),
                         SecurityEpochFilter.class)
                 .addFilterAfter(new InvalidSessionCookieFilter(sessionCookieSerializer),
                         AbsoluteSessionLifetimeFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
-                        .logoutSuccessHandler((request, response, authentication) ->
-                                response.setStatus(HttpStatus.NO_CONTENT.value())))
+                        .logoutSuccessHandler((request, response, authentication) -> {
+                            if (authentication != null
+                                    && authentication.getPrincipal() instanceof CourtsideUserDetails user) {
+                                securityEvents.sessionTerminated(user.accountId(), user.accountId(),
+                                        SecurityEventLog.SessionTermination.EXPLICIT_LOGOUT);
+                            }
+                            response.setStatus(HttpStatus.NO_CONTENT.value());
+                        }))
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
@@ -188,8 +199,9 @@ public class SecurityConfiguration {
 
     @Bean
     <S extends Session> SessionRegistry sessionRegistry(FindByIndexNameSessionRepository<S> sessions,
-                                                        UserAccountRepository accounts) {
-        return new DisplacingSessionRegistry<>(sessions, accounts);
+                                                        UserAccountRepository accounts,
+                                                        SecurityEventLog securityEvents) {
+        return new DisplacingSessionRegistry<>(sessions, accounts, securityEvents);
     }
 
     static CsrfTokenRepository csrfTokenRepository(boolean secureCookies) {

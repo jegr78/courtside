@@ -1,12 +1,18 @@
 package org.courtside.member;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.CredentialState;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
@@ -20,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(IdentityTestFixture.class)
 class CredentialWithdrawalTest extends AbstractIntegrationTest {
 
+    private final ListAppender<ILoggingEvent> recorded = new ListAppender<>();
+
     @Autowired
     private RosterService roster;
 
@@ -31,6 +39,18 @@ class CredentialWithdrawalTest extends AbstractIntegrationTest {
 
     @Autowired
     private Clock clock;
+
+    @BeforeEach
+    void attachSecurityEventAppender() {
+        recorded.start();
+        eventLogger().addAppender(recorded);
+    }
+
+    @AfterEach
+    void detachSecurityEventAppender() {
+        eventLogger().detachAppender(recorded);
+        recorded.stop();
+    }
 
     @Test
     void givenACredentialSentToAnAddressWithATypo_whenItIsCorrected_thenWhatWasSentStopsWorking() {
@@ -50,6 +70,11 @@ class CredentialWithdrawalTest extends AbstractIntegrationTest {
         assertThat(account.credentialState(clock.instant()))
                 .isEqualTo(CredentialState.AWAITING_CREDENTIAL);
         assertThat(account.getSecurityEpoch()).isGreaterThan(epochBefore);
+        assertThat(credentialWithdrawalEvents()).singleElement().satisfies(event ->
+                assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                    assertThat(pair.key).isEqualTo("account.id");
+                    assertThat(pair.value).hasToString(accountId.toString());
+                }));
     }
 
     @Test
@@ -66,6 +91,7 @@ class CredentialWithdrawalTest extends AbstractIntegrationTest {
         // then — correcting a surname must not lock a member out of a message already delivered
         assertThat(account(accountId).credentialState(clock.instant()))
                 .isEqualTo(CredentialState.CREDENTIAL_ISSUED);
+        assertThat(credentialWithdrawalEvents()).isEmpty();
     }
 
     @Test
@@ -83,6 +109,7 @@ class CredentialWithdrawalTest extends AbstractIntegrationTest {
         assertThat(account.getPasswordHash()).isEqualTo("their-own-hash");
         assertThat(account.credentialState(clock.instant()))
                 .isEqualTo(CredentialState.PASSWORD_CHOSEN);
+        assertThat(credentialWithdrawalEvents()).isEmpty();
     }
 
     @Test
@@ -112,6 +139,7 @@ class CredentialWithdrawalTest extends AbstractIntegrationTest {
 
         // then — withdrawing it would lock a club out of its own instance
         assertThat(account(accountId).getPasswordHash()).isEqualTo("from-the-environment");
+        assertThat(credentialWithdrawalEvents()).isEmpty();
     }
 
     @Test
@@ -128,5 +156,17 @@ class CredentialWithdrawalTest extends AbstractIntegrationTest {
 
     private UserAccount account(UUID accountId) {
         return accounts.findById(accountId).orElseThrow();
+    }
+
+    private java.util.List<ILoggingEvent> credentialWithdrawalEvents() {
+        return recorded.list.stream()
+                .filter(event -> event.getKeyValuePairs().stream().anyMatch(pair ->
+                        pair.key.equals("event.action")
+                                && pair.value.equals("TEMPORARY_CREDENTIAL_WITHDRAWN")))
+                .toList();
+    }
+
+    private static Logger eventLogger() {
+        return (Logger) LoggerFactory.getLogger("org.courtside.security.events");
     }
 }

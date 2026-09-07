@@ -160,7 +160,8 @@ class AdviceLoggingTest {
         DataIntegrityViolationException exception = new DataIntegrityViolationException(DUPLICATE_USERNAME);
 
         // when
-        new SharedExceptionHandler(mock(ProblemTraceReference.class)).handleRejectedByTheDatabase(exception);
+        new SharedExceptionHandler(mock(ProblemTraceReference.class),
+                mock(org.courtside.shared.SecurityEventLog.class)).handleRejectedByTheDatabase(exception);
 
         // then
         assertThat(sharedAppender.list).singleElement().satisfies(event -> {
@@ -179,7 +180,8 @@ class AdviceLoggingTest {
                 "query", "select something", new SQLException("database unavailable", "XX000"));
 
         // when
-        new SharedExceptionHandler(mock(ProblemTraceReference.class))
+        new SharedExceptionHandler(mock(ProblemTraceReference.class),
+                mock(org.courtside.shared.SecurityEventLog.class))
                 .handleUncategorizedDatabaseFailure(failure);
 
         // then
@@ -201,7 +203,8 @@ class AdviceLoggingTest {
                 FieldRejections.rejectionOf("password", rejectedPassword, "Size");
 
         // when
-        new SharedExceptionHandler(mock(ProblemTraceReference.class)).handleValidationFailure(exception);
+        new SharedExceptionHandler(mock(ProblemTraceReference.class),
+                mock(org.courtside.shared.SecurityEventLog.class)).handleValidationFailure(exception);
 
         // then
         assertThat(sharedAppender.list).singleElement().satisfies(event -> {
@@ -220,7 +223,8 @@ class AdviceLoggingTest {
                 unreadableBody("{\"courtNumber\":\"" + rejectedValue + "\"}");
 
         // when
-        new SharedExceptionHandler(mock(ProblemTraceReference.class)).handleUnreadableBody(exception);
+        new SharedExceptionHandler(mock(ProblemTraceReference.class),
+                mock(org.courtside.shared.SecurityEventLog.class)).handleUnreadableBody(exception);
 
         // then
         assertThat(sharedAppender.list).singleElement().satisfies(event -> {

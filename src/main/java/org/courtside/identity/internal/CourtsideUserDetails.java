@@ -1,12 +1,13 @@
 package org.courtside.identity.internal;
 
+import org.courtside.shared.SecurityEventPrincipal;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 
 import java.util.List;
 import java.util.UUID;
 
-public final class CourtsideUserDetails extends User {
+public final class CourtsideUserDetails extends User implements SecurityEventPrincipal {
 
     private final UUID accountId;
     private final long securityEpoch;
@@ -20,6 +21,11 @@ public final class CourtsideUserDetails extends User {
     }
 
     public UUID accountId() {
+        return accountId;
+    }
+
+    @Override
+    public UUID securityEventAccountId() {
         return accountId;
     }
 

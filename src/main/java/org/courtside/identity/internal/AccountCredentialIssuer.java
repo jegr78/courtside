@@ -1,12 +1,12 @@
 package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.courtside.identity.AccountSessions;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.CredentialIssuer;
 import org.courtside.shared.IssuedCredential;
+import org.courtside.shared.SecurityEventLog;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +16,6 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 class AccountCredentialIssuer implements CredentialIssuer {
@@ -26,6 +25,7 @@ class AccountCredentialIssuer implements CredentialIssuer {
     private final UserAccountRepository accounts;
     private final AccountSessions sessions;
     private final PasswordEncoder passwordEncoder;
+    private final SecurityEventLog securityEvents;
     private final SecureRandom random = new SecureRandom();
 
     @Override
@@ -41,7 +41,8 @@ class AccountCredentialIssuer implements CredentialIssuer {
         String credential = generated();
         account.credentialsIssued(passwordEncoder.encode(credential), expiresAt);
         sessions.endFor(account.getUsername());
-        log.info("Issued a credential for account {}", accountId);
+        securityEvents.credentialChangedAfterCommit(accountId, null,
+                SecurityEventLog.CredentialChange.TEMPORARY_CREDENTIAL_ISSUED);
         return new IssuedCredential(address,
                 account.getPerson().getFirstName(), account.getLocale(),
                 account.getUsername(), credential, expiresAt);

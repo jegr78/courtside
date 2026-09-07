@@ -3,6 +3,7 @@ package org.courtside.booking.internal;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.identity.Role;
+import org.courtside.shared.SecurityEventLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -15,6 +16,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.courtside.card.testfixture.CardTestFixture.bookingCardAllowing;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -22,6 +24,8 @@ class CardEligibilityPolicyTest {
 
     @Mock
     private CardService cards;
+    @Mock
+    private SecurityEventLog securityEvents;
 
     @Test
     void givenAnUnknownCard_whenRequiringEligibility_thenTheTypedUnknownFailureIsRaised() {
@@ -70,6 +74,7 @@ class CardEligibilityPolicyTest {
         // when / then
         assertThatThrownBy(() -> policy().requireEligible(card.getId(), Set.of(Role.MEMBER)))
                 .isInstanceOf(CardRoleRequiredException.class);
+        verify(securityEvents).authorizationDeniedForCurrentAccount();
     }
 
     @Test
@@ -86,6 +91,6 @@ class CardEligibilityPolicyTest {
     }
 
     private CardEligibilityPolicy policy() {
-        return new CardEligibilityPolicy(cards);
+        return new CardEligibilityPolicy(cards, securityEvents);
     }
 }

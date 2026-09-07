@@ -3,6 +3,7 @@ package org.courtside.identity.internal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.SecurityEventLog;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.event.AbstractAuthenticationFailureEvent;
 import org.springframework.security.authentication.event.AuthenticationFailureBadCredentialsEvent;
@@ -20,15 +21,12 @@ import java.util.UUID;
 class SignInFailureLog {
 
     private final UserAccountRepository accounts;
+    private final SecurityEventLog securityEvents;
 
     @EventListener
     void on(AbstractAuthenticationFailureEvent event) {
         // Observing a refusal must not turn it into a different answer than the one it earned.
-        accountOf(event)
-                .ifPresentOrElse(id -> log.info("A sign-in was refused as {} for account {}",
-                                reasonOf(event), id),
-                        () -> log.info("A sign-in was refused as {} for a username nothing is stored under",
-                                reasonOf(event)));
+        securityEvents.authenticationFailed(accountOf(event).orElse(null), reasonOf(event));
     }
 
     private Optional<UUID> accountOf(AbstractAuthenticationFailureEvent event) {
@@ -42,13 +40,15 @@ class SignInFailureLog {
         }
     }
 
-    private static String reasonOf(AbstractAuthenticationFailureEvent event) {
+    private static SecurityEventLog.AuthenticationFailure reasonOf(AbstractAuthenticationFailureEvent event) {
         return switch (event) {
-            case AuthenticationFailureBadCredentialsEvent ignored -> "BAD_CREDENTIALS";
-            case AuthenticationFailureDisabledEvent ignored -> "DISABLED";
-            case AuthenticationFailureLockedEvent ignored -> "LOCKED";
-            case AuthenticationFailureCredentialsExpiredEvent ignored -> "CREDENTIALS_EXPIRED";
-            default -> event.getClass().getSimpleName();
+            case AuthenticationFailureBadCredentialsEvent ignored ->
+                    SecurityEventLog.AuthenticationFailure.BAD_CREDENTIALS;
+            case AuthenticationFailureDisabledEvent ignored -> SecurityEventLog.AuthenticationFailure.DISABLED;
+            case AuthenticationFailureLockedEvent ignored -> SecurityEventLog.AuthenticationFailure.LOCKED;
+            case AuthenticationFailureCredentialsExpiredEvent ignored ->
+                    SecurityEventLog.AuthenticationFailure.CREDENTIALS_EXPIRED;
+            default -> SecurityEventLog.AuthenticationFailure.OTHER;
         };
     }
 }

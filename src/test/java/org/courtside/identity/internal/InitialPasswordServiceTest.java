@@ -6,6 +6,7 @@ import org.courtside.identity.Person;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.SecurityEventLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -19,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,6 +31,7 @@ class InitialPasswordServiceTest {
     @Mock private PasswordEncoder encoder;
     @Mock private AccountSessions sessions;
     @Mock private PasswordPolicy policy;
+    @Mock private SecurityEventLog securityEvents;
 
     @Test
     void givenActiveSessions_whenChangingTheInitialPassword_thenTheyAreEnded() {
@@ -39,13 +42,16 @@ class InitialPasswordServiceTest {
         when(currentUser.requireAccount()).thenReturn(account);
         when(encoder.encode("new-permanent-password")).thenReturn("new-hash");
         when(accounts.changeInitialPassword(account.getId(), "new-hash")).thenReturn(1);
-        InitialPasswordService service = new InitialPasswordService(currentUser, accounts, encoder, sessions, policy);
+        InitialPasswordService service = new InitialPasswordService(
+                currentUser, accounts, encoder, sessions, policy, securityEvents);
 
         // when
         service.change("new-permanent-password");
 
         // then
         verify(sessions).endFor("admin");
+        verify(securityEvents).credentialChangedAfterCommit(account.getId(), account.getId(),
+                SecurityEventLog.CredentialChange.PERMANENT_PASSWORD_REPLACED);
     }
 
     @Test
@@ -57,13 +63,15 @@ class InitialPasswordServiceTest {
         when(currentUser.requireAccount()).thenReturn(account);
         when(encoder.encode("new-permanent-password")).thenReturn("new-hash");
         when(accounts.changeInitialPassword(account.getId(), "new-hash")).thenReturn(0);
-        InitialPasswordService service = new InitialPasswordService(currentUser, accounts, encoder, sessions, policy);
+        InitialPasswordService service = new InitialPasswordService(
+                currentUser, accounts, encoder, sessions, policy, securityEvents);
 
         // when / then
         assertThatThrownBy(() -> service.change("new-permanent-password"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("The initial password was already changed");
         verify(accounts).changeInitialPassword(account.getId(), "new-hash");
+        verifyNoInteractions(securityEvents);
     }
 
     // The policy has to answer before anything is written, or a refused password would still have
@@ -78,7 +86,8 @@ class InitialPasswordServiceTest {
         doThrow(new GuessablePasswordException())
                 .when(policy).requireUnguessable("q1w2e3r4t5y6", account);
         InitialPasswordService service =
-                new InitialPasswordService(currentUser, accounts, encoder, sessions, policy);
+                new InitialPasswordService(
+                        currentUser, accounts, encoder, sessions, policy, securityEvents);
 
         // when / then
         assertThatThrownBy(() -> service.change("q1w2e3r4t5y6"))
@@ -86,5 +95,6 @@ class InitialPasswordServiceTest {
         verify(encoder, never()).encode(any());
         verify(accounts, never()).changeInitialPassword(any(), any());
         verify(sessions, never()).endFor(any());
+        verifyNoInteractions(securityEvents);
     }
 }

@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.courtside.shared.SecurityEventLog;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -32,6 +33,9 @@ class LoginAttemptFilterTest {
     @Mock
     private FilterChain chain;
 
+    @Mock
+    private SecurityEventLog securityEvents;
+
     private final RequestMatcher loginEndpoint = request -> true;
 
     @Test
@@ -49,6 +53,8 @@ class LoginAttemptFilterTest {
         // then
         verify(handler).handle(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.eq(Duration.ofSeconds(1)));
+        verify(securityEvents).controlRefused(null,
+                SecurityEventLog.ControlRefusal.LOGIN_VERIFICATION_CAPACITY);
         verify(chain, never()).doFilter(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
     }
@@ -75,7 +81,7 @@ class LoginAttemptFilterTest {
     }
 
     private LoginAttemptFilter filter(LoginVerificationCapacity capacity) {
-        return new LoginAttemptFilter(loginEndpoint, protection, capacity, handler);
+        return new LoginAttemptFilter(loginEndpoint, protection, capacity, handler, securityEvents);
     }
 
     private static LoginVerificationCapacity capacity(int permits) {

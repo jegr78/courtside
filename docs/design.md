@@ -1397,6 +1397,10 @@ management.tracing.sampling.probability=${COURTSIDE_TRACING_SAMPLING_PROBABILITY
 The OpenTelemetry SDK remains active when export is disabled. That keeps local trace context and
 log correlation available without making network calls. ECS logs remain on standard output for the
 container runtime or a collector to ingest; Courtside does not send logs through a second exporter.
+The versioned event catalogue and operator boundary are documented in
+[`security-events.md`](security-events.md). Security events use stable codes and typed fields for
+authentication, authorization, session and security-control decisions. They contain immutable
+account IDs where an account is known, never submitted identifiers or request content.
 
 **JavaMelody is not used** — it does not fit the OTLP model and offers nothing Actuator plus
 Micrometer does not do better.
@@ -1440,8 +1444,9 @@ shipping to one central instance running Grafana, Loki and Prometheus, alongside
 Admin and Uptime Kuma. Clubs that want no monitoring at all rely on the system check plus an
 uptime ping.
 
-**Logs must never contain personal data** — no names, email addresses or IBANs. Log the
-`user_account_id`, not the user. Log retention: 30 days.
+**Logs must never contain personal data** — no names, email addresses or IBANs. Security events name
+known accounts only by immutable account ID. Courtside defines no log-retention period: storage,
+access, retention, alerting and escalation belong to the operator of each installation.
 
 ---
 
@@ -1944,8 +1949,9 @@ deliver the implementation.
 
 - **Deletion concept as a scheduled job**, configurable: bookings are pseudonymised X
   months after season end (utilisation statistics survive, the personal reference does
-  not); inactive accounts deleted after departure plus retention period; login logs after
-  90 days.
+  not); inactive accounts deleted after departure plus retention period. Application and security
+  logs leave through standard output, so their retention belongs to the operator rather than this
+  job.
 - **The audit log is covered by that job rather than exempt from it.** `domain_event` is
   append-only and is never rewritten to erase somebody: it holds ids and values that are not
   personal, so removing the person the id names is what makes the entry anonymous. What the log
