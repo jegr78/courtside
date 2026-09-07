@@ -1,3 +1,46 @@
+{
+	auto_https disable_redirects
+}
+
+http://:80 {
+	@mailHostname host {$COURTSIDE_MAIL_HOSTNAME}
+	handle @mailHostname {
+		header {
+			Cache-Control "no-store"
+			Content-Security-Policy "base-uri 'none'"
+			-Location
+			-Server
+			-Via
+		}
+		respond 404
+	}
+	@browserNavigation {
+		host {$COURTSIDE_DOMAIN}
+		method GET HEAD
+		path / /courts /login /initial-password /my-bookings /my-messages /admin /admin/* /index.html /assets/* /icon.svg /manifest.webmanifest /sw.js /workbox-*.js
+	}
+	handle @browserNavigation {
+		header {
+			Cache-Control "no-store"
+			Content-Security-Policy "base-uri 'none'"
+			-Server
+			-Via
+		}
+		redir https://{$COURTSIDE_DOMAIN}{uri} permanent
+	}
+	handle {
+		header {
+			Cache-Control "no-store"
+			Content-Security-Policy "base-uri 'none'"
+			-Location
+			-Server
+			-Set-Cookie
+			-Via
+		}
+		respond "Plain HTTP is not accepted." 400
+	}
+}
+
 {$COURTSIDE_DOMAIN} {
 	encode zstd gzip
 
@@ -6,6 +49,7 @@
 	}
 
 	header {
+		+Content-Security-Policy "base-uri 'none'"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
@@ -38,6 +82,7 @@
 # here answers a browser: the block exists so that the certificate does.
 {$COURTSIDE_MAIL_HOSTNAME} {
 	header {
+		Content-Security-Policy "base-uri 'none'"
 		-Server
 		-Via
 	}

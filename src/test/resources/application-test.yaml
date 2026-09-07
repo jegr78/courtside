@@ -1,4 +1,5 @@
 courtside:
+  environment: DEVELOPMENT
   mail:
     host: localhost
     port: 2525

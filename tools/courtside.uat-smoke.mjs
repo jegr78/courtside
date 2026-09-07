@@ -50,7 +50,7 @@ function sessionHeaders(jar, headers = {}) {
 }
 
 function mutationHeaders(jar, headers = {}) {
-  return sessionHeaders(jar, { "X-XSRF-TOKEN": decodeURIComponent(jar.get("XSRF-TOKEN")), ...headers });
+  return sessionHeaders(jar, { "X-XSRF-TOKEN": decodeURIComponent(jar.get("__Host-XSRF-TOKEN")), ...headers });
 }
 
 async function requestWithCookies(jar, options) {
@@ -79,18 +79,92 @@ function futureBookingSlot() {
   return { startsAt: startsAt.toISOString(), endsAt: new Date(startsAt.getTime() + 3_600_000).toISOString() };
 }
 
+function assertPlaintextRefusal(response) {
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.body, "Plain HTTP is not accepted.");
+  assert.equal(response.headers.location, undefined);
+  assert.equal(response.headers["set-cookie"], undefined);
+  assert.equal(response.headers.server, undefined);
+  assert.equal(response.headers.via, undefined);
+  assert.equal(response.headers["cache-control"], "no-store");
+  assert.match(response.headers["content-security-policy"], /base-uri 'none'/);
+}
+
+function assertHostCookie(cookie, name, { httpOnly, expired = false }) {
+  assert.ok(cookie?.startsWith(`${name}=`));
+  const attributes = new Map(cookie.split(";").slice(1).map((part) => {
+    const [attribute, ...value] = part.trim().split("=");
+    return [attribute.toLowerCase(), value.join("=")];
+  }));
+  assert.equal(attributes.get("path"), "/");
+  assert.equal(attributes.get("samesite"), "Lax");
+  assert.equal(attributes.has("secure"), true);
+  assert.equal(attributes.has("httponly"), httpOnly);
+  assert.equal(attributes.has("domain"), false);
+  if (expired) assert.equal(attributes.get("max-age"), "0");
+}
+
+function assertNoLegacyAuthenticationCookies(response) {
+  for (const cookie of response.headers["set-cookie"] ?? []) {
+    assert.doesNotMatch(cookie, /^(?:SESSION|XSRF-TOKEN)=/);
+  }
+}
+
 try {
   const password = newBootstrapPassword();
   const permanentPassword = newBootstrapPassword();
+  const plaintextCredential = "plaintext-credential-canary";
+  const plaintextBody = "plaintext-body-canary";
   const version = process.env.COURTSIDE_UAT_VERSION;
   const startArguments = ["uat", "--no-credential-output", ...(version ? ["--version", version] : ["--skip-verify"])];
   cli(startArguments, { ...process.env, COURTSIDE_UAT_BOOTSTRAP_PASSWORD: password });
   const appBefore = composeRun("ps", "-q", "app");
-  const appStartedBefore = JSON.parse(run("docker", ["inspect", appBefore]))[0].State.StartedAt;
   const image = composeRun("images", "app", "--format", "json");
   const accountCount = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from user_account");
   const localCa = composeRun("exec", "-T", "proxy", "cat", "/data/caddy/pki/authorities/local/root.crt");
-  const redirect = await localRequest({ secure: false, port: 8081, path: "/api/session" });
+  composeRun("stop", "app");
+  const redirect = await localRequest({ secure: false, port: 8081, path: "/login?from=smoke" });
+  const headRedirect = await localRequest({
+    secure: false, port: 8081, path: "/courts?from=head", method: "HEAD"
+  });
+  const hostileRedirect = await localRequest({
+    secure: false, port: 8081, path: "/courts", headers: { Host: "attacker.example", Accept: "text/html" }
+  });
+  const plaintextRefusals = await Promise.all([
+    localRequest({
+      secure: false, port: 8081, path: "/api/session",
+      headers: { Accept: "text/html", Authorization: `Bearer ${plaintextCredential}` }
+    }),
+    localRequest({
+      secure: false, port: 8081, path: "/api/session", method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Mode": "navigate" },
+      body: `username=admin&password=${plaintextCredential}`
+    }),
+    localRequest({
+      secure: false, port: 8081, path: "/api/admin/import", method: "POST",
+      headers: { "Content-Type": "multipart/form-data; boundary=courtside-smoke" },
+      body: `--courtside-smoke\r\nContent-Disposition: form-data; name="file"\r\n\r\n${plaintextBody}\r\n`
+        + "--courtside-smoke--\r\n"
+    }),
+    localRequest({ secure: false, port: 8081, path: "/api/public/courts", method: "QUERY" }),
+    localRequest({
+      secure: false, port: 8081, path: "/login", method: "POST",
+      headers: { Accept: "text/html", "X-Forwarded-Proto": "https" }, body: plaintextBody
+    })
+  ]);
+  assert.equal(redirect.statusCode, 301);
+  assert.equal(redirect.headers.location, "https://localhost:8443/login?from=smoke");
+  assert.equal(redirect.headers.server, undefined);
+  assert.equal(redirect.headers.via, undefined);
+  assert.equal(redirect.headers["cache-control"], "no-store");
+  assert.match(redirect.headers["content-security-policy"], /base-uri 'none'/);
+  assert.equal(headRedirect.statusCode, 301);
+  assert.equal(headRedirect.headers.location, "https://localhost:8443/courts?from=head");
+  assert.equal(headRedirect.body, "");
+  assertPlaintextRefusal(hostileRedirect);
+  plaintextRefusals.forEach(assertPlaintextRefusal);
+  composeRun("up", "-d", "--wait", "app", "proxy");
+  const appStartedBefore = JSON.parse(run("docker", ["inspect", appBefore]))[0].State.StartedAt;
   const session = await localRequest({ secure: true, port: 8443, path: "/api/session", ca: localCa });
   const frontend = await localRequest({ secure: true, port: 8443, path: "/", ca: localCa });
   const apiUi = await localRequest({ secure: true, port: 8443, path: "/api-ui/", ca: localCa });
@@ -99,8 +173,9 @@ try {
   const sharedApiUi = await localRequest({ secure: false, port: 8083, path: "/api-ui/" });
   const sharedApiDocument = await localRequest({ secure: false, port: 8083, path: "/api/openapi.yaml" });
   const sharedActuator = await localRequest({ secure: false, port: 8083, path: "/actuator/health" });
-  const csrfCookie = sharedSession.headers["set-cookie"].find((cookie) => cookie.startsWith("XSRF-TOKEN="));
-  const csrfToken = csrfCookie.match(/^XSRF-TOKEN=([^;]+)/)[1];
+  const csrfCookie = sharedSession.headers["set-cookie"]
+    .find((cookie) => cookie.startsWith("__Host-XSRF-TOKEN="));
+  const csrfToken = csrfCookie.match(/^__Host-XSRF-TOKEN=([^;]+)/)[1];
   const login = await localRequest({
     secure: false,
     port: 8083,
@@ -108,19 +183,18 @@ try {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      "Cookie": `XSRF-TOKEN=${csrfToken}`,
+      "Cookie": `__Host-XSRF-TOKEN=${csrfToken}`,
       "X-XSRF-TOKEN": csrfToken
     },
     body: `username=admin&password=${password}`
   });
 
-  assert.equal(redirect.statusCode, 301);
-  assert.equal(redirect.headers.location, "https://localhost:8443/api/session");
   assert.equal(session.statusCode, 200);
   assert.equal(frontend.statusCode, 200);
   assert.match(frontend.body, /<div id="root"><\/div>/);
   assert.equal(apiUi.statusCode, 200);
   assert.match(apiUi.body, /Swagger UI/);
+  assert.match(apiUi.headers["content-security-policy"], /base-uri 'none'/);
   assert.equal(apiDocument.statusCode, 200);
   assert.match(apiDocument.body, /^openapi: 3\.1\.0/m);
   assert.equal(sharedSession.statusCode, 200);
@@ -131,10 +205,13 @@ try {
   assert.equal(sharedSession.headers["x-robots-tag"], "noindex, nofollow");
   assert.equal(sharedSession.headers.via, undefined);
   assert.match(sharedSession.headers["content-security-policy"], /img-src 'self' https:;/);
+  assert.match(sharedSession.headers["content-security-policy"], /base-uri 'none'/);
   assert.doesNotMatch(sharedSession.headers["content-security-policy"], /(?:http:|data:)/);
-  assert.match(csrfCookie, /; Secure/i);
+  assertHostCookie(csrfCookie, "__Host-XSRF-TOKEN", { httpOnly: false });
   assert.equal(login.statusCode, 200);
-  assert.match(login.headers["set-cookie"].find((cookie) => cookie.startsWith("SESSION=")), /; Secure; HttpOnly/i);
+  assertHostCookie(login.headers["set-cookie"].find((cookie) => cookie.startsWith("__Host-SESSION=")),
+    "__Host-SESSION", { httpOnly: true });
+  [session, sharedSession, login].forEach(assertNoLegacyAuthenticationCookies);
   assert.notEqual(accountCount, "0");
 
   const cookies = new Map();
@@ -205,6 +282,9 @@ try {
     path: "/api/session/logout", method: "POST", headers: mutationHeaders(cookies)
   });
   assert.equal(logout.statusCode, 204);
+  assertHostCookie(logout.headers["set-cookie"].find((cookie) => cookie.startsWith("__Host-SESSION=")),
+    "__Host-SESSION", { httpOnly: true, expired: true });
+  assertNoLegacyAuthenticationCookies(logout);
   const loggedOutSession = await requestWithCookies(cookies, { path: "/api/session" });
   assert.equal(JSON.parse(loggedOutSession.body).authenticated, false);
 
@@ -224,7 +304,8 @@ try {
 
   const logs = composeRun("logs", "--no-color", "app", "proxy");
   assert.match(logs, /Graceful shutdown complete/);
-  assert.doesNotMatch(logs, new RegExp(`${password}|${permanentPassword}`));
+  assert.doesNotMatch(logs,
+    new RegExp(`${password}|${permanentPassword}|${plaintextCredential}|${plaintextBody}`));
   writeFileSync(join(build, "qualification.json"), `${JSON.stringify({
     schemaVersion: 1,
     status: "passed",

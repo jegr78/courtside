@@ -109,7 +109,7 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     throw unsupported();
   }
   if (["10010", "10054"].includes(pluginId)) {
-    if (param !== "XSRF-TOKEN" || evidence !== "Set-Cookie: XSRF-TOKEN" || otherInfo !== "") {
+    if (param !== "__Host-XSRF-TOKEN" || evidence !== "Set-Cookie: __Host-XSRF-TOKEN" || otherInfo !== "") {
       throw unsupported();
     }
     return { kind: "cookie-attribute", cookieName: "xsrf-token",
@@ -155,10 +155,10 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     return { kind: "application-signal", signal: "scripts-without-links" };
   }
   if (pluginId === "10112") {
-    const tokenNames = otherInfo.split("\n").map((line) => /^cookie:(SESSION|XSRF-TOKEN)$/.exec(line)?.[1])
-      .filter(Boolean).map((name) => name === "SESSION" ? "session" : "xsrf-token").toSorted();
-    const expected = param === "SESSION" ? "SESSION" : param === "XSRF-TOKEN" ? "XSRF-TOKEN" : null;
-    const expectedToken = expected === "SESSION" ? "session" : expected === "XSRF-TOKEN" ? "xsrf-token" : null;
+    const tokenNames = otherInfo.split("\n").map((line) => /^cookie:(__Host-SESSION|__Host-XSRF-TOKEN)$/.exec(line)?.[1])
+      .filter(Boolean).map((name) => name === "__Host-SESSION" ? "session" : "xsrf-token").toSorted();
+    const expected = param === "__Host-SESSION" ? "__Host-SESSION" : param === "__Host-XSRF-TOKEN" ? "__Host-XSRF-TOKEN" : null;
+    const expectedToken = expected === "__Host-SESSION" ? "session" : expected === "__Host-XSRF-TOKEN" ? "xsrf-token" : null;
     if (!expected || evidence !== expected || tokenNames.length === 0
         || tokenNames.length !== otherInfo.split("\n").length || !tokenNames.includes(expectedToken)) {
       throw unsupported();
@@ -261,23 +261,27 @@ export function buildPassiveDeploymentEvidence({
 export function evaluatePublicResponseHeaders(response) {
   const contentSecurityPolicy = response.headers.get("content-security-policy") ?? "";
   const permissionsPolicy = response.headers.get("permissions-policy") ?? "";
-  const parsedDirectives = contentSecurityPolicy.split(";").map((directive) => directive.trim())
-    .filter(Boolean).map((directive) => directive.split(/\s+/).map((part) => part.toLowerCase()));
   const expectedDirectives = new Map([
     ["default-src", ["'self'"]], ["object-src", ["'none'"]],
     ["img-src", ["'self'", "https:"]], ["style-src", ["'self'"]],
     ["script-src", ["'self'"]], ["connect-src", ["'self'"]],
     ["manifest-src", ["'self'"]], ["worker-src", ["'self'"]],
-    ["frame-ancestors", ["'none'"]], ["base-uri", ["'self'"]],
+    ["frame-ancestors", ["'none'"]], ["base-uri", ["'none'"]],
     ["form-action", ["'self'"]]
   ]);
-  const cspValid = parsedDirectives.length === expectedDirectives.size
-    && new Set(parsedDirectives.map(([name]) => name)).size === expectedDirectives.size
-    && parsedDirectives.every(([name, ...sources]) => {
+  const policies = contentSecurityPolicy.split(/,\s*(?=[a-z][a-z-]*\s)/i)
+    .map((policy) => policy.split(";").map((directive) => directive.trim()).filter(Boolean)
+      .map((directive) => directive.split(/\s+/).map((part) => part.toLowerCase())));
+  const expectedPolicy = (directives) => directives.length === expectedDirectives.size
+    && new Set(directives.map(([name]) => name)).size === expectedDirectives.size
+    && directives.every(([name, ...sources]) => {
       const expectedSources = expectedDirectives.get(name);
       return expectedSources !== undefined && sources.length === expectedSources.length
         && expectedSources.every((source) => sources.includes(source));
     });
+  const basePolicy = (directives) => JSON.stringify(directives) === JSON.stringify([["base-uri", "'none'"]]);
+  const cspValid = policies.some(expectedPolicy)
+    && policies.every((policy) => expectedPolicy(policy) || basePolicy(policy));
   const passed = securityHeaders.every((header) => response.headers.has(header))
     && response.headers.get("x-content-type-options") === "nosniff"
     && response.headers.get("x-frame-options") === "DENY"
@@ -405,7 +409,7 @@ export async function runPassiveDeploymentAssessment(plan, context) {
   control.beforeRequest();
   const oversized = await passiveRequest(plan.target, "/api/session", {
     method: "POST", headers: { "content-type": "application/json", "content-length": String(2 * 1024 * 1024 + 1),
-      cookie: `XSRF-TOKEN=${csrf.cookie}`, "x-xsrf-token": csrf.header },
+      cookie: `__Host-XSRF-TOKEN=${csrf.cookie}`, "x-xsrf-token": csrf.header },
     ca: context.ca, signal: control.signal, timeoutMilliseconds: control.remainingMilliseconds()
   });
   requestCount++;
@@ -579,8 +583,8 @@ function csrfToken(origin, ca, control) {
       timeout: Math.max(1, Math.min(10_000, control.remainingMilliseconds())) }, (response) => {
       response.resume();
       response.once("end", () => {
-        const cookie = (response.headers["set-cookie"] ?? []).find((value) => value.startsWith("XSRF-TOKEN="));
-        const encoded = /^XSRF-TOKEN=([^;]+)/.exec(cookie ?? "")?.[1];
+        const cookie = (response.headers["set-cookie"] ?? []).find((value) => value.startsWith("__Host-XSRF-TOKEN="));
+        const encoded = /^__Host-XSRF-TOKEN=([^;]+)/.exec(cookie ?? "")?.[1];
         if (!encoded) reject(new Error("The proxy issued no CSRF cookie for the body-limit probe"));
         else resolve({ cookie: encoded, header: decodeURIComponent(encoded) });
       });

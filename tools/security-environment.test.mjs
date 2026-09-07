@@ -370,7 +370,7 @@ thread.join()
 
 test("given scanner diagnostics, when reporting a failed run, then session material is removed", () => {
   // given
-  const cookie = "SESSION=opaque-session; XSRF-TOKEN=opaque-csrf";
+  const cookie = "__Host-SESSION=opaque-session; __Host-XSRF-TOKEN=opaque-csrf";
 
   // when
   const diagnostic = authenticatedZapDiagnostic(

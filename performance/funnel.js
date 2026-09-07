@@ -73,7 +73,7 @@ function publicApiJourney() {
     "GET /api/public/booking-grid", readLatency);
   const session = http.get(`${target}/api/session`, { tags: { journey: "session" } });
   if (record(session, 200, "GET /api/session", readLatency)) {
-    verify(session, "session creates CSRF cookie", response => Boolean(response.cookies["XSRF-TOKEN"]?.length));
+    verify(session, "session creates CSRF cookie", response => Boolean(response.cookies["__Host-XSRF-TOKEN"]?.length));
   }
 }
 

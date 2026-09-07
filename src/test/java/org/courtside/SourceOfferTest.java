@@ -53,7 +53,7 @@ class SourceOfferTest extends AbstractIntegrationTest {
                 .as("where the corresponding source can be obtained")
                 .startsWith("http");
         assertThat(JsonPath.<String>read(body, "$.environment"))
-                .isEqualTo("PRODUCTION");
+                .isEqualTo("DEVELOPMENT");
     }
 
     @Test

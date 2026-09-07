@@ -34,8 +34,8 @@ const canaryRetestChronology = {
 
 test("given the pinned authenticated policy, when rendering role plans, then active rules stay curated", () => {
   // when
-  const member = renderAuthenticatedZapPlan("MEMBER", "SESSION=synthetic; XSRF-TOKEN=synthetic");
-  const trainer = renderAuthenticatedZapPlan("TRAINER", "SESSION=synthetic; XSRF-TOKEN=synthetic");
+  const member = renderAuthenticatedZapPlan("MEMBER", "__Host-SESSION=synthetic; __Host-XSRF-TOKEN=synthetic");
+  const trainer = renderAuthenticatedZapPlan("TRAINER", "__Host-SESSION=synthetic; __Host-XSRF-TOKEN=synthetic");
 
   // then
   assert.equal(authenticatedZapPolicy.image, zapImage);
@@ -118,7 +118,7 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
     now: () => new Date("2026-08-21T08:00:00.000Z"),
     attempt: 1,
     maxRequests: 1000,
-    authenticateRole: async (role) => ({ cookieHeader: `SESSION=secret-${role}`, requestCount: 3 }),
+    authenticateRole: async (role) => ({ cookieHeader: `__Host-SESSION=secret-${role}`, requestCount: 3 }),
     runZap: async (_selectedPlan, input) => ({
       reports: [report], requestCount: 70, runtimeHardened: true,
       roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
@@ -180,7 +180,7 @@ test("given the seeded canary remains after remediation, when assessing, then th
     now: () => new Date("2026-08-21T08:00:00.000Z"),
     attempt: 1,
     maxRequests: 1000,
-    authenticateRole: async (role) => ({ cookieHeader: `SESSION=secret-${role}`, requestCount: 3 }),
+    authenticateRole: async (role) => ({ cookieHeader: `__Host-SESSION=secret-${role}`, requestCount: 3 }),
     runZap: async (_selectedPlan, input) => ({
       reports: [report], requestCount: 70, runtimeHardened: true,
       roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
@@ -205,7 +205,7 @@ test("given a changed executed plan, when assessing, then the evidence fails clo
     deadline: new Date(Date.now() + 60_000),
     attempt: 1,
     maxRequests: 1000,
-    authenticateRole: async (role) => ({ cookieHeader: `SESSION=secret-${role}`, requestCount: 3 }),
+    authenticateRole: async (role) => ({ cookieHeader: `__Host-SESSION=secret-${role}`, requestCount: 3 }),
     runZap: async (_selectedPlan, input) => ({
       reports: [], requestCount: 70, runtimeHardened: true,
       roles: Object.keys(input.sessions), generatedDataMegabytes: 0,

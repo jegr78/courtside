@@ -21,7 +21,8 @@ import {
 
 export const authenticatedZapPolicy = Object.freeze(JSON.parse(readFileSync(
   new URL("../security/zap-authenticated-policy.json", import.meta.url), "utf8")));
-export const authenticatedZapPlanSessionPlaceholder = "SESSION=[SYNTHETIC]; XSRF-TOKEN=[SYNTHETIC]";
+export const authenticatedZapPlanSessionPlaceholder =
+  "__Host-SESSION=[SYNTHETIC]; __Host-XSRF-TOKEN=[SYNTHETIC]";
 
 export function authenticatedZapPolicyDigest(policy = authenticatedZapPolicy) {
   return `sha256:${createHash("sha256").update(JSON.stringify(policy)).digest("hex")}`;
@@ -83,7 +84,7 @@ jobs:
 
 export function renderAuthenticatedZapPlan(role, cookieHeader) {
   assertRole(role);
-  if (typeof cookieHeader !== "string" || !cookieHeader.includes("SESSION=")) {
+  if (typeof cookieHeader !== "string" || !cookieHeader.includes("__Host-SESSION=")) {
     throw new Error("Authenticated ZAP requires a synthetic session cookie");
   }
   const active = authenticatedZapPolicy.active.roles.includes(role);
@@ -404,7 +405,7 @@ export async function runAuthenticatedZapAssessment(plan, context) {
         : await authenticateSyntheticRole(plan, context, control, role);
       nativeRequests += authenticated.requestCount;
       if (authenticated.requestCount !== 3 || nativeRequests > context.maxRequests
-          || !authenticated.cookieHeader?.includes("SESSION=")) {
+          || !authenticated.cookieHeader?.includes("__Host-SESSION=")) {
         throw new Error(`Authenticated ZAP lost the synthetic ${role} session`);
       }
       sessions[role] = authenticated.cookieHeader;

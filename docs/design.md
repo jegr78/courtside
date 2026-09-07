@@ -1464,8 +1464,11 @@ whether it is built or designed. **Designed means absent today.**
   observer must average many samples to see a few milliseconds through network jitter, and rate
   limiting (below) counts every attempt before the password is checked, instance-wide as well as per
   address. The population shrinks on its own, since each sign-in removes one account from it.
-- **Sessions:** server-side via Spring Session in the database, delivered as an
-  `HttpOnly` / `Secure` / `SameSite=Lax` cookie. How many an account may hold at a time is the
+- **Sessions:** server-side via Spring Session in the database. HTTPS uses the host-bound
+  `__Host-SESSION` cookie with `HttpOnly`, `Secure`, `Path=/`, no `Domain` and `SameSite=Lax`;
+  the readable double-submit token is `__Host-XSRF-TOKEN` under the same host boundary. Local
+  plain HTTP uses explicit unprefixed development names because a conforming browser rejects a
+  `__Host-` cookie without `Secure`. How many sessions an account may hold at a time is the
   deployment's to set, five by default, and a sign-in past that is not refused — it succeeds and
   ends the least recently active session or sessions, whose stored rows go with them, so a member is
   never locked out by a device out of reach. Sign-ins that arrive at the same moment can pass the
@@ -1475,8 +1478,8 @@ whether it is built or designed. **Designed means absent today.**
   role still ends every session of the account at once. A store that refuses one of these deletions
   does not fail the sign-in that caused it; the bound slides by one until the next one. Two expiries
   bound one, and they are different promises: an inactivity window of 30 minutes that every request
-  restarts, and an absolute lifetime
-  of 24 hours counted from when the session began, which activity does not extend. Both are the
+  restarts, and an absolute lifetime of 24 hours counted from when the session began, which activity
+  does not extend. Both are the
   deployment's to set, both are stated rather than inherited from a framework default that can move,
   and an absolute lifetime shorter than the inactivity window is refused at startup because the
   window could then never be reached. Neither may fall below a minute, so that a value meant as a
@@ -1582,7 +1585,14 @@ whether it is built or designed. **Designed means absent today.**
   `Referrer-Policy: strict-origin-when-cross-origin` on its own responses. For a request it
   recognizes as secure, Spring Security also sets `Strict-Transport-Security`. Caddy repeats
   nosniff, frame denial and the referrer policy at the edge, sets HSTS independently and terminates
-  TLS; `Permissions-Policy` is the only response policy here that comes only from Caddy. An operator
+  TLS; `Permissions-Policy` is the only response policy here that comes only from Caddy. The CSP
+  denies every document base with `base-uri 'none'`. Caddy adds that narrow policy to every proxied
+  response as a separately enforced CSP; it does not replace the application's complete policy.
+  Plain HTTP redirects only safe requests for known browser routes to the configured canonical
+  origin. API, management, unknown-method and state-changing requests receive a fixed `400` at the
+  edge without forwarding or reflection. This routing is based on method and path, never on
+  client-controlled browser headers. Disabling Caddy's automatic redirects leaves its certificate
+  automation and ACME handling enabled. An operator
   without a public address can use Tailscale Funnel instead. When it supplies the trusted HTTPS
   forwarding signal, the response keeps all five application headers and loses only Caddy's
   `Permissions-Policy`. Funnel is documented as an option, not a dependency.

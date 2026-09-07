@@ -77,6 +77,18 @@ cosign verify \
 The image also carries an SBOM and provenance attestation:
 `docker buildx imagetools inspect ghcr.io/jegr78/courtside:<version> --format '{{ json .SBOM }}'`.
 
+## Plain HTTP clients
+
+The reference proxy redirects only `GET` and `HEAD` requests for known browser routes to the
+canonical HTTPS origin. API, management, unknown-method and state-changing requests over plain
+HTTP receive a fixed `400` response at Caddy. They are not forwarded and their headers or bodies
+are not reflected. Configure API clients with an `https://` base URL before sending credentials or
+content; following a redirect cannot make bytes already sent over HTTP confidential.
+
+Caddy's automatic certificate management remains enabled. Only its blanket HTTP redirect is
+disabled so the explicit browser-route and refusal policy can run; ACME challenges remain Caddy's
+responsibility.
+
 ## Without a public IP address
 
 A club with no static address, no server and no budget still needs its instance reachable.
@@ -528,7 +540,7 @@ default.
 | `COURTSIDE_MAIL_RELAY_TARGET` | `mail` | Where the relay test connects. The service on the compose network by default, because a host seldom reaches its own published port from inside a container. |
 | `COURTSIDE_MAIL_MEMORY` | `512m` | Memory ceiling for the mail server, which is the one container taking unauthenticated traffic from the internet. |
 | `COURTSIDE_MEMORY` | `1g` | Memory ceiling for the application container. |
-| `COURTSIDE_COOKIE_SECURE` | `true` | Sends the session cookie over HTTPS only. Lower it only for a local test. |
+| `COURTSIDE_COOKIE_SECURE` | `true` | Forces host-bound `__Host-SESSION` and `__Host-XSRF-TOKEN` cookies with `Secure` and `Path=/`. Lower it only for local development or a controlled test environment; production refuses to start. HTTPS requests still receive the host-bound policy, while a plain HTTP request then uses the explicit `SESSION` / `XSRF-TOKEN` test names without `Secure`. |
 | `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` | `20` | Login attempts allowed per source address and window. |
 | `COURTSIDE_LOGIN_ADDRESS_WINDOW` | `1m` | Counting window for a source address. |
 | `COURTSIDE_LOGIN_ADDRESS_BLOCK` | `1m` | Temporary source-address block duration. |

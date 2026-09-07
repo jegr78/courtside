@@ -21,6 +21,10 @@ class ReferenceDeploymentSecurityTest {
             "(?m)^\\{\\$COURTSIDE_DOMAIN} \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern UAT_PUBLIC_SITE_BLOCK = Pattern.compile(
             "(?m)^https://localhost:443 \\{\\R(?<body>(?:.*\\R)*?)^}$");
+    private static final Pattern PRODUCTION_PLAINTEXT_SITE_BLOCK = Pattern.compile(
+            "(?m)^http://:80 \\{\\R(?<body>(?:.*\\R)*?)^}$");
+    private static final Pattern UAT_PLAINTEXT_SITE_BLOCK = Pattern.compile(
+            "(?m)^http://:80 \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern HEADER_BLOCK = Pattern.compile(
             "(?m)^\\theader \\{\\R(?<fields>(?:\\t\\t.*\\R)*)\\t}$");
 
@@ -210,7 +214,41 @@ class ReferenceDeploymentSecurityTest {
         String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
 
         // then
-        assertThat(caddyfile).doesNotContain("Content-Security-Policy");
+        assertThat(caddyfile)
+                .contains("+Content-Security-Policy \"base-uri 'none'\"")
+                .doesNotContain("Content-Security-Policy \"default-src");
+    }
+
+    @Test
+    void whenReadingPublicPlaintextListeners_thenOnlyKnownSafeNavigationsRedirect() throws IOException {
+        // given
+        String production = Files.readString(Path.of("deploy/Caddyfile"));
+        String uat = Files.readString(Path.of("deploy/Caddyfile.uat"));
+
+        // when / then
+        for (var source : List.of(
+                new PlaintextSource(production, PRODUCTION_PLAINTEXT_SITE_BLOCK,
+                        "https://{$COURTSIDE_DOMAIN}{uri}"),
+                new PlaintextSource(uat, UAT_PLAINTEXT_SITE_BLOCK, "https://localhost:8443{uri}"))) {
+            Matcher site = source.pattern().matcher(source.caddyfile());
+            assertThat(site.find()).isTrue();
+            assertThat(site.group("body"))
+                    .contains("method GET HEAD", "path / /courts /login", source.redirectTarget(),
+                            "respond \"Plain HTTP is not accepted.\" 400",
+                            "Content-Security-Policy \"base-uri 'none'\"",
+                            "-Location", "-Set-Cookie", "-Server", "-Via")
+                    .doesNotContain("reverse_proxy", "{host}", "header Accept", "header User-Agent",
+                            "header Sec-Fetch");
+            assertThat(source.caddyfile())
+                    .startsWith("{\n\tauto_https disable_redirects\n}")
+                    .doesNotContain("auto_https off", "auto_https disable_certs");
+        }
+        assertThat(production)
+                .contains("@mailHostname host {$COURTSIDE_MAIL_HOSTNAME}")
+                .contains("{$COURTSIDE_MAIL_HOSTNAME} {");
+    }
+
+    private record PlaintextSource(String caddyfile, Pattern pattern, String redirectTarget) {
     }
 
     @Test

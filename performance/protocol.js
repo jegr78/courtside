@@ -50,9 +50,9 @@ function username() {
 }
 
 function csrfToken(response) {
-  const token = response?.cookies?.["XSRF-TOKEN"]?.findLast(cookie => cookie.value)?.value;
+  const token = response?.cookies?.["__Host-XSRF-TOKEN"]?.findLast(cookie => cookie.value)?.value;
   if (token) csrf = decodeURIComponent(token);
-  const cookie = http.cookieJar().cookiesForURL(target)["XSRF-TOKEN"]?.[0];
+  const cookie = http.cookieJar().cookiesForURL(target)["__Host-XSRF-TOKEN"]?.[0];
   return cookie ? decodeURIComponent(cookie) : csrf;
 }
 

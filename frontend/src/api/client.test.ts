@@ -7,8 +7,11 @@ const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   server.resetHandlers();
   document.cookie = "XSRF-TOKEN=; Max-Age=0";
+  document.cookie = "__Host-XSRF-TOKEN=; Max-Age=0";
   unauthenticatedListeners.forEach((listener) =>
     window.removeEventListener("courtside:unauthenticated", listener));
   unauthenticatedListeners.length = 0;
@@ -91,6 +94,20 @@ it("given a CSRF cookie, when logging out, then the token is echoed in the heade
   document.cookie = "XSRF-TOKEN=test-token";
   server.use(http.post("/api/session/logout", ({ request }) => {
     expect(request.headers.get("X-XSRF-TOKEN")).toBe("test-token");
+    return new HttpResponse(null, { status: 204 });
+  }));
+
+  // when / then
+  await expect(api.logout()).resolves.toBeUndefined();
+});
+
+it("given an HTTPS host-bound CSRF cookie and a legacy collision, when logging out, then only the host-bound token is used", async () => {
+  // given
+  vi.stubGlobal("location", new URL("https://courtside.test/login"));
+  vi.spyOn(document, "cookie", "get")
+    .mockReturnValue("XSRF-TOKEN=legacy-token; __Host-XSRF-TOKEN=host-token");
+  server.use(http.post("/api/session/logout", ({ request }) => {
+    expect(request.headers.get("X-XSRF-TOKEN")).toBe("host-token");
     return new HttpResponse(null, { status: 204 });
   }));
 

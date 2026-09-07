@@ -1,5 +1,6 @@
 :8080 {
 	header {
+		+Content-Security-Policy "base-uri 'none'"
 		-Via
 	}
 	@unknownMethod {

@@ -89,10 +89,10 @@ test("stored values remain data across roles without entering browser storage or
   expect(authenticated.sessionStorageKeys).toEqual([]);
   expect(authenticated.storageContainsSensitiveData).toBe(false);
   expect(authenticated.cookies).toContainEqual({
-    name: "SESSION", httpOnly: true, secure: false, sameSite: "Lax", path: "/"
+    name: "__Host-SESSION", httpOnly: true, secure: true, sameSite: "Lax", path: "/"
   });
   expect(authenticated.cookies).toContainEqual({
-    name: "XSRF-TOKEN", httpOnly: false, secure: false, sameSite: "Lax", path: "/"
+    name: "__Host-XSRF-TOKEN", httpOnly: false, secure: true, sameSite: "Lax", path: "/"
   });
 
   // when

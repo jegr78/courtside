@@ -918,6 +918,10 @@ test("given the local API collection, when reading tracked requests, then secret
   assert.match(uatEnvironment, /baseUrl: https:\/\/localhost:8443/);
   assert.doesNotMatch(`${devEnvironment}\n${uatEnvironment}`, /password|token/i);
   assert.match(csrfRequest, /bru\.setVar\("csrfToken"/);
+  assert.match(csrfRequest, /\^__Host-XSRF-TOKEN=/);
+  assert.match(csrfRequest, /\^XSRF-TOKEN=/);
+  assert.match(loginRequest, /\^__Host-XSRF-TOKEN=/);
+  assert.match(loginRequest, /\^XSRF-TOKEN=/);
   assert.match(loginRequest, /X-XSRF-TOKEN: \{\{csrfToken\}\}/);
   assert.match(loginRequest, /username: \{\{username\}\}/);
   assert.match(loginRequest, /password: \{\{password\}\}/);
@@ -1155,7 +1159,12 @@ test("given UAT persistence, when reading its Compose contract, then data, CA, T
   assert.match(databaseOverride, /127\.0\.0\.1:5433:5432/);
   assert.match(compose, /caddy-data:\/data/);
   assert.match(compose, /db:\/var\/lib\/postgresql\/data/);
+  assert.match(caddy, /auto_https disable_redirects/);
+  assert.match(caddy, /method GET HEAD/);
+  assert.match(caddy, /path \/ \/courts \/login/);
   assert.match(caddy, /redir https:\/\/localhost:8443\{uri\} permanent/);
+  assert.match(caddy, /respond "Plain HTTP is not accepted\." 400/);
+  assert.doesNotMatch(caddy, /auto_https (?:off|disable_certs)/);
   assert.doesNotMatch(localCaddy, /Strict-Transport-Security/);
   assert.doesNotMatch(compose, /demo/);
 });

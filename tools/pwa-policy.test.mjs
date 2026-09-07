@@ -26,8 +26,10 @@ test("given supported desktop browsers, when qualifying a pull request, then Chr
   assert.match(playwright, /name: "chromium"/);
   assert.match(playwright, /supported-browser\\\.spec\\\.ts/);
   assert.doesNotMatch(pom, /playwright install/);
-  // One project stays on the plain origin, so the club that serves Courtside without TLS is covered.
-  assert.match(playwright, /name: "webkit-core".*metadata: \{ plainOrigin: true \}/);
+  assert.match(playwright, /name: "webkit-core".*use: \{ browserName: "webkit"/);
+  assert.doesNotMatch(playwright, /name: "webkit-core".*metadata: \{ plainOrigin: true \}/);
+  // Firefox's periodic process cannot use the shared local CA, so it retains the explicit HTTP path.
+  assert.match(playwright, /name: "firefox-periodic".*metadata: \{ plainOrigin: true \}/);
   assert.match(fixtures, /project\.metadata\.plainOrigin === true/);
   assert.match(supported, /isSecureContext\)\)\.toBe\(overTls\)/);
   assert.match(supported, /typeof crypto\.randomUUID === "function"\)\)\.toBe\(overTls\)/);

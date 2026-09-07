@@ -10,7 +10,7 @@
       "additionalProperties": false,
       "required": ["name", "httpOnly", "secure", "sameSite", "path"],
       "properties": {
-        "name": { "enum": ["SESSION", "XSRF-TOKEN"] },
+        "name": { "enum": ["__Host-SESSION", "__Host-XSRF-TOKEN"] },
         "httpOnly": { "type": "boolean" },
         "secure": { "type": "boolean" },
         "sameSite": { "enum": ["Lax", "Strict", "None"] },

@@ -13,9 +13,10 @@ get {
 script:post-response {
   const headers = res.getHeader("set-cookie");
   const cookies = Array.isArray(headers) ? headers : [headers];
-  const csrfCookie = cookies.filter((cookie) => /^XSRF-TOKEN=[^;]/.test(cookie ?? "")).pop();
-  if (!csrfCookie) throw new Error("The response did not set an XSRF-TOKEN cookie");
-  bru.setVar("csrfToken", csrfCookie.slice("XSRF-TOKEN=".length).split(";", 1)[0]);
+  const csrfCookie = cookies.find((cookie) => /^__Host-XSRF-TOKEN=[^;]/.test(cookie ?? ""))
+    ?? cookies.find((cookie) => /^XSRF-TOKEN=[^;]/.test(cookie ?? ""));
+  if (!csrfCookie) throw new Error("The response did not set a supported CSRF cookie");
+  bru.setVar("csrfToken", csrfCookie.slice(csrfCookie.indexOf("=") + 1).split(";", 1)[0]);
 }
 
 tests {

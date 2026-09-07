@@ -44,6 +44,8 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
                 .andExpect(header().string("Content-Security-Policy",
                         allOf(containsString("default-src 'self'"),
                                 containsString("img-src 'self' https:"),
+                                containsString("base-uri 'none'"),
+                                not(containsString("base-uri 'self'")),
                                 not(containsString("http:")),
                                 not(containsString("data:")))));
     }

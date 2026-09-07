@@ -34,13 +34,13 @@ async function cookieFacts(response: import("@playwright/test").Response): Promi
     });
 }
 
-function expectIssuedCookie(cookie: CookieFacts, name: "SESSION" | "XSRF-TOKEN") {
+function expectIssuedCookie(cookie: CookieFacts, name: string, secure: boolean) {
   expect(cookie).toEqual({
     name,
     path: "/",
     sameSite: "Lax",
-    secure: false,
-    httpOnly: name === "SESSION",
+    secure,
+    httpOnly: name.endsWith("SESSION"),
     maxAge: null,
     isEmpty: false
   });
@@ -48,25 +48,28 @@ function expectIssuedCookie(cookie: CookieFacts, name: "SESSION" | "XSRF-TOKEN")
 
 async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.goto("/login");
+  const secure = new URL(page.url()).protocol === "https:";
+  const sessionName = secure ? "__Host-SESSION" : "SESSION";
+  const csrfName = secure ? "__Host-XSRF-TOKEN" : "XSRF-TOKEN";
   await page.getByTestId("username").fill(username);
   await page.getByTestId("password").fill("temporary-password");
   const allocationResponses = allocationResponseWaiter(page, 7);
   const sessionResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/session") && response.request().method() === "POST");
   const csrfResponse = page.waitForResponse(async (response) =>
-    (await cookieFacts(response)).some((cookie) => cookie.name === "XSRF-TOKEN" && !cookie.isEmpty));
+    (await cookieFacts(response)).some((cookie) => cookie.name === csrfName && !cookie.isEmpty));
   try {
     await page.getByTestId("login-submit").click();
     const response = await sessionResponse;
     expect(response.status()).toBe(200);
-    const sessionCookie = (await cookieFacts(response)).find((cookie) => cookie.name === "SESSION");
+    const sessionCookie = (await cookieFacts(response)).find((cookie) => cookie.name === sessionName);
     expect(sessionCookie).toBeDefined();
-    expectIssuedCookie(sessionCookie!, "SESSION");
+    expectIssuedCookie(sessionCookie!, sessionName, secure);
     await allocationResponses.completion;
     const csrfCookie = (await cookieFacts(await csrfResponse))
-      .find((cookie) => cookie.name === "XSRF-TOKEN" && !cookie.isEmpty);
+      .find((cookie) => cookie.name === csrfName && !cookie.isEmpty);
     expect(csrfCookie).toBeDefined();
-    expectIssuedCookie(csrfCookie!, "XSRF-TOKEN");
+    expectIssuedCookie(csrfCookie!, csrfName, secure);
     await expect(page.getByTestId("my-bookings-link")).toBeVisible();
     await expect(page.getByTestId("court-plan-legend")).toBeVisible();
   } finally {
@@ -123,9 +126,12 @@ test("a member can navigate the core signed-in journey", async ({ page }) => {
   await page.getByTestId("logout").click();
   const response = await logoutResponse;
   expect(response.status()).toBe(204);
+  const secure = new URL(page.url()).protocol === "https:";
   expect(await cookieFacts(response)).toEqual(expect.arrayContaining([
-    { name: "SESSION", path: "/", sameSite: "Lax", secure: false, httpOnly: true, maxAge: "0", isEmpty: true },
-    { name: "XSRF-TOKEN", path: "/", sameSite: "Lax", secure: false, httpOnly: false, maxAge: null, isEmpty: true }
+    { name: secure ? "__Host-SESSION" : "SESSION", path: "/", sameSite: "Lax", secure,
+      httpOnly: true, maxAge: "0", isEmpty: true },
+    { name: secure ? "__Host-XSRF-TOKEN" : "XSRF-TOKEN", path: "/", sameSite: "Lax", secure,
+      httpOnly: false, maxAge: null, isEmpty: true }
   ]));
   await expect(page.getByTestId("my-bookings-page")).not.toBeVisible();
   await expect(page.getByTestId("my-bookings-link")).not.toBeVisible();
@@ -181,4 +187,34 @@ test("a member books a court with an idempotency key the browser could generate"
   expect(await response.request().headerValue("X-XSRF-TOKEN")).toBeTruthy();
   expect(await response.request().headerValue("Idempotency-Key"))
     .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+
+test("an expired session cannot turn a supported browser back into an authenticated client", async ({ page, journeyService }) => {
+  // given
+  await signIn(page, "doe.jane");
+  const secure = new URL(page.url()).protocol === "https:";
+  const sessionName = secure ? "__Host-SESSION" : "SESSION";
+  expect((await page.context().cookies()).some((cookie) => cookie.name === sessionName)).toBe(true);
+  await journeyService.executeSql(
+    "UPDATE spring_session SET last_access_time = 0, max_inactive_interval = 1, expiry_time = 1");
+  const sessionResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/session") && response.request().method() === "GET");
+  const expiryResponse = page.waitForResponse(async (response) =>
+    (await cookieFacts(response)).some((cookie) => cookie.name === sessionName
+      && cookie.isEmpty && cookie.maxAge === "0"));
+
+  // when
+  await page.reload();
+
+  // then
+  const response = await sessionResponse;
+  const expiryCookies = await cookieFacts(await expiryResponse);
+  expect(await response.json()).toMatchObject({ authenticated: false });
+  await expect(page.getByTestId("sign-in-link").or(page.getByTestId("login-submit"))).toBeVisible();
+  expect(expiryCookies).toContainEqual({ name: sessionName, path: "/", sameSite: "Lax", secure,
+    httpOnly: true, maxAge: "0", isEmpty: true });
+  expect((await page.context().cookies()).some((cookie) => cookie.name === sessionName)).toBe(false);
+  const names = expiryCookies.map(({ name }) => name);
+  expect(names).not.toContain("SESSION");
+  expect(names).not.toContain("XSRF-TOKEN");
 });

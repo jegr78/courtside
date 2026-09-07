@@ -4,6 +4,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
 
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -21,13 +23,20 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.csrf.DeferredCsrfToken;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
+import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.session.web.http.DefaultCookieSerializer;
+
+import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
@@ -64,6 +73,7 @@ public class SecurityConfiguration {
             UserAccountRepository accounts,
             CourtsideSessionProperties sessionPolicy,
             SessionRegistry sessionRegistry,
+            CookieSerializer sessionCookieSerializer,
             @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
@@ -152,6 +162,8 @@ public class SecurityConfiguration {
                 // nothing but the order they were added here.
                 .addFilterAfter(new AbsoluteSessionLifetimeFilter(sessionPolicy.absoluteLifetime()),
                         SecurityEpochFilter.class)
+                .addFilterAfter(new InvalidSessionCookieFilter(sessionCookieSerializer),
+                        AbsoluteSessionLifetimeFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
                         .logoutSuccessHandler((request, response, authentication) ->
@@ -167,7 +179,7 @@ public class SecurityConfiguration {
                                 "default-src 'self'; object-src 'none'; img-src 'self' https:; "
                                         + "style-src 'self'; script-src 'self'; connect-src 'self'; "
                                         + "manifest-src 'self'; worker-src 'self'; "
-                                        + "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"))
+                                + "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"))
                         .frameOptions(frame -> frame.deny())
                         .referrerPolicy(referrer -> referrer.policy(
                                 ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
@@ -180,12 +192,106 @@ public class SecurityConfiguration {
         return new DisplacingSessionRegistry<>(sessions, accounts);
     }
 
-    static CookieCsrfTokenRepository csrfTokenRepository(boolean secureCookies) {
+    static CsrfTokenRepository csrfTokenRepository(boolean secureCookies) {
+        return new TransportAwareCsrfTokenRepository(secureCookies);
+    }
+
+    @Bean
+    public CookieSerializer configuredSessionCookieSerializer(
+            @Value("${server.servlet.session.cookie.secure}") boolean secureCookies,
+            @Value("${courtside.environment}") String environment) {
+        validateCookiePolicy(secureCookies, environment);
+        return sessionCookieSerializer(secureCookies);
+    }
+
+    static void validateCookiePolicy(boolean secureCookies, String environment) {
+        if (!secureCookies && "PRODUCTION".equalsIgnoreCase(environment)) {
+            throw new IllegalStateException(
+                    "COURTSIDE_COOKIE_SECURE=false is reserved for a non-production local or test environment");
+        }
+    }
+
+    static CookieSerializer sessionCookieSerializer(boolean secureCookies) {
+        return new TransportAwareCookieSerializer(secureCookies);
+    }
+
+    private static CsrfTokenRepository csrfTokenRepositoryFor(boolean secureCookies) {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieName(secureCookies ? "__Host-XSRF-TOKEN" : "XSRF-TOKEN");
         repository.setCookieCustomizer(cookie -> cookie
                 .secure(secureCookies)
                 .sameSite("Lax"));
         return repository;
+    }
+
+    private static final class TransportAwareCookieSerializer implements CookieSerializer {
+
+        private final boolean forceSecure;
+        private final CookieSerializer secure = cookieSerializer("__Host-SESSION", true);
+        private final CookieSerializer local = cookieSerializer("SESSION", false);
+
+        private TransportAwareCookieSerializer(boolean forceSecure) {
+            this.forceSecure = forceSecure;
+        }
+
+        @Override
+        public void writeCookieValue(CookieValue cookieValue) {
+            delegate(cookieValue.getRequest()).writeCookieValue(cookieValue);
+        }
+
+        @Override
+        public List<String> readCookieValues(HttpServletRequest request) {
+            return delegate(request).readCookieValues(request);
+        }
+
+        private CookieSerializer delegate(HttpServletRequest request) {
+            return forceSecure || request.isSecure() ? secure : local;
+        }
+
+        private static CookieSerializer cookieSerializer(String name, boolean secure) {
+            DefaultCookieSerializer serializer = new DefaultCookieSerializer();
+            serializer.setCookieName(name);
+            serializer.setCookiePath("/");
+            serializer.setUseSecureCookie(secure);
+            serializer.setUseHttpOnlyCookie(true);
+            serializer.setSameSite("Lax");
+            return serializer;
+        }
+    }
+
+    private static final class TransportAwareCsrfTokenRepository implements CsrfTokenRepository {
+
+        private final boolean forceSecure;
+        private final CsrfTokenRepository secure = csrfTokenRepositoryFor(true);
+        private final CsrfTokenRepository local = csrfTokenRepositoryFor(false);
+
+        private TransportAwareCsrfTokenRepository(boolean forceSecure) {
+            this.forceSecure = forceSecure;
+        }
+
+        @Override
+        public CsrfToken generateToken(HttpServletRequest request) {
+            return delegate(request).generateToken(request);
+        }
+
+        @Override
+        public void saveToken(CsrfToken token, HttpServletRequest request, HttpServletResponse response) {
+            delegate(request).saveToken(token, request, response);
+        }
+
+        @Override
+        public CsrfToken loadToken(HttpServletRequest request) {
+            return delegate(request).loadToken(request);
+        }
+
+        @Override
+        public DeferredCsrfToken loadDeferredToken(HttpServletRequest request, HttpServletResponse response) {
+            return delegate(request).loadDeferredToken(request, response);
+        }
+
+        private CsrfTokenRepository delegate(HttpServletRequest request) {
+            return forceSecure || request.isSecure() ? secure : local;
+        }
     }
 
     private static boolean hasAuthority(
