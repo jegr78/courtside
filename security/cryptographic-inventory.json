@@ -520,7 +520,7 @@
       ],
       "locations": [
         "deploy/compose*.yaml",
-        "deploy/compose.database-tls.yaml",
+        "deploy/compose.database-tls-local.yaml",
         "src/main/resources/application.yaml",
         "src/main/java/org/courtside/shared/DatabaseTls.java",
         "src/main/java/org/courtside/shared/DatabaseTls*.java"

@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 
 public final class TestPostgres {
 
-    private static final Path OVERLAY = Path.of("deploy", "compose.database-tls.yaml");
+    private static final Path OVERLAY = Path.of("deploy", "compose.database-tls-local.yaml");
     private static final Pattern SERVER_COMMAND =
             Pattern.compile("command: \\[\"sh\", \"-c\", \"(?<script>[^\"]+)\"]");
     private static final Pattern MOUNTED = Pattern.compile(":(?<path>/etc/courtside/server\\.\\w+):ro");

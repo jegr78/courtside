@@ -11,9 +11,10 @@ function repositoryFile(path) {
   return readFileSync(fileURLToPath(new URL(`../${path}`, import.meta.url)), "utf8");
 }
 
-// The verification profiles beside these two are not an operator surface, and documenting their
+// The verification profiles beside these are not an operator surface, and documenting their
 // variables would describe this repository's harness to a club.
-const compose = ["compose.yaml", "compose.database-tls.yaml"].map(deploymentFile).join("\n");
+const compose = ["compose.yaml", "compose.database-tls.yaml", "compose.database-tls-local.yaml"]
+  .map(deploymentFile).join("\n");
 const readme = deploymentFile("README.md");
 const example = deploymentFile(".env.example");
 const properties = repositoryFile("src/main/resources/application.yaml");

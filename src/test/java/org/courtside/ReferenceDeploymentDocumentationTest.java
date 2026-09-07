@@ -141,12 +141,12 @@ class ReferenceDeploymentDocumentationTest {
         return published;
     }
 
-    // The verification profiles beside these two are not an operator surface, and documenting
-    // their variables would describe this repository's harness to a club.
+    // The verification profiles beside these are not an operator surface, and documenting their
+    // variables would describe this repository's harness to a club.
     private static List<String> variablesReadByCompose() throws IOException {
         List<String> variables = new ArrayList<>();
         for (String operatorFacing : List.of("deploy/compose.yaml",
-                "deploy/compose.database-tls.yaml")) {
+                "deploy/compose.database-tls.yaml", "deploy/compose.database-tls-local.yaml")) {
             VARIABLE.matcher(Files.readString(Path.of(operatorFacing))).results()
                     .map(match -> match.group(1))
                     .forEach(variables::add);
