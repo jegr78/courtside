@@ -1917,7 +1917,10 @@ deliver the implementation.
 - **A sign-in session's row goes when the session does.** A session stops working the moment it
   expires, but its row — and the attributes cascading from it, which carry the username, the account
   id, the roles and the security epoch it was signed in with — is deleted on the cadence of
-  `COURTSIDE_SESSION_CLEANUP_CRON`, a minute by default. The stored credential is not among them:
+  `COURTSIDE_SESSION_CLEANUP_CRON`, a minute by default. Both ways of dying are swept on it: the
+  store deletes what passed its inactivity window, and Courtside deletes what passed its absolute
+  lifetime, because the stored expiry is built from the inactivity window alone and a session that
+  died of age and was never used again would otherwise keep its row until that window passed too. The stored credential is not among them:
   it is erased once the account has been authenticated and never reaches the store. The cadence may
   be widened but not switched off, and an instance configured to switch it off refuses to
   start. **Built.**
