@@ -1488,11 +1488,12 @@ whether it is built or designed. **Designed means absent today.**
   operator turns it on.* `courtside.database.tls.mode` is `prefer`, `disable` or `verify-full`.
   `verify-full` requires a certificate that chains to an operator-supplied authority and names the
   host the connection URL names. It refuses to start when that authority is missing, unreadable or
-  holds no certificate, and it refuses to start when the connection URL carries an argument that
-  would override it — the driver lets a URL argument beat the pool's own property, so
-  `?sslmode=disable` would otherwise connect in plaintext with verification configured and say
-  nothing. An unknown, expired or wrong-name certificate is reported at startup as a sentence
-  naming which of the three it was rather than a stack trace; a certificate that expires while the
+  holds no certificate, and it refuses to start when the connection URL or the pool carries something
+  that would decide the transport instead — an `ssl` argument, an `ssl` driver property, or a
+  `service` name that pulls in a file of them. The driver lets a URL argument beat the pool's own
+  property, so `?sslmode=disable` would otherwise connect in plaintext with verification configured
+  and say nothing. An unknown, expired, not-yet-valid or wrong-name certificate is reported at
+  startup as a sentence naming which of the four it was rather than a stack trace; a certificate that expires while the
   instance runs is not diagnosed that way and surfaces as the driver's own error. A replaced
   authority decides the next connection the pool opens, and one that no longer vouches for the
   database refuses rather than falling back.
@@ -1507,7 +1508,10 @@ whether it is built or designed. **Designed means absent today.**
   What bounds it: no database port is published, the network is private to the compose project, and
   both ends live on one machine. It stays accepted rather than closed because requiring a
   certificate means requiring a club to run an authority, which is a larger imposition than the
-  exposure it removes on one host. The reverse proxy's connection to the application is the other
+  exposure it removes on one host. One verification profile disables the transport by name: the
+  `postgres-exporter` in `compose.perf-telemetry.yaml` connects with `sslmode=disable` and carries
+  its own password in that connection string, so requiring a verified connection for the
+  application does not move it. The reverse proxy's connection to the application is the other
   half of this path and carries no encryption yet.
 - **Whether a permanent password is one that has already leaked:** *Designed.* A check against a
   breached-password set, asking with a partial hash so that neither the password nor a reusable

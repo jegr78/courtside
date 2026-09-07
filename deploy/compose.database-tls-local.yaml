@@ -4,5 +4,5 @@ services:
       - ${COURTSIDE_DB_TLS_CERTIFICATE:?set COURTSIDE_DB_TLS_CERTIFICATE in .env}:/etc/courtside/server.crt:ro
       - ${COURTSIDE_DB_TLS_KEY:?set COURTSIDE_DB_TLS_KEY in .env}:/etc/courtside/server.key:ro
     # PostgreSQL refuses to start on a key any user but its own can read, and a read-only mount
-    # cannot be handed over in place, so the copy the server reads is the one it owns.
-    command: ["sh", "-c", "cp /etc/courtside/server.key /tmp/server.key && chown postgres /tmp/server.key && chmod 600 /tmp/server.key && exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/etc/courtside/server.crt -c ssl_key_file=/tmp/server.key"]
+    # cannot be handed over in place, so the copy it reads is installed where only root writes.
+    command: ["sh", "-c", "install -D -o postgres -m 0600 /etc/courtside/server.key /etc/courtside/private/server.key && exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/etc/courtside/server.crt -c ssl_key_file=/etc/courtside/private/server.key"]
