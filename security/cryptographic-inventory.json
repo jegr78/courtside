@@ -509,7 +509,7 @@
       "revocation": "The issuing authority's. Courtside performs no revocation check of its own.",
       "recovery": "An authority file that no longer matches is a refusal, not a loss: the operator restores the right file, or sets the mode back to `prefer`.",
       "retirement": "Encrypting the reverse proxy's connection to the application is the remaining half of this path and is tracked as its own work.",
-      "evidence": "src/test/java/org/courtside/DatabaseTlsTest.java, src/test/java/org/courtside/shared/DatabaseTlsRefusalTest.java, src/test/java/org/courtside/shared/DatabaseTlsMaterialTest.java",
+      "evidence": "src/test/java/org/courtside/DatabaseTlsTest.java, src/test/java/org/courtside/shared/DatabaseTlsTransportTest.java, src/test/java/org/courtside/shared/DatabaseTlsMaterialTest.java",
       "detects": [
         "sslmode",
         "sslrootcert",

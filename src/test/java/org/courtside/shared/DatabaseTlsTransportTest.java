@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-class DatabaseTlsRefusalTest {
+class DatabaseTlsTransportTest {
 
     private static TestCertificate served;
     private static PostgreSQLContainer database;
@@ -118,21 +118,14 @@ class DatabaseTlsRefusalTest {
     // What the preferred mode leaves in place: encryption the driver takes when it is offered,
     // and no verification of who offered it.
     @Test
-    void givenNoConfiguredTransport_whenConnecting_thenTheDriverEncryptsWithoutVerifying()
-            throws Exception {
-        // given
-        Properties unconfigured = new Properties();
-        unconfigured.setProperty("user", database.getUsername());
-        unconfigured.setProperty("password", database.getPassword());
-
+    void givenThePreferredMode_whenTheConfiguredPoolConnects_thenTheDriverEncryptsWithoutVerifying() {
         // when / then
-        try (var connection = DriverManager.getConnection(database.getJdbcUrl(), unconfigured);
-             var statement = connection.createStatement();
-             var rows = statement.executeQuery(
-                     "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()")) {
-            rows.next();
-            assertThat(rows.getBoolean(1)).isTrue();
-        }
+        new ApplicationContextRunner()
+                .withUserConfiguration(DatabaseTlsConfiguration.class)
+                .withBean(HikariDataSource.class, () -> pool(database.getJdbcUrl()))
+                .withPropertyValues("courtside.database.tls.mode=prefer")
+                .run(context -> assertThat(encrypted(context.getBean(HikariDataSource.class)))
+                        .isTrue());
     }
 
     // Through the configuration the application really uses, so the mode this sets has to be the
@@ -152,6 +145,28 @@ class DatabaseTlsRefusalTest {
                 .run(context -> assertThatThrownBy(
                         () -> context.getBean(HikariDataSource.class).getConnection())
                         .hasStackTraceContaining("PgjdbcHostnameVerifier"));
+    }
+
+    // The same database serving the same certificate: what changes is the mode an operator chose.
+    @Test
+    void givenTheDisabledMode_whenTheConfiguredPoolConnects_thenTheConnectionCarriesNoTls() {
+        // when / then
+        new ApplicationContextRunner()
+                .withUserConfiguration(DatabaseTlsConfiguration.class)
+                .withBean(HikariDataSource.class, () -> pool(database.getJdbcUrl()))
+                .withPropertyValues("courtside.database.tls.mode=disable")
+                .run(context -> assertThat(encrypted(context.getBean(HikariDataSource.class)))
+                        .isFalse());
+    }
+
+    private static boolean encrypted(HikariDataSource dataSource) throws SQLException {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.createStatement();
+             var rows = statement.executeQuery(
+                     "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()")) {
+            rows.next();
+            return rows.getBoolean(1);
+        }
     }
 
     private static HikariDataSource pool(String url) {
