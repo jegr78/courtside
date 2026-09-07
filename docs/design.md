@@ -1475,6 +1475,15 @@ whether it is built or designed. **Designed means absent today.**
   choosing it was measured against: nearly every entry is already refused by the length minimum, so
   against a long password the list is the weaker of the two guards and the breached-password check
   below is the one that would carry weight.
+- **What this product does with cryptography, in one list:** every use is recorded in
+  `security/cryptographic-inventory.json` with its purpose, algorithm, the parameters this project
+  chose, its owner as a role, where material lives, and what rotation, revocation, recovery and
+  retirement mean for it. *Built.* A cryptographic call in the source, the workflows or the
+  reference deployment that no entry names fails the build, and an entry naming a file that no
+  longer exists fails it too. The list separates what carries a guarantee from what does not: a
+  booking fingerprint and an artefact digest are content hashes and are never evidence that
+  something was not tampered with. `docs/cryptographic-inventory.md` holds the policy and how an
+  algorithm or a key is replaced without silently weakening what it replaced.
 - **Whether a permanent password is one that has already leaked:** *Designed.* A check against a
   breached-password set, asking with a partial hash so that neither the password nor a reusable
   digest of it leaves the instance, and refusing to set a password while that check cannot run.

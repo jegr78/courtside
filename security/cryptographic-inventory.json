@@ -1,0 +1,312 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "password-hashing",
+      "purpose": "Protect a stored member or administrator password against an attacker who reads the database",
+      "algorithm": "argon2id",
+      "parameters": {
+        "memoryKibibytes": 19456,
+        "iterations": 2,
+        "parallelism": 1,
+        "saltBytes": 16,
+        "hashBytes": 32
+      },
+      "class": "credential-protection",
+      "owner": "club-operator",
+      "storageBoundary": "The instance database, in user_account.password_hash. The salt and the parameters travel inside the encoding; there is no separate key.",
+      "permittedUse": "Verifying a sign-in and re-encoding a stored hash that sits below the current parameters. Never for a digest, an identifier or a signature.",
+      "rotation": "Raising a parameter is the rotation. A stored hash below the current parameters is re-encoded on its owner's next successful sign-in; storing that is best effort, so a database failure leaves the old hash in place rather than failing the login.",
+      "revocation": "Issuing a new credential replaces the hash and ends every session of the account.",
+      "recovery": "None is possible or needed: a hash is not recoverable by design, and a member who cannot sign in is given a new credential.",
+      "retirement": "Argon2id is replaced by encoding new and re-encoded passwords under the successor while the old encoding stays verifiable, which is what the re-encode path already does for a parameter change.",
+      "evidence": "src/test/java/org/courtside/identity/PasswordHashingTest.java, src/test/java/org/courtside/identity/PasswordRehashTest.java",
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+        "src/main/java/org/courtside/identity/internal/InitialPasswordService.java",
+        "src/main/java/org/courtside/identity/internal/PasswordPolicy.java",
+        "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java",
+        "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java",
+        "src/main/java/org/courtside/**/*DataSeeder.java"
+      ]
+    },
+    {
+      "id": "issued-credential",
+      "purpose": "The one-time password an instance mails a member for their first sign-in",
+      "algorithm": "SecureRandom",
+      "parameters": {
+        "entropyBytes": 24,
+        "encoding": "base64url-unpadded"
+      },
+      "class": "credential-protection",
+      "owner": "club-operator",
+      "storageBoundary": "Generated in memory, mailed to the member, and kept only as its Argon2id hash. The plaintext is never written to the database, a log or an administrative screen.",
+      "permittedUse": "One sign-in, after which the account must set a permanent password. It cannot become that permanent password.",
+      "rotation": "Issuing a credential again replaces the previous one and ends every session of the account.",
+      "revocation": "Withdrawing an unused credential clears the hash and its deadline.",
+      "recovery": "None: a lost credential is reissued, never recovered.",
+      "retirement": "Retired with the account, whose deactivation ends its sessions.",
+      "evidence": "src/test/java/org/courtside/identity/PermanentPasswordStrengthTest.java",
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java"
+      ]
+    },
+    {
+      "id": "unusable-password",
+      "purpose": "Give an account with no credential a hash that no input can match, so an absent password is not an empty one",
+      "algorithm": "argon2id",
+      "parameters": {
+        "source": "UUIDv4"
+      },
+      "class": "credential-protection",
+      "owner": "club-operator",
+      "storageBoundary": "In memory only. The value is discarded after encoding; nothing ever needs to reproduce it.",
+      "permittedUse": "Standing in for a credential that does not exist. It is never sent, shown or verified against a member's input successfully.",
+      "rotation": "Not applicable: a new value is generated whenever one is needed.",
+      "revocation": "Not applicable.",
+      "recovery": "None is possible, which is the point.",
+      "retirement": "Replaced with the password hashing entry it shares an algorithm with.",
+      "evidence": "src/test/java/org/courtside/identity/internal/UnusablePasswordTest.java",
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/UnusablePassword.java"
+      ]
+    },
+    {
+      "id": "login-attempt-subject",
+      "purpose": "Count failed sign-ins per username and per address without keeping either in the counter",
+      "algorithm": "SHA-256",
+      "class": "pseudonymisation",
+      "owner": "club-operator",
+      "storageBoundary": "In-memory counters for the lifetime of the process. No key, and nothing written down.",
+      "permittedUse": "Grouping attempts. The digest is not an authenticator and proves nothing about who made an attempt.",
+      "rotation": "Not applicable: no key exists, and the counters do not outlive the process.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed; the counters rebuild themselves.",
+      "retirement": "A successor digest may replace it without migration, because nothing persists.",
+      "evidence": "src/test/java/org/courtside/identity/LoginAttemptProtectionTest.java",
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/LoginAttemptProtection.java"
+      ]
+    },
+    {
+      "id": "booking-request-fingerprint",
+      "purpose": "Recognise a repeated booking request so a retry does not create a second booking",
+      "algorithm": "SHA-256",
+      "class": "content-hash",
+      "owner": "club-operator",
+      "storageBoundary": "The instance database, beside the booking it identifies.",
+      "permittedUse": "Comparing one request to another. It carries no security claim and protects nothing.",
+      "rotation": "Not applicable: no key.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed; a lost fingerprint costs at most a duplicate refusal.",
+      "retirement": "Replaceable with any digest, since nothing outside the instance reads it.",
+      "evidence": "src/test/java/org/courtside/booking/BookingIdempotencyConcurrencyTest.java",
+      "locations": [
+        "src/main/java/org/courtside/booking/BookingRequestFingerprint.java"
+      ]
+    },
+    {
+      "id": "club-logo-digest",
+      "purpose": "Name the stored club logo so a browser can be told whether its copy is current",
+      "algorithm": "SHA-256",
+      "class": "content-hash",
+      "owner": "club-operator",
+      "storageBoundary": "The instance database, and the ETag it becomes.",
+      "permittedUse": "Cache validation. It is not an integrity guarantee against a party that can write the row.",
+      "rotation": "Not applicable: no key.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed; it is recomputed from the image.",
+      "retirement": "Replaceable with any digest; a changed algorithm invalidates caches once.",
+      "evidence": "src/test/java/org/courtside/config/internal/ClubLogoTest.java",
+      "locations": [
+        "src/main/java/org/courtside/config/internal/ClubLogo.java"
+      ]
+    },
+    {
+      "id": "person-fingerprint",
+      "purpose": "Match an imported row against a person already on the roster",
+      "algorithm": "SHA-256",
+      "class": "content-hash",
+      "owner": "club-operator",
+      "storageBoundary": "The instance database, on the imported reference.",
+      "permittedUse": "Deduplicating an import. It is not a pseudonym that may be published, because the input space of a name and a birth date is small enough to search.",
+      "rotation": "Not applicable: no key.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed; it is recomputed from the roster.",
+      "retirement": "A change re-matches every stored reference, so it is made with an import run rather than in place.",
+      "evidence": "src/test/java/org/courtside/dataexchange/PersonFingerprintTest.java",
+      "locations": [
+        "src/main/java/org/courtside/dataexchange/internal/PersonFingerprint.java"
+      ]
+    },
+    {
+      "id": "security-assessment-dataset-digest",
+      "purpose": "Name the seeded assessment dataset so a report says which data it was produced against",
+      "algorithm": "SHA-256",
+      "class": "content-hash",
+      "owner": "repository-maintainer",
+      "storageBoundary": "Computed at runtime from a constant in the image; nothing is stored.",
+      "permittedUse": "Identifying a dataset in a report.",
+      "rotation": "Not applicable: no key.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed; it is recomputed.",
+      "retirement": "Replaceable with any digest.",
+      "evidence": "src/test/java/org/courtside/securityassessment/SecurityAssessmentSafetyTest.java",
+      "locations": [
+        "src/main/java/org/courtside/securityassessment/SecurityAssessmentDataset.java"
+      ]
+    },
+    {
+      "id": "idempotency-key",
+      "purpose": "Give a submitted booking a client-side identity so a retry is recognised",
+      "algorithm": "crypto.getRandomValues",
+      "parameters": {
+        "entropyBytes": 16
+      },
+      "class": "identifier",
+      "owner": "club-operator",
+      "storageBoundary": "The browser, for the life of one submission.",
+      "permittedUse": "Identifying a request. It authenticates nothing, which is why the non-secure-context fallback is acceptable.",
+      "rotation": "Not applicable: every submission generates one.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed.",
+      "retirement": "Replaceable without a migration.",
+      "evidence": "frontend/src/api/idempotency.test.ts",
+      "locations": [
+        "frontend/src/api/idempotency.ts",
+        "frontend/src/api/idempotency.test.ts"
+      ]
+    },
+    {
+      "id": "harness-content-digest",
+      "purpose": "Name an artefact, a configuration or a report the verification harness produced, so two runs can be compared",
+      "algorithm": "SHA-256",
+      "class": "content-hash",
+      "owner": "repository-maintainer",
+      "storageBoundary": "Build output and workflow artefacts. Nothing reaches an instance.",
+      "permittedUse": "Comparing and naming artefacts. No harness digest is a security control, and none is presented as evidence that content was not tampered with by a party who could write it.",
+      "rotation": "Not applicable: no key.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed; a rerun recomputes everything.",
+      "retirement": "Replaceable with any digest.",
+      "evidence": "tools/security-assessment-contract.test.mjs",
+      "locations": [
+        "tools/*.mjs",
+        "deploy/mail-certificate-peer.mjs"
+      ]
+    },
+    {
+      "id": "harness-random-fixture",
+      "purpose": "Give a test run values nothing else uses, such as a scratch database name or a throwaway password",
+      "algorithm": "SecureRandom",
+      "class": "identifier",
+      "owner": "repository-maintainer",
+      "storageBoundary": "The lifetime of one verification run. Nothing is written to a tracked file and nothing reaches an instance.",
+      "permittedUse": "Test fixtures only. No harness value ever becomes an operational credential.",
+      "rotation": "Not applicable: every run generates its own.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed.",
+      "retirement": "Replaceable without a migration.",
+      "evidence": "tools/database-restore.test.mjs",
+      "locations": [
+        "tools/*.mjs"
+      ]
+    },
+    {
+      "id": "release-image-signature",
+      "purpose": "Let anybody verify that a published image was built by this repository's release workflow",
+      "algorithm": "cosign-keyless",
+      "class": "signing",
+      "owner": "repository-maintainer",
+      "storageBoundary": "No long-lived private key exists. Sigstore issues a short-lived certificate against the workflow's OIDC identity and records the signature in a public transparency log.",
+      "permittedUse": "Signing a published image and its attestations. It says which workflow built the image, not that the image is free of defects.",
+      "rotation": "Every signing operation obtains a new short-lived certificate; there is nothing to rotate on a schedule.",
+      "revocation": "Not applicable to a keyless signature. A withdrawn release is deleted and stated as withdrawn.",
+      "recovery": "None is possible or needed: no material can be lost, and a signature can be produced again by re-running the release.",
+      "retirement": "Replaced by changing the signing action, which changes what a verifier is told to expect.",
+      "evidence": ".github/workflows/release.yml, src/test/java/org/courtside/DeploymentImageParityTest.java",
+      "locations": [
+        ".github/workflows/release.yml"
+      ]
+    },
+    {
+      "id": "security-evidence-envelope",
+      "purpose": "Encrypt the protected part of a security assessment so only its custodian can read it",
+      "algorithm": "CMS",
+      "parameters": {
+        "contentEncryption": "AES-256-GCM",
+        "keyEncryption": "RSA-OAEP-SHA-256"
+      },
+      "class": "confidentiality",
+      "owner": "repository-maintainer",
+      "storageBoundary": "The recipient certificate is tracked; its expected fingerprint lives in a GitHub repository variable outside commit history, and the private key never enters this repository. The operational record is .github/security-evidence-key.json, which holds the custodian role and the decrypt-canary window and deliberately no second copy of the fingerprint.",
+      "permittedUse": "Sealing assessment evidence for its custodian. It is not a general-purpose encryption facility and no instance data passes through it.",
+      "rotation": "Replacing the recipient certificate means replacing the tracked certificate and the repository variable, which are separately held on purpose: changing only one blocks sealing rather than sealing to the wrong recipient.",
+      "revocation": "Removing the repository variable blocks sealing at the next run.",
+      "recovery": "A lost private key makes existing envelopes unreadable and cannot be recovered. That is bounded by the decrypt canary, which proves the key is still usable within its recorded window; a canary that cannot be verified is the signal to reseal under a new recipient.",
+      "retirement": "A successor recipient is introduced by sealing to it and letting the canary window of the previous one lapse.",
+      "evidence": ".github/security-evidence-key.json, tools/security-assessment-contract.test.mjs",
+      "locations": [
+        ".github/workflows/security-assessment.yml"
+      ]
+    },
+    {
+      "id": "public-tls",
+      "purpose": "Encrypt and authenticate what a member's browser sends to the instance",
+      "algorithm": "TLS",
+      "class": "transport",
+      "owner": "club-operator",
+      "storageBoundary": "The reverse proxy's own storage in the reference deployment. Courtside neither issues nor holds the material.",
+      "permittedUse": "The public entry point. Courtside does not ship a certificate authority and does not generate production key material.",
+      "rotation": "The proxy obtains and renews certificates itself; an operator supplying their own owns the renewal.",
+      "revocation": "The issuing authority's, and the operator's to request.",
+      "recovery": "A lost certificate is reissued by the authority; nothing in Courtside needs to be recovered with it.",
+      "retirement": "Follows what the proxy supports; Courtside states no cipher list of its own.",
+      "evidence": "deploy/README.md, src/test/java/org/courtside/ReferenceDeploymentSecurityTest.java",
+      "locations": [
+        "deploy/Caddyfile*",
+        "deploy/compose*.yaml"
+      ]
+    },
+    {
+      "id": "mail-relay-tls",
+      "purpose": "Authenticate the mail relay an instance hands its outgoing messages to",
+      "algorithm": "TLS",
+      "class": "transport",
+      "owner": "club-operator",
+      "storageBoundary": "The relay's certificate, read by the instance. No private material belongs to Courtside.",
+      "permittedUse": "Verifying the relay. Trusting an unverified relay certificate is a deliberate, separately named setting rather than a silent fallback.",
+      "rotation": "The relay's own renewal, which the instance observes rather than performs; a certificate whose remaining life falls below the configured share is reported.",
+      "revocation": "The issuing authority's.",
+      "recovery": "A relay that cannot present a usable certificate refuses the connection, and the message stays queued for retry rather than being sent in the clear.",
+      "retirement": "Follows the relay.",
+      "evidence": "src/test/java/org/courtside/notification/internal/MailRelayCertificateTest.java",
+      "locations": [
+        "deploy/mail-certificate.sh",
+        "deploy/mail-check.sh",
+        "deploy/mail-reload.sh",
+        "deploy/mail-certificate-peer.mjs",
+        "deploy/.env.example"
+      ]
+    },
+    {
+      "id": "mail-dkim",
+      "purpose": "Sign outgoing mail so a receiving server can tell it came from the club's domain",
+      "algorithm": "DKIM",
+      "class": "signing",
+      "owner": "club-operator",
+      "storageBoundary": "The mail container's volume in the reference deployment. The public half is a DNS record the operator publishes.",
+      "permittedUse": "Signing the club's own outgoing mail.",
+      "rotation": "The operator publishes a new selector, signs under it, and retires the old record once nothing in flight relies on it.",
+      "revocation": "Removing the DNS record for a selector.",
+      "recovery": "A lost key is replaced by generating a new one under a new selector; no past message needs to be recoverable.",
+      "retirement": "The selector's DNS record is withdrawn after the change has propagated.",
+      "evidence": "deploy/README.md",
+      "locations": [
+        "deploy/mail/*.ndjson",
+        "deploy/.env.example",
+        "deploy/compose.yaml"
+      ]
+    }
+  ]
+}
