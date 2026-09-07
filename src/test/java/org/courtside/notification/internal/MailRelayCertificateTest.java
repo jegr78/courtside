@@ -4,6 +4,7 @@ import jakarta.mail.internet.MimeMessage;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
+import org.courtside.TestCertificate;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -46,11 +47,11 @@ class MailRelayCertificateTest {
     private static final String A_NAME_NOT_ON_IT = "127.0.0.1";
 
     private static GenericContainer<?> relay;
-    private static TestRelayCertificate issued;
+    private static TestCertificate issued;
 
     @BeforeAll
     static void startARelayServingOneNameOfItsOwn() throws Exception {
-        issued = TestRelayCertificate.issuedFor(CERTIFICATE_NAME);
+        issued = TestCertificate.issuedFor(CERTIFICATE_NAME);
         relay = relayServing(issued);
         relay.start();
     }
@@ -131,7 +132,7 @@ class MailRelayCertificateTest {
     void givenNoCertificateException_whenTheRelayCertificateHasRunOut_thenTheRelayIsRefused()
             throws Exception {
         // given
-        TestRelayCertificate spent = TestRelayCertificate.expiredFor(CERTIFICATE_NAME);
+        TestCertificate spent = TestCertificate.expiredFor(CERTIFICATE_NAME);
         try (GenericContainer<?> outdated = relayServing(spent)) {
             outdated.start();
             JavaMailSender sender = senderAnchoredIn(spent.authority(), CERTIFICATE_NAME,
@@ -155,7 +156,7 @@ class MailRelayCertificateTest {
         Path executable = executableFile(directory, "openssl");
 
         // when
-        Path resolved = TestRelayCertificate.executable("openssl", List.of(directory), List.of(""));
+        Path resolved = TestCertificate.executable("openssl", List.of(directory), List.of(""));
 
         // then
         assertThat(resolved).isEqualTo(executable.toAbsolutePath().normalize()).isAbsolute();
@@ -170,7 +171,7 @@ class MailRelayCertificateTest {
 
         // when / then
         try {
-            assertThatThrownBy(() -> TestRelayCertificate.executable("openssl", List.of(directory), List.of("")))
+            assertThatThrownBy(() -> TestCertificate.executable("openssl", List.of(directory), List.of("")))
                     .isInstanceOf(IllegalStateException.class);
         } finally {
             Files.deleteIfExists(executable);
@@ -185,7 +186,7 @@ class MailRelayCertificateTest {
         Path executable = executableFile(directory, "openssl.exe");
 
         // when
-        Path resolved = TestRelayCertificate.executable("openssl", List.of(directory), List.of(".exe"));
+        Path resolved = TestCertificate.executable("openssl", List.of(directory), List.of(".exe"));
 
         // then
         assertThat(resolved).isEqualTo(executable.toAbsolutePath().normalize());
@@ -195,7 +196,7 @@ class MailRelayCertificateTest {
     void givenNoMatchingExecutable_whenResolvingAnExecutable_thenResolutionFailsClosed(
             @TempDir Path directory) {
         // given / when / then
-        assertThatThrownBy(() -> TestRelayCertificate.executable("openssl", List.of(directory), List.of("")))
+        assertThatThrownBy(() -> TestCertificate.executable("openssl", List.of(directory), List.of("")))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -257,7 +258,7 @@ class MailRelayCertificateTest {
         return executable;
     }
 
-    private static GenericContainer<?> relayServing(TestRelayCertificate pair) throws IOException {
+    private static GenericContainer<?> relayServing(TestCertificate pair) throws IOException {
         return new GenericContainer<>(DockerImageName.parse(deployedImage()))
                 .withEnv("MP_SMTP_TLS_CERT", "/etc/mailpit/cert.pem")
                 .withEnv("MP_SMTP_TLS_KEY", "/etc/mailpit/key.pem")

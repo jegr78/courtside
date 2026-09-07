@@ -55,6 +55,9 @@ courtside:
   environment: ${COURTSIDE_ENVIRONMENT:PRODUCTION}
   database:
     lock-timeout: ${COURTSIDE_DB_LOCK_TIMEOUT:5s}
+    tls:
+      mode: ${COURTSIDE_DB_TLS_MODE:prefer}
+      root-certificate: ${COURTSIDE_DB_TLS_ROOT_CERTIFICATE:}
   session:
     absolute-lifetime: ${COURTSIDE_SESSION_ABSOLUTE_LIFETIME:24h}
     concurrent-limit: ${COURTSIDE_SESSION_MAX_CONCURRENT:5}

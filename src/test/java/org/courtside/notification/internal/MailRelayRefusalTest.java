@@ -1,6 +1,7 @@
 package org.courtside.notification.internal;
 
 import jakarta.mail.internet.MimeMessage;
+import org.courtside.TestCertificate;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class MailRelayRefusalTest {
 
     @BeforeAll
     static void startARelayThatRefusesWhatDoesNotExist() throws Exception {
-        TestRelayCertificate issued = TestRelayCertificate.issuedFor("localhost");
+        TestCertificate issued = TestCertificate.issuedFor("localhost");
         relay = new GenericContainer<>(DockerImageName.parse(deployedImage()))
                 .withEnv("MP_SMTP_TLS_CERT", "/etc/mailpit/cert.pem")
                 .withEnv("MP_SMTP_TLS_KEY", "/etc/mailpit/key.pem")

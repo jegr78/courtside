@@ -1,4 +1,4 @@
-package org.courtside.notification.internal;
+package org.courtside;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,33 +18,33 @@ import java.util.stream.Stream;
 
 // The JDK exposes no way to write an X.509 certificate, and adding a library to sign one would be a
 // dependency this repository carries for one test class.
-record TestRelayCertificate(String certificate, String key, String authority) {
+public record TestCertificate(String certificate, String key, String authority) {
 
-    private static final String SUBJECT = "/CN=courtside-relay-under-test";
+    private static final String SUBJECT = "/CN=courtside-service-under-test";
     private static final DateTimeFormatter MOMENT =
             DateTimeFormatter.ofPattern("uuuuMMddHHmmss'Z'").withZone(ZoneOffset.UTC);
 
-    static TestRelayCertificate issuedFor(String name) throws Exception {
+    public static TestCertificate issuedFor(String name) throws Exception {
         Instant now = Instant.now();
         return issued(name, now.minus(Duration.ofHours(1)), now.plus(Duration.ofDays(1)));
     }
 
-    static TestRelayCertificate expiredFor(String name) throws Exception {
+    public static TestCertificate expiredFor(String name) throws Exception {
         Instant ranOut = Instant.now().minus(Duration.ofDays(30));
         return issued(name, ranOut.minus(Duration.ofDays(30)), ranOut);
     }
 
     // Signed by an authority of its own rather than by itself, because a self-signed certificate
     // handed to a caller as its own anchor is one PKIX never checks the validity of.
-    private static TestRelayCertificate issued(String name, Instant from, Instant until)
+    private static TestCertificate issued(String name, Instant from, Instant until)
             throws Exception {
-        Path directory = Files.createTempDirectory("courtside-relay-");
+        Path directory = Files.createTempDirectory("courtside-certificate-");
         try {
             Files.writeString(directory.resolve("index.txt"), "");
             Files.writeString(directory.resolve("serial"), "01\n");
             Files.writeString(directory.resolve("authority.cnf"), authorityConfiguration(name));
             openssl(directory, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
-                    "-subj", "/CN=courtside-relay-authority-under-test",
+                    "-subj", "/CN=courtside-authority-under-test",
                     "-keyout", "authority.key", "-out", "authority.pem");
             openssl(directory, "req", "-new", "-newkey", "rsa:2048", "-nodes", "-subj", SUBJECT,
                     "-keyout", "key.pem", "-out", "request.pem");
@@ -54,7 +54,7 @@ record TestRelayCertificate(String certificate, String key, String authority) {
                     "-cert", "authority.pem", "-keyfile", "authority.key",
                     "-in", "request.pem", "-out", "cert.pem", "-notext", "-extensions", "leaf",
                     "-startdate", MOMENT.format(from), "-enddate", MOMENT.format(until));
-            return new TestRelayCertificate(read(directory, "cert.pem"), read(directory, "key.pem"),
+            return new TestCertificate(read(directory, "cert.pem"), read(directory, "key.pem"),
                     read(directory, "authority.pem"));
         } finally {
             discard(directory);
@@ -96,7 +96,7 @@ record TestRelayCertificate(String certificate, String key, String authority) {
                 .directory(directory.toFile()).redirectErrorStream(true).start();
         String output = new String(openssl.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         if (openssl.waitFor() != 0) {
-            throw new IllegalStateException("Could not issue the relay certificate: " + output);
+            throw new IllegalStateException("Could not issue the test certificate: " + output);
         }
     }
 
@@ -108,7 +108,7 @@ record TestRelayCertificate(String certificate, String key, String authority) {
         }
     }
 
-    static Path executable(String name) {
+    public static Path executable(String name) {
         String searchPath = System.getenv("PATH");
         if (searchPath == null || searchPath.isBlank()) {
             throw new IllegalStateException("PATH does not name an OpenSSL executable");
@@ -120,7 +120,7 @@ record TestRelayCertificate(String certificate, String key, String authority) {
         return executable(name, directories, executableExtensions());
     }
 
-    static Path executable(String name, List<Path> directories, List<String> extensions) {
+    public static Path executable(String name, List<Path> directories, List<String> extensions) {
         return directories.stream()
                 .filter(Path::isAbsolute)
                 .flatMap(directory -> extensions.stream().map(extension -> directory.resolve(name + extension)))
@@ -130,7 +130,7 @@ record TestRelayCertificate(String certificate, String key, String authority) {
                 .orElseThrow(() -> new IllegalStateException("PATH does not name an OpenSSL executable"));
     }
 
-    static List<String> executableExtensions() {
+    public static List<String> executableExtensions() {
         String pathExtensions = System.getenv("PATHEXT");
         if (pathExtensions == null || pathExtensions.isBlank()) {
             return List.of("");

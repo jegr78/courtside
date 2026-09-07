@@ -500,21 +500,30 @@
     {
       "id": "postgres-transport",
       "purpose": "Carry the instance's database traffic, which includes session rows, password hashes and the hashed login subjects",
-      "algorithm": "none",
+      "algorithm": "TLS, when an operator requires it; the driver's own opportunistic default otherwise",
       "class": "transport",
       "owner": "club-operator",
-      "storageBoundary": "The connection between the application container and the database container. It is not encrypted: the reference deployment connects over the compose network without an ssl parameter, and one profile disables it explicitly.",
-      "permittedUse": "Reaching the database over a private container network that no published port exposes. It is not a boundary to cross a machine on: an operator putting the database on another host owns adding TLS to the connection string, and this is recorded as an accepted risk in section 10 of the design specification rather than presented as a protected path.",
-      "rotation": "Not applicable: no material exists.",
-      "revocation": "Not applicable.",
-      "recovery": "Not applicable.",
-      "retirement": "Encrypting this path is a change to the deployment contract rather than to this entry, and is tracked as its own work.",
-      "evidence": "deploy/compose.yaml, src/test/java/org/courtside/ReferenceDeploymentSecurityTest.java",
+      "storageBoundary": "The connection between the application container and the database container, and the operator's own authority file where one is configured. Courtside reads that file and holds no material of its own; the reference deployment ships no certificate and defaults to the driver's opportunistic mode, which encrypts when the database offers it and verifies nothing.",
+      "permittedUse": "Reaching the database. `courtside.database.tls.mode` decides what that means: `prefer` leaves the driver alone, `disable` refuses encryption, and `verify-full` requires a certificate that chains to the configured authority and names the host the connection URL names. Verified mode refuses to start when the authority is missing or unreadable, when the connection URL or the pool carries something that would decide the transport instead, and when no connection pool was configured with it at all.",
+      "rotation": "The operator's, on their own authority and server certificate. Courtside reads the authority file for every new connection, so a replaced file takes effect without a restart and a replaced one that no longer vouches for the database refuses the next connection rather than falling back.",
+      "revocation": "The issuing authority's. Courtside performs no revocation check of its own.",
+      "recovery": "An authority file that no longer matches is a refusal, not a loss: the operator restores the right file, or sets the mode back to `prefer`.",
+      "retirement": "Encrypting the reverse proxy's connection to the application is the remaining half of this path and is tracked as its own work.",
+      "evidence": "src/test/java/org/courtside/DatabaseTlsTest.java, src/test/java/org/courtside/shared/DatabaseTlsTransportTest.java, src/test/java/org/courtside/shared/DatabaseTlsConfigurationTest.java",
       "detects": [
-        "sslmode"
+        "sslmode",
+        "sslrootcert",
+        "root-certificate",
+        "ssl_cert_file",
+        "ssl_key_file",
+        "CertificateFactory"
       ],
       "locations": [
-        "deploy/compose*.yaml"
+        "deploy/compose*.yaml",
+        "deploy/compose.database-tls-local.yaml",
+        "src/main/resources/application.yaml",
+        "src/main/java/org/courtside/shared/DatabaseTls.java",
+        "src/main/java/org/courtside/shared/DatabaseTls*.java"
       ]
     }
   ]

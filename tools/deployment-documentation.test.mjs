@@ -11,7 +11,11 @@ function repositoryFile(path) {
   return readFileSync(fileURLToPath(new URL(`../${path}`, import.meta.url)), "utf8");
 }
 
-const compose = deploymentFile("compose.yaml");
+// The verification profiles beside these are not an operator surface, and documenting their
+// variables would describe this repository's harness to a club.
+const OPERATOR_FACING =
+  ["compose.yaml", "compose.database-tls.yaml", "compose.database-tls-local.yaml"];
+const compose = OPERATOR_FACING.map(deploymentFile).join("\n");
 const readme = deploymentFile("README.md");
 const example = deploymentFile(".env.example");
 const properties = repositoryFile("src/main/resources/application.yaml");
@@ -44,6 +48,23 @@ function announced(script) {
     .map((match) => match[1].replace(/^(?:failed|ok) /, ""));
 }
 
+test("given the two documentation contracts, when both read Compose, then they read the same files",
+  () => {
+    // given
+    const contract = repositoryFile(
+      "src/test/java/org/courtside/ReferenceDeploymentDocumentationTest.java");
+
+    // when
+    const named = [...new Set([...contract
+      .slice(contract.indexOf("variablesReadByCompose"))
+      .matchAll(/"deploy\/(compose[\w.-]*\.yaml)"/g)].map((match) => match[1]))];
+
+    // then
+    assert.deepEqual(named.sort(), [...OPERATOR_FACING].sort(),
+      "both contracts read the operator-facing Compose files, and an overlay added to only one of "
+      + "them narrows the other's gate without failing it");
+  });
+
 test("given the reference deployment, when a variable is read, then it is documented and offered",
   () => {
     // given
@@ -53,18 +74,18 @@ test("given the reference deployment, when a variable is read, then it is docume
 
     // when / then
     assert.ok(interpolated.size > 40,
-      `compose.yaml interpolates only ${interpolated.size} variables`);
+      `the operator-facing Compose files interpolate only ${interpolated.size} variables`);
     for (const variable of interpolated) {
       assert.ok(documented.has(variable),
-        `compose.yaml reads ${variable} and README.md never names it, so an operator can set it `
+        `Compose reads ${variable} and README.md never names it, so an operator can set it `
         + "only by reading the Compose file the documentation is supposed to replace");
       assert.ok(offered.has(variable),
-        `compose.yaml reads ${variable} and .env.example does not offer it`);
+        `Compose reads ${variable} and .env.example does not offer it`);
     }
     for (const variable of offered) {
       assert.ok(interpolated.has(variable),
-        `.env.example offers ${variable} and compose.yaml reads it nowhere, so setting it does `
-        + "nothing");
+        `.env.example offers ${variable} and no operator-facing Compose file reads it, so `
+        + "setting it does nothing");
     }
     // The README says in one sentence which variables it still names after they stopped being read,
     // so the exemption is the documentation's own and not a list kept beside it.
@@ -74,7 +95,7 @@ test("given the reference deployment, when a variable is read, then it is docume
     const read = named(properties, /\$\{(COURTSIDE_[A-Z0-9_]+)/g);
     for (const variable of documented) {
       assert.ok(interpolated.has(variable) || read.has(variable) || retired.has(variable),
-        `README.md names ${variable} and neither compose.yaml nor application.yaml reads it, so it `
+        `README.md names ${variable} and neither Compose nor application.yaml reads it, so it `
         + "documents a variable that does nothing");
     }
   });

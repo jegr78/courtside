@@ -1,0 +1,9 @@
+services:
+  app:
+    # A directory, because a bind mount of one file pins its inode: a rotation that writes a new
+    # file and renames it over the old one would never be seen by this container.
+    volumes:
+      - ${COURTSIDE_DB_TLS_AUTHORITY:?set COURTSIDE_DB_TLS_AUTHORITY in .env}:/etc/courtside/database-tls:ro
+    environment:
+      COURTSIDE_DB_TLS_MODE: verify-full
+      COURTSIDE_DB_TLS_ROOT_CERTIFICATE: /etc/courtside/database-tls/authority.pem

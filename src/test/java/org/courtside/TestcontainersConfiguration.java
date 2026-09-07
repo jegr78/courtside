@@ -40,6 +40,25 @@ class TestcontainersConfiguration {
         return PostgresHolder.INSTANCE;
     }
 
+    static DockerImageName deployedPostgresImage() {
+        return DockerImageName.parse(deployedImage()).asCompatibleSubstituteFor("postgres");
+    }
+
+    // Qualifying against a database a club does not run proves nothing about the one it does,
+    // so the reference is read from the deployment rather than repeated beside it.
+    private static String deployedImage() {
+        try {
+            Matcher found = POSTGRES_IMAGE.matcher(Files.readString(DEPLOYMENT));
+            if (!found.find()) {
+                throw new IllegalStateException(
+                        DEPLOYMENT + " names no PostgreSQL image pinned by digest");
+            }
+            return found.group();
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not read " + DEPLOYMENT, e);
+        }
+    }
+
     private static void createDatabase(PostgreSQLContainer postgres, String database) {
         try (var connection = DriverManager.getConnection(
                 postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
@@ -55,26 +74,9 @@ class TestcontainersConfiguration {
         private static final PostgreSQLContainer INSTANCE = startPostgres();
 
         private static PostgreSQLContainer startPostgres() {
-            PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName
-                    .parse(deployedImage())
-                    .asCompatibleSubstituteFor("postgres"));
+            PostgreSQLContainer postgres = new PostgreSQLContainer(deployedPostgresImage());
             postgres.start();
             return postgres;
-        }
-
-        // Qualifying against a database a club does not run proves nothing about the one it does,
-        // so the reference is read from the deployment rather than repeated beside it.
-        private static String deployedImage() {
-            try {
-                Matcher found = POSTGRES_IMAGE.matcher(Files.readString(DEPLOYMENT));
-                if (!found.find()) {
-                    throw new IllegalStateException(
-                            DEPLOYMENT + " names no PostgreSQL image pinned by digest");
-                }
-                return found.group();
-            } catch (IOException e) {
-                throw new IllegalStateException("Could not read " + DEPLOYMENT, e);
-            }
         }
     }
 

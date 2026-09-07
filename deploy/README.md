@@ -501,6 +501,99 @@ To change the administrator password instead, edit `COURTSIDE_MAIL_ADMIN_PASSWOR
 `mail-configure` again: the plan upserts the account, so it reconciles rather than duplicates.
 
 
+## Encrypting the connection to the database
+
+By default the application reaches PostgreSQL over the compose network with whatever the driver
+chooses, which is `prefer`: encrypted when the database offers it, verified never. No database port
+is published and the network is private to the compose project, so on a single host that is the
+whole story. It stops being the whole story when the database is somewhere else.
+
+`COURTSIDE_DB_TLS_MODE` names what the connection guarantees.
+
+| Mode | What it means |
+|---|---|
+| `prefer` | The default. Courtside configures nothing and the driver encrypts opportunistically without checking who answered. |
+| `disable` | No encryption, stated rather than assumed. |
+| `verify-full` | Encryption is required, the certificate must chain to the authority you configure, and it must name the host the connection URL names. |
+
+### What each side owns
+
+Courtside owns the inputs and what they enforce: it reads your authority file, refuses to start when
+that file is missing, unreadable or holds no certificate, refuses to start when the connection URL
+or the pool carries something that would decide the transport instead, and turns an unknown,
+expired, not-yet-valid or wrong-name certificate into a sentence rather than a stack trace.
+
+You own the rest: which authority issues the certificate, how it is issued, where the private key
+lives, how long it is valid, when it is renewed, how it is revoked and what you do when it is lost.
+Courtside ships no authority and generates no production key material.
+
+There are two overlays, because the application requiring a certificate and this deployment's own
+database serving one are separate decisions.
+
+### Requiring a verified connection
+
+`compose.database-tls.yaml` mounts your authority into the application read-only and pins the mode.
+Name the directory that holds it in `.env`, and call the file inside it `authority.pem`:
+
+```
+COURTSIDE_DB_TLS_AUTHORITY=/srv/courtside/tls/authority
+```
+
+A directory rather than the file itself, because a bind mount of a single file pins the inode it had
+when the container started: renewal that writes a new file and renames it over the old one — which
+is what most renewal does — would leave the container reading the file it first saw.
+
+Put nothing else in that directory. The application container can read everything it holds, and the
+one thing the application needs is the authority. A private key kept beside it — the database's
+own, for instance — would be readable by whatever a flaw in the application can be made to read,
+and whoever holds the database's key can be the database.
+
+```bash
+docker compose -f compose.yaml -f compose.database-tls.yaml up -d
+```
+
+That is the application's side of a database somewhere else. Pointing it at that host is a change
+to `compose.yaml` itself and not a line in `.env`: `SPRING_DATASOURCE_URL` is set literally there,
+and the `app` service waits for the local `db` service through `depends_on`. Edit both, and drop
+the `db` service if this host no longer runs one. The certificate that host serves has to name the
+host the URL names.
+
+Do not put an `ssl` or `gssEncMode` argument, or a `service` name, in that URL, and do not set one
+as a driver property on the pool. Each decides the transport behind the verification — a URL
+argument beats the pool's own configuration, a service name pulls in a file of properties, and GSS
+encryption is negotiated before TLS is — so the application refuses to start rather than let one
+quietly undo it.
+
+### Making this deployment's own database serve one
+
+`compose.database-tls-local.yaml` adds the server side. Issue a certificate whose subject
+alternative name includes `DNS:db` — `db` is the name the application connects to on the compose
+network, and `verify-full` checks exactly that name. Name the pair in `.env`:
+
+```
+COURTSIDE_DB_TLS_CERTIFICATE=/srv/courtside/tls/server/server.crt
+COURTSIDE_DB_TLS_KEY=/srv/courtside/tls/server/server.key
+```
+
+```bash
+docker compose -f compose.yaml -f compose.database-tls.yaml -f compose.database-tls-local.yaml up -d
+```
+
+Both files are mounted read-only, and the overlay installs the key where only root writes under the
+ownership PostgreSQL insists on. Keep the key at `0600` on the host, outside the directory the
+application mounts; nothing but the database ever needs to read it.
+
+### Renewal
+
+Replacing `authority.pem` inside that directory takes effect for the next connection the pool opens,
+without a restart; connections already open keep running until the pool recycles them. A refusal
+after a replacement is a refusal, never a fallback to plaintext. Replacing the database's own
+certificate and key means restarting the `db` service, because the server reads them once at start.
+
+A certificate that expires while the instance is running is not diagnosed the way one that is wrong
+at startup is. The diagnosis is written when the application starts; a pool that later fails to
+reconnect reports the driver's own error in the log.
+
 ## Environment variables
 
 These are a published surface: renaming one is a breaking change, and every optional variable has a
@@ -511,6 +604,11 @@ default.
 | `COURTSIDE_VERSION` | *required* | The release to run, optionally with `@sha256:…`. Pin it. |
 | `POSTGRES_PASSWORD` | *required* | Database password, used only between the containers. |
 | `COURTSIDE_DB_LOCK_TIMEOUT` | `5s` | Maximum time a database operation waits for a conflicting row or advisory lock. A refusal is returned as a retryable `503`; increase this only after diagnosing legitimate contention. Accepted range: `1s` to `1m`. |
+| `COURTSIDE_DB_TLS_MODE` | `prefer` | What the connection to PostgreSQL guarantees: `prefer`, `disable` or `verify-full`. See *Encrypting the connection to the database*. |
+| `COURTSIDE_DB_TLS_AUTHORITY` | *required with `compose.database-tls.yaml`* | Host directory holding `authority.pem`, the certificate authority that issued the database's certificate, and nothing else. The application container reads everything in it. |
+| `COURTSIDE_DB_TLS_ROOT_CERTIFICATE` | *unset* | Path **inside the container** to that authority certificate. `compose.database-tls.yaml` sets it to `/etc/courtside/database-tls/authority.pem`; set it yourself only when running the image without that overlay. |
+| `COURTSIDE_DB_TLS_CERTIFICATE` | *required with `compose.database-tls-local.yaml`* | Host path to the certificate this deployment's own database serves. Its subject alternative name has to include `DNS:db`. |
+| `COURTSIDE_DB_TLS_KEY` | *required with `compose.database-tls-local.yaml`* | Host path to the private key belonging to that certificate. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | *required on an empty account table* | Username of the first local administrator. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
